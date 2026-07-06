@@ -24,8 +24,11 @@ import (
 //  3. Writes attentionDetails[r.ID] into r.AttentionDetails under the matching
 //     FindingCode (the fold-layer re-keying from Resource.ID to FindingCode).
 //
-// Walks ResourceCache, LazyResourceCache, and ProbeResources. Replaces prior
-// wave-2 findings in place while preserving wave-1.
+// Walks ResourceCache and LazyResourceCache in place (both legs stay
+// map-mutation, Stage 3 scope). The RowStore leg (replacing the former
+// session.ProbeResources walk) instead goes through AmendRows' copy-on-write
+// fold (task #17 wave 1 stage 2 — DEF-7's mutate-in-place bug class is
+// exactly what Amend exists to remove; see RowStore.Amend's doc comment).
 func (c *Core) applyEnrichment(
 	resourceType string,
 	findings map[string]domain.Finding,
@@ -52,9 +55,17 @@ func (c *Core) applyEnrichment(
 	if rows, ok := c.session.LazyResourceCache[canon]; ok {
 		apply(rows)
 	}
-	if rows, ok := c.session.ProbeResources[canon]; ok {
-		apply(rows)
-	}
+	c.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
+		if len(rows) == 0 {
+			return rows
+		}
+		out := make([]resource.Resource, len(rows))
+		copy(out, rows)
+		for i := range out {
+			ApplyWave2ToRow(&out[i], td, findings, attentionDetails)
+		}
+		return out
+	})
 }
 
 // ApplyWave2ToRow strips any existing Wave-2 entries from r.Findings, then

@@ -220,18 +220,17 @@ func TestReconcileTypeFile_Wave2SourcedObservation_ClearsCarriedData(t *testing.
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
 
-	// Seed ProbeResources with the CURRENT session's bare Wave-1-observed row
-	// (no findings of its own yet) — mirrors what a live availability sweep
-	// would have populated this session before enrichment ran.
-	// snapshotProbeResourcesForSave (which handleEnrichmentChecked's "all
-	// done" branch calls) reads from ProbeResources — an empty/nil map here
-	// produces a nil save payload and never touches disk at all, which would
-	// trivially (and wrongly) "pass" this test without exercising the
+	// Seed RowStore with the CURRENT session's bare Wave-1-observed row (no
+	// findings of its own yet) — mirrors what a live availability sweep would
+	// have populated this session before enrichment ran.
+	// snapshotRowStoreForSave (which handleEnrichmentChecked's "all done"
+	// branch calls) reads from RowStore — a never-observed type here produces
+	// a nil save payload and never touches disk at all, which would trivially
+	// (and wrongly) "pass" this test without exercising the
 	// Wave-2-completion save path.
-	core.Session().ProbeResources = map[string][]resource.Resource{
-		"s3": {{ID: "s3-bucket-x", Name: "s3-bucket-x", Type: "s3"}},
-	}
-	core.Session().ProbeTruncated = map[string]bool{"s3": false}
+	core.Session().RowStore.Observe("s3", []resource.Resource{
+		{ID: "s3-bucket-x", Name: "s3-bucket-x", Type: "s3"},
+	}, &resource.PaginationMeta{IsTruncated: false}, session.OriginProbe, false)
 
 	// Enrichment queue already drained (EnrichChecked reaches EnrichTotal once
 	// this single result lands) so handleEnrichmentChecked's "all done" branch
@@ -284,11 +283,11 @@ func TestReconcileTypeFile_Wave2SourcedObservation_ClearsCarriedData(t *testing.
 
 // ────────────────────────────────────────────────────────────────────────────
 // Test 3 — in-memory probe-store carry: handleAvailabilityChecked
-// (internal/runtime/handlers_availability.go:278) overwrites
-// session.ProbeResources[canon] with msg.Resources unconditionally. A fresh
-// bare Wave-1 probe result (same IDs, no findings) must not blank the
-// carried wave2 finding + status that a prior enrichment pass wrote into
-// ProbeResources.
+// (internal/runtime/handlers_availability.go) calls ObserveRows(canon,
+// msg.Resources, ...) after carryWave2ForResources folds the previous
+// RowStore rows' Wave-2 data into the fresh probe result. A fresh bare
+// Wave-1 probe result (same IDs, no findings) must not blank the carried
+// wave2 finding + status that a prior enrichment pass wrote into RowStore.
 // ────────────────────────────────────────────────────────────────────────────
 
 func TestHandleAvailabilityChecked_Wave2Carry_ProbeResourcesKeepFindingAndStatus(t *testing.T) {
@@ -311,10 +310,7 @@ func TestHandleAvailabilityChecked_Wave2Carry_ProbeResourcesKeepFindingAndStatus
 			},
 		},
 	}
-	c.Session().ProbeResources = map[string][]resource.Resource{
-		"s3": {enrichedRow},
-	}
-	c.Session().ProbeTruncated = map[string]bool{"s3": false}
+	c.Session().RowStore.Observe("s3", []resource.Resource{enrichedRow}, &resource.PaginationMeta{IsTruncated: false}, session.OriginProbe, false)
 	c.Session().AvailChecked = 0
 	c.Session().AvailTotal = 1
 	c.Session().AvailQueue = nil
@@ -333,22 +329,19 @@ func TestHandleAvailabilityChecked_Wave2Carry_ProbeResourcesKeepFindingAndStatus
 		Gen:          c.AvailabilityGen(),
 	})
 
-	got, ok := c.Session().ProbeResources["s3"]
-	if !ok {
-		t.Fatal("ProbeResources[\"s3\"] missing after handleAvailabilityChecked")
+	snap := c.Session().RowStore.Snapshot("s3")
+	if len(snap.Rows) != 1 {
+		t.Fatalf("RowStore.Snapshot(\"s3\").Rows has %d entries, want 1", len(snap.Rows))
 	}
-	if len(got) != 1 {
-		t.Fatalf("ProbeResources[\"s3\"] has %d entries, want 1", len(got))
-	}
-	row := got[0]
+	row := snap.Rows[0]
 	if len(row.Findings) != 1 {
-		t.Fatalf("ProbeResources row Findings = %+v, want 1 carried wave2 finding — a bare Wave-1 probe result must not blank the in-memory carried finding (C6b)", row.Findings)
+		t.Fatalf("RowStore row Findings = %+v, want 1 carried wave2 finding — a bare Wave-1 probe result must not blank the in-memory carried finding (C6b)", row.Findings)
 	}
 	if got := row.Findings[0].Source; got != "wave2:s3" {
-		t.Errorf("ProbeResources row Findings[0].Source = %q, want %q", got, "wave2:s3")
+		t.Errorf("RowStore row Findings[0].Source = %q, want %q", got, "wave2:s3")
 	}
 	if got := row.Fields["status"]; got != "public access block incomplete" {
-		t.Errorf(`ProbeResources row Fields["status"] = %q, want %q (C6b in-memory carry)`, got, "public access block incomplete")
+		t.Errorf(`RowStore row Fields["status"] = %q, want %q (C6b in-memory carry)`, got, "public access block incomplete")
 	}
 }
 

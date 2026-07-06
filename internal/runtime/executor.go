@@ -145,10 +145,12 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		// list-open persistence path (app.Controller.maybeSaveResourceListCache)
 		// but is driven from the dispatch-time snapshot the caller captured via
 		// SaveCachePayload (see its doc comment for why dispatch-time capture,
-		// not a live session read, is required), falling back to a live read of
-		// c.session.ProbeResources for any nil-Payload dispatch. C6 scope:
-		// ProbeResources IS this session's canonical top-level population for
-		// each type — the same rows a fresh list-open would seed from.
+		// not a live session read, is required), falling back to a live
+		// RowStore read (task #17 wave 1 stage 2 — replaces the removed
+		// session.ProbeResources/ProbeTruncated live-read fallback) for any
+		// nil-Payload dispatch. C6 scope: RowStore's retained rows ARE this
+		// session's canonical top-level population for each type — the same
+		// rows a fresh list-open would seed from.
 		//
 		// Runs BEFORE SaveAvailabilityCache (order matters): both calls write
 		// tf.Issues for the same type, and SaveAvailabilityCache's issueKnown
@@ -158,7 +160,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		// call just persisted via existing.Issues/existing.Rows (not known).
 		// The reverse order let the row-derived, potentially-incomplete count
 		// computed here unconditionally clobber a more accurate aggregate.
-		saveResources, saveTruncated := c.session.ProbeResources, c.session.ProbeTruncated
+		saveResources, saveTruncated := c.rowStoreResourcesAndTruncated()
 		var wave2Complete bool
 		if p, ok := req.Payload.(*SaveCachePayload); ok && p != nil {
 			saveResources, saveTruncated = p.Resources, p.Truncated

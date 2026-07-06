@@ -274,17 +274,17 @@ func TestCacheTypeFile_RowFindingsRoundTripThroughSaveLoad(t *testing.T) {
 
 // TestListOpen_ColdStart_SeedsFromDiskCache_WithRefreshing pins the
 // controller-level outcome of Contract B: on a cold start (empty session,
-// no ProbeResources) with a valid disk cache file present, opening a list
-// before probes complete must seed rows+findings from disk with
+// RowStore never observed) with a valid disk cache file present, opening a
+// list before probes complete must seed rows+findings from disk with
 // Refreshing=true — mirroring Contract A's in-session seeding outcome, but
 // sourced from disk instead of session state.
 //
 // Ambiguity resolution: "seeds from disk" is modeled at the controller
 // level as the disk cache.TypeFile.Rows having already been loaded into
-// session.ProbeResources by the startup cache-load path (the same seam
+// RowStore (OriginDisk) by the startup cache-load path (the same seam
 // LoadAvailabilityCache/SaveAvailabilityCache in internal/runtime/probes.go
 // already uses for counts) — this test drives that outcome directly via
-// core.Session().ProbeResources rather than asserting on the startup
+// core.Session().RowStore.Observe rather than asserting on the startup
 // loader's internals, since the loader itself is not in this task's scope
 // (probes.go is read-only reference material per the dispatch).
 func TestListOpen_ColdStart_SeedsFromDiskCache_WithRefreshing(t *testing.T) {
@@ -324,7 +324,7 @@ func TestListOpen_ColdStart_SeedsFromDiskCache_WithRefreshing(t *testing.T) {
 	for i, cr := range diskTF.Rows {
 		rows[i] = resource.Resource{ID: cr.ID, Name: cr.Name, Type: "ec2", Fields: cr.Fields}
 	}
-	core.Session().ProbeResources = map[string][]resource.Resource{"ec2": rows}
+	core.Session().RowStore.Observe("ec2", rows, &resource.PaginationMeta{IsTruncated: false}, session.OriginDisk, false)
 
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	snap := c.Snapshot()

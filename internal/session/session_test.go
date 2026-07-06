@@ -151,10 +151,7 @@ func TestSession_Rotate_ResetsQueueState(t *testing.T) {
 	s.EnrichQueue = []string{"rds"}
 	s.EnrichChecked = 2
 	s.EnrichTotal = 5
-	s.ProbeResources = map[string][]resource.Resource{
-		"ec2": {{}},
-	}
-	s.ProbeTruncated = map[string]bool{"ec2": true}
+	s.RowStore.Observe("ec2", []resource.Resource{{}}, &resource.PaginationMeta{IsTruncated: true}, session.OriginProbe, false)
 
 	s.Rotate()
 
@@ -176,11 +173,12 @@ func TestSession_Rotate_ResetsQueueState(t *testing.T) {
 	if s.EnrichQueue != nil {
 		t.Errorf("EnrichQueue after Rotate() = %v, want nil", s.EnrichQueue)
 	}
-	if s.ProbeResources != nil {
-		t.Errorf("ProbeResources after Rotate() = %v, want nil", s.ProbeResources)
+	tr := s.RowStore.Snapshot("ec2")
+	if tr.Gen != 0 {
+		t.Errorf("RowStore.Snapshot(\"ec2\").Gen after Rotate() = %d, want 0 (never observed this session)", tr.Gen)
 	}
-	if s.ProbeTruncated != nil {
-		t.Errorf("ProbeTruncated after Rotate() = %v, want nil", s.ProbeTruncated)
+	if tr.Rows != nil {
+		t.Errorf("RowStore.Snapshot(\"ec2\").Rows after Rotate() = %v, want nil", tr.Rows)
 	}
 }
 

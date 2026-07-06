@@ -190,14 +190,36 @@ func TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu(t *testing
 // ExecuteTask(TaskKindLoadAvailCache) produces) through Controller.Handle,
 // exactly as DrainSyncProgress does for BootstrapLive's returned tasks.
 //
-// Currently red: handleAvailabilityCacheLoaded queues session.AvailQueue but
-// never writes session.ProbeResources, so menuRefreshing() — which ranges
-// over ProbeResources, not AvailQueue — reports false immediately after the
-// cache load, even though a real multi-type background sweep has just been
-// queued and is about to run for real (slow, network-bound) probes.
+// internal/app/menu.go's menuRefreshing() (task #17 wave 1 stage 2 re-point,
+// per its own doc comment — "Flagged for Stage 3 to fold into whatever
+// internal/app's own RowStore migration does") reports true only for a type
+// RowStore.ProbeOriginTypeNames() names, which itself requires
+// len(Rows) > 0 for that type's OriginProbe/OriginDisk entry. A counts-only
+// AvailabilityCacheLoaded entry with no real per-type disk file (C6a: never
+// fabricates Rows) therefore does NOT make menuRefreshing() see it — this
+// fixture seeds a REAL on-disk s3 file so RowStore genuinely retains
+// OriginDisk rows for at least one queued type, exercising the sweep-in-
+// flight signal Contract B actually describes rather than the now-provably-
+// unreachable (post-C6a) placeholder-count path.
 func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	core, ctrl := newLiveWebStyleController("", "us-east-1")
+	core, ctrl := newLiveWebStyleController("webboot-refreshing-prof", "us-east-1")
+
+	store := core.EnsureCacheStore()
+	if store == nil {
+		t.Fatal("core.EnsureCacheStore() = nil — test fixture requires a live disk store to seed rows into")
+	}
+	store.Put("s3", cache.TypeFile{
+		HasResources: true,
+		Count:        57,
+		Exact:        false,
+		Rows: []cache.Row{
+			{ID: "bucket-webboot-1", Name: "bucket-webboot-1"},
+		},
+	})
+	if err := store.SaveType("s3"); err != nil {
+		t.Fatalf("seed fixture SaveType(s3): %v", err)
+	}
 
 	vs, tasks := ctrl.Handle(messages.AvailabilityCacheLoaded{
 		Entries:    map[string]int{"s3": 57, "ec2": 3},
@@ -301,28 +323,33 @@ func TestWebBoot_ColdListOpen_ControllerLevel_ReturnsLoadingShellAndFetchTask(t 
 // Contract D — disk-rows seeding at web boot (cache-load never seeds Rows)
 // -----------------------------------------------------------------------
 
-// TestWebBoot_AvailabilityCacheLoaded_DoesNotSeedProbeResourcesRows pins
-// Contract D directly against the real handler: even though
-// handleAvailabilityCacheLoaded DOES apply counts/issues to the menu
-// (Contract A, green), it never touches session.ProbeResources — so a list
-// opened immediately after a cache-seeded live sweep starts shows
-// Loading=true with zero rows, not the disk-cached rows with Refreshing=true.
+// TestWebBoot_AvailabilityCacheLoaded_CountsOnlyFallback_KeepsLoadingTrue pins
+// Contract D / C6a directly against the real handler: when
+// AvailabilityCacheLoaded carries a known count for a type but the on-disk
+// per-type Store has NO real row data for it (a counts-only projection —
+// e.g. a synthetic/legacy event, or a cold pair with a count but no
+// persisted rows file), handleAvailabilityCacheLoaded feeds RowStore's
+// counts-only observation (ObserveCountRows, C6a) and must NEVER fabricate
+// placeholder Rows — so a list opened immediately after shows Loading=true
+// with zero rows, not a seeded-but-fake page. Renamed from
+// TestWebBoot_AvailabilityCacheLoaded_DoesNotSeedProbeResourcesRows: the old
+// name's assertions were inverted relative to its own doc comment (which
+// already stated this Loading=true/zero-rows outcome as the correct
+// contract) — task #17 wave 1 stage 2 confirms C6a is authoritative here
+// (docs/design/cache-requirements.md C6a: "a counts-only observation...
+// never touches a type's persisted Rows"), not a placeholder-row fallback.
 //
-// Kept as a narrow single-page pin driven purely through the counts-only
-// AvailabilityCacheLoaded event (no cache package types referenced) — still
-// valid and independent of the round-2 on-disk shape change. See
-// TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBeforeFetch
-// Completes below for the round-2, all-pages, per-type-file extension.
-func TestWebBoot_AvailabilityCacheLoaded_DoesNotSeedProbeResourcesRows(t *testing.T) {
+// See TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBeforeFetch
+// Completes below for the REAL-disk-row seeding contract (Loading=false),
+// which is what a genuine warm/cold-boot-with-cache scenario exercises.
+func TestWebBoot_AvailabilityCacheLoaded_CountsOnlyFallback_KeepsLoadingTrue(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	_, ctrl := newLiveWebStyleController("", "us-east-1")
 
 	// Models exactly what ExecuteTask(TaskKindLoadAvailCache) would produce
-	// from a loaded per-type ec2 TypeFile with one row — the counts-only
-	// projection this event carries today. No cache package type is
-	// referenced directly; this keeps the test isolated from the round-2
-	// on-disk shape so it remains a pure "handler never seeds
-	// ProbeResources" pin.
+	// from a counts-only projection with no per-type disk file backing it —
+	// no cache package type is referenced directly, so this stays isolated
+	// from the round-2 on-disk shape.
 	_, _ = ctrl.Handle(messages.AvailabilityCacheLoaded{
 		Entries: map[string]int{"ec2": 1},
 	})
@@ -333,11 +360,11 @@ func TestWebBoot_AvailabilityCacheLoaded_DoesNotSeedProbeResourcesRows(t *testin
 	if lb == nil {
 		t.Fatal("Body.List is nil after opening ec2 list post-cache-load")
 	}
-	if lb.Loading {
-		t.Error("Loading = true, want false — handleAvailabilityCacheLoaded must load the per-type cache's Rows into session.ProbeResources (mirroring Count/Truncated) so a cold list-open renders real disk-cached rows immediately instead of the empty Loading shell")
+	if !lb.Loading {
+		t.Error("Loading = false, want true — C6a: a counts-only cache-load with no real per-type disk rows must never fabricate placeholder Rows, so the list-open still shows the ordinary Loading shell")
 	}
-	if !lb.Refreshing {
-		t.Error("Refreshing = false, want true — a live fetch must still run to confirm/replace disk-seeded rows")
+	if len(lb.Rows) != 0 {
+		t.Errorf("len(Rows) = %d, want 0 — C6a: no real disk row data exists for this type, so RowStore must not seed any rows", len(lb.Rows))
 	}
 }
 

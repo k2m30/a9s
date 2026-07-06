@@ -121,11 +121,35 @@ func TestIsBackgroundFetchTask_NonFetchKind_UnaffectedByRenderability(t *testing
 // IsBackgroundFetchTask bound to the post-Apply screen-renderable state —
 // must land in the DEFERRED slice, never executed synchronously.
 func TestWebBoot_WarmListOpen_FetchTaskDeferredAsBackground(t *testing.T) {
-	_, ctrl := newLiveWebStyleController("", "us-east-1")
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	core, ctrl := newLiveWebStyleController("pilot-def1-prof", "us-east-1")
 
-	// Seed the menu with a known, non-zero count so the cache-first list-open
-	// path (NavigateKindPushResourceListCached / ProbeResources fallback)
-	// has something to seed rows from — mirrors a warm boot per pilot step 5.
+	// Seed a REAL on-disk per-type file for s3 so the cache-first list-open
+	// path (NavigateKindPushResourceList's RowStore/OriginDisk seed) has
+	// genuine row data to seed from — mirrors a warm boot per pilot step 5.
+	// task #17 wave 1 stage 2 / C6a: a counts-only AvailabilityCacheLoaded
+	// with no real disk row data never fabricates placeholder Rows (see
+	// TestWebBoot_AvailabilityCacheLoaded_CountsOnlyFallback_KeepsLoadingTrue
+	// in app_web_live_cold_boot_test.go), so this test needs a real store to
+	// exercise a genuinely-renderable warm open.
+	store := core.EnsureCacheStore()
+	if store == nil {
+		t.Fatal("core.EnsureCacheStore() = nil — test fixture requires a live disk store to seed rows into")
+	}
+	store.Put("s3", cache.TypeFile{
+		HasResources: true,
+		Count:        3,
+		Exact:        true,
+		Rows: []cache.Row{
+			{ID: "bucket-pilot-def1-1", Name: "bucket-pilot-def1-1"},
+			{ID: "bucket-pilot-def1-2", Name: "bucket-pilot-def1-2"},
+			{ID: "bucket-pilot-def1-3", Name: "bucket-pilot-def1-3"},
+		},
+	})
+	if err := store.SaveType("s3"); err != nil {
+		t.Fatalf("seed fixture SaveType(s3): %v", err)
+	}
+
 	ctrl.Handle(messages.AvailabilityCacheLoaded{
 		Entries: map[string]int{"s3": 3},
 	})
@@ -494,7 +518,31 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 // Refreshing=false and ListBody.LastFetchError populated — rows must remain
 // on screen (nothing blanks).
 func TestAPIError_OverCachedList_ClearsRefreshing_SetsErrorMarker(t *testing.T) {
-	_, ctrl := newLiveWebStyleController("", "us-east-1")
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	core, ctrl := newLiveWebStyleController("pilot-def5-prof", "us-east-1")
+
+	// Seed a REAL on-disk per-type file for s3 so the cache-first list-open
+	// has genuine row data to seed from (C6a: a counts-only
+	// AvailabilityCacheLoaded with no real disk row data never fabricates
+	// placeholder Rows — see
+	// TestWebBoot_AvailabilityCacheLoaded_CountsOnlyFallback_KeepsLoadingTrue
+	// in app_web_live_cold_boot_test.go).
+	store := core.EnsureCacheStore()
+	if store == nil {
+		t.Fatal("core.EnsureCacheStore() = nil — test fixture requires a live disk store to seed rows into")
+	}
+	store.Put("s3", cache.TypeFile{
+		HasResources: true,
+		Count:        2,
+		Exact:        true,
+		Rows: []cache.Row{
+			{ID: "bucket-pilot-def5-1", Name: "bucket-pilot-def5-1"},
+			{ID: "bucket-pilot-def5-2", Name: "bucket-pilot-def5-2"},
+		},
+	})
+	if err := store.SaveType("s3"); err != nil {
+		t.Fatalf("seed fixture SaveType(s3): %v", err)
+	}
 
 	ctrl.Handle(messages.AvailabilityCacheLoaded{
 		Entries: map[string]int{"s3": 2},

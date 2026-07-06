@@ -20,7 +20,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // ProbeAvailabilityResult carries the outcome of a single Wave-1 resource
@@ -526,45 +525,6 @@ func (c *Core) saveResourceListCache(shortName string, rows []cache.Row, count i
 	})
 }
 
-// SyncProbeResourcesForType overwrites session.ProbeResources/ProbeTruncated
-// for shortName with the caller's current, fully-accumulated row set (item A,
-// #17 wave 2, DEF-21). Without this, ProbeResources[shortName] is only ever
-// written by the availability sweep's own first-page probe call (
-// handleAvailabilityChecked) or an enrichment rerun — never by a plain
-// list-open append (`m`/load-more) — so it silently drifts behind the
-// controller's own ls.Rows once a user pages past page 1. A LATER
-// TaskKindSaveCache dispatch (sweep or enrichment completion) then persists
-// that stale, smaller snapshot via saveProbeResourcesToTypeFiles /
-// SaveResourceListCache. reconcileTypeFile's rule 1 (shallower-subset-keeps-
-// deeper) only protects the on-disk rows when the stale snapshot's IDs are a
-// literal subset of the richer stored set — true when both observations came
-// from the same accumulated page set, but not guaranteed when the sweep's
-// probe and the list's own page 1 are independent AWS list calls without a
-// deterministic sort key (rule 1 then falls through to "incoming wins" and
-// destroys the deeper rows). Keeping ProbeResources in lockstep with the
-// controller's own accumulated rows removes the dependency on that
-// coincidence entirely: any later sweep-lane save re-persists the SAME rows
-// the list screen already wrote, so the two lanes can never disagree.
-//
-// Callers are responsible for the same C6 scope gate as
-// SaveResourceListCache (top-level, unfiltered list only).
-func (c *Core) SyncProbeResourcesForType(shortName string, resources []resource.Resource, truncated bool) {
-	canon := canonShortName(shortName)
-	if c.session.ProbeResources == nil {
-		c.session.ProbeResources = make(map[string][]resource.Resource)
-	}
-	c.session.ProbeResources[canon] = resources
-	if c.session.ProbeTruncated == nil {
-		c.session.ProbeTruncated = make(map[string]bool)
-	}
-	c.session.ProbeTruncated[canon] = truncated
-	// Dual-write (task #17 wave 1): resources here is the controller's own
-	// full accumulated row set (this method's whole purpose is keeping
-	// ProbeResources in lockstep with it) — OriginFetch, wholesale
-	// replace.
-	c.ObserveRows(canon, resources, &resource.PaginationMeta{IsTruncated: truncated}, session.OriginFetch, false)
-}
-
 // CachedListDepth returns the number of rows previously persisted for
 // shortName's canonical top-level list, so a background verify-refetch
 // (KindFetchResources) can be bounded to at most the depth already shown to
@@ -735,12 +695,22 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 // buildEnrichQueue returns resource types that have a registered Wave-2 issue
 // enricher AND retained probe resources, in dispatch order. Dispatch order
 // (priority ascending, then alphabetical) is owned by awsclient.AllWave2 so
-// this function only filters by ProbeResources membership.
+// this function only filters by RowStore membership (task #17 wave 1 stage
+// 2 — replaces the removed session.ProbeResources membership check).
+//
+// Deliberately uses tr.Gen != 0 (observed-at-all), NOT ProbeOriginTypeNames'
+// len(Rows)>0 gate: the legacy session.ProbeResources map-key-presence check
+// this replaces (`_, ok := c.session.ProbeResources[e.ShortName]`) was true
+// even for an explicitly-retained, observed-EMPTY slice (a live Wave-1 probe
+// confirming zero resources still ran that type's Wave-2 enricher). Reusing
+// ProbeOriginTypeNames here would silently skip Wave-2 enrichment for every
+// observed-empty type, a real behavior regression this membership test must
+// not introduce.
 func (c *Core) BuildEnrichQueue() []string {
 	all := awsclient.AllWave2()
 	queue := make([]string, 0, len(all))
 	for _, e := range all {
-		if _, ok := c.session.ProbeResources[e.ShortName]; !ok {
+		if tr := c.session.RowStore.Snapshot(e.ShortName); tr.Gen == 0 {
 			continue
 		}
 		queue = append(queue, e.ShortName)
@@ -754,11 +724,12 @@ func (c *Core) BuildEnrichQueue() []string {
 // the caller embeds it in the adapter message for stale-result rejection.
 //
 // Builds a ResourceCache snapshot via buildResourceCacheSnapshot — it merges
-// c.session.ProbeResources (first-page rows retained by the availability
-// probe) AND c.session.LazyResourceCache AND c.session.ResourceCache.
-// On the normal startup path c.session.ResourceCache is empty until the user
-// opens a list, so building from ResourceCache alone would leave the first
-// enrichment pass blind to siblings.
+// RowStore's retained rows (task #17 wave 1 stage 2 — first-page rows
+// retained by the availability probe, replacing the removed
+// session.ProbeResources) AND c.session.LazyResourceCache AND
+// c.session.ResourceCache. On the normal startup path c.session.ResourceCache
+// is empty until the user opens a list, so building from ResourceCache alone
+// would leave the first enrichment pass blind to siblings.
 // Regression pin: TestProbeEnrichment_CacheSnapshotMergesProbeResources.
 func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceClients, shortName string) ProbeEnrichmentResult {
 	if clients == nil {
@@ -771,7 +742,7 @@ func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceCl
 	if !ok {
 		return ProbeEnrichmentResult{ResourceType: shortName}
 	}
-	resources := c.session.ProbeResources[shortName]
+	resources, _ := c.ProbeResources(shortName)
 	cacheSnap := c.BuildResourceCacheSnapshot()
 
 	probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -797,18 +768,23 @@ func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceCl
 
 // BuildResourceCacheSnapshot returns a read-only snapshot of currently-loaded
 // resource lists, keyed by resource short name. Merges ResourceCache,
-// LazyResourceCache, and ProbeResources so enrichers see the full set
-// (including out-of-scope entries pulled via FetchByIDs). On ID collision,
-// ResourceCache wins (it is the scope-filtered authoritative source).
+// LazyResourceCache, and RowStore's retained rows so enrichers see the full
+// set (including out-of-scope entries pulled via FetchByIDs). On ID
+// collision, ResourceCache wins (it is the scope-filtered authoritative
+// source).
 //
 // LazyResourceCache entries are marked IsTruncated=true because they are
-// sparse (FetchByIDs, not a full first page). ProbeResources pages are
-// first-page-only — also marked IsTruncated=true so the orphan rule in
-// cross-ref enrichers treats parent-not-found as "unknown, skip" rather
-// than "definitively deleted" per spec §3.1.
+// sparse (FetchByIDs, not a full first page). RowStore's retained rows (task
+// #17 wave 1 stage 2 — replaces the removed session.ProbeResources/
+// ProbeTruncated merge; SnapshotAll(false) excludes Partial-only entries per
+// C6 scope) carry their own per-type Pagination.IsTruncated — first-page-only
+// probe/disk rows are marked truncated so the orphan rule in cross-ref
+// enrichers treats parent-not-found as "unknown, skip" rather than
+// "definitively deleted" per spec §3.1.
 func (c *Core) BuildResourceCacheSnapshot() resource.ResourceCache {
 	s := c.session
-	snap := make(resource.ResourceCache, len(s.ResourceCache)+len(s.LazyResourceCache)+len(s.ProbeResources))
+	rowStoreAll := s.RowStore.SnapshotAll(false)
+	snap := make(resource.ResourceCache, len(s.ResourceCache)+len(s.LazyResourceCache)+len(rowStoreAll))
 
 	// Seed from LazyResourceCache first; ResourceCache entries will overwrite.
 	for shortName, rows := range s.LazyResourceCache {
@@ -817,16 +793,20 @@ func (c *Core) BuildResourceCacheSnapshot() resource.ResourceCache {
 			IsTruncated: true,
 		}
 	}
-	// Merge ProbeResources — first-page rows retained by the Wave-1 probe pass.
-	for shortName, rows := range s.ProbeResources {
-		probeTrunc := s.ProbeTruncated[shortName]
+	// Merge RowStore's retained rows — first-page rows retained by the
+	// Wave-1 probe/disk-seed/fetch pass.
+	for shortName, tr := range rowStoreAll {
+		if len(tr.Rows) == 0 {
+			continue
+		}
+		probeTrunc := tr.Pagination != nil && tr.Pagination.IsTruncated
 		if existing, ok := snap[shortName]; ok {
 			known := make(map[string]struct{}, len(existing.Resources))
 			for _, r := range existing.Resources {
 				known[r.ID] = struct{}{}
 			}
 			merged := append([]resource.Resource(nil), existing.Resources...)
-			for _, r := range rows {
+			for _, r := range tr.Rows {
 				if _, dup := known[r.ID]; !dup {
 					merged = append(merged, r)
 				}
@@ -837,14 +817,15 @@ func (c *Core) BuildResourceCacheSnapshot() resource.ResourceCache {
 			}
 		} else {
 			snap[shortName] = resource.ResourceCacheEntry{
-				Resources:   rows,
+				Resources:   tr.Rows,
 				IsTruncated: probeTrunc,
 			}
 		}
 	}
 	// ResourceCache is authoritative — overwrite anything from lazy/probe.
 	for shortName, entry := range s.ResourceCache {
-		cacheIsTruncated := (entry.Pagination != nil && entry.Pagination.IsTruncated) || s.ProbeTruncated[shortName]
+		rowStoreTrunc := rowStoreAll[shortName].Pagination != nil && rowStoreAll[shortName].Pagination.IsTruncated
+		cacheIsTruncated := (entry.Pagination != nil && entry.Pagination.IsTruncated) || rowStoreTrunc
 		if existing, ok := snap[shortName]; ok {
 			known := make(map[string]struct{}, len(entry.Resources))
 			for _, r := range entry.Resources {

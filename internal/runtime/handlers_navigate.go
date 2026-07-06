@@ -184,30 +184,37 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 			DisplayAlias: alias,
 		}
 		// The seed rides the miss branch, not a NavigateKindPushResourceListCached
-		// promotion: ProbeResources/ProbeTruncated hold disk-cached/probe knowledge
-		// that is distinct from session.ResourceCache (DEF-12 C1 + Goal 4) — the
-		// fetch must still run to confirm/replace what the probe retained, so Kind
-		// and the KindFetchResources task below are unchanged.
+		// promotion: RowStore's OriginProbe/OriginDisk rows hold disk-cached/probe
+		// knowledge that is distinct from session.ResourceCache (DEF-12 C1 +
+		// Goal 4) — the fetch must still run to confirm/replace what the probe
+		// retained, so Kind and the KindFetchResources task below are unchanged.
 		//
-		// DEF-15: ProbeResources is freed (set nil) by handleEnrichmentChecked
-		// once the Wave-2 sweep completes (DEF-7 memory free), so any list open
-		// AFTER the sweep — or mid-sweep via a lane that lands after the free —
-		// finds no seed here even though the on-disk per-type Store still holds
-		// every row. Fall back to the loaded cache Store, which outlives the
-		// ProbeResources free and is already pair-stamped by EnsureCacheStore.
+		// task #17 wave 1 stage 2: RowStore retains rows for the session (no
+		// enrichment-completion free — see RowStore.Amend's doc comment), so the
+		// DEF-15 free-then-disk-fallback race this comment used to describe
+		// against session.ProbeResources no longer exists; the store is read
+		// directly instead.
 		//
-		// DEF-15/P2: the fallback fires only when this session never observed
-		// canon (map key absent, e.g. after the post-sweep free). A key present
-		// with a zero-length slice means a live Wave-1 probe already confirmed
-		// the type is empty this session — that observed-empty result is
-		// fresher than any disk row (C2), so it seeds a bare list rather than
-		// falling back to stale disk rows.
-		if rows, observed := c.session.ProbeResources[canon]; observed {
-			if len(rows) > 0 {
+		// DEF-15/P2: the disk fallback fires only when this session never
+		// observed canon at all. Gen (domain.Gen, zero value 0) is the
+		// observed-at-all discriminator here, NOT Origin — TypeRows{}'s zero
+		// value has Origin==OriginDisk (iota 0), so testing Origin alone cannot
+		// distinguish "never observed" from "observed via disk with zero rows";
+		// every RowStore.Observe call unconditionally increments Gen from its
+		// prior value (0 on first observation), so Gen!=0 means "observed",
+		// independent of which Origin produced the observation. A tr.Gen!=0
+		// entry with a zero-length Rows slice means a live Wave-1 probe (or a
+		// disk seed, or a fetch) already confirmed the type is empty this
+		// session — that observed-empty result is fresher than any disk row
+		// (C2), so it seeds a bare list rather than falling back to stale disk
+		// rows.
+		tr := c.session.RowStore.Snapshot(canon)
+		if tr.Gen != 0 {
+			if len(tr.Rows) > 0 {
 				result.CachedEntry = &session.ResourceCacheEntry{
-					Resources: rows,
+					Resources: tr.Rows,
 					Pagination: &resource.PaginationMeta{
-						IsTruncated: c.session.ProbeTruncated[canon],
+						IsTruncated: tr.Pagination != nil && tr.Pagination.IsTruncated,
 					},
 				}
 			}

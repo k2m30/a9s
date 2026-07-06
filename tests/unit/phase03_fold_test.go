@@ -12,11 +12,11 @@
 //
 // ── Red-light expectations (before PR-03a-fold) ─────────────────────────────
 //
-//	Test 1/ProbeResources: fails because the handler's "all-enrichment-done"
-//	    cleanup (m.Core().Session().EnrichChecked >= m.Core().Session().EnrichTotal → m.Core().Session().ProbeResources = nil) runs
-//	    before the test can inspect the cache. After fold, applyEnrichment
-//	    must run BEFORE cleanup AND tests seed EnrichTotal=2 to keep ProbeResources
-//	    alive for inspection. Without EnrichTotal=2, this subtest ALWAYS fails.
+//	Test 1/RowStore: pins that applyEnrichment folds RowStore's retained rows
+//	    via AmendRows (task #17 wave 1 stage 2 removed the old
+//	    session.ProbeResources/ProbeTruncated "all-enrichment-done" free, so
+//	    RowStore's rows for this type survive past EnrichChecked >= EnrichTotal
+//	    with no special seeding needed to keep them inspectable).
 //
 //	Test 4: Session.EnrichmentFindings still exists — the reflection check
 //	    fails with "EnrichmentFindings field still exists".
@@ -47,9 +47,9 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
@@ -105,15 +105,17 @@ func newRootModel() tui.Model {
 //     should yield exactly one finding after enrichment — the wave2 entry.
 //   - That wave2 finding must have Phrase == ef.Phrase and Source == "wave2:<canonShort>".
 //   - r.AttentionDetails[code].Rows must contain the EnrichmentFinding's Rows.
-//   - The same row mutation must occur for LazyResourceCache and ProbeResources.
+//   - The same row mutation must occur for LazyResourceCache and RowStore.
 //
 // Red-light today:
 //   - ResourceCache and LazyResourceCache subtests PASS with the current shim
 //     (DeriveFindings correctly filters "running" and emits only wave2).
-//   - ProbeResources subtest FAILS: the handler's all-enrichment-done cleanup
-//     (EnrichChecked >= EnrichTotal → ProbeResources = nil) fires before the
-//     test can inspect the cache. The subtest seeds EnrichTotal=2 to prevent
-//     the cleanup, making this a genuine red-light until fold is implemented.
+//   - RowStore subtest pins that applyEnrichment's AmendRows fold reaches
+//     RowStore's retained rows the same way it reaches the other two caches
+//     (task #17 wave 1 stage 2 replaced the removed session.ProbeResources/
+//     ProbeTruncated all-enrichment-done free with a no-op — RowStore rows
+//     are never cleared on completion, so no special seeding is needed to
+//     keep them inspectable).
 func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 	// alias == "" means use canonShort as the message ResourceType (canonical-only).
 	// alias != "" means use alias as the message ResourceType, assert cache under canonShort.
@@ -165,11 +167,11 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 			}
 
 			m = applyMsg(m, messages.EnrichmentChecked{
-				ResourceType: msgType,
-				Findings:     map[string]domain.Finding{rid: efFinding},
+				ResourceType:     msgType,
+				Findings:         map[string]domain.Finding{rid: efFinding},
 				AttentionDetails: map[string]domain.AttentionDetail{rid: efAttention},
-				Gen:          0,
-				TypeGen:      0,
+				Gen:              0,
+				TypeGen:          0,
 			})
 
 			entry, ok := m.Core().Session().ResourceCache[tc.canonShort]
@@ -239,25 +241,23 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 			}
 		})
 
-		t.Run(tc.name+"/ProbeResources", func(t *testing.T) {
+		t.Run(tc.name+"/RowStore", func(t *testing.T) {
 			m := newRootModel()
 
-			// Prevent the "all enrichment done" cleanup path (app_handlers_availability.go:
-			// if m.Core().Session().EnrichChecked >= m.Core().Session().EnrichTotal { m.Core().Session().ProbeResources = nil }).
-			// After EnrichChecked++ fires (0→1), we need 1 < EnrichTotal to avoid
-			// the cleanup so ProbeResources remains inspectable. Setting EnrichTotal=2
-			// simulates "one type still pending", keeping the cache alive.
-			m.Core().Session().EnrichTotal = 2
+			// task #17 wave 1 stage 2: the "all enrichment done" cleanup that
+			// used to nil out session.ProbeResources is gone — RowStore
+			// retains its rows for the session even after
+			// EnrichChecked >= EnrichTotal (see handlers_availability.go's
+			// doc comment on that branch). EnrichTotal is left at its
+			// session.New() default; there is no cleanup left to avoid.
 
-			// ProbeResources is initialized via AvailabilityCheckedMsg in real usage,
-			// but for the fold test we set it directly — the fold must walk ProbeResources
-			// just as it walks the other two caches.
-			if m.Core().Session().ProbeResources == nil {
-				m.Core().Session().ProbeResources = make(map[string][]resource.Resource)
-			}
-			m.Core().Session().ProbeResources[tc.canonShort] = []resource.Resource{
+			// RowStore is populated via AvailabilityCheckedMsg in real usage,
+			// but for the fold test we seed it directly (OriginProbe) — the
+			// fold must walk RowStore's retained rows just as it walks the
+			// other two caches.
+			m.Core().Session().RowStore.Observe(tc.canonShort, []resource.Resource{
 				{ID: rid, Name: "probe-" + tc.canonShort, Fields: map[string]string{"status": "running"}},
-			}
+			}, nil, session.OriginProbe, false)
 
 			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType:     msgType,
@@ -267,14 +267,14 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 				TypeGen:          0,
 			})
 
-			probeSlice, ok := m.Core().Session().ProbeResources[tc.canonShort]
-			if !ok || len(probeSlice) == 0 {
-				t.Fatalf("ProbeResources[%q] is empty after EnrichmentCheckedMsg (fold path must update ProbeResources before cleanup)", tc.canonShort)
+			tr := m.Core().Session().RowStore.Snapshot(tc.canonShort)
+			if len(tr.Rows) == 0 {
+				t.Fatalf("RowStore.Snapshot(%q).Rows is empty after EnrichmentCheckedMsg (fold path must update RowStore via AmendRows)", tc.canonShort)
 			}
-			r := probeSlice[0]
+			r := tr.Rows[0]
 
 			if len(r.Findings) != 1 {
-				t.Errorf("ProbeResources[%q][0].Findings: got len=%d, want 1 (wave2 only; wave1 'running' is lifecycle-filtered)", tc.canonShort, len(r.Findings))
+				t.Errorf("RowStore.Snapshot(%q).Rows[0].Findings: got len=%d, want 1 (wave2 only; wave1 'running' is lifecycle-filtered)", tc.canonShort, len(r.Findings))
 			} else if r.Findings[0].Phrase != tc.summary {
 				t.Errorf("Findings[0].Phrase: got %q, want %q", r.Findings[0].Phrase, tc.summary)
 			} else if r.Findings[0].Source != wantSource {

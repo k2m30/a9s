@@ -3,10 +3,10 @@ package runtime
 // handlers_availability_test.go — locks the two NEEDS-CHANGES invariants from
 // PR #344 Stage 5 review:
 //
-//  1. Truncation precedence in handleEnrichmentChecked: Wave-1 ProbeTruncated
-//     is authoritative — it must override the zero-issues clear, so a
-//     truncated availability scan keeps the badge truncated even when the
-//     visible subset shows no issues.
+//  1. Truncation precedence in handleEnrichmentChecked: Wave-1's RowStore
+//     Pagination.IsTruncated signal is authoritative — it must override the
+//     zero-issues clear, so a truncated availability scan keeps the badge
+//     truncated even when the visible subset shows no issues.
 //
 //  2. PatchDetail.EnrichmentFindings nil = clear contract: when Wave-2 returns
 //     no findings, the emitted PatchDetail intent must carry nil
@@ -17,6 +17,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/session"
 )
@@ -63,7 +64,7 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_Wave1Wins(t *testing.T) {
 	rt := pickKnownShortName(t)
 
 	sess := session.New()
-	sess.ProbeTruncated = map[string]bool{rt: true}
+	sess.RowStore.Observe(rt, nil, &resource.PaginationMeta{IsTruncated: true}, session.OriginProbe, false)
 
 	c := New(sess, catalog.All())
 
@@ -79,7 +80,7 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_Wave1Wins(t *testing.T) {
 		t.Fatalf("no PatchMenu intent emitted for %q", rt)
 	}
 	if !pm.Truncated {
-		t.Fatalf("expected Truncated=true (Wave-1 ProbeTruncated must override zero-issues clear); got false. PatchMenu=%+v", pm)
+		t.Fatalf("expected Truncated=true (Wave-1 RowStore Pagination.IsTruncated must override zero-issues clear); got false. PatchMenu=%+v", pm)
 	}
 }
 

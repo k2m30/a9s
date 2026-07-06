@@ -4,8 +4,8 @@
 // results on profile/region switch or refresh.
 //
 // Session is held as Session *session.Session on tui.Model. Access sites use
-// m.Session.ResourceCache, m.Session.ProbeResources, m.Session.RelatedGen etc.
-// directly.
+// m.Session.ResourceCache, m.Session.RelatedGen etc. directly; Wave-1 probe
+// rows go through RowStore (see rowstore.go) rather than a session field.
 //
 // Rules of ownership:
 //
@@ -13,8 +13,8 @@
 //     (view stack, header, input mode, theme) stay on the surrounding Model.
 //   - Maps that handler paths write into directly (ResourceCache,
 //     EnrichmentRan, EnrichmentTypeGen, EnrichmentTruncatedIDs) MUST be
-//     constructed by New(). ProbeResources and the availability/enrich queues
-//     stay nil until a probe retains its first batch — they are built in place.
+//     constructed by New(). The availability/enrich queues stay nil until a
+//     probe retains its first batch — they are built in place.
 //   - There is no parallel EnrichmentFindings map on tui.Model or on Session;
 //     Wave 2 findings are written directly onto each cached
 //     `resource.Resource.Findings` slice
@@ -102,10 +102,10 @@ type Session struct {
 	// CommandArmed latches that the live (cached) connect path has decided
 	// the one-shot -c navigation for PendingCommand is eligible to fire
 	// (Command was set and StackDepth==1 at ClientsReady time), but must wait
-	// for handleAvailabilityCacheLoaded to seed session.ProbeResources first
-	// so the navigation never races the availability-cache seed (DEF-14/D11).
-	// Consumed (cleared) by handleAvailabilityCacheLoaded; not cleared by
-	// Rotate for the same reason Command survives it.
+	// for handleAvailabilityCacheLoaded to seed RowStore's disk-cached rows
+	// first so the navigation never races the availability-cache seed
+	// (DEF-14/D11). Consumed (cleared) by handleAvailabilityCacheLoaded; not
+	// cleared by Rotate for the same reason Command survives it.
 	CommandArmed bool
 
 	// PendingCommand carries the resource short name captured from Command at
@@ -153,12 +153,16 @@ type Session struct {
 	AvailTotal      int        // total types to probe in current gen
 
 	// Wave 2 issue-enrichment dispatch.
-	ProbeResources map[string][]resource.Resource // retained first-page resources from Wave 1
-	ProbeTruncated map[string]bool                // per-type truncation signal from Wave 1 probe
-	EnrichQueue    []string                       // resource types pending Wave 2 enrichment
-	EnrichmentGen  domain.Gen                     // session-wide gen counter for Wave 2
-	EnrichChecked  int                            // number of enrichment probes completed in current gen
-	EnrichTotal    int                            // total enrichment probes to run in current gen
+	//
+	// ProbeResources/ProbeTruncated DIED in task #17 wave 1 stage 2 (row-store
+	// unification): every read/write site in internal/session, internal/runtime,
+	// and internal/tui now goes through RowStore (Origin=OriginProbe/OriginDisk/
+	// OriginFetch as appropriate) instead of these two maps. See RowStore's doc
+	// comment for the semantics this replaces.
+	EnrichQueue   []string   // resource types pending Wave 2 enrichment
+	EnrichmentGen domain.Gen // session-wide gen counter for Wave 2
+	EnrichChecked int        // number of enrichment probes completed in current gen
+	EnrichTotal   int        // total enrichment probes to run in current gen
 
 	// Per-type Wave 2 finding state (feature 018-enrichment-visibility).
 	// NOTE: there is no parallel EnrichmentFindings map;
@@ -226,7 +230,6 @@ type Session struct {
 // Gen at its zero value are rejected by the gen guards.
 func New() *Session {
 	return &Session{
-		ProbeResources: nil, // initialized lazily on first probe retention
 		// C10: a navigation issued before the first connect must trigger the
 		// active-list re-fetch once connected, exactly like a post-switch
 		// reconnect. On a menu-only startup, maybeRefreshIntents consumes this
@@ -402,8 +405,6 @@ func (s *Session) Rotate() {
 	s.PrevRegion = ""
 
 	s.EnrichQueue = nil
-	s.ProbeResources = nil
-	s.ProbeTruncated = nil
 	s.AvailQueue = nil
 	s.AvailChecked = 0
 	s.AvailTotal = 0

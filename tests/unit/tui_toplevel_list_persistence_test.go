@@ -264,7 +264,7 @@ func TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch(t *testin
 
 // TestCacheMissSeed_RefreshingMarkerOnFirstFrame pins that a cache-miss-but-
 // probe-seeded top-level list open (NavigateKindPushResourceList's
-// CachedEntry branch, seeded here via session.ProbeResources) shows the
+// CachedEntry branch, seeded here via session.RowStore) shows the
 // "refreshing..." marker on the VERY FIRST rendered frame after
 // messages.Navigate — i.e. before any fetch-result cmd is executed or
 // drained. internal/tui/runtime_adapter_navigate.go constructs the list via
@@ -279,16 +279,14 @@ func TestCacheMissSeed_RefreshingMarkerOnFirstFrame(t *testing.T) {
 
 	m := tuitest.Sized(profile, region)
 
-	// Seed session.ProbeResources for ec2 BEFORE navigating, exactly as a
+	// Seed session.RowStore for ec2 BEFORE navigating, exactly as a
 	// prior availability probe would have — this is the CachedEntry seed
 	// source for the cache-miss branch (NavigateKindPushResourceList).
 	core := m.Core()
-	core.Session().ProbeResources = map[string][]resource.Resource{
-		"ec2": {
-			{ID: "i-seed1", Name: "seed-1", Type: "ec2", Fields: map[string]string{"state": "running"}},
-			{ID: "i-seed2", Name: "seed-2", Type: "ec2", Fields: map[string]string{"state": "stopped"}},
-		},
-	}
+	core.Session().RowStore.Observe("ec2", []resource.Resource{
+		{ID: "i-seed1", Name: "seed-1", Type: "ec2", Fields: map[string]string{"state": "running"}},
+		{ID: "i-seed2", Name: "seed-2", Type: "ec2", Fields: map[string]string{"state": "stopped"}},
+	}, nil, session.OriginProbe, false)
 
 	m, _ = tuitest.Step(m, messages.Navigate{
 		Target:       messages.TargetResourceList,

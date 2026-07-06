@@ -105,28 +105,35 @@ func seedDiskStoreWithS3RowsTruncated(t *testing.T, profile, region string) *cac
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Test 1 — runtime level: HandleNavigate post-sweep must fall back to the
-// disk store once ProbeResources has been freed.
+// Test 1 — runtime level: HandleNavigate post-sweep must seed CachedEntry
+// from RowStore's retained rows (RowStore is never freed post-sweep, task
+// #17 wave 1 stage 2), which in this fixture match the disk store's rows.
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestPostSweepWarmOpen_SeedsFromStore pins DEF-15 at the Core.HandleNavigate
 // seam. The disk store for "s3" carries 2 real rows (written exactly as a
 // completed sweep's TaskKindSaveCache would). The session is driven through
 // the full post-sweep state machine: AvailabilityCacheLoaded (seeds
-// ProbeResources from the disk store, as handleAvailabilityCacheLoaded
-// does) -> AvailabilityChecked (Wave-1 completes, queue drains) ->
-// EnrichmentChecked with TypeGen matching so it is NOT dropped as stale, and
-// with the enrichment queue naturally empty (BuildEnrichQueue returns
-// nothing for this synthetic single-type fixture with no detail enrichers
-// registered against it in this harness) so EnrichChecked(1) >=
-// EnrichTotal(1) fires the "all enrichment done" free on this very call.
+// RowStore from the disk store, as handleAvailabilityCacheLoaded does) ->
+// AvailabilityChecked (Wave-1 completes, queue drains) -> EnrichmentChecked
+// with TypeGen matching so it is NOT dropped as stale, and with the
+// enrichment queue naturally empty (BuildEnrichQueue returns nothing for
+// this synthetic single-type fixture with no detail enrichers registered
+// against it in this harness) so EnrichChecked(1) >= EnrichTotal(1) fires
+// the "all enrichment done" branch on this very call.
 //
-// The precondition assertion (session.ProbeResources == nil after the sweep)
-// proves the free actually fired — this is not a trivially-true setup.
+// task #17 wave 1 stage 2 removed the legacy free that branch used to
+// perform (session.ProbeResources/ProbeTruncated no longer exist; RowStore
+// retains its rows for the session unconditionally — see RowStore.Amend's
+// doc comment). The precondition below instead confirms RowStore has
+// genuinely been observed for s3 with the AvailabilityChecked-landed rows,
+// so the seed the assertions inspect provably reflects a completed
+// post-sweep state.
 //
-// RED today: HandleNavigate's miss-branch seed reads only ProbeResources,
-// which is nil post-free, so CachedEntry stays nil and the adapter would
-// render a bare Loading shell despite fresh, complete disk data.
+// A post-sweep list-open must seed CachedEntry from RowStore's retained
+// rows immediately (C1 "show what you know, then verify on sight"),
+// matching disk-store data by construction in this fixture (the sweep wrote
+// the same row IDs to both).
 func TestPostSweepWarmOpen_SeedsFromStore(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	profile, region := "def15-store-profile", "us-east-1"
@@ -145,10 +152,10 @@ func TestPostSweepWarmOpen_SeedsFromStore(t *testing.T) {
 	})
 
 	// Confirm the pre-sweep seed landed (sanity check, not the assertion
-	// under test): ProbeResources must be populated before we can prove the
-	// post-sweep free actually clears it.
-	if rows, ok := core.ProbeResources("s3"); !ok || len(rows) == 0 {
-		t.Fatal("fixture assumption broken: ProbeResources[s3] not seeded by AvailabilityCacheLoaded before driving the sweep to completion")
+	// under test): RowStore must be populated before we drive the sweep to
+	// completion.
+	if tr := core.Session().RowStore.Snapshot("s3"); tr.Gen == 0 || len(tr.Rows) == 0 {
+		t.Fatal("fixture assumption broken: RowStore not seeded for s3 by AvailabilityCacheLoaded before driving the sweep to completion")
 	}
 
 	// Drain Wave-1: a single AvailabilityChecked with the queue naturally
@@ -179,9 +186,15 @@ func TestPostSweepWarmOpen_SeedsFromStore(t *testing.T) {
 		_, _ = core.HandleEvent(messages.EnrichmentChecked{ResourceType: "s3"})
 	}
 
-	// Precondition: prove the free actually fired.
-	if rows, ok := core.ProbeResources("s3"); ok && len(rows) > 0 {
-		t.Fatalf("fixture assumption broken: session.ProbeResources[s3] still populated (%d rows) after driving to post-sweep completion — the DEF-15 precondition (ProbeResources freed) was never reached, so this test cannot validate the disk-store fallback", len(rows))
+	// Precondition: task #17 wave 1 stage 2 removed the legacy
+	// "all-enrichment-done" free this test used to prove fired here (RowStore
+	// now retains its rows for the session unconditionally — see RowStore.
+	// Amend's doc comment). Confirm instead that RowStore has genuinely been
+	// observed for s3 (Gen != 0) with the same rows the sweep landed, so the
+	// seed the assertions below inspect is demonstrably sourced from a
+	// completed post-sweep state, not an untouched fixture.
+	if tr := core.Session().RowStore.Snapshot("s3"); tr.Gen == 0 || len(tr.Rows) != 2 {
+		t.Fatalf("fixture assumption broken: RowStore.Snapshot(s3) = %+v, want Gen != 0 with 2 rows after driving to post-sweep completion", tr)
 	}
 
 	result, tasks := core.HandleNavigate(runtime.NavigateEvent{
@@ -263,12 +276,20 @@ func driveToPostSweepState(m tui.Model, region string) tui.Model {
 // TestPostSweepWarmOpen_TUI_RendersRows pins DEF-15 at the real Bubble Tea
 // Update/View seam. Same post-sweep state as Test 1, driven through
 // tui.Model.Update; navigating via a messages.Navigate (exactly what pressing
-// Enter on the main menu emits) must render the disk-seeded row names, not
-// the bare "Loading..." shell.
+// Enter on the main menu emits) must render the RowStore-seeded row names
+// (driveToPostSweepState's own AvailabilityChecked delivery), not the bare
+// "Loading..." shell.
 //
-// RED today: HandleNavigate's miss-branch CachedEntry stays nil post-free
-// (same root cause as Test 1), so the TUI adapter renders an empty list
-// shell until the live fetch round-trip lands.
+// task #17 wave 1 stage 2 removed the legacy free HandleNavigate's
+// disk-store fallback depended on (session.ProbeResources/ProbeTruncated no
+// longer exist; RowStore retains its rows for the session unconditionally —
+// see RowStore.Amend's doc comment). RowStore's own retained rows (the
+// AvailabilityChecked-landed "def15-tui-bucket-*" rows) are therefore always
+// what a post-sweep list-open seeds from; the on-disk store seeded here
+// carries deliberately DIFFERENT row names ("def15-store-bucket-*") so this
+// test can distinguish "rendered from RowStore" from "rendered from disk" —
+// see TestPostSweepWarmOpen_SeedsFromStore for the disk-fallback path
+// (reachable only when RowStore was never observed this session).
 func TestPostSweepWarmOpen_TUI_RendersRows(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const profile, region = "def15-tui-profile", "us-east-1"
@@ -284,13 +305,13 @@ func TestPostSweepWarmOpen_TUI_RendersRows(t *testing.T) {
 
 	content := stripANSI(rootViewContent(m))
 	if strings.Contains(content, "Loading...") {
-		t.Errorf("rendered view after post-sweep opening s3 (disk store fully seeded) still shows the bare Loading shell — DEF-15:\n%s", content)
+		t.Errorf("rendered view after post-sweep opening s3 (RowStore fully seeded) still shows the bare Loading shell — DEF-15:\n%s", content)
 	}
-	if !strings.Contains(content, "def15-store-bucket-1") {
-		t.Errorf("rendered view after post-sweep opening s3 does not contain the disk-seeded row %q:\n%s", "def15-store-bucket-1", content)
+	if !strings.Contains(content, "def15-tui-bucket-1") {
+		t.Errorf("rendered view after post-sweep opening s3 does not contain the RowStore-seeded row %q:\n%s", "def15-tui-bucket-1", content)
 	}
-	if !strings.Contains(content, "def15-store-bucket-2") {
-		t.Errorf("rendered view after post-sweep opening s3 does not contain the disk-seeded row %q:\n%s", "def15-store-bucket-2", content)
+	if !strings.Contains(content, "def15-tui-bucket-2") {
+		t.Errorf("rendered view after post-sweep opening s3 does not contain the RowStore-seeded row %q:\n%s", "def15-tui-bucket-2", content)
 	}
 }
 
@@ -555,16 +576,23 @@ func TestObservedEmpty_DoesNotSeedStaleDiskRows(t *testing.T) {
 		Resources:    nil,
 	})
 
-	// Precondition: prove the key is observed-present (not absent) with a
-	// zero-length slice — this is not a trivially-true setup. If this fails,
-	// the storage-shape assumption above is wrong and the test cannot
-	// validate the observed-empty fallback distinction.
-	rows, observed := core.ProbeResources("s3")
-	if !observed {
-		t.Fatal("fixture assumption broken: session.ProbeResources[s3] key absent after a live AvailabilityChecked{Err:nil} event — the storage-shape finding (Err==nil alone triggers storage) does not hold; HandleNavigate cannot be pinned against this precondition")
+	// Precondition: prove RowStore observed s3 this session (Gen != 0 — the
+	// observed-at-all discriminator per handlers_navigate.go's own doc
+	// comment) with a zero-length Rows slice — this is not a trivially-true
+	// setup. If this fails, the storage-shape assumption above is wrong and
+	// the test cannot validate the observed-empty fallback distinction.
+	//
+	// Note: Core.ProbeResources()'s own two-value return cannot be used for
+	// this precondition — it reports ok=false whenever len(Rows)==0
+	// regardless of Gen, so it cannot distinguish "never observed" from
+	// "observed empty" (unlike HandleNavigate's own RowStore.Snapshot(canon).
+	// Gen != 0 check, which this precondition mirrors directly instead).
+	tr := core.Session().RowStore.Snapshot("s3")
+	if tr.Gen == 0 {
+		t.Fatal("fixture assumption broken: RowStore.Snapshot(s3).Gen == 0 (never observed) after a live AvailabilityChecked{Err:nil} event — the storage-shape finding (Err==nil alone triggers storage) does not hold; HandleNavigate cannot be pinned against this precondition")
 	}
-	if len(rows) != 0 {
-		t.Fatalf("fixture assumption broken: session.ProbeResources[s3] = %d rows, want 0 (observed-empty)", len(rows))
+	if len(tr.Rows) != 0 {
+		t.Fatalf("fixture assumption broken: RowStore.Snapshot(s3).Rows = %d rows, want 0 (observed-empty)", len(tr.Rows))
 	}
 
 	result, tasks := core.HandleNavigate(runtime.NavigateEvent{

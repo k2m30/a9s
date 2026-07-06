@@ -9,6 +9,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // Handle feeds an event through runtime.Core.HandleEvent, applies the returned
@@ -321,12 +322,18 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 	issues := c.listIssueCount(ls, canon)
 	exact := !ls.HasPagination
 	_ = c.core.SaveResourceListCache(canon, rows, len(ls.Rows), exact, issues, issuesKnown, ls.HasPagination)
-	// Item A / DEF-21: keep the sweep lane's ProbeResources mirror in lockstep
-	// with what was just persisted, so a LATER sweep/enrichment-completion
-	// TaskKindSaveCache dispatch re-saves these same accumulated rows instead
-	// of a stale, independently-fetched probe snapshot that reconcileTypeFile's
-	// subset check might not recognise as a subset. See SyncProbeResourcesForType.
-	c.core.SyncProbeResourcesForType(canon, ls.Rows, ls.HasPagination)
+	// Item A / DEF-21 (task #17 wave 1 stage 2: SyncProbeResourcesForType and
+	// its session.ProbeResources/ProbeTruncated target are deleted; RowStore
+	// is now the sweep lane's only per-type row source, so keeping it in
+	// lockstep with what was just persisted is a direct ObserveRows call
+	// instead): a LATER sweep/enrichment-completion TaskKindSaveCache dispatch
+	// must re-save these same accumulated rows instead of a stale,
+	// independently-fetched probe snapshot that reconcileTypeFile's subset
+	// check might not recognise as a subset. ls.Rows is the controller's own
+	// full accumulated row set — OriginFetch, wholesale replace (mirrors
+	// SyncProbeResourcesForType's own dual-write, which called this same
+	// ObserveRows with these same arguments).
+	c.core.ObserveRows(canon, ls.Rows, &resource.PaginationMeta{IsTruncated: ls.HasPagination}, session.OriginFetch, false)
 }
 
 // materializeAllListFieldsForSave resolves typeName's column set the same

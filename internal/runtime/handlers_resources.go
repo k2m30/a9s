@@ -64,9 +64,9 @@ type ResourcesLoadedEvent struct {
 //   - On a paginated partial-success (Err non-nil with Resources present)
 //     emits a FlashIntent so the `!` log records the failure.
 //   - On enrichment-rerun match (TypeGen non-zero AND matches the per-type
-//     gen captured at Ctrl+R dispatch), seeds Session.ProbeResources +
-//     ProbeTruncated and emits a TaskKindProbeEnrich task. Stale rerun
-//     tokens are silently dropped.
+//     gen captured at Ctrl+R dispatch), reseeds RowStore (OriginFetch) and
+//     emits a TaskKindProbeEnrich task. Stale rerun tokens are silently
+//     dropped.
 func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []TaskRequest) {
 	intents := []UIIntent{ClearFlash{}}
 
@@ -91,18 +91,12 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 
 	var tasks []TaskRequest
 	if ev.TypeGen != 0 && ev.TypeGen == c.session.EnrichmentTypeGen[ev.ResourceType] {
-		if c.session.ProbeResources == nil {
-			c.session.ProbeResources = make(map[string][]resource.Resource)
-		}
-		c.session.ProbeResources[ev.ResourceType] = ev.Resources
-		if c.session.ProbeTruncated == nil {
-			c.session.ProbeTruncated = make(map[string]bool)
-		}
-		c.session.ProbeTruncated[ev.ResourceType] = ev.Pagination != nil && ev.Pagination.IsTruncated
-		// Dual-write (task #17 wave 1): the enrichment-rerun reseed is a
-		// genuine fetch result — OriginFetch, wholesale replace (mirrors
-		// the unconditional ProbeResources[ev.ResourceType] = ev.Resources
-		// assignment above, not an append).
+		// task #17 wave 1 stage 2: the removed session.ProbeResources/
+		// ProbeTruncated reseed is now store-only — ObserveRows below is this
+		// reseed's only destination. The enrichment-rerun reseed is a genuine
+		// fetch result — OriginFetch, wholesale replace (mirrors the
+		// unconditional whole-slice assignment the legacy map write used to
+		// perform, not an append).
 		c.ObserveRows(ev.ResourceType, ev.Resources, ev.Pagination, session.OriginFetch, false)
 		tasks = append(tasks, TaskRequest{
 			Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: ev.ResourceType},

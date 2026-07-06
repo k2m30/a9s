@@ -23,8 +23,12 @@ import (
 //  3. Write attentionDetails[r.ID] into r.AttentionDetails under the
 //     Finding's Code (the fold-layer Resource.ID → FindingCode re-key).
 //
-// Walks ResourceCache, LazyResourceCache, and ProbeResources. Cached rows now
-// hold their own Findings/AttentionDetails directly; views read from r.Findings.
+// Walks ResourceCache and LazyResourceCache in place (both legs stay
+// map-mutation, Stage 3 scope). The RowStore leg (replacing the former
+// ProbeResources walk) instead goes through m.core.AmendRows' copy-on-write
+// fold (task #17 wave 1 stage 2) — see RowStore.Amend's doc comment for why
+// in-place mutation is no longer valid for this leg. Cached rows hold their
+// own Findings/AttentionDetails directly; views read from r.Findings.
 func (m *Model) applyEnrichment(
 	resourceType string,
 	findings map[string]domain.Finding,
@@ -51,9 +55,17 @@ func (m *Model) applyEnrichment(
 	if rows, ok := m.core.LazyResourceCache(canon); ok {
 		apply(rows)
 	}
-	if rows, ok := m.core.ProbeResources(canon); ok {
-		apply(rows)
-	}
+	m.core.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
+		if len(rows) == 0 {
+			return rows
+		}
+		out := make([]resource.Resource, len(rows))
+		copy(out, rows)
+		for i := range out {
+			applyWave2ToRow(&out[i], td, findings, attentionDetails)
+		}
+		return out
+	})
 }
 
 // applyWave2ToRow mirrors internal/runtime/helpers.go applyWave2ToRow.  Kept as
@@ -168,11 +180,24 @@ func clearAllWave2(m *Model) {
 			rows[i].AttentionDetails = nil
 		}
 	})
-	m.core.ForEachProbeResources(func(_ string, rows []resource.Resource) {
-		for i := range rows {
-			rows[i].Findings = stripWave2(rows[i].Findings)
-			rows[i].AttentionDetails = nil
-		}
-	})
+	// RowStore leg (task #17 wave 1 stage 2 — replaces the former
+	// ForEachProbeResources in-place walk): ForEachProbeResources now hands
+	// out a defensive copy (RowStore.SnapshotAll), so mutating the callback's
+	// rows slice in place would be a silent no-op. AmendRows' copy-on-write
+	// fold is the store's only valid mutation path.
+	for _, canon := range m.core.ProbeOriginTypeNames() {
+		m.core.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
+			if len(rows) == 0 {
+				return rows
+			}
+			out := make([]resource.Resource, len(rows))
+			copy(out, rows)
+			for i := range out {
+				out[i].Findings = stripWave2(out[i].Findings)
+				out[i].AttentionDetails = nil
+			}
+			return out
+		})
+	}
 }
 

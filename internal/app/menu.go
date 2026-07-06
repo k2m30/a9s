@@ -180,15 +180,21 @@ func (c *Controller) markMenuSweepAcked(shortName string) {
 }
 
 // menuRefreshing reports whether a background availability sweep is still in
-// flight: true when core.Session().ProbeResources holds at least one type
+// flight: true when RowStore holds at least one OriginProbe/OriginDisk type
 // whose probe result has not yet been acked via markMenuSweepAcked. This is
-// Contract C's MenuBody.Refreshing signal — a cache-seeded startup (session
-// ProbeResources populated from the on-disk availability cache before any
-// live probe completes) shows Refreshing=true until every retained type's
+// Contract C's MenuBody.Refreshing signal — a cache-seeded startup (RowStore
+// populated from the on-disk availability cache before any live probe
+// completes) shows Refreshing=true until every retained type's
 // AvailabilityChecked result lands. Caller must hold c.mu (at least read).
+//
+// NOTE (task #17 wave 1 stage 2, row-store unification): this used to read
+// session.ProbeResources directly; that field is gone as of stage 2. This
+// one-line re-point to core.ProbeOriginTypeNames() is the minimal edit
+// needed to keep internal/app compiling — internal/app itself is out of
+// scope for stage 2 (its own ResourceCache lanes are Stage 3). Flagged for
+// Stage 3 to fold into whatever internal/app's own RowStore migration does.
 func (c *Controller) menuRefreshing() bool {
-	probeResources := c.core.Session().ProbeResources
-	for shortName := range probeResources {
+	for _, shortName := range c.core.ProbeOriginTypeNames() {
 		canon := shortName
 		if td := resource.FindResourceType(shortName); td != nil {
 			canon = td.ShortName

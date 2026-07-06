@@ -209,11 +209,16 @@ func (c *Core) ResetEnrichmentMaps() {
 	c.session.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
 }
 
-// ResetProbeMaps clears the Wave-1 retained-probe maps. Used by the global
-// refresh path so the next probe round populates fresh.
+// ResetProbeMaps clears the Wave-1 retained-probe row-store entries so the
+// next probe round populates fresh (used by the global refresh / Ctrl+R
+// path). Prior to task #17 wave 1 stage 2 this reset session.ProbeResources/
+// ProbeTruncated directly; those fields are gone, so this now clears every
+// RowStore entry whose Origin is OriginProbe or OriginDisk (the two origins
+// a Wave-1 probe/disk-seed populate) while leaving OriginFetch (top-level
+// list fetch) rows untouched — a menu-only refresh must not blank an
+// already-open resource list's own fetched rows.
 func (c *Core) ResetProbeMaps() {
-	c.session.ProbeResources = make(map[string][]resource.Resource)
-	c.session.ProbeTruncated = make(map[string]bool)
+	c.session.RowStore.ClearProbeOrigin()
 }
 
 // SetIdentityFetching sets the session-wide IdentityFetching latch.
@@ -319,20 +324,40 @@ func (c *Core) ExtendLazyResourceCache(adds map[string][]resource.Resource) {
 	}
 }
 
-// ProbeResources returns the Wave-1 retained first-page resources for the
-// given resource short name. ok reports whether an entry exists in the
-// retained map.
-func (c *Core) ProbeResources(rt string) ([]resource.Resource, bool) {
-	rows, ok := c.session.ProbeResources[rt]
-	return rows, ok
+// ProbeOriginTypeNames returns the canonical short names of every type
+// currently retaining an OriginProbe/OriginDisk row-carrying entry in
+// RowStore (task #17 wave 1 stage 2 — the membership test the removed
+// session.ProbeResources map used to provide via range-over-map).
+func (c *Core) ProbeOriginTypeNames() []string {
+	return c.session.RowStore.ProbeOriginTypeNames()
 }
 
-// ForEachProbeResources invokes fn for every retained Wave-1 probe slice.
-// The slice underlying array is shared, so the callback may mutate rows[i]
-// fields in-place.
+// ProbeResources returns the Wave-1/disk-seed retained rows for the given
+// resource short name, read from RowStore (task #17 wave 1 stage 2 —
+// replaces the removed session.ProbeResources map). ok reports whether
+// RowStore currently holds an OriginProbe/OriginDisk entry with rows for rt;
+// the returned slice is a defensive copy (RowStore.Snapshot), so callers
+// wishing to mutate row content must go through AmendRows instead of writing
+// into the returned slice in place.
+func (c *Core) ProbeResources(rt string) ([]resource.Resource, bool) {
+	tr := c.session.RowStore.Snapshot(rt)
+	if len(tr.Rows) == 0 || (tr.Origin != session.OriginProbe && tr.Origin != session.OriginDisk) {
+		return nil, false
+	}
+	return tr.Rows, true
+}
+
+// ForEachProbeResources invokes fn for every retained OriginProbe/OriginDisk
+// row set (task #17 wave 1 stage 2 — replaces the removed
+// session.ProbeResources map). Each rows slice is a defensive copy
+// (RowStore.SnapshotAll); the callback MUST NOT rely on in-place mutation
+// propagating back into the store — use AmendRows for that.
 func (c *Core) ForEachProbeResources(fn func(rt string, rows []resource.Resource)) {
-	for rt, rows := range c.session.ProbeResources {
-		fn(rt, rows)
+	for rt, tr := range c.session.RowStore.SnapshotAll(true) {
+		if len(tr.Rows) == 0 || (tr.Origin != session.OriginProbe && tr.Origin != session.OriginDisk) {
+			continue
+		}
+		fn(rt, tr.Rows)
 	}
 }
 

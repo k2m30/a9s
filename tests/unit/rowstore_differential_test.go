@@ -1,47 +1,15 @@
-// rowstore_differential_test.go — dual-write EQUIVALENCE harness for Stage 1
-// of the row-store unification plan (rowstore-unification-plan.md, Stage 1:
-// "Introduce RowStore behind existing maps (dual-write scaffolding, zero
-// behavior change)"). Drives the EXISTING handler flows exactly the way
-// tests/unit/app_cache_first_seeding_test.go already does (same
-// newSeededTestController-style helper, same app.Controller.Handle seam),
-// and after EACH event asserts: internal/session.RowStore's contents are
-// equivalent to the legacy state it is meant to mirror.
-//
-// Wiring this harness depends on (internal/runtime, landed):
-//   - Core.HandleEvent gained direct cases for messages.ResourcesLoaded and
-//     messages.RelatedCheckResult (internal/runtime/orchestrator.go) that
-//     call observeResourcesLoadedRows/observeRelatedCheckResultRows
-//     (internal/runtime/rowstore_observe.go) — RowStore dual-write ONLY,
-//     deliberately returning nil,nil so Controller.Handle's own separate
-//     ResourcesLoaded/RelatedCheckResult pipelines (handleResourcesLoadedEvent,
-//     applyIntents-driven PatchResourceCache/PatchLazyResourceCache) are not
-//     double-applied. Both lanes fire from ONE Controller.Handle call because
-//     Controller.Handle always calls core.HandleEvent first
-//     (internal/app/handle.go).
-//   - handleAvailabilityCacheLoaded/handleAvailabilityPrefetched/
-//     handleAvailabilityChecked/handleEnrichmentChecked/HandleResourcesLoaded/
-//     SyncProbeResourcesForType each dual-write directly against
-//     session.ProbeResources (no intent needed for that map).
-//   - A bare messages.RelatedCheckResult's LazyAddedResources is dual-written
-//     to RowStore by Core.HandleEvent's new case, but the LEGACY
-//     session.LazyResourceCache map is only populated via
-//     Core.HandleRelatedCheckResult's PatchLazyResourceCache intent — which
-//     Controller.Handle does NOT apply for a bare RelatedCheckResult (only
-//     for RelatedCheckBatch, see internal/app/handle.go
-//     handleRelatedCheckBatch). This harness therefore drives BOTH paths
-//     explicitly for the lazy-add event (see
-//     TestDifferential_RelatedLazyAdd_MatchesLazyResourceCache) to get a
-//     genuine two-sided comparison.
-//
-// This is a DRIFT ALARM for Stages 2-4 of the plan, not a permanent
-// behavioral contract of its own: once those stages delete
-// ProbeResources/ResourceCache/LazyResourceCache/Controller.resourceCache and
-// re-point every reader at RowStore directly, the legacy state this file
-// compares against will no longer exist in this shape, and this file MUST BE
-// DELETED at Stage 5 ("Remove scaffolding") per the plan's
-// architecture_conformance_test.go step. Do not carry these equivalence
-// assertions forward past Stage 4 — they exist only to catch a dual-write
-// drifting out of sync with the legacy state it shadows while both are live.
+// rowstore_differential_test.go — task #17 wave 1 stage 2 retired the legacy
+// session.ProbeResources/ProbeTruncated maps this file's harness used to
+// compare RowStore against (originally a Stage 1 dual-write EQUIVALENCE
+// harness per rowstore-unification-plan.md). Per that plan's own Stage 5
+// ("Remove scaffolding") instruction, the ProbeResources-vs-store comparisons
+// are now meaningless — the map they compared against no longer exists — so
+// those cases are converted to STORE-ONLY assertions of the same semantics
+// RowStore was always meant to hold. The remaining legacy-map comparisons
+// against session.ResourceCache/session.LazyResourceCache stay intact: those
+// maps still exist (Stage 3 has not yet retired them), so the
+// ListState.Rows/LazyResourceCache differential checks here still catch a
+// genuine RowStore drift against a live sibling source.
 //
 // Event coverage this harness drives (see individual Test funcs below):
 //  1. cache-loaded seed              (AvailabilityCacheLoaded, real disk rows AND placeholder-fallback/counts-only)
@@ -99,18 +67,21 @@ func idSetsEqual(a, b map[string]bool) bool {
 	return true
 }
 
-// assertRowStoreMatchesProbeResources compares session.RowStore's rows for
-// shortName against the legacy session.ProbeResources map, by ID set — the
-// dual-write drift alarm for the Wave 1 sweep lane.
-func assertRowStoreMatchesProbeResources(t *testing.T, s *session.Session, shortName string) {
+// assertRowStoreHasIDs asserts session.RowStore's retained rows for shortName
+// have exactly the given ID set — the store-only replacement for the retired
+// legacy-map differential check (task #17 wave 1 stage 2: session.
+// ProbeResources/ProbeTruncated no longer exist to compare against).
+func assertRowStoreHasIDs(t *testing.T, s *session.Session, shortName string, wantIDs ...string) {
 	t.Helper()
-	legacy := s.ProbeResources[shortName]
 	snap := s.RowStore.Snapshot(shortName)
 
-	legacyIDs := idSet(legacy)
-	storeIDs := idSet(snap.Rows)
-	if !idSetsEqual(legacyIDs, storeIDs) {
-		t.Errorf("type %q: RowStore rows %v != legacy ProbeResources rows %v — dual-write drift", shortName, storeIDs, legacyIDs)
+	want := make(map[string]bool, len(wantIDs))
+	for _, id := range wantIDs {
+		want[id] = true
+	}
+	got := idSet(snap.Rows)
+	if !idSetsEqual(want, got) {
+		t.Errorf("type %q: RowStore.Snapshot(%q).Rows ID set = %v, want %v", shortName, shortName, got, want)
 	}
 }
 
@@ -143,8 +114,8 @@ func assertRowStoreMatchesListRows(t *testing.T, s *session.Session, c *app.Cont
 
 // TestDifferential_AvailabilityCacheLoaded_RealDiskRows_MatchesProbeResources
 // drives the disk-cache-loaded seed event with a populated on-disk per-type
-// file (real row data, not the placeholder fallback) and asserts RowStore's
-// rows match session.ProbeResources.
+// file (real row data, not the placeholder fallback) and asserts RowStore
+// retains exactly those rows (OriginDisk).
 func TestDifferential_AvailabilityCacheLoaded_RealDiskRows_MatchesProbeResources(t *testing.T) {
 	s, core, c := newDifferentialTestController(t)
 
@@ -169,7 +140,7 @@ func TestDifferential_AvailabilityCacheLoaded_RealDiskRows_MatchesProbeResources
 		Truncated: map[string]bool{"ec2": false},
 	})
 
-	assertRowStoreMatchesProbeResources(t, s, "ec2")
+	assertRowStoreHasIDs(t, s, "ec2", "i-diskrow-1")
 	snap := s.RowStore.Snapshot("ec2")
 	if len(snap.Rows) != 1 || snap.Rows[0].ID != "i-diskrow-1" {
 		t.Errorf("RowStore.Snapshot(ec2).Rows = %+v, want [i-diskrow-1] seeded from the real on-disk row data", snap.Rows)
@@ -179,9 +150,8 @@ func TestDifferential_AvailabilityCacheLoaded_RealDiskRows_MatchesProbeResources
 // TestDifferential_AvailabilityCacheLoaded_PlaceholderFallback_IsCountsOnly
 // drives the disk-cache-loaded seed event with NO on-disk per-type file (the
 // placeholder-row fallback path) and asserts RowStore treats it as a
-// counts-only observation (C6a: TotalCount set, Rows untouched/empty) —
-// the legacy ProbeResources map gets placeholder rows for the Loading=false
-// UX contract, but RowStore must never fabricate Rows from placeholders.
+// counts-only observation (C6a: TotalCount set, Rows untouched/empty) — a
+// placeholder-only fallback must never fabricate Rows in the store.
 func TestDifferential_AvailabilityCacheLoaded_PlaceholderFallback_IsCountsOnly(t *testing.T) {
 	s, _, c := newDifferentialTestController(t)
 
@@ -190,17 +160,12 @@ func TestDifferential_AvailabilityCacheLoaded_PlaceholderFallback_IsCountsOnly(t
 		Truncated: map[string]bool{"ec2": false},
 	})
 
-	legacyRows := s.ProbeResources["ec2"]
-	if len(legacyRows) != 3 {
-		t.Fatalf("precondition: legacy ProbeResources[ec2] = %+v, want 3 placeholder rows", legacyRows)
-	}
-
 	snap := s.RowStore.Snapshot("ec2")
 	if snap.TotalCount != 3 {
 		t.Errorf("RowStore.Snapshot(ec2).TotalCount = %d, want 3 to mirror the cache-loaded count (C6a)", snap.TotalCount)
 	}
 	if len(snap.Rows) != 0 {
-		t.Errorf("RowStore.Snapshot(ec2).Rows = %+v, want empty — a placeholder-only fallback must never fabricate Rows in the store (C6a), even though the legacy map gets placeholder rows for its own UX contract", snap.Rows)
+		t.Errorf("RowStore.Snapshot(ec2).Rows = %+v, want empty — a placeholder-only fallback must never fabricate Rows in the store (C6a)", snap.Rows)
 	}
 }
 
@@ -209,8 +174,8 @@ func TestDifferential_AvailabilityCacheLoaded_PlaceholderFallback_IsCountsOnly(t
 // -----------------------------------------------------------------------
 
 // TestDifferential_AvailabilityPrefetched_MatchesProbeResources drives the
-// synchronous no-cache-mode prefetch path and asserts RowStore's rows for
-// the prefetched type match session.ProbeResources verbatim.
+// synchronous no-cache-mode prefetch path and asserts RowStore retains
+// exactly the prefetched rows for the type (OriginFetch).
 func TestDifferential_AvailabilityPrefetched_MatchesProbeResources(t *testing.T) {
 	s, _, c := newDifferentialTestController(t)
 
@@ -226,7 +191,7 @@ func TestDifferential_AvailabilityPrefetched_MatchesProbeResources(t *testing.T)
 		Gen:        s.AvailabilityGen,
 	})
 
-	assertRowStoreMatchesProbeResources(t, s, "ec2")
+	assertRowStoreHasIDs(t, s, "ec2", "i-prefetch-1", "i-prefetch-2")
 }
 
 // -----------------------------------------------------------------------
@@ -234,7 +199,8 @@ func TestDifferential_AvailabilityPrefetched_MatchesProbeResources(t *testing.T)
 // -----------------------------------------------------------------------
 
 // TestDifferential_AvailabilityChecked_MatchesProbeResources drives one
-// type's Wave 1 background-probe completion and asserts equivalence.
+// type's Wave 1 background-probe completion and asserts RowStore retains
+// exactly the probed rows (OriginProbe).
 func TestDifferential_AvailabilityChecked_MatchesProbeResources(t *testing.T) {
 	s, _, c := newDifferentialTestController(t)
 
@@ -248,7 +214,7 @@ func TestDifferential_AvailabilityChecked_MatchesProbeResources(t *testing.T) {
 		Resources:    rows,
 	})
 
-	assertRowStoreMatchesProbeResources(t, s, "ec2")
+	assertRowStoreHasIDs(t, s, "ec2", "i-probed-1")
 }
 
 // -----------------------------------------------------------------------
@@ -306,24 +272,20 @@ func TestDifferential_ListOpen_ThenLoadMore_MatchesListRows(t *testing.T) {
 // keep the enrichment queue open past the "ec2" completion in
 // TestDifferential_EnrichmentChecked_FieldUpdates_MatchesProbeResources. A
 // single-type queue would make that one EnrichmentChecked delivery the FINAL
-// one (EnrichChecked >= EnrichTotal), which legitimately frees
-// session.ProbeResources in handleEnrichmentChecked's "all done" branch
-// (internal/runtime/handlers_availability.go) before the legacy-map
-// comparison runs — see
-// TestDifferential_EnrichmentChecked_AllDone_RowStoreSurvivesLegacyFree for a
-// pinned regression on that exact free. Registering this second sentinel
+// one (EnrichChecked >= EnrichTotal) — see
+// TestDifferential_EnrichmentChecked_AllDone_RowStoreSurvivesLegacyFree for
+// the dedicated all-done-completion pin. Registering this second sentinel
 // keeps EnrichTotal at 2 so the ec2 delivery is a genuine partial-completion,
-// matching this test's stated intent (compare RowStore against a live,
-// still-populated ProbeResources).
+// matching this test's stated intent (assert RowStore's own amended rows
+// mid-sweep, before the queue drains).
 const rowstoreDiffSentinelWave2Type = "rowstore-diff-sentinel-wave2"
 
 // TestDifferential_EnrichmentChecked_FieldUpdates_MatchesProbeResources
 // drives a Wave 2 enrichment completion carrying FieldUpdates and asserts
-// the row store's amended rows match the legacy ProbeResources fold
-// (runtime.Core.applyEnrichment) both in ID set and in the merged Fields
-// values — the copy-on-write Amend must reproduce today's applyEnrichment
-// FieldUpdates maps.Copy behavior, per the plan ("Amend... replaces
-// in-place applyEnrichment walks and FieldUpdates maps.Copy writes").
+// RowStore's amended rows (via AmendRows, task #17 wave 1 stage 2's
+// replacement for the removed session.ProbeResources applyEnrichment fold)
+// carry the merged FieldUpdates values — the copy-on-write Amend must
+// reproduce applyEnrichment's FieldUpdates maps.Copy behavior.
 func TestDifferential_EnrichmentChecked_FieldUpdates_MatchesProbeResources(t *testing.T) {
 	awsclient.SetWave2EnricherForTest(t, rowstoreDiffSentinelWave2Type, awsclient.IssueEnricher{
 		Fn:       awsclient.InFetcherWave2Sentinel,
@@ -343,9 +305,9 @@ func TestDifferential_EnrichmentChecked_FieldUpdates_MatchesProbeResources(t *te
 		Resources:    seed,
 	})
 
-	// Seed the sentinel type's own ProbeResources entry too — BuildEnrichQueue
+	// Seed the sentinel type's own RowStore entry too — BuildEnrichQueue
 	// (internal/runtime/probes.go) only enqueues a Wave-2 entry when
-	// session.ProbeResources already has a key for it.
+	// RowStore.Snapshot(type).Gen != 0 (observed-at-all).
 	_, _ = c.Handle(messages.AvailabilityChecked{
 		ResourceType: rowstoreDiffSentinelWave2Type,
 		HasResources: true,
@@ -374,28 +336,24 @@ func TestDifferential_EnrichmentChecked_FieldUpdates_MatchesProbeResources(t *te
 		t.Fatalf("precondition: want a partial enrichment completion (EnrichChecked < EnrichTotal) so handleEnrichmentChecked's all-done free does not fire; got EnrichChecked=%d EnrichTotal=%d", s.EnrichChecked, s.EnrichTotal)
 	}
 
-	assertRowStoreMatchesProbeResources(t, s, "ec2")
-
-	legacyRows := s.ProbeResources["ec2"]
-	if len(legacyRows) != 1 || legacyRows[0].Fields["cost_estimate"] != "12.50" {
-		t.Fatalf("precondition: legacy ProbeResources FieldUpdates fold did not apply cost_estimate, got %+v", legacyRows)
-	}
+	assertRowStoreHasIDs(t, s, "ec2", "i-enrich-1")
 
 	snap := s.RowStore.Snapshot("ec2")
 	if len(snap.Rows) != 1 || snap.Rows[0].Fields["cost_estimate"] != "12.50" {
-		t.Errorf("RowStore.Snapshot(ec2).Rows = %+v, want Fields[cost_estimate]=12.50 to match the legacy applyEnrichment FieldUpdates fold", snap.Rows)
+		t.Errorf("RowStore.Snapshot(ec2).Rows = %+v, want Fields[cost_estimate]=12.50 from the applyEnrichment FieldUpdates fold", snap.Rows)
 	}
 }
 
 // TestDifferential_EnrichmentChecked_AllDone_RowStoreSurvivesLegacyFree pins
 // the D12-class survival behavior RowStore exists for: when a single-type
-// enrichment queue drains on the FIRST EnrichmentChecked delivery,
-// handleEnrichmentChecked's "all done" branch
-// (internal/runtime/handlers_availability.go) frees
-// session.ProbeResources/ProbeTruncated to nil (after already snapshotting
-// them for the cache save) — but the RowStore dual-write (via AmendRows,
-// which ran earlier in the same handler call) is NOT part of that free and
-// must still carry the merged FieldUpdates row.
+// enrichment queue drains on the FIRST EnrichmentChecked delivery
+// (handleEnrichmentChecked's "all done" branch,
+// internal/runtime/handlers_availability.go), RowStore's rows for that type
+// are retained after the sweep completes — task #17 wave 1 stage 2 removed
+// the legacy session.ProbeResources/ProbeTruncated free this branch used to
+// perform, so there is no map-nil race left to survive; the row set the
+// enrichment fold merged into RowStore via AmendRows earlier in the same
+// handler call must simply still be there.
 func TestDifferential_EnrichmentChecked_AllDone_RowStoreSurvivesLegacyFree(t *testing.T) {
 	s, _, c := newDifferentialTestController(t)
 
@@ -427,13 +385,10 @@ func TestDifferential_EnrichmentChecked_AllDone_RowStoreSurvivesLegacyFree(t *te
 	if s.EnrichChecked < s.EnrichTotal {
 		t.Fatalf("precondition: want the all-done branch to have fired (EnrichChecked >= EnrichTotal), got EnrichChecked=%d EnrichTotal=%d", s.EnrichChecked, s.EnrichTotal)
 	}
-	if s.ProbeResources != nil {
-		t.Fatalf("precondition: want session.ProbeResources freed to nil by the all-done branch, got %+v", s.ProbeResources)
-	}
 
 	snap := s.RowStore.Snapshot("ec2")
 	if len(snap.Rows) != 1 || snap.Rows[0].Fields["cost_estimate"] != "9.99" {
-		t.Errorf("RowStore.Snapshot(ec2).Rows = %+v, want the merged cost_estimate=9.99 row to survive the legacy ProbeResources free", snap.Rows)
+		t.Errorf("RowStore.Snapshot(ec2).Rows = %+v, want the merged cost_estimate=9.99 row to survive enrichment-sweep completion", snap.Rows)
 	}
 }
 
@@ -516,11 +471,10 @@ func TestDifferential_RelatedLazyAdd_MatchesLazyResourceCache(t *testing.T) {
 // Event 7 — pair switch (Session.Rotate)
 // -----------------------------------------------------------------------
 
-// TestDifferential_PairSwitch_ClearsRowStoreLikeLegacyMaps drives a
-// Wave-1 probe result (populating both the legacy ProbeResources path and
-// RowStore), then rotates the session (profile/region switch) and asserts
-// RowStore ends up empty in lockstep with the legacy ProbeResources map
-// (C9 pair isolation).
+// TestDifferential_PairSwitch_ClearsRowStoreLikeLegacyMaps drives a Wave-1
+// probe result (populating RowStore), then rotates the session
+// (profile/region switch) and asserts RowStore ends up empty — never
+// observed again (Gen==0), not merely empty-Rows (C9 pair isolation).
 func TestDifferential_PairSwitch_ClearsRowStoreLikeLegacyMaps(t *testing.T) {
 	s, _, c := newDifferentialTestController(t)
 
@@ -531,17 +485,17 @@ func TestDifferential_PairSwitch_ClearsRowStoreLikeLegacyMaps(t *testing.T) {
 		Gen:          s.AvailabilityGen,
 		Resources:    []resource.Resource{{ID: "bucket-preswitch-1", Type: "s3"}},
 	})
-	assertRowStoreMatchesProbeResources(t, s, "s3")
+	assertRowStoreHasIDs(t, s, "s3", "bucket-preswitch-1")
 
 	s.Profile = "other-profile"
 	s.Region = "eu-west-1"
 	s.Rotate()
 
-	if len(s.ProbeResources) != 0 {
-		t.Fatalf("precondition: legacy ProbeResources after Rotate = %+v, want empty", s.ProbeResources)
-	}
 	postSnap := s.RowStore.Snapshot("s3")
+	if postSnap.Gen != 0 {
+		t.Errorf("RowStore.Snapshot(s3).Gen after pair switch = %d, want 0 (never observed this new session) — C9", postSnap.Gen)
+	}
 	if len(postSnap.Rows) != 0 {
-		t.Errorf("RowStore.Snapshot(s3).Rows after pair switch = %+v, want empty in lockstep with legacy ProbeResources (C9)", postSnap.Rows)
+		t.Errorf("RowStore.Snapshot(s3).Rows after pair switch = %+v, want empty (C9)", postSnap.Rows)
 	}
 }

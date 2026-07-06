@@ -357,3 +357,39 @@ func (s *RowStore) Clear() {
 
 	s.types = make(map[string]TypeRows)
 }
+
+// ClearProbeOrigin drops every retained type entry whose Origin is
+// OriginProbe or OriginDisk, leaving OriginFetch entries (a top-level list's
+// own fetched rows) untouched. Used by the main-menu Ctrl+R refresh path
+// (formerly a reset of the now-removed session.ProbeResources/ProbeTruncated
+// maps) so the next Wave-1 probe round populates fresh without blanking an
+// already-open resource list's live fetch result.
+func (s *RowStore) ClearProbeOrigin() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for canon, tr := range s.types {
+		if tr.Origin == OriginProbe || tr.Origin == OriginDisk {
+			delete(s.types, canon)
+		}
+	}
+}
+
+// ProbeOriginTypeNames returns the canonical short names of every type
+// currently retaining a rows-carrying OriginProbe or OriginDisk entry (the
+// Wave-1-probe/disk-seed role the removed session.ProbeResources map used to
+// play). Used by callers that need the same "has this type been retained by
+// a Wave-1 probe/disk seed this session" membership test the old map
+// provided, without exposing the rows themselves.
+func (s *RowStore) ProbeOriginTypeNames() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	names := make([]string, 0, len(s.types))
+	for canon, tr := range s.types {
+		if (tr.Origin == OriginProbe || tr.Origin == OriginDisk) && len(tr.Rows) > 0 {
+			names = append(names, canon)
+		}
+	}
+	return names
+}

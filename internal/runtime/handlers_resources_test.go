@@ -130,8 +130,8 @@ func TestHandleResourcesLoaded_PartialError_EmitsFlash(t *testing.T) {
 
 // TestHandleResourcesLoaded_RerunTokenMatches_EmitsProbeTask verifies
 // the enrichment-rerun path: when TypeGen is non-zero AND matches the
-// per-type gen captured at Ctrl+R dispatch, Core seeds ProbeResources +
-// ProbeTruncated and emits a TaskKindProbeEnrich task.
+// per-type gen captured at Ctrl+R dispatch, Core seeds RowStore (OriginFetch,
+// wholesale replace) and emits a TaskKindProbeEnrich task.
 func TestHandleResourcesLoaded_RerunTokenMatches_EmitsProbeTask(t *testing.T) {
 	sess := session.New()
 	sess.EnrichmentTypeGen["ec2"] = 7
@@ -148,17 +148,19 @@ func TestHandleResourcesLoaded_RerunTokenMatches_EmitsProbeTask(t *testing.T) {
 	if !hasTask(tasks, TaskKindProbeEnrich, "ec2") {
 		t.Fatalf("expected TaskKindProbeEnrich for ec2, got %d tasks", len(tasks))
 	}
-	if got := sess.ProbeResources["ec2"]; len(got) != 1 || got[0].ID != "i-001" {
-		t.Errorf("ProbeResources[ec2] = %v, want one row with ID i-001", got)
+	tr := sess.RowStore.Snapshot("ec2")
+	if len(tr.Rows) != 1 || tr.Rows[0].ID != "i-001" {
+		t.Errorf("RowStore.Snapshot(\"ec2\").Rows = %v, want one row with ID i-001", tr.Rows)
 	}
-	if !sess.ProbeTruncated["ec2"] {
-		t.Errorf("ProbeTruncated[ec2] = false, want true")
+	if tr.Pagination == nil || !tr.Pagination.IsTruncated {
+		t.Errorf("RowStore.Snapshot(\"ec2\").Pagination.IsTruncated = %v, want true", tr.Pagination)
 	}
 }
 
 // TestHandleResourcesLoaded_RerunTokenStale_NoProbeTask verifies stale
 // rerun tokens are silently dropped: when TypeGen does not match the
-// per-type gen, no probe task fires and ProbeResources is not mutated.
+// per-type gen, no probe task fires and RowStore is never observed for
+// this type (Gen stays 0).
 func TestHandleResourcesLoaded_RerunTokenStale_NoProbeTask(t *testing.T) {
 	sess := session.New()
 	sess.EnrichmentTypeGen["ec2"] = 7
@@ -173,8 +175,8 @@ func TestHandleResourcesLoaded_RerunTokenStale_NoProbeTask(t *testing.T) {
 	if hasTask(tasks, TaskKindProbeEnrich, "ec2") {
 		t.Errorf("expected NO probe task for stale TypeGen, got %d tasks", len(tasks))
 	}
-	if got := sess.ProbeResources["ec2"]; got != nil {
-		t.Errorf("ProbeResources[ec2] should not be seeded on stale gen, got %v", got)
+	if tr := sess.RowStore.Snapshot("ec2"); tr.Gen != 0 {
+		t.Errorf("RowStore.Snapshot(\"ec2\") should not be observed on stale gen, got Gen=%d Rows=%v", tr.Gen, tr.Rows)
 	}
 }
 

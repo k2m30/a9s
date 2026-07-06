@@ -70,8 +70,8 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		})
 	}
 
-	// Contract D / C1: seed session.ProbeResources with the disk-cached rows
-	// for every known type so a cold list-open renders real cells instantly
+	// Contract D / C1: seed RowStore with the disk-cached rows for every
+	// known type so a cold list-open renders real cells instantly
 	// (Loading=false, Refreshing=true) instead of the empty Loading shell —
 	// mirrors Count/Truncated already being applied to the menu above.
 	//
@@ -82,12 +82,14 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 	// the seeded-list contract (Loading=false) intact even for callers that
 	// deliver a counts-only AvailabilityCacheLoaded event without a populated
 	// on-disk per-type file (e.g. a synthetic/legacy counts projection).
+	//
+	// task #17 wave 1 stage 2: this is now a store-only write — the
+	// already-observed guard reads RowStore.ProbeOriginTypeNames' membership
+	// test instead of the removed session.ProbeResources map.
 	if len(entries) > 0 {
-		if c.session.ProbeResources == nil {
-			c.session.ProbeResources = make(map[string][]resource.Resource, len(entries))
-		}
-		if c.session.ProbeTruncated == nil {
-			c.session.ProbeTruncated = make(map[string]bool, len(entries))
+		alreadyObserved := make(map[string]struct{})
+		for _, name := range c.session.RowStore.ProbeOriginTypeNames() {
+			alreadyObserved[name] = struct{}{}
 		}
 		rowsByType := make(map[string][]cache.Row, len(entries))
 		_ = c.ReadCacheStore(func(store *cache.Store) error {
@@ -105,19 +107,13 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 			if count <= 0 {
 				continue
 			}
-			if _, already := c.session.ProbeResources[shortName]; already {
+			if _, already := alreadyObserved[shortName]; already {
 				continue
 			}
 			var realRows []resource.Resource
 			if cr, ok := rowsByType[shortName]; ok {
 				realRows = rowsFromCacheRows(shortName, cr)
 			}
-			rows := realRows
-			if len(rows) == 0 {
-				rows = placeholderRows(shortName, count)
-			}
-			c.session.ProbeResources[shortName] = rows
-			c.session.ProbeTruncated[shortName] = truncated[shortName]
 			// Dual-write (task #17 wave 1): only real per-type disk row data
 			// feeds RowStore's rows-carrying Observe (OriginDisk — a later live
 			// probe/fetch result is never regressed by a race-losing disk seed).
@@ -204,20 +200,13 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 	}
 	intents = append(intents, PatchMenuCheckProgress{Checked: 0, Total: 0}) // signal "done"
 
-	// T034: retain prefetch resources for Wave-2 enrichment.
+	// T034: retain prefetch resources for Wave-2 enrichment. Fetcher-emitted
+	// rows already carry Findings; no re-derive needed (W1.4b.3 dropped the
+	// legacy Status/Issues bridge). task #17 wave 1 stage 2: store-only —
+	// the removed session.ProbeResources/ProbeTruncated dual-write is gone,
+	// ObserveRows below is now this write's only destination for the
+	// Wave-2-retained-rows role.
 	if msg.Resources != nil {
-		if c.session.ProbeResources == nil {
-			c.session.ProbeResources = make(map[string][]resource.Resource, len(msg.Resources))
-		}
-		// Fetcher-emitted rows already carry Findings; no re-derive needed
-		// (W1.4b.3 dropped the legacy Status/Issues bridge).
-		maps.Copy(c.session.ProbeResources, msg.Resources)
-
-		if c.session.ProbeTruncated == nil {
-			c.session.ProbeTruncated = make(map[string]bool, len(msg.Truncated))
-		}
-		maps.Copy(c.session.ProbeTruncated, msg.Truncated)
-
 		if c.session.ResourceCache == nil {
 			c.session.ResourceCache = make(map[string]*session.ResourceCacheEntry, len(msg.Resources))
 		}
@@ -226,9 +215,9 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 			if pageMeta == nil {
 				pageMeta = &resource.PaginationMeta{IsTruncated: msg.Truncated[rt]}
 			}
-			// Dual-write (task #17 wave 1): a synchronous prefetch is a live,
-			// full result — OriginFetch — regardless of whether the legacy
-			// ResourceCache write below is skipped by the exists-guard.
+			// A synchronous prefetch is a live, full result — OriginFetch —
+			// regardless of whether the legacy ResourceCache write below is
+			// skipped by the exists-guard.
 			c.ObserveRows(rt, resources, pageMeta, session.OriginFetch, false)
 			if _, exists := c.session.ResourceCache[rt]; exists {
 				continue
@@ -281,17 +270,13 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 			Truncated:    msg.Truncated,
 		})
 
-		// T032: retain probe resources for Wave-2 enrichment.
-		if c.session.ProbeResources == nil {
-			c.session.ProbeResources = make(map[string][]resource.Resource)
-		}
+		// T032: retain probe resources for Wave-2 enrichment. Fetcher-emitted
+		// rows already carry Findings; no re-derive needed (W1.4b.3 dropped
+		// the legacy Status/Issues bridge).
 		canonType := msg.ResourceType
 		if td := resource.FindResourceType(msg.ResourceType); td != nil {
 			canonType = td.ShortName
 		}
-		// Fetcher-emitted rows already carry Findings; no re-derive needed
-		// (W1.4b.3 dropped the legacy Status/Issues bridge).
-		//
 		// C6b/D17: this bare Wave-1 probe result carries no Wave-2 data of its
 		// own — if a prior Wave-2 enrichment pass this session already wrote
 		// Findings/Fields onto the type's previous in-memory rows, a plain
@@ -299,16 +284,13 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		// completes (the visible mid-session blink D17 describes). Carry
 		// forward the previous rows' Wave-2-sourced Findings and this type's
 		// registered enricher Fields keys per matching resource ID first.
-		freshResources := carryWave2ForResources(c.session.ProbeResources[canonType], msg.Resources, issueEnricherFieldKeysFor(canonType))
-		c.session.ProbeResources[canonType] = freshResources
-		if c.session.ProbeTruncated == nil {
-			c.session.ProbeTruncated = make(map[string]bool)
-		}
-		c.session.ProbeTruncated[canonType] = msg.Truncated
-		// Dual-write (task #17 wave 1): the Wave-2-carried result IS this
-		// probe's final row state — feed RowStore the same freshResources the
-		// legacy map above just received, so the store never sees a
-		// pre-carry, Wave-2-blind snapshot.
+		// task #17 wave 1 stage 2: the "previous rows" read is now RowStore's
+		// own current snapshot for canonType (replaces the removed
+		// session.ProbeResources[canonType] read) — the Wave-2-carried result
+		// IS this probe's final row state, and ObserveRows below is its only
+		// write destination now.
+		previous, _ := c.ProbeResources(canonType)
+		freshResources := carryWave2ForResources(previous, msg.Resources, issueEnricherFieldKeysFor(canonType))
 		c.ObserveRows(canonType, freshResources, &resource.PaginationMeta{IsTruncated: msg.Truncated}, session.OriginProbe, false)
 	}
 
@@ -342,17 +324,19 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	intents = append(intents, PatchMenuCheckProgress{Checked: 0, Total: 0}) // 0,0 = done
 	intents = append(intents, ClearFlash{})
 
-	// DEF-7: snapshot ProbeResources/ProbeTruncated NOW, before a later mutation
-	// (e.g. a subsequent handleEnrichmentChecked's applyEnrichment/FieldUpdates
-	// merge for a type already in this snapshot) could change them out from
-	// under an already-dispatched save — see SaveCachePayload's doc comment for
-	// why dispatch-time capture is required here. This is the Wave-1
-	// sweep-completion save, not the Wave-2-completion save, so
+	// DEF-7 (restated on RowStore): snapshot RowStore NOW, before a later
+	// mutation (e.g. a subsequent handleEnrichmentChecked's
+	// applyEnrichment/FieldUpdates AmendRows fold for a type already in this
+	// snapshot) could change it out from under an already-dispatched save —
+	// snapshotRowStoreForSave's SnapshotAll call captures a defensive,
+	// by-construction-isolated copy at THIS instant (see SaveCachePayload's
+	// doc comment for why dispatch-time capture is required here). This is
+	// the Wave-1 sweep-completion save, not the Wave-2-completion save, so
 	// wave2Complete=false (C6b): the executor carries forward on-disk Wave-2
 	// data these bare rows themselves lack instead of letting them clobber it.
 	tasks = append(tasks, TaskRequest{
 		Key:     TaskKey{Kind: TaskKindSaveCache},
-		Payload: c.snapshotProbeResourcesForSave(false),
+		Payload: c.snapshotRowStoreForSave(false),
 	})
 
 	enrichIntents, enrichTasks := c.startEnrichment()
@@ -444,22 +428,11 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		// every cached row of this type.
 		c.applyEnrichment(msg.ResourceType, msg.Findings, msg.AttentionDetails)
 
-		// Merge FieldUpdates into ProbeResources and ResourceCache.
+		// Merge FieldUpdates into ResourceCache and RowStore. The
+		// session.ProbeResources leg (task #17 wave 1 stage 2) is gone — the
+		// AmendRows fold below is now this merge's only per-type-row
+		// destination for that removed leg.
 		if len(msg.FieldUpdates) > 0 {
-			if c.session.ProbeResources == nil {
-				c.session.ProbeResources = make(map[string][]resource.Resource)
-			}
-			slice := c.session.ProbeResources[msg.ResourceType]
-			for i := range slice {
-				if updates, ok := msg.FieldUpdates[slice[i].ID]; ok {
-					if slice[i].Fields == nil {
-						slice[i].Fields = make(map[string]string, len(updates))
-					}
-					maps.Copy(slice[i].Fields, updates)
-				}
-			}
-			c.session.ProbeResources[msg.ResourceType] = slice
-
 			if entry, ok := c.session.ResourceCache[msg.ResourceType]; ok {
 				for i := range entry.Resources {
 					if updates, ok := msg.FieldUpdates[entry.Resources[i].ID]; ok {
@@ -471,9 +444,8 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 				}
 			}
 
-			// Dual-write (task #17 wave 1): apply the same FieldUpdates onto
-			// RowStore's copy via copy-on-write Amend, mirroring the legacy
-			// in-place merge above without aliasing its backing arrays.
+			// task #17 wave 1 stage 2: apply FieldUpdates onto RowStore's copy
+			// via copy-on-write Amend.
 			c.AmendRows(msg.ResourceType, func(rows []resource.Resource) []resource.Resource {
 				out := make([]resource.Resource, len(rows))
 				for i, r := range rows {
@@ -495,7 +467,14 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		td := resource.FindResourceType(msg.ResourceType)
 		var unified int
 		if td != nil {
-			unified = unifiedIssueCount(c.session.ProbeResources[msg.ResourceType], *td, msg.Findings)
+			// task #17 wave 1 stage 2: unifiedIssueCount's input is now
+			// RowStore's own current rows for this type (replaces the removed
+			// session.ProbeResources[msg.ResourceType] read) — this is the
+			// SAME rows applyEnrichment/AmendRows above just folded findings
+			// and FieldUpdates onto, so this aggregation is over the freshest
+			// per-type row state this call produced.
+			rows, _ := c.ProbeResources(msg.ResourceType)
+			unified = unifiedIssueCount(rows, *td, msg.Findings)
 		} else {
 			unified = msg.Issues
 		}
@@ -511,7 +490,10 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		if unified == 0 && len(msg.Findings) == 0 {
 			issueTruncated = false
 		}
-		if c.session.ProbeTruncated[msg.ResourceType] {
+		// task #17 wave 1 stage 2: the removed session.ProbeTruncated map's
+		// per-type truncation signal is now RowStore's own Pagination for this
+		// type, set by this same probe cycle's ObserveRows/AmendRows write.
+		if tr := c.session.RowStore.Snapshot(msg.ResourceType); tr.Pagination != nil && tr.Pagination.IsTruncated {
 			issueTruncated = true
 		}
 
@@ -565,19 +547,25 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		return intents, tasks
 	}
 
-	// All enrichment done — clear progress, free retained resources, save cache.
+	// All enrichment done — clear progress, save cache. RowStore retains its
+	// rows for the session (task #17 wave 1 stage 2 — no
+	// enrichment-completion free; see RowStore.Amend's doc comment), so
+	// unlike the removed session.ProbeResources/ProbeTruncated free this
+	// branch used to perform, there is nothing to nil out here.
 	if c.session.EnrichChecked >= c.session.EnrichTotal {
 		intents = append(intents, PatchMenuEnrichProgress{Checked: 0, Total: 0})
-		// DEF-7: snapshot BEFORE freeing ProbeResources/ProbeTruncated below —
-		// this is the completion path that carries the FINAL Wave-2-enriched
-		// findings (applyEnrichment above already mutated r.Findings on every
-		// cached row of this type), so it must not be lost to the free.
+		// DEF-7 (restated on RowStore): SnapshotAll captures a defensive,
+		// by-construction-isolated copy (see RowStore.SnapshotAll's doc
+		// comment) at THIS dispatch instant, immune to any later Amend the
+		// live store still accepts for this type. This is the completion path
+		// that carries the FINAL Wave-2-enriched findings (applyEnrichment
+		// above already folded r.Findings/r.AttentionDetails onto every
+		// retained row of this type via AmendRows), so it must not be lost to
+		// a later mutation of the live store.
 		// wave2Complete=true (C6b): this save IS the fresh enrichment result
 		// and must supersede any carried Wave-2 data wholesale so a
 		// healed/resolved issue can clear.
-		saveSnapshot := c.snapshotProbeResourcesForSave(true)
-		c.session.ProbeResources = nil
-		c.session.ProbeTruncated = nil
+		saveSnapshot := c.snapshotRowStoreForSave(true)
 		tasks = append(tasks, TaskRequest{
 			Key:     TaskKey{Kind: TaskKindSaveCache},
 			Payload: saveSnapshot,
@@ -587,50 +575,51 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	return intents, tasks
 }
 
-// snapshotProbeResourcesForSave captures a deep-enough copy of
-// c.session.ProbeResources/ProbeTruncated for a TaskKindSaveCache dispatch —
-// DEF-7. Must be called BEFORE any subsequent same-call mutation of those
-// maps (the free-on-enrichment-complete nil-out, or a LATER
-// handleEnrichmentChecked call's applyEnrichment/FieldUpdates merge for a
-// type already captured here) so the eventual save sees the rows as they
-// stood at dispatch time, not as they stand whenever the task executes.
+// snapshotRowStoreForSave builds a TaskKindSaveCache payload from RowStore's
+// current retained rows (task #17 wave 1 stage 2 — replaces the deleted
+// snapshotProbeResourcesForSave, whose source was session.ProbeResources/
+// ProbeTruncated). SnapshotAll(false) excludes Partial-only entries (C6
+// scope: a sparse LazyResourceCache-role read must never poison a type's
+// canonical persisted list) — mirrors snapshotProbeResourcesForSave's own
+// scope, since the legacy session.ProbeResources map never carried Partial
+// rows either.
 //
-// A shallow map copy is NOT sufficient here: applyEnrichment mutates each
-// resource.Resource IN PLACE (via ApplyWave2ToRow on &rows[i]) on the SAME
-// backing array a shallow []resource.Resource slice copy would still alias —
-// a plain maps.Copy of the outer map would still observe that later
-// in-place mutation. Each per-type slice, each resource's Findings slice (the
-// field ApplyWave2ToRow mutates), AND each resource's Fields map (the field
-// the later FieldUpdates enrichment step maps.Copy's INTO on the same
-// backing map — an aliased Fields map would let that later mutation corrupt
-// an already-dispatched snapshot) are copied element-by-element so the
-// snapshot is fully isolated from any later mutation of the live session
-// state.
+// SnapshotAll's own defensive-copy guarantee (fresh slice + fresh Fields map
+// per row, see RowStore.Snapshot's doc comment) is what gives this payload
+// the DEF-7 dispatch-time-freeze property the deleted function's
+// element-by-element copy used to provide by hand.
 //
 // wave2Complete is stamped onto the returned payload's Wave2Complete field
 // as-is (C6b) — see SaveCachePayload's doc comment for what it drives at
 // execute time.
-func (c *Core) snapshotProbeResourcesForSave(wave2Complete bool) *SaveCachePayload {
-	if len(c.session.ProbeResources) == 0 {
+func (c *Core) snapshotRowStoreForSave(wave2Complete bool) *SaveCachePayload {
+	resources, truncated := c.rowStoreResourcesAndTruncated()
+	if len(resources) == 0 {
 		return nil
 	}
-	resources := make(map[string][]resource.Resource, len(c.session.ProbeResources))
-	for shortName, rows := range c.session.ProbeResources {
-		cp := make([]resource.Resource, len(rows))
-		for i, r := range rows {
-			r.Findings = append([]domain.Finding(nil), r.Findings...)
-			if r.Fields != nil {
-				fields := make(map[string]string, len(r.Fields))
-				maps.Copy(fields, r.Fields)
-				r.Fields = fields
-			}
-			cp[i] = r
-		}
-		resources[shortName] = cp
-	}
-	truncated := make(map[string]bool, len(c.session.ProbeTruncated))
-	maps.Copy(truncated, c.session.ProbeTruncated)
 	return &SaveCachePayload{Resources: resources, Truncated: truncated, Wave2Complete: wave2Complete}
+}
+
+// rowStoreResourcesAndTruncated converts RowStore.SnapshotAll(false) (task
+// #17 wave 1 stage 2) into the (resources, truncated) map pair
+// snapshotRowStoreForSave and the TaskKindSaveCache nil-Payload executor
+// fallback both need — the shape TaskKindSaveCache's payload/live-read
+// carried since before the row-store unification (SaveCachePayload.Resources/
+// Truncated). Excludes Partial-only entries and any Rows-empty entry (C6a:
+// a counts-only ObserveCount write must never surface here as a
+// zero-resource, zero-value-Truncated row-carrying entry).
+func (c *Core) rowStoreResourcesAndTruncated() (map[string][]resource.Resource, map[string]bool) {
+	all := c.session.RowStore.SnapshotAll(false)
+	resources := make(map[string][]resource.Resource, len(all))
+	truncated := make(map[string]bool, len(all))
+	for shortName, tr := range all {
+		if len(tr.Rows) == 0 {
+			continue
+		}
+		resources[shortName] = tr.Rows
+		truncated[shortName] = tr.Pagination != nil && tr.Pagination.IsTruncated
+	}
+	return resources, truncated
 }
 
 // rowsFromCacheRows converts a per-type file's persisted Rows (ID/Name/Fields
@@ -666,21 +655,6 @@ func rowsFromCacheRows(shortName string, rows []cache.Row) []resource.Resource {
 	return out
 }
 
-// placeholderRows synthesizes count ID-only resource.Resource rows for a type
-// whose cached count is known but whose per-row disk data is unavailable
-// (e.g. a counts-only cache projection). Placeholder IDs are never shown to
-// the operator as real identifiers by themselves — the immediate live fetch
-// this seeding always accompanies (Refreshing=true) replaces them.
-func placeholderRows(shortName string, count int) []resource.Resource {
-	out := make([]resource.Resource, count)
-	for i := range out {
-		out[i] = resource.Resource{
-			ID:   fmt.Sprintf("%s-cached-%d", shortName, i),
-			Type: shortName,
-		}
-	}
-	return out
-}
 
 // unifiedIssueCount returns the distinct count of resource IDs with ≥1 issue
 // across both Wave-1 (IsIssue() status color) and Wave-2 (enrichment findings).

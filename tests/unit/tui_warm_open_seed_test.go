@@ -2,14 +2,14 @@
 // docs/design/cache-requirements.md).
 //
 // Root cause: on a cache-MISS (no session.ResourceCache entry for the type
-// yet, but session.ProbeResources DOES hold retained first-page rows from a
+// yet, but session.RowStore DOES hold retained first-page rows from a
 // prior Wave-1 probe / disk-cache replay), the two renderer adapters diverge:
 //
 //   - internal/app/navigate.go's applyNavResult, NavigateKindPushResourceList
 //     branch (controller/headless/web lane) seeds the pushed list straight
-//     from c.core.Session().ProbeResources[res.ResolvedType] (+ ProbeTruncated
-//     → synthetic PaginationMeta), so the list renders instantly with
-//     Refreshing=true instead of Loading=true.
+//     from c.core.Session().RowStore.Snapshot(res.ResolvedType) (Rows +
+//     Pagination.IsTruncated → synthetic PaginationMeta), so the list renders
+//     instantly with Refreshing=true instead of Loading=true.
 //   - internal/tui/runtime_adapter_navigate.go's NavigateKindPushResourceList
 //     case (live TUI lane) does no such seeding — it only calls
 //     views.NewResourceList(...).Init() and dispatches the fetch, so the
@@ -19,7 +19,7 @@
 //
 // The fix (coder, parallel dispatch) moves the seeding decision up to
 // runtime.Core.HandleNavigate: on the NavigateTargetResourceList cache-MISS
-// branch, when session.ProbeResources[canon] is non-empty, the runtime
+// branch, when session.RowStore.Snapshot(canon) is non-empty, the runtime
 // attaches a synthetic session.ResourceCacheEntry on NavigateResult.CachedEntry
 // (reusing the same field the cache-HIT branch already populates) while STILL
 // returning the KindFetchResources task (C1 "show what you know, then verify
@@ -64,9 +64,9 @@ import (
 
 // TestHandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask pins DEF-12
 // at the runtime.Core.HandleNavigate seam: session.ResourceCache has NO entry
-// for "s3" (a genuine cache miss), but session.ProbeResources["s3"] holds
-// retained first-page rows from a prior Wave-1 probe, with
-// ProbeTruncated["s3"] = true. HandleNavigate(NavigateTargetResourceList,
+// for "s3" (a genuine cache miss), but session.RowStore holds retained
+// first-page rows for "s3" from a prior Wave-1 probe, with
+// Pagination.IsTruncated = true. HandleNavigate(NavigateTargetResourceList,
 // "s3") must:
 //
 //  1. still return NavigateKindPushResourceList (not the Cached variant —
@@ -86,8 +86,7 @@ func TestHandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask(t *testing.T)
 		{ID: "arn:aws:s3:::def12-warm-bucket-1", Name: "def12-warm-bucket-1", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
 		{ID: "arn:aws:s3:::def12-warm-bucket-2", Name: "def12-warm-bucket-2", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
 	}
-	sess.ProbeResources = map[string][]resource.Resource{"s3": probeRows}
-	sess.ProbeTruncated = map[string]bool{"s3": true}
+	sess.RowStore.Observe("s3", probeRows, &resource.PaginationMeta{IsTruncated: true}, session.OriginProbe, false)
 	// Explicitly confirm the fixture is a genuine cache MISS.
 	if _, hit := sess.ResourceCache["s3"]; hit {
 		t.Fatal("test setup: session.ResourceCache[s3] unexpectedly populated — this test requires a genuine cache miss")
@@ -104,7 +103,7 @@ func TestHandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask(t *testing.T)
 		t.Fatalf("result.Kind = %v, want NavigateKindPushResourceList — this is a genuine cache miss, not a cache hit", result.Kind)
 	}
 	if result.CachedEntry == nil {
-		t.Fatal("result.CachedEntry = nil, want a synthetic entry seeded from session.ProbeResources[s3] — DEF-12: warm list-open must not render a bare Loading shell when probe rows are already known")
+		t.Fatal("result.CachedEntry = nil, want a synthetic entry seeded from session.RowStore.Snapshot(s3) — DEF-12: warm list-open must not render a bare Loading shell when probe rows are already known")
 	}
 	if len(result.CachedEntry.Resources) != 2 {
 		t.Fatalf("len(result.CachedEntry.Resources) = %d, want 2 (the retained probe rows)", len(result.CachedEntry.Resources))
@@ -116,7 +115,7 @@ func TestHandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask(t *testing.T)
 		t.Errorf("result.CachedEntry.Resources[1].ID = %q, want %q", result.CachedEntry.Resources[1].ID, "arn:aws:s3:::def12-warm-bucket-2")
 	}
 	if result.CachedEntry.Pagination == nil || !result.CachedEntry.Pagination.IsTruncated {
-		t.Errorf("result.CachedEntry.Pagination = %+v, want non-nil with IsTruncated=true (mirrors session.ProbeTruncated[s3])", result.CachedEntry.Pagination)
+		t.Errorf("result.CachedEntry.Pagination = %+v, want non-nil with IsTruncated=true (mirrors RowStore.Snapshot(s3).Pagination.IsTruncated)", result.CachedEntry.Pagination)
 	}
 
 	if len(tasks) != 1 {
@@ -182,7 +181,7 @@ func newWarmOpenApp(t *testing.T) tui.Model {
 // driveSweepCompletion uses (a real messages.AvailabilityChecked with
 // Gen: 1 — session.New() seeds AvailabilityGen at 1, not 0, and
 // AvailabilityChecked.AcceptZeroGen() is false), which naturally populates
-// session.ProbeResources["s3"] / ProbeTruncated["s3"] = true via
+// session.RowStore's "s3" entry (Rows + Pagination.IsTruncated = true) via
 // handleAvailabilityChecked — exactly as a live warm-open scenario would
 // have them populated from a completed background sweep. Crucially, this
 // probe result does NOT populate session.ResourceCache — only a subsequent
@@ -195,7 +194,7 @@ func newWarmOpenApp(t *testing.T) tui.Model {
 //
 // RED today: runtime_adapter_navigate.go's NavigateKindPushResourceList case
 // only calls rl.Init() and dispatches the fetch; it never seeds from
-// ProbeResources, so the list starts empty (Loading=true) until the fetch
+// RowStore, so the list starts empty (Loading=true) until the fetch
 // completes.
 func TestTUI_WarmOpen_RendersSeededRows_NotLoading(t *testing.T) {
 	m := newWarmOpenApp(t)
