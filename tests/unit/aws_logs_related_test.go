@@ -337,9 +337,19 @@ func TestRelated_Logs_APIGW_CacheMissNoClients(t *testing.T) {
 
 // --- ECSTask checker (Pattern N+C — "/ecs/{family}") ---
 
+// TestRelated_Logs_ECSTask_MatchByFamily verifies that checkLogsECSTask
+// extracts the family from Fields["task_definition"] (the full task-definition
+// ARN, with the trailing :revision stripped after arnLastSegment), not from
+// the task's Name/ID — docs/resources/logs.md §2 `ecs-task`.
 func TestRelated_Logs_ECSTask_MatchByFamily(t *testing.T) {
 	const family = "web-task"
-	taskRes := resource.Resource{ID: "web-task:3", Name: "web-task"}
+	taskRes := resource.Resource{
+		ID:   "web-task:3",
+		Name: "web-task",
+		Fields: map[string]string{
+			"task_definition": "arn:aws:ecs:us-east-1:123456789012:task-definition/" + family + ":3",
+		},
+	}
 	cache := resource.ResourceCache{
 		"ecs-task": resource.ResourceCacheEntry{Resources: []resource.Resource{taskRes}},
 	}

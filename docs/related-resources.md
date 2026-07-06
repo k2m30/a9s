@@ -183,16 +183,16 @@ AWS API: <https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis.htm
 - **`alarm`** — Stage latency/error alarms.
 - **`cf`** — APIGW often fronted by CloudFront.
 - **`ct-events`** — Audit trail for API changes.
-- **`elb`** — VpcLink NLB backend.
+- **`elb`** — VpcLink NLB backend (`GetVpcLinks` — each VpcLink's `TargetArns` NLB ARNs matched against the loaded `elb` cache).
 - **`kms`** — KMS key referenced by Lambda integrations (weak pair: no direct API GW KMS field; follows Lambda integration FunctionConfiguration.KMSKeyArn).
 - **`lambda`** — Lambda integrations.
 - **`logs`** — API access log destination.
-- **`r53`** — R53 alias records for custom domains.
-- **`role`** — Invocation/authorizer role.
-- **`sfn`** — Step Functions integration target.
-- **`sns`** — APIGW -> SNS via integration.
-- **`vpce`** — Private APIs expose via VPC endpoint.
-- **`waf`** — WebACL attached to the API stage.
+- **`r53`** — R53 alias records for custom domains. `budget-excluded` (Policy rule 7): alias records live on per-zone `ListResourceRecordSets` and are not cached as joinable record sets (the r53 fetcher summarizes alias targets into one Fields string); resolving custom-domain aliases needs `GetDomainNames` plus per-zone record scans — checker returns Count -1.
+- **`role`** — Invocation/authorizer role (`GetIntegrations` `CredentialsArn` + `GetAuthorizers` `AuthorizerCredentialsArn` matched against the loaded `role` cache).
+- **`sfn`** — Step Functions integration target: the integration URI only reveals the `:states:action/` service slug — the target state-machine ARN lives in the route REQUEST TEMPLATE, not the IntegrationUri. `budget-excluded` (Policy rule 7): identifying the state machine requires per-route request-template parsing — checker returns Count -1.
+- **`sns`** — APIGW -> SNS via integration: the integration URI only reveals `:sns:action/Publish` — the topic ARN lives in the route REQUEST TEMPLATE, not the IntegrationUri. `budget-excluded` (Policy rule 7): identifying the topic requires per-route request-template parsing — checker returns Count -1.
+- **`vpce`** — Private APIs expose via VPC endpoint. `budget-excluded` (Policy rule 7): endpoint IDs live on v1 `RestApi.EndpointConfiguration` only; the v2 `GetApis` items carry none, and the v2 path is a brittle resource-policy parse (policy-parse gap) — checker returns Count -1.
+- **`waf`** — WebACL attached to the API stage. `budget-excluded` (Policy rule 7): v2 APIs carry no Web ACL binding on `GetApis`; WAF-side resolution requires `wafv2:ListResourcesForWebACL` per Web ACL (O(N)) — checker returns Count -1.
 
 ### `asg`
 
@@ -533,11 +533,11 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.htm
 - **`cfn`** — CFN stack that created the EIP.
 - **`ct-events`** — Audit trail for allocation/association.
 - **`ec2`** — Associated instance.
-- **`ecs`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`ecs-svc`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`ecs-task`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`ecs`** — Cluster of the task whose ENI carries this EIP — zero-call join: `Address.NetworkInterfaceId` matched against task ENI attachments in the already-loaded `ecs-task` cache, then `clusterArn` to the `ecs` cache.
+- **`ecs-svc`** — Service owning the task whose ENI carries this EIP — zero-call join via the same `ecs-task` cache match, then the task's `service:` group to the `ecs-svc` cache.
+- **`ecs-task`** — Task whose ENI carries this EIP — zero-call join: `Address.NetworkInterfaceId` matched against task ENI attachments in the already-loaded `ecs-task` cache.
 - **`eni`** — Associated ENI.
-- **`logs`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`logs`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): EIPs emit no logs; flow logs on the associated ENI/subnet/VPC are not identifiable from the EIP without per-ENI `DescribeFlowLogs` — checker returns Count -1.
 - **`nat`** — NAT gateway consuming this EIP.
 
 ### `eks`
@@ -568,7 +568,7 @@ AWS API: <https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/A
 - **`cfn`** — CloudFormation stack that created the LB.
 - **`ct-events`** — Audit trail for LB config changes.
 - **`eni`** — LB creates ENIs per AZ.
-- **`r53`** — Route 53 alias/records pointing at this LB.
+- **`r53`** — Route 53 alias/records pointing at this LB. `budget-excluded` (Policy rule 7): record sets live on per-zone `ListResourceRecordSets` and are not cached as joinable structures (the r53 fetcher summarizes alias targets into one Fields string); identifying the aliasing records requires O(N) per-zone record-set queries — checker returns Count -1.
 - **`s3`** — Access-log S3 destination.
 - **`sg`** — Attached security groups (ALB only).
 - **`subnet`** — AZ subnets the LB listens in.
@@ -648,7 +648,7 @@ AWS API: <https://docs.aws.amazon.com/kms/latest/APIReference/API_KeyMetadata.ht
 - **`dbi`** — RDS instances using this key.
 - **`ebs`** — EBS volumes using this key.
 - **`role`** — Key policy trusts roles.
-- **`s3`** — S3 buckets using this key for SSE-KMS.
+- **`s3`** — S3 buckets using this key for SSE-KMS. `budget-excluded` (Policy rule 7): bucket encryption config is not on `ListBuckets` and not cached; resolving consumers requires `GetBucketEncryption` per bucket — checker returns Count -1.
 - **`secrets`** — Secrets encrypted with this key.
 
 ### `lambda`
@@ -787,7 +787,7 @@ AWS API: <https://docs.aws.amazon.com/Route53/latest/APIReference/API_HostedZone
 - **`cf`** — CloudFront distributions aliased from records in this zone.
 - **`ct-events`** — Audit trail for zone record changes.
 - **`elb`** — Load balancers aliased from records in this zone.
-- **`logs`** — Query logs → CW Logs.
+- **`logs`** — Query logs → CW Logs (`route53:ListQueryLoggingConfigs` per zone; at most one log-group binding).
 - **`s3`** — Alias to S3 website endpoint.
 - **`vpc`** — Private hosted zones VPC association.
 
@@ -987,7 +987,7 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Subnet.html
 - **`cfn`** — CloudFormation stack that created the subnet.
 - **`ct-events`** — Audit trail for subnet changes.
 - **`ec2`** — Instances in this subnet.
-- **`efs`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`efs`** — EFS mount targets project one ENI per AZ into the subnet — zero-call join: scan the already-loaded `eni` cache for mount-target ENIs in this subnet (well-known `EFS mount target for <fs-id>` description) and match the file-system IDs against the loaded `efs` cache.
 - **`eks`** — EKS clusters declaring subnet.
 - **`elb`** — Load balancer AZ-subnet mappings.
 - **`eni`** — ENIs in this subnet.
@@ -1002,19 +1002,19 @@ AWS API: <https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/A
 
 - **`alarm`** — TG health/unhealthy-host count alarms.
 - **`asg`** — ASGs registering into this TG.
-- **`backup`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`backup`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): AWS Backup does not support target groups; no AWS field links a TG to a plan or recovery point — checker returns Count -1.
 - **`cfn`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`ct-events`** — Audit trail for TG changes.
-- **`dbc`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`dbi`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`dbc`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): TG target types are instance/ip/lambda/alb; no AWS field references a DocumentDB cluster — checker returns Count -1.
+- **`dbi`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): TG target types are instance/ip/lambda/alb; no AWS field references an RDS instance — checker returns Count -1.
 - **`ec2`** — Instance targets.
 - **`ecs-svc`** — ECS services routing to this TG.
 - **`elb`** — Load balancers using this TG.
 - **`lambda`** — Lambda targets.
-- **`logs`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`dbi-snap`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`sg`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`subnet`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`logs`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): target groups do not emit CloudWatch Logs; ELB access logs go to S3 on the parent LB — checker returns Count -1.
+- **`dbi-snap`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): no AWS field links a TG to an RDS snapshot — checker returns Count -1.
+- **`sg`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): `TargetGroup` has no SecurityGroups field; the SG pivot belongs to the parent `elb` — checker returns Count -1.
+- **`subnet`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): `TargetGroup` has no subnet field; the subnet pivot belongs to the parent `elb` via `AvailabilityZones[].SubnetId` — checker returns Count -1.
 - **`vpc`** — TargetGroup.VpcId.
 
 ### `tgw`
@@ -1059,20 +1059,20 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html>
 
 AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html>
 
-- **`acm`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`acm`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): the list response carries no cert reference; resolution requires `PrivateDnsNameConfiguration` lookups per endpoint service — checker returns Count -1.
 - **`alarm`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`cf`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`cf`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): the CloudFront→VPCE link goes through CloudFront VPC Origins, which are not on `DistributionSummary` — checker returns Count -1.
 - **`ct-events`** — Audit trail for endpoint changes.
 - **`eni`** — ENIs backing interface endpoints.
 - **`logs`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`r53`** — Private DNS → R53 private zones.
+- **`r53`** — Private DNS → R53 private zones (`route53:ListHostedZonesByVPC` per endpoint, keyed by the endpoint's `VpcId`; results matched against the loaded `r53` cache).
 - **`rtb`** — Route tables for gateway endpoints.
-- **`s3`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`s3`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): identifying reachable buckets requires interpreting `VpcEndpoint.PolicyDocument` JSON against bucket policies — no deterministic join within the checker budget; checker returns Count -1.
 - **`sg`** — SGs attached to interface endpoints.
 - **`subnet`** — Interface endpoint subnets.
-- **`tg`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`tg`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): the TG cache carries no registered targets; matching endpoint IPs requires `DescribeTargetHealth` per TG — checker returns Count -1.
 - **`vpc`** — Parent VPC.
-- **`waf`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`waf`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): the endpoint list response has no Web ACL binding; WAF associations resolve only from the WAF side via `wafv2:ListResourcesForWebACL` per ACL — checker returns Count -1.
 
 ### `waf`
 

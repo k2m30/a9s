@@ -275,12 +275,22 @@ func TestRelated_EIP_ECS_EmptyIDReturnsZero(t *testing.T) {
 	}
 }
 
-func TestRelated_EIP_ECS_NonEmptyIDReturnsMinusOne(t *testing.T) {
-	source := resource.Resource{ID: "eipalloc-0a1b2c3d4e5f60001"}
+// TestRelated_EIP_ECS_NoENIReturnsZero verifies that checkEIPECS is a
+// zero-extra-call ENI-cache join (eipENIID + eipMatchingECSTask), not an
+// outside-1-call-budget "-1 unknown" stub: an EIP with no NetworkInterfaceId
+// (eniID resolves to "") returns Count=0, not -1 —
+// docs/resources/eip.md §2 `ecs`.
+func TestRelated_EIP_ECS_NoENIReturnsZero(t *testing.T) {
+	source := resource.Resource{
+		ID: "eipalloc-0a1b2c3d4e5f60001",
+		RawStruct: ec2types.Address{
+			AllocationId: aws.String("eipalloc-0a1b2c3d4e5f60001"),
+		},
+	}
 	checker := eipCheckerByTarget(t, "ecs")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (outside 1-call budget)", result.Count)
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no NetworkInterfaceId, no ENI to join)", result.Count)
 	}
 }
 

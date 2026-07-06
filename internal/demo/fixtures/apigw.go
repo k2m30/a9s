@@ -21,6 +21,12 @@ type APIGWFixtures struct {
 	DomainNames []apigwtypes.DomainName
 	// ApiMappings maps DomainName -> mappings, served by GetApiMappings.
 	ApiMappings map[string][]apigwtypes.ApiMapping
+	// VpcLinks is served by GetVpcLinks (account-wide, not API-scoped).
+	// Required for the apigw:elb related-panel pivot (checkApigwELB).
+	VpcLinks []apigwtypes.VpcLink
+	// Authorizers maps ApiId -> authorizers, served by GetAuthorizers.
+	// Required for the apigw:role related-panel pivot (checkApigwRole).
+	Authorizers map[string][]apigwtypes.Authorizer
 }
 
 const (
@@ -30,6 +36,15 @@ const (
 	// PublicAPIGWDomainName is the custom domain mapped to PublicAPIGWID —
 	// required for the apigw:acm pivot witness (checkApigwACM).
 	PublicAPIGWDomainName = "api.acme-corp.com"
+	// APIGWVpcLinkID is the VPC link ID bound to PublicAPIGWID's VPC_LINK
+	// integration — required for the apigw:elb related-panel pivot
+	// (checkApigwELB).
+	APIGWVpcLinkID = "vpcl-0aaa111111111111a"
+	// APIGWVpcLinkSecurityGroupID is the security group carried by
+	// APIGWVpcLinkID — matches the acme-prod-nlb SecurityGroups entry
+	// (elb.go), required for the apigw:elb related-panel pivot
+	// (checkApigwELB)'s security-group-based fallback match.
+	APIGWVpcLinkSecurityGroupID = "sg-0vpcl11111111111a"
 )
 
 // NewAPIGWFixtures constructs APIGWFixtures from the canonical demo data.
@@ -80,6 +95,39 @@ var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
 					IntegrationId:   aws.String("integ-authorizer-1"),
 					IntegrationType: apigwtypes.IntegrationTypeAwsProxy,
 					IntegrationUri:  aws.String("arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:123456789012:function:api-gateway-authorizer/invocations"),
+				},
+				// VPC_LINK integration to the private backend NLB — required
+				// for the apigw:elb related-panel pivot (checkApigwELB).
+				{
+					IntegrationId:   aws.String("integ-vpclink-backend"),
+					IntegrationType: apigwtypes.IntegrationTypeHttpProxy,
+					ConnectionType:  apigwtypes.ConnectionTypeVpcLink,
+					ConnectionId:    aws.String(APIGWVpcLinkID),
+					IntegrationUri:  aws.String("http://internal-backend.acme-corp.local"),
+					// CredentialsArn — required for the apigw:role related-panel
+					// pivot (checkApigwRole). Matches the acme-ci-deploy-role
+					// fixture (iam.go).
+					CredentialsArn: aws.String("arn:aws:iam::123456789012:role/acme-ci-deploy-role"),
+				},
+			},
+		},
+		VpcLinks: []apigwtypes.VpcLink{
+			{
+				VpcLinkId:        aws.String(APIGWVpcLinkID),
+				Name:             aws.String("acme-prod-nlb-link"),
+				SecurityGroupIds: []string{APIGWVpcLinkSecurityGroupID},
+				SubnetIds:        []string{fixtProdPrivateSubnetA},
+				VpcLinkStatus:    apigwtypes.VpcLinkStatusAvailable,
+			},
+		},
+		// Authorizers — required for the apigw:role related-panel pivot
+		// (checkApigwRole)'s AuthorizerCredentialsArn path.
+		Authorizers: map[string][]apigwtypes.Authorizer{
+			PublicAPIGWID: {
+				{
+					AuthorizerId:             aws.String("auth-public-api-1"),
+					Name:                     aws.String("acme-public-authorizer"),
+					AuthorizerCredentialsArn: aws.String("arn:aws:iam::123456789012:role/acme-ci-deploy-role"),
 				},
 			},
 		},

@@ -308,14 +308,70 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, _ reso
 }
 
 // checkR53Logs reports CloudWatch log groups receiving query-log traffic for
-// this zone. Query-log configuration is on route53:ListQueryLoggingConfigs
-// (not on ListHostedZones). That API is not in Route53API yet; returns
-// Count:-1 until wired. No second-call workaround exists at 1-call budget.
-func checkR53Logs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
+// this zone. Pattern C: one route53:ListQueryLoggingConfigs call filtered by
+// HostedZoneId; match CloudWatchLogsLogGroupArn against the logs cache.
+func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	zoneID := res.ID
+	if zoneID == "" {
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.Route53 == nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+	api, ok := c.Route53.(Route53ListQueryLoggingConfigsAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.ListQueryLoggingConfigsOutput, error) {
+		return api.ListQueryLoggingConfigs(ctx, &route53.ListQueryLoggingConfigsInput{HostedZoneId: &zoneID})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+	}
+	if out == nil || len(out.QueryLoggingConfigs) == 0 {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+
+	logList, _, fetchErr := FetchRelatedTarget(ctx, clients, cache, "logs")
+	if logList == nil {
+		// Fallback: return the log-group ARNs as IDs when the cache is unavailable.
+		var ids []string
+		for _, cfg := range out.QueryLoggingConfigs {
+			if cfg.CloudWatchLogsLogGroupArn != nil && *cfg.CloudWatchLogsLogGroupArn != "" {
+				ids = append(ids, *cfg.CloudWatchLogsLogGroupArn)
+			}
+		}
+		r := relatedResult("logs", ids)
+		r.Err = fetchErr
+		return r
+	}
+
+	wanted := make(map[string]struct{})
+	for _, cfg := range out.QueryLoggingConfigs {
+		if cfg.CloudWatchLogsLogGroupArn == nil || *cfg.CloudWatchLogsLogGroupArn == "" {
+			continue
+		}
+		// Log group ARN: arn:aws:logs:REGION:ACCT:log-group:NAME:*
+		if _, name, found := strings.Cut(*cfg.CloudWatchLogsLogGroupArn, ":log-group:"); found {
+			if colon := strings.Index(name, ":"); colon >= 0 {
+				name = name[:colon]
+			}
+			if name != "" {
+				wanted[name] = struct{}{}
+			}
+		}
+	}
+	if len(wanted) == 0 {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+	var ids []string
+	for _, logRes := range logList {
+		if _, found := wanted[logRes.ID]; found {
+			ids = append(ids, logRes.ID)
+		}
+	}
+	return relatedResult("logs", ids)
 }
 
 // checkR53VPC reports VPCs associated with a private hosted zone.

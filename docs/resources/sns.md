@@ -19,7 +19,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **Display name**: SNS Topics
 - **AWS API reference**: <https://docs.aws.amazon.com/sns/latest/api/API_Topic.html>
 - **List API**: `ListTopics` (returns `Topic.TopicArn` only — no attributes, no state field)
-- **Describe API (if any)**: `GetTopicAttributes` (per topic, Wave 2)
+- **Describe API (if any)**: `ListSubscriptionsByTopic` (per topic, paginated — drives the Wave 2 subscription signals); `GetTopicAttributes` (per topic — attribute-based pivots such as `kms`/`role`)
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -65,9 +65,13 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-- **Signal**: `SubscriptionsConfirmed==0 AND SubscriptionsPending==0` → Warning (orphan topic).
+- **Signal**: `ListSubscriptionsByTopic` returns zero subscriptions → Warning (orphan topic — same semantics as the golden-doc `SubscriptionsConfirmed==0 AND SubscriptionsPending==0` condition).
   - **State bucket**: Warning (informational — the topic is Healthy in the AWS-state sense, but operationally orphaned).
-  - **API call**: `GetTopicAttributes` — one call per topic.
+  - **API call**: `ListSubscriptionsByTopic` — one paginated call chain per topic (follows `NextToken` to completion).
+  - **Cost shape**: per-resource.
+- **Signal**: every subscription returned by `ListSubscriptionsByTopic` is still unconfirmed (`SubscriptionArn == "PendingConfirmation"`) → Warning (deliveries go nowhere until an endpoint confirms).
+  - **State bucket**: Warning (informational — companion finding from the same per-topic call; fires only when at least one subscription exists and none is confirmed).
+  - **API call**: `ListSubscriptionsByTopic` — same call as above; no added cost.
   - **Cost shape**: per-resource.
 - **Signal**: `KmsMasterKeyId` absent on sensitive topic → Warning.
   - **State bucket**: Warning.
@@ -101,7 +105,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `SubscriptionsConfirmed==0 && SubscriptionsPending==0` | 2 | Warning | `~` | S3, S4, S5 | `no subscribers` | `Topic has no confirmed or pending subscriptions — published messages are discarded.` |
+| zero subscriptions on the topic | 2 | Warning | `~` | S3, S4, S5 | `no subscribers` | `Topic has no subscriptions — published messages are discarded.` |
+| all subscriptions unconfirmed | 2 | Warning | `~` | S3, S4, S5 | `all pending confirmation` | `Every subscription is still pending confirmation — no endpoint receives messages yet.` |
 | `KmsMasterKeyId absent on sensitive topic` | 2 | Warning | `~` | S3, S4, S5 (pending trigger definition) | `not encrypted` | `Topic has no KMS master key configured — server-side encryption is not in effect.` |
 
 ## 4.1 UX review
@@ -133,7 +138,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - §2 `sns-sub` how discovered — a9s-devops (2026-04-20): possible=yes, worth=yes. `ListSubscriptionsByTopic(TopicArn)` is the dedicated SNS API; no cheaper path — `ListSubscriptions` is account-wide and paginated with no topic filter.
 - §2 `sns-sub` count shown — a9s-devops (2026-04-20): possible=yes, worth=yes. Fanout-width is a primary decision signal for an SNS operator.
 - §3.1 no Wave 1 signals — `docs/attention-signals.md` § Messaging § `sns` row (line 83, Wave 1 cell: "None — `ListTopics` returns ARN only").
-- §3.2 orphan-topic signal — `docs/attention-signals.md` § Messaging § `sns` row (line 83, Wave 2 cell).
+- §3.2 orphan-topic signal — `docs/attention-signals.md` § Messaging § `sns` row (line 83, Wave 2 cell). Mechanism amended to match the implementation: `ListSubscriptionsByTopic` with pagination and per-subscription `PendingConfirmation` detection (`internal/aws/sns_issue_enrichment.go:22-99`), not `GetTopicAttributes` subscription counts; same signal semantics.
+- §3.2 all-pending-confirmation signal — companion finding from the same `ListSubscriptionsByTopic` call (`internal/aws/sns_issue_enrichment.go:22-99`): fires when every returned `SubscriptionArn == "PendingConfirmation"`.
 - §3.2 missing-KMS signal — `docs/attention-signals.md` § Messaging § `sns` row (line 83, Wave 2 cell). Trigger definition for "sensitive topic" not specified.
 - §3.2 `SubscriptionsConfirmed`/`SubscriptionsPending`/`KmsMasterKeyId` field names — `AWS SDK Go v2 — sns.GetTopicAttributesOutput § Attributes` doc comment.
 - §3.3 Wave 3 CloudWatch metric — `docs/attention-signals.md` § Messaging § `sns` row (line 83, Wave 3 cell).

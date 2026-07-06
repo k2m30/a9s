@@ -253,10 +253,10 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			if !ok || c == nil {
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
-			return FetchWAFWebACLsPage(ctx, c.WAFv2, continuationToken)
+			return FetchWAFWebACLsPageWithCloudFront(ctx, c.WAFv2, c.WAFv2CloudFront, continuationToken)
 		},
 		Wave2:                  IssueEnricher{Fn: EnrichWAFLogging, Priority: 100},
-		FieldKeys:              []string{"name", "id", "description"},
+		FieldKeys:              []string{"name", "id", "description", "scope"},
 		IssueEnricherFieldKeys: []string{"rules_summary"},
 		Related: []domain.RelatedDef{
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkWAFELB, NeedsTargetCache: false},

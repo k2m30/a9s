@@ -3,12 +3,14 @@ package unit
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -205,5 +207,68 @@ func TestFetchCloudTrailTrails_LogFileValidationFieldKey(t *testing.T) {
 	got2 := td.Color(resource.Resource{Fields: colorableFields})
 	if got2 != resource.ColorWarning {
 		t.Errorf("trail Color with log_file_validation_enabled=false should be ColorWarning, got %v", got2)
+	}
+}
+
+// TestFetchCloudTrailTrails_StaleDeliveryIsBroken pins docs/resources/trail.md
+// §3.2: "Signal: LatestDeliveryTime >1h ago on IsLogging==true trail → Broken
+// (silent delivery)." A trail that is actively logging (IsLogging==true) but
+// whose most recent successful S3 delivery is more than an hour old must be
+// classified Broken — CloudTrail is silently failing to ship log files even
+// though it reports itself as "logging". This is RED at HEAD: trail.go never
+// reads GetTrailStatusOutput.LatestDeliveryTime, so no finding or field is
+// ever produced for this condition and colorTrail has no way to see it.
+func TestFetchCloudTrailTrails_StaleDeliveryIsBroken(t *testing.T) {
+	staleDelivery := time.Now().Add(-2 * time.Hour)
+
+	mock := &mockCloudTrailClient{
+		output: &cloudtrail.DescribeTrailsOutput{
+			TrailList: []cloudtrailtypes.Trail{
+				{
+					Name:                     aws.String("silent-delivery-trail"),
+					TrailARN:                 aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/silent-delivery-trail"),
+					S3BucketName:             aws.String("audit-bucket"),
+					HomeRegion:               aws.String("us-east-1"),
+					IsMultiRegionTrail:       aws.Bool(true),
+					IsOrganizationTrail:      aws.Bool(false),
+					LogFileValidationEnabled: aws.Bool(true),
+				},
+			},
+		},
+		statusByName: map[string]*cloudtrail.GetTrailStatusOutput{
+			"arn:aws:cloudtrail:us-east-1:123456789012:trail/silent-delivery-trail": {
+				IsLogging:          aws.Bool(true),
+				LatestDeliveryTime: &staleDelivery,
+			},
+		},
+	}
+
+	resources, err := awsclient.FetchCloudTrailTrails(context.Background(), mock)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
+	}
+
+	r := resources[0]
+
+	foundBroken := false
+	for _, f := range r.Findings {
+		if f.Severity == domain.SevBroken && f.Source == "wave2" {
+			foundBroken = true
+		}
+	}
+	if !foundBroken {
+		t.Errorf("expected a wave2 SevBroken Finding for a >1h-stale delivery on a logging trail, got %+v", r.Findings)
+	}
+
+	td := resource.FindResourceType("trail")
+	if td == nil {
+		t.Fatal("trail type not registered")
+	}
+	gotColor := td.Color(r)
+	if gotColor != resource.ColorBroken {
+		t.Errorf("trail Color for stale delivery on a logging trail = %v, want ColorBroken (red row per trail.md §4)", gotColor)
 	}
 }

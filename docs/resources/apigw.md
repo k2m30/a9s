@@ -48,7 +48,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 ### `elb`
 
 - **Why related**: VpcLink NLB backend — HTTP APIs use a VpcLink backed by a Network Load Balancer to reach private VPC services.
-- **How discovered**: call `apigatewayv2:GetVpcLinks`, collect each VpcLink's associated NLB ARN/subnet set, then intersect with `apigatewayv2:GetIntegrations` per API whose `IntegrationType==VPC_LINK` and `ConnectionId` matches a VpcLink — a9s-devops: a VpcLink is API-scoped only via integrations, so the account-wide VpcLink list plus integrations per API is the chain.
+- **How discovered**: call `GetVpcLinks` (one account-wide call) and read each VpcLink's `TargetArns` — the NLB ARNs — then match them against the already-loaded `elb` cache — a9s-devops: `TargetArns` is the only field that names the NLBs behind the links; the per-API integration intersection would cost an extra `GetIntegrations` beyond the checker budget.
 - **Count shown**: yes.
 
 ### `kms`
@@ -72,8 +72,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 ### `r53`
 
 - **Why related**: R53 alias records for the API's custom domains — the DNS surface operators hit in a browser.
-- **How discovered**: for each custom domain from `apigatewayv2:GetDomainNames`, collect `DomainNameConfigurations[].ApiGatewayDomainName` (the regional or CloudFront-fronted target) and reverse-scan the already-loaded `r53` hosted-zone record sets for `AliasTarget.DNSName` matching — a9s-devops: alias-target matching is the only way to surface the DNS hop without walking every zone's records.
-- **Count shown**: yes.
+- **How discovered**: not resolvable within the checker budget. Record sets are not cached as joinable structures — the r53 fetcher summarizes each zone's alias targets into one Fields string — so the alias-target reverse-scan this row originally described is not available; resolving the DNS hop would need `apigatewayv2:GetDomainNames` plus per-zone `ListResourceRecordSets` walks. (budget-excluded per related-resources.md Policy rule 7: custom-domain alias resolution requires per-zone record-set scans beyond the one-call budget.)
+- **Count shown**: unknown.
 
 ### `role`
 
@@ -84,26 +84,26 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 ### `sfn`
 
 - **Why related**: Step Functions integration target — APIGW can start a state-machine execution directly.
-- **How discovered**: `apigatewayv2:GetIntegrations` per API → `IntegrationUri` of the form `arn:aws:apigateway:<region>:states:action/StartExecution` paired with a request-template referencing a state-machine ARN, or direct `arn:aws:states:<region>:<acct>:stateMachine:<name>` in the URI; match to already-loaded `sfn` list — a9s-devops: AWS-service integrations via APIGW use this `:states:action/` ARN form.
-- **Count shown**: yes.
+- **How discovered**: `apigatewayv2:GetIntegrations` per API detects `IntegrationUri` of the form `arn:aws:apigateway:<region>:states:action/StartExecution` — but that URI only says "this API talks to Step Functions". The target state-machine ARN lives in the route REQUEST TEMPLATE, not the IntegrationUri, so naming the specific state machine requires per-route template parsing. (budget-excluded per related-resources.md Policy rule 7: per-route request-template parsing exceeds the one-call budget; the checker detects the integration but cannot count targets.)
+- **Count shown**: unknown.
 
 ### `sns`
 
 - **Why related**: APIGW → SNS integration — publish a notification directly from an API request.
-- **How discovered**: `apigatewayv2:GetIntegrations` per API → `IntegrationUri` of the form `arn:aws:apigateway:<region>:sns:action/Publish` (with topic ARN in request templates) or direct `arn:aws:sns:<region>:<acct>:<topic>`; match to already-loaded `sns` list — a9s-devops: identical pattern to sfn, different AWS-service slug.
-- **Count shown**: yes.
+- **How discovered**: `apigatewayv2:GetIntegrations` per API detects `IntegrationUri` of the form `arn:aws:apigateway:<region>:sns:action/Publish` — but the topic ARN lives in the route REQUEST TEMPLATE, not the IntegrationUri, so naming the specific topic requires per-route template parsing — a9s-devops: identical pattern to sfn, different AWS-service slug. (budget-excluded per related-resources.md Policy rule 7: per-route request-template parsing exceeds the one-call budget; the checker detects the integration but cannot count targets.)
+- **Count shown**: unknown.
 
 ### `vpce`
 
 - **Why related**: Private APIs expose via VPC endpoint (interface type, `com.amazonaws.<region>.execute-api`).
-- **How discovered**: for REST v1 APIs, read `RestApi.EndpointConfiguration.VpcEndpointIds` directly; for HTTP v2 APIs, parse the API's resource policy for `aws:SourceVpce` condition keys (requires `apigatewayv2:GetApi` or policy fetch) — a9s-devops: possible=yes for v1 via a first-class field, possible=yes for v2 only via policy parse which is brittle; surface the v1 path now and cite the v2 gap honestly.
-- **Count shown**: yes for v1; unknown for v2 (policy-parse path).
+- **How discovered**: for REST v1 APIs the IDs sit on `RestApi.EndpointConfiguration.VpcEndpointIds`, but the v2 `GetApis` items this fetcher lists carry no endpoint configuration, and the HTTP v2 path is a brittle resource-policy parse for `aws:SourceVpce` condition keys — a9s-devops: possible=yes for v1 via a first-class field, v2 only via policy parse. (budget-excluded per related-resources.md Policy rule 7: endpoint IDs are absent from the v2 list response and the v2 policy-parse gap has no in-budget resolution.)
+- **Count shown**: unknown.
 
 ### `waf`
 
 - **Why related**: WebACL attached to the API stage — the ingress filter that blocks bots, SQLi, rate abuse.
-- **How discovered**: call `wafv2:GetWebACLForResource` per stage ARN (WAFv2 regional scope); match returned `WebACLArn` to already-loaded `waf` list — a9s-devops: this is the only reverse lookup WAFv2 offers per resource ARN; the alternative (enumerate all ACLs and their resources) is O(N·M).
-- **Count shown**: yes.
+- **How discovered**: not resolvable within the checker budget — v2 APIs carry no Web ACL binding on `GetApis` (only REST v1 stages associate ACLs via `apigateway:GetWebACL`), and resolving from the WAF side requires `wafv2:ListResourcesForWebACL` per Web ACL, an O(N) fan-out over the target population. (budget-excluded per related-resources.md Policy rule 7: no in-budget lookup exists for v2 APIs.)
+- **Count shown**: unknown.
 
 ### `ct-events`
 
@@ -191,16 +191,16 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `acm` discovery via `GetDomainNames` + `GetApiMappings` with `DomainNameConfigurations[].CertificateArn` — a9s-devops (2026-04-20): possible=yes, worth=yes. Cert expiry is a known outage vector for custom-domain APIs and operators want a direct pivot from the API to the cert.
 - `alarm` discovery via reverse scan on `Namespace=AWS/ApiGateway` dimensions — a9s-devops (2026-04-20): possible=yes, worth=yes. Standard CloudWatch dimension convention, no extra API call when alarm list is already loaded.
 - `cf` discovery via reverse scan on `Origins[].DomainName` matching `execute-api` — a9s-devops (2026-04-20): possible=yes, worth=yes. CloudFront origin hostname is the only AWS-exposed link.
-- `elb` discovery via `GetVpcLinks` + `GetIntegrations` (`IntegrationType==VPC_LINK`) — a9s-devops (2026-04-20): possible=yes, worth=yes. Only chain AWS exposes for VpcLink → NLB.
+- `elb` discovery via `GetVpcLinks` `TargetArns` matched against the elb cache — a9s-devops (2026-04-20): possible=yes, worth=yes. `TargetArns` is the only field naming the NLBs behind the links; one account-wide call fits the checker budget.
 - `kms` discovery is transitive via Lambda integration — a9s-devops (2026-04-20): possible=yes, worth=marginal. Keep per golden-doc contract; low-value but cheap since Lambda panel already resolves KMS.
 - `lambda` discovery via `GetIntegrations` parsing Lambda function ARN in `IntegrationUri` — a9s-devops (2026-04-20): possible=yes, worth=yes. Highest-traffic pivot for this resource type.
 - `logs` discovery via `Stage.AccessLogSettings.DestinationArn` — a9s-devops (2026-04-20): possible=yes, worth=yes. Stage access logs are the first log surface an operator wants when an API misbehaves.
-- `r53` discovery via reverse scan on hosted-zone record sets with `AliasTarget.DNSName` matching custom-domain target — a9s-devops (2026-04-20): possible=yes, worth=yes. Alias-target matching is the only available reverse link.
+- `r53` budget exclusion — record sets are not cached as joinable structures (the r53 fetcher summarizes alias targets into one Fields string); custom-domain alias resolution needs per-zone `ListResourceRecordSets` walks — `docs/related-resources.md` § Policy rule 7.
 - `role` discovery via `GetIntegrations.CredentialsArn` + `GetAuthorizers.AuthorizerCredentialsArn` — a9s-devops (2026-04-20): possible=yes, worth=yes. These are the only two APIGW-assumed-role fields.
-- `sfn` discovery via `GetIntegrations` integration URI `arn:aws:apigateway:...:states:action/` — a9s-devops (2026-04-20): possible=yes, worth=yes. Canonical AWS-service integration ARN form.
-- `sns` discovery via `GetIntegrations` integration URI `arn:aws:apigateway:...:sns:action/Publish` — a9s-devops (2026-04-20): possible=yes, worth=yes. Same pattern as sfn.
-- `vpce` discovery split: v1 uses `RestApi.EndpointConfiguration.VpcEndpointIds` (first-class field); v2 only via resource-policy parse — a9s-devops (2026-04-20): possible=yes for v1, brittle for v2. Deferred v2 path to §5 Out of Scope.
-- `waf` discovery via `wafv2:GetWebACLForResource` per stage ARN — a9s-devops (2026-04-20): possible=yes, worth=yes. Only reverse lookup WAFv2 offers per resource.
+- `sfn` detection via `GetIntegrations` integration URI `arn:aws:apigateway:...:states:action/`; the state-machine ARN itself lives in the route request template, so the target count is budget-excluded — `docs/related-resources.md` § Policy rule 7.
+- `sns` detection via `GetIntegrations` integration URI `arn:aws:apigateway:...:sns:action/Publish`; the topic ARN lives in the route request template, so the target count is budget-excluded — `docs/related-resources.md` § Policy rule 7.
+- `vpce` budget exclusion: v1 uses `RestApi.EndpointConfiguration.VpcEndpointIds` (first-class field) but the v2 list response carries none; v2 resource-policy parse is brittle — a9s-devops (2026-04-20): possible=yes for v1, brittle for v2. `docs/related-resources.md` § Policy rule 7; v2 gap also in §5 Out of Scope.
+- `waf` budget exclusion: v2 APIs carry no Web ACL binding; WAF-side resolution requires `wafv2:ListResourcesForWebACL` per ACL (O(N)) — `docs/related-resources.md` § Policy rule 7.
 - `ct-events` universal-pivot policy — `docs/related-resources.md` § Policy.
 - Allowed surfaces S1–S5, Wave→surface mapping, banned-words list, list-text ≤40 chars / detail ≤100 chars — `.claude/skills/a9s-resource-spec/SKILL.md` § "Allowed visualization surfaces" and § "UX rules the spec must enforce" (skill governance, not golden docs).
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".

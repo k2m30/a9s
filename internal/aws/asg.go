@@ -95,6 +95,11 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 		}
 		suspendedProcesses := strings.Join(suspendedNames, ",")
 
+		vpcZoneIdentifier := ""
+		if asg.VPCZoneIdentifier != nil {
+			vpcZoneIdentifier = *asg.VPCZoneIdentifier
+		}
+
 		r := resource.Resource{
 			ID:   asgName,
 			Name: asgName,
@@ -109,6 +114,7 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 				"instances_unhealthy_count": fmt.Sprintf("%d", unhealthyCount),
 				"in_service_count":          fmt.Sprintf("%d", inServiceCount),
 				"suspended_processes":       suspendedProcesses,
+				"vpc_zone_identifier":       vpcZoneIdentifier,
 			},
 			RawStruct: asg,
 		}

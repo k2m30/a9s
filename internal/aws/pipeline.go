@@ -30,7 +30,33 @@ func FetchCodePipelines(ctx context.Context, api CodePipelineListPipelinesAPI) (
 }
 
 // FetchCodePipelinesPage fetches a single page of CodePipeline pipelines.
+// No client context is available here to resolve the real account, so
+// Fields["arn"] is left empty. Use FetchCodePipelinesPageWithClients (the
+// production catalog path) to construct the ARN from the session's real
+// resolved region/account.
 func FetchCodePipelinesPage(ctx context.Context, api CodePipelineListPipelinesAPI, continuationToken string) (resource.FetchResult, error) {
+	return fetchCodePipelinesPage(ctx, api, GetDefaultRegion("", ""), "", continuationToken)
+}
+
+// FetchCodePipelinesPageWithClients fetches a single page of CodePipeline
+// pipelines and constructs Fields["arn"] for each pipeline
+// (arn:aws:codepipeline:<region>:<account>:pipeline/<name>) using the
+// session's resolved region/account. Account resolution is best-effort — on
+// failure Fields["arn"] is left empty rather than constructed from a wrong
+// account.
+func FetchCodePipelinesPageWithClients(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
+	account := accountIDFromClients(ctx, c, c.IdentityStore())
+	region := c.Region
+	if region == "" {
+		region = GetDefaultRegion("", "")
+	}
+	return fetchCodePipelinesPage(ctx, c.CodePipeline, region, account, continuationToken)
+}
+
+// fetchCodePipelinesPage is the shared implementation. When region and
+// account are both non-empty, Fields["arn"] is constructed as
+// arn:aws:codepipeline:<region>:<account>:pipeline/<name>; otherwise it is "".
+func fetchCodePipelinesPage(ctx context.Context, api CodePipelineListPipelinesAPI, region, account, continuationToken string) (resource.FetchResult, error) {
 	input := &codepipeline.ListPipelinesInput{
 		MaxResults: aws.Int32(DefaultPageSize),
 	}
@@ -68,15 +94,21 @@ func FetchCodePipelinesPage(ctx context.Context, api CodePipelineListPipelinesAP
 			version = fmt.Sprintf("%d", *pl.Version)
 		}
 
+		arn := ""
+		if region != "" && account != "" && name != "" {
+			arn = "arn:aws:codepipeline:" + region + ":" + account + ":pipeline/" + name
+		}
+
 		r := resource.Resource{
-			ID:    name,
-			Name:  name,
+			ID:   name,
+			Name: name,
 			Fields: map[string]string{
 				"name":          name,
 				"pipeline_type": pipelineType,
 				"created":       created,
 				"updated":       updated,
 				"version":       version,
+				"arn":           arn,
 			},
 			RawStruct: pl,
 		}

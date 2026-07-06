@@ -1,9 +1,9 @@
 package fixtures
 
 import (
-	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
+	"sync"
 )
 
 // R53Fixtures holds typed fixture data for Route53.
@@ -11,7 +11,18 @@ type R53Fixtures struct {
 	HostedZones []r53types.HostedZone
 	// RecordSets maps hosted zone ID to its resource record sets.
 	RecordSets map[string][]r53types.ResourceRecordSet
+	// QueryLoggingConfigs maps hosted zone ID (canonical "/hostedzone/..."
+	// form — the same form the r53 fetcher stores as Resource.ID) to its
+	// query-logging configuration — required for the r53:logs related-panel
+	// pivot (checkR53Logs).
+	QueryLoggingConfigs map[string]r53types.QueryLoggingConfig
 }
+
+// PublicZoneQueryLogGroupARN is the CloudWatch Logs log group ARN receiving
+// query-log traffic for the acme-corp.com public zone — matches the
+// /app/custom/no-retention log group fixture (cwlogs.go), required for the
+// r53:logs related-panel pivot (checkR53Logs).
+const PublicZoneQueryLogGroupARN = "arn:aws:logs:us-east-1:123456789012:log-group:/app/custom/no-retention:*"
 
 // NewR53Fixtures constructs R53Fixtures from the canonical demo data.
 var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
@@ -263,6 +274,13 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 						{Value: aws.String("prod-api-primary.cluster-c9xyz123.us-east-1.rds.amazonaws.com.")},
 					},
 				},
+			},
+		},
+		QueryLoggingConfigs: map[string]r53types.QueryLoggingConfig{
+			"/hostedzone/Z0123456789ABCDEFGHIJ": {
+				Id:                        aws.String("qlc-acme-corp-001"),
+				HostedZoneId:              aws.String("Z0123456789ABCDEFGHIJ"),
+				CloudWatchLogsLogGroupArn: aws.String(PublicZoneQueryLogGroupARN),
 			},
 		},
 	}

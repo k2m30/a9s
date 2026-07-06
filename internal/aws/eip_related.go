@@ -3,9 +3,11 @@ package aws
 
 import (
 	"context"
+	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -189,34 +191,119 @@ func checkEIPASG(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("asg", []string{asgName})
 }
 
-// checkEIPECS reports ECS clusters whose tasks currently hold this EIP.
-// ECS tasks that use awsvpc networking get ENIs but do not attach EIPs
-// directly; association requires DescribeTasks per cluster — outside the
-// 1-call budget. Returns Count: -1.
-func checkEIPECS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
-		return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
+// eipENIID resolves the network interface ID this Elastic IP is attached to,
+// from RawStruct (preferred) or res.ID as a last resort. Returns "" when no
+// ENI association exists.
+func eipENIID(res resource.Resource) string {
+	raw, ok := assertStruct[ec2types.Address](res.RawStruct)
+	if ok && raw.NetworkInterfaceId != nil && *raw.NetworkInterfaceId != "" {
+		return *raw.NetworkInterfaceId
 	}
-	return resource.RelatedCheckResult{TargetType: "ecs", Count: -1}
+	return ""
 }
 
-// checkEIPECSSvc reports ECS services whose tasks currently hold this EIP.
-// Same limitation as checkEIPECS — task networking is not in the list caches.
-func checkEIPECSSvc(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
-		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
+// eipMatchingECSTask scans the already-loaded ecs-task cache for the task
+// whose Attachments[].Details carries this ENI's networkInterfaceId
+// (Pattern C — zero extra API calls, cache join only). Returns the matching
+// task Resource and whether the ecs-task cache was truncated.
+func eipMatchingECSTask(ctx context.Context, clients any, cache resource.ResourceCache, eniID string) (resource.Resource, bool, error) {
+	taskList, truncated, err := eipRelatedResources(ctx, clients, cache, "ecs-task")
+	if err != nil {
+		return resource.Resource{}, truncated, err
 	}
-	return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: -1}
+	for _, taskRes := range taskList {
+		task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)
+		if !ok {
+			continue
+		}
+		for _, att := range task.Attachments {
+			for _, d := range att.Details {
+				if d.Name != nil && *d.Name == "networkInterfaceId" && d.Value != nil && *d.Value == eniID {
+					return taskRes, truncated, nil
+				}
+			}
+		}
+	}
+	return resource.Resource{}, truncated, nil
 }
 
-// checkEIPECSTask reports ECS tasks currently holding this EIP.
-// ECS task ENIs are not in the EIP list response; resolving requires
-// DescribeTasks per cluster — outside the 1-call budget.
-func checkEIPECSTask(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
+// checkEIPECSTask reports the ECS task currently holding this EIP, resolved
+// via a zero-extra-call join: this EIP's NetworkInterfaceId is matched
+// against the ecs-task cache's Task.Attachments[].Details networkInterfaceId.
+func checkEIPECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	eniID := eipENIID(res)
+	if eniID == "" {
 		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
+	taskRes, truncated, err := eipMatchingECSTask(ctx, clients, cache, eniID)
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1, Err: err}
+	}
+	if taskRes.ID == "" {
+		if truncated {
+			return resource.ApproximateZero("ecs-task")
+		}
+		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
+	}
+	return relatedResult("ecs-task", []string{taskRes.ID})
+}
+
+// checkEIPECSSvc reports the ECS service whose task currently holds this EIP,
+// resolved via the same ecs-task cache join as checkEIPECSTask, then reading
+// the task's Group field ("service:<name>" convention) to name the service.
+func checkEIPECSSvc(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	eniID := eipENIID(res)
+	if eniID == "" {
+		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
+	}
+	taskRes, truncated, err := eipMatchingECSTask(ctx, clients, cache, eniID)
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: -1, Err: err}
+	}
+	if taskRes.ID == "" {
+		if truncated {
+			return resource.ApproximateZero("ecs-svc")
+		}
+		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
+	}
+	task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)
+	if !ok || task.Group == nil || !strings.HasPrefix(*task.Group, "service:") {
+		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
+	}
+	svcName := strings.TrimPrefix(*task.Group, "service:")
+	if svcName == "" {
+		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
+	}
+	return relatedResult("ecs-svc", []string{svcName})
+}
+
+// checkEIPECS reports the ECS cluster whose task currently holds this EIP,
+// resolved via the same ecs-task cache join as checkEIPECSTask, then reading
+// the task's ClusterArn.
+func checkEIPECS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	eniID := eipENIID(res)
+	if eniID == "" {
+		return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
+	}
+	taskRes, truncated, err := eipMatchingECSTask(ctx, clients, cache, eniID)
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ecs", Count: -1, Err: err}
+	}
+	if taskRes.ID == "" {
+		if truncated {
+			return resource.ApproximateZero("ecs")
+		}
+		return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
+	}
+	task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)
+	if !ok || task.ClusterArn == nil || *task.ClusterArn == "" {
+		return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
+	}
+	clusterName := arnLastSegment(*task.ClusterArn)
+	if clusterName == "" {
+		return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
+	}
+	return relatedResult("ecs", []string{clusterName})
 }
 
 // checkEIPLogs reports CloudWatch log groups related to this EIP.

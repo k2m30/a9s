@@ -30,10 +30,49 @@ func FetchWAFWebACLs(ctx context.Context, api WAFv2ListWebACLsAPI) ([]resource.R
 	return all, nil
 }
 
-// FetchWAFWebACLsPage fetches a single page of WAF web ACLs.
+// FetchWAFWebACLsPage fetches a single page of REGIONAL-scope WAF web ACLs.
+// Fields["scope"] is always "REGIONAL" — use FetchWAFWebACLsPageWithCloudFront
+// (the production catalog path) to also include CLOUDFRONT-scope ACLs.
 func FetchWAFWebACLsPage(ctx context.Context, api WAFv2ListWebACLsAPI, continuationToken string) (resource.FetchResult, error) {
+	return fetchWAFWebACLsScopePage(ctx, api, wafv2types.ScopeRegional, continuationToken)
+}
+
+// FetchWAFWebACLsPageWithCloudFront fetches a single page of REGIONAL-scope
+// WAF web ACLs and, on the first page only (continuationToken == ""), also
+// fully lists CLOUDFRONT-scope ACLs and appends them. CLOUDFRONT-scope ACLs
+// are account-wide/global (not region-paginated the way REGIONAL ACLs are),
+// so folding them into page 1 avoids re-listing them on every REGIONAL page.
+// cfAPI may be nil (e.g. not yet wired) — in that case only REGIONAL ACLs
+// are returned, same as FetchWAFWebACLsPage.
+func FetchWAFWebACLsPageWithCloudFront(ctx context.Context, api WAFv2ListWebACLsAPI, cfAPI WAFv2ListWebACLsAPI, continuationToken string) (resource.FetchResult, error) {
+	result, err := fetchWAFWebACLsScopePage(ctx, api, wafv2types.ScopeRegional, continuationToken)
+	if err != nil {
+		return resource.FetchResult{}, err
+	}
+	if continuationToken != "" || cfAPI == nil {
+		return result, nil
+	}
+
+	cfToken := ""
+	for {
+		cfResult, cfErr := fetchWAFWebACLsScopePage(ctx, cfAPI, wafv2types.ScopeCloudfront, cfToken)
+		if cfErr != nil {
+			return resource.FetchResult{}, cfErr
+		}
+		result.Resources = append(result.Resources, cfResult.Resources...)
+		if cfResult.Pagination == nil || !cfResult.Pagination.IsTruncated {
+			break
+		}
+		cfToken = cfResult.Pagination.NextToken
+	}
+	return result, nil
+}
+
+// fetchWAFWebACLsScopePage fetches a single page of WAF web ACLs for the
+// given scope (REGIONAL or CLOUDFRONT).
+func fetchWAFWebACLsScopePage(ctx context.Context, api WAFv2ListWebACLsAPI, scope wafv2types.Scope, continuationToken string) (resource.FetchResult, error) {
 	input := &wafv2.ListWebACLsInput{
-		Scope: wafv2types.ScopeRegional,
+		Scope: scope,
 		Limit: aws.Int32(DefaultPageSize),
 	}
 	if continuationToken != "" {
@@ -82,7 +121,7 @@ func FetchWAFWebACLsPage(ctx context.Context, api WAFv2ListWebACLsAPI, continuat
 				"arn":         arn,
 				"description": description,
 				"lock_token":  lockToken,
-				"scope":       string(wafv2types.ScopeRegional),
+				"scope":       string(scope),
 			},
 			RawStruct: acl,
 		}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
@@ -122,19 +123,28 @@ func TestRelated_Kinesis_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- checkKinesisLambda (scan lambda cache for event_source_arn match) ---
+// --- checkKinesisLambda (checker-owned lambda:ListEventSourceMappings call
+// filtered by EventSourceArn=<StreamARN>, mapped against the lambda cache —
+// spec docs/resources/kinesis.md §lambda L59-62) ---
 
 func TestRelated_Kinesis_Lambda_Found(t *testing.T) {
 	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
-	lambdaRes := resource.Resource{
-		ID:   "process-clickstream",
-		Name: "process-clickstream",
-		Fields: map[string]string{
-			"event_source_arn": streamARN,
+	const fnArn = "arn:aws:lambda:us-east-1:123456789012:function:process-clickstream"
+
+	fake := &fakeLambdaListEventSourceMappingsByArn{
+		wantEventSourceArn: streamARN,
+		mappings: []lambdatypes.EventSourceMappingConfiguration{
+			{FunctionArn: aws.String(fnArn)},
 		},
 	}
+	clients := &awsclient.ServiceClients{Lambda: fake}
+
 	cache := resource.ResourceCache{
-		"lambda": resource.ResourceCacheEntry{Resources: []resource.Resource{lambdaRes}},
+		"lambda": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{ID: "process-clickstream", Name: "process-clickstream", Fields: map[string]string{"arn": fnArn}},
+			},
+		},
 	}
 	source := resource.Resource{
 		ID:   "clickstream-ingest",
@@ -146,7 +156,7 @@ func TestRelated_Kinesis_Lambda_Found(t *testing.T) {
 	}
 
 	checker := kinesisCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), nil, source, cache)
+	result := checker(context.Background(), clients, source, cache)
 
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1", result.Count)
@@ -154,32 +164,47 @@ func TestRelated_Kinesis_Lambda_Found(t *testing.T) {
 	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "process-clickstream" {
 		t.Errorf("ResourceIDs = %v, want [process-clickstream]", result.ResourceIDs)
 	}
+	if fake.calls != 1 {
+		t.Errorf("ListEventSourceMappings called %d times, want exactly 1", fake.calls)
+	}
 }
 
 func TestRelated_Kinesis_Lambda_NotFound(t *testing.T) {
-	lambdaRes := resource.Resource{
-		ID:   "unrelated-fn",
-		Name: "unrelated-fn",
-		Fields: map[string]string{
-			"event_source_arn": "arn:aws:sqs:us-east-1:123456789012:other-queue",
+	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
+	const mappedFnArn = "arn:aws:lambda:us-east-1:123456789012:function:process-clickstream"
+	const cachedFnArn = "arn:aws:lambda:us-east-1:123456789012:function:unrelated-fn"
+
+	fake := &fakeLambdaListEventSourceMappingsByArn{
+		wantEventSourceArn: streamARN,
+		mappings: []lambdatypes.EventSourceMappingConfiguration{
+			{FunctionArn: aws.String(mappedFnArn)},
 		},
 	}
+	clients := &awsclient.ServiceClients{Lambda: fake}
+
 	cache := resource.ResourceCache{
-		"lambda": resource.ResourceCacheEntry{Resources: []resource.Resource{lambdaRes}},
+		"lambda": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{ID: "unrelated-fn", Name: "unrelated-fn", Fields: map[string]string{"arn": cachedFnArn}},
+			},
+		},
 	}
 	source := resource.Resource{
 		ID:   "clickstream-ingest",
 		Name: "clickstream-ingest",
 		Fields: map[string]string{
 			"stream_name": "clickstream-ingest",
-			"stream_arn":  "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest",
+			"stream_arn":  streamARN,
 		},
 	}
 
 	checker := kinesisCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), nil, source, cache)
+	result := checker(context.Background(), clients, source, cache)
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no lambda event-source match)", result.Count)
+		t.Errorf("Count = %d, want 0 (mapping's function isn't the one cached — no match against lambda cache)", result.Count)
+	}
+	if fake.calls != 1 {
+		t.Errorf("ListEventSourceMappings called %d times, want exactly 1", fake.calls)
 	}
 }
 

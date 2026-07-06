@@ -334,6 +334,14 @@ func (f *fakeAPIGWV2ACM) GetApiMappings(_ context.Context, params *apigatewayv2.
 	return &apigatewayv2.GetApiMappingsOutput{Items: f.mappings[domain]}, nil
 }
 
+func (f *fakeAPIGWV2ACM) GetVpcLinks(_ context.Context, _ *apigatewayv2.GetVpcLinksInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetVpcLinksOutput, error) {
+	return &apigatewayv2.GetVpcLinksOutput{}, nil
+}
+
+func (f *fakeAPIGWV2ACM) GetAuthorizers(_ context.Context, _ *apigatewayv2.GetAuthorizersInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetAuthorizersOutput, error) {
+	return &apigatewayv2.GetAuthorizersOutput{}, nil
+}
+
 func ptr(s string) *string { return &s }
 
 // TestCheckApigwACM_ResolvesCertArn verifies that checkApigwACM finds the domain

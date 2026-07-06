@@ -115,6 +115,18 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 			Description:        aws.String("Triggers order-fulfillment-workflow nightly at 3 AM UTC"),
 			RoleArn:            aws.String(prodEBRoleARN),
 		},
+		// acme-api-deploy-trigger — required for the pipeline:eb-rule
+		// related-panel pivot (checkPipelineEbRule calls
+		// events:ListRuleNamesByTarget with the pipeline's constructed ARN as
+		// TargetArn; see EventBridgeFake.ListRuleNamesByTarget).
+		{
+			Name:         aws.String("acme-api-deploy-trigger"),
+			Arn:          aws.String("arn:aws:events:us-east-1:123456789012:rule/acme-api-deploy-trigger"),
+			State:        eventbridgetypes.RuleStateEnabled,
+			EventBusName: aws.String("default"),
+			EventPattern: aws.String(`{"source":["aws.codecommit"],"detail-type":["CodeCommit Repository State Change"],"detail":{"referenceName":["main"]}}`),
+			Description:  aws.String("Triggers acme-api-deploy on main branch push"),
+		},
 	}
 
 	targetsByRule := map[string][]eventbridgetypes.Target{
@@ -181,6 +193,12 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 			{
 				Id:  aws.String("SFNOrderFulfillmentWorkflow"),
 				Arn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"),
+			},
+		},
+		"acme-api-deploy-trigger": {
+			{
+				Id:  aws.String("CodePipelineAcmeApiDeploy"),
+				Arn: aws.String("arn:aws:codepipeline:us-east-1:123456789012:pipeline/acme-api-deploy"),
 			},
 		},
 	}

@@ -32,7 +32,8 @@ func NewCloudTrailFixtures() *CloudTrailFixtures {
 }
 
 // buildCTTrailStatus keys GetTrailStatus responses by trail ARN. One trail is
-// intentionally not logging, one has a LatestDeliveryError, the rest healthy.
+// intentionally not logging, one has a LatestDeliveryError, one has a stale
+// LatestDeliveryTime (docs/resources/trail.md §3.2), the rest healthy.
 func buildCTTrailStatus() map[string]cloudtrail.GetTrailStatusOutput {
 	return map[string]cloudtrail.GetTrailStatusOutput{
 		"arn:aws:cloudtrail:us-east-1:123456789012:trail/acme-management-trail": {
@@ -51,6 +52,13 @@ func buildCTTrailStatus() map[string]cloudtrail.GetTrailStatusOutput {
 		// S3 healthy-bucket trail status.
 		"arn:aws:cloudtrail:us-east-1:123456789012:trail/a9s-demo-s3-trail": {
 			IsLogging: aws.Bool(true),
+		},
+		// IsLogging=true but LatestDeliveryTime is fixed far in the past —
+		// always >1h stale regardless of when the demo runs, witnessing the
+		// "silent delivery failure" Broken condition (checkTrailDeliveryStale).
+		"arn:aws:cloudtrail:us-east-1:123456789012:trail/acme-stale-delivery-trail": {
+			IsLogging:          aws.Bool(true),
+			LatestDeliveryTime: aws.Time(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)),
 		},
 	}
 }
@@ -129,6 +137,20 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			IsMultiRegionTrail:         aws.Bool(false),
 			IsOrganizationTrail:        aws.Bool(false),
 			LogFileValidationEnabled:   aws.Bool(false),
+			IncludeGlobalServiceEvents: aws.Bool(false),
+			HasCustomEventSelectors:    aws.Bool(false),
+			HasInsightSelectors:        aws.Bool(false),
+		},
+		// LatestDeliveryTime stale (>1h) while IsLogging=true → Wave-2 Broken
+		// "silent delivery failure" (docs/resources/trail.md §3.2).
+		{
+			Name:                       aws.String("acme-stale-delivery-trail"),
+			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/acme-stale-delivery-trail"),
+			S3BucketName:               aws.String("cloudtrail-audit-logs"),
+			HomeRegion:                 aws.String("us-east-1"),
+			IsMultiRegionTrail:         aws.Bool(false),
+			IsOrganizationTrail:        aws.Bool(false),
+			LogFileValidationEnabled:   aws.Bool(true),
 			IncludeGlobalServiceEvents: aws.Bool(false),
 			HasCustomEventSelectors:    aws.Bool(false),
 			HasInsightSelectors:        aws.Bool(false),
@@ -824,13 +846,13 @@ func buildCTEvents() []cloudtrailtypes.Event {
 		// prod-s3-endpoint policy-change event — required for ct-events:vpce
 		// related-panel pivot. vpcEndpointId matches vpce-0aaa111111111111a (ec2.go).
 		{
-			EventId:     aws.String("evt-vpce-s3-endpoint-modify-001"),
-			EventName:   aws.String("ModifyVpcEndpoint"),
-			EventSource: aws.String("ec2.amazonaws.com"),
-			EventTime:   aws.Time(time.Date(2026, 4, 12, 13, 0, 0, 0, time.UTC)),
-			Username:    aws.String("acme-ci-deploy-role"),
-			ReadOnly:    aws.String("false"),
-			Resources:   []cloudtrailtypes.Resource{},
+			EventId:         aws.String("evt-vpce-s3-endpoint-modify-001"),
+			EventName:       aws.String("ModifyVpcEndpoint"),
+			EventSource:     aws.String("ec2.amazonaws.com"),
+			EventTime:       aws.Time(time.Date(2026, 4, 12, 13, 0, 0, 0, time.UTC)),
+			Username:        aws.String("acme-ci-deploy-role"),
+			ReadOnly:        aws.String("false"),
+			Resources:       []cloudtrailtypes.Resource{},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::123456789012:assumed-role/acme-ci-deploy-role/net-change-221","accountId":"123456789012"},"eventSource":"ec2.amazonaws.com","eventName":"ModifyVpcEndpoint","vpcEndpointId":"vpce-0aaa111111111111a","requestParameters":{"vpcEndpointId":"vpce-0aaa111111111111a"}}`),
 		},
 		// acme-vpc-stack update event — required for ct-events:cfn related-panel
@@ -846,6 +868,21 @@ func buildCTEvents() []cloudtrailtypes.Event {
 				{ResourceType: aws.String("AWS::CloudFormation::Stack"), ResourceName: aws.String("acme-vpc-stack")},
 			},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::123456789012:assumed-role/acme-ci-deploy-role/infra-change-055","accountId":"123456789012"},"eventSource":"cloudformation.amazonaws.com","eventName":"UpdateStack","requestParameters":{"stackName":"acme-vpc-stack"}}`),
+		},
+		// disk-space-warning alarm config-change event — required for the
+		// alarm:ct-events related-panel pivot (checkAlarmCTEvents). ResourceName
+		// matches disk-space-warning (cloudwatch.go).
+		{
+			EventId:     aws.String("evt-alarm-disk-space-put-001"),
+			EventName:   aws.String("PutMetricAlarm"),
+			EventSource: aws.String("monitoring.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 14, 10, 0, 0, 0, time.UTC)),
+			Username:    aws.String("alice.johnson"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::CloudWatch::Alarm"), ResourceName: aws.String("disk-space-warning")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"monitoring.amazonaws.com","eventName":"PutMetricAlarm","requestParameters":{"alarmName":"disk-space-warning"}}`),
 		},
 	}
 }

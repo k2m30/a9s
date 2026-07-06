@@ -250,16 +250,69 @@ func checkSubnetASG(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResult("asg", ids)
 }
 
-// checkSubnetEFS reports EFS file systems mounted into this subnet.
-// EFS mount targets are listed per-file-system by DescribeMountTargets; the
-// EFS list cache carries only FileSystemDescription which lacks mount targets.
-// Determining the relationship requires DescribeMountTargets per file system —
-// outside the 1-call budget. Returns Count: -1.
-func checkSubnetEFS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
+// checkSubnetEFS reports EFS file systems mounted into this subnet. Pattern
+// C — zero extra API calls: scans the already-loaded eni cache for mount-
+// target ENIs (Description "EFS mount target for <fsID>") whose SubnetId
+// matches this subnet, extracting the filesystem ID and cross-checking it
+// against the efs cache. Mirrors checkEFSSubnet's reverse direction
+// (efs_related.go).
+func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	subnetID := res.ID
+	if subnetID == "" {
 		return resource.RelatedCheckResult{TargetType: "efs", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "efs", Count: -1}
+
+	eniList, eniTruncated, err := subnetRelatedResources(ctx, clients, cache, "eni")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "efs", Count: -1, Err: err}
+	}
+	if eniList == nil {
+		return resource.RelatedCheckResult{TargetType: "efs", Count: -1}
+	}
+
+	const mountTargetPrefix = "EFS mount target for "
+	fsIDSet := make(map[string]struct{})
+	for _, eniRes := range eniList {
+		eni, ok := assertStruct[ec2types.NetworkInterface](eniRes.RawStruct)
+		if !ok {
+			continue
+		}
+		if eni.SubnetId == nil || *eni.SubnetId != subnetID {
+			continue
+		}
+		if eni.Description == nil || !strings.HasPrefix(*eni.Description, mountTargetPrefix) {
+			continue
+		}
+		fsID := strings.TrimPrefix(*eni.Description, mountTargetPrefix)
+		if fsID != "" {
+			fsIDSet[fsID] = struct{}{}
+		}
+	}
+	if len(fsIDSet) == 0 {
+		if eniTruncated {
+			return resource.ApproximateZero("efs")
+		}
+		return resource.RelatedCheckResult{TargetType: "efs", Count: 0}
+	}
+
+	efsList, efsTruncated, err := subnetRelatedResources(ctx, clients, cache, "efs")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "efs", Count: -1, Err: err}
+	}
+	if efsList == nil {
+		return resource.RelatedCheckResult{TargetType: "efs", Count: -1}
+	}
+
+	var ids []string
+	for _, efsRes := range efsList {
+		if _, found := fsIDSet[efsRes.ID]; found {
+			ids = append(ids, efsRes.ID)
+		}
+	}
+	if len(ids) == 0 && efsTruncated {
+		return resource.ApproximateZero("efs")
+	}
+	return relatedResult("efs", ids)
 }
 
 // checkSubnetEKS reports EKS clusters whose VpcConfig.SubnetIds includes

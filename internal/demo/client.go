@@ -49,6 +49,7 @@ func NewServiceClients() *awsclient.ServiceClients {
 	clients.CodePipeline = fakes.NewCodePipeline()
 	clients.Kinesis = fakes.NewKinesis()
 	clients.WAFv2 = fakes.NewWAF()
+	clients.WAFv2CloudFront = clients.WAFv2
 	clients.Glue = fakes.NewGlue()
 	clients.ElasticBeanstalk = fakes.NewEB()
 	clients.SES = fakes.NewSESV1()

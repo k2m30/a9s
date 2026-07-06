@@ -167,7 +167,8 @@ func TestRelated_Eb_ELB_WrongRawStruct(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestRelated_Eb_Role_MatchByIamInstanceProfile verifies that checkEbRole resolves
-// role ARNs from the IamInstanceProfile option setting.
+// bare role names (via asgInstanceProfileToRoles/arnRoleName) from the
+// IamInstanceProfile option setting — docs/resources/eb.md §2 `role`.
 func TestRelated_Eb_Role_MatchByIamInstanceProfile(t *testing.T) {
 	envName := "my-eb-env"
 	appName := "my-app"
@@ -205,15 +206,16 @@ func TestRelated_Eb_Role_MatchByIamInstanceProfile(t *testing.T) {
 	if result.Count < 1 {
 		t.Errorf("Count = %d, want >= 1 (role from IamInstanceProfile)", result.Count)
 	}
+	wantRoleName := "aws-elasticbeanstalk-ec2-role"
 	found := false
 	for _, id := range result.ResourceIDs {
-		if id == roleARN {
+		if id == wantRoleName {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, roleARN)
+		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, wantRoleName)
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error: %v", result.Err)

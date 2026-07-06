@@ -200,7 +200,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return FetchSQSQueuesPage(ctx, listAPI, c.SQS, continuationToken)
 		},
 		Wave2:                  IssueEnricher{Fn: EnrichSQSAttributes, Priority: 100},
-		FieldKeys:              []string{"queue_name", "queue_url", "arn", "approx_messages", "approx_not_visible", "delay_seconds"},
+		FieldKeys:              []string{"queue_name", "queue_url", "arn", "approx_messages", "approx_not_visible", "delay_seconds", "kms_key_id"},
 		IssueEnricherFieldKeys: []string{"dlq"},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSQSAlarm, NeedsTargetCache: true},

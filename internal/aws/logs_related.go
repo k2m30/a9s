@@ -163,7 +163,15 @@ func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, c
 	}
 	var ids []string
 	for _, taskRes := range taskList {
-		if strings.Contains(taskRes.ID, family) || strings.Contains(taskRes.Name, family) {
+		// Fields["task_definition"] holds the full task-definition ARN
+		// (arn:aws:ecs:region:account:task-definition/family:revision) —
+		// extract the family the same way checkECSTaskLogs does, rather than
+		// substring-matching the family against the task's own UUID ID/Name.
+		taskFamily := arnLastSegment(taskRes.Fields["task_definition"])
+		if idx := strings.LastIndex(taskFamily, ":"); idx >= 0 {
+			taskFamily = taskFamily[:idx]
+		}
+		if taskFamily == family {
 			ids = append(ids, taskRes.ID)
 		}
 	}

@@ -104,6 +104,11 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource 
 		}
 	}
 
+	subnetIDs := ""
+	if cluster.ResourcesVpcConfig != nil {
+		subnetIDs = strings.Join(cluster.ResourcesVpcConfig.SubnetIds, ",")
+	}
+
 	r := resource.Resource{
 		ID:   name,
 		Name: clusterName,
@@ -117,6 +122,7 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource 
 			"arn":                 aws.ToString(cluster.Arn),
 			"health_issues_count": strconv.Itoa(healthIssuesCount),
 			"health_issues":       strings.Join(issueCodes, ","),
+			"subnet_ids":          subnetIDs,
 		},
 		RawStruct: cluster,
 	}

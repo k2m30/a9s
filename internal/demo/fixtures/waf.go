@@ -2,14 +2,19 @@
 package fixtures
 
 import (
-	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
+	"sync"
 )
 
 // WAFFixtures holds typed fixture data for WAFv2.
 type WAFFixtures struct {
+	// WebACLSummaries holds REGIONAL-scope Web ACLs (served by ListWebACLs
+	// when Scope=REGIONAL).
 	WebACLSummaries []wafv2types.WebACLSummary
+	// CloudFrontWebACLSummaries holds CLOUDFRONT-scope Web ACLs (served by
+	// ListWebACLs when Scope=CLOUDFRONT — a us-east-1-only global listing).
+	CloudFrontWebACLSummaries []wafv2types.WebACLSummary
 	// ResourcesByWebACL maps WebACL ARN to associated resource ARNs.
 	ResourcesByWebACL map[string][]string
 }
@@ -26,18 +31,24 @@ var sharedWAFFixtures = sync.OnceValue(func() *WAFFixtures {
 				LockToken:   aws.String("lock-token-111"),
 			},
 			{
-				Id:          aws.String("a1b2c3d4-5678-90ab-cdef-222222222222"),
-				Name:        aws.String("acme-cloudfront-waf"),
-				ARN:         aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-cloudfront-waf/a1b2c3d4-5678-90ab-cdef-222222222222"),
-				Description: aws.String("WAF for CloudFront distributions"),
-				LockToken:   aws.String("lock-token-222"),
-			},
-			{
 				Id:          aws.String("a1b2c3d4-5678-90ab-cdef-333333333333"),
 				Name:        aws.String("acme-staging-waf"),
 				ARN:         aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-staging-waf/a1b2c3d4-5678-90ab-cdef-333333333333"),
 				Description: aws.String("WAF for staging environment ALB"),
 				LockToken:   aws.String("lock-token-333"),
+			},
+		},
+		// acme-cloudfront-waf is CLOUDFRONT-scope — CloudFront can only bind
+		// Web ACLs created with Scope=CLOUDFRONT (AWS SDK Go v2 —
+		// wafv2/types.Scope § CLOUDFRONT), so this ACL is served under
+		// ListWebACLs(Scope=CLOUDFRONT), not REGIONAL.
+		CloudFrontWebACLSummaries: []wafv2types.WebACLSummary{
+			{
+				Id:          aws.String("a1b2c3d4-5678-90ab-cdef-222222222222"),
+				Name:        aws.String("acme-cloudfront-waf"),
+				ARN:         aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-cloudfront-waf/a1b2c3d4-5678-90ab-cdef-222222222222"),
+				Description: aws.String("WAF for CloudFront distributions"),
+				LockToken:   aws.String("lock-token-222"),
 			},
 		},
 		ResourcesByWebACL: map[string][]string{

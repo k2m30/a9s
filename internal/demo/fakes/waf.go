@@ -21,7 +21,13 @@ func NewWAF() *WAFFake {
 	return &WAFFake{fix: fixtures.NewWAFFixtures()}
 }
 
-func (f *WAFFake) ListWebACLs(_ context.Context, _ *wafv2.ListWebACLsInput, _ ...func(*wafv2.Options)) (*wafv2.ListWebACLsOutput, error) {
+// ListWebACLs respects the Scope input: Scope=CLOUDFRONT returns only the
+// global CLOUDFRONT-scope fixtures; anything else (including the zero value)
+// returns the REGIONAL fixtures, matching the real ListWebACLs default.
+func (f *WAFFake) ListWebACLs(_ context.Context, input *wafv2.ListWebACLsInput, _ ...func(*wafv2.Options)) (*wafv2.ListWebACLsOutput, error) {
+	if input != nil && input.Scope == wafv2types.ScopeCloudfront {
+		return &wafv2.ListWebACLsOutput{WebACLs: f.fix.CloudFrontWebACLSummaries}, nil
+	}
 	return &wafv2.ListWebACLsOutput{WebACLs: f.fix.WebACLSummaries}, nil
 }
 

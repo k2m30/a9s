@@ -699,15 +699,18 @@ func TestRelated_ASG_Role_MatchByServiceLinkedRole(t *testing.T) {
 	if result.Count < 1 {
 		t.Errorf("Count = %d, want >= 1 (service-linked role found)", result.Count)
 	}
+	// Role pivots return the bare RoleName, not the full ARN, so the role
+	// cache's FetchByIDs (keyed on RoleName) can resolve it — docs/resources/asg.md §2 `role`.
+	wantRoleName := "AWSServiceRoleForAutoScaling"
 	found := false
 	for _, id := range result.ResourceIDs {
-		if id == roleARN {
+		if id == wantRoleName {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, roleARN)
+		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, wantRoleName)
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error: %v", result.Err)
@@ -745,15 +748,17 @@ func TestRelated_ASG_Role_MatchByLaunchConfigInstanceProfile(t *testing.T) {
 	if result.Count < 1 {
 		t.Errorf("Count = %d, want >= 1 (role from instance profile)", result.Count)
 	}
+	// Role pivots return the bare RoleName, not the full ARN — docs/resources/asg.md §2 `role`.
+	wantRoleName := "my-ec2-role"
 	found := false
 	for _, id := range result.ResourceIDs {
-		if id == roleARN {
+		if id == wantRoleName {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, roleARN)
+		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, wantRoleName)
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error: %v", result.Err)
@@ -1214,15 +1219,17 @@ func TestRelated_ASG_Role_MatchByLaunchTemplateInstanceProfile(t *testing.T) {
 	if result.Count < 1 {
 		t.Errorf("Count = %d, want >= 1 (role from LT instance profile ARN)", result.Count)
 	}
+	// Role pivots return the bare RoleName, not the full ARN — docs/resources/asg.md §2 `role`.
+	wantRoleName := "ec2-role-from-lt"
 	found := false
 	for _, id := range result.ResourceIDs {
-		if id == roleARN {
+		if id == wantRoleName {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, roleARN)
+		t.Errorf("ResourceIDs = %v, want to contain %s", result.ResourceIDs, wantRoleName)
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error: %v", result.Err)

@@ -229,9 +229,11 @@ func checkASGRole(ctx context.Context, clients any, res resource.Resource, _ res
 
 	var ids []string
 
-	// ServiceLinkedRoleARN is directly a role ARN
+	// ServiceLinkedRoleARN is directly a role ARN — strip to the bare
+	// RoleName so the role cache's FetchByIDs (keyed on RoleName) resolves it,
+	// mirroring the ec2_related.go precedent for role-ARN-to-name reduction.
 	if asg.ServiceLinkedRoleARN != nil && *asg.ServiceLinkedRoleARN != "" {
-		ids = append(ids, *asg.ServiceLinkedRoleARN)
+		ids = append(ids, arnRoleName(*asg.ServiceLinkedRoleARN))
 	}
 
 	c, ok := clients.(*ServiceClients)
@@ -321,7 +323,7 @@ func asgInstanceProfileToRoles(ctx context.Context, c *ServiceClients, profileNa
 	var roleARNs []string
 	for _, r := range out.InstanceProfile.Roles {
 		if r.Arn != nil && *r.Arn != "" {
-			roleARNs = append(roleARNs, *r.Arn)
+			roleARNs = append(roleARNs, arnRoleName(*r.Arn))
 		}
 	}
 	return roleARNs

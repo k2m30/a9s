@@ -86,10 +86,11 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 		approxNotVisible := attrs["ApproximateNumberOfMessagesNotVisible"]
 		delaySeconds := attrs["DelaySeconds"]
 		queueArn := attrs["QueueArn"]
+		kmsKeyID := attrs["KmsMasterKeyId"]
 
 		r := resource.Resource{
-			ID:    queueName,
-			Name:  queueName,
+			ID:   queueName,
+			Name: queueName,
 			Fields: map[string]string{
 				"queue_name":         queueName,
 				"queue_url":          queueURL,
@@ -97,6 +98,7 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 				"approx_messages":    approxMessages,
 				"approx_not_visible": approxNotVisible,
 				"delay_seconds":      delaySeconds,
+				"kms_key_id":         kmsKeyID,
 			},
 			RawStruct: SQSQueueAttributesRow{
 				QueueURL:   queueURL,

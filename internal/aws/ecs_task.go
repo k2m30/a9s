@@ -114,6 +114,14 @@ func fetchECSTasksPageWithJoin(
 			stopCode := string(task.StopCode)
 			healthStatus := string(task.HealthStatus)
 
+			var images []string
+			for _, container := range task.Containers {
+				if container.Image != nil && *container.Image != "" {
+					images = append(images, *container.Image)
+				}
+			}
+			containerImages := strings.Join(images, ",")
+
 			// Join task definition to extract EFS file-system IDs, IAM
 			// roles, and Secrets Manager / SSM ValueFrom references.
 			// Skipped gracefully when describeTaskDefAPI is nil. A join
@@ -140,6 +148,7 @@ func fetchECSTasksPageWithJoin(
 				"execution_role":      taskDefJoin.executionRoleARN,
 				"secret_arns":         taskDefJoin.secretARNs,
 				"ssm_param_names":     taskDefJoin.ssmParamNames,
+				"container_images":    containerImages,
 			}
 			if joinErr != nil {
 				fields["task_def_join_error"] = "true"

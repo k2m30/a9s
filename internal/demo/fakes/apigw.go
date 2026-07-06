@@ -49,3 +49,18 @@ func (f *APIGWFake) GetIntegrations(_ context.Context, input *apigatewayv2.GetIn
 	}
 	return &apigatewayv2.GetIntegrationsOutput{Items: f.fix.Integrations[*input.ApiId]}, nil
 }
+
+// GetVpcLinks returns the fixture-registered VPC links (account-wide),
+// backing the apigw:elb related-panel pivot (checkApigwELB).
+func (f *APIGWFake) GetVpcLinks(_ context.Context, _ *apigatewayv2.GetVpcLinksInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetVpcLinksOutput, error) {
+	return &apigatewayv2.GetVpcLinksOutput{Items: f.fix.VpcLinks}, nil
+}
+
+// GetAuthorizers returns the fixture-registered authorizers for the requested
+// API, backing the apigw:role related-panel pivot (checkApigwRole).
+func (f *APIGWFake) GetAuthorizers(_ context.Context, input *apigatewayv2.GetAuthorizersInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetAuthorizersOutput, error) {
+	if input == nil || input.ApiId == nil {
+		return &apigatewayv2.GetAuthorizersOutput{}, nil
+	}
+	return &apigatewayv2.GetAuthorizersOutput{Items: f.fix.Authorizers[*input.ApiId]}, nil
+}

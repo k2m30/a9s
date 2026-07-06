@@ -11,6 +11,7 @@ import (
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	lambdapkg "github.com/aws/aws-sdk-go-v2/service/lambda"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -343,14 +344,118 @@ func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache
 	return relatedResult("cf", ids)
 }
 
-// checkApigwELB reports NLB target groups behind this API's VPC link.
-// VpcLink → NLB mapping lives on apigatewayv2:GetVpcLinks (not GetApis).
-// Returns Count: -1.
-func checkApigwELB(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
+// checkApigwELB reports the Network Load Balancer behind this API's VPC
+// link. Pattern C: apigatewayv2:GetIntegrations to find VPC_LINK integrations
+// and their ConnectionId (the VpcLink ID), apigatewayv2:GetVpcLinks
+// (account-wide, not API-scoped) to resolve that VpcLink's subnet/security-
+// group set, then intersect against the already-loaded elb cache's NLBs by
+// AvailabilityZones[].SubnetId / SecurityGroups membership.
+func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	apiID := res.ID
+	if apiID == "" {
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+
+	items, err := apigwListIntegrations(ctx, clients, apiID)
+	if err != nil {
+		if errors.Is(err, errClientMissing) {
+			return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		}
+		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+	}
+	var vpcLinkIDs []string
+	seenLinks := make(map[string]struct{})
+	for _, item := range items {
+		if item.ConnectionType != apigwtypes.ConnectionTypeVpcLink || item.ConnectionId == nil || *item.ConnectionId == "" {
+			continue
+		}
+		if _, dup := seenLinks[*item.ConnectionId]; dup {
+			continue
+		}
+		seenLinks[*item.ConnectionId] = struct{}{}
+		vpcLinkIDs = append(vpcLinkIDs, *item.ConnectionId)
+	}
+	if len(vpcLinkIDs) == 0 {
+		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+	}
+
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.APIGatewayV2 == nil {
+		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+	}
+	vpcLinkAPI, ok := c.APIGatewayV2.(APIGatewayV2GetVpcLinksAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetVpcLinksOutput, error) {
+		return vpcLinkAPI.GetVpcLinks(ctx, &apigatewayv2.GetVpcLinksInput{})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+	}
+	if out == nil {
+		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+	}
+
+	wantedSubnets := make(map[string]struct{})
+	wantedSGs := make(map[string]struct{})
+	for _, link := range out.Items {
+		if link.VpcLinkId == nil {
+			continue
+		}
+		if _, wanted := seenLinks[*link.VpcLinkId]; !wanted {
+			continue
+		}
+		for _, s := range link.SubnetIds {
+			wantedSubnets[s] = struct{}{}
+		}
+		for _, sg := range link.SecurityGroupIds {
+			wantedSGs[sg] = struct{}{}
+		}
+	}
+	if len(wantedSubnets) == 0 && len(wantedSGs) == 0 {
+		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
+	}
+
+	elbList, truncated, fetchErr := apigwRelatedResources(ctx, clients, cache, "elb")
+	if fetchErr != nil {
+		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: fetchErr}
+	}
+	if elbList == nil {
+		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+	}
+
+	var ids []string
+	for _, elbRes := range elbList {
+		lb, ok := assertStruct[elbv2types.LoadBalancer](elbRes.RawStruct)
+		if !ok {
+			continue
+		}
+		matched := false
+		for _, az := range lb.AvailabilityZones {
+			if az.SubnetId != nil {
+				if _, found := wantedSubnets[*az.SubnetId]; found {
+					matched = true
+					break
+				}
+			}
+		}
+		if !matched {
+			for _, sg := range lb.SecurityGroups {
+				if _, found := wantedSGs[sg]; found {
+					matched = true
+					break
+				}
+			}
+		}
+		if matched {
+			ids = append(ids, elbRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("elb")
+	}
+	return relatedResult("elb", ids)
 }
 
 // checkApigwR53 reports Route 53 zones with alias records for this API's
@@ -362,14 +467,62 @@ func checkApigwR53(_ context.Context, _ any, res resource.Resource, _ resource.R
 	return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
 }
 
-// checkApigwRole reports IAM roles this API assumes (invocation/authorizer
-// roles). Role references live on GetRoute/GetAuthorizer (per-route), not
-// GetApis. Returns Count: -1.
-func checkApigwRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
+// checkApigwRole reports IAM roles this API assumes to call the integration
+// target or to run a request authorizer. Pattern C: reuses the
+// apigatewayv2:GetIntegrations call (Integration.CredentialsArn) already
+// made by the lambda/kms/sfn/sns pivots, plus one apigatewayv2:GetAuthorizers
+// call (Authorizer.AuthorizerCredentialsArn) — role ARNs reduced to bare
+// RoleName so the role cache's FetchByIDs resolves them.
+func checkApigwRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	apiID := res.ID
+	if apiID == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+
+	seen := make(map[string]struct{})
+
+	items, err := apigwListIntegrations(ctx, clients, apiID)
+	if err != nil && !errors.Is(err, errClientMissing) {
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+	}
+	for _, item := range items {
+		if item.CredentialsArn != nil && *item.CredentialsArn != "" {
+			seen[arnRoleName(*item.CredentialsArn)] = struct{}{}
+		}
+	}
+
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.APIGatewayV2 == nil {
+		if len(seen) > 0 {
+			return relatedResult("role", mapKeys(seen))
+		}
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+	}
+	authAPI, ok := c.APIGatewayV2.(APIGatewayV2GetAuthorizersAPI)
+	if !ok {
+		if len(seen) > 0 {
+			return relatedResult("role", mapKeys(seen))
+		}
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+	}
+	authOut, authErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetAuthorizersOutput, error) {
+		return authAPI.GetAuthorizers(ctx, &apigatewayv2.GetAuthorizersInput{ApiId: &apiID})
+	})
+	if authErr != nil {
+		if len(seen) > 0 {
+			return relatedResult("role", mapKeys(seen))
+		}
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: authErr}
+	}
+	if authOut != nil {
+		for _, a := range authOut.Items {
+			if a.AuthorizerCredentialsArn != nil && *a.AuthorizerCredentialsArn != "" {
+				seen[arnRoleName(*a.AuthorizerCredentialsArn)] = struct{}{}
+			}
+		}
+	}
+
+	return relatedResult("role", mapKeys(seen))
 }
 
 // checkApigwSFN reports Step Functions state machines integrated as targets.

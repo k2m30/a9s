@@ -17,6 +17,13 @@ type ECRGetRepositoryPolicyAPI interface {
 	GetRepositoryPolicy(ctx context.Context, params *ecr.GetRepositoryPolicyInput, optFns ...func(*ecr.Options)) (*ecr.GetRepositoryPolicyOutput, error)
 }
 
+// ECRListTagsForResourceAPI defines the interface for the ECR ListTagsForResource operation.
+// Used by checkECRCFN to read the aws:cloudformation:stack-name tag directly
+// from the repository (ECR does not embed tags in DescribeRepositories).
+type ECRListTagsForResourceAPI interface {
+	ListTagsForResource(ctx context.Context, params *ecr.ListTagsForResourceInput, optFns ...func(*ecr.Options)) (*ecr.ListTagsForResourceOutput, error)
+}
+
 // ECRDescribeImagesAPI defines the interface for the ECR DescribeImages operation.
 type ECRDescribeImagesAPI interface {
 	DescribeImages(ctx context.Context, params *ecr.DescribeImagesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error)
@@ -42,4 +49,5 @@ type ECRAPI interface {
 	ECRDescribeImagesAPI
 	ECRDescribeImageScanFindingsAPI // Wave 2 enrichment
 	ECRGetRepositoryPolicyAPI       // related-panel: ecr→role
+	ECRListTagsForResourceAPI       // related-panel: ecr→cfn
 }

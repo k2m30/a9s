@@ -59,11 +59,11 @@ func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	var ids []string
 	for _, tRes := range taskList {
-		// The task's Containers[].Image is only populated in the task struct
-		// for running tasks, not in DescribeTasks responses for all tasks.
-		// A weak substring match on any field that looks like an image URI.
-		for _, v := range tRes.Fields {
-			if strings.Contains(v, ".dkr.ecr.") && strings.Contains(v, "/"+repoName) {
+		// Fields["container_images"] is a comma-joined list of this task's
+		// Containers[].Image values (populated directly from DescribeTasks —
+		// no task-definition join required).
+		for image := range strings.SplitSeq(tRes.Fields["container_images"], ",") {
+			if strings.Contains(image, ".dkr.ecr.") && strings.Contains(image, "/"+repoName) {
 				ids = append(ids, tRes.ID)
 				break
 			}
@@ -174,7 +174,11 @@ func checkECRRole(ctx context.Context, clients any, res resource.Resource, _ res
 	}
 
 	roleARNs := ecrPolicyRoleARNs(*out.PolicyText)
-	return relatedResult("role", roleARNs)
+	roleNames := make([]string, 0, len(roleARNs))
+	for _, arn := range roleARNs {
+		roleNames = append(roleNames, arnRoleName(arn))
+	}
+	return relatedResult("role", roleNames)
 }
 
 // ecrPolicyRoleARNs parses an IAM policy JSON document and returns all IAM role

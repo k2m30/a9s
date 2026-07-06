@@ -650,7 +650,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		// task_role/execution_role/secret_arns/ssm_param_names — emitted by
 		// ecsJoinTaskDefinition's DescribeTaskDefinition join; required by
 		// the ecs-task:role, ecs-task:secrets, and ecs-task:ssm pivots.
-		FieldKeys: []string{"task_id", "cluster", "last_status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "status", "efs_file_system_ids", "task_role", "execution_role", "secret_arns", "ssm_param_names"},
+		FieldKeys: []string{"task_id", "cluster", "last_status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "status", "efs_file_system_ids", "task_role", "execution_role", "secret_arns", "ssm_param_names", "container_images"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSTaskService},
 			{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSTaskCluster},
@@ -771,6 +771,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		FieldKeys: []string{
 			"asg_name", "min_size", "max_size", "desired", "instances", "status",
 			"instances_unhealthy_count", "in_service_count", "suspended_processes",
+			"vpc_zone_identifier",
 		},
 		Related: []domain.RelatedDef{
 			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkASGEC2},

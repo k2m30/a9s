@@ -70,42 +70,56 @@ import (
 // is undefined behavior per the Go memory model. Methods serialize the
 // access.
 type ServiceClients struct {
-	storesMu       sync.RWMutex
-	iamPolicies    iamPolicyStore
-	identityStore  identityStore
-	ruleSets       ruleSetStore
+	storesMu      sync.RWMutex
+	iamPolicies   iamPolicyStore
+	identityStore identityStore
+	ruleSets      ruleSetStore
 
-	EC2              EC2API
-	S3               S3API
-	RDS              RDSAPI
-	ElastiCache      ElastiCacheAPI
-	DocDB            DocDBAPI
-	EKS              EKSAPI
-	SecretsManager   SecretsManagerAPI
-	Lambda           LambdaAPI
-	CloudWatch       CloudWatchAPI
-	SNS              SNSAPI
-	SQS              SQSAPI
-	ELBv2            ELBv2API
-	ECS              ECSAPI
-	CloudFormation   CFNAPI
-	IAM              IAMAPI
-	CloudWatchLogs   CWLogsAPI
-	SSM              SSMAPI
-	DynamoDB         DynamoDBAPI
-	ACM              ACMAPI
-	AutoScaling      ASGAPI
-	CloudFront       CloudFrontAPI
-	Route53          Route53API
-	APIGatewayV1     APIGatewayV1API
-	APIGatewayV2     APIGatewayV2API
-	ECR              ECRAPI
-	EFS              EFSAPI
-	EventBridge      EventBridgeAPI
-	SFN              SFNAPI
-	CodePipeline     CodePipelineAPI
-	Kinesis          KinesisAPI
-	WAFv2            WAFv2API
+	// Region is the region resolved from the session's AWS config at
+	// construction time (profile config, AWS_REGION/AWS_DEFAULT_REGION env,
+	// or the SDK default). Immutable after CreateServiceClients returns — safe
+	// to read from fetcher/related-checker goroutines without locking. Used to
+	// construct ARNs (e.g. pipeline, glue) and to detect when a us-east-1-only
+	// global API (WAFv2 CLOUDFRONT scope) needs a dedicated client.
+	Region string
+
+	EC2            EC2API
+	S3             S3API
+	RDS            RDSAPI
+	ElastiCache    ElastiCacheAPI
+	DocDB          DocDBAPI
+	EKS            EKSAPI
+	SecretsManager SecretsManagerAPI
+	Lambda         LambdaAPI
+	CloudWatch     CloudWatchAPI
+	SNS            SNSAPI
+	SQS            SQSAPI
+	ELBv2          ELBv2API
+	ECS            ECSAPI
+	CloudFormation CFNAPI
+	IAM            IAMAPI
+	CloudWatchLogs CWLogsAPI
+	SSM            SSMAPI
+	DynamoDB       DynamoDBAPI
+	ACM            ACMAPI
+	AutoScaling    ASGAPI
+	CloudFront     CloudFrontAPI
+	Route53        Route53API
+	APIGatewayV1   APIGatewayV1API
+	APIGatewayV2   APIGatewayV2API
+	ECR            ECRAPI
+	EFS            EFSAPI
+	EventBridge    EventBridgeAPI
+	SFN            SFNAPI
+	CodePipeline   CodePipelineAPI
+	Kinesis        KinesisAPI
+	WAFv2          WAFv2API
+	// WAFv2CloudFront is a second WAFv2 client pinned to us-east-1.
+	// wafv2:ListWebACLs/GetWebACL with Scope=CLOUDFRONT is a global operation
+	// that AWS only serves from the us-east-1 endpoint regardless of the
+	// session's selected region (AWS SDK Go v2 — wafv2 CLOUDFRONT-scope
+	// operations require Region=us-east-1).
+	WAFv2CloudFront  WAFv2API
 	Glue             GlueAPI
 	ElasticBeanstalk ElasticBeanstalkAPI
 	SES              SESV1API
@@ -142,6 +156,7 @@ func NewAWSSessionContext(ctx context.Context, profile, region string) (aws.Conf
 // CreateServiceClients creates all service clients from the given AWS config.
 func CreateServiceClients(cfg aws.Config) *ServiceClients {
 	return &ServiceClients{
+		Region:           cfg.Region,
 		EC2:              ec2.NewFromConfig(cfg),
 		S3:               s3.NewFromConfig(cfg),
 		RDS:              rds.NewFromConfig(cfg),
@@ -173,6 +188,7 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 		CodePipeline:     codepipeline.NewFromConfig(cfg),
 		Kinesis:          kinesis.NewFromConfig(cfg),
 		WAFv2:            wafv2.NewFromConfig(cfg),
+		WAFv2CloudFront:  wafv2.NewFromConfig(cfg, func(o *wafv2.Options) { o.Region = "us-east-1" }),
 		Glue:             glue.NewFromConfig(cfg),
 		ElasticBeanstalk: elasticbeanstalk.NewFromConfig(cfg),
 		SES:              ses.NewFromConfig(cfg),

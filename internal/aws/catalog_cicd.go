@@ -83,10 +83,10 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			if !ok || c == nil {
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
-			return FetchCodePipelinesPage(ctx, c.CodePipeline, continuationToken)
+			return FetchCodePipelinesPageWithClients(ctx, c, continuationToken)
 		},
 		Wave2:                  IssueEnricher{Fn: EnrichCodePipelineStatus, Priority: 10},
-		FieldKeys:              []string{"name", "pipeline_type", "version", "created", "updated"},
+		FieldKeys:              []string{"name", "pipeline_type", "version", "created", "updated", "arn"},
 		IssueEnricherFieldKeys: []string{"last_status"},
 		Related: []domain.RelatedDef{
 			{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkPipelineCB, NeedsTargetCache: false},

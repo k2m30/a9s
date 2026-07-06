@@ -2,8 +2,12 @@
 package aws
 
 import (
+	"context"
 	"sort"
 	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -108,4 +112,57 @@ func relatedResult(target string, ids []string) resource.RelatedCheckResult {
 		Count:       len(uniq),
 		ResourceIDs: uniq,
 	}
+}
+
+// lambdaEventSourceMappingLambdaCheck is shared by checkKinesisLambda and
+// checkMSKLambda. Both pivots need the same mechanism: a stream/cluster ARN
+// is the Lambda event source, and lambda:ListEventSourceMappings filtered by
+// EventSourceArn (one call per open resource — budget rule 7 in
+// docs/related-resources.md) returns the mappings' FunctionArn values, which
+// are matched against the already-loaded lambda cache's Fields["arn"].
+func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, eventSourceArn string, cache resource.ResourceCache) resource.RelatedCheckResult {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.Lambda == nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+	api, ok := c.Lambda.(LambdaListEventSourceMappingsAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+	}
+
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.ListEventSourceMappingsOutput, error) {
+		return api.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
+			EventSourceArn: aws.String(eventSourceArn),
+		})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+	}
+
+	functionArns := make(map[string]struct{}, len(out.EventSourceMappings))
+	for _, m := range out.EventSourceMappings {
+		if m.FunctionArn != nil && *m.FunctionArn != "" {
+			functionArns[*m.FunctionArn] = struct{}{}
+		}
+	}
+	if len(functionArns) == 0 {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+	}
+
+	entry, ok := cache["lambda"]
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "lambda"}
+	}
+
+	var ids []string
+	for _, fn := range entry.Resources {
+		if _, matched := functionArns[fn.Fields["arn"]]; matched {
+			ids = append(ids, fn.ID)
+		}
+	}
+	result := relatedResult("lambda", ids)
+	if len(ids) == 0 && entry.IsTruncated {
+		return resource.ApproximateZero("lambda")
+	}
+	return result
 }

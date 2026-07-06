@@ -178,7 +178,7 @@ func checkAlarmCTEvents(ctx context.Context, clients any, res resource.Resource,
 	}
 	var ids []string
 	for _, evRes := range evList {
-		if strings.Contains(evRes.Fields["event_source"], "monitoring.amazonaws.com") &&
+		if strings.Contains(evRes.Fields["source"], "monitoring.amazonaws.com") &&
 			strings.Contains(evRes.Fields["event_name"], "Alarm") {
 			ids = append(ids, evRes.ID)
 		}

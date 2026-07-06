@@ -76,8 +76,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `asg`, `cfn
 ### `efs`
 
 - **Why related**: EFS file systems project into a subnet via one mount target per AZ; losing a subnet (or running out of IPs) breaks EFS reachability from that AZ. Related-resources.md §subnet lists `efs` as a DevOps audit pivot.
-- **How discovered**: cross-reference `efs` mount-target metadata by subnet ID — mount targets are returned by `DescribeMountTargets` (per file system), carrying `MountTargetDescription.SubnetId`. Because a9s does not persist mount-target data in the top-level `efs` list, the pivot surfaces an `efs` count only when mount-target data has been populated via the `efs` resource's own Wave 2 fetch.
-- **Count shown**: yes (subject to the mount-target data being loaded).
+- **How discovered**: zero-call ENI scan — EFS mount-target ENIs carry a well-known description (`EFS mount target for <fs-id> (fsmt-...)`); scan the already-loaded `eni` list for entries with `NetworkInterface.SubnetId == Subnet.SubnetId` and that description form, extract the file-system IDs, and match them against the already-loaded `efs` list. Avoids the per-file-system `DescribeMountTargets` fan-out (mount targets are not on the top-level `efs` list response).
+- **Count shown**: yes (subject to the `eni` and `efs` lists being loaded).
 
 ### `vpce`
 
@@ -204,7 +204,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Related-panel `elb` discovery (`LoadBalancer.AvailabilityZones[].SubnetId`) — `docs/related-resources.md` line 550 ("AZ subnets the LB listens in"); `AWS SDK Go v2 — elasticloadbalancingv2/types.AvailabilityZone § SubnetId`.
 - Related-panel `eks` discovery (`Cluster.ResourcesVpcConfig.SubnetIds`) — `docs/related-resources.md` line 534 ("Cluster.ResourcesVpcConfig.SubnetIds — cluster subnets"); `AWS SDK Go v2 — eks/types.VpcConfigResponse § SubnetIds`.
 - Related-panel `asg` discovery (parse `VPCZoneIdentifier`) — `docs/related-resources.md` line 191 ("AutoScalingGroup.VPCZoneIdentifier — subnets the ASG launches into"); `AWS SDK Go v2 — autoscaling/types.AutoScalingGroup § VPCZoneIdentifier`.
-- Related-panel `efs` discovery (`MountTargetDescription.SubnetId`) — `docs/related-resources.md` line 500 ("MountTarget subnets"); `AWS SDK Go v2 — efs/types.MountTargetDescription § SubnetId`.
+- Related-panel `efs` discovery (mount-target ENI scan of the loaded `eni` list by `NetworkInterface.SubnetId` + EFS mount-target description) — `docs/related-resources.md` § `subnet` (`efs` bullet); `AWS SDK Go v2 — ec2/types.NetworkInterface § SubnetId, Description`.
 - Related-panel `vpce` discovery (Interface endpoints' `VpcEndpoint.SubnetIds`) — `docs/related-resources.md` line 1044 ("Interface endpoint subnets"); `AWS SDK Go v2 — ec2/types.VpcEndpoint § SubnetIds`.
 - Related-panel `cfn` discovery (tag-based, `aws:cloudformation:stack-name`) — `AWS SDK Go v2 — ec2/types.Subnet § Tags`. Tag convention is an AWS-wide CFN behavior cited from related-resources.md's general use of CFN tag-based pivots.
 - Related-panel `ct-events` universal pivot — `docs/related-resources.md` § Policy (universal pivot).
@@ -218,7 +218,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - §5 read-only invariant — `docs/architecture.md` § "What is a9s?" (line 13: "a9s is a read-only terminal UI for AWS.").
 - `efs` count caveat (mount-target data is not on the top-level `efs` list response — it requires `DescribeMountTargets` per FS) — `AWS SDK Go v2 — efs/types.FileSystemDescription` (no subnet field on `FileSystemDescription`; subnet data only on `MountTargetDescription`).
 - `cfn` tag-based discovery is conventional (no direct field on `Subnet`) — a9s-devops (2026-04-20): possible=yes, worth=yes. Real-world subnets that are CFN-managed carry `aws:cloudformation:stack-name`; operator commonly pivots from a subnet to its stack during drift or change investigations. No AWS surface carries a direct Stack reference on `Subnet` itself, so tags are the only read-only discovery path.
-- `efs` pivot worth surfacing despite indirect discovery — a9s-devops (2026-04-20): possible=yes, worth=yes. Subnet IP exhaustion or AZ failure directly breaks EFS mount-target reachability in that AZ; operator routinely asks "which FS mounts through this subnet?" during AZ incident triage. Surfaced as count-when-loaded, accepting that the count is present only when mount-target data has been fetched by the `efs` resource's own Wave 2.
+- `efs` pivot worth surfacing despite indirect discovery — a9s-devops (2026-04-20): possible=yes, worth=yes. Subnet IP exhaustion or AZ failure directly breaks EFS mount-target reachability in that AZ; operator routinely asks "which FS mounts through this subnet?" during AZ incident triage. Surfaced via the zero-call mount-target ENI scan, so the count is present whenever the `eni` and `efs` lists are loaded.
 
 <!-- BEGIN GENERATED: header -->
 subnet — NETWORKING. Lifecycle key: `state`.

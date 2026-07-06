@@ -61,6 +61,14 @@ func (f *fakeRoute53Full) GetHostedZone(_ context.Context, _ *route53.GetHostedZ
 	return &route53.GetHostedZoneOutput{}, nil
 }
 
+func (f *fakeRoute53Full) ListQueryLoggingConfigs(_ context.Context, _ *route53.ListQueryLoggingConfigsInput, _ ...func(*route53.Options)) (*route53.ListQueryLoggingConfigsOutput, error) {
+	return &route53.ListQueryLoggingConfigsOutput{}, nil
+}
+
+func (f *fakeRoute53Full) ListHostedZonesByVPC(_ context.Context, _ *route53.ListHostedZonesByVPCInput, _ ...func(*route53.Options)) (*route53.ListHostedZonesByVPCOutput, error) {
+	return &route53.ListHostedZonesByVPCOutput{}, nil
+}
+
 // Compile-time check: fakeRoute53Full satisfies Route53API.
 var _ awsclient.Route53API = (*fakeRoute53Full)(nil)
 

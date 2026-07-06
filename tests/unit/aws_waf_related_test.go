@@ -156,7 +156,10 @@ func TestRelated_WAF_CF_RegionalReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_WAF_CF_CloudfrontScopeUnknown: CLOUDFRONT scope → Count: -1 (would need API).
+// TestRelated_WAF_CF_CloudfrontScopeUnknown: CLOUDFRONT scope with a resolvable
+// WebACL ARN but no CloudFront client available → Count: -1 (would need
+// cloudfront:ListDistributionsByWebACLId) — docs/resources/waf.md §2 `cf`.
+// Fields["arn"] must be set: checkWAFCF reads Fields["arn"], not Fields["id"].
 func TestRelated_WAF_CF_CloudfrontScopeUnknown(t *testing.T) {
 	res := resource.Resource{
 		ID:   "a1b2c3d4-5678-90ab-cdef-222222222222",
@@ -164,6 +167,7 @@ func TestRelated_WAF_CF_CloudfrontScopeUnknown(t *testing.T) {
 		Fields: map[string]string{
 			"name":  "my-cf-waf",
 			"id":    "a1b2c3d4-5678-90ab-cdef-222222222222",
+			"arn":   "arn:aws:wafv2:us-east-1:123456789012:global/webacl/my-cf-waf/a1b2c3d4-5678-90ab-cdef-222222222222",
 			"scope": "CLOUDFRONT",
 		},
 	}
@@ -546,7 +550,9 @@ func TestRelated_WAF_Logs_NoLoggingConfigured(t *testing.T) {
 // --- CF checker: real dispatch with fake CloudFront ---
 
 // TestRelated_WAF_CF_CloudfrontScopeReturnsDistributionIDs verifies that
-// a CLOUDFRONT-scope WebACL with a fake CloudFront client returns distribution IDs.
+// a CLOUDFRONT-scope WebACL with a fake CloudFront client returns distribution
+// IDs. checkWAFCF passes the full WebACL ARN (Fields["arn"], not Fields["id"])
+// to cloudfront:ListDistributionsByWebACLId — docs/resources/waf.md §2 `cf`.
 func TestRelated_WAF_CF_CloudfrontScopeReturnsDistributionIDs(t *testing.T) {
 	res := resource.Resource{
 		ID:   "a1b2c3d4-5678-90ab-cdef-222222222222",
@@ -554,6 +560,7 @@ func TestRelated_WAF_CF_CloudfrontScopeReturnsDistributionIDs(t *testing.T) {
 		Fields: map[string]string{
 			"name":  "my-cf-waf",
 			"id":    "a1b2c3d4-5678-90ab-cdef-222222222222",
+			"arn":   "arn:aws:wafv2:us-east-1:123456789012:global/webacl/my-cf-waf/a1b2c3d4-5678-90ab-cdef-222222222222",
 			"scope": "CLOUDFRONT",
 		},
 	}
@@ -577,7 +584,7 @@ func TestRelated_WAF_CF_CloudfrontScopeReturnsDistributionIDs(t *testing.T) {
 		t.Errorf("Count = %d, want 2", result.Count)
 	}
 	if len(result.ResourceIDs) != 2 {
-		t.Errorf("ResourceIDs len = %d, want 2", len(result.ResourceIDs))
+		t.Fatalf("ResourceIDs len = %d, want 2 (got %v)", len(result.ResourceIDs), result.ResourceIDs)
 	}
 	if result.ResourceIDs[0] != "E1ABC123DEF456" || result.ResourceIDs[1] != "E2XYZ789GHI012" {
 		t.Errorf("ResourceIDs = %v, want [E1ABC123DEF456, E2XYZ789GHI012]", result.ResourceIDs)

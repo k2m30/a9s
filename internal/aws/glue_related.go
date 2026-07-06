@@ -123,9 +123,15 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 	if !ok || c == nil || c.Glue == nil {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 	}
-	region := regionFromEnv()
+	region := c.Region
+	if region == "" {
+		region = GetDefaultRegion("", "")
+	}
 	account := accountIDFromClients(ctx, c, c.IdentityStore())
-	if region == "" || account == "" {
+	if account == "" {
+		// Identity unresolved (STS GetCallerIdentity failed or is unavailable):
+		// the ARN this checker needs cannot be constructed, so the result is
+		// unknown, not a real zero.
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 	}
 	jobARN := "arn:aws:glue:" + region + ":" + account + ":job/" + jobName

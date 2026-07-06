@@ -713,18 +713,20 @@ func TestRelated_Alarm_WAF_NoDimension(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRelated_Alarm_CTEvents_MatchMonitoringAlarm(t *testing.T) {
+	// checkAlarmCTEvents matches on Fields["source"] (not "event_source") and
+	// Fields["event_name"] — docs/resources/alarm.md §2 `ct-events`.
 	evRes := resource.Resource{
 		ID: "ct-event-abc",
 		Fields: map[string]string{
-			"event_source": "monitoring.amazonaws.com",
-			"event_name":   "PutMetricAlarm",
+			"source":     "monitoring.amazonaws.com",
+			"event_name": "PutMetricAlarm",
 		},
 	}
 	otherEv := resource.Resource{
 		ID: "ct-event-def",
 		Fields: map[string]string{
-			"event_source": "lambda.amazonaws.com",
-			"event_name":   "InvokeFunction",
+			"source":     "lambda.amazonaws.com",
+			"event_name": "InvokeFunction",
 		},
 	}
 	cache := resource.ResourceCache{
@@ -744,11 +746,12 @@ func TestRelated_Alarm_CTEvents_MatchMonitoringAlarm(t *testing.T) {
 }
 
 func TestRelated_Alarm_CTEvents_NoMatchWhenEventNameLacksAlarm(t *testing.T) {
+	// docs/resources/alarm.md §2 `ct-events` — field is Fields["source"].
 	evRes := resource.Resource{
 		ID: "ct-event-abc",
 		Fields: map[string]string{
-			"event_source": "monitoring.amazonaws.com",
-			"event_name":   "DescribeMetrics",
+			"source":     "monitoring.amazonaws.com",
+			"event_name": "DescribeMetrics",
 		},
 	}
 	cache := resource.ResourceCache{

@@ -89,7 +89,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 		},
 		FieldKeys: []string{
 			"cluster_name", "version", "status", "endpoint", "platform_version",
-			"arn", "health_issues_count", "health_issues",
+			"arn", "health_issues_count", "health_issues", "subnet_ids",
 		},
 		// In-fetcher Wave 2: the eks fetcher already issues per-cluster
 		// DescribeCluster calls and populates health_issues_count / health_issues

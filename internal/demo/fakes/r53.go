@@ -64,3 +64,50 @@ func (f *R53Fake) GetHostedZone(_ context.Context, input *route53.GetHostedZoneI
 	}
 	return nil, fmt.Errorf("GetHostedZone: zone %q not found", *input.Id)
 }
+
+// ListQueryLoggingConfigs returns the fixture query-logging configuration
+// for the requested hosted zone, backing the r53:logs related-panel pivot
+// (checkR53Logs).
+func (f *R53Fake) ListQueryLoggingConfigs(_ context.Context, input *route53.ListQueryLoggingConfigsInput, _ ...func(*route53.Options)) (*route53.ListQueryLoggingConfigsOutput, error) {
+	var zoneID string
+	if input != nil && input.HostedZoneId != nil {
+		zoneID = *input.HostedZoneId
+	}
+	cfg, ok := f.fix.QueryLoggingConfigs[zoneID]
+	if !ok {
+		return &route53.ListQueryLoggingConfigsOutput{}, nil
+	}
+	return &route53.ListQueryLoggingConfigsOutput{
+		QueryLoggingConfigs: []r53types.QueryLoggingConfig{cfg},
+	}, nil
+}
+
+// ListHostedZonesByVPC returns the private hosted zones associated with the
+// requested VPC, backing the vpce:r53 related-panel pivot (checkVPCER53).
+// Mirrors GetHostedZone's VPC associations: only
+// Z5678901234ABCDEFGHIJ carries a VPC association in demo mode.
+func (f *R53Fake) ListHostedZonesByVPC(_ context.Context, input *route53.ListHostedZonesByVPCInput, _ ...func(*route53.Options)) (*route53.ListHostedZonesByVPCOutput, error) {
+	if input == nil || input.VPCId == nil {
+		return nil, fmt.Errorf("ListHostedZonesByVPC: VPCId is required")
+	}
+	if *input.VPCId != "vpc-0abc123def456789a" {
+		return &route53.ListHostedZonesByVPCOutput{}, nil
+	}
+	const zoneID = "Z5678901234ABCDEFGHIJ"
+	for i := range f.fix.HostedZones {
+		hz := f.fix.HostedZones[i]
+		if hz.Id == nil || *hz.Id != "/hostedzone/"+zoneID {
+			continue
+		}
+		return &route53.ListHostedZonesByVPCOutput{
+			HostedZoneSummaries: []r53types.HostedZoneSummary{
+				{
+					HostedZoneId: aws.String(zoneID),
+					Name:         hz.Name,
+					Owner:        &r53types.HostedZoneOwner{OwningAccount: aws.String("123456789012")},
+				},
+			},
+		}, nil
+	}
+	return &route53.ListHostedZonesByVPCOutput{}, nil
+}

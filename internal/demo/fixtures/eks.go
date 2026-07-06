@@ -2,9 +2,9 @@
 package fixtures
 
 import (
-	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	"sync"
 )
 
 // EKSFixtures holds all EKS domain objects served by the fake.
@@ -81,8 +81,8 @@ func buildEKSClusters() []*ekstypes.Cluster {
 			// aws:cloudformation:stack-name tag — required for eks→cfn
 			// related-panel pivot. acme-eks-cluster is a real stack fixture (cfn.go).
 			Tags: map[string]string{
-				"Environment":                    "prod",
-				"Team":                           "platform",
+				"Environment":                   "prod",
+				"Team":                          "platform",
 				"aws:cloudformation:stack-name": "acme-eks-cluster",
 			},
 		},

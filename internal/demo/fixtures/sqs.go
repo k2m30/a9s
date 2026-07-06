@@ -1,8 +1,8 @@
 package fixtures
 
 import (
-	"sync"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"sync"
 )
 
 // SQSFixtures holds typed fixture data for SQS.
@@ -27,6 +27,9 @@ var sharedSQSFixtures = sync.OnceValue(func() *SQSFixtures {
 					// RedrivePolicy — required for the sqs:sqs related-panel pivot
 					// (checkSQSSQS forward direction: this queue's DLQ target).
 					"RedrivePolicy": `{"deadLetterTargetArn":"arn:aws:sqs:us-east-1:123456789012:data-pipeline-dlq","maxReceiveCount":5}`,
+					// KmsMasterKeyId — required for the sqs:kms related-panel pivot
+					// (checkSQSKMS).
+					"KmsMasterKeyId": OrdersProdKMSKeyID,
 				},
 			},
 			{

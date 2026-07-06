@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 
@@ -10,9 +11,10 @@ import (
 )
 
 // FetchCloudTrailTrails calls DescribeTrails and GetTrailStatus (per trail)
-// so the list row can classify `is_logging=false` / `latest_delivery_error` as
-// broken. GetTrailStatus is the authoritative source for logging health; the
-// DescribeTrails response alone has no runtime signal.
+// so the list row can classify `is_logging=false`, non-empty
+// `latest_delivery_error`, or a stale `latest_delivery_time` (>1h on a
+// logging trail) as broken. GetTrailStatus is the authoritative source for
+// logging health; the DescribeTrails response alone has no runtime signal.
 func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI) ([]resource.Resource, error) {
 	output, err := api.DescribeTrails(ctx, &cloudtrail.DescribeTrailsInput{})
 	if err != nil {
@@ -62,6 +64,7 @@ func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI)
 		// the whole list.
 		isLogging := ""
 		latestDeliveryError := ""
+		latestDeliveryTime := ""
 		if trailARN != "" {
 			statusOut, statusErr := api.GetTrailStatus(ctx, &cloudtrail.GetTrailStatusInput{Name: &trailARN})
 			if statusErr == nil && statusOut != nil {
@@ -74,6 +77,9 @@ func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI)
 				}
 				if statusOut.LatestDeliveryError != nil {
 					latestDeliveryError = *statusOut.LatestDeliveryError
+				}
+				if statusOut.LatestDeliveryTime != nil {
+					latestDeliveryTime = statusOut.LatestDeliveryTime.Format(time.RFC3339)
 				}
 			}
 		}
@@ -91,7 +97,9 @@ func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI)
 				"log_file_validation_enabled": logValidation,
 				"is_logging":                  isLogging,
 				"latest_delivery_error":       latestDeliveryError,
+				"latest_delivery_time":        latestDeliveryTime,
 			},
+			Findings:  trailWave1Wave2Findings(isLogging, latestDeliveryError, latestDeliveryTime, logValidation),
 			RawStruct: trail,
 		}
 

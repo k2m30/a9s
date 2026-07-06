@@ -66,36 +66,17 @@ func checkMSKSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	return relatedResult("sg", ids)
 }
 
-// checkMSKLambda scans the Lambda cache for functions whose first
-// EventSourceArn (captured in Fields["event_source_arn"] at fetch time) matches
-// this cluster's ARN. MSK → Lambda triggers use the cluster ARN as the event
-// source. Secondary event sources are not captured in the field (only the first
-// is stored), so this check may under-count.
+// checkMSKLambda calls lambda:ListEventSourceMappings with the EventSourceArn
+// filter set to this cluster's ARN (one call per open cluster — budget rule 7
+// in docs/related-resources.md) and maps the returned FunctionArn entries
+// against the lambda cache. MSK → Lambda triggers use the cluster ARN as the
+// event source.
 func checkMSKLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok || cluster.ClusterArn == nil || *cluster.ClusterArn == "" {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 	}
-	clusterARN := *cluster.ClusterArn
-
-	lambdaList, truncated, err := mskRelatedResources(ctx, clients, cache, "lambda")
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
-	}
-	if lambdaList == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
-	}
-
-	var ids []string
-	for _, fn := range lambdaList {
-		if fn.Fields["event_source_arn"] == clusterARN {
-			ids = append(ids, fn.ID)
-		}
-	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("lambda")
-	}
-	return relatedResult("lambda", ids)
+	return lambdaEventSourceMappingLambdaCheck(ctx, clients, *cluster.ClusterArn, cache)
 }
 
 // checkMSKCFN matches the MSK cluster's aws:cloudformation:stack-name tag to

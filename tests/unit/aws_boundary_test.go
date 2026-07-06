@@ -199,9 +199,9 @@ func TestChecker_Approximate_PropagatedFromCache(t *testing.T) {
 		taskRes := resource.Resource{
 			ID:   "task-boundary:1",
 			Name: "task-boundary:1",
-			// checkECRECSTask scans Fields for ".dkr.ecr." + "/repoName" patterns.
+			// checkECRECSTask scans Fields["container_images"] (comma-joined) for ".dkr.ecr." + "/repoName" patterns.
 			Fields: map[string]string{
-				"image_0": imageURI,
+				"container_images": imageURI,
 			},
 			RawStruct: ecstypes.TaskDefinition{
 				Family: aws.String("task-boundary"),

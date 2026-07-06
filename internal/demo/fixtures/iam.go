@@ -191,6 +191,18 @@ func buildIAMRoles() []iamtypes.Role {
 			CreateDate:  aws.Time(time.Date(2025, 7, 1, 9, 0, 0, 0, time.UTC)),
 			Description: aws.String("Service role for Glue ETL jobs"),
 		},
+		// acme-ec2-instance-role — attached to the acme-ec2-instance-profile
+		// instance profile referenced by acme-web-prod-lc's IamInstanceProfile.
+		// Required for the asg:role related-panel pivot (checkASGRole via
+		// asgResolveInstanceProfile → asgInstanceProfileToRoles).
+		{
+			RoleName:    aws.String("acme-ec2-instance-role"),
+			RoleId:      aws.String("AROAEXAMPLE999999999"),
+			Arn:         aws.String("arn:aws:iam::123456789012:role/acme-ec2-instance-role"),
+			Path:        aws.String("/"),
+			CreateDate:  aws.Time(time.Date(2025, 1, 5, 9, 0, 0, 0, time.UTC)),
+			Description: aws.String("EC2 instance role for web-tier ASG instances"),
+		},
 		// ARN-keyed alias fixtures for EKS node group NodeRole navigable field
 		{
 			RoleName:    aws.String("arn:aws:iam::123456789012:role/eks-node-role"),
@@ -460,7 +472,7 @@ func buildIAMRoles() []iamtypes.Role {
 func buildIAMInstanceProfiles(roles []iamtypes.Role) map[string]iamtypes.InstanceProfile {
 	var ec2ProfileRole iamtypes.Role
 	for _, r := range roles {
-		if aws.ToString(r.RoleName) == "acme-ec2-instance-profile" {
+		if aws.ToString(r.RoleName) == "acme-ec2-instance-role" {
 			ec2ProfileRole = r
 			break
 		}

@@ -8,6 +8,8 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
+	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -192,13 +194,49 @@ func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, _ re
 }
 
 // checkVPCER53 reports Route 53 private hosted zones associated with this VPC
-// endpoint's PrivateDns. The associated-zones list lives on
-// route53:ListHostedZonesByVPC — not in the r53 hosted-zone cache. Returns -1.
-func checkVPCER53(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
+// endpoint's VPC. Pattern C: one route53:ListHostedZonesByVPC call for the
+// endpoint's VpcId.
+func checkVPCER53(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	vpcID := res.Fields["vpc_id"]
+	if vpcID == "" {
+		if vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct); ok && vpce.VpcId != nil {
+			vpcID = *vpce.VpcId
+		}
+	}
+	if vpcID == "" {
 		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.Route53 == nil {
+		return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+	}
+	api, ok := c.Route53.(Route53ListHostedZonesByVPCAPI)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+	}
+	region := c.Region
+	if region == "" {
+		region = GetDefaultRegion("", "")
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.ListHostedZonesByVPCOutput, error) {
+		return api.ListHostedZonesByVPC(ctx, &route53.ListHostedZonesByVPCInput{
+			VPCId:     &vpcID,
+			VPCRegion: r53types.VPCRegion(region),
+		})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "r53", Count: -1, Err: err}
+	}
+	if out == nil || len(out.HostedZoneSummaries) == 0 {
+		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
+	}
+	var ids []string
+	for _, z := range out.HostedZoneSummaries {
+		if z.HostedZoneId != nil && *z.HostedZoneId != "" {
+			ids = append(ids, *z.HostedZoneId)
+		}
+	}
+	return relatedResult("r53", ids)
 }
 
 // checkVPCES3 reports S3 buckets associated with a Gateway-type VPC endpoint

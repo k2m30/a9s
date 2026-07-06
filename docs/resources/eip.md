@@ -76,8 +76,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 ### `logs`
 
 - **Why related**: CloudWatch Logs groups receiving VPC Flow Logs that include traffic for this IP — the only log surface that directly references an EIP by value — persona (a9s-devops): flow-log capture is enabled at the VPC/subnet/ENI level, so the operator pivot is to log groups destined from the attached ENI, not from the EIP itself. Value here is narrow; surface it only when an ENI association exists.
-- **How discovered**: read `Address.NetworkInterfaceId` → follow to `eni` in the already-loaded `eni` list → read `NetworkInterface.VpcId` → filter the already-loaded `logs` list by log-group-name convention for VPC Flow Logs (`/aws/vpc/flowlogs/<vpc-id>` or operator-defined). No direct AWS cross-reference API — persona (a9s-devops): this pivot is best-effort; when flow logs target S3 or Kinesis instead of CloudWatch Logs, the count is 0.
-- **Count shown**: yes.
+- **How discovered**: not resolvable within the checker budget — EIPs themselves emit no logs, flow-log group names are operator-defined (no reliable naming convention to filter the `logs` cache by), and tying the address's traffic to a log group would need `DescribeFlowLogs` per associated ENI/subnet/VPC. (budget-excluded per related-resources.md Policy rule 7: per-ENI flow-log resolution exceeds the one-call budget.)
+- **Count shown**: unknown.
 
 ### `nat`
 
@@ -175,7 +175,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops persona — `asg` via two-hop `ec2` lookup (`Address.InstanceId` → `Instance.Tags[aws:autoscaling:groupName]`) — persona (2026-04-20): possible=yes, worth=yes. Operator needs to know whether the underlying instance is replaceable by an ASG.
 - a9s-devops persona — `cfn` via `Address.Tags[aws:cloudformation:stack-name]` — persona (2026-04-20): possible=yes, worth=yes. CFN writes reserved tags on stack-managed resources; cheap cache pivot.
 - a9s-devops persona — `ecs` / `ecs-svc` / `ecs-task` via `NetworkInterfaceId` match on `attachments[].details[]` — persona (2026-04-20): possible=yes, worth=yes-narrow. Pattern is rare (ALB/Fargate auto-IP is more common) but valid for legacy task-per-EIP setups; skip when no ENI association.
-- a9s-devops persona — `logs` via VPC-flow-log group-name convention keyed off the attached ENI's VPC — persona (2026-04-20): possible=partial, worth=yes-narrow. No direct AWS reference API; returns 0 when flow logs target S3 or Kinesis.
+- `logs` budget exclusion — EIPs emit no logs; flow-log group names are operator-defined and tying the address's traffic to a log group needs `DescribeFlowLogs` per associated ENI/subnet/VPC — `docs/related-resources.md` § Policy rule 7.
 - a9s-devops persona — `alarm` non-ENI/NAT dimensions, `logs` beyond best-effort, ECS without ENI recorded in §5 — persona (2026-04-20): possible=no / partial, worth=no. AWS surface does not expose a direct cross-reference and the operator benefit is below the Wave 1 cost budget.
 
 <!-- BEGIN GENERATED: header -->

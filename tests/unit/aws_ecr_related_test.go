@@ -2,9 +2,11 @@ package unit_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
@@ -16,6 +18,24 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// fakeCFNDescribeStacksErrors implements awsclient.CFNAPI and always fails
+// DescribeStacks — used to exercise the "cfn cache miss, fetch fails" path
+// without crashing on an unset CloudFormation client (which would nil-panic
+// inside FetchCloudFormationStacksPage).
+type fakeCFNDescribeStacksErrors struct{}
+
+func (f *fakeCFNDescribeStacksErrors) DescribeStacks(_ context.Context, _ *cloudformation.DescribeStacksInput, _ ...func(*cloudformation.Options)) (*cloudformation.DescribeStacksOutput, error) {
+	return nil, errors.New("simulated DescribeStacks failure")
+}
+
+func (f *fakeCFNDescribeStacksErrors) DescribeStackEvents(_ context.Context, _ *cloudformation.DescribeStackEventsInput, _ ...func(*cloudformation.Options)) (*cloudformation.DescribeStackEventsOutput, error) {
+	return &cloudformation.DescribeStackEventsOutput{}, nil
+}
+
+func (f *fakeCFNDescribeStacksErrors) ListStackResources(_ context.Context, _ *cloudformation.ListStackResourcesInput, _ ...func(*cloudformation.Options)) (*cloudformation.ListStackResourcesOutput, error) {
+	return &cloudformation.ListStackResourcesOutput{}, nil
+}
 
 func ecrCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
@@ -257,7 +277,13 @@ func TestRelated_ECR_CB_EmptyURI(t *testing.T) {
 
 // --- CloudFormation checker (Pattern C — cache-based, CFN tag on repo) ---
 
+// TestRelated_ECR_CFN_Found verifies that checkECRCFN resolves the
+// aws:cloudformation:stack-name tag via a live ecr:ListTagsForResource call
+// (RepositoryArn-keyed), not from a pre-populated Fields["cfn_stack_name"] —
+// docs/resources/ecr.md §2 `cfn` ("Call ecr:ListTagsForResource for this repo
+// and read the aws:cloudformation:stack-name tag").
 func TestRelated_ECR_CFN_Found(t *testing.T) {
+	const repoArn = "arn:aws:ecr:us-east-1:123456789012:repository/acme/api-service"
 	cfnRes := resource.Resource{
 		ID: "my-stack",
 		RawStruct: cfntypes.Stack{
@@ -267,21 +293,24 @@ func TestRelated_ECR_CFN_Found(t *testing.T) {
 	cache := resource.ResourceCache{
 		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{cfnRes}},
 	}
-	// ECR DescribeRepositories does not embed tags; the cfn_stack_name field
-	// is populated by tag enrichment into Fields["cfn_stack_name"].
 	source := resource.Resource{
 		ID: "acme/api-service",
 		Fields: map[string]string{
-			"uri":            "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service",
-			"cfn_stack_name": "my-stack",
+			"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service",
 		},
 		RawStruct: ecrtypes.Repository{
 			RepositoryName: aws.String("acme/api-service"),
+			RepositoryArn:  aws.String(repoArn),
 		},
 	}
+	fake := &fakeECRListTagsForResource{
+		repoArn: repoArn,
+		tags:    map[string]string{"aws:cloudformation:stack-name": "my-stack"},
+	}
+	clients := &awsclient.ServiceClients{ECR: fake}
 
 	checker := ecrCheckerByTarget(t, "cfn")
-	result := checker(context.Background(), nil, source, cache)
+	result := checker(context.Background(), clients, source, cache)
 
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1", result.Count)
@@ -291,6 +320,9 @@ func TestRelated_ECR_CFN_Found(t *testing.T) {
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error: %v", result.Err)
+	}
+	if fake.calls == 0 {
+		t.Error("ListTagsForResource was never called — checker must fetch tags per open repo")
 	}
 }
 
@@ -323,20 +355,30 @@ func TestRelated_ECR_CFN_NotFound(t *testing.T) {
 	}
 }
 
+// TestRelated_ECR_CFN_CacheMissNoClients verifies that when the repository
+// carries a resolvable CFN tag (via a live ListTagsForResource call) but the
+// cfn cache is empty and the CFN page-fetch fails, the result is Count=-1
+// (unknown), not a false Count=0 — docs/resources/ecr.md §2 `cfn`.
 func TestRelated_ECR_CFN_CacheMissNoClients(t *testing.T) {
+	const repoArn = "arn:aws:ecr:us-east-1:123456789012:repository/acme/api-service"
 	source := resource.Resource{
 		ID: "acme/api-service",
 		Fields: map[string]string{
-			"uri":            "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service",
-			"cfn_stack_name": "my-stack",
+			"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service",
 		},
 		RawStruct: ecrtypes.Repository{
 			RepositoryName: aws.String("acme/api-service"),
+			RepositoryArn:  aws.String(repoArn),
 		},
 	}
+	fakeECR := &fakeECRListTagsForResource{
+		repoArn: repoArn,
+		tags:    map[string]string{"aws:cloudformation:stack-name": "my-stack"},
+	}
+	clients := &awsclient.ServiceClients{ECR: fakeECR, CloudFormation: &fakeCFNDescribeStacksErrors{}}
 
 	checker := ecrCheckerByTarget(t, "cfn")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
@@ -577,11 +619,15 @@ func ecrPolicyWithRoles(roleARNs ...string) string {
 }
 
 // TestRelated_ECR_Role_Match verifies that two role ARNs in the repository
-// policy return Count=2.
+// policy return Count=2 with bare RoleNames (via arnRoleName), so the role
+// cache's FetchByIDs (keyed on RoleName) resolves them — docs/resources/ecr.md
+// §2 `role`.
 func TestRelated_ECR_Role_Match(t *testing.T) {
 	const repoName = "acme/api-service"
 	const role1 = "arn:aws:iam::123456789012:role/deploy-role"
 	const role2 = "arn:aws:iam::123456789012:role/ci-role"
+	const role1Name = "deploy-role"
+	const role2Name = "ci-role"
 
 	fakeECR := newFakeECRWithRepositoryPolicy(ecrPolicyWithRoles(role1, role2))
 	clients := &awsclient.ServiceClients{ECR: fakeECR}
@@ -607,11 +653,11 @@ func TestRelated_ECR_Role_Match(t *testing.T) {
 	for _, id := range result.ResourceIDs {
 		seen[id] = true
 	}
-	if !seen[role1] {
-		t.Errorf("ResourceIDs missing %q; got %v", role1, result.ResourceIDs)
+	if !seen[role1Name] {
+		t.Errorf("ResourceIDs missing %q; got %v", role1Name, result.ResourceIDs)
 	}
-	if !seen[role2] {
-		t.Errorf("ResourceIDs missing %q; got %v", role2, result.ResourceIDs)
+	if !seen[role2Name] {
+		t.Errorf("ResourceIDs missing %q; got %v", role2Name, result.ResourceIDs)
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error: %v", result.Err)
@@ -684,14 +730,17 @@ func TestRelated_ECR_Role_NoClient(t *testing.T) {
 // ecr → ecs-task (checkECRECSTask — Pattern C+reverse: cache["ecs-task"] scan)
 // ---------------------------------------------------------------------------
 
-// ecrECSTaskResource creates a task resource whose Fields contain the image URI,
-// matching the pattern checkECRECSTask uses (".dkr.ecr." + "/repoName").
+// ecrECSTaskResource creates a task resource whose Fields["container_images"]
+// (a comma-joined list of this task's Containers[].Image values, populated
+// directly from DescribeTasks) contains the image URI, matching the pattern
+// checkECRECSTask uses (".dkr.ecr." + "/repoName") —
+// docs/resources/ecr.md §2 `ecs-task`.
 func ecrECSTaskResource(taskFamily, imageURI string) resource.Resource {
 	return resource.Resource{
 		ID:   taskFamily + ":1",
 		Name: taskFamily + ":1",
 		Fields: map[string]string{
-			"image_0": imageURI,
+			"container_images": imageURI,
 		},
 	}
 }

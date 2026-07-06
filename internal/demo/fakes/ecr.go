@@ -3,6 +3,7 @@ package fakes
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 
@@ -54,15 +55,31 @@ func (f *ECRFake) ListImages(_ context.Context, input *ecr.ListImagesInput, _ ..
 	return &ecr.ListImagesOutput{ImageIds: ids}, nil
 }
 
-// GetRepositoryPolicy is a no-op stub satisfying ECRGetRepositoryPolicyAPI.
-// Demo mode does not model ECR repository policies. checkECRRole returns
-// role ARNs verbatim from the policy's Principal.AWS field (see
-// ecrPolicyRoleARNs/isRoleARN in internal/aws/ecr_related_extra.go), but the
-// registered role FetchByIDs helper (FetchRolesByIDs) requires a bare
-// RoleName — a fixture policy would produce a witness whose drill-down
-// permanently fails FetchByIDs, which is worse than the current disconnected
-// pivot. Fixing this requires the checker to extract the bare role name
-// before returning, which is out of scope for a fixture-only change.
-func (f *ECRFake) GetRepositoryPolicy(_ context.Context, _ *ecr.GetRepositoryPolicyInput, _ ...func(*ecr.Options)) (*ecr.GetRepositoryPolicyOutput, error) {
-	return &ecr.GetRepositoryPolicyOutput{}, nil
+// GetRepositoryPolicy returns fixture policy JSON for the requested
+// repository. checkECRRole now reduces the policy's Principal.AWS role ARNs
+// to bare RoleName before returning (internal/aws/ecr_related_extra.go), so
+// the fixture policy's role resolves cleanly via FetchRolesByIDs.
+func (f *ECRFake) GetRepositoryPolicy(_ context.Context, input *ecr.GetRepositoryPolicyInput, _ ...func(*ecr.Options)) (*ecr.GetRepositoryPolicyOutput, error) {
+	var repoName string
+	if input != nil && input.RepositoryName != nil {
+		repoName = *input.RepositoryName
+	}
+	policyText, ok := f.fix.Policies[repoName]
+	if !ok {
+		return nil, &ecrtypes.RepositoryPolicyNotFoundException{Message: aws.String("no policy configured for this repository")}
+	}
+	return &ecr.GetRepositoryPolicyOutput{
+		RepositoryName: input.RepositoryName,
+		PolicyText:     &policyText,
+	}, nil
+}
+
+// ListTagsForResource returns fixture tags for the given repository ARN,
+// backing the ecr:cfn related-panel pivot (checkECRCFN).
+func (f *ECRFake) ListTagsForResource(_ context.Context, input *ecr.ListTagsForResourceInput, _ ...func(*ecr.Options)) (*ecr.ListTagsForResourceOutput, error) {
+	var arn string
+	if input != nil && input.ResourceArn != nil {
+		arn = *input.ResourceArn
+	}
+	return &ecr.ListTagsForResourceOutput{Tags: f.fix.Tags[arn]}, nil
 }

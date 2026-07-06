@@ -367,6 +367,10 @@ func (f *fakeECRBatch4) GetRepositoryPolicy(_ context.Context, _ *ecr.GetReposit
 	return &ecr.GetRepositoryPolicyOutput{}, nil
 }
 
+func (f *fakeECRBatch4) ListTagsForResource(_ context.Context, _ *ecr.ListTagsForResourceInput, _ ...func(*ecr.Options)) (*ecr.ListTagsForResourceOutput, error) {
+	return &ecr.ListTagsForResourceOutput{}, nil
+}
+
 // Compile-time check: fakeECRBatch4 satisfies ECRAPI.
 var _ awsclient.ECRAPI = (*fakeECRBatch4)(nil)
 

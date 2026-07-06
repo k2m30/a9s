@@ -27,6 +27,26 @@ func (f *CloudFrontFake) ListDistributions(_ context.Context, _ *cloudfront.List
 	}, nil
 }
 
+// ListDistributionsByWebACLId returns distributions whose WebACLId exactly
+// matches the requested ARN, backing the waf:cf related-panel pivot
+// (checkWAFCF, which sends the Web ACL's ARN — cloudfront:ListDistributionsByWebACLId
+// expects the ARN form, not the bare Web ACL ID).
+func (f *CloudFrontFake) ListDistributionsByWebACLId(_ context.Context, input *cloudfront.ListDistributionsByWebACLIdInput, _ ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
+	var webACLID string
+	if input != nil && input.WebACLId != nil {
+		webACLID = *input.WebACLId
+	}
+	var items []cftypes.DistributionSummary
+	for _, d := range f.fix.Distributions {
+		if d.WebACLId != nil && *d.WebACLId == webACLID {
+			items = append(items, d)
+		}
+	}
+	return &cloudfront.ListDistributionsByWebACLIdOutput{
+		DistributionList: &cftypes.DistributionList{Items: items},
+	}, nil
+}
+
 // GetDistributionConfig returns a config carrying the Lambda@Edge
 // associations and access-log destination for known demo distributions
 // (backing checkCfLambda / checkCfLogs), and an empty config for everything

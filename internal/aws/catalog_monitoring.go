@@ -49,6 +49,9 @@ func colorTrail(r domain.Resource) domain.Color {
 	if r.Fields["latest_delivery_error"] != "" && r.Fields["latest_delivery_error"] != "-" {
 		return domain.ColorBroken
 	}
+	if trailDeliveryIsStale(r.Fields["is_logging"], r.Fields["latest_delivery_time"]) {
+		return domain.ColorBroken
+	}
 	switch r.Fields["status"] {
 	case "failed", "FAILED", "error", "ERROR":
 		return domain.ColorBroken

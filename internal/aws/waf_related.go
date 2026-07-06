@@ -107,8 +107,7 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, _ res
 	})
 	if err != nil {
 		// WAFNonexistentItemException = no logging configured → real 0.
-		var notFound *wafv2types.WAFNonexistentItemException
-		if errors.As(err, &notFound) {
+		if _, ok := errors.AsType[*wafv2types.WAFNonexistentItemException](err); ok {
 			return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 		}
 		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
@@ -152,11 +151,14 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 	if scope != string(wafv2types.ScopeCloudfront) {
 		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
 	}
-	webACLID := res.ID
-	if webACLID == "" {
-		webACLID = res.Fields["id"]
+	webACLArn := res.Fields["arn"]
+	if webACLArn == "" {
+		webACLArn = res.Fields["id"]
 	}
-	if webACLID == "" {
+	if webACLArn == "" {
+		webACLArn = res.ID
+	}
+	if webACLArn == "" {
 		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
 	}
 	c, ok := clients.(*ServiceClients)
@@ -168,7 +170,7 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 		return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
-		return api.ListDistributionsByWebACLId(ctx, &cloudfront.ListDistributionsByWebACLIdInput{WebACLId: &webACLID})
+		return api.ListDistributionsByWebACLId(ctx, &cloudfront.ListDistributionsByWebACLIdInput{WebACLId: &webACLArn})
 	})
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "cf", Count: -1, Err: err}

@@ -2,9 +2,9 @@
 package fixtures
 
 import (
-	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
+	"sync"
 )
 
 // ASGFixtures holds all AutoScaling domain objects served by the fake.
@@ -248,6 +248,11 @@ func buildLaunchConfigurations() map[string]asgtypes.LaunchConfiguration {
 			SecurityGroups:          []string{"sg-0web111111111111w"},
 			KeyName:                 aws.String("acme-prod-key"),
 			CreatedTime:             aws.Time(mustTime("2025-01-10T09:00:00Z")),
+			// IamInstanceProfile — required for the asg:role related-panel pivot
+			// (checkASGRole via asgResolveInstanceProfile →
+			// asgInstanceProfileToRoles → iam:GetInstanceProfile). Resolves to
+			// acme-ec2-instance-role via fixtures/iam.go's InstanceProfiles map.
+			IamInstanceProfile: aws.String("acme-ec2-instance-profile"),
 		},
 	}
 }

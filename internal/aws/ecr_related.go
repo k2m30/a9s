@@ -9,6 +9,7 @@ import (
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
+	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
@@ -87,8 +88,12 @@ func checkECRCodeBuild(ctx context.Context, clients any, res resource.Resource, 
 
 // checkECRCFN checks the ECR repository's tags for aws:cloudformation:stack-name
 // and matches against the CFN stack cache (Pattern C — tag-based).
+// One ecr:ListTagsForResource call per open repository.
 func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	stackName := ecrCFNStackName(res)
+	stackName, err := ecrCFNStackName(ctx, clients, res)
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+	}
 	if stackName == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
@@ -119,12 +124,37 @@ func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache 
 }
 
 // ecrCFNStackName extracts the aws:cloudformation:stack-name tag value from the
-// resource. ECR Repository does not embed tags in the DescribeRepositories response;
-// tags are fetched via a separate ListTagsForResource call. We check the Fields map
-// (populated if tags were enriched) and fall back to zero if unavailable.
-func ecrCFNStackName(res resource.Resource) string {
-	// Tags are not present on ecrtypes.Repository directly; check enriched Fields.
-	return res.Fields["cfn_stack_name"]
+// repository. ECR Repository does not embed tags in the DescribeRepositories
+// response; tags are fetched via a single ecr:ListTagsForResource call keyed
+// on the repository ARN. Returns "" (no error) when the tag is absent.
+func ecrCFNStackName(ctx context.Context, clients any, res resource.Resource) (string, error) {
+	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
+	if !ok || repo.RepositoryArn == nil || *repo.RepositoryArn == "" {
+		return "", nil
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.ECR == nil {
+		return "", nil
+	}
+	api, ok := c.ECR.(ECRListTagsForResourceAPI)
+	if !ok {
+		return "", nil
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.ListTagsForResourceOutput, error) {
+		return api.ListTagsForResource(ctx, &ecr.ListTagsForResourceInput{ResourceArn: repo.RepositoryArn})
+	})
+	if err != nil {
+		return "", err
+	}
+	if out == nil {
+		return "", nil
+	}
+	for _, tag := range out.Tags {
+		if tag.Key != nil && *tag.Key == "aws:cloudformation:stack-name" && tag.Value != nil {
+			return *tag.Value, nil
+		}
+	}
+	return "", nil
 }
 
 // checkECRKMS extracts the KMS key from the ECR Repository's

@@ -58,8 +58,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ala
 ### `r53`
 
 - **Why related**: Route 53 alias/records pointing at this LB — answers "which hostname resolves here?", the #1 question an operator asks when an LB misbehaves.
-- **How discovered**: cross-reference the already-loaded `r53` list: within each hosted zone, record sets where `AliasTarget.DNSName` equals this LB's `DNSName` (with/without trailing dot). — a9s-devops: possible=yes, worth=yes. Route 53 alias records to ELBs carry the LB's `DNSName` in `AliasTarget.DNSName`; this is the canonical join.
-- **Count shown**: yes.
+- **How discovered**: not resolvable within the checker budget. Record sets are not cached as joinable structures — the r53 fetcher summarizes each zone's alias targets into one Fields string — so the per-record `AliasTarget.DNSName` reverse-scan this row originally described is not available; identifying the aliasing records requires per-zone `route53:ListResourceRecordSets` queries across all zones. (budget-excluded per related-resources.md Policy rule 7: O(N) per-zone record-set fan-out exceeds the one-call budget.)
+- **Count shown**: unknown.
 
 ### `s3`
 
@@ -190,7 +190,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `cf` discovery via `Distribution.Origins.Items[].DomainName == LB.DNSName` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Matches the reverse pivot from the cf contract row.`
 - a9s-devops consultation — `cfn` discovery via `aws:cloudformation:stack-name` tag — `a9s-devops (2026-04-20): possible=yes, worth=yes. CFN stamps this tag on every created resource.`
 - a9s-devops consultation — `eni` discovery via Description prefix `ELB app/...` / `ELB net/...` / `ELB <name>` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Canonical SRE pivot for ELB-owned ENIs.`
-- a9s-devops consultation — `r53` discovery via `AliasTarget.DNSName == LB.DNSName` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Standard Route 53 alias join.`
+- `r53` budget exclusion — record sets are not cached as joinable structures (the r53 fetcher summarizes alias targets into one Fields string); the `AliasTarget.DNSName == LB.DNSName` join needs per-zone `ListResourceRecordSets` fan-out — `docs/related-resources.md` § Policy rule 7.
 - a9s-devops consultation — `waf` discovery via `wafv2:ListResourcesForWebACL(ResourceType=APPLICATION_LOAD_BALANCER)` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Documented reverse pivot; matches waf contract row listing elb.`
 - a9s-devops consultation — `s3` (access-log bucket) discovery deferred — `a9s-devops (2026-04-20): possible=yes via DescribeLoadBalancerAttributes, worth=no at list time. Would require N+1 fan-out attention-signals.md explicitly defers to Wave 3.`
 - a9s-devops consultation — Classic (ELBv1) default Healthy bucket when no State field — implicit from attention-signals.md note "Classic (ELBv1) has no State field"; no state signal available, so the row defaults to Healthy and target-health signalling moves to `tg`. No separate devops dispatch.

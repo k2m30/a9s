@@ -1,13 +1,11 @@
 // identity_cache.go provides a session-scoped lookup for the caller's AWS
-// account ID and the resolved region. Used by related-panel Pattern C checkers
-// that need to construct resource ARNs for APIs like Backup
-// ListRecoveryPointsByResource and Glue GetTags.
+// account ID. Used by related-panel Pattern C checkers that need to construct
+// resource ARNs for APIs like Backup ListRecoveryPointsByResource and Glue
+// GetTags (region for those ARNs comes from ServiceClients.Region).
 //
 // Resolution is best-effort: the per-session store is populated on first
-// access via STS GetCallerIdentity (for account) and falls back to environment
-// AWS_REGION or us-east-1 when region isn't otherwise known. Callers receive
-// "" from these helpers when the info cannot be resolved; honest Count: -1
-// follows.
+// access via STS GetCallerIdentity. Callers receive "" from these helpers
+// when the info cannot be resolved; honest Count: -1 follows.
 //
 // Concurrency note: no top-level lock is held across the
 // "check store / fetch / set" sequence. Two concurrent Pattern C checks may
@@ -19,7 +17,6 @@ package aws
 
 import (
 	"context"
-	"os"
 
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
@@ -85,12 +82,3 @@ var errAccountUnresolved = errSentinel("account-unresolved")
 type errSentinel string
 
 func (e errSentinel) Error() string { return string(e) }
-
-// regionFromEnv reads the default region from AWS_REGION or AWS_DEFAULT_REGION.
-// Returns "" if neither is set — callers must Count: -1 in that case.
-func regionFromEnv() string {
-	if r := os.Getenv("AWS_REGION"); r != "" {
-		return r
-	}
-	return os.Getenv("AWS_DEFAULT_REGION")
-}

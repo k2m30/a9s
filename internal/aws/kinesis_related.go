@@ -48,36 +48,18 @@ func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource,
 	return relatedResult("alarm", ids)
 }
 
-// checkKinesisLambda scans the Lambda cache for functions whose first
-// EventSourceArn (captured in Fields["event_source_arn"] at fetch time) matches
-// this stream's ARN. Pattern C — uses the lambda cache enriched via
-// FetchLambdaFunctionsPageWithEventSources. Secondary event sources are not
-// captured in the field (only the first is stored), so this check may
-// under-count; that's a known cache limitation, not a stub.
+// checkKinesisLambda calls lambda:ListEventSourceMappings with the
+// EventSourceArn filter set to this stream's ARN (one call per open stream —
+// budget rule 7 in docs/related-resources.md) and maps the returned
+// FunctionArn entries against the lambda cache. Secondary event sources on a
+// given mapping are not relevant here — every mapping returned by the
+// EventSourceArn-filtered call already belongs to this stream.
 func checkKinesisLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamARN := res.Fields["stream_arn"]
 	if streamARN == "" {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 	}
-
-	lambdaList, truncated, err := kinesisRelatedResources(ctx, clients, cache, "lambda")
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
-	}
-	if lambdaList == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
-	}
-
-	var ids []string
-	for _, fn := range lambdaList {
-		if fn.Fields["event_source_arn"] == streamARN {
-			ids = append(ids, fn.ID)
-		}
-	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("lambda")
-	}
-	return relatedResult("lambda", ids)
+	return lambdaEventSourceMappingLambdaCheck(ctx, clients, streamARN, cache)
 }
 
 // checkKinesisCFN calls kinesis:ListTagsForStream and looks up the

@@ -331,6 +331,14 @@ func (f *fakeAPIGWV2US1) GetApiMappings(_ context.Context, _ *apigatewayv2.GetAp
 	return &apigatewayv2.GetApiMappingsOutput{}, nil
 }
 
+func (f *fakeAPIGWV2US1) GetVpcLinks(_ context.Context, _ *apigatewayv2.GetVpcLinksInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetVpcLinksOutput, error) {
+	return &apigatewayv2.GetVpcLinksOutput{}, nil
+}
+
+func (f *fakeAPIGWV2US1) GetAuthorizers(_ context.Context, _ *apigatewayv2.GetAuthorizersInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetAuthorizersOutput, error) {
+	return &apigatewayv2.GetAuthorizersOutput{}, nil
+}
+
 // newFakeAPIGWV2WithLambdaIntegration returns a fakeAPIGWV2US1 whose
 // GetIntegrations returns a single integration pointing at the given Lambda
 // function name.

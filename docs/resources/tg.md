@@ -41,7 +41,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 - **Why related**: listed by related-resources.md contract. In practice, AWS Backup does not support target groups as a backup resource — TGs are configuration, not stateful data, and do not appear in AWS Backup's supported-services matrix.
 - **How discovered**: no AWS field or API links a target group to a Backup plan or recovery point. — a9s-devops: possible=no, worth=no. This is recorded in §5 Out of Scope as an unfillable contract entry; removing it from the contract needs a separate amendment to `docs/related-resources.md`.
-- **Count shown**: unknown.
+- **Count shown**: unknown (budget-excluded per related-resources.md Policy rule 7: AWS Backup does not support target groups; no linkage resolvable within the checker call budget).
 
 ### `cfn`
 
@@ -53,13 +53,13 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 - **Why related**: listed by related-resources.md contract (1/6 audit mention). In practice, TG target types are `instance`, `ip`, `lambda`, and `alb` (per `types.TargetTypeEnum`) — DocumentDB clusters are not a routable target; clients reach DocDB via its own endpoint, not a load balancer.
 - **How discovered**: no AWS field on `TargetGroup` or `DescribeTargetHealth` references a DocumentDB cluster. — a9s-devops: possible=no, worth=no. Recorded in §5.
-- **Count shown**: unknown.
+- **Count shown**: unknown (budget-excluded per related-resources.md Policy rule 7: no AWS field links a TG to a DocumentDB cluster).
 
 ### `dbi`
 
 - **Why related**: listed by related-resources.md contract (1/6 audit mention). Same reasoning as `dbc` — RDS DB instances are not a valid TG target type.
 - **How discovered**: no AWS field on `TargetGroup` or `DescribeTargetHealth` references an RDS instance. — a9s-devops: possible=no, worth=no. Recorded in §5.
-- **Count shown**: unknown.
+- **Count shown**: unknown (budget-excluded per related-resources.md Policy rule 7: no AWS field links a TG to an RDS instance).
 
 ### `ec2`
 
@@ -89,25 +89,25 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 
 - **Why related**: listed by related-resources.md contract (2/6 audit mention). In practice target groups do not emit CloudWatch Logs — access logs from the parent ELB go to S3 (`DescribeLoadBalancerAttributes`), not CloudWatch Logs.
 - **How discovered**: no AWS field on `TargetGroup` references a CloudWatch log group. — a9s-devops: possible=no, worth=no. Recorded in §5.
-- **Count shown**: unknown.
+- **Count shown**: unknown (budget-excluded per related-resources.md Policy rule 7: TGs emit no CloudWatch Logs; access logs live on the parent ELB in S3).
 
 ### `dbi-snap`
 
 - **Why related**: listed by related-resources.md contract (2/6 audit mention). Same reasoning as `dbi`/`dbc` — RDS snapshots are not a TG target and share no AWS-API field with TGs.
 - **How discovered**: no AWS field on `TargetGroup` or `DescribeTargetHealth` references an RDS snapshot. — a9s-devops: possible=no, worth=no. Recorded in §5.
-- **Count shown**: unknown.
+- **Count shown**: unknown (budget-excluded per related-resources.md Policy rule 7: no AWS field links a TG to an RDS snapshot).
 
 ### `sg`
 
 - **Why related**: listed by related-resources.md contract (1/6 audit mention). Security groups attach to ENIs (LB listeners, instances), not to target groups — `TargetGroup` has no `SecurityGroups` field. The right pivot for SG inspection is the parent `elb` (ALB has `SecurityGroups[]`) or the registered instances.
 - **How discovered**: no AWS field on `TargetGroup` references a security group. — a9s-devops: possible=no, worth=no at the TG level; use `elb` → `sg` instead. Recorded in §5.
-- **Count shown**: unknown.
+- **Count shown**: unknown (budget-excluded per related-resources.md Policy rule 7: `TargetGroup` has no SecurityGroups field; SG pivot belongs to the parent `elb`).
 
 ### `subnet`
 
 - **Why related**: listed by related-resources.md contract (1/6 audit mention). Target groups are not subnet-scoped — the parent LB occupies subnets via `AvailabilityZones[].SubnetId`; `TargetGroup` has no subnet field.
 - **How discovered**: no AWS field on `TargetGroup` references a subnet. — a9s-devops: possible=no, worth=no at the TG level; use `elb` → `subnet` instead. Recorded in §5.
-- **Count shown**: unknown.
+- **Count shown**: unknown (budget-excluded per related-resources.md Policy rule 7: `TargetGroup` has no subnet field; subnet pivot belongs to the parent `elb` via `AvailabilityZones[].SubnetId`).
 
 ### `vpc`
 

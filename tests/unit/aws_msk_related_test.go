@@ -8,8 +8,9 @@ import (
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -126,19 +127,28 @@ func TestRelated_MSK_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- checkMSKLambda (scan lambda cache for event_source_arn match) ---
+// --- checkMSKLambda (checker-owned lambda:ListEventSourceMappings call
+// filtered by EventSourceArn=<ClusterARN>, mapped against the lambda cache —
+// spec docs/resources/msk.md §lambda L46-49) ---
 
 func TestRelated_MSK_Lambda_Found(t *testing.T) {
 	const clusterARN = "arn:aws:kafka:us-east-1:123456789012:cluster/analytics-kafka-cluster/abc-123"
-	lambdaRes := resource.Resource{
-		ID:   "kafka-consumer",
-		Name: "kafka-consumer",
-		Fields: map[string]string{
-			"event_source_arn": clusterARN,
+	const fnArn = "arn:aws:lambda:us-east-1:123456789012:function:kafka-consumer"
+
+	fake := &fakeLambdaListEventSourceMappingsByArn{
+		wantEventSourceArn: clusterARN,
+		mappings: []lambdatypes.EventSourceMappingConfiguration{
+			{FunctionArn: aws.String(fnArn)},
 		},
 	}
+	clients := &awsclient.ServiceClients{Lambda: fake}
+
 	cache := resource.ResourceCache{
-		"lambda": resource.ResourceCacheEntry{Resources: []resource.Resource{lambdaRes}},
+		"lambda": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{ID: "kafka-consumer", Name: "kafka-consumer", Fields: map[string]string{"arn": fnArn}},
+			},
+		},
 	}
 	source := resource.Resource{
 		ID:   "analytics-kafka-cluster",
@@ -150,7 +160,7 @@ func TestRelated_MSK_Lambda_Found(t *testing.T) {
 	}
 
 	checker := mskCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), nil, source, cache)
+	result := checker(context.Background(), clients, source, cache)
 
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1", result.Count)
@@ -158,32 +168,47 @@ func TestRelated_MSK_Lambda_Found(t *testing.T) {
 	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "kafka-consumer" {
 		t.Errorf("ResourceIDs = %v, want [kafka-consumer]", result.ResourceIDs)
 	}
+	if fake.calls != 1 {
+		t.Errorf("ListEventSourceMappings called %d times, want exactly 1", fake.calls)
+	}
 }
 
 func TestRelated_MSK_Lambda_NotFound(t *testing.T) {
-	lambdaRes := resource.Resource{
-		ID:   "unrelated-fn",
-		Name: "unrelated-fn",
-		Fields: map[string]string{
-			"event_source_arn": "arn:aws:sqs:us-east-1:123456789012:other-queue",
+	const clusterARN = "arn:aws:kafka:us-east-1:123456789012:cluster/analytics-kafka-cluster/abc-123"
+	const mappedFnArn = "arn:aws:lambda:us-east-1:123456789012:function:kafka-consumer"
+	const cachedFnArn = "arn:aws:lambda:us-east-1:123456789012:function:unrelated-fn"
+
+	fake := &fakeLambdaListEventSourceMappingsByArn{
+		wantEventSourceArn: clusterARN,
+		mappings: []lambdatypes.EventSourceMappingConfiguration{
+			{FunctionArn: aws.String(mappedFnArn)},
 		},
 	}
+	clients := &awsclient.ServiceClients{Lambda: fake}
+
 	cache := resource.ResourceCache{
-		"lambda": resource.ResourceCacheEntry{Resources: []resource.Resource{lambdaRes}},
+		"lambda": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{ID: "unrelated-fn", Name: "unrelated-fn", Fields: map[string]string{"arn": cachedFnArn}},
+			},
+		},
 	}
 	source := resource.Resource{
 		ID:   "analytics-kafka-cluster",
 		Name: "analytics-kafka-cluster",
 		RawStruct: kafkatypes.Cluster{
 			ClusterName: aws.String("analytics-kafka-cluster"),
-			ClusterArn:  aws.String("arn:aws:kafka:us-east-1:123456789012:cluster/analytics-kafka-cluster/abc-123"),
+			ClusterArn:  aws.String(clusterARN),
 		},
 	}
 
 	checker := mskCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), nil, source, cache)
+	result := checker(context.Background(), clients, source, cache)
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no lambda event-source match)", result.Count)
+		t.Errorf("Count = %d, want 0 (mapping's function isn't the one cached — no match against lambda cache)", result.Count)
+	}
+	if fake.calls != 1 {
+		t.Errorf("ListEventSourceMappings called %d times, want exactly 1", fake.calls)
 	}
 }
 
