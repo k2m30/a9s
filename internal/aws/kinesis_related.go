@@ -178,7 +178,7 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 
 	entry, ok := cache["ddb"]
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ddb"}
+		return resource.RelatedCheckResult{TargetType: "ddb", Count: -1}
 	}
 
 	var ids []string

@@ -246,26 +246,6 @@ func TestRelated_Secrets_EB_MatchApproximate(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_EB_MissingCache verifies that checkSecretsEB returns
-// Count=0 (not -1) when the eb cache is missing — the checker returns 0 until
-// the cache is populated on the next panel open.
-func TestRelated_Secrets_EB_MissingCache(t *testing.T) {
-	source := secretsSourceWithARN(
-		"arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password",
-		"prod/db/password",
-	)
-
-	checker := secretsCheckerByTarget(t, "eb")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (missing cache — unknown, not error)", result.Count)
-	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
-	}
-}
-
 // TestRelated_Secrets_EB_WrongRawStruct verifies that checkSecretsEB returns
 // Count=-1 for wrong RawStruct type.
 func TestRelated_Secrets_EB_WrongRawStruct(t *testing.T) {

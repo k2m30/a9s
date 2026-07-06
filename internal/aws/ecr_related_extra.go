@@ -97,7 +97,7 @@ func checkECRPipeline(ctx context.Context, clients any, res resource.Resource, c
 
 	entry, ok := cache["pipeline"]
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "pipeline"}
+		return resource.RelatedCheckResult{TargetType: "pipeline", Count: -1}
 	}
 
 	var ids []string

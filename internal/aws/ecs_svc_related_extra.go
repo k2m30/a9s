@@ -396,7 +396,7 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 
 	entry, ok := cache["sfn"]
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sfn"}
+		return resource.RelatedCheckResult{TargetType: "sfn", Count: -1}
 	}
 
 	var ids []string

@@ -87,7 +87,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 
 	entry, ok := cache["eb"]
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eb"}
+		return resource.RelatedCheckResult{TargetType: "eb", Count: -1}
 	}
 
 	c, cok := clients.(*ServiceClients)

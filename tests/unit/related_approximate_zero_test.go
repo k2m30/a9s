@@ -26,6 +26,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
+
 	_ "github.com/k2m30/a9s/v3/internal/aws" // ensure all related registrations run
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -479,9 +482,15 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsApproximate(t *testing
 			Fields: map[string]string{},
 		},
 		"ecr": {
-			ID:     "arn:aws:ecr:us-east-1:123456789012:repository/test-repo",
-			Name:   "test-repo",
-			Fields: map[string]string{},
+			ID:   "arn:aws:ecr:us-east-1:123456789012:repository/test-repo",
+			Name: "test-repo",
+			Fields: map[string]string{
+				"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/test-repo",
+			},
+			RawStruct: ecrtypes.Repository{
+				RepositoryName: aws.String("test-repo"),
+				RepositoryArn:  aws.String("arn:aws:ecr:us-east-1:123456789012:repository/test-repo"),
+			},
 		},
 		"sfn": {
 			ID:     "arn:aws:states:us-east-1:123456789012:stateMachine:test-sm",

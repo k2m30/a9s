@@ -208,7 +208,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECRCTEvents, NeedsTargetCache: true},
 			{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkECREbRule},
 			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECRECSTask, NeedsTargetCache: true},
-			{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkECRPipeline},
+			{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkECRPipeline, NeedsTargetCache: true},
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkECRRole},
 		},
 		Navigable: []domain.NavigableField{

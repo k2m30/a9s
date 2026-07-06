@@ -594,19 +594,6 @@ func TestRelated_ECSSvc_SFN_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_SFN_MissingCache verifies that a missing "sfn" cache key
-// returns the zero-value (Count=0), not Count=-1.
-func TestRelated_ECSSvc_SFN_MissingCache(t *testing.T) {
-	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
-
-	checker := ecsSvcCheckerByTarget(t, "sfn")
-	result := checker(context.Background(), nil, ecsSvcSourceResource("api-service", "prod-cluster", taskDefARN), resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (cache key missing returns zero-value)", result.Count)
-	}
-}
-
 // TestRelated_ECSSvc_SFN_WrongRawStruct verifies that a wrong parent RawStruct
 // type returns Count=-1 (assertStruct guard).
 func TestRelated_ECSSvc_SFN_WrongRawStruct(t *testing.T) {

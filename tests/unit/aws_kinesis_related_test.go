@@ -366,22 +366,6 @@ func TestRelated_Kinesis_DDB_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_Kinesis_DDB_MissingCache verifies that a missing "ddb" cache key
-// returns the zero-value (Count=0), not Count=-1.
-func TestRelated_Kinesis_DDB_MissingCache(t *testing.T) {
-	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
-
-	fakeDDB := &fakeDynamoDBBatch4{}
-	clients := &awsclient.ServiceClients{DynamoDB: fakeDDB}
-
-	checker := kinesisCheckerByTarget(t, "ddb")
-	result := checker(context.Background(), clients, kinesisSourceResource("clickstream-ingest", streamARN), resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (cache key missing returns zero-value)", result.Count)
-	}
-}
-
 // TestRelated_Kinesis_DDB_NoStreamARN verifies that a stream resource with no
 // stream_arn field returns Count=0 (not an error).
 func TestRelated_Kinesis_DDB_NoStreamARN(t *testing.T) {

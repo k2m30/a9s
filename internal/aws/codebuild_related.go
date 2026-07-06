@@ -35,8 +35,8 @@ func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, ca
 
 	entry, ok := cache["pipeline"]
 	if !ok {
-		// cache not yet populated — honest 0, not -1
-		return resource.RelatedCheckResult{TargetType: "pipeline"}
+		// cache not yet populated — unknown, not a definitive 0
+		return resource.RelatedCheckResult{TargetType: "pipeline", Count: -1}
 	}
 
 	// If there are pipelines to check but no CodePipeline client to call GetPipeline,

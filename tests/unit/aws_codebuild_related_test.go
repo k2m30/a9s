@@ -124,17 +124,6 @@ func TestRelated_Cb_Pipeline_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_Cb_Pipeline_MissingCache verifies that when the pipeline key is
-// absent from the cache, Count=0 (not -1) is returned.
-func TestRelated_Cb_Pipeline_MissingCache(t *testing.T) {
-	checker := cbCheckerByTarget(t, "pipeline")
-	result := checker(context.Background(), nil, cbSourceResource("my-project"), resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (cache miss should return 0, not -1)", result.Count)
-	}
-}
-
 // TestRelated_Cb_Pipeline_WrongRawStruct verifies that a wrong parent RawStruct
 // type returns Count=-1 (assertStruct guard).
 func TestRelated_Cb_Pipeline_WrongRawStruct(t *testing.T) {
