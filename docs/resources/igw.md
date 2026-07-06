@@ -59,15 +59,15 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `Attachments[0].State` on the list-response IGW.
 
-- **Signal**: `Attachments[].State == detached` → Warning (orphan).
+- **Signal**: `Attachments[].State == detached` → Warning (orphan). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `Attachments[0].State` on the list-response IGW.
 
-- **Signal**: `len(Attachments) == 0` → Warning (orphan — never attached or fully detached).
+- **Signal**: `len(Attachments) == 0` → Warning (orphan — never attached or fully detached). — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: size of the `Attachments[]` slice on the list-response IGW.
 
-- **Signal**: IGW attached to a VPC but no route table in that VPC has a `0.0.0.0/0 → igw` route → Warning (unused — operator is paying for a gateway nothing routes through).
+- **Signal**: IGW attached to a VPC but no route table in that VPC has a `0.0.0.0/0 → igw` route → Warning (unused — operator is paying for a gateway nothing routes through). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: Take this IGW's `Attachments[0].VpcId`; cross-reference the already-loaded `rtb` list and filter to route tables whose `VpcId` equals that value; scan their `Routes[]` for any route where `DestinationCidrBlock == "0.0.0.0/0"` and `GatewayId == InternetGatewayId`. If none match, raise the signal.
 
@@ -105,9 +105,9 @@ One row per §3 signal (Healthy case omitted per rule):
 |---|---|---|---|---|---|---|
 | `Attachments[0].State == attaching` | 1 | Warning | n/a | S2, S4 | `attaching to VPC` | n/a (Wave 1 Warning has no S5) |
 | `Attachments[0].State == detaching` | 1 | Warning | n/a | S2, S4 | `detaching from VPC` | n/a |
-| `Attachments[0].State == detached` | 1 | Warning | n/a | S2, S4 | `detached: orphan gateway` | n/a |
-| `len(Attachments) == 0` | 1 | Warning | n/a | S2, S4 | `unattached: no VPC` | n/a |
-| IGW attached but VPC has no `0.0.0.0/0 → igw` route | 1 | Warning | n/a | S2, S4 | `attached but unused: no default route` | n/a |
+| `Attachments[0].State == detached` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `detached: orphan gateway` | n/a |
+| `len(Attachments) == 0` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `unattached: no VPC` | n/a |
+| IGW attached but VPC has no `0.0.0.0/0 → igw` route — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `attached but unused: no default route` | n/a |
 
 ## 4.1 UX review (two sentences)
 

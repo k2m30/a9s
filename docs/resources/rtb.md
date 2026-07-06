@@ -86,11 +86,11 @@ Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `Routes[].State == blackhole` — at least one route in the table has a dead target (gateway detached, NAT deleted, ENI gone, peering torn down).
+- **Signal**: `Routes[].State == blackhole` — at least one route in the table has a dead target (gateway detached, NAT deleted, ENI gone, peering torn down). — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Broken.
   - **How obtained**: `DescribeRouteTables` response — inspect each `Route.State` on every `RouteTable.Routes[]`.
 
-- **Signal**: `Associations[]` contains no entries AND the route table is not the VPC main RTB (`Associations[].Main != true`) — orphan route table that no subnet and no gateway uses.
+- **Signal**: `Associations[]` contains no entries AND the route table is not the VPC main RTB (`Associations[].Main != true`) — orphan route table that no subnet and no gateway uses. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `DescribeRouteTables` response — inspect `RouteTable.Associations[]` (length, and `Main` flag on each association).
 
@@ -126,8 +126,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `Routes[].State == blackhole` | 1 | Broken | n/a | S2 + S4 | `blackhole route: target gone` | `One or more routes point at a target that no longer exists (gateway detached, NAT/ENI deleted).` |
-| no associations AND not VPC main | 1 | Warning | n/a | S2 + S4 | `orphan: no subnet associations` | `No subnet or gateway uses this route table and it is not the VPC main table.` |
+| `Routes[].State == blackhole` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2 + S4 | `blackhole route: target gone` | `One or more routes point at a target that no longer exists (gateway detached, NAT/ENI deleted).` |
+| no associations AND not VPC main — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `orphan: no subnet associations` | `No subnet or gateway uses this route table and it is not the VPC main table.` |
 
 Rules for filling list and detail text:
 

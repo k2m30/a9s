@@ -120,10 +120,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `LogFileValidationEnabled==false` | 1 | Warning | n/a | S2, S4 | `log validation off` | `Log-file integrity validation disabled — files are unsigned; tamper-evidence off.` |
+| `LogFileValidationEnabled==false` | 1 | Warning | n/a | S2, S4 | `log file validation disabled` | `Log-file integrity validation disabled — files are unsigned; tamper-evidence off.` |
 | `IsLogging==false` | 2 | Broken | `!` | S1, S2 (red), S4, S5 (S3 suppressed on red) | `not logging` | `Trail is stopped — no API events are being captured since <StopLoggingTime>.` |
-| `LatestDeliveryError` non-empty | 2 | Broken | `!` | S1, S2 (red), S4, S5 (S3 suppressed on red) | `s3 delivery failing` | `S3 delivery failing: <LatestDeliveryError> — fix bucket policy or destination.` |
-| `LatestDeliveryTime` >1h stale (on `IsLogging==true`) | 2 | Broken | `!` | S1, S2 (red), S4, S5 (S3 suppressed on red) | `delivery stale >1h` | `Logging is on but no file delivered since <LatestDeliveryTime> — silent delivery failure.` |
+| `LatestDeliveryError` non-empty | 2 | Broken | `!` | S1, S2 (red), S4, S5 (S3 suppressed on red) | `delivery error: <LatestDeliveryError>` | `Delivery error: <LatestDeliveryError> — fix bucket policy or destination.` |
+| `LatestDeliveryTime` >1h stale (on `IsLogging==true`) | 2 | Broken | `!` | S1, S2 (red), S4, S5 (S3 suppressed on red) | `delivery stale since <LatestDeliveryTime>` | `Logging is on but no file delivered since <LatestDeliveryTime> — silent delivery failure.` |
 
 Rules for filling list and detail text:
 
@@ -133,7 +133,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — all four signals put a concrete cause in S4 (`log validation off`, `not logging`, `s3 delivery failing`, `delivery stale >1h`), so the operator can triage trail health from the list alone; the three Wave 2 signals are all Broken (red) and the color + S4 text answer "what?" without a detail keypress, with S5 carrying the exact error string (`LatestDeliveryError`) or timestamp (`StopLoggingTime`, `LatestDeliveryTime`) for the follow-up fix.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — all four signals put a concrete cause in S4 (`log file validation disabled`, `not logging`, `delivery error: <LatestDeliveryError>`, `delivery stale since <LatestDeliveryTime>`), so the operator can triage trail health from the list alone; the three Wave 2 signals are all Broken (red) and the color + S4 text answer "what?" without a detail keypress, with S5 carrying the exact error string (`LatestDeliveryError`) or timestamp (`StopLoggingTime`, `LatestDeliveryTime`) for the follow-up fix.
 
 ## 5. Out of Scope
 

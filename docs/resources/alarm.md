@@ -138,19 +138,19 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Broken.
   - **How obtained**: `MetricAlarm.StateValue` from `DescribeAlarms`; operator-readable cause is carried in `MetricAlarm.StateReason`.
 
-- **Signal**: `ActionsEnabled == false` (muted alarm).
+- **Signal**: `ActionsEnabled == false` (muted alarm). — no separate finding code exists; the code emits only the single `alarm.no_actions` finding (phrase `no actions`, keyed on empty `AlarmActions`), shared with the alert-to-nowhere signal below
   - **State bucket**: Warning.
   - **How obtained**: `MetricAlarm.ActionsEnabled` from `DescribeAlarms`.
 
-- **Signal**: `AlarmActions == []` (alert-to-nowhere).
+- **Signal**: `AlarmActions == []` (alert-to-nowhere). — emitted as the single `alarm.no_actions` finding (phrase `no actions`); the only finding code covering both this and the muted-alarm concept above
   - **State bucket**: Warning.
   - **How obtained**: `MetricAlarm.AlarmActions` from `DescribeAlarms` (an empty slice means no action is wired for the ALARM transition).
 
-- **Signal**: `StateValue == INSUFFICIENT_DATA` AND `StateUpdatedTimestamp` older than `2 × Period` (dead metric pipeline).
+- **Signal**: `StateValue == INSUFFICIENT_DATA` AND `StateUpdatedTimestamp` older than `2 × Period` (dead metric pipeline). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Broken.
   - **How obtained**: `MetricAlarm.StateValue`, `MetricAlarm.StateUpdatedTimestamp`, and `MetricAlarm.Period` from `DescribeAlarms`, compared to wall-clock time. Overrides the plain `INSUFFICIENT_DATA` Warning when both apply.
 
-- **Signal**: `Dimensions[]` reference a resource ID that is absent from the already-loaded sibling-type list (zombie alarm). Rule is skipped when the relevant sibling list was not loaded in this sweep, to avoid false positives.
+- **Signal**: `Dimensions[]` reference a resource ID that is absent from the already-loaded sibling-type list (zombie alarm). Rule is skipped when the relevant sibling list was not loaded in this sweep, to avoid false positives. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `MetricAlarm.Namespace` + `MetricAlarm.Dimensions[]` from `DescribeAlarms`, cross-referenced against the loaded list of whichever sibling type the namespace maps to (e.g. `AWS/EC2` + `InstanceId` vs loaded `ec2` list; `AWS/RDS` + `DBInstanceIdentifier` vs loaded `dbi` list; same pivot table as §2).
 
@@ -188,10 +188,10 @@ One row per signal from §3:
 |---|---|---|---|---|---|---|
 | `StateValue == INSUFFICIENT_DATA` | 1 | Warning | n/a | S2, S4 | `no data` | `Alarm has no recent data points — metric may not be reporting.` |
 | `StateValue == ALARM` | 1 | Broken | n/a | S2, S4 | `firing: <StateReason short>` | `Alarm firing — <MetricAlarm.StateReason text>.` |
-| `ActionsEnabled == false` | 1 | Warning | n/a | S2, S4 | `actions muted` | `Alarm is configured but actions are disabled — no one will be paged if it fires.` |
-| `AlarmActions == []` | 1 | Warning | n/a | S2, S4 | `no action wired` | `Alarm has no ALARM-state action — transitions go unobserved.` |
-| `INSUFFICIENT_DATA older than 2×Period` | 1 | Broken | n/a | S2, S4 | `metric pipeline stale <Xm>` | `Alarm stuck in INSUFFICIENT_DATA for more than 2x the evaluation period — metric stopped reporting.` |
-| zombie alarm (dimension points at missing resource) | 1 | Warning | n/a | S2, S4 | `zombie: <dim-name>=<dim-value>` | `Alarm watches a <sibling-type> that is not in the loaded list — likely points at a deleted resource.` |
+| `ActionsEnabled == false` (no separate finding code — the single `alarm.no_actions` finding, shared with the row below, is the only emission) | 1 | Warning | n/a | S2, S4 | `no actions` | `Alarm is configured but actions are disabled — no one will be paged if it fires.` |
+| `AlarmActions == []` (emits the single `alarm.no_actions` finding — one finding code for both this and the row above) | 1 | Warning | n/a | S2, S4 | `no actions` | `Alarm has no ALARM-state action — transitions go unobserved.` |
+| `INSUFFICIENT_DATA older than 2×Period` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `metric pipeline stale <Xm>` | `Alarm stuck in INSUFFICIENT_DATA for more than 2x the evaluation period — metric stopped reporting.` |
+| zombie alarm (dimension points at missing resource) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `zombie: <dim-name>=<dim-value>` | `Alarm watches a <sibling-type> that is not in the loaded list — likely points at a deleted resource.` |
 
 Notes:
 
@@ -201,7 +201,7 @@ Notes:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy alarm carries a specific cause in S4 (`firing: Threshold Crossed`, `no data`, `actions muted`, `no action wired`, `metric pipeline stale 45m`, `zombie: InstanceId=i-abc`), which is exactly the triage information an on-call engineer needs to decide whether to drill in or move on. The only compression concern is the `firing: <StateReason>` cell — `StateReason` can exceed 40 characters; the list renderer must truncate and the full text must remain available in S5.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy alarm carries a specific cause in S4 (`firing: Threshold Crossed`, `no data`, `no actions`, `metric pipeline stale 45m`, `zombie: InstanceId=i-abc`), which is exactly the triage information an on-call engineer needs to decide whether to drill in or move on. The only compression concern is the `firing: <StateReason>` cell — `StateReason` can exceed 40 characters; the list renderer must truncate and the full text must remain available in S5.
 
 ## 5. Out of Scope
 

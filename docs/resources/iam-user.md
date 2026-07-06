@@ -52,7 +52,7 @@ Transcribed from `docs/attention-signals.md`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `PasswordLastUsed` absent AND `CreateDate` >90d → dormant console user.
+- **Signal**: `PasswordLastUsed` absent AND `CreateDate` >90d → dormant console user. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `ListUsers` response — `User.PasswordLastUsed` (nullable `*time.Time`) and `User.CreateDate` (`*time.Time`). Both fields are present on the `ListUsers` output shape; no extra call is required.
 
@@ -103,7 +103,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `PasswordLastUsed` null AND `CreateDate` >90d | 1 | Warning | n/a | S2, S4 | `dormant: no console login in 90d+` | `Console user created 2y ago has never signed in — candidate for removal.` |
+| `PasswordLastUsed` null AND `CreateDate` >90d — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `dormant: no console login in 90d+` | `Console user created 2y ago has never signed in — candidate for removal.` |
 | Active key unused >90d | 2 | Warning | `~` | S3, S4, S5 | `key unused 120d` | `Access key AKIA…4QJZ last used 120 days ago — consider rotating or deactivating.` |
 | Active key never used, CreateDate >90d | 2 | Warning | `~` | S3, S4, S5 | `key never used, 180d old` | `Access key AKIA…4QJZ created 180 days ago and never used — candidate for deletion.` |
 | Console login without MFA | 2 | Broken | `!` | S1, S3, S4, S5 | `console login, no MFA` | `User has console password but zero MFA devices — add MFA or remove password.` |

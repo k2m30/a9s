@@ -57,7 +57,7 @@ Transcribed from `docs/attention-signals.md`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `SubscriptionArn == "PendingConfirmation"` → Warning (never confirmed).
+- **Signal**: `SubscriptionArn == "PendingConfirmation"` → Warning (never confirmed). — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: field `SubscriptionArn` on the `ListSubscriptions` response item. When the subscription has not yet been confirmed by the endpoint, AWS returns the literal sentinel string `"PendingConfirmation"` instead of a real ARN (`AWS SDK Go v2 — sns/types.Subscription § SubscriptionArn`).
 
@@ -96,7 +96,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `SubscriptionArn == "PendingConfirmation"` | 1 | Warning | n/a | S2, S4 | `pending confirmation` | — |
+| `SubscriptionArn == "PendingConfirmation"` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `pending confirmation` | — |
 
 ### 4.1 UX review (two sentences)
 

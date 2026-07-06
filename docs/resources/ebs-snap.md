@@ -81,15 +81,15 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Broken.
   - **How obtained**: `Snapshot.State` on the `DescribeSnapshots` list response. `StateMessage` carries AWS's human-readable cause (e.g. KMS permission failure on an encrypted copy) and is used for S4/S5 text.
 
-- **Signal**: snapshot age > 365d with automated description — cost concern.
+- **Signal**: snapshot age > 365d with automated description — cost concern. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `now() - Snapshot.StartTime > 365d` AND `Snapshot.Description` begins with `"Created by ..."` (automated-snapshot tell). Pure computation over the list response.
 
-- **Signal**: `Encrypted == false` (CIS EC2.1 — EBS snapshots should be encrypted at rest).
+- **Signal**: `Encrypted == false` (CIS EC2.1 — EBS snapshots should be encrypted at rest). — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `Snapshot.Encrypted` on the `DescribeSnapshots` list response.
 
-- **Signal**: source volume deleted — orphan snapshot. Cross-reference `ebs`.
+- **Signal**: source volume deleted — orphan snapshot. Cross-reference `ebs`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `Snapshot.VolumeId` not present in the already-loaded `ebs` list (rule skipped when the `ebs` list was not loaded in this sweep).
 
@@ -129,11 +129,11 @@ One row per signal from §3:
 |---|---|---|---|---|---|---|
 | `State == pending` | 1 | Warning | n/a | S2, S4 | `creating (Progress%)` | `Snapshot still being created; progress reported by AWS.` |
 | `State == error` | 1 | Broken | n/a | S2, S4 | `error: <StateMessage>` | `Snapshot failed; AWS reason: <StateMessage>.` |
-| `State == recoverable` | 1 | Broken | n/a | S2, S4 | `recoverable: AWS degraded` | `Snapshot in recoverable state; contact AWS to restore.` |
-| `State == recovering` | 1 | Broken | n/a | S2, S4 | `recovering: being restored by AWS` | `AWS is recovering this snapshot after an earlier failure.` |
-| age > 365d AND automated description | 1 | Warning | n/a | S2, S4 | `age 420d: automated, review cost` | `Automated snapshot older than 365d; consider lifecycle policy.` |
-| `Encrypted == false` | 1 | Warning | n/a | S2, S4 | `unencrypted: CIS EC2.1` | `Snapshot is not encrypted at rest; CIS EC2.1 flags this.` |
-| orphan: source volume deleted | 1 | Warning | n/a | S2, S4 | `orphan: source volume deleted` | `Source EBS volume no longer exists in this account/region.` |
+| `State == recoverable` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `recoverable: AWS degraded` | `Snapshot in recoverable state; contact AWS to restore.` |
+| `State == recovering` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `recovering: being restored by AWS` | `AWS is recovering this snapshot after an earlier failure.` |
+| age > 365d AND automated description — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `age 420d: automated, review cost` | `Automated snapshot older than 365d; consider lifecycle policy.` |
+| `Encrypted == false` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `unencrypted: CIS EC2.1` | `Snapshot is not encrypted at rest; CIS EC2.1 flags this.` |
+| orphan: source volume deleted — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `orphan: source volume deleted` | `Source EBS volume no longer exists in this account/region.` |
 
 (Summary-row figures like `420d` and `<StateMessage>` are placeholders the view fills from the SDK fields `StartTime` and `StateMessage` respectively; List text ≤ 40 chars, Detail text ≤ 100 chars.)
 

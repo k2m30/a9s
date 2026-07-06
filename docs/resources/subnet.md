@@ -123,15 +123,15 @@ Transcribed from `docs/attention-signals.md` §Networking — `subnet` row.
   - **State bucket**: Broken.
   - **How obtained**: `Subnet.State` on the list response. Per AWS SDK: "The underlying infrastructure to support the subnet failed to provision due to a shortage of EC2 instance capacity." Operator implication: ENI provisioning into this subnet will fail — move workloads to another AZ.
 
-- **Signal**: `AvailableIpAddressCount / CIDR-size < 0.1` (IP pool running low).
+- **Signal**: `AvailableIpAddressCount / CIDR-size < 0.1` (IP pool running low). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: compute on the list response — `Subnet.AvailableIpAddressCount` against the host count of `Subnet.CidrBlock`.
 
-- **Signal**: `AvailableIpAddressCount / CIDR-size < 0.02` (IP pool nearly exhausted).
+- **Signal**: `AvailableIpAddressCount / CIDR-size < 0.02` (IP pool nearly exhausted). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Broken.
   - **How obtained**: compute on the list response — same fields as above.
 
-- **Signal**: `MapPublicIpOnLaunch == true` AND the effective route table for this subnet has no `0.0.0.0/0 → IGW` default route (where "effective" = the explicitly associated route table, or the VPC main route table when no explicit association exists).
+- **Signal**: `MapPublicIpOnLaunch == true` AND the effective route table for this subnet has no `0.0.0.0/0 → IGW` default route (where "effective" = the explicitly associated route table, or the VPC main route table when no explicit association exists). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning (misconfigured public subnet).
   - **How obtained**: read `Subnet.MapPublicIpOnLaunch`; cross-reference the already-loaded `rtb` list by `Associations[].SubnetId` (falling back to the VPC main route table); scan `Routes[]` for a `DestinationCidrBlock == "0.0.0.0/0"` with `GatewayId` starting `igw-`.
 
@@ -171,9 +171,9 @@ One row per signal from §3:
 | `State == unavailable` | 1 | Broken | n/a | S2, S4 | `unavailable` | — |
 | `State == failed` | 1 | Broken | n/a | S2, S4 | `failed: infrastructure` | — |
 | `State == failed-insufficient-capacity` | 1 | Broken | n/a | S2, S4 | `failed: AZ out of capacity` | — |
-| IP pool low (`< 10%` free) | 1 | Warning | n/a | S2, S4 | `IPs low: N free of M` | — |
-| IP pool exhausted (`< 2%` free) | 1 | Broken | n/a | S2, S4 | `IPs exhausted: N free of M` | — |
-| Misconfigured public subnet (auto-assign public IP, no IGW default route) | 1 | Warning | n/a | S2, S4 | `public IP on launch, no IGW route` | — |
+| IP pool low (`< 10%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `IPs low: N free of M` | — |
+| IP pool exhausted (`< 2%` free) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `IPs exhausted: N free of M` | — |
+| Misconfigured public subnet (auto-assign public IP, no IGW default route) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `public IP on launch, no IGW route` | — |
 
 Rules for filling list and detail text:
 

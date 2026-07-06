@@ -109,7 +109,7 @@ One bullet per distinct signal. AWS field names from `SecretListEntry` are verba
   - **State bucket**: Warning.
   - **How obtained**: `SecretListEntry.RotationEnabled` and `SecretListEntry.NextRotationDate` on the `ListSecrets` response.
 
-- **Signal**: `RotationEnabled==true && (now - LastRotatedDate) > RotationRules.AutomaticallyAfterDays × 2` → rotation failing.
+- **Signal**: `RotationEnabled==true && (now - LastRotatedDate) > RotationRules.AutomaticallyAfterDays × 2` → rotation failing. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Broken.
   - **How obtained**: `SecretListEntry.RotationEnabled`, `SecretListEntry.LastRotatedDate`, and `SecretListEntry.RotationRules.AutomaticallyAfterDays` on the `ListSecrets` response. Note: rotations scheduled via `RotationRules.ScheduleExpression` (cron/rate) leave `AutomaticallyAfterDays` null and this rule cannot fire on them — a9s-devops: possible=yes but not covered by the golden doc; worth=yes for operators using cron-based schedules, so flagged as a UX gap in §4.1.
 
@@ -118,14 +118,14 @@ One bullet per distinct signal. AWS field names from `SecretListEntry` are verba
   - **How obtained**: `SecretListEntry.LastAccessedDate` on the `ListSecrets` response. Caveat carried from the golden doc: the field is day-truncated and excludes access in the current call, so the "180d" threshold is approximate.
 
 - **Signal**: `DeletedDate` set → scheduled for deletion.
-  - **State bucket**: Warning.
+  - **State bucket**: Broken.
   - **How obtained**: `SecretListEntry.DeletedDate` on the `ListSecrets` response; presence of a non-null value means the secret is inside its recovery window and will be permanently deleted at the end of it.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
 One bullet per distinct signal.
 
-- **Signal**: `VersionIdsToStages` stuck on `AWSPENDING` → rotation started but never finished.
+- **Signal**: `VersionIdsToStages` stuck on `AWSPENDING` → rotation started but never finished. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Broken.
   - **API call**: `DescribeSecret` — one call per secret.
   - **Cost shape**: per-resource.
@@ -157,10 +157,10 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | `now > NextRotationDate` | 1 | Warning | n/a | S2, S4 | `rotation overdue: due Apr 10` | `Rotation overdue — next rotation was due 2026-04-10.` |
-| `(now - LastRotatedDate) > AutomaticallyAfterDays × 2` | 1 | Broken | n/a | S2, S4 | `rotation failing: last ok 92d ago` | `Rotation schedule is 30d but last successful rotation was 92d ago.` |
+| `(now - LastRotatedDate) > AutomaticallyAfterDays × 2` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `rotation failing: last ok 92d ago` | `Rotation schedule is 30d but last successful rotation was 92d ago.` |
 | `LastAccessedDate > 180d` | 1 | Warning | n/a | S2, S4 | `dormant: not read in 210d` | `Secret has not been read in this region for 210 days — check if still in use.` |
-| `DeletedDate set` | 1 | Warning | n/a | S2, S4 | `deletion in 6d` | `Scheduled for deletion on 2026-04-26 — restore with RestoreSecret before window ends.` |
-| `AWSPENDING stuck` | 2 | Broken | `!` | S1, S3, S4, S5 | `rotation stuck: AWSPENDING` | `Rotation started but never completed — an AWSPENDING version has been lingering.` |
+| `DeletedDate set` | 1 | Broken | n/a | S2, S4 | `deletion in 6d` | `Scheduled for deletion on 2026-04-26 — restore with RestoreSecret before window ends.` |
+| `AWSPENDING stuck` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S3, S4, S5 | `rotation stuck: AWSPENDING` | `Rotation started but never completed — an AWSPENDING version has been lingering.` |
 
 Formatting notes applied:
 

@@ -87,7 +87,7 @@ Transcribed from `docs/attention-signals.md`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `imageScanningConfiguration.scanOnPush==false` → no vulnerability scanning configured on new image pushes.
+- **Signal**: `imageScanningConfiguration.scanOnPush==false` → no vulnerability scanning configured on new image pushes. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `DescribeRepositories` response — each `Repository` carries its `ImageScanningConfiguration.ScanOnPush` (bool). No extra call.
 
@@ -128,7 +128,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `scanOnPush==false` | 1 | Warning | n/a | S2, S4 | `scan-on-push off` | `Vulnerability scanning is disabled for this repo — new images will push without a CVE scan.` |
+| `scanOnPush==false` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `scan-on-push off` | `Vulnerability scanning is disabled for this repo — new images will push without a CVE scan.` |
 | latest image `CRITICAL>0` | 2 | Broken | `!` | S1, S2, S4, S5 | `CRITICAL CVEs in latest` | `Latest image (pushed <date>) has N CRITICAL vulnerabilities — block deploys until patched.` |
 | latest image `HIGH>0` (no CRITICAL) | 2 | Warning | `~` | S2, S4, S5 | `HIGH CVEs in latest` | `Latest image (pushed <date>) has N HIGH vulnerabilities — review before next deploy.` |
 

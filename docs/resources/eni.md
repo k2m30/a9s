@@ -105,7 +105,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `NetworkInterface.Status` on the list response.
 
-- **Signal**: Requester-managed ENI with `Description` referencing a deleted service → Warning (zombie — AWS forgot to reap after the owning service went away).
+- **Signal**: Requester-managed ENI with `Description` referencing a deleted service → Warning (zombie — AWS forgot to reap after the owning service went away). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `NetworkInterface.RequesterManaged == true` AND `NetworkInterface.Description` is set AND the referenced owner (parsed from the description string, e.g. NAT gateway id, function name, endpoint id) is not present in the already-loaded sibling list (`nat`, `lambda`, `vpce`, `elb`).
 
@@ -144,7 +144,7 @@ One row per signal from §3:
 | `Status == attaching` | 1 | Warning | n/a | S2 + S4 | `attaching` | n/a |
 | `Status == detaching` | 1 | Warning | n/a | S2 + S4 | `detaching` | n/a |
 | `Status == available` (orphan) | 1 | Warning | n/a | S2 + S4 | `unattached — billed while idle` | n/a |
-| Requester-managed, owner gone | 1 | Warning | n/a | S2 + S4 | `zombie: owner <kind> <id> gone` | n/a |
+| Requester-managed, owner gone — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `zombie: owner <kind> <id> gone` | n/a |
 
 ## 4.1 UX review (two sentences)
 

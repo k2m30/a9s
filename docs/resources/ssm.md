@@ -43,13 +43,13 @@ Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `Type==SecureString` AND `LastModifiedDate` >365d → Warning (stale secret — rotation overdue).
+- **Signal**: `Type==SecureString` AND `LastModifiedDate` >365d → Warning (stale secret — rotation overdue). — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `ParameterMetadata.Type` and `ParameterMetadata.LastModifiedDate` on the `DescribeParameters` list response.
-- **Signal**: `Type==String` AND name suffix matches `-password` / `-secret` / `-token` or name contains `/secret` / `/password` / `/token` → Warning (should be SecureString — plaintext credential).
+- **Signal**: `Type==String` AND name suffix matches `-password` / `-secret` / `-token` or name contains `/secret` / `/password` / `/token` → Warning (should be SecureString — plaintext credential). — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `ParameterMetadata.Type` and `ParameterMetadata.Name` on the list response; pure string match against the name.
-- **Signal**: `Tier==Advanced` AND `LastModifiedDate` >90d → Warning (cost — aged Advanced parameter; `$0.05/month` vs free Standard).
+- **Signal**: `Tier==Advanced` AND `LastModifiedDate` >90d → Warning (cost — aged Advanced parameter; `$0.05/month` vs free Standard). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `ParameterMetadata.Tier` and `ParameterMetadata.LastModifiedDate` on the list response.
 
@@ -83,9 +83,9 @@ Wave → surface mapping:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `SecureString not rotated >365d` | 1 | Warning | n/a | S2 + S4 | `stale: not rotated in 365d+` | `SecureString parameter has not been modified in over a year — rotate or confirm still in use.` |
-| `String name looks like a secret` | 1 | Warning | n/a | S2 + S4 | `plaintext: name looks like a secret` | `Parameter is type String but name suggests a credential — switch to SecureString.` |
-| `Advanced tier aged >90d` | 1 | Warning | n/a | S2 + S4 | `advanced: aged 90d+ ($0.05/mo)` | `Advanced-tier parameter has not changed in 90d+ — downgrade to Standard if no Advanced features are used.` |
+| `SecureString not rotated >365d` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `stale: not rotated in 365d+` | `SecureString parameter has not been modified in over a year — rotate or confirm still in use.` |
+| `String name looks like a secret` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `plaintext: name looks like a secret` | `Parameter is type String but name suggests a credential — switch to SecureString.` |
+| `Advanced tier aged >90d` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `advanced: aged 90d+ ($0.05/mo)` | `Advanced-tier parameter has not changed in 90d+ — downgrade to Standard if no Advanced features are used.` |
 
 Rules for filling list and detail text:
 

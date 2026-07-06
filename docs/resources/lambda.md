@@ -195,13 +195,13 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 - **Signal**: `State` in `Failed` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `ListFunctions` response field `State`; reason carried on `StateReason` + `StateReasonCode`.
-- **Signal**: `LastUpdateStatus==Failed` → Broken.
+- **Signal**: `LastUpdateStatus==Failed` → Broken. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Broken.
   - **How obtained**: `ListFunctions` response fields `LastUpdateStatus` + `LastUpdateStatusReason` + `LastUpdateStatusReasonCode`.
-- **Signal**: `Runtime` in [deprecated-runtimes list](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html) → Broken.
+- **Signal**: `Runtime` in [deprecated-runtimes list](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html) → Broken. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Broken.
   - **How obtained**: `ListFunctions` response field `Runtime` compared against the AWS-published deprecated-runtimes list baked into the build.
-- **Signal**: `DeadLetterConfig==nil` → Warning.
+- **Signal**: `DeadLetterConfig==nil` → Warning. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `ListFunctions` response field `DeadLetterConfig` (nil means async-invocation failures are silently dropped after retries).
 
@@ -243,9 +243,9 @@ One row per signal from §3:
 | `State==Pending` | 1 | Warning | n/a | S2, S4 | `creating` | — |
 | `State==Inactive` | 1 | Dim | n/a | S2, S4 | `idle: not invoked recently` | — |
 | `State==Failed` | 1 | Broken | n/a | S2, S4 | `failed: <StateReasonCode>` | — |
-| `LastUpdateStatus==Failed` | 1 | Broken | n/a | S2, S4 | `update failed: <LastUpdateStatusReasonCode>` | — |
-| `Runtime` deprecated | 1 | Broken | n/a | S2, S4 | `runtime deprecated: <Runtime>` | — |
-| `DeadLetterConfig==nil` | 1 | Warning | n/a | S2, S4 | `no DLQ — async failures dropped` | — |
+| `LastUpdateStatus==Failed` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `update failed: <LastUpdateStatusReasonCode>` | — |
+| `Runtime` deprecated — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `runtime deprecated: <Runtime>` | — |
+| `DeadLetterConfig==nil` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no DLQ — async failures dropped` | — |
 
 Rules for filling list and detail text:
 

@@ -57,7 +57,7 @@ Transcribed from `docs/attention-signals.md` §Security & IAM row `policy`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `AttachmentCount==0` AND not AWS-managed → Warning (orphan — customer-managed policy attached to nothing, dead weight during IAM cleanup).
+- **Signal**: `AttachmentCount==0` AND not AWS-managed → Warning (orphan — customer-managed policy attached to nothing, dead weight during IAM cleanup). — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `AttachmentCount` field on the `ListPolicies` response. "Not AWS-managed" is derived from the `Arn` — AWS-managed policies live under `arn:aws:iam::aws:policy/...` (the literal account id `aws`); customer-managed policies live under `arn:aws:iam::<account-id>:policy/...`. Orphan detection runs only on the customer-managed subset.
 
@@ -96,7 +96,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `AttachmentCount==0`, customer-managed | 1 | Warning | n/a | S2, S4 | `orphan: 0 attachments` | `Customer-managed policy attached to no users, groups, or roles.` |
+| `AttachmentCount==0`, customer-managed — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `orphan: 0 attachments` | `Customer-managed policy attached to no users, groups, or roles.` |
 | Document has `Allow *:* on *` | 2 | Broken | `!` | S1, S4, S5 (S2 red; S3 suppressed on non-green) | `wildcard admin: Allow *:*` | `Default version grants Action=* on Resource=* — effective AdministratorAccess.` |
 
 Rules for filling list and detail text:

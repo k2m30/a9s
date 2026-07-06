@@ -113,7 +113,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: `State` field on the list-response VPC.
 
-- **Signal**: No subnets in this VPC → Warning (empty VPC).
+- **Signal**: No subnets in this VPC → Warning (empty VPC). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: Cross-reference the already-loaded `subnet` list; count entries where `Subnet.VpcId == this.VpcId`. If zero, raise the signal.
 
@@ -153,7 +153,7 @@ One row per §3 signal (Healthy case omitted per rule):
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | `State == pending` | 1 | Warning | n/a | S2, S4 | `pending: VPC being created` | n/a (Wave 1 Warning has no S5) |
-| no subnets in VPC | 1 | Warning | n/a | S2, S4 | `empty: no subnets` | n/a |
+| no subnets in VPC — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `empty: no subnets` | n/a |
 | no flow logs for this VPC | 2 | Healthy | `~` | S3, S4, S5 | `no flow logs` | `No VPC flow logs configured — network traffic here is unlogged (CIS/Well-Architected SEC).` |
 
 ## 4.1 UX review (two sentences)

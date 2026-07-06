@@ -88,22 +88,27 @@ Transcribed from `docs/attention-signals.md`.
 - **Signal**: `Status == Deployed`.
   - **State bucket**: Healthy.
   - **How obtained**: `DistributionSummary.Status` field on the list response.
-- **Signal**: `Status == InProgress`.
+- **Signal**: `Status == InProgress`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `DistributionSummary.Status` field on the list response.
-- **Signal**: `Enabled == false`.
+- **Signal**: `Enabled == false`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Dim.
   - **How obtained**: `DistributionSummary.Enabled` field on the list response.
-- **Signal**: `ViewerCertificate.CloudFrontDefaultCertificate == false` AND `MinimumProtocolVersion` in `SSLv3` / `TLSv1` / `TLSv1_2016` / `TLSv1.1_2016`.
+- **Signal**: `ViewerCertificate.CloudFrontDefaultCertificate == false` AND `MinimumProtocolVersion` in `SSLv3` / `TLSv1` / `TLSv1_2016` / `TLSv1.1_2016`. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `DistributionSummary.ViewerCertificate.MinimumProtocolVersion` field on the list response.
-- **Signal**: `WebACLId == ""` (no WAF attached).
+- **Signal**: `WebACLId == ""` (no WAF attached). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `DistributionSummary.WebACLId` field on the list response.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-- **Signal**: `LoggingConfig.Enabled == false` on the full distribution config.
+- **Signal**: `DefaultCacheBehavior.ViewerProtocolPolicy == allow-all` (no HTTPS redirect) or any origin with `CustomOriginConfig.OriginProtocolPolicy == http-only` (origin without TLS). Emitted by `EnrichCloudFrontDistribution` (`internal/aws/cf_issue_enrichment.go`) as the single `cf.insecure-protocol` finding — distinct from the Wave 1 weak-TLS `MinimumProtocolVersion` signal above.
+  - **State bucket**: Healthy (informational `~` finding on a green row).
+  - **API call**: `GetDistributionConfig` — one call per distribution.
+  - **Cost shape**: per-resource.
+
+- **Signal**: `LoggingConfig.Enabled == false` on the full distribution config. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **API call**: `GetDistributionConfig` — one call per distribution.
   - **Cost shape**: per-resource.
@@ -137,11 +142,12 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `Status == InProgress` | 1 | Warning | n/a | S2, S4 | `deploying: config propagating` | `Distribution config change is still propagating to edge locations.` |
-| `Enabled == false` | 1 | Dim | n/a | S2, S4 | `disabled (admin-off)` | `Distribution is administratively disabled — not serving traffic.` |
-| Weak TLS policy on aliased distribution | 1 | Warning | n/a | S2, S4 | `weak TLS: MinimumProtocolVersion=<v>` | `Viewer TLS policy allows deprecated protocols (SSLv3 / TLSv1 / TLSv1_2016 / TLSv1.1_2016).` |
-| `WebACLId == ""` | 1 | Warning | n/a | S2, S4 | `no WAF attached` | `Distribution has no Web ACL in front of it — public surface without rate limiting.` |
-| `LoggingConfig.Enabled == false` | 2 | Warning (on Healthy row) | `~` | S3, S4, S5 | `access logs off` | `Standard access logs are disabled — no S3 log trail for this distribution.` |
+| `Status == InProgress` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `deploying: config propagating` | `Distribution config change is still propagating to edge locations.` |
+| `Enabled == false` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `disabled (admin-off)` | `Distribution is administratively disabled — not serving traffic.` |
+| Weak TLS policy on aliased distribution — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `weak TLS: MinimumProtocolVersion=<v>` | `Viewer TLS policy allows deprecated protocols (SSLv3 / TLSv1 / TLSv1_2016 / TLSv1.1_2016).` |
+| `WebACLId == ""` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `no WAF attached` | `Distribution has no Web ACL in front of it — public surface without rate limiting.` |
+| viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`) | 2 | Healthy | `~` | S3, S4, S5 | `no HTTPS redirect (insecure); origin without TLS` | `Viewer protocol policy allows plain HTTP, or an origin accepts HTTP only — traffic can travel unencrypted.` |
+| `LoggingConfig.Enabled == false` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning (on Healthy row) | `~` | S3, S4, S5 | `access logs off` | `Standard access logs are disabled — no S3 log trail for this distribution.` |
 
 ## 4.1 UX review (two sentences)
 

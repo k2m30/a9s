@@ -102,16 +102,16 @@ One bullet per distinct signal. AWS field names verbatim.
 - **Signal**: `Health == Green`.
   - **State bucket**: Healthy.
   - **How obtained**: `EnvironmentDescription.Health` on the `DescribeEnvironments` list response.
-- **Signal**: `Health == Yellow`.
+- **Signal**: `Health == Yellow`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `EnvironmentDescription.Health` on the list response. AWS documents this as "something is wrong — two consecutive health-check failures".
-- **Signal**: `Health == Grey`.
+- **Signal**: `Health == Grey`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `EnvironmentDescription.Health` on the list response. AWS documents this as "new environment not fully launched, or health checks suspended during an `UpdateEnvironment`/`RestartEnvironment` request".
-- **Signal**: `Health == Red`.
+- **Signal**: `Health == Red`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Broken.
   - **How obtained**: `EnvironmentDescription.Health` on the list response. AWS documents this as "environment not responsive — three or more consecutive health-check failures".
-- **Signal**: `Status == Terminated`.
+- **Signal**: `Status == Terminated`. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Dim.
   - **How obtained**: `EnvironmentDescription.Status` on the list response.
 
@@ -153,10 +153,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `Health == Yellow` | 1 | Warning | n/a | S2, S4 | `degraded: health checks failing` | `Environment health is Yellow — two consecutive health checks failed; expect partial impact.` |
-| `Health == Grey` | 1 | Warning | n/a | S2, S4 | `launching: health checks suspended` | `Environment health is Grey — not fully launched or checks suspended by an update/restart.` |
-| `Health == Red` | 1 | Broken | n/a | S2, S4 | `unresponsive: 3+ health checks failed` | `Environment health is Red — three or more consecutive health-check failures; app likely down.` |
-| `Status == Terminated` | 1 | Dim | n/a | S2, S4 | `terminated` | `Environment is terminated — not running; retained for history only.` |
+| `Health == Yellow` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `degraded: health checks failing` | `Environment health is Yellow — two consecutive health checks failed; expect partial impact.` |
+| `Health == Grey` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `launching: health checks suspended` | `Environment health is Grey — not fully launched or checks suspended by an update/restart.` |
+| `Health == Red` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2, S4 | `unresponsive: 3+ health checks failed` | `Environment health is Red — three or more consecutive health-check failures; app likely down.` |
+| `Status == Terminated` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `terminated` | `Environment is terminated — not running; retained for history only.` |
 | `Causes[]` non-empty | 2 | Warning (adds detail to an existing non-green row) | n/a | S4 (dedupe), S5 | `<first Cause, truncated to 40 chars>` | `Enhanced health reported: <first 1-2 Causes, joined by '; ', clipped to 100 chars>.` |
 
 Notes on the `Causes[]` row:

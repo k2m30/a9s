@@ -85,7 +85,7 @@ Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `AssumeRolePolicyDocument` (URL-encoded JSON on `ListRoles`) contains `Principal:{"AWS":"*"}` without an external-id condition.
+- **Signal**: `AssumeRolePolicyDocument` (URL-encoded JSON on `ListRoles`) contains `Principal:{"AWS":"*"}` without an external-id condition. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Broken.
   - **How obtained**: URL-decode and JSON-parse `Role.AssumeRolePolicyDocument` from the `ListRoles` response; search for a `Statement` whose `Effect==Allow` and `Principal.AWS=="*"` with no matching `Condition.StringEquals["sts:ExternalId"]`.
 
@@ -125,7 +125,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| trust policy allows `Principal:AWS=*` without external-id | 1 | Broken | n/a (color is the signal) | S2, S4 | `trust allows *, no external-id` | `Trust policy allows any AWS principal to assume this role with no external-id guard — anyone can AssumeRole.` |
+| trust policy allows `Principal:AWS=*` without external-id — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a (color is the signal) | S2, S4 | `trust allows *, no external-id` | `Trust policy allows any AWS principal to assume this role with no external-id guard — anyone can AssumeRole.` |
 | dormant — `RoleLastUsed.LastUsedDate` missing or >90d | 2 | Healthy (finding on green row) | `~` | S3, S4, S5 | `unused >90d` | `No AssumeRole activity in the last 90 days (region-scoped — may miss usage in other regions).` |
 
 Rules for filling list and detail text:

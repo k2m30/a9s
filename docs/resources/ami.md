@@ -82,13 +82,13 @@ Transcribed from `docs/attention-signals.md`.
 - **Signal**: `State == failed` or `State == error` or `State == invalid` → Broken.
   - **State bucket**: Broken.
   - **How obtained**: `Image.State` on the `DescribeImages` list response; pair with `StateReason.Message` for the cause string.
-- **Signal**: `State == deregistered` or `State == disabled` → Dim.
+- **Signal**: `State == deregistered` or `State == disabled` → Dim. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Dim.
   - **How obtained**: `Image.State` on the `DescribeImages` list response.
-- **Signal**: `DeprecationTime < now()` → Warning.
+- **Signal**: `DeprecationTime < now()` → Warning. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: `Image.DeprecationTime` (ISO-8601 string) on the `DescribeImages` list response, parsed and compared against the current time.
-- **Signal**: Cross-ref `ebs-snap` (owner-scoped only — skip public/marketplace AMIs) — backing snapshot missing → Warning.
+- **Signal**: Cross-ref `ebs-snap` (owner-scoped only — skip public/marketplace AMIs) — backing snapshot missing → Warning. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: read `Image.BlockDeviceMappings[].Ebs.SnapshotId` and look each ID up in the already-loaded `ebs-snap` list; a miss on an owner-scoped AMI is the signal. Skip the check when `ImageOwnerAlias` is `amazon`/`aws-marketplace` or the AMI is otherwise not in the caller's account.
 
@@ -126,10 +126,10 @@ One row per signal from §3:
 |---|---|---|---|---|---|---|
 | `State == pending` or `transient` | 1 | Warning | n/a | S2, S4 | `pending: registering image` | AMI registration in progress; not yet launchable. |
 | `State == failed / error / invalid` | 1 | Broken | n/a | S2, S4 | `failed: <StateReason.Message>` | AMI registration failed: `<StateReason.Message>` — image is unusable. |
-| `State == deregistered` | 1 | Dim | n/a | S2, S4 | `deregistered` | AMI has been deregistered; cannot launch new instances from it. |
-| `State == disabled` | 1 | Dim | n/a | S2, S4 | `disabled` | AMI is disabled in this account; launches are blocked until re-enabled. |
-| `DeprecationTime < now()` | 1 | Warning | n/a | S2, S4 | `deprecated <Nd> ago` | AWS marked this AMI deprecated on `<DeprecationTime>`; replace with current image. |
-| Backing snapshot missing (owner-scoped) | 1 | Warning | n/a | S2, S4 | `backing snapshot missing` | One or more EBS snapshots in `BlockDeviceMappings` are absent — AMI cannot be used to launch. |
+| `State == deregistered` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `deregistered` | AMI has been deregistered; cannot launch new instances from it. |
+| `State == disabled` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Dim | n/a | S2, S4 | `disabled` | AMI is disabled in this account; launches are blocked until re-enabled. |
+| `DeprecationTime < now()` — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `deprecated <Nd> ago` | AWS marked this AMI deprecated on `<DeprecationTime>`; replace with current image. |
+| Backing snapshot missing (owner-scoped) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `backing snapshot missing` | One or more EBS snapshots in `BlockDeviceMappings` are absent — AMI cannot be used to launch. |
 
 ## 4.1 UX review (two sentences)
 

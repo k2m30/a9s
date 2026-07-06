@@ -102,7 +102,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 - **Signal**: `AssociationId` absent AND `InstanceId` absent AND `NetworkInterfaceId` absent → Warning (unattached, billed hourly).
   - **State bucket**: Warning.
   - **How obtained**: three fields on the list-response `Address` shape: `AssociationId`, `InstanceId`, `NetworkInterfaceId`. No extra call.
-- **Signal**: Cross-ref `ec2` — attached to instance with `State.Name==stopped` → Warning (zombie billing).
+- **Signal**: Cross-ref `ec2` — attached to instance with `State.Name==stopped` → Warning (zombie billing). — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: read `Address.InstanceId`; look up the already-loaded `ec2` list by `Instance.InstanceId` and check `Instance.State.Name`. Zero extra API calls (sibling-list cross-reference).
 
@@ -139,7 +139,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | unattached EIP (no association/instance/ENI) | 1 | Warning | n/a | S2, S4 | `unattached — billed hourly` | — (Wave 1, no S5) |
-| attached to stopped EC2 instance | 1 | Warning | n/a | S2, S4 | `attached to stopped instance` | — (Wave 1, no S5) |
+| attached to stopped EC2 instance — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2, S4 | `attached to stopped instance` | — (Wave 1, no S5) |
 
 Rules for filling list and detail text:
 

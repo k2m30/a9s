@@ -73,7 +73,7 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
   - **State bucket**: Warning (informational — companion finding from the same per-topic call; fires only when at least one subscription exists and none is confirmed).
   - **API call**: `ListSubscriptionsByTopic` — same call as above; no added cost.
   - **Cost shape**: per-resource.
-- **Signal**: `KmsMasterKeyId` absent on sensitive topic → Warning.
+- **Signal**: `KmsMasterKeyId` absent on sensitive topic → Warning. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **API call**: `GetTopicAttributes` — one call per topic (same call as above; no added cost).
   - **Cost shape**: per-resource.
@@ -107,7 +107,7 @@ One row per signal from §3:
 |---|---|---|---|---|---|---|
 | zero subscriptions on the topic | 2 | Warning | `~` | S3, S4, S5 | `no subscribers` | `Topic has no subscriptions — published messages are discarded.` |
 | all subscriptions unconfirmed | 2 | Warning | `~` | S3, S4, S5 | `all pending confirmation` | `Every subscription is still pending confirmation — no endpoint receives messages yet.` |
-| `KmsMasterKeyId absent on sensitive topic` | 2 | Warning | `~` | S3, S4, S5 (pending trigger definition) | `not encrypted` | `Topic has no KMS master key configured — server-side encryption is not in effect.` |
+| `KmsMasterKeyId absent on sensitive topic` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S3, S4, S5 (pending trigger definition) | `not encrypted` | `Topic has no KMS master key configured — server-side encryption is not in effect.` |
 
 ## 4.1 UX review
 

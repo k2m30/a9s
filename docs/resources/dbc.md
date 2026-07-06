@@ -145,8 +145,8 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 
 One bullet per distinct signal.
 
-- **Signal**: Cluster has a pending maintenance action with `ForcedApplyDate` or `AutoAppliedAfterDate` in the past → Warning.
-  - **State bucket**: Warning.
+- **Signal**: Cluster has a pending maintenance action with `ForcedApplyDate` or `AutoAppliedAfterDate` in the past → Broken.
+  - **State bucket**: Broken.
   - **API call**: `DescribePendingMaintenanceActions` — one account-wide call (shared with `dbi`), bucket results by `ResourceIdentifier` (cluster ARN).
   - **Cost shape**: account-wide.
 
@@ -186,7 +186,7 @@ One row per signal from §3:
 | `DeletionProtection == false` | 1 | Warning | n/a | S2, S4 | `delete-protection off` | `DeletionProtection is disabled — an accidental DeleteDBCluster will destroy the cluster.` |
 | `StorageEncrypted == false` | 1 | Warning | n/a | S2, S4 | `not encrypted at rest` | `StorageEncrypted is false — cluster storage is not protected by KMS.` |
 | `BackupRetentionPeriod == 0` | 1 | Warning | n/a | S2, S4 | `no automated backups` | `BackupRetentionPeriod is 0 — automated snapshots are disabled; PITR will not work.` |
-| Pending maintenance action overdue | 2 | Warning | `!` | S1, S3, S4, S5 | `maintenance overdue` | `AWS-mandated maintenance past its ForcedApplyDate — AWS will apply it in the next window.` |
+| Pending maintenance action overdue | 2 | Broken | `!` | S1, S3, S4, S5 | `maintenance overdue` | `AWS-mandated maintenance past its ForcedApplyDate — AWS will apply it in the next window.` |
 
 Rules for filling list and detail text:
 

@@ -81,10 +81,10 @@ Transcribed from `docs/attention-signals.md`.
 
 One bullet per distinct signal. Keep AWS field names verbatim.
 
-- **Signal**: `IpPermissions[]` with `IpRanges[].CidrIp == 0.0.0.0/0` covering any port in the set {22, 23, 21, 3389, 1433, 3306, 5432, 6379, 27017, 11211, 9200}.
+- **Signal**: `IpPermissions[]` with `IpRanges[].CidrIp == 0.0.0.0/0` covering any port in the set {22, 23, 21, 3389, 1433, 3306, 5432, 6379, 27017, 11211, 9200}. — implemented as a row-color rule, no finding row (as of 2026-07-06)
   - **State bucket**: Broken.
   - **How obtained**: read `IpPermissions[]` on the SG, inspect each rule's `FromPort`/`ToPort`/`IpProtocol` against `IpRanges[].CidrIp` — the list API returns the full ingress rule set, no extra call. a9s-devops: port list is the standard "admin/database exposed to the internet" set (SSH/telnet/FTP/RDP/SQL/MySQL/Postgres/Redis/Mongo/memcached/Elasticsearch).
-- **Signal**: Cross-ref `eni` — this SG's `GroupId` is not referenced by any `NetworkInterface.Groups[].GroupId` in the loaded `eni` list.
+- **Signal**: Cross-ref `eni` — this SG's `GroupId` is not referenced by any `NetworkInterface.Groups[].GroupId` in the loaded `eni` list. — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06)
   - **State bucket**: Warning.
   - **How obtained**: cross-reference the already-loaded `eni` list by `Groups[].GroupId`. Skip the rule if the `eni` list wasn't loaded in this sweep (cannot distinguish "no users" from "didn't look").
 
@@ -120,8 +120,8 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
-| `0.0.0.0/0` on admin/db port | 1 | Broken | n/a | S2 + S4 | `open: 22 to 0.0.0.0/0` | `Ingress rule allows TCP 22 from 0.0.0.0/0 — SSH is reachable from the entire internet.` |
-| Not referenced by any ENI (orphan) | 1 | Warning | n/a | S2 + S4 | `orphan: no ENIs attached` | `This security group is not attached to any network interface — candidate for cleanup.` |
+| `0.0.0.0/0` on admin/db port — implemented as a row-color rule, no finding row (as of 2026-07-06) | 1 | Broken | n/a | S2 + S4 | `open: 22 to 0.0.0.0/0` | `Ingress rule allows TCP 22 from 0.0.0.0/0 — SSH is reachable from the entire internet.` |
+| Not referenced by any ENI (orphan) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 1 | Warning | n/a | S2 + S4 | `orphan: no ENIs attached` | `This security group is not attached to any network interface — candidate for cleanup.` |
 
 Rules for filling list and detail text:
 
