@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/session"
 )
@@ -22,6 +23,16 @@ type Core struct {
 	session *session.Session
 	types   []catalog.ResourceTypeDef
 	isDemo  bool
+
+	// saveColumns resolves the list column set a resource short name persists
+	// under (task #17 wave 1 stage 4: single materializer for both the
+	// list-open and sweep save lanes). Set once via SetSaveColumns by the
+	// renderer-neutral Controller constructor (app.New), which is
+	// view-config-aware; nil means no renderer has registered one yet (e.g. a
+	// bare Core built directly in a runtime-package test), in which case
+	// SaveTypeRows falls back to resolveSaveColumns' built-in-defaults-only
+	// cascade.
+	saveColumns func(shortName string) []config.ListColumn
 }
 
 // New constructs a Core bound to the given session and catalog snapshot.
@@ -46,6 +57,15 @@ func (c *Core) Session() *session.Session { return c.session }
 
 // Types returns the catalog snapshot the Core was constructed with.
 func (c *Core) Types() []catalog.ResourceTypeDef { return c.types }
+
+// SetSaveColumns registers the view-config-aware column resolver SaveTypeRows
+// uses to materialize Path-backed columns before persisting a type's rows.
+// Called once by app.New so a user's per-session column overrides are
+// honored at save time, matching what the render path already does via
+// resolveListColumnsForBuild.
+func (c *Core) SetSaveColumns(fn func(shortName string) []config.ListColumn) {
+	c.saveColumns = fn
+}
 
 // HandleEvent is the single entry point adapters call to deliver an
 // inbound event. It returns the UI intents to apply and the background

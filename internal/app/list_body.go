@@ -7,15 +7,27 @@ import (
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
+	"github.com/k2m30/a9s/v3/internal/session"
 )
 
-// applyResourcesLoaded stores a page of resources per-screen (on ls.Rows) and
-// also in the type-keyed resourceCache for callers that only have a typeName
-// (ApplyListFieldUpdates, GetListAllResources). When appendPage is true the
-// new slice is appended; otherwise it replaces. Mirrors what
-// ResourceListModel.Update does on ResourcesLoaded.
+// applyResourcesLoaded stores a page of resources per-screen (on ls.Rows).
+// When appendPage is true the new slice is appended; otherwise it replaces.
+// Mirrors what ResourceListModel.Update does on ResourcesLoaded.
 // Called from handleResourcesLoadedEvent (via Handle) and from the public
 // ApplyResourcesLoaded test seam in testing.go.
+//
+// topLevelCanonical marks whether this call targets the canonical top-level,
+// unfiltered ScreenResourceList for typeName (not a ScreenChildList, and not
+// a filtered/related-nav list — EscPops/ParentContext) — the same C6 scope
+// gate maybeSaveResourceListCache/syncExactTotalToMenu already use. Only a
+// topLevelCanonical call routes its accepted rows through
+// Core.ObserveRows (task #17 wave 1 stage 4: the RowStore is the single
+// per-type row source of truth; decision #1 explicitly rejects letting a
+// child/related-filtered list's narrower row set poison it). A
+// non-topLevelCanonical call keeps writing ls.Rows locally only, exactly as
+// before RowStore existed — its content already came from a store read
+// (listScreenResources' fallback, or a related-navigate cache hit) and must
+// not be re-written back into the store under the same type key.
 //
 // Every incoming page is run through MaterializeListFields first (Contract B
 // render-sufficiency): Path-based, Key-less columns get their scalar value
@@ -24,7 +36,7 @@ import (
 // Resources that already have Fields populated (e.g. a cache-replay caller
 // passing rows with RawStruct==nil) pass through unchanged — see
 // MaterializeListFields's early-return.
-func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool) {
+func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool, topLevelCanonical bool) {
 	resources = c.materializeListFieldsForType(typeName, resources)
 
 	// Item C: a silent swap (a non-append replace — the common cold-boot shape
@@ -39,7 +51,7 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// onto this screen) BEFORE they are overwritten, keyed by resource ID, so
 	// they can be carried onto the incoming replacement rows for any ID that
 	// survives the swap.
-	priorFindings := outgoingRowFindingsByID(ls, c.resourceCache[typeName])
+	priorFindings := outgoingRowFindingsByID(ls, c.cachedResources(typeName))
 
 	// DEF-18 mechanism A: a background verify-refetch (e.g. cold-open's
 	// KindFetchResources, bounded by a CachedListDepth snapshot taken at
@@ -72,9 +84,9 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 
 	// Item C (continued): a silent swap is exactly the !appendPage && !stale
 	// replace path below. Fold the captured prior findings onto the incoming
-	// resources for any surviving ID BEFORE they land on ls.Rows/
-	// c.resourceCache — only when the session enrichment store has nothing
-	// for this type yet (checked via listEnrichmentFindings).
+	// resources for any surviving ID BEFORE they land on ls.Rows/RowStore —
+	// only when the session enrichment store has nothing for this type yet
+	// (checked via listEnrichmentFindings).
 	//
 	// Merged per-source, never wholesale: a fresh fetch result IS the
 	// authoritative statement about Wave-1 state for that row — a row that
@@ -112,8 +124,20 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// cause below — it only prevents a duplicate that already reached this
 	// call from becoming visible; the empty-cursor guard is what stops the
 	// duplicate fetch from happening in the first place.
+	//
+	// topLevelCanonical routes the SAME decision (append/stale/replace)
+	// through Core.ObserveRows first and adopts its accepted slice onto
+	// ls.Rows/ls.RowsGen — RowStore is the reconciler, this screen adopts
+	// what it accepted (task #17 wave 1 stage 4). A non-canonical screen
+	// (child/filtered/related) keeps the pre-RowStore local-only behavior:
+	// its own dedup-append/stale-discard/replace decision, written only to
+	// ls.Rows, never observed into the shared per-type store.
 	if ls != nil {
 		switch {
+		case topLevelCanonical && !stale:
+			accepted, gen := c.core.ObserveRows(typeName, resources, pagination, session.OriginFetch, appendPage)
+			ls.Rows = accepted
+			ls.RowsGen = gen
 		case appendPage:
 			ls.Rows = append(ls.Rows, dedupAgainstExisting(ls.Rows, resources)...)
 		case stale:
@@ -121,24 +145,6 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		default:
 			ls.Rows = resources
 		}
-	}
-
-	// --- Type-keyed cache (retained for field-update / all-resources reads) --
-	// ApplyListFieldUpdates and GetListAllResources key on typeName, not on a
-	// specific screen. Keep them in sync so those callers still work correctly.
-	if c.resourceCache == nil {
-		c.resourceCache = make(map[string][]resource.Resource)
-	}
-	switch {
-	case appendPage:
-		existing := c.resourceCache[typeName]
-		c.resourceCache[typeName] = append(existing, dedupAgainstExisting(existing, resources)...)
-	case stale:
-		// Discard: see the DEF-18 mechanism A comment above — the type-keyed
-		// mirror must not diverge from ls.Rows by accepting the stale page
-		// that ls.Rows just rejected.
-	default:
-		c.resourceCache[typeName] = resources
 	}
 
 	if ls != nil {
@@ -185,9 +191,9 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 // row set about to be replaced by a silent swap (item C), keyed by resource
 // ID. Prefers ls.Rows (the per-screen store applyResourcesLoaded is about to
 // overwrite) since it is the richer, currently-displayed source; falls back
-// to the type-keyed resourceCache mirror when ls is nil or carries no rows
-// yet (e.g. the very first ResourcesLoaded for a screen whose seed only
-// populated the type-keyed cache). Rows with no findings are omitted so the
+// to the RowStore-backed type cache when ls is nil or carries no rows yet
+// (e.g. the very first ResourcesLoaded for a screen whose seed only
+// populated the type cache). Rows with no findings are omitted so the
 // caller's len(priorFindings) == 0 check short-circuits cheaply when there is
 // nothing to carry forward.
 func outgoingRowFindingsByID(ls *ListState, cachedRows []resource.Resource) map[string][]domain.Finding {
@@ -659,12 +665,27 @@ func (c *Controller) GetListVisibleResources() []resource.Resource {
 // ApplyListFieldUpdates merges Wave-2 field updates into the cached resource
 // slice for typeName. Keyed by resource ID then field key.
 // Updates are applied both to the top list screen's ls.Rows (the primary read
-// path after the Bug 1 fix) and to the type-keyed resourceCache (for callers
-// such as GetListAllResources that don't have a specific ListState).
+// path after the Bug 1 fix) and to the RowStore-backed type cache (for
+// callers such as GetListAllResources that don't have a specific ListState).
 func (c *Controller) ApplyListFieldUpdates(typeName string, updates map[string]map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.applyListFieldUpdates(typeName, updates)
+}
+
+// applyFieldUpdatesToSlice merges updates into a resource slice IN PLACE.
+// Safe for a screen's own s.State.List.Rows (screen-owned memory); NOT safe
+// to call on a RowStore snapshot slice, which must go through
+// Core.AmendRows' copy-on-write contract instead — see applyListFieldUpdates.
+func applyFieldUpdatesToSlice(rows []resource.Resource, updates map[string]map[string]string) {
+	for i := range rows {
+		if kvMap, ok := updates[rows[i].ID]; ok {
+			if rows[i].Fields == nil {
+				rows[i].Fields = make(map[string]string, len(kvMap))
+			}
+			maps.Copy(rows[i].Fields, kvMap)
+		}
+	}
 }
 
 // applyListFieldUpdates is the lock-free body of ApplyListFieldUpdates so it can
@@ -673,17 +694,6 @@ func (c *Controller) ApplyListFieldUpdates(typeName string, updates map[string]m
 func (c *Controller) applyListFieldUpdates(typeName string, updates map[string]map[string]string) {
 	if len(updates) == 0 {
 		return
-	}
-	// Helper: merge updates into a resource slice in-place.
-	applyToSlice := func(rows []resource.Resource) {
-		for i := range rows {
-			if kvMap, ok := updates[rows[i].ID]; ok {
-				if rows[i].Fields == nil {
-					rows[i].Fields = make(map[string]string, len(kvMap))
-				}
-				maps.Copy(rows[i].Fields, kvMap)
-			}
-		}
 	}
 	// Apply to EVERY list screen of this type in the stack (primary read path).
 	// PatchResourceList updates every matching ResourceListModel, so the matching
@@ -707,17 +717,37 @@ func (c *Controller) applyListFieldUpdates(typeName string, updates map[string]m
 		if st != canon || s.State.List == nil {
 			continue
 		}
-		applyToSlice(s.State.List.Rows)
+		applyFieldUpdatesToSlice(s.State.List.Rows, updates)
 	}
-	// Also update the type-keyed cache so GetListAllResources etc. see the same values.
-	if c.resourceCache != nil {
-		applyToSlice(c.resourceCache[typeName])
-	}
+	// Also update the RowStore-backed type cache so GetListAllResources etc.
+	// see the same values. Amend's copy-on-write contract (RowStore.Amend's
+	// doc comment) means a touched row's Fields map must be cloned before
+	// writing into it — mutating the shared map in place would corrupt every
+	// other snapshot/screen still holding a reference to the store's
+	// pre-Amend row value.
+	c.core.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
+		if len(rows) == 0 {
+			return rows
+		}
+		out := make([]resource.Resource, len(rows))
+		copy(out, rows)
+		for i := range out {
+			kvMap, ok := updates[out[i].ID]
+			if !ok {
+				continue
+			}
+			fresh := make(map[string]string, len(out[i].Fields)+len(kvMap))
+			maps.Copy(fresh, out[i].Fields)
+			maps.Copy(fresh, kvMap)
+			out[i].Fields = fresh
+		}
+		return out
+	})
 }
 
 // ClearRowFindings strips every Wave-2 finding (domain.Finding with Source
 // prefixed "wave2:") from the cached resource rows for typeName, on both
-// per-screen ls.Rows and the type-keyed resourceCache — mirroring the
+// per-screen ls.Rows and the RowStore-backed type cache — mirroring the
 // dual-store walk in applyListFieldUpdates. AttentionDetails entries keyed by
 // a stripped Wave-2 Finding's Code are dropped alongside it.
 //
@@ -726,7 +756,7 @@ func (c *Controller) applyListFieldUpdates(typeName string, updates map[string]m
 // the session-owned stores (Core.ResourceCache / LazyResourceCache /
 // ProbeResources); those stores no longer alias the controller's rows since
 // applyResourcesLoaded materializes copies (MaterializeListFields) into
-// ls.Rows / c.resourceCache. Without this explicit companion call, a
+// ls.Rows / the RowStore. Without this explicit companion call, a
 // ResourceListModel constructed from the (now-copied) cache-hit rows retains
 // stale Wave-2 findings across Ctrl+R even after the session-side clear.
 func (c *Controller) ClearRowFindings(typeName string) {
@@ -766,25 +796,40 @@ func (c *Controller) clearRowFindings(typeName string) {
 		clearSlice(s.State.List.Rows)
 	}
 
-	// Type-keyed cache (GetListAllResources and other typeName-only callers).
-	if c.resourceCache != nil {
-		clearSlice(c.resourceCache[typeName])
-		if typeName != canon {
-			clearSlice(c.resourceCache[canon])
+	// RowStore-backed type cache (GetListAllResources and other
+	// typeName-only callers). clearSlice's own reassignments
+	// (rows[i].Findings = stripWave2Findings(...), rows[i].AttentionDetails
+	// = nil) are struct-field replacements, not in-place mutation of a
+	// shared backing array/map, so it is safe to run directly against the
+	// copied slice Amend hands it — stripWave2Findings itself already
+	// allocates a fresh backing array (its zero-capacity re-slice) rather
+	// than truncating findings' existing one.
+	amend := func(rows []resource.Resource) []resource.Resource {
+		if len(rows) == 0 {
+			return rows
 		}
+		out := make([]resource.Resource, len(rows))
+		copy(out, rows)
+		clearSlice(out)
+		return out
+	}
+	c.core.AmendRows(canon, amend)
+	if typeName != canon {
+		c.core.AmendRows(typeName, amend)
 	}
 }
 
 // applyRowFindings is the applying-direction mirror of clearRowFindings: it
 // writes Wave-2 findings (and their attention details) onto the controller's
-// own row stores — every matching list screen's ls.Rows plus c.resourceCache.
-// Without it, enrichment applied to an OPEN live list reaches only the
-// session-owned stores (Core.applyEnrichment) and the controller's
-// enrichmentStore glyph map, so the list-open save path (which persists from
-// ls.Rows) writes rows with no findings — cached rows then reseed glyphless
-// (S3-pilot DEF-8). Callers must hold c.mu (write); the PatchResourceList
-// intent case is the production entry point. A nil findings map clears Wave-2
-// entries, matching runtime.ApplyWave2ToRow's contract.
+// own row stores — every matching list screen's ls.Rows plus the
+// RowStore-backed type cache. Without it, enrichment applied to an OPEN live
+// list reaches only the session-owned stores (Core.applyEnrichment) and the
+// controller's enrichmentStore glyph map, so the list-open save path (which
+// persists from ls.Rows) writes rows with no findings — cached rows then
+// reseed glyphless (S3-pilot DEF-8). Callers must hold c.mu (write); the
+// PatchResourceList intent case is the production entry point. A nil
+// findings map clears Wave-2 entries, matching runtime.ApplyWave2ToRow's
+// contract.
 func (c *Controller) applyRowFindings(typeName string, findings map[string]domain.Finding, details map[string]domain.AttentionDetail) {
 	canon := typeName
 	var td resource.ResourceTypeDef
@@ -816,11 +861,29 @@ func (c *Controller) applyRowFindings(typeName string, findings map[string]domai
 		applySlice(s.State.List.Rows)
 	}
 
-	if c.resourceCache != nil {
-		applySlice(c.resourceCache[typeName])
-		if typeName != canon {
-			applySlice(c.resourceCache[canon])
+	// RowStore-backed type cache. Unlike clearRowFindings' stripWave2Findings
+	// (which already allocates a fresh backing array), ApplyWave2ToRow
+	// truncates/writes r.Findings' EXISTING backing array in place
+	// (r.Findings[n] = f) — calling it directly against a shallow
+	// copy(out, rows) would still corrupt the store's pre-Amend Findings
+	// slice, since a shallow struct copy shares the original slice header's
+	// backing array. Each touched row's Findings must be given a fresh
+	// backing array before applySlice runs.
+	amend := func(rows []resource.Resource) []resource.Resource {
+		if len(rows) == 0 {
+			return rows
 		}
+		out := make([]resource.Resource, len(rows))
+		copy(out, rows)
+		for i := range out {
+			out[i].Findings = append([]domain.Finding(nil), out[i].Findings...)
+		}
+		applySlice(out)
+		return out
+	}
+	c.core.AmendRows(canon, amend)
+	if typeName != canon {
+		c.core.AmendRows(typeName, amend)
 	}
 }
 

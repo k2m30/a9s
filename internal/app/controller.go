@@ -32,10 +32,6 @@ type Controller struct {
 	core *runtime.Core
 	stack []Screen
 
-	// resourceCache stores the latest fetched resource pages per resource type,
-	// keyed by canonical short name. Populated by applyResourcesLoaded.
-	resourceCache map[string][]resource.Resource
-
 	// enrichmentStore stores Wave-2 per-resource findings per resource type,
 	// keyed by canonical short name. Populated by ApplyEnrichmentState.
 	enrichmentStore map[string]map[string]domain.Finding
@@ -114,8 +110,14 @@ type controllerErrorEntry struct {
 // New constructs a Controller backed by the given runtime Core.
 // The root screen is always ScreenMenu so Snapshot() returns BodyKindMenu
 // immediately.
+//
+// Registers c's view-config-aware column resolver on core via
+// SetSaveColumns (task #17 wave 1 stage 4) so Core.SaveTypeRows persists a
+// user's per-session column overrides — not just the built-in defaults —
+// from both the TUI and web renderer, which both construct their Controller
+// through this single entry point.
 func New(core *runtime.Core) *Controller {
-	return &Controller{
+	c := &Controller{
 		core: core,
 		stack: []Screen{
 			{
@@ -124,6 +126,52 @@ func New(core *runtime.Core) *Controller {
 			},
 		},
 	}
+	core.SetSaveColumns(c.resolveSaveColumns)
+	return c
+}
+
+// resolveSaveColumns is the runtime.Core.saveColumns implementation
+// registered by New. It mirrors resolveListColumnsForBuild's cascade (the
+// same one buildListBody/materializeListFieldsForType use at render time)
+// so a save persists exactly the columns the render path would show,
+// including any per-session view-config override — then narrows the result
+// to the config.ListColumn shape SaveTypeRows shares with the built-in-only
+// fallback (resolveSaveColumns in internal/runtime/probes.go).
+//
+// Reads c.viewConfig/c.fallbackTypeDefs live (not a value captured at
+// construction time) since SetViewConfig/RegisterFallbackTypeDef are called
+// after New returns.
+//
+// Locking: Go's sync.RWMutex is not reentrant, and every production call to
+// Core.SaveTypeRows (and thus this resolver) from the list-open lane
+// (maybeSaveResourceListCache) currently runs while c.mu is ALREADY held for
+// writing (Handle/Apply take c.mu.Lock() once at the top and every helper
+// down to maybeSaveResourceListCache is lock-free by convention) — a
+// c.mu.RLock() here would self-deadlock on that path. The executor's
+// background sweep lane (saveProbeResourcesToTypeFiles) never touches
+// Controller at all, so it cannot race this method's reads against
+// SetViewConfig/RegisterFallbackTypeDef, which only ever run from a
+// Controller-owned, c.mu-serialized call (SetViewConfig, RegisterFallbackTypeDef
+// themselves take c.mu.Lock()). The only remaining hazard — a concurrent
+// SetViewConfig/RegisterFallbackTypeDef call racing THIS method while it runs
+// under the caller's already-held write lock — cannot happen either: both of
+// those setters also require c.mu, so they cannot run concurrently with any
+// other Controller method. No additional lock is taken here.
+func (c *Controller) resolveSaveColumns(shortName string) []config.ListColumn {
+	var tdVal resource.ResourceTypeDef
+	var td *resource.ResourceTypeDef
+	if ftd, ok := c.fallbackTypeDefs[shortName]; ok {
+		tdVal = ftd
+		td = &tdVal
+	} else if catalogTD := resource.FindResourceType(shortName); catalogTD != nil {
+		td = catalogTD
+	}
+	cols := resolveListColumnsForBuild(c.viewConfig, shortName, td)
+	out := make([]config.ListColumn, len(cols))
+	for i, cd := range cols {
+		out[i] = config.ListColumn{Key: cd.Key, Title: cd.Title, Width: cd.Width, Path: cd.Path}
+	}
+	return out
 }
 
 // SetViewConfig stores the per-session view configuration so that
@@ -194,10 +242,8 @@ func (c *Controller) selectedResourceForAction() (resource.Resource, string, boo
 	if len(c.stack) > 0 {
 		top := c.stack[len(c.stack)-1]
 		if isTextScreen(top.ID) && top.Ctx.ResourceType != "" && top.Ctx.ResourceID != "" {
-			for _, r := range c.resourceCache[top.Ctx.ResourceType] {
-				if r.ID == top.Ctx.ResourceID {
-					return r, top.Ctx.ResourceType, true
-				}
+			if r, ok := c.findCachedResourceByID(top.Ctx.ResourceType, top.Ctx.ResourceID); ok {
+				return r, top.Ctx.ResourceType, true
 			}
 		}
 	}

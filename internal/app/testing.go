@@ -2,7 +2,6 @@ package app
 
 import (
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime"
 )
 
 // ApplyResourcesLoaded is a test-support seam that seeds the controller's
@@ -28,8 +27,9 @@ func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.
 		canon = td.ShortName
 	}
 	ls := c.topListState()
-	c.applyResourcesLoaded(ls, canon, resources, pagination, appendPage)
-	if ls != nil && !ls.EscPops && ls.ParentContext == nil && c.topScreenID() == runtime.ScreenResourceList {
+	topLevelCanonical := isTopLevelCanonicalList(c.topScreenID(), ls)
+	c.applyResourcesLoaded(ls, canon, resources, pagination, appendPage, topLevelCanonical)
+	if topLevelCanonical {
 		c.maybeSaveResourceListCache(ls, canon)
 	}
 }

@@ -117,7 +117,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		// confirmed/replaced (Contract A: cache-first seeding never skips the
 		// live fetch, it only removes the visible wait for it).
 		if res.Kind == runtime.NavigateKindPushResourceListCached && res.CachedEntry != nil {
-			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false)
+			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false, isTopLevelCanonicalList(intent.ID, top.State.List))
 			top.State.List.Refreshing = true
 			// Item B/DEF-21: set AFTER applyResourcesLoaded, same ordering as
 			// Refreshing above — applyResourcesLoaded unconditionally clears
@@ -140,7 +140,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		// does, so the list still renders instantly instead of falling back to
 		// the no-rows-known Loading=true path ensureListState already applied.
 		if res.Kind == runtime.NavigateKindPushResourceList && res.CachedEntry != nil {
-			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false)
+			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false, isTopLevelCanonicalList(intent.ID, top.State.List))
 			top.State.List.Loading = false
 			top.State.List.Refreshing = true
 			// Item B/DEF-21: same set-after-seed ordering as the cache-hit branch

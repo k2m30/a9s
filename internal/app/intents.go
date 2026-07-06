@@ -196,9 +196,9 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// list rows or enriched columns render stale (ECR/WAF/CodeArtifact).
 				c.applyListFieldUpdates(v.ResourceType, v.Enrichment.FieldUpdates)
 				// ...and the findings themselves must land on the controller's own
-				// rows (ls.Rows / resourceCache) — the list-open save path persists
-				// from them, so without this the on-disk cache rows carry no
-				// findings and reseed glyphless (DEF-8).
+				// rows (ls.Rows / the RowStore-backed type cache) — the list-open
+				// save path persists from them, so without this the on-disk cache
+				// rows carry no findings and reseed glyphless (DEF-8).
 				c.applyRowFindings(v.ResourceType, v.Enrichment.Findings, v.Enrichment.AttentionDetails)
 			}
 

@@ -315,18 +315,16 @@ func (c *Core) SaveAvailabilityCache(
 	})
 }
 
-// materializeListFieldsForSave resolves shortName's built-in list column set
-// (owner decision, item A: "для всех ресурсов должны быть закешированы все
-// колонки, которые могут меняться" — every renderable list column must be
-// cached, driven by the column CONFIG, no hardcode) and, for every Path-backed
+// materializeListFieldsForSave resolves shortName's list column set (via
+// Core.saveColumns when the renderer registered one, else the built-in-
+// defaults-only cascade in resolveSaveColumns) and, for every Path-backed
 // column whose Fields entry is still empty, extracts the scalar from
 // RawStruct and writes it into Fields under the column's resolved key (Key
-// when set, else the lowercased Title). Mirrors
-// app.materializeAllListFieldsForSave (the list-lane save's counterpart) so
-// both save seams persist the identical column set — but lives in
-// internal/runtime (which internal/app already imports) so the sweep-lane
-// save (saveProbeResourcesToTypeFiles, package internal/runtime) can run it
-// too, without an internal/runtime -> internal/app import cycle.
+// when set, else the lowercased Title). Owner decision, item A: "для всех
+// ресурсов должны быть закешированы все колонки, которые могут меняться" —
+// every renderable list column must be cached, driven by the column CONFIG,
+// no hardcode. Shared by both save lanes via SaveTypeRows (task #17 wave 1
+// stage 4: one materializer for the list-open lane and the sweep lane).
 //
 // Unlike the render-time app.MaterializeListFields (which the render path
 // uses and intentionally skips every Key-based column, since a live
@@ -341,16 +339,18 @@ func (c *Core) SaveAvailabilityCache(
 // RawStruct-derived value for it would be actively wrong once Findings
 // disagree (mirrors app.materializeAllPathFields's exclusion).
 //
-// internal/runtime has no per-session view-config override (that is an
-// internal/app.Controller-only concept), so this always resolves against the
-// built-in defaults (config.GetViewDef(nil, shortName)), same as
-// resolveSaveColumns's fallback when vc == nil. A resource whose RawStruct is
-// nil (e.g. a cache-replay round-trip) passes through unchanged.
-func materializeListFieldsForSave(shortName string, resources []resource.Resource) []resource.Resource {
+// A resource whose RawStruct is nil (e.g. a cache-replay round-trip) passes
+// through unchanged.
+func (c *Core) materializeListFieldsForSave(shortName string, resources []resource.Resource) []resource.Resource {
 	if len(resources) == 0 {
 		return resources
 	}
-	columns := resolveSaveColumns(shortName)
+	var columns []config.ListColumn
+	if c.saveColumns != nil {
+		columns = c.saveColumns(shortName)
+	} else {
+		columns = resolveSaveColumns(shortName)
+	}
 	if len(columns) == 0 {
 		return resources
 	}
@@ -370,6 +370,8 @@ func materializeListFieldsForSave(shortName string, resources []resource.Resourc
 // strict superset of the catalog's own Columns (same first-column-title
 // guard), else fall back to the catalog Columns (carrying Path from the
 // defaults by title match when present), else the raw built-in defaults.
+// Used as SaveTypeRows' fallback when no renderer has called SetSaveColumns
+// (e.g. a bare Core built directly in a runtime-package test).
 func resolveSaveColumns(shortName string) []config.ListColumn {
 	td := resource.FindResourceType(shortName)
 	defaultVD := config.GetViewDef(nil, shortName)
@@ -479,6 +481,39 @@ func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count i
 // otherwise a healed/resolved issue could never clear (C6b).
 func (c *Core) saveResourceListCacheWave2Complete(shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated bool) error {
 	return c.saveResourceListCache(shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, true)
+}
+
+// SaveTypeRows is the single per-type save chokepoint (task #17 wave 1 stage
+// 4): materializes resources' Path-backed columns (via
+// materializeListFieldsForSave, honoring a registered SetSaveColumns
+// resolver), builds the persisted cache.Row projection (ID/Name/Fields/
+// Findings — colors/glyphs/status are derived at render time and never
+// persisted), and writes through saveResourceListCache/
+// saveResourceListCacheWave2Complete depending on wave2Authoritative.
+//
+// Callers own the C6 scope gate (only a top-level, unfiltered list may call
+// this) and the issue-count computation — the list-open lane
+// (app.Controller.maybeSaveResourceListCache) and the sweep lane
+// (saveProbeResourcesToTypeFiles) each aggregate issues from different
+// inputs (per-screen enrichment-store findings vs. a bare Wave-1 probe
+// snapshot) and must keep computing issues/issuesKnown/issuesTruncated
+// themselves; unifying that computation here would silently change either
+// lane's counted total.
+func (c *Core) SaveTypeRows(shortName string, resources []resource.Resource, count int, exact bool, issues int, issuesKnown, issuesTruncated, wave2Authoritative bool) error {
+	materialized := c.materializeListFieldsForSave(shortName, resources)
+	rows := make([]cache.Row, len(materialized))
+	for i, r := range materialized {
+		rows[i] = cache.Row{
+			ID:       r.ID,
+			Name:     r.Name,
+			Fields:   r.Fields,
+			Findings: r.Findings,
+		}
+	}
+	if wave2Authoritative {
+		return c.saveResourceListCacheWave2Complete(shortName, rows, count, exact, issues, issuesKnown, issuesTruncated)
+	}
+	return c.saveResourceListCache(shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, false)
 }
 
 func (c *Core) saveResourceListCache(shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated, wave2Authoritative bool) error {

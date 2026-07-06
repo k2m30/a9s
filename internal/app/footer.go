@@ -94,12 +94,9 @@ func (c *Controller) buildTextFooterHints(screenID runtime.ScreenID, ctx runtime
 	// Skip when no resource type is set (raw-text / reveal YAML path).
 	if ctx.ResourceType != "" && ctx.ResourceID != "" {
 		// Find the resource in the cache to call BuildCloudTrailFilter.
-		for _, r := range c.resourceCache[ctx.ResourceType] {
-			if r.ID == ctx.ResourceID {
-				if resource.BuildCloudTrailFilter(r, ctx.ResourceType) != nil {
-					hints = append(hints, KeyHint{Key: "t", Help: "CloudTrail"})
-				}
-				break
+		if r, ok := c.findCachedResourceByID(ctx.ResourceType, ctx.ResourceID); ok {
+			if resource.BuildCloudTrailFilter(r, ctx.ResourceType) != nil {
+				hints = append(hints, KeyHint{Key: "t", Help: "CloudTrail"})
 			}
 		}
 	}

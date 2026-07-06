@@ -216,10 +216,8 @@ func (c *Controller) GetTextResource() resource.Resource {
 	if top.Ctx.ResourceType == "" || top.Ctx.ResourceID == "" {
 		return resource.Resource{}
 	}
-	for _, r := range c.resourceCache[top.Ctx.ResourceType] {
-		if r.ID == top.Ctx.ResourceID {
-			return r
-		}
+	if r, ok := c.findCachedResourceByID(top.Ctx.ResourceType, top.Ctx.ResourceID); ok {
+		return r
 	}
 	return resource.Resource{}
 }

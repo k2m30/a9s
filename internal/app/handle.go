@@ -2,14 +2,10 @@ package app
 
 import (
 	"maps"
-	"strings"
 
-	"github.com/k2m30/a9s/v3/internal/cache"
-	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // Handle feeds an event through runtime.Core.HandleEvent, applies the returned
@@ -160,7 +156,7 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 		if screenType != canon {
 			continue
 		}
-		c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append)
+		c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append, isTopLevelCanonicalList(s.ID, s.State.List))
 		// Contract D: sync the list's now-current row count to the root menu's
 		// availability badge here, at the controller level, so both the TUI and
 		// web renderer get it — this replaces the TUI-only sync-back that used
@@ -285,7 +281,19 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 // mirroring every other cache-write call site in this file.
 //
 // Callers MUST already have applied the C6 scope gate (top-level
-// ScreenResourceList, not EscPops, not ParentContext) before calling this.
+// ScreenResourceList, not EscPops, not ParentContext) before calling this —
+// isTopLevelCanonicalList computes it.
+//
+// task #17 wave 1 stage 4: the per-type materialize/build-rows/write body
+// this method used to own directly now lives once in
+// runtime.Core.SaveTypeRows, shared with the sweep lane
+// (saveProbeResourcesToTypeFiles) — this method's job shrinks to computing
+// the two save-lane-specific inputs (issues/issuesKnown via
+// c.listIssueCount, exact via ls.HasPagination) and calling it. The
+// redundant ObserveRows re-write this method used to perform after the disk
+// save is gone too: applyResourcesLoaded (this method's only two callers'
+// common ancestor) already routed ls.Rows through Core.ObserveRows before
+// either caller reached here, so ls.Rows already IS what the store holds.
 func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 	if ls == nil || c.core.NoCache() {
 		return
@@ -295,139 +303,10 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 		// Issue-badge eligibility unknowable without a ResourceTypeDef.
 		return
 	}
-	// Item A (owner decision): every renderable list column — including
-	// Path-based ones like s3's Region — must be cached, driven by the
-	// column config, no hardcode. cache.Row is built from r.Fields only, so a
-	// Path-based column must be materialized into Fields first, exactly as
-	// the render path (buildListBody/extractListCells) does at render time
-	// via its own RawStruct fallback — otherwise a column that only ever
-	// resolved from RawStruct silently never reaches the persisted cache.Row,
-	// which never carries RawStruct. materializeAllListFieldsForSave (unlike
-	// the render-time materializeListFieldsForType/MaterializeListFields)
-	// also covers Path-carrying columns that ALSO declare a Key: at render
-	// time such a column's RawStruct fallback only matters when nothing has
-	// set Fields[key] yet, but at the SAVE seam RawStruct is about to be
-	// stripped for good, so the same "no value yet" gap applies to it too.
-	materialized := c.materializeAllListFieldsForSave(canon, ls.Rows)
-	rows := make([]cache.Row, len(materialized))
-	for i, r := range materialized {
-		rows[i] = cache.Row{
-			ID:       r.ID,
-			Name:     r.Name,
-			Fields:   r.Fields,
-			Findings: r.Findings,
-		}
-	}
 	issuesKnown := !td.ExcludeFromIssueBadge
 	issues := c.listIssueCount(ls, canon)
 	exact := !ls.HasPagination
-	_ = c.core.SaveResourceListCache(canon, rows, len(ls.Rows), exact, issues, issuesKnown, ls.HasPagination)
-	// Item A / DEF-21 (task #17 wave 1 stage 2: SyncProbeResourcesForType and
-	// its session.ProbeResources/ProbeTruncated target are deleted; RowStore
-	// is now the sweep lane's only per-type row source, so keeping it in
-	// lockstep with what was just persisted is a direct ObserveRows call
-	// instead): a LATER sweep/enrichment-completion TaskKindSaveCache dispatch
-	// must re-save these same accumulated rows instead of a stale,
-	// independently-fetched probe snapshot that reconcileTypeFile's subset
-	// check might not recognise as a subset. ls.Rows is the controller's own
-	// full accumulated row set — OriginFetch, wholesale replace (mirrors
-	// SyncProbeResourcesForType's own dual-write, which called this same
-	// ObserveRows with these same arguments).
-	c.core.ObserveRows(canon, ls.Rows, &resource.PaginationMeta{IsTruncated: ls.HasPagination}, session.OriginFetch, false)
-}
-
-// materializeAllListFieldsForSave resolves typeName's column set the same
-// way buildListBody/materializeListFieldsForType do (fallback typeDef first,
-// then catalog, via resolveListColumnsForBuild), then writes every Path-
-// backed column's RawStruct scalar into Fields when that column's resolved
-// key is not already populated — including a column that ALSO declares a
-// Key (unlike MaterializeListFields, which the render path uses and which
-// intentionally skips Key-based columns since a live Fields-map lookup or a
-// Wave-2 override already covers them while RawStruct is still present).
-//
-// This wider rule only applies at this SAVE seam: cache.Row never carries
-// RawStruct (SaveResourceListCache's doc comment), so a Key-based column
-// whose value has so far only ever come from a RawStruct fallback (never an
-// explicit Fields write) needs the exact same one-time materialization a
-// pure Path-only column needs, or it goes blank the moment the row is
-// replayed from disk. The existing non-empty-value guard this mirrors from
-// MaterializeListFields means a column already carrying an explicit value
-// (e.g. a Wave-2 enrichment override) is never overwritten by this pass.
-func (c *Controller) materializeAllListFieldsForSave(typeName string, resources []resource.Resource) []resource.Resource {
-	if len(resources) == 0 {
-		return resources
-	}
-	var tdVal resource.ResourceTypeDef
-	var td *resource.ResourceTypeDef
-	if ftd, ok := c.fallbackTypeDefs[typeName]; ok {
-		tdVal = ftd
-		td = &tdVal
-	} else if catalogTD := resource.FindResourceType(typeName); catalogTD != nil {
-		td = catalogTD
-	}
-	columns := resolveListColumnsForBuild(c.viewConfig, typeName, td)
-	if len(columns) == 0 {
-		return resources
-	}
-	lifecycleKey := "state"
-	if td != nil && td.LifecycleKey != "" {
-		lifecycleKey = td.LifecycleKey
-	}
-	out := make([]resource.Resource, len(resources))
-	for i, r := range resources {
-		out[i] = materializeAllPathFields(r, columns, lifecycleKey)
-	}
-	return out
-}
-
-// materializeAllPathFields is materializeAllListFieldsForSave's single-
-// resource core: for every column with a non-empty Path (Key-based or not),
-// write RawStruct's extracted scalar into Fields under the column's
-// resolved key (Key when set, else the lowercased Title) whenever that key
-// is not already populated with a non-empty value. The status/lifecycle
-// column is always skipped regardless of Path: its cell is derived at
-// render time from Findings (listExtractCellValue's isStatusCol branch,
-// buildListBody's S4 override), so persisting a RawStruct-derived value for
-// it would render a stale/wrong status once Findings disagree — the same
-// exclusion the render-time MaterializeListFields effectively gets for free
-// by skipping every Key-based column, which this wider save-time pass must
-// reproduce explicitly since it no longer skips Key-based columns in general.
-func materializeAllPathFields(r resource.Resource, columns []ColumnDef, lifecycleKey string) resource.Resource {
-	if r.RawStruct == nil {
-		return r
-	}
-	out := r
-	copied := false
-	for _, col := range columns {
-		if col.Path == "" {
-			continue
-		}
-		if col.Key == "status" || col.Key == lifecycleKey {
-			continue
-		}
-		key := col.Key
-		if key == "" {
-			key = strings.ToLower(col.Title)
-		}
-		if key == "" {
-			continue
-		}
-		if v, ok := out.Fields[key]; ok && v != "" {
-			continue
-		}
-		val := fieldpath.ExtractScalar(out.RawStruct, col.Path)
-		if val == "" {
-			continue
-		}
-		if !copied {
-			fresh := make(map[string]string, len(out.Fields)+1)
-			maps.Copy(fresh, out.Fields)
-			out.Fields = fresh
-			copied = true
-		}
-		out.Fields[key] = val
-	}
-	return out
+	_ = c.core.SaveTypeRows(canon, ls.Rows, len(ls.Rows), exact, issues, issuesKnown, ls.HasPagination, false)
 }
 
 // autoOpenSingleDetail replaces a web/headless by-ID placeholder list with the

@@ -33,6 +33,21 @@ func (c *Controller) topScreenID() runtime.ScreenID {
 	return c.stack[len(c.stack)-1].ID
 }
 
+// isTopLevelCanonicalList reports whether screenID/ls together identify the
+// canonical top-level, unfiltered resource list for its type — the C6 scope
+// gate maybeSaveResourceListCache/syncExactTotalToMenu use to decide
+// disk-cache eligibility, and applyResourcesLoaded's callers use to decide
+// RowStore eligibility (task #17 wave 1 stage 4): a ScreenChildList, or a
+// ScreenResourceList opened via EscPops/carrying a ParentContext (a
+// related-navigation or filtered view), is never the type's global
+// population and must not read/write the shared per-type RowStore entry.
+func isTopLevelCanonicalList(screenID runtime.ScreenID, ls *ListState) bool {
+	if screenID != runtime.ScreenResourceList || ls == nil {
+		return false
+	}
+	return !ls.EscPops && ls.ParentContext == nil
+}
+
 // EnsureListState is the exported surface that TUI builders call immediately
 // after a ScreenResourceList/ScreenChildList PushScreen intent has already
 // been applied (e.g. via ApplyIntents) so that State.List is non-nil before
@@ -96,15 +111,32 @@ func (c *Controller) listVisibleCount(ls *ListState) int {
 	return len(visible)
 }
 
-// cachedResources returns the resource slice for typeName from the controller's
-// type-keyed resource cache, or nil if no data has been received yet.
-// Callers that have a per-screen ListState should prefer listScreenResources
-// so that stacked same-type screens read their own rows, not a shared slice.
+// cachedResources returns the resource slice for typeName from the
+// session-owned RowStore (any origin — Fetch, Probe, or Disk), or nil if no
+// data has been received yet. Callers that have a per-screen ListState
+// should prefer listScreenResources so that stacked same-type screens read
+// their own rows, not a shared slice.
 func (c *Controller) cachedResources(typeName string) []resource.Resource {
-	if c.resourceCache == nil {
+	entry, ok := c.core.AnyOriginResourceCache(typeName)
+	if !ok {
 		return nil
 	}
-	return c.resourceCache[typeName]
+	return entry.Resources
+}
+
+// findCachedResourceByID looks up a single resource by ID within typeName's
+// RowStore-backed cache (any origin), for callers that only need one row
+// (text/detail screen resolution) rather than the full slice. Mirrors the
+// linear-scan-by-ID pattern previously duplicated across
+// selectedResourceForAction, buildTextFooterHints, and GetTextResource
+// against the deleted Controller.resourceCache map.
+func (c *Controller) findCachedResourceByID(typeName, id string) (resource.Resource, bool) {
+	for _, r := range c.cachedResources(typeName) {
+		if r.ID == id {
+			return r, true
+		}
+	}
+	return resource.Resource{}, false
 }
 
 // listScreenResources returns the resource slice for the given screen's

@@ -255,7 +255,19 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 		return existing.Rows, existing.Gen
 	}
 
-	if !appendPage && !existing.Partial && isStaleReplaceRows(existing.Rows, rows, pagination) {
+	// C5/DEF-18 mechanism A: the stale-shaped-replace rejection below only
+	// applies while the EXISTING entry has not yet reached a confirmed exact
+	// total (mirrors internal/app/list_body.go's applyResourcesLoaded, which
+	// gates its own isStaleReplace call on !ls.HasPagination). A Ctrl+R full
+	// reset legitimately replays the exact same page-1 IDs with
+	// IsTruncated=true while the existing entry is ALSO still truncated
+	// (never confirmed exact) — that reset must win, matching
+	// TestStoryF1_CtrlR_ResetsPagination. Once existing.Pagination reports
+	// IsTruncated=false (C5: exact only ever advances), a smaller,
+	// still-truncated, ID-subset replace can only be an out-of-order
+	// straggler and IS rejected (TestRowStore_Observe_StaleTruncatedSubsetRejectedOnceExact).
+	existingIsExact := existing.Pagination != nil && !existing.Pagination.IsTruncated
+	if !appendPage && !existing.Partial && existingIsExact && isStaleReplaceRows(existing.Rows, rows, pagination) {
 		return existing.Rows, existing.Gen
 	}
 
