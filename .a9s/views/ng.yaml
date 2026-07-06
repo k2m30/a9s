@@ -7,10 +7,8 @@ list:
     width: 24
   Status:
     path: Status
+    key: status
     width: 14
-  Issues:
-    key: health_issues
-    width: 28
   Instance Types:
     path: InstanceTypes
     width: 20

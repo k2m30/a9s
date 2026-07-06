@@ -2,6 +2,9 @@ list:
   Topic ARN:
     path: TopicArn
     width: 48
+  Status:
+    key: status
+    width: 12
   Protocol:
     path: Protocol
     width: 10

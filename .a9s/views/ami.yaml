@@ -5,7 +5,7 @@ list:
   Image ID:
     path: ImageId
     width: 22
-  State:
+  Status:
     path: State
     width: 12
   Deprecated:

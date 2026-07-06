@@ -428,7 +428,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		CloudTrailKey: "ResourceName:ID",
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28, Sortable: true},
-			{Key: "state", Title: "State", Width: 12, Sortable: true},
+			{Key: "state", Title: "Status", Width: 12, Sortable: true},
 			{Key: "lifecycle", Title: "Lifecycle", Width: 12, Sortable: true},
 			{Key: "type", Title: "Type", Width: 14, Sortable: true},
 			{Key: "private_ip", Title: "Private IP", Width: 16, Sortable: false},
@@ -715,6 +715,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "runtime", Title: "Runtime", Width: 16, Sortable: true},
 			{Key: "memory", Title: "Memory", Width: 8, Sortable: true},
 			{Key: "timeout", Title: "Timeout", Width: 8, Sortable: true},
+			{Key: "state", Title: "Status", Width: 10, Sortable: true},
 			{Key: "handler", Title: "Handler", Width: 30, Sortable: false},
 			{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
 		},
@@ -849,7 +850,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24, Sortable: true},
 			{Key: "volume_id", Title: "Volume ID", Width: 22, Sortable: true},
-			{Key: "state", Title: "State", Width: 12, Sortable: true},
+			{Key: "state", Title: "Status", Width: 12, Sortable: true},
 			{Key: "size", Title: "Size (GiB)", Width: 10, Sortable: true},
 			{Key: "type", Title: "Type", Width: 8, Sortable: true},
 			{Key: "iops", Title: "IOPS", Width: 8, Sortable: true},
@@ -898,7 +899,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24, Sortable: true},
 			{Key: "snapshot_id", Title: "Snapshot ID", Width: 24, Sortable: true},
-			{Key: "state", Title: "State", Width: 12, Sortable: true},
+			{Key: "state", Title: "Status", Width: 12, Sortable: true},
 			{Key: "volume_id", Title: "Volume ID", Width: 22, Sortable: true},
 			{Key: "size", Title: "Size (GiB)", Width: 10, Sortable: true},
 			{Key: "encrypted", Title: "Encrypted", Width: 10, Sortable: true},

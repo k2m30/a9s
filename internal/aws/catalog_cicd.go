@@ -74,6 +74,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Columns: []domain.Column{
 			{Key: "name", Title: "Pipeline Name", Width: 30, Sortable: true},
 			{Key: "pipeline_type", Title: "Type", Width: 6, Sortable: true},
+			{Key: "last_status", Title: "Status", Width: 18, Sortable: true},
 			{Key: "version", Title: "Version", Width: 9, Sortable: true},
 			{Key: "created", Title: "Created", Width: 22, Sortable: true},
 			{Key: "updated", Title: "Updated", Width: 22, Sortable: true},
@@ -122,6 +123,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Columns: []domain.Column{
 			{Key: "name", Title: "Project Name", Width: 32, Sortable: true},
 			{Key: "source_type", Title: "Source Type", Width: 14, Sortable: true},
+			{Key: "last_build", Title: "Status", Width: 18, Sortable: true},
 			{Key: "description", Title: "Description", Width: 36, Sortable: false},
 			{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
 		},

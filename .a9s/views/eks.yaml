@@ -7,10 +7,8 @@ list:
     width: 10
   Status:
     path: Status
+    key: status
     width: 14
-  Issues:
-    key: health_issues
-    width: 28
   Endpoint:
     path: Endpoint
     width: 48

@@ -4,7 +4,7 @@ list:
   TGW ID:
     path: TransitGatewayId
     width: 26
-  State:
+  Status:
     path: State
     width: 12
   Att Issues:

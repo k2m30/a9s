@@ -7,7 +7,7 @@ list:
   VPC ID:
     key: vpc_id
     width: 24
-  State:
+  Status:
     key: state
     width: 12
 

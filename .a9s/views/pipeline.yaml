@@ -5,7 +5,7 @@ list:
   Type:
     path: PipelineType
     width: 6
-  Last Status:
+  Status:
     key: last_status
     width: 18
   Version:

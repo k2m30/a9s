@@ -4,7 +4,7 @@ list:
   Volume ID:
     path: VolumeId
     width: 22
-  State:
+  Status:
     path: State
     width: 12
   Size (GiB):

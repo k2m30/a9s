@@ -4,7 +4,7 @@ list:
   Snapshot ID:
     path: SnapshotId
     width: 24
-  State:
+  Status:
     path: State
     width: 12
   Volume ID:

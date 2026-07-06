@@ -2,7 +2,7 @@ list:
   Rule Name:
     path: Name
     width: 28
-  State:
+  Status:
     path: State
     width: 10
   Targets:

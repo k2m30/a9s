@@ -5,7 +5,7 @@ func monitoringDefaultViews() map[string]ViewDef {
 		"alarm": {
 			List: []ListColumn{
 				{Title: "Alarm Name", Path: "AlarmName", Width: 36},
-				{Title: "State", Path: "StateValue", Width: 12},
+				{Title: "Status", Path: "StateValue", Width: 12},
 				{Title: "Actions On", Path: "ActionsEnabled", Width: 10},
 				{Title: "Metric", Path: "MetricName", Width: 24},
 				{Title: "Namespace", Path: "Namespace", Width: 24},
@@ -24,6 +24,7 @@ func monitoringDefaultViews() map[string]ViewDef {
 		"logs": {
 			List: []ListColumn{
 				{Title: "Log Group Name", Path: "LogGroupName", Width: 48},
+				{Title: "Status", Key: "status", Width: 12},
 				{Title: "Size", Key: "stored_bytes", SortPath: "StoredBytes", Width: 14},
 				{Title: "Retention", Path: "RetentionInDays", Width: 10},
 				{Title: "Metric Filters", Path: "MetricFilterCount", Width: 8},
@@ -40,6 +41,7 @@ func monitoringDefaultViews() map[string]ViewDef {
 		"trail": {
 			List: []ListColumn{
 				{Title: "Trail Name", Path: "Name", Width: 28},
+				{Title: "Status", Key: "status", Width: 12},
 				{Title: "Logging", Key: "is_logging", Width: 10},
 				{Title: "Last Error", Key: "latest_delivery_error", Width: 32},
 				{Title: "S3 Bucket", Path: "S3BucketName", Width: 28},
@@ -91,6 +93,7 @@ func monitoringDefaultViews() map[string]ViewDef {
 		"ct-events": {
 			List: []ListColumn{
 				{Title: "V", Key: "_ct.verb", Width: 1},
+				{Title: "Status", Key: "status", Width: 12},
 				{Title: "TIME", Key: "time", SortKey: "event_time", Width: 15},
 				{Title: "ACTOR", Key: "_ct.actor", Width: 36},
 				{Title: "ORIGIN", Key: "_ct.origin", Width: 7},

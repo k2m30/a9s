@@ -5,7 +5,7 @@ list:
   Type:
     key: policy_type
     width: 10
-  Risk:
+  Status:
     key: risk
     width: 14
   Attached:

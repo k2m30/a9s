@@ -2,7 +2,7 @@ list:
   Workgroup:
     path: Name
     width: 28
-  State:
+  Status:
     path: State
     width: 12
   Cost Cap:

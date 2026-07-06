@@ -11,8 +11,9 @@ list:
   Timeout:
     path: Timeout
     width: 8
-  State:
+  Status:
     path: State
+    key: state
     width: 10
   Last Modified:
     path: LastModified

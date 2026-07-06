@@ -134,6 +134,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 40, Sortable: true},
 			{Key: "type", Title: "Type", Width: 14, Sortable: true},
+			{Key: "risk", Title: "Status", Width: 10, Sortable: true},
 			{Key: "version", Title: "Version", Width: 8, Sortable: true},
 			{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
 			{Key: "description", Title: "Description", Width: 30, Sortable: false},

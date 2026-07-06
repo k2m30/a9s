@@ -5,7 +5,7 @@ func computeDefaultViews() map[string]ViewDef {
 		"ec2": {
 			List: []ListColumn{
 				{Title: "Name", Path: "", Width: 24},
-				{Title: "State", Path: "State.Name", Width: 12},
+				{Title: "Status", Path: "State.Name", Width: 12},
 				{Title: "Health", Key: "instance_status", Width: 12},
 				{Title: "Lifecycle", Key: "lifecycle", Width: 12},
 				{Title: "Type", Path: "InstanceType", Width: 14},
@@ -85,7 +85,7 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Runtime", Path: "Runtime", Width: 16},
 				{Title: "Memory", Path: "MemorySize", Width: 8},
 				{Title: "Timeout", Path: "Timeout", Width: 8},
-				{Title: "State", Key: "state", Path: "State", Width: 10},
+				{Title: "Status", Key: "state", Path: "State", Width: 10},
 				{Title: "Last Modified", Path: "LastModified", Width: 22},
 			},
 			Detail: []DetailField{
@@ -211,7 +211,7 @@ func computeDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Name", Path: "", Width: 24},
 				{Title: "Volume ID", Path: "VolumeId", Width: 22},
-				{Title: "State", Path: "State", Width: 12},
+				{Title: "Status", Path: "State", Width: 12},
 				{Title: "Size (GiB)", Path: "Size", Width: 10},
 				{Title: "Type", Path: "VolumeType", Width: 8},
 				{Title: "IOPS", Path: "Iops", Width: 8},
@@ -231,7 +231,7 @@ func computeDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Name", Path: "", Width: 24},
 				{Title: "Snapshot ID", Path: "SnapshotId", Width: 24},
-				{Title: "State", Path: "State", Width: 12},
+				{Title: "Status", Path: "State", Width: 12},
 				{Title: "Volume ID", Path: "VolumeId", Width: 22},
 				{Title: "Size (GiB)", Path: "VolumeSize", Width: 10},
 				{Title: "Encrypted", Path: "Encrypted", Width: 10},
@@ -249,7 +249,7 @@ func computeDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Name", Path: "Name", Width: 32},
 				{Title: "Image ID", Path: "ImageId", Width: 22},
-				{Title: "State", Path: "State", Width: 12},
+				{Title: "Status", Path: "State", Width: 12},
 				{Title: "Deprecated", Key: "deprecated", Width: 22},
 				{Title: "Arch", Path: "Architecture", Width: 10},
 				{Title: "Platform", Path: "PlatformDetails", Width: 16},

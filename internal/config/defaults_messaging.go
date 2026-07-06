@@ -5,6 +5,7 @@ func messagingDefaultViews() map[string]ViewDef {
 		"sqs": {
 			List: []ListColumn{
 				{Title: "Queue Name", Path: "", Key: "queue_name", Width: 36},
+				{Title: "Status", Key: "status", Width: 12},
 				{Title: "Messages", Path: "", Key: "approx_messages", Width: 10},
 				{Title: "In Flight", Path: "", Key: "approx_not_visible", Width: 10},
 				{Title: "DLQ", Key: "dlq", Width: 5},
@@ -18,6 +19,7 @@ func messagingDefaultViews() map[string]ViewDef {
 		"sns": {
 			List: []ListColumn{
 				{Title: "Topic Name", Path: "TopicArn", Width: 40},
+				{Title: "Status", Key: "status", Width: 12},
 				{Title: "Subs", Key: "subs_count", Width: 6},
 				{Title: "Topic ARN", Path: "TopicArn", Width: 60},
 			},
@@ -28,6 +30,7 @@ func messagingDefaultViews() map[string]ViewDef {
 		"sns-sub": {
 			List: []ListColumn{
 				{Title: "Topic ARN", Path: "TopicArn", Width: 48},
+				{Title: "Status", Key: "status", Width: 12},
 				{Title: "Protocol", Path: "Protocol", Width: 10},
 				{Title: "Endpoint", Path: "Endpoint", Width: 48},
 				{Title: "Confirmed", Path: "SubscriptionArn", Width: 22},
@@ -41,7 +44,7 @@ func messagingDefaultViews() map[string]ViewDef {
 		"eb-rule": {
 			List: []ListColumn{
 				{Title: "Rule Name", Path: "Name", Width: 28},
-				{Title: "State", Path: "State", Width: 10},
+				{Title: "Status", Path: "State", Width: 10},
 				{Title: "Targets", Key: "target_count", Width: 8},
 				{Title: "Event Bus", Path: "EventBusName", Width: 18},
 				{Title: "Schedule", Path: "ScheduleExpression", Width: 24},
@@ -83,7 +86,7 @@ func messagingDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Cluster Name", Path: "ClusterName", Width: 28},
 				{Title: "Type", Path: "ClusterType", Width: 14},
-				{Title: "State", Path: "State", Width: 14},
+				{Title: "Status", Path: "State", Width: 14},
 				{Title: "Version", Path: "CurrentVersion", Width: 14},
 			},
 			Detail: []DetailField{
@@ -96,6 +99,7 @@ func messagingDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Name", Path: "Name", Width: 36},
 				{Title: "Type", Path: "Type", Width: 10},
+				{Title: "Status", Key: "status", Width: 12},
 				{Title: "Last Run", Key: "last_run", Width: 18},
 				{Title: "ARN", Path: "StateMachineArn", Width: 60},
 				{Title: "Created", Path: "CreationDate", Width: 22},

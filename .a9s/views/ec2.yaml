@@ -1,7 +1,7 @@
 list:
   Name:
     width: 24
-  State:
+  Status:
     path: State.Name
     width: 12
   Health:

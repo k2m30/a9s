@@ -8,7 +8,7 @@ list:
   Type:
     path: VpcEndpointType
     width: 12
-  State:
+  Status:
     path: State
     width: 12
   Last Error:
