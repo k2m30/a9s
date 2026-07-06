@@ -220,27 +220,45 @@ func (f *IAMFake) GetRolePolicy(_ context.Context, input *iam.GetRolePolicyInput
 	}, nil
 }
 
-// GetLoginProfile returns NoSuchEntityException for all users in demo mode
-// (no demo users have a console password configured).
+// GetLoginProfile returns a login profile for fixture-registered console
+// users (see IAMFixtures.ConsoleUsers) and NoSuchEntityException for
+// everyone else, matching real AWS behavior for a user with no console
+// password configured. Required for EnrichIAMUserMFA's Wave-2 issue check.
 func (f *IAMFake) GetLoginProfile(_ context.Context, input *iam.GetLoginProfileInput, _ ...func(*iam.Options)) (*iam.GetLoginProfileOutput, error) {
 	userName := aws.ToString(input.UserName)
-	return nil, &iamtypes.NoSuchEntityException{
-		Message: aws.String(fmt.Sprintf("Login Profile for User %s cannot be found.", userName)),
+	if !f.fix.ConsoleUsers[userName] {
+		return nil, &iamtypes.NoSuchEntityException{
+			Message: aws.String(fmt.Sprintf("Login Profile for User %s cannot be found.", userName)),
+		}
 	}
+	return &iam.GetLoginProfileOutput{
+		LoginProfile: &iamtypes.LoginProfile{UserName: aws.String(userName)},
+	}, nil
 }
 
-// ListMFADevices returns an empty list for all users in demo mode.
-func (f *IAMFake) ListMFADevices(_ context.Context, _ *iam.ListMFADevicesInput, _ ...func(*iam.Options)) (*iam.ListMFADevicesOutput, error) {
-	return &iam.ListMFADevicesOutput{MFADevices: []iamtypes.MFADevice{}}, nil
+// ListMFADevices returns the fixture-registered MFA devices for the
+// requested user (see IAMFixtures.MFADevicesByUser). Required for
+// EnrichIAMUserMFA's Wave-2 issue check.
+func (f *IAMFake) ListMFADevices(_ context.Context, input *iam.ListMFADevicesInput, _ ...func(*iam.Options)) (*iam.ListMFADevicesOutput, error) {
+	userName := aws.ToString(input.UserName)
+	return &iam.ListMFADevicesOutput{MFADevices: f.fix.MFADevicesByUser[userName]}, nil
 }
 
-// ListAccessKeys returns an empty list for all users in demo mode.
-func (f *IAMFake) ListAccessKeys(_ context.Context, _ *iam.ListAccessKeysInput, _ ...func(*iam.Options)) (*iam.ListAccessKeysOutput, error) {
-	return &iam.ListAccessKeysOutput{AccessKeyMetadata: []iamtypes.AccessKeyMetadata{}}, nil
+// ListAccessKeys returns the fixture-registered access keys for the
+// requested user (see IAMFixtures.AccessKeysByUser). Required for
+// EnrichIAMUserMFA's Wave-2 stale-key issue check.
+func (f *IAMFake) ListAccessKeys(_ context.Context, input *iam.ListAccessKeysInput, _ ...func(*iam.Options)) (*iam.ListAccessKeysOutput, error) {
+	userName := aws.ToString(input.UserName)
+	return &iam.ListAccessKeysOutput{AccessKeyMetadata: f.fix.AccessKeysByUser[userName]}, nil
 }
 
-// GetInstanceProfile is a no-op stub for demo mode.
-// Demo mode fixture ASGs/EB environments do not reference named instance profiles.
-func (f *IAMFake) GetInstanceProfile(_ context.Context, _ *iam.GetInstanceProfileInput, _ ...func(*iam.Options)) (*iam.GetInstanceProfileOutput, error) {
+// GetInstanceProfile resolves an instance-profile name from fixture data.
+// Backs the asg:role and eb:role related-panel pivots (checkASGRole /
+// checkEbRole via asgInstanceProfileToRoles).
+func (f *IAMFake) GetInstanceProfile(_ context.Context, input *iam.GetInstanceProfileInput, _ ...func(*iam.Options)) (*iam.GetInstanceProfileOutput, error) {
+	name := aws.ToString(input.InstanceProfileName)
+	if profile, ok := f.fix.InstanceProfiles[name]; ok {
+		return &iam.GetInstanceProfileOutput{InstanceProfile: &profile}, nil
+	}
 	return &iam.GetInstanceProfileOutput{InstanceProfile: &iamtypes.InstanceProfile{}}, nil
 }

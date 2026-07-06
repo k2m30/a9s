@@ -11,6 +11,12 @@ import (
 // KinesisFixtures holds typed fixture data for Kinesis.
 type KinesisFixtures struct {
 	Streams []kinesistypes.StreamSummary
+	// TagsByStream maps stream name to its tags — backs kinesis:ListTagsForStream
+	// for the kinesis:cfn related-panel pivot.
+	TagsByStream map[string][]kinesistypes.Tag
+	// KeyIDByStream maps stream name to its KMS KeyId — backs
+	// kinesis:DescribeStreamSummary for the kinesis:kms related-panel pivot.
+	KeyIDByStream map[string]string
 }
 
 func mustParseKinesisTime(s string) time.Time {
@@ -70,6 +76,21 @@ var sharedKinesisFixtures = sync.OnceValue(func() *KinesisFixtures {
 					StreamMode: kinesistypes.StreamModeProvisioned,
 				},
 			},
+		},
+		// TagsByStream — required for the kinesis:cfn related-panel pivot
+		// (checkKinesisCFN → kinesis:ListTagsForStream). Points at
+		// acme-vpc-stack (cfn.go).
+		TagsByStream: map[string][]kinesistypes.Tag{
+			"clickstream-ingest": {
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-vpc-stack")},
+				{Key: aws.String("Environment"), Value: aws.String("production")},
+			},
+		},
+		// KeyIDByStream — required for the kinesis:kms related-panel pivot
+		// (checkKinesisKMS → kinesis:DescribeStreamSummary). Reuses the
+		// primary production KMS key (kms.go).
+		KeyIDByStream: map[string]string{
+			"clickstream-ingest": "a1b2c3d4-5678-90ab-cdef-111111111111",
 		},
 	}
 })

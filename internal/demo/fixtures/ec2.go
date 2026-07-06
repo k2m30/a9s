@@ -30,6 +30,16 @@ type EC2Fixtures struct {
 	Volumes           []ec2types.Volume
 	Snapshots         []ec2types.Snapshot
 	Images            []ec2types.Image
+	// TGWVpcAttachmentSubnets maps a TransitGatewayAttachmentId to the
+	// subnet IDs backing that VPC attachment. Backs the tgw→subnet
+	// related-panel pivot (checkTGWSubnet), mirroring
+	// ec2:DescribeTransitGatewayVpcAttachments.TransitGatewayVpcAttachments[].SubnetIds.
+	TGWVpcAttachmentSubnets map[string][]string
+	// FlowLogsByResourceID maps a "resource-id" filter value (e.g. a VPC
+	// endpoint ID) to the flow logs configured against it. Backs
+	// ec2:DescribeFlowLogs for the vpce:logs related-panel pivot
+	// (checkVPCELogs).
+	FlowLogsByResourceID map[string][]ec2types.FlowLog
 }
 
 // shared constants (mirrors internal/demo/constants_shared.go — no import allowed)
@@ -96,6 +106,27 @@ var sharedEC2Fixtures = sync.OnceValue(func() *EC2Fixtures {
 	f.Volumes = buildVolumes()
 	f.Snapshots = buildSnapshots()
 	f.Images = buildImages()
+	// TGWVpcAttachmentSubnets — the hub TGW's prod-VPC attachment spans the
+	// two prod public subnets, backing the tgw→subnet related-panel pivot.
+	f.TGWVpcAttachmentSubnets = map[string][]string{
+		"tgw-attach-0aaa111111111111a": {fixtProdPublicSubnetA, fixtProdPublicSubnetB},
+	}
+	// FlowLogsByResourceID — the prod S3 gateway endpoint has a flow log
+	// delivering to CloudWatch Logs, backing the vpce:logs related-panel
+	// pivot (checkVPCELogs via ec2:DescribeFlowLogs filtered by resource-id).
+	f.FlowLogsByResourceID = map[string][]ec2types.FlowLog{
+		"vpce-0aaa111111111111a": {
+			{
+				FlowLogId:          aws.String("fl-0aaa111111111111a"),
+				ResourceId:         aws.String("vpce-0aaa111111111111a"),
+				LogDestinationType: ec2types.LogDestinationTypeCloudWatchLogs,
+				LogGroupName:       aws.String("/aws/vpc/flowlogs/vpce-s3-endpoint"),
+				DeliverLogsStatus:  aws.String("SUCCESS"),
+				TrafficType:        ec2types.TrafficTypeAll,
+				CreationTime:       aws.Time(time.Date(2025, 6, 15, 12, 10, 0, 0, time.UTC)),
+			},
+		},
+	}
 	return f
 })
 
@@ -356,6 +387,13 @@ func makeInstance(
 			ec2types.Tag{Key: aws.String("eks:nodegroup-name"), Value: aws.String(fixtRelatedEC2NGNodeGroupID)},
 		)
 	}
+	// elasticbeanstalk:environment-name tag — required for eb:ec2 related-panel
+	// pivot. acme-prod-api is a real eb.go environment fixture.
+	if instanceID == "i-0a1b2c3d4e5f60002" {
+		inst.Tags = append(inst.Tags,
+			ec2types.Tag{Key: aws.String("elasticbeanstalk:environment-name"), Value: aws.String("acme-prod-api")},
+		)
+	}
 	// aws:cloudformation:stack-name tag — required for ec2→cfn related-panel
 	// pivot. acme-eks-cluster is a real stack fixture (cfn.go).
 	if instanceID == "i-0a1b2c3d4e5f60005" {
@@ -523,9 +561,13 @@ func buildVpcs() []ec2types.Vpc {
 					},
 				},
 			},
+			// aws:cloudformation:stack-name tag — required for vpc→cfn
+			// related-panel pivot. acme-eks-cluster is a real stack fixture
+			// (cfn.go).
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("acme-prod")},
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
 			},
 		},
 		{
@@ -656,9 +698,13 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 			IpPermissionsEgress: []ec2types.IpPermission{
 				{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
 			},
+			// aws:cloudformation:stack-name tag — required for sg→cfn
+			// related-panel pivot. acme-eks-cluster is a real stack fixture
+			// (cfn.go).
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("acme-web-alb-sg")},
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
 			},
 		},
 		{
@@ -1103,10 +1149,14 @@ func buildSubnets() []ec2types.Subnet {
 			DefaultForAz:            aws.Bool(false),
 			SubnetArn:               aws.String("arn:aws:ec2:us-east-1:123456789012:subnet/" + fixtProdPublicSubnetA),
 			OwnerId:                 aws.String("123456789012"),
+			// aws:cloudformation:stack-name tag — required for subnet→cfn
+			// related-panel pivot. acme-eks-cluster is a real stack fixture
+			// (cfn.go).
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("prod-public-1a")},
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 				{Key: aws.String("Tier"), Value: aws.String("public")},
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
 			},
 		},
 		{
@@ -1448,9 +1498,13 @@ func buildRouteTables() []ec2types.RouteTable {
 				{Main: aws.Bool(true), RouteTableAssociationId: aws.String("rtbassoc-0aaa111111111111a"), RouteTableId: aws.String("rtb-0aaa111111111111a")},
 				{Main: aws.Bool(false), RouteTableAssociationId: aws.String("rtbassoc-0aaa222222222222a"), RouteTableId: aws.String("rtb-0aaa111111111111a"), SubnetId: aws.String(fixtProdPrivateSubnetA)},
 			},
+			// aws:cloudformation:stack-name tag — required for rtb→cfn
+			// related-panel pivot. acme-eks-cluster is a real stack fixture
+			// (cfn.go), matching the same pattern used on ec2/sg/vpc.
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("prod-main")},
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
 			},
 		},
 		{
@@ -1461,6 +1515,12 @@ func buildRouteTables() []ec2types.RouteTable {
 				{DestinationCidrBlock: aws.String("10.0.0.0/16"), GatewayId: aws.String("local"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRouteTable},
 				{DestinationCidrBlock: aws.String("0.0.0.0/0"), GatewayId: aws.String("igw-0aaa111111111111a"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
 				{DestinationCidrBlock: aws.String("10.1.0.0/16"), NatGatewayId: aws.String("nat-0aaa111111111111a"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
+				// required for rtb→eni related-panel pivot (checkRTBENI):
+				// route via a real ENI in this VPC (eni-0eee555555555555e, ec2.go).
+				{DestinationCidrBlock: aws.String("192.168.100.0/24"), NetworkInterfaceId: aws.String("eni-0eee555555555555e"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
+				// required for rtb→tgw related-panel pivot (checkRTBTGW):
+				// route via the hub transit gateway (tgw-0aaa111111111111a, this file).
+				{DestinationCidrBlock: aws.String("10.5.0.0/16"), TransitGatewayId: aws.String("tgw-0aaa111111111111a"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
 			},
 			Associations: []ec2types.RouteTableAssociation{
 				{Main: aws.Bool(false), RouteTableAssociationId: aws.String("rtbassoc-0bbb222222222222b"), RouteTableId: aws.String("rtb-0bbb222222222222b"), SubnetId: aws.String(fixtProdPublicSubnetA)},
@@ -1540,8 +1600,11 @@ func buildNatGateways() []ec2types.NatGateway {
 			State:            ec2types.NatGatewayStateAvailable,
 			ConnectivityType: ec2types.ConnectivityTypePublic,
 			CreateTime:       t2,
+			// NetworkInterfaceId — required for nat→eni and eni→nat
+			// related-panel pivots (checkNATENI / checkENINAT). Matches
+			// eni-0nat0000000000002b (this file, buildNetworkInterfaces).
 			NatGatewayAddresses: []ec2types.NatGatewayAddress{
-				{AllocationId: aws.String("eipalloc-0bbb222222222222b"), PublicIp: aws.String("54.210.33.201"), PrivateIp: aws.String("10.0.2.50"), IsPrimary: aws.Bool(true)},
+				{AllocationId: aws.String("eipalloc-0bbb222222222222b"), PublicIp: aws.String("54.210.33.201"), PrivateIp: aws.String("10.0.2.50"), IsPrimary: aws.Bool(true), NetworkInterfaceId: aws.String("eni-0nat0000000000002b")},
 			},
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("prod-nat-1b")},
@@ -2092,6 +2155,75 @@ func buildNetworkInterfaces() []ec2types.NetworkInterface {
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
+		// ELB-owned ENI — required for eni→elb related-panel pivot
+		// (checkENIELB). Real ALB/NLB ENIs are RequesterManaged with
+		// RequesterId "amazon-elb" and Description "ELB app/<name>/<hash>";
+		// they have no EC2 Attachment. Matches acme-prod-web (elb.go).
+		{
+			NetworkInterfaceId: aws.String("eni-0elbowned00000001a"),
+			Status:             ec2types.NetworkInterfaceStatusInUse,
+			InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
+			VpcId:              aws.String(fixtProdVPCID),
+			SubnetId:           aws.String(fixtProdPublicSubnetA),
+			AvailabilityZone:   aws.String("us-east-1a"),
+			PrivateIpAddress:   aws.String("10.0.1.60"),
+			PrivateDnsName:     aws.String("ip-10-0-1-60.ec2.internal"),
+			MacAddress:         aws.String("0a:1b:2c:3d:4e:e1"),
+			Description:        aws.String("ELB app/acme-prod-web/1234567890abcdef"),
+			OwnerId:            aws.String("123456789012"),
+			RequesterId:        aws.String("amazon-elb"),
+			RequesterManaged:   aws.Bool(true),
+			SourceDestCheck:    aws.Bool(false),
+			Groups: []ec2types.GroupIdentifier{
+				{GroupId: aws.String("sg-0aaa111111111111a"), GroupName: aws.String("acme-web-alb-sg")},
+			},
+			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("acme-prod-web-eni-1a")}},
+		},
+		// NAT-backing ENI — required for eni→nat related-panel pivot
+		// (checkENINAT). Matches nat-0bbb222222222222b's
+		// NatGatewayAddresses[].NetworkInterfaceId (this file, buildNatGateways).
+		{
+			NetworkInterfaceId: aws.String("eni-0nat0000000000002b"),
+			Status:             ec2types.NetworkInterfaceStatusInUse,
+			InterfaceType:      ec2types.NetworkInterfaceTypeNatGateway,
+			VpcId:              aws.String(fixtProdVPCID),
+			SubnetId:           aws.String(fixtProdPublicSubnetB),
+			AvailabilityZone:   aws.String("us-east-1b"),
+			PrivateIpAddress:   aws.String("10.0.2.51"),
+			PrivateDnsName:     aws.String("ip-10-0-2-51.ec2.internal"),
+			MacAddress:         aws.String("0a:1b:2c:3d:4e:n2"),
+			Description:        aws.String("Interface for NAT Gateway nat-0bbb222222222222b"),
+			OwnerId:            aws.String("123456789012"),
+			RequesterManaged:   aws.Bool(true),
+			SourceDestCheck:    aws.Bool(false),
+			Groups: []ec2types.GroupIdentifier{
+				{GroupId: aws.String(fixtProdWebALBSGID), GroupName: aws.String("acme-web-alb-sg")},
+			},
+			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("prod-nat-eni-1b-2")}},
+		},
+		// VPC-endpoint-owned ENI — required for eni→vpce related-panel pivot
+		// (checkENIVPCE) and the vpce→eni reverse pivot. prod-s3-endpoint
+		// (vpce-0aaa111111111111a, this file) references this ENI ID in its
+		// NetworkInterfaceIds.
+		{
+			NetworkInterfaceId: aws.String("eni-0ccc333333333333c"),
+			Status:             ec2types.NetworkInterfaceStatusInUse,
+			InterfaceType:      ec2types.NetworkInterfaceTypeVpcEndpoint,
+			VpcId:              aws.String(fixtProdVPCID),
+			SubnetId:           aws.String(fixtProdPrivateSubnetA),
+			AvailabilityZone:   aws.String("us-east-1a"),
+			PrivateIpAddress:   aws.String("10.0.3.150"),
+			PrivateDnsName:     aws.String("ip-10-0-3-150.ec2.internal"),
+			MacAddress:         aws.String("0a:1b:2c:3d:4e:v1"),
+			Description:        aws.String("VPC Endpoint Interface for S3"),
+			OwnerId:            aws.String("123456789012"),
+			RequesterManaged:   aws.Bool(true),
+			SourceDestCheck:    aws.Bool(true),
+			Groups: []ec2types.GroupIdentifier{
+				{GroupId: aws.String(fixtProdWebALBSGID), GroupName: aws.String("acme-web-alb-sg")},
+			},
+			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("vpce-s3-eni-1a")}},
+		},
 		// Lambda hyperplane ENI — required for lambda→eni related-panel pivot.
 		// checkLambdaENI matches ENIs whose Description contains the function name.
 		{
@@ -2221,8 +2353,15 @@ func buildSnapshots() []ec2types.Snapshot {
 		{
 			SnapshotId: aws.String("snap-0a1b2c3d4e5f60001"), State: ec2types.SnapshotStateCompleted,
 			VolumeId: aws.String("vol-0a1b2c3d4e5f60001"), VolumeSize: aws.Int32(50),
-			Encrypted: aws.Bool(true), Description: aws.String("Quarterly backup of web-prod-01 root volume"),
-			StartTime: aws.Time(t1), Progress: aws.String("100%"), OwnerId: aws.String("123456789012"),
+			Encrypted: aws.Bool(true),
+			// Description — required for the ebs-snap:ec2 related-panel pivot
+			// (checkEBSSnapEC2 parses "Created by CreateImage(i-xxx)"), matching
+			// real AWS behavior where CreateImage auto-generates this snapshot
+			// description. This snapshot is also referenced by an AMI's block
+			// device mapping (ebs-snap:ami pivot) — consistent with the AMI
+			// having been created from this same instance.
+			Description: aws.String("Created by CreateImage(i-0a1b2c3d4e5f60001) for ami-0a1b2c3d4e5f60001 from vol-0a1b2c3d4e5f60001"),
+			StartTime:   aws.Time(t1), Progress: aws.String("100%"), OwnerId: aws.String("123456789012"),
 			KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("web-prod-snapshot-2025q3")}},
 		},

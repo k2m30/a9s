@@ -55,7 +55,14 @@ func (f *ECRFake) ListImages(_ context.Context, input *ecr.ListImagesInput, _ ..
 }
 
 // GetRepositoryPolicy is a no-op stub satisfying ECRGetRepositoryPolicyAPI.
-// Demo mode does not model ECR repository policies.
+// Demo mode does not model ECR repository policies. checkECRRole returns
+// role ARNs verbatim from the policy's Principal.AWS field (see
+// ecrPolicyRoleARNs/isRoleARN in internal/aws/ecr_related_extra.go), but the
+// registered role FetchByIDs helper (FetchRolesByIDs) requires a bare
+// RoleName — a fixture policy would produce a witness whose drill-down
+// permanently fails FetchByIDs, which is worse than the current disconnected
+// pivot. Fixing this requires the checker to extract the bare role name
+// before returning, which is out of scope for a fixture-only change.
 func (f *ECRFake) GetRepositoryPolicy(_ context.Context, _ *ecr.GetRepositoryPolicyInput, _ ...func(*ecr.Options)) (*ecr.GetRepositoryPolicyOutput, error) {
 	return &ecr.GetRepositoryPolicyOutput{}, nil
 }

@@ -12,6 +12,10 @@ type SNSFixtures struct {
 	Subscriptions []snstypes.Subscription
 	// SubscriptionsByTopic maps topic ARN to its subscriptions.
 	SubscriptionsByTopic map[string][]snstypes.Subscription
+	// TopicAttributes maps topic ARN to its GetTopicAttributes response —
+	// backs the sns:kms and sns:role related-panel pivots (checkSNSKMS /
+	// checkSNSRole).
+	TopicAttributes map[string]map[string]string
 }
 
 // NewSNSFixtures constructs SNSFixtures from the canonical demo data.
@@ -32,6 +36,10 @@ var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 		// GetBackupVaultNotifications("acme-prod-vault").SNSTopicArn points here.
 		// checkBackupSNS resolves this ARN against sns resource cache by name (last ":" segment).
 		{TopicArn: aws.String(BackupAlertsSNSTopicARN)},
+		// Issue: zero subscribers → "~" (orphan topic). Required for
+		// EnrichSNSSubscriptions's Wave-2 issue check. Deliberately has no
+		// SubscriptionsByTopic entry so ListSubscriptionsByTopic returns empty.
+		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:staging-deploy-alerts")},
 	}
 
 	subscriptions := []snstypes.Subscription{
@@ -85,10 +93,22 @@ var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 		BackupAlertsSNSTopicARN: minimalSubscriptions(BackupAlertsSNSTopicARN, "email", "backup-ops@acme-corp.com"),
 	}
 
+	// TopicAttributes — required for the sns:kms and sns:role related-panel
+	// pivots (checkSNSKMS / checkSNSRole via GetTopicAttributes). The
+	// alarm-notifications topic carries an at-rest encryption key and an
+	// access policy granting the CI deploy role publish access.
+	topicAttributes := map[string]map[string]string{
+		"arn:aws:sns:us-east-1:123456789012:alarm-notifications": {
+			"KmsMasterKeyId": "a1b2c3d4-5678-90ab-cdef-111111111111",
+			"Policy":         `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/acme-ci-deploy-role"},"Action":"sns:Publish","Resource":"arn:aws:sns:us-east-1:123456789012:alarm-notifications"}]}`,
+		},
+	}
+
 	return &SNSFixtures{
 		Topics:               topics,
 		Subscriptions:        subscriptions,
 		SubscriptionsByTopic: subsByTopic,
+		TopicAttributes:      topicAttributes,
 	}
 })
 

@@ -12,6 +12,12 @@ import (
 type GlueFixtures struct {
 	Jobs    []gluetypes.Job
 	JobRuns map[string][]gluetypes.JobRun // key: job name
+	// SecurityConfigurations maps configuration name to its detail — backs
+	// glue:GetSecurityConfiguration for the glue:kms related-panel pivot.
+	SecurityConfigurations map[string]gluetypes.SecurityConfiguration
+	// TagsByResourceARN maps a Glue job ARN to its tags — backs
+	// glue:GetTags for the glue:cfn related-panel pivot.
+	TagsByResourceARN map[string]map[string]string
 }
 
 func mustParseGlueTime(s string) time.Time {
@@ -39,6 +45,16 @@ var sharedGlueFixtures = sync.OnceValue(func() *GlueFixtures {
 				LastModifiedOn:  aws.Time(mustParseGlueTime("2026-03-15T14:30:00+00:00")),
 				Command: &gluetypes.JobCommand{
 					Name: aws.String("glueetl"),
+				},
+				// SecurityConfiguration — required for the glue:kms related-panel
+				// pivot (checkGlueKMS → glue:GetSecurityConfiguration).
+				SecurityConfiguration: aws.String("acme-glue-security-config"),
+				// DefaultArguments — required for the glue:secrets related-panel
+				// pivot (checkGlueSecrets scans for arn:aws:secretsmanager: values).
+				// References the prod/database/primary secret (secrets.go).
+				DefaultArguments: map[string]string{
+					"--enable-metrics": "true",
+					"--db-secret-arn":  "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf",
 				},
 			},
 			{
@@ -162,6 +178,32 @@ var sharedGlueFixtures = sync.OnceValue(func() *GlueFixtures {
 					ExecutionTime: 720,
 					DPUSeconds:    &dpuSucceeded,
 				},
+			},
+		},
+		SecurityConfigurations: map[string]gluetypes.SecurityConfiguration{
+			"acme-glue-security-config": {
+				Name:              aws.String("acme-glue-security-config"),
+				CreatedTimeStamp:  aws.Time(mustParseGlueTime("2025-05-01T09:00:00+00:00")),
+				EncryptionConfiguration: &gluetypes.EncryptionConfiguration{
+					CloudWatchEncryption: &gluetypes.CloudWatchEncryption{
+						CloudWatchEncryptionMode: gluetypes.CloudWatchEncryptionModeSsekms,
+						KmsKeyArn:                aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+					},
+					JobBookmarksEncryption: &gluetypes.JobBookmarksEncryption{
+						JobBookmarksEncryptionMode: gluetypes.JobBookmarksEncryptionModeCsekms,
+						KmsKeyArn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+					},
+				},
+			},
+		},
+		TagsByResourceARN: map[string]map[string]string{
+			// acme-etl-orders job ARN — required for the glue:cfn related-panel
+			// pivot (checkGlueCFN → glue:GetTags → aws:cloudformation:stack-name).
+			// Points at acme-vpc-stack (cfn.go), consistent with the ETL
+			// pipeline being provisioned by the core networking stack.
+			"arn:aws:glue:us-east-1:123456789012:job/acme-etl-orders": {
+				"aws:cloudformation:stack-name": "acme-vpc-stack",
+				"Environment":                   "production",
 			},
 		},
 	}

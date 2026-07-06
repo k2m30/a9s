@@ -40,6 +40,18 @@ type IAMFixtures struct {
 	PolicyDocuments map[string]string
 	// InlinePolicyDocuments keyed by "roleName/policyName" — URL-encoded JSON document strings
 	InlinePolicyDocuments map[string]string
+	// InstanceProfiles keyed by instance-profile name — backs iam:GetInstanceProfile
+	// for the asg→role and eb→role related-panel pivots (checkASGRole /
+	// checkEbRole via asgInstanceProfileToRoles).
+	InstanceProfiles map[string]iamtypes.InstanceProfile
+	// ConsoleUsers is the set of user names with a console password (GetLoginProfile
+	// succeeds). Backs EnrichIAMUserMFA's Wave-2 no-MFA issue check.
+	ConsoleUsers map[string]bool
+	// MFADevicesByUser keyed by user name — backs EnrichIAMUserMFA.
+	MFADevicesByUser map[string][]iamtypes.MFADevice
+	// AccessKeysByUser keyed by user name — backs EnrichIAMUserMFA's stale
+	// access-key check.
+	AccessKeysByUser map[string][]iamtypes.AccessKeyMetadata
 }
 
 // PolicyEntities holds the entities (roles, users, groups) attached to a policy.
@@ -76,9 +88,28 @@ var sharedIAMFixtures = sync.OnceValue(func() *IAMFixtures {
 	f.Users = buildIAMUsers()
 	f.Groups = buildIAMGroups()
 	buildIAMRelations(f)
+	f.InstanceProfiles = buildIAMInstanceProfiles(f.Roles)
 	f.AccountAliases = []string{"acme-corp"}
 	f.InlineGroupPolicies["developers"] = []string{"AllowAssumeRole", "AllowChangeOwnPassword"}
 	f.InlineGroupPolicies["readonly"] = []string{"DenyS3Delete"}
+	// ConsoleUsers / MFADevicesByUser / AccessKeysByUser — required for
+	// EnrichIAMUserMFA's Wave-2 issue checks. alice.johnson has a console
+	// password (PasswordLastUsed is set) but no MFA device registered → "!"
+	// finding (CIS IAM.5). bob.smith has an active access key older than 90
+	// days → "~" finding (rotation).
+	f.ConsoleUsers = map[string]bool{
+		"alice.johnson": true,
+	}
+	f.MFADevicesByUser = map[string][]iamtypes.MFADevice{}
+	f.AccessKeysByUser = map[string][]iamtypes.AccessKeyMetadata{
+		"bob.smith": {
+			{
+				AccessKeyId: aws.String("AKIAEXAMPLE2222222222"),
+				Status:      iamtypes.StatusTypeActive,
+				CreateDate:  aws.Time(time.Date(2025, 9, 1, 10, 30, 0, 0, time.UTC)),
+			},
+		},
+	}
 	return f
 })
 
@@ -121,6 +152,12 @@ func buildIAMRoles() []iamtypes.Role {
 			Path:        aws.String("/"),
 			CreateDate:  aws.Time(time.Date(2025, 1, 20, 14, 0, 0, 0, time.UTC)),
 			Description: aws.String("CI/CD deployment role for CodePipeline"),
+			// AssumeRolePolicyDocument — required for the role:iam-group and
+			// role:iam-user related-panel pivots (checkRoleIamGroup /
+			// checkRoleIamUser, offline parse of Principal.AWS ARNs). Models
+			// a realistic "break-glass manual deploy" trust policy alongside
+			// the CodePipeline service principal.
+			AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"codepipeline.amazonaws.com"},"Action":"sts:AssumeRole"},{"Effect":"Allow","Principal":{"AWS":["arn:aws:iam::123456789012:group/admins","arn:aws:iam::123456789012:user/alice.johnson"]},"Action":"sts:AssumeRole","Condition":{"Bool":{"aws:MultiFactorAuthPresent":"true"}}}]}`),
 		},
 		{
 			RoleName:    aws.String("acme-rds-monitoring"),
@@ -184,6 +221,20 @@ func buildIAMRoles() []iamtypes.Role {
 		CreateDate:               aws.Time(time.Date(2025, 4, 10, 9, 0, 0, 0, time.UTC)),
 		Description:              aws.String("IAM role assumed by AWS Backup for prod database and critical plan backups"),
 		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"backup.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+	})
+
+	// CloudTrail-to-CloudWatch-Logs delivery role — required for trail:role
+	// related-panel pivot (checkTrailRole). acme-management-trail's
+	// CloudWatchLogsRoleArn points here; checkTrailRole extracts the bare
+	// role name as the last segment after "/".
+	roles = append(roles, iamtypes.Role{
+		RoleName:                 aws.String("acme-cloudtrail-cwlogs-role"),
+		RoleId:                   aws.String("AROAEXAMPLECTLOGS001"),
+		Arn:                      aws.String("arn:aws:iam::123456789012:role/acme-cloudtrail-cwlogs-role"),
+		Path:                     aws.String("/"),
+		CreateDate:               aws.Time(time.Date(2025, 2, 1, 9, 0, 0, 0, time.UTC)),
+		Description:              aws.String("IAM role assumed by CloudTrail to deliver events to CloudWatch Logs"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"cloudtrail.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
 	})
 
 	// RDS monitoring roles — required for dbi→role related-panel pivot.
@@ -372,7 +423,58 @@ func buildIAMRoles() []iamtypes.Role {
 			Description: aws.String(fmt.Sprintf("Service role for %s", name)),
 		})
 	}
+	// AWSServiceRoleForVPCTransitGateway — required for the tgw→role
+	// related-panel pivot (checkTGWRole), which probes for this exact
+	// service-linked-role name via iam:GetRole. checkTGWRole's navigation ID
+	// is the role's ARN (not the bare name), and the demo drill's role
+	// FetchByIDs passes that ID straight through as GetRoleInput.RoleName —
+	// so a second alias entry keyed by the ARN itself is required, mirroring
+	// the fixtIAMProdLambdaRoleARN pattern above.
+	const tgwSLRArn = "arn:aws:iam::123456789012:role/aws-service-role/transitgateway.amazonaws.com/AWSServiceRoleForVPCTransitGateway"
+	roles = append(roles,
+		iamtypes.Role{
+			RoleName:    aws.String("AWSServiceRoleForVPCTransitGateway"),
+			RoleId:      aws.String("AROAEXAMPLETGW0001"),
+			Arn:         aws.String(tgwSLRArn),
+			Path:        aws.String("/aws-service-role/transitgateway.amazonaws.com/"),
+			CreateDate:  aws.Time(time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)),
+			Description: aws.String("Service-linked role for AWS Transit Gateway"),
+		},
+		iamtypes.Role{
+			RoleName:    aws.String(tgwSLRArn),
+			RoleId:      aws.String("AROAEXAMPLETGW0002"),
+			Arn:         aws.String(tgwSLRArn),
+			Path:        aws.String("/aws-service-role/transitgateway.amazonaws.com/"),
+			CreateDate:  aws.Time(time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)),
+			Description: aws.String("Transit Gateway SLR ARN alias (navigable-field cross-reference)"),
+		},
+	)
 	return roles
+}
+
+// buildIAMInstanceProfiles maps instance-profile name → InstanceProfile for
+// iam:GetInstanceProfile, required by the asg:role related-panel pivot
+// (checkASGRole → asgResolveInstanceProfile → asgInstanceProfileToRoles).
+// The acme-ec2-instance-profile role doubles as the instance-profile role —
+// AWS instance profiles commonly carry a single role of the same name.
+func buildIAMInstanceProfiles(roles []iamtypes.Role) map[string]iamtypes.InstanceProfile {
+	var ec2ProfileRole iamtypes.Role
+	for _, r := range roles {
+		if aws.ToString(r.RoleName) == "acme-ec2-instance-profile" {
+			ec2ProfileRole = r
+			break
+		}
+	}
+	return map[string]iamtypes.InstanceProfile{
+		"acme-ec2-instance-profile": {
+			InstanceProfileName: aws.String("acme-ec2-instance-profile"),
+			InstanceProfileId:   aws.String("AIPAEXAMPLEEC2PROFILE1"),
+			Arn:                 aws.String("arn:aws:iam::123456789012:instance-profile/acme-ec2-instance-profile"),
+			Path:                aws.String("/"),
+			CreateDate:          aws.Time(time.Date(2025, 1, 5, 9, 0, 0, 0, time.UTC)),
+			Roles:               []iamtypes.Role{ec2ProfileRole},
+		},
+	}
 }
 
 func buildIAMPolicies() []iamtypes.Policy {

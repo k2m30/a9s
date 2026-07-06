@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 
@@ -34,7 +35,10 @@ func (f *R53Fake) ListResourceRecordSets(_ context.Context, input *route53.ListR
 
 // GetHostedZone returns the hosted zone detail including VPC associations.
 // In demo mode the private zone Z1234567890ABCDEFGHIJ is returned with no VPC
-// associations, triggering the orphan finding in EnrichRoute53Zone.
+// associations, triggering the orphan finding in EnrichRoute53Zone. The
+// private zone Z5678901234ABCDEFGHIJ carries a real VPC association —
+// required for the r53:vpc related-panel pivot (checkR53VPC) — kept distinct
+// from the orphan zone so the Wave-2 finding demo is undisturbed.
 func (f *R53Fake) GetHostedZone(_ context.Context, input *route53.GetHostedZoneInput, _ ...func(*route53.Options)) (*route53.GetHostedZoneOutput, error) {
 	if input.Id == nil {
 		return nil, fmt.Errorf("GetHostedZone: Id is required")
@@ -45,9 +49,16 @@ func (f *R53Fake) GetHostedZone(_ context.Context, input *route53.GetHostedZoneI
 			continue
 		}
 		out := &route53.GetHostedZoneOutput{HostedZone: &hz}
-		// Private zone with no VPCs — demo triggers the orphan finding.
 		if hz.Config != nil && hz.Config.PrivateZone {
-			out.VPCs = []r53types.VPC{}
+			switch *hz.Id {
+			case "/hostedzone/Z5678901234ABCDEFGHIJ":
+				out.VPCs = []r53types.VPC{
+					{VPCId: aws.String("vpc-0abc123def456789a"), VPCRegion: r53types.VPCRegionUsEast1},
+				}
+			default:
+				// Private zone with no VPCs — demo triggers the orphan finding.
+				out.VPCs = []r53types.VPC{}
+			}
 		}
 		return out, nil
 	}

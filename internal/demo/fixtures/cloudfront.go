@@ -11,6 +11,11 @@ import (
 // CloudFrontFixtures holds typed fixture data for CloudFront.
 type CloudFrontFixtures struct {
 	Distributions []cftypes.DistributionSummary
+	// DistributionConfigs maps a distribution ID to the config returned by
+	// cloudfront:GetDistributionConfig. Backs the cf→lambda (Lambda@Edge
+	// associations) and cf→logs (access-log S3 destination) related-panel
+	// pivots (checkCfLambda / checkCfLogs), which call this API directly.
+	DistributionConfigs map[string]*cftypes.DistributionConfig
 }
 
 // NewCloudFrontFixtures constructs CloudFrontFixtures from the canonical demo data.
@@ -28,15 +33,26 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 					Items:    []string{"acme-corp.com", "www.acme-corp.com"},
 				},
 				Origins: &cftypes.Origins{
-					Quantity: aws.Int32(2),
+					Quantity: aws.Int32(3),
 					Items: []cftypes.Origin{
 						{
 							Id:         aws.String("s3-static-assets"),
 							DomainName: aws.String("acme-webapp-assets-prod.s3-website.us-east-1.amazonaws.com"),
 						},
+						// alb-api-backend origin — required for the cf:elb /
+						// elb:cf related-panel pivot witness. DomainName must
+						// match an existing ELB fixture's DNS name exactly
+						// (checkCfELB / checkELBCF match on dns_name).
 						{
 							Id:         aws.String("alb-api-backend"),
-							DomainName: aws.String("prod-api-alb-1234567890.us-east-1.elb.amazonaws.com"),
+							DomainName: aws.String(fixtProdELBDNS),
+						},
+						// acme-public-api origin — required for apigw:cf
+						// related-panel pivot. checkApigwCF matches origin
+						// DomainName containing "{apiID}.execute-api.".
+						{
+							Id:         aws.String("apigw-public-api"),
+							DomainName: aws.String(PublicAPIGWID + ".execute-api.us-east-1.amazonaws.com"),
 						},
 					},
 				},
@@ -56,6 +72,19 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 							},
 						},
 					},
+				},
+				// WebACLId — required for the cf:waf related-panel pivot
+				// witness (checkCfWAF). Matches the acme-cloudfront-waf ACL's
+				// ARN in waf.go (ResourcesByWebACL already reverse-maps this
+				// same distribution for the waf→cf direction).
+				WebACLId: aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-cloudfront-waf/a1b2c3d4-5678-90ab-cdef-222222222222"),
+				// ViewerCertificate.ACMCertificateArn — required for the
+				// cf:acm related-panel pivot (checkCfACM). ProdACMCertARN1
+				// (acm.go) covers acme-corp.com, this distribution's alias.
+				ViewerCertificate: &cftypes.ViewerCertificate{
+					ACMCertificateArn:      aws.String("arn:aws:acm:us-east-1:123456789012:certificate/a1b2c3d4-5678-90ab-cdef-111111111111"),
+					MinimumProtocolVersion: cftypes.MinimumProtocolVersionTLSv122021,
+					SSLSupportMethod:       cftypes.SSLSupportMethodSniOnly,
 				},
 				HttpVersion:      cftypes.HttpVersionHttp2,
 				PriceClass:       cftypes.PriceClassPriceClassAll,
@@ -223,6 +252,43 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 				PriceClass:       cftypes.PriceClassPriceClass100,
 				Comment:          aws.String("CDN fronting misconfigured S3 buckets"),
 				LastModifiedTime: aws.Time(time.Date(2026, 2, 20, 11, 0, 0, 0, time.UTC)),
+			},
+		},
+		// DistributionConfigs — backs the cf→lambda and cf→logs related-panel
+		// pivots (checkCfLambda / checkCfLogs), which call
+		// cloudfront:GetDistributionConfig directly. E1A2B3C4D5E6F7 mirrors
+		// the Lambda@Edge association already on its DistributionSummary and
+		// adds an access-log destination pointing at the a9s-demo-logs bucket
+		// (s3.go LogsBucketName).
+		DistributionConfigs: map[string]*cftypes.DistributionConfig{
+			"E1A2B3C4D5E6F7": {
+				DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
+					TargetOriginId:       aws.String("s3-static-assets"),
+					ViewerProtocolPolicy: cftypes.ViewerProtocolPolicyRedirectToHttps,
+					LambdaFunctionAssociations: &cftypes.LambdaFunctionAssociations{
+						Quantity: aws.Int32(1),
+						Items: []cftypes.LambdaFunctionAssociation{
+							{
+								EventType:         cftypes.EventTypeViewerRequest,
+								LambdaFunctionARN: aws.String("arn:aws:lambda:us-east-1:123456789012:function:api-gateway-authorizer:1"),
+							},
+						},
+					},
+				},
+				Logging: &cftypes.LoggingConfig{
+					Enabled: aws.Bool(true),
+					Bucket:  aws.String(LogsBucketName + ".s3.amazonaws.com"),
+				},
+			},
+			// E5E6F7G8H9I0J1 — required for the Wave-2 issue-coverage gate
+			// (TestDemoIssueCoverage). Mirrors its DistributionSummary's
+			// already-modeled insecure ViewerProtocolPolicyAllowAll so
+			// EnrichCloudFrontDistribution's viewer-protocol check fires.
+			"E5E6F7G8H9I0J1": {
+				DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
+					TargetOriginId:       aws.String("alb-old-api"),
+					ViewerProtocolPolicy: cftypes.ViewerProtocolPolicyAllowAll,
+				},
 			},
 		},
 	}

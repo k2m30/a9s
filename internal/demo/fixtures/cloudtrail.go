@@ -2,8 +2,8 @@
 package fixtures
 
 import (
-	"sync"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -73,7 +73,13 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			HasCustomEventSelectors:    aws.Bool(true),
 			HasInsightSelectors:        aws.Bool(false),
 			CloudWatchLogsLogGroupArn:  aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
-			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+			// CloudWatchLogsRoleArn — required for trail:role related-panel
+			// pivot (checkTrailRole extracts the bare role name).
+			CloudWatchLogsRoleArn: aws.String("arn:aws:iam::123456789012:role/acme-cloudtrail-cwlogs-role"),
+			// SnsTopicARN — required for trail:sns related-panel pivot
+			// (checkTrailSNS matches against the sns cache by full ARN).
+			SnsTopicARN: aws.String("arn:aws:sns:us-east-1:123456789012:alarm-notifications"),
+			KmsKeyId:    aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		{
 			Name:                       aws.String("data-events-trail"),
@@ -743,6 +749,103 @@ func buildCTEvents() []cloudtrailtypes.Event {
 				`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"rds.amazonaws.com","eventName":"CreateDBSnapshot","requestParameters":{"dBSnapshotIdentifier":%q,"dBInstanceIdentifier":"prod-dbi-1"}}`,
 				ProdDBISnapID,
 			)),
+		},
+		// acme/api-service push event — required for ecr:ct-events
+		// related-panel pivot. checkECRCTEvents matches ResourceName
+		// containing the repository name (ecr.go).
+		{
+			EventId:     aws.String("evt-ecr-api-service-push-001"),
+			EventName:   aws.String("PutImage"),
+			EventSource: aws.String("ecr.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 3, 22, 3, 20, 0, 0, time.UTC)),
+			Username:    aws.String("acme-ci-deploy-role"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::ECR::Repository"), ResourceName: aws.String("acme/api-service")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::123456789012:assumed-role/acme-ci-deploy-role/build-142","accountId":"123456789012"},"eventSource":"ecr.amazonaws.com","eventName":"PutImage","requestParameters":{"repositoryName":"acme/api-service","imageTag":"v2.5.1"}}`),
+		},
+		// data-pipeline-transform update event — required for ct-events:lambda
+		// related-panel pivot. ResourceName matches the lambda.go function name.
+		{
+			EventId:     aws.String("evt-lambda-data-pipeline-update-001"),
+			EventName:   aws.String("UpdateFunctionConfiguration"),
+			EventSource: aws.String("lambda.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 5, 10, 0, 0, 0, time.UTC)),
+			Username:    aws.String("acme-ci-deploy-role"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::Lambda::Function"), ResourceName: aws.String("data-pipeline-transform")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::123456789012:assumed-role/acme-ci-deploy-role/deploy-887","accountId":"123456789012"},"eventSource":"lambda.amazonaws.com","eventName":"UpdateFunctionConfiguration","requestParameters":{"functionName":"data-pipeline-transform"}}`),
+		},
+		// rds!db-prod-dbi-1-ABCDEF rotation event — required for
+		// ct-events:secrets related-panel pivot.
+		{
+			EventId:     aws.String("evt-secrets-prod-dbi-rotate-001"),
+			EventName:   aws.String("RotateSecret"),
+			EventSource: aws.String("secretsmanager.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 8, 3, 0, 0, 0, time.UTC)),
+			Username:    aws.String("acme-rds-monitoring"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::SecretsManager::Secret"), ResourceName: aws.String("rds!db-prod-dbi-1-ABCDEF")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AWSService","invokedBy":"secretsmanager.amazonaws.com"},"eventSource":"secretsmanager.amazonaws.com","eventName":"RotateSecret","requestParameters":{"secretId":"rds!db-prod-dbi-1-ABCDEF"}}`),
+		},
+		// acme-web-alb-sg ingress-rule change — required for ct-events:sg
+		// related-panel pivot. ResourceName matches fixtProdWebALBSGID (ec2.go).
+		{
+			EventId:     aws.String("evt-sg-web-alb-authorize-001"),
+			EventName:   aws.String("AuthorizeSecurityGroupIngress"),
+			EventSource: aws.String("ec2.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 9, 15, 0, 0, 0, time.UTC)),
+			Username:    aws.String("alice.johnson"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::EC2::SecurityGroup"), ResourceName: aws.String("sg-0aaa111111111111a")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"ec2.amazonaws.com","eventName":"AuthorizeSecurityGroupIngress","requestParameters":{"groupId":"sg-0aaa111111111111a"}}`),
+		},
+		// acme-management-trail config-change event — required for
+		// ct-events:trail related-panel pivot (meta: trail auditing trail changes).
+		{
+			EventId:     aws.String("evt-trail-management-update-001"),
+			EventName:   aws.String("UpdateTrail"),
+			EventSource: aws.String("cloudtrail.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 11, 8, 0, 0, 0, time.UTC)),
+			Username:    aws.String("alice.johnson"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::CloudTrail::Trail"), ResourceName: aws.String("acme-management-trail")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"cloudtrail.amazonaws.com","eventName":"UpdateTrail","requestParameters":{"name":"acme-management-trail"}}`),
+		},
+		// prod-s3-endpoint policy-change event — required for ct-events:vpce
+		// related-panel pivot. vpcEndpointId matches vpce-0aaa111111111111a (ec2.go).
+		{
+			EventId:     aws.String("evt-vpce-s3-endpoint-modify-001"),
+			EventName:   aws.String("ModifyVpcEndpoint"),
+			EventSource: aws.String("ec2.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 12, 13, 0, 0, 0, time.UTC)),
+			Username:    aws.String("acme-ci-deploy-role"),
+			ReadOnly:    aws.String("false"),
+			Resources:   []cloudtrailtypes.Resource{},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::123456789012:assumed-role/acme-ci-deploy-role/net-change-221","accountId":"123456789012"},"eventSource":"ec2.amazonaws.com","eventName":"ModifyVpcEndpoint","vpcEndpointId":"vpce-0aaa111111111111a","requestParameters":{"vpcEndpointId":"vpce-0aaa111111111111a"}}`),
+		},
+		// acme-vpc-stack update event — required for ct-events:cfn related-panel
+		// pivot. ResourceName matches acme-vpc-stack (cfn.go).
+		{
+			EventId:     aws.String("evt-cfn-vpc-stack-update-001"),
+			EventName:   aws.String("UpdateStack"),
+			EventSource: aws.String("cloudformation.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 13, 9, 0, 0, 0, time.UTC)),
+			Username:    aws.String("acme-ci-deploy-role"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::CloudFormation::Stack"), ResourceName: aws.String("acme-vpc-stack")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::123456789012:assumed-role/acme-ci-deploy-role/infra-change-055","accountId":"123456789012"},"eventSource":"cloudformation.amazonaws.com","eventName":"UpdateStack","requestParameters":{"stackName":"acme-vpc-stack"}}`),
 		},
 	}
 }

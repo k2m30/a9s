@@ -66,12 +66,19 @@ func (f *ASGFake) DescribeLaunchConfigurations(_ context.Context, input *autosca
 	return &autoscaling.DescribeLaunchConfigurationsOutput{LaunchConfigurations: result}, nil
 }
 
-// DescribeNotificationConfigurations is a no-op stub for demo mode.
-func (f *ASGFake) DescribeNotificationConfigurations(_ context.Context, _ *autoscaling.DescribeNotificationConfigurationsInput, _ ...func(*autoscaling.Options)) (*autoscaling.DescribeNotificationConfigurationsOutput, error) {
-	return &autoscaling.DescribeNotificationConfigurationsOutput{}, nil
+// DescribeNotificationConfigurations returns notification configurations by
+// ASG name from fixture data. Backs the asg:sns related-panel pivot.
+func (f *ASGFake) DescribeNotificationConfigurations(_ context.Context, input *autoscaling.DescribeNotificationConfigurationsInput, _ ...func(*autoscaling.Options)) (*autoscaling.DescribeNotificationConfigurationsOutput, error) {
+	var result []asgtypes.NotificationConfiguration
+	for _, name := range input.AutoScalingGroupNames {
+		result = append(result, f.fix.NotificationConfigurations[name]...)
+	}
+	return &autoscaling.DescribeNotificationConfigurationsOutput{NotificationConfigurations: result}, nil
 }
 
-// DescribeLifecycleHooks is a no-op stub for demo mode.
-func (f *ASGFake) DescribeLifecycleHooks(_ context.Context, _ *autoscaling.DescribeLifecycleHooksInput, _ ...func(*autoscaling.Options)) (*autoscaling.DescribeLifecycleHooksOutput, error) {
-	return &autoscaling.DescribeLifecycleHooksOutput{}, nil
+// DescribeLifecycleHooks returns lifecycle hooks for the given ASG name from
+// fixture data. Backs the asg:sns related-panel pivot (SNS-ARN reverse scan).
+func (f *ASGFake) DescribeLifecycleHooks(_ context.Context, input *autoscaling.DescribeLifecycleHooksInput, _ ...func(*autoscaling.Options)) (*autoscaling.DescribeLifecycleHooksOutput, error) {
+	name := aws.ToString(input.AutoScalingGroupName)
+	return &autoscaling.DescribeLifecycleHooksOutput{LifecycleHooks: f.fix.LifecycleHooks[name]}, nil
 }

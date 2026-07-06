@@ -59,6 +59,39 @@ func (f *WAFFake) GetWebACL(_ context.Context, input *wafv2.GetWebACLInput, _ ..
 	}, nil
 }
 
+// GetWebACLForResource performs a reverse lookup over ResourcesByWebACL to
+// find which WebACL (if any) protects the given resource ARN, backing the
+// elb→waf related-panel pivot (checkELBWAF).
+func (f *WAFFake) GetWebACLForResource(_ context.Context, input *wafv2.GetWebACLForResourceInput, _ ...func(*wafv2.Options)) (*wafv2.GetWebACLForResourceOutput, error) {
+	if input == nil || input.ResourceArn == nil {
+		return nil, fmt.Errorf("GetWebACLForResource: ResourceArn is required")
+	}
+	if err := validateARN(*input.ResourceArn); err != nil {
+		return nil, err
+	}
+	for webACLArn, resourceArns := range f.fix.ResourcesByWebACL {
+		for _, arn := range resourceArns {
+			if arn != *input.ResourceArn {
+				continue
+			}
+			for i := range f.fix.WebACLSummaries {
+				summary := f.fix.WebACLSummaries[i]
+				if summary.ARN == nil || *summary.ARN != webACLArn {
+					continue
+				}
+				return &wafv2.GetWebACLForResourceOutput{
+					WebACL: &wafv2types.WebACL{
+						Id:   summary.Id,
+						Name: summary.Name,
+						ARN:  summary.ARN,
+					},
+				}, nil
+			}
+		}
+	}
+	return &wafv2.GetWebACLForResourceOutput{}, nil
+}
+
 // GetLoggingConfiguration returns a stub logging configuration.
 // In demo mode the staging WAF ACL has no logging configured
 // (returns WAFNonexistentItemException), triggering the finding.

@@ -14,6 +14,9 @@ type KMSFixtures struct {
 	Keys map[string]*kmstypes.KeyMetadata
 	// Aliases is the full list of key aliases (returned by ListAliases).
 	Aliases []kmstypes.AliasListEntry
+	// KeyPolicies maps key ID to its default key-policy JSON document — backs
+	// kms:GetKeyPolicy for the kms:role related-panel pivot (checkKMSRole).
+	KeyPolicies map[string]string
 }
 
 // NewKMSFixtures constructs KMSFixtures from the canonical demo data.
@@ -447,7 +450,15 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 		},
 	}
 
-	return &KMSFixtures{Keys: keys, Aliases: aliases}
+	// KeyPolicies — required for the kms:role related-panel pivot
+	// (checkKMSRole → kms:GetKeyPolicy). Grants the primary production key's
+	// default policy to acme-ec2-instance-profile (iam.go), matching a
+	// realistic default key policy shape.
+	keyPolicies := map[string]string{
+		"a1b2c3d4-5678-90ab-cdef-111111111111": `{"Version":"2012-10-17","Statement":[{"Sid":"EnableRootAccess","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"kms:*","Resource":"*"},{"Sid":"AllowKeyUseByEC2InstanceRole","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/acme-ec2-instance-profile"},"Action":["kms:Decrypt","kms:GenerateDataKey"],"Resource":"*"}]}`,
+	}
+
+	return &KMSFixtures{Keys: keys, Aliases: aliases, KeyPolicies: keyPolicies}
 })
 
 func NewKMSFixtures() *KMSFixtures {

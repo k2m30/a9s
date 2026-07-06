@@ -23,6 +23,9 @@ func (f *CodePipelineFake) ListPipelines(_ context.Context, _ *codepipeline.List
 	return &codepipeline.ListPipelinesOutput{Pipelines: f.fix.Pipelines}, nil
 }
 
+// GetPipelineState returns the fixture-registered stage states for the
+// requested pipeline (see CodePipelineFixtures.States). Required for
+// EnrichCodePipelineStatus's Wave-2 failed-stage issue check.
 func (f *CodePipelineFake) GetPipelineState(_ context.Context, input *codepipeline.GetPipelineStateInput, _ ...func(*codepipeline.Options)) (*codepipeline.GetPipelineStateOutput, error) {
 	var name string
 	if input != nil && input.Name != nil {
@@ -30,16 +33,20 @@ func (f *CodePipelineFake) GetPipelineState(_ context.Context, input *codepipeli
 	}
 	return &codepipeline.GetPipelineStateOutput{
 		PipelineName: &name,
-		StageStates:  []cptypes.StageState{},
+		StageStates:  f.fix.States[name],
 	}, nil
 }
 
-// GetPipeline returns an empty pipeline declaration — demo mode does not
-// model pipeline stage details.
+// GetPipeline returns the fixture-registered stage/action declaration for
+// the requested pipeline, falling back to a bare declaration (no stages)
+// when no fixture entry exists.
 func (f *CodePipelineFake) GetPipeline(_ context.Context, input *codepipeline.GetPipelineInput, _ ...func(*codepipeline.Options)) (*codepipeline.GetPipelineOutput, error) {
 	var name string
 	if input != nil && input.Name != nil {
 		name = *input.Name
+	}
+	if decl, ok := f.fix.Declarations[name]; ok {
+		return &codepipeline.GetPipelineOutput{Pipeline: decl}, nil
 	}
 	return &codepipeline.GetPipelineOutput{
 		Pipeline: &cptypes.PipelineDeclaration{

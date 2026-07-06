@@ -16,13 +16,24 @@ type SFNFixtures struct {
 	// DescribeStateMachine. Required for the ecs-svc:sfn related-panel pivot
 	// witness (checkECSSvcSFN matches Task states whose Resource starts with
 	// "arn:aws:states:::ecs:runTask" and whose Parameters.TaskDefinition
-	// contains the ECS service's task-definition family name).
+	// contains the ECS service's task-definition family name) and for the
+	// sfn:lambda related-panel pivot witness (checkSFNLambda walks the
+	// definition for Task states referencing a Lambda function ARN).
 	Definitions map[string]string
+	// RoleArns maps state machine ARN -> execution role ARN, served by
+	// DescribeStateMachine. Required for the sfn:role related-panel pivot
+	// witness (checkSFNRole). acme-lambda-execution is a real iam.go fixture.
+	RoleArns map[string]string
+	// EncryptionKeyIDs maps state machine ARN -> KMS key ID, served by
+	// DescribeStateMachine. Required for the sfn:kms related-panel pivot
+	// witness (checkSFNKMS). Shared prod KMS key used across fixtures.
+	EncryptionKeyIDs map[string]string
 }
 
 // NewSFNFixtures constructs SFNFixtures from the canonical demo data.
 var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 	const smARNOrderFulfillment = "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"
+	const smARNPaymentValidation = "arn:aws:states:us-east-1:123456789012:stateMachine:payment-validation"
 
 	redriveCount := int32(1)
 	redriveDate := time.Date(2026, 3, 21, 19, 0, 0, 0, time.UTC)
@@ -57,7 +68,7 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 			},
 			{
 				Name:            aws.String("payment-validation"),
-				StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:payment-validation"),
+				StateMachineArn: aws.String(smARNPaymentValidation),
 				Type:            sfntypes.StateMachineTypeExpress,
 				CreationDate:    aws.Time(time.Date(2025, 11, 20, 10, 45, 0, 0, time.UTC)),
 			},
@@ -128,11 +139,26 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 					Status:          sfntypes.ExecutionStatusSucceeded,
 				},
 			},
+			// payment-validation's single (and therefore latest) execution
+			// failed — required for EnrichStepFunctionsStatus's Wave-2 issue
+			// check.
+			smARNPaymentValidation: {
+				{
+					ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:payment-validation:exec-2026-0322-0400-b1c2d3e4"),
+					Name:            aws.String("exec-2026-0322-0400-b1c2d3e4"),
+					StartDate:       aws.Time(time.Date(2026, 3, 22, 4, 0, 0, 0, time.UTC)),
+					StopDate:        aws.Time(time.Date(2026, 3, 22, 4, 0, 8, 0, time.UTC)),
+					StateMachineArn: aws.String(smARNPaymentValidation),
+					Status:          sfntypes.ExecutionStatusFailed,
+				},
+			},
 		},
 		// order-fulfillment-workflow's ASL definition runs an ECS task on
 		// the acme-services cluster using the api-gateway task-definition
 		// family (both real ecs.go fixtures) — required for the
-		// ecs-svc:sfn related-panel pivot witness (checkECSSvcSFN).
+		// ecs-svc:sfn related-panel pivot witness (checkECSSvcSFN) — then
+		// invokes api-gateway-authorizer (real lambda.go fixture) — required
+		// for the sfn:lambda related-panel pivot witness (checkSFNLambda).
 		Definitions: map[string]string{
 			smARNOrderFulfillment: `{
 				"Comment": "Order fulfillment workflow",
@@ -145,10 +171,26 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 							"Cluster": "` + ecsClusterArnServices + `",
 							"TaskDefinition": "api-gateway"
 						},
+						"Next": "AuthorizeShipment"
+					},
+					"AuthorizeShipment": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::lambda:invoke",
+						"Parameters": {
+							"FunctionName": "arn:aws:lambda:us-east-1:123456789012:function:api-gateway-authorizer"
+						},
 						"End": true
 					}
 				}
 			}`,
+		},
+		// order-fulfillment-workflow execution role — required for sfn:role.
+		RoleArns: map[string]string{
+			smARNOrderFulfillment: fixtIAMProdLambdaRoleARN,
+		},
+		// order-fulfillment-workflow encryption key — required for sfn:kms.
+		EncryptionKeyIDs: map[string]string{
+			smARNOrderFulfillment: "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111",
 		},
 	}
 })

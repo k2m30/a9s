@@ -29,17 +29,23 @@ func (f *APIGWFake) GetStages(_ context.Context, _ *apigatewayv2.GetStagesInput,
 	return &apigatewayv2.GetStagesOutput{}, nil
 }
 
-// GetDomainNames returns an empty domain name list for demo mode.
+// GetDomainNames returns the fixture-registered custom domain names.
 func (f *APIGWFake) GetDomainNames(_ context.Context, _ *apigatewayv2.GetDomainNamesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetDomainNamesOutput, error) {
-	return &apigatewayv2.GetDomainNamesOutput{}, nil
+	return &apigatewayv2.GetDomainNamesOutput{Items: f.fix.DomainNames}, nil
 }
 
-// GetApiMappings returns an empty mapping list for demo mode.
-func (f *APIGWFake) GetApiMappings(_ context.Context, _ *apigatewayv2.GetApiMappingsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApiMappingsOutput, error) {
-	return &apigatewayv2.GetApiMappingsOutput{}, nil
+// GetApiMappings returns the fixture-registered mappings for the requested domain.
+func (f *APIGWFake) GetApiMappings(_ context.Context, input *apigatewayv2.GetApiMappingsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApiMappingsOutput, error) {
+	if input == nil || input.DomainName == nil {
+		return &apigatewayv2.GetApiMappingsOutput{}, nil
+	}
+	return &apigatewayv2.GetApiMappingsOutput{Items: f.fix.ApiMappings[*input.DomainName]}, nil
 }
 
-// GetIntegrations returns an empty integrations list for demo mode.
-func (f *APIGWFake) GetIntegrations(_ context.Context, _ *apigatewayv2.GetIntegrationsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetIntegrationsOutput, error) {
-	return &apigatewayv2.GetIntegrationsOutput{}, nil
+// GetIntegrations returns the fixture-registered integrations for the requested API.
+func (f *APIGWFake) GetIntegrations(_ context.Context, input *apigatewayv2.GetIntegrationsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetIntegrationsOutput, error) {
+	if input == nil || input.ApiId == nil {
+		return &apigatewayv2.GetIntegrationsOutput{}, nil
+	}
+	return &apigatewayv2.GetIntegrationsOutput{Items: f.fix.Integrations[*input.ApiId]}, nil
 }

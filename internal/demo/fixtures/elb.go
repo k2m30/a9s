@@ -20,6 +20,13 @@ type ELBFixtures struct {
 	TargetHealth map[string][]elbv2types.TargetHealthDescription
 	// Rules keyed by listener ARN
 	Rules map[string][]elbv2types.Rule
+	// ResourceTags maps an ELB/TG ARN to its elbv2:DescribeTags tag set.
+	// Backs the elb→cfn and tg→cfn related-panel pivots (checkELBCFN / checkTGCFN).
+	ResourceTags map[string][]elbv2types.Tag
+	// LoadBalancerAttributes maps a load balancer ARN to its
+	// elbv2:DescribeLoadBalancerAttributes response. Backs the elb→s3
+	// related-panel pivot (checkELBS3).
+	LoadBalancerAttributes map[string][]elbv2types.LoadBalancerAttribute
 }
 
 const (
@@ -48,6 +55,26 @@ var sharedELBFixtures = sync.OnceValue(func() *ELBFixtures {
 		Listeners:    make(map[string][]elbv2types.Listener),
 		TargetHealth: make(map[string][]elbv2types.TargetHealthDescription),
 		Rules:        make(map[string][]elbv2types.Rule),
+		// ResourceTags — the prod ALB and its web TG both carry the stack tag,
+		// backing elb→cfn and tg→cfn. acme-eks-cluster is a real stack
+		// fixture (cfn.go).
+		ResourceTags: map[string][]elbv2types.Tag{
+			fixtProdELBARN: {
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
+			},
+			fixtProdWebTGARN: {
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
+			},
+		},
+		// LoadBalancerAttributes — the prod ALB has access logging enabled
+		// to the a9s-demo-logs bucket (s3.go LogsBucketName), backing elb→s3.
+		LoadBalancerAttributes: map[string][]elbv2types.LoadBalancerAttribute{
+			fixtProdELBARN: {
+				{Key: aws.String("access_logs.s3.enabled"), Value: aws.String("true")},
+				{Key: aws.String("access_logs.s3.bucket"), Value: aws.String(LogsBucketName)},
+				{Key: aws.String("access_logs.s3.prefix"), Value: aws.String("acme-prod-web")},
+			},
+		},
 	}
 	f.LoadBalancers = buildLoadBalancers()
 	f.TargetGroups = buildTargetGroups()
@@ -286,6 +313,12 @@ func buildListeners(f *ELBFixtures) {
 			LoadBalancerArn: aws.String(fixtProdELBARN),
 			Port:            aws.Int32(443),
 			Protocol:        elbv2types.ProtocolEnumHttps,
+			// Certificates — required for the elb→acm related-panel pivot
+			// (checkELBACM). ProdACMCertARN1 (acm.go) is the same cert this
+			// ELB's ARN appears under in ACM's InUseBy fixture (acm→elb).
+			Certificates: []elbv2types.Certificate{
+				{CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/a1b2c3d4-5678-90ab-cdef-111111111111")},
+			},
 			DefaultActions: []elbv2types.Action{
 				{
 					Type:           elbv2types.ActionTypeEnumForward,

@@ -44,24 +44,30 @@ func (f *LambdaFake) ListEventSourceMappings(_ context.Context, input *lambda.Li
 	return &lambda.ListEventSourceMappingsOutput{EventSourceMappings: filtered}, nil
 }
 
+// GetFunction resolves by bare function name or full ARN, matching the real
+// Lambda API's dual-accepting FunctionName parameter — callers that only
+// have a rotationLambdaARN (e.g. checkSecretsRole/checkSecretsSNS) must
+// still resolve.
 func (f *LambdaFake) GetFunction(_ context.Context, input *lambda.GetFunctionInput, _ ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error) {
 	name := aws.ToString(input.FunctionName)
 	for _, fn := range f.fix.Functions {
-		if aws.ToString(fn.FunctionName) == name {
-			code := &lambdatypes.FunctionCodeLocation{
-				Location:       aws.String("https://s3.amazonaws.com/example-bucket/" + name + ".zip"),
-				RepositoryType: aws.String("S3"),
-			}
-			if imageURI, ok := f.fix.ImageURIs[name]; ok {
-				code.ImageUri = aws.String(imageURI)
-				code.RepositoryType = aws.String("ECR")
-				code.Location = nil
-			}
-			return &lambda.GetFunctionOutput{
-				Configuration: &fn,
-				Code:          code,
-			}, nil
+		if aws.ToString(fn.FunctionName) != name && aws.ToString(fn.FunctionArn) != name {
+			continue
 		}
+		bareName := aws.ToString(fn.FunctionName)
+		code := &lambdatypes.FunctionCodeLocation{
+			Location:       aws.String("https://s3.amazonaws.com/example-bucket/" + bareName + ".zip"),
+			RepositoryType: aws.String("S3"),
+		}
+		if imageURI, ok := f.fix.ImageURIs[bareName]; ok {
+			code.ImageUri = aws.String(imageURI)
+			code.RepositoryType = aws.String("ECR")
+			code.Location = nil
+		}
+		return &lambda.GetFunctionOutput{
+			Configuration: &fn,
+			Code:          code,
+		}, nil
 	}
 	return nil, &smithy.GenericAPIError{
 		Code:    "ResourceNotFoundException",

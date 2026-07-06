@@ -1,9 +1,9 @@
 package fixtures
 
 import (
-	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	"sync"
 )
 
 // CWLogsFixtures holds typed fixture data for CloudWatch Logs.
@@ -13,6 +13,10 @@ type CWLogsFixtures struct {
 	LogStreams map[string][]cwlogstypes.LogStream
 	// LogEvents maps log group name to its events (for GetLogEvents / FilterLogEvents).
 	LogEvents map[string][]cwlogstypes.OutputLogEvent
+	// SubscriptionFilters maps log group name to its subscription filters —
+	// backs logs:DescribeSubscriptionFilters for the logs:kinesis and
+	// logs:s3 related-panel pivots.
+	SubscriptionFilters map[string][]cwlogstypes.SubscriptionFilter
 }
 
 // NewCWLogsFixtures constructs CWLogsFixtures from the canonical demo data.
@@ -120,6 +124,23 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(90),
 			CreationTime:    aws.Int64(1745769600000), // 2025-04-28
 		},
+		// Glue shared job log groups — required for glue:logs related-panel
+		// pivot. checkGlueLogs matches the fixed IDs "/aws-glue/jobs/output"
+		// and "/aws-glue/jobs/error" (shared across all Glue jobs).
+		{
+			LogGroupName:    aws.String("/aws-glue/jobs/output"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws-glue/jobs/output:*"),
+			StoredBytes:     aws.Int64(41943040),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1715731200000), // 2024-05-15
+		},
+		{
+			LogGroupName:    aws.String("/aws-glue/jobs/error"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws-glue/jobs/error:*"),
+			StoredBytes:     aws.Int64(10485760),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1715731200000), // 2024-05-15
+		},
 		{
 			LogGroupName:    aws.String("/aws/docdb/acme-docdb-prod/profiler"),
 			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/docdb/acme-docdb-prod/profiler:*"),
@@ -223,6 +244,66 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(30),
 			CreationTime:    aws.Int64(1750100000000),
 		},
+		// acme-public-api execution log group — required for apigw:logs
+		// related-panel pivot. checkApigwLogs matches log groups whose ID
+		// has the "API-Gateway-Execution-Logs_{apiID}/" prefix.
+		{
+			LogGroupName:    aws.String("API-Gateway-Execution-Logs_" + PublicAPIGWID + "/$default"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:API-Gateway-Execution-Logs_" + PublicAPIGWID + "/$default:*"),
+			StoredBytes:     aws.Int64(31457280),
+			RetentionInDays: aws.Int32(14),
+			CreationTime:    aws.Int64(1750200000000),
+		},
+		// acme-api-build CodeBuild log group — required for cb:logs
+		// related-panel pivot. checkCbLogs matches Project.LogsConfig.
+		// CloudWatchLogs.GroupName exactly.
+		{
+			LogGroupName:    aws.String("/aws/codebuild/acme-api-build"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/codebuild/acme-api-build:*"),
+			StoredBytes:     aws.Int64(20971520),
+			RetentionInDays: aws.Int32(14),
+			CreationTime:    aws.Int64(1750300000000),
+		},
+		// order-fulfillment-workflow vendedlogs log group — required for
+		// sfn:logs related-panel pivot. checkSFNLogs matches log groups
+		// whose ID is exactly "/aws/vendedlogs/states/{sfnName}".
+		{
+			LogGroupName:    aws.String("/aws/vendedlogs/states/order-fulfillment-workflow"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/vendedlogs/states/order-fulfillment-workflow:*"),
+			StoredBytes:     aws.Int64(15728640),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1750400000000),
+		},
+		// acme-prod-api Elastic Beanstalk log group — required for eb:logs
+		// related-panel pivot. checkEbLogs matches log groups whose ID has
+		// the "/aws/elasticbeanstalk/{envName}/" prefix.
+		{
+			LogGroupName:    aws.String("/aws/elasticbeanstalk/acme-prod-api/var/log/eb-engine.log"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/elasticbeanstalk/acme-prod-api/var/log/eb-engine.log:*"),
+			StoredBytes:     aws.Int64(10485760),
+			RetentionInDays: aws.Int32(14),
+			CreationTime:    aws.Int64(1750500000000),
+		},
+		// CloudTrail delivery log group — required for trail:logs related-panel
+		// pivot. checkTrailLogs parses the log group name out of the trail's
+		// CloudWatchLogsLogGroupArn and matches it against this cache by ID.
+		{
+			LogGroupName:    aws.String("/aws/cloudtrail"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			StoredBytes:     aws.Int64(104857600),
+			RetentionInDays: aws.Int32(90),
+			CreationTime:    aws.Int64(1750600000000),
+		},
+		// VPC endpoint flow-log destination — required for vpce:logs
+		// related-panel pivot. checkVPCELogs reads the LogGroupName off the
+		// matching ec2:DescribeFlowLogs entry (see EC2Fixtures.FlowLogsByResourceID).
+		{
+			LogGroupName:    aws.String("/aws/vpc/flowlogs/vpce-s3-endpoint"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/vpc/flowlogs/vpce-s3-endpoint:*"),
+			StoredBytes:     aws.Int64(31457280),
+			RetentionInDays: aws.Int32(14),
+			CreationTime:    aws.Int64(1750700000000),
+		},
 	}
 
 	logStreams := map[string][]cwlogstypes.LogStream{
@@ -266,16 +347,16 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			},
 		},
 		// Graph-root log groups that must have streams so logs→log_streams drill lands non-empty.
-		"/aws/dynamodb/tables/" + OrdersProdID + "/insights/default":     minimalLogStreams("ddb-insights"),
-		"/aws/rds/instance/prod-dbi-aurora-1/postgresql":                 minimalLogStreams("dbi-aurora-pg"),
-		"/aws/rds/cluster/prod-aurora-cluster/postgresql":                minimalLogStreams("dbc-aurora-pg"),
-		ProdRedisLogGroup:                                                minimalLogStreams("redis-slow"),
-		OpenSearchLogGroupAudit:                                          minimalLogStreams("os-audit"),
-		OpenSearchLogGroupIndexSlow:                                      minimalLogStreams("os-index-slow"),
-		OpenSearchLogGroupSearchSlow:                                     minimalLogStreams("os-search-slow"),
-		"/aws/redshift/cluster/" + AcmeWarehouseID + "/connectionlog":    minimalLogStreams("rs-conn"),
-		"/aws/redshift/cluster/" + AcmeWarehouseID + "/userlog":          minimalLogStreams("rs-user"),
-		"/aws/redshift/cluster/" + AcmeWarehouseID + "/useractivitylog":  minimalLogStreams("rs-useract"),
+		"/aws/dynamodb/tables/" + OrdersProdID + "/insights/default": minimalLogStreams("ddb-insights"),
+		"/aws/rds/instance/prod-dbi-aurora-1/postgresql":             minimalLogStreams("dbi-aurora-pg"),
+		"/aws/rds/cluster/prod-aurora-cluster/postgresql":            minimalLogStreams("dbc-aurora-pg"),
+		ProdRedisLogGroup:            minimalLogStreams("redis-slow"),
+		OpenSearchLogGroupAudit:      minimalLogStreams("os-audit"),
+		OpenSearchLogGroupIndexSlow:  minimalLogStreams("os-index-slow"),
+		OpenSearchLogGroupSearchSlow: minimalLogStreams("os-search-slow"),
+		"/aws/redshift/cluster/" + AcmeWarehouseID + "/connectionlog":   minimalLogStreams("rs-conn"),
+		"/aws/redshift/cluster/" + AcmeWarehouseID + "/userlog":         minimalLogStreams("rs-user"),
+		"/aws/redshift/cluster/" + AcmeWarehouseID + "/useractivitylog": minimalLogStreams("rs-useract"),
 		// Lambda log groups for graph-root-drilled functions — required for
 		// lambda→lambda_invocations (parses REPORT lines from FilterLogEvents).
 		"/aws/lambda/a9s-demo-s3-notifier": minimalLogStreams("lambda-s3-notifier"),
@@ -386,10 +467,38 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 	logEvents["/aws/lambda/acme-inbound-parser"] = lambdaInvocationReport("acme-inbound-parser")
 	logEvents["/aws/lambda/orders-projector"] = lambdaInvocationReport("orders-projector")
 
+	// SubscriptionFilters — required for the logs:kinesis and logs:s3
+	// related-panel pivots (checkLogsKinesis / checkLogsS3 via
+	// DescribeSubscriptionFilters). /aws-glue/jobs/output streams to Kinesis
+	// for real-time monitoring; /aws-glue/jobs/error archives to S3.
+	subscriptionFilters := map[string][]cwlogstypes.SubscriptionFilter{
+		"/aws-glue/jobs/output": {
+			{
+				FilterName:     aws.String("stream-to-audit-log"),
+				LogGroupName:   aws.String("/aws-glue/jobs/output"),
+				FilterPattern:  aws.String(""),
+				DestinationArn: aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/audit-log-stream"),
+				Distribution:   cwlogstypes.DistributionByLogStream,
+				CreationTime:   aws.Int64(1715731200000),
+			},
+		},
+		"/aws-glue/jobs/error": {
+			{
+				FilterName:     aws.String("archive-errors-to-s3"),
+				LogGroupName:   aws.String("/aws-glue/jobs/error"),
+				FilterPattern:  aws.String("ERROR"),
+				DestinationArn: aws.String("arn:aws:s3:::" + LogsBucketName),
+				Distribution:   cwlogstypes.DistributionByLogStream,
+				CreationTime:   aws.Int64(1715731200000),
+			},
+		},
+	}
+
 	return &CWLogsFixtures{
-		LogGroups:  logGroups,
-		LogStreams: logStreams,
-		LogEvents:  logEvents,
+		LogGroups:           logGroups,
+		LogStreams:          logStreams,
+		LogEvents:           logEvents,
+		SubscriptionFilters: subscriptionFilters,
 	}
 })
 

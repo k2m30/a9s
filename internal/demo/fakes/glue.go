@@ -29,3 +29,27 @@ func (f *GlueFake) GetJobRuns(_ context.Context, input *glue.GetJobRunsInput, _ 
 	}
 	return &glue.GetJobRunsOutput{JobRuns: f.fix.JobRuns[jobName]}, nil
 }
+
+// GetSecurityConfiguration returns the named security configuration from
+// fixture data. Backs the glue:kms related-panel pivot (checkGlueKMS).
+func (f *GlueFake) GetSecurityConfiguration(_ context.Context, input *glue.GetSecurityConfigurationInput, _ ...func(*glue.Options)) (*glue.GetSecurityConfigurationOutput, error) {
+	var name string
+	if input != nil && input.Name != nil {
+		name = *input.Name
+	}
+	cfg, ok := f.fix.SecurityConfigurations[name]
+	if !ok {
+		return &glue.GetSecurityConfigurationOutput{}, nil
+	}
+	return &glue.GetSecurityConfigurationOutput{SecurityConfiguration: &cfg}, nil
+}
+
+// GetTags returns tags for a Glue resource ARN from fixture data. Backs the
+// glue:cfn related-panel pivot (checkGlueCFN).
+func (f *GlueFake) GetTags(_ context.Context, input *glue.GetTagsInput, _ ...func(*glue.Options)) (*glue.GetTagsOutput, error) {
+	var arn string
+	if input != nil && input.ResourceArn != nil {
+		arn = *input.ResourceArn
+	}
+	return &glue.GetTagsOutput{Tags: f.fix.TagsByResourceARN[arn]}, nil
+}

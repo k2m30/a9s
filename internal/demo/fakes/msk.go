@@ -26,3 +26,13 @@ func (f *MSKFake) ListClustersV2(_ context.Context, _ *kafka.ListClustersV2Input
 func (f *MSKFake) DescribeClusterV2(_ context.Context, _ *kafka.DescribeClusterV2Input, _ ...func(*kafka.Options)) (*kafka.DescribeClusterV2Output, error) {
 	return &kafka.DescribeClusterV2Output{}, nil
 }
+
+// ListScramSecrets returns SCRAM secret ARNs for the given cluster from
+// fixture data. Backs the msk:secrets related-panel pivot (checkMSKSecrets).
+func (f *MSKFake) ListScramSecrets(_ context.Context, input *kafka.ListScramSecretsInput, _ ...func(*kafka.Options)) (*kafka.ListScramSecretsOutput, error) {
+	var clusterArn string
+	if input != nil && input.ClusterArn != nil {
+		clusterArn = *input.ClusterArn
+	}
+	return &kafka.ListScramSecretsOutput{SecretArnList: f.fix.ScramSecretsByCluster[clusterArn]}, nil
+}

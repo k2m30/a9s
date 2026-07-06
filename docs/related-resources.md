@@ -45,6 +45,17 @@
    `FlashMsg{IsError:true}` so the `!` error log captures the failure;
    without this the pivot renders `?` with no actionable cause. Op-name
    convention: `"<short>-related: <Verb>"` (e.g. `"s3-related: GetBucketPolicy"`).
+7. **Call budget** — a checker runs on every detail open, so it gets AT MOST
+   one extra AWS API call beyond reading the already-loaded sibling caches
+   (`resource.ResourceCache`); per-item fan-outs over the OPEN resource's own
+   sub-objects are inside the budget, fan-outs over the TARGET type's whole
+   population are not. A pivot whose documented mechanism cannot resolve
+   within that budget returns `Count: -1` (unknown — renders as the bare row
+   name, no badge, not drillable) and MUST (a) say so in a one-line checker
+   comment citing this rule, and (b) be marked `budget-excluded` in its
+   per-type row here and in `docs/resources/<type>.md` §2. An undocumented
+   `Count: -1` is a defect, not a decision. Lifting one out of exclusion
+   requires the same evidence bar as rule 1.
 
 ## Per-type contract
 

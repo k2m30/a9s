@@ -37,10 +37,14 @@ func (f *SNSFake) ListSubscriptionsByTopic(_ context.Context, input *sns.ListSub
 	return &sns.ListSubscriptionsByTopicOutput{Subscriptions: f.fix.SubscriptionsByTopic[topicARN]}, nil
 }
 
-// GetTopicAttributes returns an empty attributes map — demo mode does not
-// model SNS topic attributes.
-func (f *SNSFake) GetTopicAttributes(_ context.Context, _ *sns.GetTopicAttributesInput, _ ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
-	return &sns.GetTopicAttributesOutput{Attributes: map[string]string{}}, nil
+// GetTopicAttributes returns the topic's attributes from fixture data. Backs
+// the sns:kms and sns:role related-panel pivots (checkSNSKMS / checkSNSRole).
+func (f *SNSFake) GetTopicAttributes(_ context.Context, input *sns.GetTopicAttributesInput, _ ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
+	var topicARN string
+	if input != nil && input.TopicArn != nil {
+		topicARN = *input.TopicArn
+	}
+	return &sns.GetTopicAttributesOutput{Attributes: f.fix.TopicAttributes[topicARN]}, nil
 }
 
 // GetSubscriptionAttributes returns an empty attributes map — demo mode does not

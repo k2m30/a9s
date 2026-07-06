@@ -24,10 +24,23 @@ func (f *CodeArtifactFake) ListRepositories(_ context.Context, _ *codeartifact.L
 	return &codeartifact.ListRepositoriesOutput{Repositories: f.fix.Repositories}, nil
 }
 
-// GetRepositoryPermissionsPolicy is a stub satisfying CodeArtifactGetRepositoryPermissionsPolicyAPI.
-// Demo mode returns no policy (nil Policy), simulating repositories without a permissions policy.
-func (f *CodeArtifactFake) GetRepositoryPermissionsPolicy(_ context.Context, _ *codeartifact.GetRepositoryPermissionsPolicyInput, _ ...func(*codeartifact.Options)) (*codeartifact.GetRepositoryPermissionsPolicyOutput, error) {
-	return &codeartifact.GetRepositoryPermissionsPolicyOutput{}, nil
+// GetRepositoryPermissionsPolicy returns the fixture-registered policy for
+// the requested repository (see CodeArtifactFixtures.PermissionsPolicies).
+// Repositories with no registered policy return ResourceNotFoundException,
+// matching real AWS behavior for a repository with no permissions policy set —
+// required for EnrichCodeArtifactRepository's Wave-2 issue checks.
+func (f *CodeArtifactFake) GetRepositoryPermissionsPolicy(_ context.Context, input *codeartifact.GetRepositoryPermissionsPolicyInput, _ ...func(*codeartifact.Options)) (*codeartifact.GetRepositoryPermissionsPolicyOutput, error) {
+	var repoName string
+	if input != nil && input.Repository != nil {
+		repoName = *input.Repository
+	}
+	policy, ok := f.fix.PermissionsPolicies[repoName]
+	if !ok {
+		return nil, &codeartifacttypes.ResourceNotFoundException{
+			Message: aws.String("policy does not exist for repository " + repoName),
+		}
+	}
+	return &codeartifact.GetRepositoryPermissionsPolicyOutput{Policy: policy}, nil
 }
 
 // DescribeRepository returns an empty repository — demo mode does not model repository details.
@@ -41,10 +54,18 @@ func (f *CodeArtifactFake) GetDomainPermissionsPolicy(_ context.Context, _ *code
 	return &codeartifact.GetDomainPermissionsPolicyOutput{}, nil
 }
 
-// DescribeDomain is a no-op stub satisfying CodeArtifactDescribeDomainAPI.
-// Demo mode does not model CodeArtifact domain KMS encryption keys.
-func (f *CodeArtifactFake) DescribeDomain(_ context.Context, _ *codeartifact.DescribeDomainInput, _ ...func(*codeartifact.Options)) (*codeartifact.DescribeDomainOutput, error) {
-	return &codeartifact.DescribeDomainOutput{}, nil
+// DescribeDomain returns the fixture-registered domain description for the
+// requested domain name (see CodeArtifactFixtures.Domains).
+func (f *CodeArtifactFake) DescribeDomain(_ context.Context, input *codeartifact.DescribeDomainInput, _ ...func(*codeartifact.Options)) (*codeartifact.DescribeDomainOutput, error) {
+	var domainName string
+	if input != nil && input.Domain != nil {
+		domainName = *input.Domain
+	}
+	domain, ok := f.fix.Domains[domainName]
+	if !ok {
+		return &codeartifact.DescribeDomainOutput{}, nil
+	}
+	return &codeartifact.DescribeDomainOutput{Domain: &domain}, nil
 }
 
 // ListPackages returns stub package summaries for demo mode.

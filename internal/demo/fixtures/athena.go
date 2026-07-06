@@ -68,6 +68,35 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 					SelectedEngineVersion:  aws.String("Athena engine version 3"),
 				},
 			},
+			// Spark workgroup — required for athena:kms, athena:logs, and
+			// athena:role related-panel pivots. checkAthenaKMS/Logs/Role all
+			// read Configuration fields only populated on Spark workgroups
+			// (ExecutionRole, PublishCloudWatchMetricsEnabled,
+			// EncryptionConfiguration.KmsKey) via GetWorkGroup.
+			{
+				Name:         aws.String("acme-spark-analytics"),
+				State:        athenatypes.WorkGroupStateEnabled,
+				Description:  aws.String("PySpark workgroup for ad-hoc analytics notebooks"),
+				CreationTime: aws.Time(mustParseAthenaTime("2025-05-12T09:00:00+00:00")),
+				EngineVersion: &athenatypes.EngineVersion{
+					EffectiveEngineVersion: aws.String("PySpark engine version 3"),
+					SelectedEngineVersion:  aws.String("PySpark engine version 3"),
+				},
+			},
+			// acme-etl-orders workgroup — required for the glue:athena
+			// related-panel pivot. checkGlueAthena matches wg.ID == jobName;
+			// this workgroup is provisioned for analysts querying the ETL
+			// job's output tables via Athena (glue.go acme-etl-orders job).
+			{
+				Name:         aws.String("acme-etl-orders"),
+				State:        athenatypes.WorkGroupStateEnabled,
+				Description:  aws.String("Athena workgroup for querying acme-etl-orders output tables"),
+				CreationTime: aws.Time(mustParseAthenaTime("2025-05-11T09:00:00+00:00")),
+				EngineVersion: &athenatypes.EngineVersion{
+					EffectiveEngineVersion: aws.String("Athena engine version 3"),
+					SelectedEngineVersion:  aws.String("Athena engine version 3"),
+				},
+			},
 		},
 		WorkGroupDetails: map[string]*athena.GetWorkGroupOutput{
 			"a9s-demo-s3-queries": {
@@ -77,6 +106,27 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 					Configuration: &athenatypes.WorkGroupConfiguration{
 						ResultConfiguration: &athenatypes.ResultConfiguration{
 							OutputLocation: aws.String("s3://" + HealthyBucketName + "/athena-results/"),
+						},
+					},
+				},
+			},
+			"acme-spark-analytics": {
+				WorkGroup: &athenatypes.WorkGroup{
+					Name:  aws.String("acme-spark-analytics"),
+					State: athenatypes.WorkGroupStateEnabled,
+					Configuration: &athenatypes.WorkGroupConfiguration{
+						EngineVersion: &athenatypes.EngineVersion{
+							EffectiveEngineVersion: aws.String("PySpark engine version 3"),
+							SelectedEngineVersion:  aws.String("PySpark engine version 3"),
+						},
+						ExecutionRole:                   aws.String("arn:aws:iam::123456789012:role/acme-glue-role"),
+						PublishCloudWatchMetricsEnabled: aws.Bool(true),
+						ResultConfiguration: &athenatypes.ResultConfiguration{
+							OutputLocation: aws.String("s3://" + HealthyBucketName + "/spark-results/"),
+							EncryptionConfiguration: &athenatypes.EncryptionConfiguration{
+								EncryptionOption: athenatypes.EncryptionOptionSseKms,
+								KmsKey:           aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
+							},
 						},
 					},
 				},

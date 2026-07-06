@@ -81,6 +81,8 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 
 	images := map[string][]ecrtypes.ImageDetail{
 		"acme/api-service": {
+			// Issue: CRITICAL vulnerability findings on the latest image —
+			// required for EnrichECRRepository's Wave-2 "!" issue check.
 			{
 				ImageTags:        []string{"v2.5.1", "latest"},
 				ImageDigest:      aws.String("sha256:abc123def456"),
@@ -88,6 +90,12 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 				ImagePushedAt:    aws.Time(mustParseECRTime("2026-03-22T03:20:00+00:00")),
 				RegistryId:       aws.String("123456789012"),
 				RepositoryName:   aws.String("acme/api-service"),
+				ImageScanFindingsSummary: &ecrtypes.ImageScanFindingsSummary{
+					FindingSeverityCounts: map[string]int32{
+						string(ecrtypes.FindingSeverityCritical): 2,
+						string(ecrtypes.FindingSeverityHigh):      5,
+					},
+				},
 			},
 			{
 				ImageTags:        []string{"v2.5.0"},

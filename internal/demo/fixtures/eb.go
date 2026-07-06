@@ -2,21 +2,104 @@
 package fixtures
 
 import (
-	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
+	"sync"
 )
 
 // EBFixtures holds all Elastic Beanstalk domain objects served by the fake.
 type EBFixtures struct {
 	// Environments is the full list returned by DescribeEnvironments.
 	Environments []ebtypes.EnvironmentDescription
+	// ConfigurationSettings maps "applicationName/environmentName" to the
+	// configuration set served by DescribeConfigurationSettings. Required
+	// for the secrets:eb, eb:sg and eb:role related-panel pivot witnesses.
+	ConfigurationSettings map[string][]ebtypes.ConfigurationSettingsDescription
+	// EnvironmentResources maps environmentName -> resources, served by
+	// DescribeEnvironmentResources. Required for the eb:elb and eb:tg
+	// related-panel pivot witnesses (checkEbELB / checkEbTG).
+	EnvironmentResources map[string]*ebtypes.EnvironmentResourceDescription
+	// ApplicationVersions maps applicationName -> versions, served by
+	// DescribeApplicationVersions. Required for the eb:s3 related-panel
+	// pivot witness (checkEbS3).
+	ApplicationVersions map[string][]ebtypes.ApplicationVersionDescription
+	// EnvironmentHealthCauses maps environmentName -> DescribeEnvironmentHealth
+	// causes. Backs EnrichEBEnvironmentHealth's Wave-2 "~" issue check.
+	EnvironmentHealthCauses map[string][]string
 }
 
 // NewEBFixtures builds and returns a fully-populated EBFixtures struct.
 var sharedEBFixtures = sync.OnceValue(func() *EBFixtures {
 	return &EBFixtures{
 		Environments: buildEBEnvironments(),
+		ConfigurationSettings: map[string][]ebtypes.ConfigurationSettingsDescription{
+			// acme-api/acme-prod-api references prod/database/primary (a
+			// real secrets.go fixture) via the Elastic Beanstalk secret
+			// resolution syntax in an environment variable.
+			"acme-api/acme-prod-api": {
+				{
+					ApplicationName: aws.String("acme-api"),
+					EnvironmentName: aws.String("acme-prod-api"),
+					OptionSettings: []ebtypes.ConfigurationOptionSetting{
+						{
+							Namespace:  aws.String("aws:elasticbeanstalk:application:environment"),
+							OptionName: aws.String("DATABASE_URL"),
+							Value:      aws.String("{{resolve:secretsmanager:arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf}}"),
+						},
+						// Required for eb:sg related-panel pivot witness
+						// (checkEbSG). sg-0aaa111111111111a is a real ec2.go
+						// security group (acme-web-alb-sg).
+						{
+							Namespace:  aws.String("aws:autoscaling:launchconfiguration"),
+							OptionName: aws.String("SecurityGroups"),
+							Value:      aws.String("sg-0aaa111111111111a"),
+						},
+						// Required for eb:role related-panel pivot witness
+						// (checkEbRole). acme-ci-deploy-role is a real
+						// iam.go role fixture.
+						{
+							Namespace:  aws.String("aws:elasticbeanstalk:environment"),
+							OptionName: aws.String("ServiceRole"),
+							Value:      aws.String("acme-ci-deploy-role"),
+						},
+					},
+				},
+			},
+		},
+		// EnvironmentResources — required for eb:elb and eb:tg related-panel
+		// pivot witnesses (checkEbELB / checkEbTG). acme-prod-web is a real
+		// elb.go load balancer fixture with a listener forwarding to a
+		// target group.
+		EnvironmentResources: map[string]*ebtypes.EnvironmentResourceDescription{
+			"acme-prod-api": {
+				EnvironmentName: aws.String("acme-prod-api"),
+				LoadBalancers: []ebtypes.LoadBalancer{
+					{Name: aws.String("acme-prod-web")},
+				},
+			},
+		},
+		// ApplicationVersions — required for eb:s3 related-panel pivot
+		// witness (checkEbS3). a9s-demo-healthy is a real s3.go bucket.
+		ApplicationVersions: map[string][]ebtypes.ApplicationVersionDescription{
+			"acme-api": {
+				{
+					ApplicationName: aws.String("acme-api"),
+					VersionLabel:    aws.String("v2.4.1"),
+					SourceBundle: &ebtypes.S3Location{
+						S3Bucket: aws.String(HealthyBucketName),
+						S3Key:    aws.String("acme-api/v2.4.1.zip"),
+					},
+				},
+			},
+		},
+		// EnvironmentHealthCauses — acme-eb-red (Health=Red) has a real cause
+		// explaining the critical health state, so EnrichEBEnvironmentHealth's
+		// "~" issue check fires in demo mode.
+		EnvironmentHealthCauses: map[string][]string{
+			"acme-eb-red": {
+				"40% of the requests are failing with HTTP 5xx.",
+			},
+		},
 	}
 })
 
