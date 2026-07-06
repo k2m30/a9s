@@ -100,7 +100,7 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource 
 	if cluster.Health != nil {
 		for _, issue := range cluster.Health.Issues {
 			healthIssuesCount++
-			issueCodes = append(issueCodes, string(issue.Code))
+			issueCodes = append(issueCodes, domain.HumanizeStatusPhrase(string(issue.Code)))
 		}
 	}
 
@@ -121,7 +121,7 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource 
 			"platform_version":    platformVersion,
 			"arn":                 aws.ToString(cluster.Arn),
 			"health_issues_count": strconv.Itoa(healthIssuesCount),
-			"health_issues":       strings.Join(issueCodes, ","),
+			"health_issues":       strings.Join(issueCodes, ", "),
 			"subnet_ids":          subnetIDs,
 		},
 		RawStruct: cluster,

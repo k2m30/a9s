@@ -148,7 +148,7 @@ func colorMSK(r domain.Resource) domain.Color {
 }
 
 func colorSES(r domain.Resource) domain.Color {
-	// Wave-2 SES findings (account SHUTDOWN/PROBATION/quota) live in
+	// Wave-2 SES findings (account shutdown/probation/quota) live in
 	// r.Findings with Source="wave2:ses"; FieldUpdates["status"] is no longer
 	// written. Wave-1 (verification/sending) is in Fields["status"] from the
 	// SES fetcher's sesTopPhrase. Wave-2 wins when present — Severity drives
@@ -564,8 +564,8 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeSESVerificationNotStarted, Phrase: "verification not started", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeSESVerificationPending, Phrase: "pending verification", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeSESSendingDisabled, Phrase: "sending disabled", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: sesCodeShutdown, Phrase: "account SHUTDOWN", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: sesCodeProbation, Phrase: "account PROBATION", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: sesCodeShutdown, Phrase: "sending paused by AWS (shutdown)", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: sesCodeProbation, Phrase: "account under review (probation)", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: sesCodeQuota, Phrase: "quota 80%+ used", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},

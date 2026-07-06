@@ -190,9 +190,12 @@ func TestBackup_Enricher_OneFailed_ShowsBrokenPhrase(t *testing.T) {
 		"IssueCount must be >= 1 when a '!' finding exists")
 
 	// U11: Phrase must not contain any Row.Value (skip pure-integer counts — they appear in
-	// both Phrase phrases and count rows by design).
+	// both Phrase phrases and count rows by design — and skip the humanized job-state word
+	// "failed", which legitimately appears in both the Row.Value and the "N job(s) failed..."
+	// Phrase now that HumanizeStatusPhrase lowercases the raw AWS enum instead of leaving it
+	// as "FAILED"; that overlap is the intended shared vocabulary, not a U11 leak).
 	for _, row := range result.AttentionDetails[planID].Rows {
-		if row.Value == "" {
+		if row.Value == "" || row.Value == "failed" {
 			continue
 		}
 		if _, isNum := strconv.Atoi(row.Value); isNum == nil {
@@ -202,17 +205,17 @@ func TestBackup_Enricher_OneFailed_ShowsBrokenPhrase(t *testing.T) {
 			"U11 violation: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
 	}
 
-	// Rows must carry the state value for the failed job.
+	// Rows must carry the state value for the failed job (humanized: "failed", not "FAILED").
 	require.NotEmpty(t, result.AttentionDetails[planID].Rows, "Rows must not be empty — must carry job state detail")
 	stateFound := false
 	for _, row := range result.AttentionDetails[planID].Rows {
-		if row.Value == "FAILED" {
+		if row.Value == "failed" {
 			stateFound = true
 			break
 		}
 	}
 	require.True(t, stateFound,
-		"Rows must contain a row with Value='FAILED' (job state detail); Rows: %v", result.AttentionDetails[planID].Rows)
+		"Rows must contain a row with Value='failed' (humanized job state detail); Rows: %v", result.AttentionDetails[planID].Rows)
 }
 
 // ---------------------------------------------------------------------------
@@ -246,9 +249,11 @@ func TestBackup_Enricher_TwoFailed_CountsCorrectly(t *testing.T) {
 	require.Equal(t, "2 jobs failed in last 24h", updates["status"],
 		"FieldUpdates[status] must equal the S4 phrase")
 
-	// U11: skip pure-integer count values — they naturally appear in count phrases.
+	// U11: skip pure-integer count values — they naturally appear in count phrases —
+	// and skip the humanized "failed" state word, which legitimately overlaps with
+	// the "N jobs failed..." Phrase (see TestBackup_Enricher_OneFailed_ShowsBrokenPhrase).
 	for _, row := range result.AttentionDetails[planID].Rows {
-		if row.Value == "" {
+		if row.Value == "" || row.Value == "failed" {
 			continue
 		}
 		if _, isNum := strconv.Atoi(row.Value); isNum == nil {
@@ -258,13 +263,13 @@ func TestBackup_Enricher_TwoFailed_CountsCorrectly(t *testing.T) {
 			"U11: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
 	}
 
-	// Both FAILED and EXPIRED states must appear in Rows.
+	// Both FAILED and EXPIRED states must appear in Rows (humanized: "failed"/"expired").
 	rowVals := make(map[string]bool)
 	for _, row := range result.AttentionDetails[planID].Rows {
 		rowVals[row.Value] = true
 	}
-	require.True(t, rowVals["FAILED"], "Rows must carry FAILED state; rowValues: %v", rowVals)
-	require.True(t, rowVals["EXPIRED"], "Rows must carry EXPIRED state; rowValues: %v", rowVals)
+	require.True(t, rowVals["failed"], "Rows must carry humanized failed state; rowValues: %v", rowVals)
+	require.True(t, rowVals["expired"], "Rows must carry humanized expired state; rowValues: %v", rowVals)
 }
 
 // ---------------------------------------------------------------------------
@@ -438,8 +443,8 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 	for _, row := range result.AttentionDetails[planID].Rows {
 		rowVals[row.Value] = true
 	}
-	require.True(t, rowVals["FAILED"],
-		"Rows must contain State=FAILED; rows: %v", result.AttentionDetails[planID].Rows)
+	require.True(t, rowVals["failed"],
+		"Rows must contain humanized State=failed; rows: %v", result.AttentionDetails[planID].Rows)
 
 	// Partial evidence must be preserved alongside the FAILED evidence so the
 	// enricher cannot silently drop partial context when a failed job exists.
@@ -452,9 +457,10 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 	}
 	require.True(t, sawPartial, "mixed FAILED+PARTIAL finding must surface partial evidence in Rows")
 
-	// U11: skip pure-integer count values.
+	// U11: skip pure-integer count values, and skip the humanized "failed" state
+	// word, which legitimately overlaps with the "N job(s) failed..." Phrase.
 	for _, row := range result.AttentionDetails[planID].Rows {
-		if row.Value == "" {
+		if row.Value == "" || row.Value == "failed" {
 			continue
 		}
 		if _, isNum := strconv.Atoi(row.Value); isNum == nil {
@@ -745,9 +751,12 @@ func TestBackup_Enricher_FailedBucket_AllStatesMapToBang(t *testing.T) {
 			// allowed to appear inside the Phrase (e.g. "2 jobs failed
 			// in last 24h" legitimately contains "2"), and U11 is meant to
 			// catch Phrase concatenated from descriptive Row values, not
-			// numeric match-ups.
+			// numeric match-ups. Also skip the humanized "failed" state word:
+			// EXPIRED and ABORTED both map to Row.Value "expired"/"aborted"
+			// (no overlap), but FAILED's Row.Value "failed" legitimately
+			// overlaps with the "N job(s) failed..." Phrase text.
 			for _, row := range result.AttentionDetails[tc.planID].Rows {
-				if row.Value == "" {
+				if row.Value == "" || row.Value == "failed" {
 					continue
 				}
 				if _, convErr := strconv.Atoi(row.Value); convErr == nil {
@@ -812,11 +821,13 @@ func TestBackup_Enricher_U11_SummaryNeverContainsRowValues(t *testing.T) {
 
 	for planID, finding := range result.Findings {
 		for _, row := range result.AttentionDetails[planID].Rows {
-			if row.Value == "" {
+			if row.Value == "" || row.Value == "failed" {
 				continue
 			}
 			// Skip pure-integer count values — they naturally appear in count phrases
-			// like "1 job failed in last 24h" and are not a U11 violation.
+			// like "1 job failed in last 24h" and are not a U11 violation. The
+			// "failed" skip above covers the FAILED-state Row.Value, which now
+			// legitimately overlaps the humanized Phrase's "failed" word.
 			if _, isNum := strconv.Atoi(row.Value); isNum == nil {
 				continue
 			}

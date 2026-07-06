@@ -72,15 +72,17 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 			exec := out.Executions[0]
 			lastRunVal := "OK"
 			if s == sfntypes.ExecutionStatusFailed || s == sfntypes.ExecutionStatusTimedOut || s == sfntypes.ExecutionStatusAborted {
+				statusVal := string(s)
+				statusPhrase := domain.HumanizeStatusPhrase(statusVal)
 				if exec.StopDate != nil {
 					elapsed := time.Since(*exec.StopDate)
 					hours := int(elapsed.Hours())
-					lastRunVal = fmt.Sprintf("%s %dh ago", string(s), hours)
+					lastRunVal = fmt.Sprintf("%s %dh ago", statusVal, hours)
 				} else {
-					lastRunVal = string(s)
+					lastRunVal = statusVal
 				}
 				rows := []domain.DetailRow{
-					{Label: "Latest Status", Value: string(s), Tier: "!"},
+					{Label: "Latest Status", Value: statusPhrase, Tier: "!"},
 				}
 				if exec.StopDate != nil {
 					rows = append(rows, domain.DetailRow{Label: "Ended", Value: exec.StopDate.Format("2006-01-02")})
@@ -88,7 +90,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 				if exec.Name != nil && *exec.Name != "" {
 					rows = append(rows, domain.DetailRow{Label: "Execution Name", Value: *exec.Name})
 				}
-				setWave2Finding(&result, r.ID, sfnCodeLatestExecutionFailed, fmt.Sprintf("latest execution %s", string(s)), "!", "sfn", rows, "")
+				setWave2Finding(&result, r.ID, sfnCodeLatestExecutionFailed, fmt.Sprintf("latest execution %s", statusPhrase), "!", "sfn", rows, "")
 			}
 			result.FieldUpdates[r.ID] = map[string]string{
 				"last_run": lastRunVal,

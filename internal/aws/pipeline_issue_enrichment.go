@@ -74,7 +74,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 			lastStatus = stageName
 			rows := []domain.DetailRow{
 				{Label: "Failed Stage", Value: stageName, Tier: "!"},
-				{Label: "Status", Value: string(stage.LatestExecution.Status)},
+				{Label: "Status", Value: domain.HumanizeStatusPhrase(string(stage.LatestExecution.Status))},
 			}
 			// Collect error details from any failed action in this stage.
 			for _, action := range stage.ActionStates {

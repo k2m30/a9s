@@ -22,8 +22,8 @@ const (
 // the single account-level finding onto every identity row in the input slice.
 //
 // §4 precedence:
-//   - SHUTDOWN  → severity "!", Summary "account SHUTDOWN"
-//   - PROBATION → severity "!", Summary "account PROBATION"
+//   - SHUTDOWN  → severity "!", Summary "sending paused by AWS (shutdown)"
+//   - PROBATION → severity "!", Summary "account under review (probation)"
 //   - quota > 80% → severity "~", Summary "quota 80%+ used"
 //   - otherwise → no finding
 //
@@ -94,11 +94,11 @@ func sesAccountFinding(out *sesv2.GetAccountOutput) (domain.FindingCode, string,
 
 	switch enforcementStatus {
 	case "SHUTDOWN":
-		return sesCodeShutdown, "account SHUTDOWN", "!", []domain.DetailRow{
+		return sesCodeShutdown, "sending paused by AWS (shutdown)", "!", []domain.DetailRow{
 			{Label: "Action", Value: "Open an AWS support case after fixing the underlying issue", Tier: "!"},
 		}, true
 	case "PROBATION":
-		return sesCodeProbation, "account PROBATION", "!", []domain.DetailRow{
+		return sesCodeProbation, "account under review (probation)", "!", []domain.DetailRow{
 			{Label: "Action", Value: "Reduce bounce/complaint rate before AWS suspends sending", Tier: "!"},
 		}, true
 	}

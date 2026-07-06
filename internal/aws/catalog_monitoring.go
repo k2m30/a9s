@@ -120,7 +120,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkAlarmCTEvents, NeedsTargetCache: true},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeAlarmStateAlarm, Phrase: "ALARM", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeAlarmStateAlarm, Phrase: "alarm triggered", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeAlarmStateInsufficient, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeAlarmNoActions, Phrase: "no actions", Severity: domain.SevWarn, Source: "wave1"},
 		},
@@ -284,8 +284,8 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "role_name", TargetType: "role"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeCTEventDanger, Phrase: "danger", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeCTEventAttention, Phrase: "attention", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeCTEventDanger, Phrase: "destructive call", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCTEventAttention, Phrase: "root account activity", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeCTEventInfo, Phrase: "routine event", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},

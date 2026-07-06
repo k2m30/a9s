@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -127,23 +128,27 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		}
 
 		var rows []domain.DetailRow
+		var parts []string
 		tier := "~"
 		if criticalTotal > 0 {
 			tier = "!"
+			parts = append(parts, fmt.Sprintf("%d critical", criticalTotal))
 			rows = append(rows, domain.DetailRow{
-				Label: "CRITICAL",
-				Value: fmt.Sprintf("%d CRITICAL findings across %d image(s)", criticalTotal, scannedCount),
+				Label: "Critical",
+				Value: fmt.Sprintf("%d critical findings across %d image(s)", criticalTotal, scannedCount),
 				Tier:  "!",
 			})
 		}
 		if highTotal > 0 {
+			parts = append(parts, fmt.Sprintf("%d high", highTotal))
 			rows = append(rows, domain.DetailRow{
-				Label: "HIGH",
-				Value: fmt.Sprintf("%d HIGH findings across %d image(s)", highTotal, scannedCount),
+				Label: "High",
+				Value: fmt.Sprintf("%d high findings across %d image(s)", highTotal, scannedCount),
 				Tier:  "~",
 			})
 		}
-		setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, rows[0].Value, tier, "ecr", rows, "")
+		summary := strings.Join(parts, ", ") + " vulnerabilities"
+		setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, summary, tier, "ecr", rows, "")
 	})
 	sort.Strings(failures)
 

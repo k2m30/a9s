@@ -215,7 +215,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{FieldPath: "EncryptionConfiguration.KmsKey", TargetType: "kms"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: ecrCodeVulnerabilities, Phrase: "<N> CRITICAL findings across <M> image(s)", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: ecrCodeVulnerabilities, Phrase: "<N> critical, <M> high vulnerabilities", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{

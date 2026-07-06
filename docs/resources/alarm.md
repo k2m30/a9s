@@ -240,7 +240,7 @@ alarm — MONITORING. Lifecycle key: `state`.
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
-| alarm.state.alarm | ALARM | broken | wave1 |
+| alarm.state.alarm | alarm triggered | broken | wave1 |
 | alarm.state.insufficient_data | insufficient data | warn | wave1 |
 | alarm.no_actions | no actions | warn | wave1 |
 <!-- END GENERATED: findings -->

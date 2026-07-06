@@ -193,7 +193,7 @@ ecr — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
-| ecr.vulnerabilities | <N> CRITICAL findings across <M> image(s) | broken | wave2 |
+| ecr.vulnerabilities | <N> critical, <M> high vulnerabilities | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

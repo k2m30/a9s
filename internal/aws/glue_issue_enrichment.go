@@ -58,8 +58,10 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 			run := out.JobRuns[0]
 			s := run.JobRunState
 			if s == gluetypes.JobRunStateFailed || s == gluetypes.JobRunStateError || s == gluetypes.JobRunStateTimeout {
+				stateVal := string(s)
+				statePhrase := domain.HumanizeStatusPhrase(stateVal)
 				rows := []domain.DetailRow{
-					{Label: "State", Value: string(s), Tier: "!"},
+					{Label: "State", Value: statePhrase, Tier: "!"},
 				}
 				if run.CompletedOn != nil {
 					rows = append(rows, domain.DetailRow{Label: "Ended", Value: run.CompletedOn.Format("2006-01-02")})
@@ -67,8 +69,8 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 				if run.ErrorMessage != nil && *run.ErrorMessage != "" {
 					rows = append(rows, domain.DetailRow{Label: "Error", Value: *run.ErrorMessage, Tier: "!"})
 				}
-				setWave2Finding(&result, key, glueCodeLatestRunFailed, fmt.Sprintf("latest run %s", string(s)), "!", "glue", rows, "")
-				result.FieldUpdates[key] = map[string]string{"last_run": string(s)}
+				setWave2Finding(&result, key, glueCodeLatestRunFailed, fmt.Sprintf("latest run %s", statePhrase), "!", "glue", rows, "")
+				result.FieldUpdates[key] = map[string]string{"last_run": stateVal}
 			} else {
 				result.FieldUpdates[key] = map[string]string{"last_run": "OK"}
 			}

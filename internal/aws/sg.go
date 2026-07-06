@@ -80,12 +80,16 @@ func isInternetFacing(p ec2types.IpPermission) bool {
 // computeSGRiskFields inspects the ingress rules of a security group and
 // returns (dangerous_open_count, wide_open, risk_summary).
 //
-//	risk_summary is a short human-readable label:
-//	  ""              — no internet exposure on dangerous ports
-//	  "WIDE_OPEN"     — at least one rule with all-protocols (-1) open to 0.0.0.0/0
-//	  "PORTS:22,3306" — specific dangerous ports open to 0.0.0.0/0
-//	When both wide-open and specific ports are present, "WIDE_OPEN" wins
-//	(it's the more severe signal).
+//	dangerous_open_count and wide_open are the machine fields colorSG reads
+//	to decide severity; they are never rewritten by the humanizer.
+//
+//	risk_summary is a display-only, owner-worded phrase for the list Risk
+//	column and the detail "Risk Summary" row:
+//	  ""                                  — no internet exposure on dangerous ports
+//	  "all ports open to 0.0.0.0/0"        — at least one rule with all-protocols (-1) open to 0.0.0.0/0
+//	  "ports 22, 3306 open to 0.0.0.0/0"   — specific dangerous ports open to 0.0.0.0/0
+//	When both wide-open and specific ports are present, the wide-open phrase
+//	wins (it's the more severe signal) — mirrors colorSG's own precedence.
 func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string) {
 	dangerousCount := 0
 	wideOpen := false
@@ -125,7 +129,7 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 	riskSummary := ""
 	switch {
 	case wideOpen:
-		riskSummary = "WIDE_OPEN"
+		riskSummary = sgWideOpenPhrase
 	case dangerousCount > 0:
 		ports := make([]int, 0, len(portSet))
 		for p := range portSet {
@@ -137,30 +141,41 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 			parts[i] = strconv.Itoa(p)
 		}
 		if len(parts) > 0 {
-			riskSummary = "PORTS:" + strings.Join(parts, ",")
+			riskSummary = sgDangerousPortsPhrase(strings.Join(parts, ", "))
 		} else {
 			// dangerousCount > 0 but no specific port captured (large-range case).
-			riskSummary = "PORTS:?"
+			riskSummary = sgDangerousPortsPhrase("unspecified")
 		}
 	}
 	return strconv.Itoa(dangerousCount), wideOpenStr, riskSummary
 }
 
+// sgWideOpenPhrase is the single owner-worded source for the all-protocols
+// exposure phrase, shared by risk_summary (display) and sgRiskFindings
+// (the Broken-color explanation) so the two never drift.
+const sgWideOpenPhrase = "all ports open to 0.0.0.0/0"
+
+// sgDangerousPortsPhrase is the single owner-worded source for the
+// specific-ports exposure phrase, shared by risk_summary (display) and
+// sgRiskFindings (the Broken-color explanation) so the two never drift.
+func sgDangerousPortsPhrase(ports string) string {
+	return "ports " + ports + " open to 0.0.0.0/0"
+}
+
 // sgRiskFindings mirrors colorSG's own precedence (wide-open first, then
 // dangerous ports) so the list Status cell / detail Attention block always
-// explain the Broken color with a jargon-free cause instead of the raw
-// risk_summary token (WIDE_OPEN / PORTS:...).
+// explain the Broken color with the same owner-worded phrase risk_summary
+// carries for display.
 func sgRiskFindings(wideOpen, dangerousOpenCount, riskSummary string) []domain.Finding {
 	switch {
 	case wideOpen == "true":
 		return []domain.Finding{{
-			Code: sgCodeWideOpen, Phrase: "all ports open to 0.0.0.0/0",
+			Code: sgCodeWideOpen, Phrase: sgWideOpenPhrase,
 			Severity: domain.SevBroken, Source: "wave1",
 		}}
 	case dangerousOpenCount != "" && dangerousOpenCount != "0":
-		ports := strings.TrimPrefix(riskSummary, "PORTS:")
 		return []domain.Finding{{
-			Code: sgCodeDangerousPorts, Phrase: "ports " + ports + " open to 0.0.0.0/0",
+			Code: sgCodeDangerousPorts, Phrase: riskSummary,
 			Severity: domain.SevBroken, Source: "wave1",
 		}}
 	}

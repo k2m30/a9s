@@ -199,7 +199,7 @@ ddb — DATABASES & STORAGE. Lifecycle key: `status`.
 | ddb.warn.updating | updating | warn | wave1 |
 | ddb.warn.deleting | deleting | warn | wave1 |
 | ddb.warn.archiving | archiving | warn | wave1 |
-| ddb.pitr-off | PITR off | warn | wave2 |
+| ddb.pitr-off | point-in-time recovery disabled | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

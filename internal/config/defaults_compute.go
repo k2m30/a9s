@@ -85,7 +85,7 @@ func computeDefaultViews() map[string]ViewDef {
 				{Title: "Runtime", Path: "Runtime", Width: 16},
 				{Title: "Memory", Path: "MemorySize", Width: 8},
 				{Title: "Timeout", Path: "Timeout", Width: 8},
-				{Title: "State", Path: "State", Width: 10},
+				{Title: "State", Key: "state", Path: "State", Width: 10},
 				{Title: "Last Modified", Path: "LastModified", Width: 22},
 			},
 			Detail: []DetailField{

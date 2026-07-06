@@ -152,7 +152,7 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 	if ng.Health != nil {
 		for _, issue := range ng.Health.Issues {
 			healthIssuesCount++
-			issueCodes = append(issueCodes, string(issue.Code))
+			issueCodes = append(issueCodes, domain.HumanizeStatusPhrase(string(issue.Code)))
 		}
 	}
 
@@ -185,7 +185,7 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 			"instance_types":      instanceTypes,
 			"desired_size":        desiredSize,
 			"health_issues_count": strconv.Itoa(healthIssuesCount),
-			"health_issues":       strings.Join(issueCodes, ","),
+			"health_issues":       strings.Join(issueCodes, ", "),
 		},
 		Findings:  findings,
 		RawStruct: ng,

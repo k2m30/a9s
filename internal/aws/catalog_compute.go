@@ -512,7 +512,6 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "BlockDeviceMappings.Ebs.VolumeId", TargetType: "ebs"},
 			{FieldPath: "SecurityGroups.GroupId", TargetType: "sg"},
 			{FieldPath: "NetworkInterfaces.NetworkInterfaceId", TargetType: "eni"},
-			{FieldPath: "IamInstanceProfile.Arn", TargetType: "role"},
 		},
 		Findings: []catalog.FindingDef{
 			{Code: CodeEC2StatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
@@ -885,6 +884,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Findings: []catalog.FindingDef{
 			{Code: CodeEBSStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeEBSStateError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeEBSOrphanUnattached, Phrase: "orphan: unattached Nd", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEBSUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: ebsCodeVolumeIODegraded, Phrase: "volume I/O degraded", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},

@@ -130,7 +130,7 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 		// Check instance status (docs/resources/ec2.md §4 lines 225-227).
 		if is.InstanceStatus != nil {
 			if sf, ok := classifyEC2Status(is.InstanceStatus.Status); ok {
-				statusStr := string(is.InstanceStatus.Status)
+				statusStr := domain.HumanizeStatusPhrase(string(is.InstanceStatus.Status))
 				rows = append(rows, domain.DetailRow{Label: "Instance Status", Value: statusStr, Tier: sf.tier})
 				if sf.tier == "!" {
 					severity = "!"
@@ -145,7 +145,7 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 		// Check system status (docs/resources/ec2.md §4 lines 225-227).
 		if is.SystemStatus != nil {
 			if sf, ok := classifyEC2Status(is.SystemStatus.Status); ok {
-				statusStr := string(is.SystemStatus.Status)
+				statusStr := domain.HumanizeStatusPhrase(string(is.SystemStatus.Status))
 				rows = append(rows, domain.DetailRow{Label: "System Status", Value: statusStr, Tier: sf.tier})
 				if sf.tier == "!" {
 					severity = "!"

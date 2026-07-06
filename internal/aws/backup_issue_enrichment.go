@@ -122,7 +122,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 			for _, job := range b.failedJobs[:cap] {
 				rows = append(rows, domain.DetailRow{
 					Label: "State",
-					Value: string(job.State),
+					Value: domain.HumanizeStatusPhrase(string(job.State)),
 					Tier:  "!",
 				})
 			}

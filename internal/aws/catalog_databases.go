@@ -133,7 +133,7 @@ func colorDDB(r domain.Resource) domain.Color {
 		return domain.ColorWarning
 	case "kms key inaccessible", "archived: kms key lost":
 		return domain.ColorBroken
-	case "PITR off":
+	case "point-in-time recovery disabled":
 		return domain.ColorHealthy
 	}
 	return domain.ColorHealthy
@@ -612,7 +612,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDDBUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDDBDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDDBArchiving, Phrase: "archiving", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: ddbCodePITROff, Phrase: "PITR off", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ddbCodePITROff, Phrase: "point-in-time recovery disabled", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{

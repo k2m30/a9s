@@ -22,7 +22,7 @@ const (
 
 // EnrichCodeBuildStatus calls BatchGetBuilds for the latest build of each project
 // and returns a Finding for every project whose latest build is not SUCCEEDED.
-// Severity is "!" (broken/degraded). Summary: "latest build FAILED (<date>)".
+// Severity is "!" (broken/degraded). Summary: "latest build failed (<date>)".
 func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string]domain.Finding),
@@ -95,6 +95,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 			continue
 		}
 		statusVal := string(b.BuildStatus)
+		statusPhrase := domain.HumanizeStatusPhrase(statusVal)
 		lastBuildVal := statusVal
 		if b.EndTime != nil {
 			elapsed := time.Since(*b.EndTime)
@@ -102,7 +103,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 			lastBuildVal = fmt.Sprintf("%s %dh ago", statusVal, hours)
 		}
 		rows := []domain.DetailRow{
-			{Label: "Status", Value: statusVal, Tier: "!"},
+			{Label: "Status", Value: statusPhrase, Tier: "!"},
 		}
 		if b.EndTime != nil {
 			rows = append(rows, domain.DetailRow{Label: "Ended", Value: b.EndTime.Format("2006-01-02")})
@@ -122,9 +123,9 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 				}
 			}
 		}
-		summary := fmt.Sprintf("latest build %s", statusVal)
+		summary := fmt.Sprintf("latest build %s", statusPhrase)
 		if b.EndTime != nil {
-			summary = fmt.Sprintf("latest build %s (%s)", statusVal, b.EndTime.Format("2006-01-02"))
+			summary = fmt.Sprintf("latest build %s (%s)", statusPhrase, b.EndTime.Format("2006-01-02"))
 		}
 		setWave2Finding(&result, projectName, cbCodeLatestBuildFailed, summary, "!", "cb", rows, "")
 		result.FieldUpdates[projectName] = map[string]string{"last_build": lastBuildVal}

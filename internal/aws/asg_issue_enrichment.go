@@ -75,7 +75,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 			summary = fmt.Sprintf("latest scaling activity failed: %s", statusMsg)
 		}
 		rows := []domain.DetailRow{
-			{Label: "Status", Value: string(act.StatusCode), Tier: "!"},
+			{Label: "Status", Value: domain.HumanizeStatusPhrase(string(act.StatusCode)), Tier: "!"},
 		}
 		if statusMsg != "" {
 			rows = append(rows, domain.DetailRow{Label: "Message", Value: statusMsg, Tier: "!"})

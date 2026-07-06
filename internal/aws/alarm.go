@@ -117,7 +117,7 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 func alarmStateFindings(state string, actionsCount int) []domain.Finding {
 	switch state {
 	case "ALARM":
-		return []domain.Finding{{Code: CodeAlarmStateAlarm, Phrase: "ALARM", Severity: domain.SevBroken, Source: "wave1"}}
+		return []domain.Finding{{Code: CodeAlarmStateAlarm, Phrase: "alarm triggered", Severity: domain.SevBroken, Source: "wave1"}}
 	case "INSUFFICIENT_DATA":
 		return []domain.Finding{{Code: CodeAlarmStateInsufficient, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1"}}
 	case "OK":

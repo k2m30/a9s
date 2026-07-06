@@ -174,8 +174,8 @@ func TestDDB_Enrich_PITRDisabled_HealthyRow(t *testing.T) {
 	if finding.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
-	if finding.Phrase != "PITR off" {
-		t.Errorf("Phrase = %q, want %q", finding.Phrase, "PITR off")
+	if finding.Phrase != "point-in-time recovery disabled" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "point-in-time recovery disabled")
 	}
 
 	// AS-140: FieldUpdates must be empty for this resource — the merged
@@ -218,8 +218,8 @@ func TestDDB_Enrich_PITRDisabled_NonHealthyRow(t *testing.T) {
 	if finding.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
-	if finding.Phrase != "PITR off" {
-		t.Errorf("Phrase = %q, want %q", finding.Phrase, "PITR off")
+	if finding.Phrase != "point-in-time recovery disabled" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "point-in-time recovery disabled")
 	}
 
 	// AS-140: FieldUpdates must be empty for this resource — the merged
@@ -257,8 +257,8 @@ func TestDDB_Enrich_SummaryNotRows_Contract(t *testing.T) {
 		t.Fatalf("expected finding for %q", fixtures.AuditPITROffID)
 	}
 
-	if finding.Phrase != "PITR off" {
-		t.Errorf("Phrase = %q, want exactly %q", finding.Phrase, "PITR off")
+	if finding.Phrase != "point-in-time recovery disabled" {
+		t.Errorf("Phrase = %q, want exactly %q", finding.Phrase, "point-in-time recovery disabled")
 	}
 	// U11: no Row value should appear in Phrase.
 	for _, row := range result.AttentionDetails[fixtures.AuditPITROffID].Rows {

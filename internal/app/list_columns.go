@@ -270,17 +270,36 @@ func listExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resourc
 		return r.ID
 	}
 
-	// Status/lifecycle column — two-layer priority.
+	// Status/lifecycle column — two-layer priority. A Key-less, Path-based
+	// column (e.g. lambda/ec2's per-session view {Title:"State", Path:"State"}
+	// with no Key, or acm/eks/ng's default-view {Path:"Status"} with no Key) is
+	// still the status column by title, so it must route through the same
+	// phraseFromFindings + HumanizeStatusPhrase chokepoint as the Key-based
+	// case — otherwise it falls through to the raw fieldpath/Fields value
+	// further down and a raw AWS enum (e.g. "FAILED", "Active") reaches the
+	// screen. The title check mirrors resolveListStatusCol's own cascade
+	// ("State" OR "Status", case-insensitive) so the two functions never
+	// disagree about which column is the status column.
 	lifecycleKey := "state"
 	if td != nil && td.LifecycleKey != "" {
 		lifecycleKey = td.LifecycleKey
 	}
-	isStatusCol := col.Key == "status" || col.Key == lifecycleKey
+	isStatusCol := col.Key == "status" || col.Key == lifecycleKey ||
+		(col.Key == "" && (strings.EqualFold(col.Title, "status") || strings.EqualFold(col.Title, "state")))
 	if isStatusCol {
 		if phrase := listPhraseFromFindings(r.Findings); phrase != "" {
 			return phrase
 		}
-		return r.Fields[lifecycleKey]
+		if v, ok := r.Fields[lifecycleKey]; ok && v != "" {
+			return domain.HumanizeStatusPhrase(v)
+		}
+		if v, ok := r.Fields["status"]; ok && v != "" {
+			return domain.HumanizeStatusPhrase(v)
+		}
+		if col.Path != "" && r.RawStruct != nil {
+			return domain.HumanizeStatusPhrase(fieldpath.ExtractScalar(r.RawStruct, col.Path))
+		}
+		return ""
 	}
 
 	// Fields map (key-based) takes priority.

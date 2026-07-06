@@ -30,15 +30,20 @@ import (
 // TestAS140_FetcherListPath_NonFindingStatusVisible exercises the fetcher→list
 // contract: when a fetcher emits Fields["status"] = <lifecycle phrase> with
 // empty Findings (healthy / non-broken / non-transitional row), the list
-// status column MUST display the phrase. This regression-pins the
-// LifecycleKey: "status" declaration in internal/catalog/types_*.go for
+// status column MUST display the phrase (as domain.HumanizeStatusPhrase
+// renders it — e.g. raw "ACTIVE"/"CREATE_COMPLETE" enums lowercase and
+// de-snake into "active"/"create complete"; an already-lowercase phrase like
+// "available" or "in-use" passes through unchanged). This regression-pins
+// the LifecycleKey: "status" declaration in internal/catalog/types_*.go for
 // every type whose status column key is "status".
 func TestAS140_FetcherListPath_NonFindingStatusVisible(t *testing.T) {
 	ensureNoColor(t)
 
 	// Each case mirrors what a production fetcher emits for a healthy row:
-	// Fields["status"] carries the lifecycle phrase; Findings is empty
-	// (no Wave-1 broken/warn/transitional finding fired).
+	// Fields["status"] carries the raw lifecycle phrase exactly as the AWS
+	// SDK returns it; Findings is empty (no Wave-1 broken/warn/transitional
+	// finding fired). The assertion below humanizes statusPhrase the same
+	// way the render chokepoint does before checking the list view.
 	cases := []struct {
 		shortName    string // catalog ShortName
 		id           string // resource id for this row
@@ -106,9 +111,10 @@ func TestAS140_FetcherListPath_NonFindingStatusVisible(t *testing.T) {
 			}
 
 			view := newListModel(t, tc.shortName, configForType(tc.shortName), []resource.Resource{res})
-			if !strings.Contains(view, tc.statusPhrase) {
-				t.Errorf("AS-140 regression: list view for %q missing fetcher-emitted Fields[\"status\"] = %q; got:\n%s",
-					tc.shortName, tc.statusPhrase, view)
+			wantPhrase := domain.HumanizeStatusPhrase(tc.statusPhrase)
+			if !strings.Contains(view, wantPhrase) {
+				t.Errorf("AS-140 regression: list view for %q missing fetcher-emitted Fields[\"status\"] = %q (humanized: %q); got:\n%s",
+					tc.shortName, tc.statusPhrase, wantPhrase, view)
 			}
 		})
 	}

@@ -112,6 +112,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 				attID = *att.TransitGatewayAttachmentId
 			}
 			state := string(att.State)
+			humanState := domain.HumanizeStatusPhrase(state)
 			var candidate *worstTGWFinding
 			switch state {
 			case "failed", "failing":
@@ -122,18 +123,18 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 					glyph:   "!",
 					rows: []domain.DetailRow{
 						{Label: "Attachment", Value: attID, Tier: "!"},
-						{Label: "State", Value: state, Tier: "!"},
+						{Label: "State", Value: humanState, Tier: "!"},
 					},
 				}
 			case "modifying", "pendingAcceptance", "rollingBack":
 				issueCount++
 				candidate = &worstTGWFinding{
 					code:    tgwCodeAttachmentTransitional,
-					summary: fmt.Sprintf("attachment %s %s", attID, state),
+					summary: fmt.Sprintf("attachment %s %s", attID, humanState),
 					glyph:   "~",
 					rows: []domain.DetailRow{
 						{Label: "Attachment", Value: attID, Tier: "~"},
-						{Label: "State", Value: state, Tier: "~"},
+						{Label: "State", Value: humanState, Tier: "~"},
 					},
 				}
 			}
