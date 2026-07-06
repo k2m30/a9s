@@ -430,90 +430,48 @@ func TestRelated_NG_AMI_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// --- EBS checker tests (Pattern A — ASG.DescribeAutoScalingGroups + EC2.DescribeInstances) ---
+// --- EBS checker tests (Pattern C — ec2 cache join, see aws_ng_ebs_cache_join_test.go) ---
 
-func ngSrcResourceWithASG(asgName string) resource.Resource {
-	return resource.Resource{
-		ID:   "general-pool",
-		Name: "general-pool",
-		Fields: map[string]string{
-			"cluster_name": "acme-prod",
-		},
-		RawStruct: ekstypes.Nodegroup{
-			NodegroupName: aws.String("general-pool"),
-			ClusterName:   aws.String("acme-prod"),
-			Resources: &ekstypes.NodegroupResources{
-				AutoScalingGroups: []ekstypes.AutoScalingGroup{
-					{Name: aws.String(asgName)},
-				},
-			},
-		},
-	}
-}
-
-// TestRelated_NG_EBS_Match verifies the two-hop path (ASG → EC2.DescribeInstances)
-// completes without error when ASG returns one instance. fakeEC2Batch2 returns
-// empty DescribeInstances so Count=0 — the integration path covers real BDM counts.
-func TestRelated_NG_EBS_Match(t *testing.T) {
-	const asgName = "eks-acme-prod-ng-general-asg"
-
-	fakeASG := newFakeASGWithGroups([]asgtypes.AutoScalingGroup{
-		{
-			AutoScalingGroupName: aws.String(asgName),
-			Instances: []asgtypes.Instance{
-				{InstanceId: aws.String("i-0a1b2c3d4e5f60001")},
-			},
-		},
-	})
-	clients := &awsclient.ServiceClients{AutoScaling: fakeASG, EC2: &fakeEC2Batch2{}}
-	res := ngSrcResourceWithASG(asgName)
-
-	checker := ngCheckerByTarget(t, "ebs")
-	result := checker(context.Background(), clients, res, nil)
-
-	// fakeEC2Batch2.DescribeInstances returns empty → no BDMs found.
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty EC2 stub returns no BDMs)", result.Count)
-	}
-	if result.Err != nil {
-		t.Errorf("unexpected Err: %v", result.Err)
-	}
-}
-
-// TestRelated_NG_EBS_Empty verifies that a node group with no ASG returns Count=0.
+// TestRelated_NG_EBS_Empty verifies that a node group whose nodegroup name
+// cannot be resolved (empty Fields, RawStruct carries no NodegroupName)
+// returns Count=0 via the early-return guard — checkNGEBS no longer touches
+// ASG data at all under the cache-join contract (see
+// aws_ng_ebs_cache_join_test.go for the full cache-join behavior).
 func TestRelated_NG_EBS_Empty(t *testing.T) {
 	res := resource.Resource{
 		ID:     "general-pool",
 		Name:   "general-pool",
 		Fields: map[string]string{},
 		RawStruct: ekstypes.Nodegroup{
-			NodegroupName: aws.String("general-pool"),
-			ClusterName:   aws.String("acme-prod"),
-			Resources:     nil, // no ASGs at all
+			ClusterName: aws.String("acme-prod"),
+			// No NodegroupName — nodegroup name cannot be resolved.
 		},
 	}
-	clients := &awsclient.ServiceClients{AutoScaling: &fakeASGBatch2{}, EC2: &fakeEC2Batch2{}}
 
 	checker := ngCheckerByTarget(t, "ebs")
-	result := checker(context.Background(), clients, res, nil)
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no ASG resources)", result.Count)
+		t.Errorf("Count = %d, want 0 (nodegroup name unresolved)", result.Count)
 	}
 }
 
-// TestRelated_NG_EBS_WrongRawStruct verifies that a wrong RawStruct type
-// returns Count=-1 (defensive guard).
+// TestRelated_NG_EBS_WrongRawStruct verifies that a wrong RawStruct type with
+// no Fields["nodegroup_name"] falls through the same empty-name early return
+// as TestRelated_NG_EBS_Empty — the cache-join contract reads
+// Fields["nodegroup_name"] first and only consults RawStruct as an override,
+// so an unrelated RawStruct type does not force Count=-1 the way the old
+// two-AWS-call implementation's defensive assertStruct guard did.
 func TestRelated_NG_EBS_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "general-pool",
 		RawStruct: "not-a-nodegroup",
 	}
 	checker := ngCheckerByTarget(t, "ebs")
-	result := checker(context.Background(), nil, res, nil)
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (wrong RawStruct type, no nodegroup_name field)", result.Count)
 	}
 }
 

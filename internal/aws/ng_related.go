@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	autoscalingPkg "github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
@@ -235,76 +234,63 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 	return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
 }
 
-// checkNGEBS resolves EBS volume IDs for instances in this node group.
-// Path: NG.Resources.AutoScalingGroups → autoscaling:DescribeAutoScalingGroups →
-// Instances[].InstanceId → ec2:DescribeInstances → BlockDeviceMappings[].Ebs.VolumeId.
-func checkNGEBS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ebs", Count: -1}
-	}
-	if ng.Resources == nil || len(ng.Resources.AutoScalingGroups) == 0 {
-		return resource.RelatedCheckResult{TargetType: "ebs", Count: 0}
-	}
-
-	var asgNames []string
-	for _, asg := range ng.Resources.AutoScalingGroups {
-		if asg.Name != nil && *asg.Name != "" {
-			asgNames = append(asgNames, *asg.Name)
+// checkNGEBS scans the EC2 instance cache for instances tagged with this node
+// group's name via "eks:nodegroup-name" (and, when known, "eks:cluster-name"),
+// then collects the EBS volume IDs from each matched instance's
+// BlockDeviceMappings. Pattern C: tag-based cache scan, mirroring checkNGEC2 —
+// zero extra AWS calls beyond the shared ec2 cache join.
+func checkNGEBS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	nodegroupName := res.Fields["nodegroup_name"]
+	clusterName := res.Fields["cluster_name"]
+	if ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct); ok {
+		if ng.NodegroupName != nil && *ng.NodegroupName != "" {
+			nodegroupName = *ng.NodegroupName
+		}
+		if ng.ClusterName != nil && *ng.ClusterName != "" {
+			clusterName = *ng.ClusterName
 		}
 	}
-	if len(asgNames) == 0 {
+	if nodegroupName == "" {
 		return resource.RelatedCheckResult{TargetType: "ebs", Count: 0}
 	}
 
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.AutoScaling == nil || c.EC2 == nil {
-		return resource.RelatedCheckResult{TargetType: "ebs", Count: -1}
-	}
-
-	asgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscalingPkg.DescribeAutoScalingGroupsOutput, error) {
-		return c.AutoScaling.DescribeAutoScalingGroups(ctx, &autoscalingPkg.DescribeAutoScalingGroupsInput{
-			AutoScalingGroupNames: asgNames,
-		})
-	})
+	ec2List, truncated, err := ngRelatedResources(ctx, clients, cache, "ec2")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "ebs", Count: -1, Err: err}
 	}
-
-	var instanceIDs []string
-	for _, asg := range asgOut.AutoScalingGroups {
-		for _, inst := range asg.Instances {
-			if inst.InstanceId != nil && *inst.InstanceId != "" {
-				instanceIDs = append(instanceIDs, *inst.InstanceId)
-			}
-		}
-	}
-	if len(instanceIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "ebs", Count: 0}
-	}
-
-	ec2Out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeInstancesOutput, error) {
-		return c.EC2.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
-			InstanceIds: instanceIDs,
-		})
-	})
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ebs", Count: -1, Err: err}
+	if ec2List == nil {
+		return resource.RelatedCheckResult{TargetType: "ebs", Count: -1}
 	}
 
 	seen := make(map[string]struct{})
-	for _, res := range ec2Out.Reservations {
-		for _, inst := range res.Instances {
-			for _, bdm := range inst.BlockDeviceMappings {
-				if bdm.Ebs != nil && bdm.Ebs.VolumeId != nil && *bdm.Ebs.VolumeId != "" {
-					seen[*bdm.Ebs.VolumeId] = struct{}{}
+	var ids []string
+	for _, ec2Res := range ec2List {
+		inst, ok := assertStruct[ec2types.Instance](ec2Res.RawStruct)
+		if !ok {
+			continue
+		}
+		if tagValue(inst.Tags, "eks:nodegroup-name") != nodegroupName {
+			continue
+		}
+		if clusterName != "" {
+			instCluster := tagValue(inst.Tags, "eks:cluster-name")
+			if instCluster != "" && instCluster != clusterName {
+				continue
+			}
+		}
+		for _, bdm := range inst.BlockDeviceMappings {
+			if bdm.Ebs != nil && bdm.Ebs.VolumeId != nil && *bdm.Ebs.VolumeId != "" {
+				volumeID := *bdm.Ebs.VolumeId
+				if _, dup := seen[volumeID]; dup {
+					continue
 				}
+				seen[volumeID] = struct{}{}
+				ids = append(ids, volumeID)
 			}
 		}
 	}
-	var ids []string
-	for id := range seen {
-		ids = append(ids, id)
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("ebs")
 	}
 	return relatedResult("ebs", ids)
 }

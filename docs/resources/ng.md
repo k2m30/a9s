@@ -47,7 +47,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ami`, `asg
 ### `ebs`
 
 - **Why related**: root and data volumes attached to worker nodes — capacity, IOPS, encryption posture. Operators pivot here when disk-pressure evictions or storage-full issues appear on the cluster.
-- **How discovered**: node group → backing ASG (`Resources.AutoScalingGroups[0].Name`) → `autoscaling:DescribeAutoScalingGroups.Instances[].InstanceId` → `ec2:DescribeInstances.BlockDeviceMappings[].Ebs.VolumeId` — a9s-devops: chained pivot, cheap when ASG and EC2 lists are already loaded, otherwise fan-out.
+- **How discovered**: zero-call cache join — cached EC2 instances tagged `eks:nodegroup-name` (with the `eks:cluster-name` guard, same match as the `ec2` pivot) → `Instance.BlockDeviceMappings[].Ebs.VolumeId`, deduplicated. Cold or missing EC2 cache → `?`; truncated cache with no match → approximate zero.
 - **Count shown**: yes (sum across all worker-node instances).
 
 ### `ec2`
@@ -187,6 +187,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - `ami` discovery split (`ReleaseVersion` for EKS-optimized, `LaunchTemplate` + `DescribeLaunchTemplateVersions` for custom) — `a9s-devops (2026-04-20): possible=yes, worth=yes. ReleaseVersion identifies the EKS-managed AMI alias; LaunchTemplate fields are populated only when a custom LT was supplied at create time, and resolving to an ImageId needs DescribeLaunchTemplateVersions. Showing the AMI is valuable for patch-level verification and post-drift diagnosis.`
 - `ec2` / `ebs` discovery via ASG → Instances → BlockDeviceMappings — `a9s-devops (2026-04-20): possible=yes, worth=yes. EKS API exposes no direct instance list on a node group; the ASG pivot is the canonical path and is the same one the AWS Console uses. Cheap when ec2 and asg lists are already cached, otherwise fan-out per node group.`
+  <!-- amended 2026-07-06: the "otherwise fan-out" branch violated Policy rule 7 (two AWS calls per checker). Both pivots now use the zero-call variant the citation itself calls cheap: the eks:nodegroup-name / eks:cluster-name tag join over the cached EC2 list (EKS managed node groups always tag their instances), with BlockDeviceMappings read from the cached Instance structs for `ebs`. Cold EC2 cache → `?` instead of a fan-out. -->
+
 - `sg` split between `Resources.RemoteAccessSecurityGroup` and `RemoteAccess.SourceSecurityGroups` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Operators confuse these two; the first is the SG attached to nodes' ENIs for remote access, the second is the list of client SGs allowed to SSH in. Surfacing both (deduplicated) in the related panel prevents "why can't I SSH?" misdiagnosis. Primary data-plane SG for pod traffic lives on the cluster, not the node group.`
 - S4/S5 cause-text rewrites for each `health.issues[]` code — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS surfaces the issue Code and Message verbatim; the spec rewrites jargon-free short causes for S4 (<= 40 chars) and one-line operator sentences for S5 (<= 100 chars). Keeping Message as fallback for DEGRADED so runtime detail isn't lost.`
 
