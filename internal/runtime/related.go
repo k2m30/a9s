@@ -1,8 +1,6 @@
 package runtime
 
 import (
-	"strings"
-
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -45,43 +43,6 @@ func RelatedTitleSuffix(src resource.Resource) string {
 		return " -- " + src.ID + " (" + src.Name + ")"
 	}
 	return " -- " + src.ID
-}
-
-// EnterChildForResource returns the ChildViewDef registered under Key="enter",
-// or nil when absent or DrillCondition vetoes the row.
-func EnterChildForResource(td *resource.ResourceTypeDef, r resource.Resource) *resource.ChildViewDef {
-	if td == nil {
-		return nil
-	}
-	for i := range td.Children {
-		c := &td.Children[i]
-		if c.Key != "enter" {
-			continue
-		}
-		if c.DrillCondition != nil && !c.DrillCondition(r) {
-			return nil
-		}
-		return c
-	}
-	return nil
-}
-
-// BuildChildContextForResource resolves ContextKeys for a ChildViewDef.
-func BuildChildContextForResource(child resource.ChildViewDef, r resource.Resource) map[string]string {
-	ctx := make(map[string]string, len(child.ContextKeys))
-	for param, source := range child.ContextKeys {
-		switch {
-		case source == "ID":
-			ctx[param] = r.ID
-		case source == "Name":
-			ctx[param] = r.Name
-		case strings.HasPrefix(source, "@parent."):
-			// no parent stack in related-navigation NavigationKindDetail entry
-		default:
-			ctx[param] = r.Fields[source]
-		}
-	}
-	return ctx
 }
 
 // MissingFromCache returns ids absent from cache[targetType], excluding empty

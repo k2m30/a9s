@@ -12,6 +12,17 @@ package unit_test
 // TestApp_008_RelatedNavigate_* tests FAIL AT RUNTIME until handleRelatedNavigate
 // is fixed in app_handlers.go.
 // TestApp_008_RelatedCheckResult_Count0_NoNavigation PASSES NOW (regression guard).
+//
+// Rule (owner, 2026-07-06 — supersedes the 2026-04-24 "mirror manual Enter"
+// rule): a related pivot that narrows to exactly ONE resource must open that
+// resource's DETAIL view (fields + related), for EVERY target type, in both
+// lanes (TUI and web) — never the target's enter-keyed child view. The old
+// rule made the web lane diverge from the TUI lane, since the web lane
+// always rendered detail. Child views stay reachable exactly as before by
+// pressing Enter inside the target's own list.
+// TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget (tg) and
+// TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget
+// (asg) pin this rule.
 
 import (
 	"strings"
@@ -117,10 +128,10 @@ func applyRelatedFollowUp(m tui.Model, cmd tea.Cmd) tui.Model {
 
 // TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget verifies that when a
 // RelatedNavigateMsg arrives with a single TargetID (count=1 path), the model
-// mirrors manual Enter on the target's list row: for types with
-// Children[Key="enter"] registered, it must enter that child view rather
-// than push generic detail or a filtered list. tg's enter-child is
-// tg_health.
+// opens the target resource's DETAIL view — per the 2026-07-06 rule
+// (supersedes "mirror manual Enter"), a related-panel Count=1 pivot always
+// lands on detail, even for types like tg that register Children[Key="enter"]
+// (tg_health). Child views stay reachable by pressing Enter in tg's own list.
 func TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget(t *testing.T) {
 	m := newRelatedDemoModel(t)
 
@@ -151,15 +162,14 @@ func TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget(t *testing.T) {
 
 	view := stripAnsi(relatedViewContent(m))
 
-	// tg registers Children[Key="enter"] → tg_health, so fast path enters it.
-	if !strings.Contains(view, "tg_health") {
-		t.Errorf("RelatedNavigateMsg with TargetID on tg (enter-child registered) must enter tg_health child view; got:\n%s", view)
+	if strings.Contains(view, "tg_health") {
+		t.Errorf("RelatedNavigateMsg with TargetID on tg must NOT enter the tg_health child view (2026-07-06 rule: Count=1 pivot always opens detail); got:\n%s", view)
 	}
 	if strings.Contains(view, "tg(1)") {
 		t.Errorf("RelatedNavigateMsg with TargetID=%q must not open a filtered list; got:\n%s", "tg-spec008-single", view)
 	}
-	if strings.Contains(view, "detail -- tg-spec008-single") {
-		t.Errorf("RelatedNavigateMsg for tg (with enter-child) must not push plain detail; got:\n%s", view)
+	if !strings.Contains(view, "detail -- tg-spec008-single") {
+		t.Errorf("RelatedNavigateMsg for tg must open the target's DETAIL view; got:\n%s", view)
 	}
 }
 
@@ -208,10 +218,11 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_AutoOpensDetail(t *testing.T
 }
 
 // TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget verifies
-// the right-column path: RelatedIDs with one element must auto-open the type's drill
-// target (child view if Children[Key="enter"] is registered, else detail) — NOT leave
-// the operator stranded on a 1-row filtered list. For asg the Enter-child is
-// `asg_activities`, so the test asserts that view loads after auto-navigation.
+// the right-column path: RelatedIDs with one element must auto-open the target's
+// DETAIL view — NOT leave the operator stranded on a 1-row filtered list, and NOT
+// the enter-keyed child view even when one is registered (2026-07-06 rule
+// supersedes "mirror manual Enter"). asg registers Children[Key="enter"]=
+// asg_activities but the Count=1 pivot must still land on asg's own detail.
 func TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget(t *testing.T) {
 	m := newRelatedDemoModel(t)
 
@@ -243,13 +254,14 @@ func TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget
 	m = applyRelatedFollowUp(m, cmd)
 
 	view := stripAnsi(relatedViewContent(m))
-	// asg has Children[Key="enter"]=asg_activities — auto-open must mirror
-	// manual Enter and land on the child view, not the generic detail.
-	if !strings.Contains(view, "asg_activities") {
-		t.Fatalf("single related right-column cache-miss path must auto-open asg Enter-child (asg_activities); got:\n%s", view)
+	if strings.Contains(view, "asg_activities") {
+		t.Fatalf("single related right-column cache-miss path must NOT auto-open the asg_activities child view (2026-07-06 rule: Count=1 pivot always opens detail); got:\n%s", view)
 	}
 	if strings.Contains(view, "asg(1/") || strings.Contains(view, "asg(1)") {
 		t.Fatalf("single related right-column cache-miss path must not leave user in list view; got:\n%s", view)
+	}
+	if !strings.Contains(view, "detail -- asg-single-1") {
+		t.Fatalf("single related right-column cache-miss path must auto-open the asg DETAIL view; got:\n%s", view)
 	}
 }
 
@@ -313,12 +325,17 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t 
 	m = applyRelatedFollowUp(m, cmd)
 
 	view := stripAnsi(relatedViewContent(m))
-	// alarm has Children[Key="enter"]=alarm_history — auto-open must open
-	// the Enter-child, not the generic detail. The test still guards the
-	// key property: once the later page yields the target, the user must
-	// not be left on a dead-end 1-row list.
-	if !strings.Contains(view, "alarm_history") {
-		t.Fatalf("exact-ID related navigation should auto-open alarm Enter-child (alarm_history) once a later page contains the target; got:\n%s", view)
+	// alarm has Children[Key="enter"]=alarm_history, but the 2026-07-06 rule
+	// (supersedes the 2026-04-24 "mirror manual Enter" rule) means a related
+	// pivot that narrows to exactly ONE resource always opens that
+	// resource's detail view. The load-more mechanics under test are
+	// unchanged: once the later page yields the target, the user must not
+	// be left on a dead-end 1-row list.
+	if strings.Contains(view, "alarm_history") {
+		t.Fatalf("exact-ID related navigation must NOT auto-open alarm_history (2026-07-06 rule: Count=1 pivot always opens detail); got:\n%s", view)
+	}
+	if !strings.Contains(view, "detail -- alarm-page2-target") {
+		t.Fatalf("exact-ID related navigation should auto-open the alarm DETAIL view once a later page contains the target; got:\n%s", view)
 	}
 }
 
@@ -479,5 +496,88 @@ func TestApp_008_RelatedCheckResult_Count0_NoNavigation(t *testing.T) {
 		if _, isNav := resultMsg.(messages.RelatedNavigate); isNav {
 			t.Error("RelatedCheckResultMsg with Count=0 must not produce RelatedNavigateMsg")
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Count=1 drill rule (2026-07-06): detail for every target type, including
+// childless ones. Parameterized over three enter-child types (s3, tg, asg)
+// plus one childless type (kms) so the childless case proves no regression:
+// with no Children[Key="enter"] to redirect through, kms already landed on
+// detail before this rule change, and must continue to do so.
+// ---------------------------------------------------------------------------
+
+func TestApp_008_RelatedNavigate_CountOne_AlwaysOpensDetail(t *testing.T) {
+	cases := []struct {
+		name       string
+		targetType string
+		res        resource.Resource
+	}{
+		{
+			name:       "s3_has_enter_child",
+			targetType: "s3",
+			res: resource.Resource{
+				ID:     "a9s-drill-rule-bucket",
+				Name:   "a9s-drill-rule-bucket",
+				Fields: map[string]string{"bucket_name": "a9s-drill-rule-bucket"},
+			},
+		},
+		{
+			name:       "tg_has_enter_child",
+			targetType: "tg",
+			res: resource.Resource{
+				ID:     "tg-drill-rule-single",
+				Name:   "drill-rule-target-group",
+				Fields: map[string]string{"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/drill-rule-target-group/def456"},
+			},
+		},
+		{
+			name:       "asg_has_enter_child",
+			targetType: "asg",
+			res: resource.Resource{
+				ID:     "asg-drill-rule-single",
+				Name:   "drill-rule-asg",
+				Fields: map[string]string{"status": "InService"},
+			},
+		},
+		{
+			name:       "kms_is_childless",
+			targetType: "kms",
+			res: resource.Resource{
+				ID:     "arn:aws:kms:us-east-1:123456789012:key/drill-rule-key",
+				Name:   "drill-rule-key",
+				Fields: map[string]string{"status": "Enabled"},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newRelatedDemoModel(t)
+
+			ec2Res := resource.Resource{
+				ID:     "i-0a1b2c3d4e5f60001",
+				Name:   "web-prod-01",
+				Fields: map[string]string{"instance_id": "i-0a1b2c3d4e5f60001"},
+			}
+			m = navigateToEC2DetailRelated(t, m, ec2Res)
+
+			// Prime the target-type cache so RelatedNavigate takes the
+			// NavigationKindDetail cache-hit branch (the branch that used to
+			// redirect into the enter-keyed child view).
+			m = applyRelatedResourcesLoaded(m, tc.targetType, []resource.Resource{tc.res})
+
+			m, cmd := relatedApplyMsg(m, messages.RelatedNavigate{
+				TargetType:     tc.targetType,
+				SourceResource: ec2Res,
+				RelatedIDs:     []string{tc.res.ID},
+			})
+			m = applyRelatedFollowUp(m, cmd)
+
+			view := stripAnsi(relatedViewContent(m))
+			if !strings.Contains(view, "detail -- "+tc.res.ID) {
+				t.Errorf("Count=1 related pivot to %s must open the target's DETAIL view; got:\n%s", tc.targetType, view)
+			}
+		})
 	}
 }

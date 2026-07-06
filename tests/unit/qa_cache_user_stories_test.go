@@ -129,9 +129,12 @@ func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad
 		Fields: map[string]string{"instance_id": "i-cache-001"},
 	}
 	// tg registers Children[Key="enter"] → tg_health with ContextKeys
-	// {"target_group_arn":"target_group_arn"}. Under the rule that
-	// single-result auto-drill mirrors manual Enter, the cache-hit path
-	// must enter that child view rather than push the plain TG detail.
+	// {"target_group_arn":"target_group_arn"}. Rule (owner, 2026-07-06 —
+	// supersedes the 2026-04-24 "mirror manual Enter" rule): a related pivot
+	// that narrows to exactly ONE resource always opens that resource's
+	// plain detail view, even when the target registers an enter-keyed
+	// child view. Pressing Enter inside tg's own list still reaches
+	// tg_health unchanged.
 	tg1 := resource.Resource{
 		ID:     "tg-cache-1",
 		Name:   "frontend-tg",
@@ -159,7 +162,6 @@ func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad
 		SourceResource: src,
 		TargetID:       tg1.ID,
 	})
-	// Drain the EnterChildViewMsg command so the view reflects the child-view push.
 	if cmd != nil {
 		if msg := cmd(); msg != nil {
 			m, _ = rootApplyMsg(m, msg)
@@ -167,18 +169,18 @@ func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad
 	}
 
 	plain := stripANSI(rootViewContent(m))
-	// tg has Children[Key="enter"] → tg_health. The cache-hit fast path
-	// must enter that child view rather than push the plain TG detail.
-	if !strings.Contains(plain, "tg_health") {
-		t.Fatalf("related cache hit on tg (enter-child registered) should enter tg_health child view, got:\n%s", plain)
+	// Must NOT enter tg_health — the 2026-07-06 rule always opens detail.
+	if strings.Contains(plain, "tg_health") {
+		t.Fatalf("related cache hit on tg must NOT enter tg_health (2026-07-06 rule: Count=1 pivot always opens detail), got:\n%s", plain)
 	}
 	// Must NOT show an intermediate filtered list.
 	if strings.Contains(plain, "tg(1)") {
 		t.Fatalf("related cache hit should not show an intermediate target list, got:\n%s", plain)
 	}
-	// Must NOT show the plain tg detail — fast path must enter child view.
-	if strings.Contains(plain, "detail -- "+tg1.ID) {
-		t.Fatalf("tg has Children[Key=\"enter\"] → tg_health; related cache hit must enter the child view, not push plain detail, got:\n%s", plain)
+	// Must show the plain tg detail using target data cached from the
+	// background load — this is the story this test pins.
+	if !strings.Contains(plain, "detail -- "+tg1.ID) {
+		t.Fatalf("related cache hit on tg should open the TG DETAIL view using cached data, got:\n%s", plain)
 	}
 }
 

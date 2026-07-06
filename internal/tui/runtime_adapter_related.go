@@ -337,28 +337,6 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 		}
 		if detailFound {
 			r := detailRes
-			// DirectDetail (set only by the detail-view navigable-field Enter
-			// handler, internal/tui/app_stack.go) means the user asked to see
-			// this exact resource's own detail — skip the enter-child redirect
-			// even when the target type registers Children[Key="enter"] (e.g.
-			// "role" -> role_policies). The related-PANEL Count=1 pivot leaves
-			// DirectDetail false and keeps mirroring "press Enter in the
-			// target's list view" per the pinned 2026-04-24 invariant
-			// (tests/unit/related_navigate_cache_enter_child_test.go).
-			if !msg.DirectDetail {
-				if enterChild := runtime.EnterChildForResource(rt, r); enterChild != nil {
-					ctx := runtime.BuildChildContextForResource(*enterChild, r)
-					displayName := ctx[enterChild.DisplayNameKey]
-					childType := enterChild.ChildType
-					return m, func() tea.Msg {
-						return messages.EnterChildView{
-							ChildType:     childType,
-							ParentContext: ctx,
-							DisplayName:   displayName,
-						}
-					}
-				}
-			}
 			// Push ScreenDetail onto the controller stack and seed DetailState.
 			m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenDetail}})
 			m.ctrl.EnsureDetailState(r, msg.TargetType)

@@ -182,12 +182,15 @@ func TestEC2_008_NavChain_RightCol_Count1_OpensDrillTarget(t *testing.T) {
 		Resources:    []resource.Resource{tgRes},
 	})
 
-	// Deliver RelatedNavigateMsg with TargetID (count=1 path)
+	// Deliver RelatedNavigateMsg with TargetID (count=1 path).
+	// Rule (user, 2026-07-06, supersedes 2026-04-24): a related drill that
+	// narrows to exactly one resource opens that resource's DETAIL view for
+	// every target type; enter-keyed child views stay reachable only via
+	// Enter inside the target's own list.
 	m, cmd := navApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "tg",
 		TargetID:   "tg-ec2chain-001",
 	})
-	// Drain EnterChildViewMsg dispatch so the child view is pushed.
 	if cmd != nil {
 		if msg := cmd(); msg != nil {
 			m, _ = navApplyMsg(m, msg)
@@ -196,14 +199,14 @@ func TestEC2_008_NavChain_RightCol_Count1_OpensDrillTarget(t *testing.T) {
 
 	view := navStripANSI(navViewContent(m))
 
-	if !strings.Contains(view, "tg_health") {
-		t.Errorf("after RelatedNavigateMsg(TargetID) on tg (enter-child registered), view must enter tg_health child view; got:\n%s", view)
+	if !strings.Contains(view, "detail -- tg-ec2chain-001") {
+		t.Errorf("after RelatedNavigateMsg(TargetID) on tg, view must open the tg detail; got:\n%s", view)
 	}
 	if strings.Contains(view, "tg(1)") {
 		t.Errorf("RelatedNavigateMsg(TargetID) must not open a filtered list; got:\n%s", view)
 	}
-	if strings.Contains(view, "detail -- tg-ec2chain-001") {
-		t.Errorf("RelatedNavigateMsg for tg (with enter-child) must not push plain detail; got:\n%s", view)
+	if strings.Contains(view, "tg_health") {
+		t.Errorf("RelatedNavigateMsg(TargetID) must not enter the tg_health child view; got:\n%s", view)
 	}
 }
 

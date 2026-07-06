@@ -1,24 +1,25 @@
 package unit
 
 // related_navigate_cache_enter_child_test.go — Pin for the "single-result
-// auto-drill mirrors Enter" invariant on the CACHE-HIT fast path.
+// pivot always opens the target's DETAIL view" invariant on the CACHE-HIT
+// fast path.
 //
-// Rule (user, 2026-04-24): a related pivot that narrows to Count=1 must do
-// EXACTLY what pressing Enter would do in the target type's list view —
-// if the type registers Children[Key="enter"], drill INTO the child view;
-// otherwise open the generic detail view. The slow path (cache miss →
-// NavigationKindFilteredList + autoOpenSingleDetail) has been doing this since
-// commit e6dfbc9 via (ResourceListModel).enterChildFor. The fast path
-// (cache hit → NavigationKindDetail in internal/runtime/handlers_related.go)
-// was never updated and silently stranded the operator on the generic detail
-// when the target cache was already populated.
+// Rule (owner, 2026-07-06 — supersedes the 2026-04-24 rule): a related pivot
+// that narrows to exactly ONE resource must open that resource's DETAIL view
+// (fields + related), for EVERY target type, in both lanes (TUI and web) —
+// never the target's enter-keyed child view. The old rule ("do exactly what
+// Enter would do" — child view for ~19 types with Children[Key="enter"])
+// made the web lane diverge from the TUI lane, since the web lane always
+// rendered detail. Child views stay reachable exactly as before by pressing
+// Enter inside the target's own list.
 //
 // This test pins the fast-path fix using s3 (Children[Key="enter"] →
-// s3_objects, ContextKeys={"bucket":"ID"}).
+// s3_objects, ContextKeys={"bucket":"ID"}): a cache-hit pivot to s3 must land
+// on the s3 bucket's DETAIL view, not s3_objects.
 
 import (
 	"context"
-	"fmt"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -27,8 +28,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // setupS3ListWithCache primes the root model's resourceCache["s3"] so a
@@ -65,7 +66,9 @@ func setupS3ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 }
 
 // containsEnterChildViewMsg returns true when any message in msgs is an
-// EnterChildViewMsg for the given child type.
+// EnterChildViewMsg for the given child type. Retained for the negative
+// assertion below: the new rule requires this NEVER fires on the related-
+// panel Count=1 pivot.
 func containsEnterChildViewMsg(msgs []tea.Msg, childType string) (messages.EnterChildView, bool) {
 	for _, msg := range msgs {
 		if m, ok := msg.(messages.EnterChildView); ok && m.ChildType == childType {
@@ -75,28 +78,13 @@ func containsEnterChildViewMsg(msgs []tea.Msg, childType string) (messages.Enter
 	return messages.EnterChildView{}, false
 }
 
-// containsNavigateMsgTargetDetail reports whether any message in msgs is a
-// NavigateMsg{Target: TargetDetail} for the given resource type. Used by the
-// negative assertion: when the target registers an enter-child, the fast
-// path must NOT emit a plain detail navigation.
-func containsNavigateMsgTargetDetail(msgs []tea.Msg, resourceType string) bool {
-	for _, msg := range msgs {
-		if m, ok := msg.(messages.Navigate); ok &&
-			m.Target == messages.TargetDetail &&
-			m.ResourceType == resourceType {
-			return true
-		}
-	}
-	return false
-}
-
 // ---------------------------------------------------------------------------
 // Pin: RelatedNavigateMsg with a single cached RelatedID targeting s3 must
-// dispatch EnterChildViewMsg{ChildType:"s3_objects"}, NOT a plain detail
-// NavigateMsg. Mirrors (ResourceListModel).enterChildFor in the fast path.
+// land on the s3 bucket's DETAIL view (frame title "detail -- <id>"), NOT
+// the s3_objects child view.
 // ---------------------------------------------------------------------------
 
-func TestRelatedNavigate_CacheHit_SingleRelatedID_S3_EntersChildView(t *testing.T) {
+func TestRelatedNavigate_CacheHit_SingleRelatedID_S3_OpensDetail(t *testing.T) {
 	m, s3Res := setupS3ListWithCache(t)
 	if len(s3Res) == 0 {
 		t.Fatal("no s3 fixtures loaded")
@@ -113,37 +101,26 @@ func TestRelatedNavigate_CacheHit_SingleRelatedID_S3_EntersChildView(t *testing.
 		SourceType: "cfn",
 	}
 
-	_, cmd := rootApplyMsg(m, navMsg)
-	if cmd == nil {
-		t.Fatal("RelatedNavigateMsg returned nil cmd; expected EnterChildViewMsg for s3_objects")
-	}
+	m, cmd := rootApplyMsg(m, navMsg)
 	_, msgs := drainCmds(t, m, cmd, 4)
 
-	ecv, ok := containsEnterChildViewMsg(msgs, "s3_objects")
-	if !ok {
-		types := make([]string, len(msgs))
-		for i, msg := range msgs {
-			types[i] = fmt.Sprintf("%T", msg)
-		}
-		t.Fatalf("expected EnterChildViewMsg{ChildType:\"s3_objects\"} on cache-hit single-RelatedID drill into s3; got: %v",
-			types)
+	view := stripANSI(rootViewContent(m))
+	if !strings.Contains(view, "detail -- "+bucket.ID) {
+		t.Fatalf("expected s3 bucket DETAIL view (\"detail -- %s\") on cache-hit single-RelatedID pivot into s3; got:\n%s",
+			bucket.ID, view)
 	}
-	if got := ecv.ParentContext["bucket"]; got != bucket.ID {
-		t.Errorf("EnterChildViewMsg.ParentContext[\"bucket\"] = %q, want %q (s3 Children ContextKeys {\"bucket\":\"ID\"})",
-			got, bucket.ID)
-	}
-	if containsNavigateMsgTargetDetail(msgs, "s3") {
-		t.Errorf("fast path also emitted NavigateMsg{TargetDetail, s3} — must not push detail when an enter-child exists; got messages: %v", msgs)
+	if _, ok := containsEnterChildViewMsg(msgs, "s3_objects"); ok {
+		t.Errorf("fast path emitted EnterChildViewMsg{ChildType:\"s3_objects\"} — a related-panel Count=1 pivot must open detail, not the enter-child view")
 	}
 }
 
 // ---------------------------------------------------------------------------
-// Pin: RelatedNavigateMsg with TargetID on s3 (cache hit) also enters child.
+// Pin: RelatedNavigateMsg with TargetID on s3 (cache hit) also opens detail.
 // Covers the TargetID path of the NavigationKindDetail branch
 // (internal/runtime/handlers_related.go) in addition to the single-RelatedID path.
 // ---------------------------------------------------------------------------
 
-func TestRelatedNavigate_CacheHit_TargetID_S3_EntersChildView(t *testing.T) {
+func TestRelatedNavigate_CacheHit_TargetID_S3_OpensDetail(t *testing.T) {
 	m, s3Res := setupS3ListWithCache(t)
 	bucket := s3Res[0]
 
@@ -157,25 +134,15 @@ func TestRelatedNavigate_CacheHit_TargetID_S3_EntersChildView(t *testing.T) {
 		SourceType: "cfn",
 	}
 
-	_, cmd := rootApplyMsg(m, navMsg)
-	if cmd == nil {
-		t.Fatal("RelatedNavigateMsg{TargetID} returned nil cmd")
-	}
+	m, cmd := rootApplyMsg(m, navMsg)
 	_, msgs := drainCmds(t, m, cmd, 4)
 
-	ecv, ok := containsEnterChildViewMsg(msgs, "s3_objects")
-	if !ok {
-		types := make([]string, len(msgs))
-		for i, msg := range msgs {
-			types[i] = fmt.Sprintf("%T", msg)
-		}
-		t.Fatalf("expected EnterChildViewMsg{ChildType:\"s3_objects\"} on cache-hit TargetID drill into s3; got: %v",
-			types)
+	view := stripANSI(rootViewContent(m))
+	if !strings.Contains(view, "detail -- "+bucket.ID) {
+		t.Fatalf("expected s3 bucket DETAIL view (\"detail -- %s\") on cache-hit TargetID pivot into s3; got:\n%s",
+			bucket.ID, view)
 	}
-	if got := ecv.ParentContext["bucket"]; got != bucket.ID {
-		t.Errorf("EnterChildViewMsg.ParentContext[\"bucket\"] = %q, want %q", got, bucket.ID)
-	}
-	if containsNavigateMsgTargetDetail(msgs, "s3") {
-		t.Errorf("fast path also emitted NavigateMsg{TargetDetail, s3} — must not push detail when an enter-child exists")
+	if _, ok := containsEnterChildViewMsg(msgs, "s3_objects"); ok {
+		t.Errorf("fast path emitted EnterChildViewMsg{ChildType:\"s3_objects\"} — a related-panel Count=1 pivot must open detail, not the enter-child view")
 	}
 }

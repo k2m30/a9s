@@ -80,32 +80,6 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 			if ok {
 				m.ctrl.ClearListAutoOpenSingle()
 				shortName := rs.resourceType
-				td := resource.FindResourceType(shortName)
-				if td == nil {
-					td = resource.GetChildType(shortName)
-				}
-				// Check for an enter-keyed child view on this resource type.
-				if td != nil {
-					for i := range td.Children {
-						cv := &td.Children[i]
-						if cv.Key != "enter" {
-							continue
-						}
-						if cv.DrillCondition != nil && !cv.DrillCondition(r) {
-							break
-						}
-						ctx := resource.ResolveChildContext(*cv, &r, m.ctrl.GetListParentContext())
-						displayName := ctx[cv.DisplayNameKey]
-						childType := cv.ChildType
-						return m, tea.Batch(coreCmd, func() tea.Msg {
-							return messages.EnterChildView{
-								ChildType:     childType,
-								ParentContext: ctx,
-								DisplayName:   displayName,
-							}
-						})
-					}
-				}
 				rCopy := r
 				listType := shortName
 				return m, tea.Batch(coreCmd, func() tea.Msg {

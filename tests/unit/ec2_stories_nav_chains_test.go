@@ -26,8 +26,8 @@ import (
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ---------------------------------------------------------------------------
@@ -118,13 +118,14 @@ func chainEsc(m tui.Model) tui.Model {
 // Section 4 — Right Column Enter (count=1): EC2-027, EC2-028
 // ---------------------------------------------------------------------------
 
-// TestEC2_027_ASG_Count1_OpensChildView verifies that a RelatedNavigateMsg with
-// TargetType "asg" and a single TargetID mirrors manual Enter on that row.
-// The asg resource type registers Children[Key="enter"] → asg_activities,
-// so single-result auto-drill must enter that child view rather than push
-// the generic detail (rule 2026-04-24: related-count-1 does exactly what
-// Enter on the target list would do).
-func TestEC2_027_ASG_Count1_OpensChildView(t *testing.T) {
+// TestEC2_027_ASG_Count1_OpensDetail verifies that a RelatedNavigateMsg with
+// TargetType "asg" and a single TargetID opens the asg's DETAIL view. Rule
+// (owner, 2026-07-06 — supersedes the 2026-04-24 "mirror manual Enter"
+// rule): a related pivot that narrows to exactly ONE resource always opens
+// that resource's detail view, even though asg registers
+// Children[Key="enter"] → asg_activities. Pressing Enter inside asg's own
+// list still reaches asg_activities unchanged.
+func TestEC2_027_ASG_Count1_OpensDetail(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
 
@@ -146,7 +147,6 @@ func TestEC2_027_ASG_Count1_OpensChildView(t *testing.T) {
 		TargetType: "asg",
 		TargetID:   "web-prod-asg",
 	})
-	// Drain the EnterChildViewMsg command so the view reflects the push.
 	if cmd != nil {
 		if msg := cmd(); msg != nil {
 			m, _ = chainApplyMsg(m, msg)
@@ -155,18 +155,16 @@ func TestEC2_027_ASG_Count1_OpensChildView(t *testing.T) {
 
 	view := chainStrip(chainViewContent(m))
 
-	// asg_activities child view renders its header with the parent asg_name.
-	if !strings.Contains(view, "web-prod-asg") {
-		t.Errorf("EC2-027: after RelatedNavigateMsg(TargetType=asg, TargetID=web-prod-asg), child view must show parent asg name %q; got:\n%s",
-			"web-prod-asg", view)
-	}
-	// Must NOT show a filtered list title like "asg(1)" — we should be in the child view.
+	// Must NOT show a filtered list title like "asg(1)" — we should be in detail.
 	if strings.Contains(view, "asg(1)") {
-		t.Errorf("EC2-027: RelatedNavigateMsg with TargetID must enter child view, not show a filtered list; got:\n%s", view)
+		t.Errorf("EC2-027: RelatedNavigateMsg with TargetID must enter detail, not show a filtered list; got:\n%s", view)
 	}
-	// Must NOT show the generic asg detail — we should be inside asg_activities.
-	if strings.Contains(view, "detail -- web-prod-asg") {
-		t.Errorf("EC2-027: RelatedNavigateMsg for asg (with enter-child) must NOT push plain detail — it must enter asg_activities; got:\n%s", view)
+	// Must NOT enter asg_activities — the 2026-07-06 rule always opens detail.
+	if strings.Contains(view, "asg_activities") {
+		t.Errorf("EC2-027: RelatedNavigateMsg for asg must NOT enter asg_activities (2026-07-06 rule: Count=1 pivot always opens detail); got:\n%s", view)
+	}
+	if !strings.Contains(view, "detail -- web-prod-asg") {
+		t.Errorf("EC2-027: RelatedNavigateMsg for asg must open the asg DETAIL view; got:\n%s", view)
 	}
 }
 
@@ -495,10 +493,12 @@ func TestEC2_037_ChainC_EC2ToSGAndBack(t *testing.T) {
 	}
 }
 
-// TestEC2_038_ChainD_EC2TabToTGAndBack verifies EC2 detail → TG child view
-// (right column, count=1) → Esc → EC2 detail. The tg type registers
-// Children[Key="enter"] → tg_health, so single-result auto-drill must
-// enter that child view rather than push generic detail (rule 2026-04-24).
+// TestEC2_038_ChainD_EC2TabToTGAndBack verifies EC2 detail → TG detail view
+// (right column, count=1) → Esc → EC2 detail. Rule (owner, 2026-07-06 —
+// supersedes the 2026-04-24 "mirror manual Enter" rule): a related pivot
+// that narrows to exactly ONE resource always opens that resource's detail
+// view, even though tg registers Children[Key="enter"] → tg_health.
+// Pressing Enter inside tg's own list still reaches tg_health unchanged.
 func TestEC2_038_ChainD_EC2TabToTGAndBack(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -521,7 +521,6 @@ func TestEC2_038_ChainD_EC2TabToTGAndBack(t *testing.T) {
 		TargetType: "tg",
 		TargetID:   "tg-web-prod",
 	})
-	// Drain EnterChildViewMsg dispatch so the child view is pushed.
 	if cmd != nil {
 		if msg := cmd(); msg != nil {
 			m, _ = chainApplyMsg(m, msg)
@@ -529,14 +528,12 @@ func TestEC2_038_ChainD_EC2TabToTGAndBack(t *testing.T) {
 	}
 
 	viewTG := chainStrip(chainViewContent(m))
-	// tg has Children[Key="enter"] → tg_health. The fast path must push
-	// that child view — header reads "tg_health".
-	if !strings.Contains(viewTG, "tg_health") {
-		t.Errorf("EC2-038: after RelatedNavigateMsg to TG (with enter-child), view must enter tg_health child view; got:\n%s", viewTG)
+	// Must NOT enter tg_health — the 2026-07-06 rule always opens detail.
+	if strings.Contains(viewTG, "tg_health") {
+		t.Errorf("EC2-038: RelatedNavigateMsg to TG must NOT enter tg_health (2026-07-06 rule: Count=1 pivot always opens detail); got:\n%s", viewTG)
 	}
-	// Must NOT show the generic tg detail — enter-child exists so fast path must use it.
-	if strings.Contains(viewTG, "detail -- tg-web-prod") {
-		t.Errorf("EC2-038: RelatedNavigateMsg for tg (with enter-child) must enter tg_health, not push plain detail; got:\n%s", viewTG)
+	if !strings.Contains(viewTG, "detail -- tg-web-prod") {
+		t.Errorf("EC2-038: after RelatedNavigateMsg to TG, view must show the TG DETAIL view; got:\n%s", viewTG)
 	}
 
 	// Esc → EC2 detail
