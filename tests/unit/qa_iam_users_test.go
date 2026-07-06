@@ -123,6 +123,8 @@ func TestQA_IAMUsers_TypeDef(t *testing.T) {
 		title string
 	}{
 		{"user_name", "User Name"},
+		{"mfa", "MFA"},
+		{"risk", "Status"},
 		{"user_id", "User ID"},
 		{"path", "Path"},
 		{"create_date", "Created"},

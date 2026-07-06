@@ -149,7 +149,7 @@ func TestMSK_ResourceTypeDef(t *testing.T) {
 	}{
 		{"Cluster Name", "cluster_name", 28},
 		{"Type", "cluster_type", 14},
-		{"State", "state", 14},
+		{"Status", "state", 14},
 		{"Version", "version", 14},
 	}
 

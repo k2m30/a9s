@@ -174,6 +174,7 @@ func TestCodeBuild_ResourceTypeDef(t *testing.T) {
 	}{
 		{"Project Name", "name", 32},
 		{"Source Type", "source_type", 14},
+		{"Status", "last_build", 18},
 		{"Description", "description", 36},
 		{"Last Modified", "last_modified", 22},
 	}

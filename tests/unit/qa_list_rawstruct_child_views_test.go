@@ -550,7 +550,10 @@ func TestQA_ListRawStruct_AsgActivities(t *testing.T) {
 	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
-	if !strings.Contains(view, "Successful") {
+	// The "Status"-titled column now routes through domain.HumanizeStatusPhrase
+	// (the title-based Status cascade, a56dc887/142c3a5d): a single-word,
+	// mixed-case AWS enum like "Successful" is lowercased to "successful".
+	if !strings.Contains(view, "successful") {
 		t.Errorf("asg_activities list should contain status code, got:\n%s", view)
 	}
 }
@@ -717,7 +720,10 @@ func TestQA_ListRawStruct_CBBuilds(t *testing.T) {
 	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
-	if !strings.Contains(view, "SUCCEEDED") {
+	// The "Status"-titled column now routes through domain.HumanizeStatusPhrase
+	// (the title-based Status cascade, a56dc887/142c3a5d): the all-caps AWS
+	// enum "SUCCEEDED" is lowercased to "succeeded".
+	if !strings.Contains(view, "succeeded") {
 		t.Errorf("cb_builds list should contain build status, got:\n%s", view)
 	}
 	if !strings.Contains(view, "142") {

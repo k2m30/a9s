@@ -109,6 +109,7 @@ func TestQA_IAMPolicies_TypeDef(t *testing.T) {
 	}{
 		{"policy_name", "Policy Name"},
 		{"policy_type", "Type"},
+		{"risk", "Status"},
 		{"attachment_count", "Attached"},
 		{"path", "Path"},
 		{"create_date", "Created"},

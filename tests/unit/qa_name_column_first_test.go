@@ -107,16 +107,16 @@ var expectedConfigColumnCounts = map[string]int{
 	"sg":     5,
 	"vpc":    6, // +1 Flow Logs (attention signal column)
 	"subnet": 8,
-	"rtb":    6, // +1 Blackholes (attention signal column)
+	"rtb":    7, // +1 Blackholes (attention signal column), +1 single Status column
 	"nat":    7,
 	"igw":    4,
 	"eip":    7, // +1 State/status (attention signal column)
 	"vpce":   6,
 	"tgw":    6, // +1 Att Issues (attention signal column)
 	"eni":    6,
-	"r53":    5,
+	"r53":    6, // +1 single Status column
 	"cf":     8,
-	"apigw":  6, // +1 Stages (attention signal column)
+	"apigw":  7, // +1 Stages (attention signal column), +1 single Status column
 	"efs":    6,
 }
 
@@ -124,7 +124,7 @@ var expectedConfigColumnCounts = map[string]int{
 // definition (resource.FindResourceType). These may differ from config counts
 // when YAML views have been updated ahead of the type definitions.
 var expectedTypeDefColumnCounts = map[string]int{
-	"sg":     4,
+	"sg":     5, // +1 single Status column (risk_summary, added f68982f7)
 	"vpc":    5,
 	"subnet": 7,
 	"rtb":    5,
@@ -194,16 +194,31 @@ var expectedSecondColumn = map[string]struct {
 	"efs":    {configTitle: "File System ID", typeDefTitle: "File System ID", typeDefKey: "file_system_id"},
 }
 
+// configIDColumnIndexOverride lists resource types whose config-driven default
+// view now inserts a single Status column ahead of the ID column (the
+// title-based Status cascade, a56dc887), pushing the ID column from index 1
+// to index 2. The Go ResourceTypeDef.Columns for these types is unaffected
+// (no Status column there), so TestResourceTypeDef_IDColumnSecond still uses
+// index 1 via expectedSecondColumn.
+var configIDColumnIndexOverride = map[string]int{
+	"r53":   2,
+	"apigw": 2,
+}
+
 func TestConfigDefaultViewDef_IDColumnSecond(t *testing.T) {
 	for shortName, want := range expectedSecondColumn {
 		t.Run(shortName, func(t *testing.T) {
 			vd := config.DefaultViewDef(shortName)
-			if len(vd.List) < 2 {
-				t.Fatalf("config.DefaultViewDef(%q) has fewer than 2 columns", shortName)
+			idx := 1
+			if override, ok := configIDColumnIndexOverride[shortName]; ok {
+				idx = override
 			}
-			if vd.List[1].Title != want.configTitle {
-				t.Errorf("config.DefaultViewDef(%q).List[1].Title = %q, want %q",
-					shortName, vd.List[1].Title, want.configTitle)
+			if len(vd.List) <= idx {
+				t.Fatalf("config.DefaultViewDef(%q) has fewer than %d columns", shortName, idx+1)
+			}
+			if vd.List[idx].Title != want.configTitle {
+				t.Errorf("config.DefaultViewDef(%q).List[%d].Title = %q, want %q",
+					shortName, idx, vd.List[idx].Title, want.configTitle)
 			}
 		})
 	}

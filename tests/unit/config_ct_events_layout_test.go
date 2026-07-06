@@ -1,14 +1,18 @@
 package unit
 
 // TestCTEventsViewLayout_MatchesDesignSpec asserts the ct-events column layout
-// in the built-in defaults matches §8 of docs/design/ct-event-list-v2.md exactly.
+// in the built-in defaults matches §8 of docs/design/ct-event-list-v2.md, plus
+// the single Status column added by the title-based cascade (a56dc887): every
+// list view now carries exactly one column titled "Status", key="status",
+// populated by the ct-events fetcher (ct_events.go Fields["status"]).
 //
 // This test catches any accidental width drift in defaults_monitoring.go that
 // would not be caught by compilation. A width change (e.g., TIME from 15→19)
 // is a silent regression — the code compiles but the layout violates the spec.
 //
-// §8 column spec:
+// §8 column spec (plus the Status column inserted at index 1):
 //   V       width=1   key="_ct.verb"
+//   Status  width=12  key="status"
 //   TIME    width=15  key="time"
 //   ACTOR   width=36  key="_ct.actor"
 //   ORIGIN  width=7   key="_ct.origin"
@@ -31,6 +35,7 @@ func TestCTEventsViewLayout_MatchesDesignSpec(t *testing.T) {
 		width int
 	}{
 		{"V", 1},
+		{"Status", 12},
 		{"TIME", 15},
 		{"ACTOR", 36},
 		{"ORIGIN", 7},
@@ -40,14 +45,14 @@ func TestCTEventsViewLayout_MatchesDesignSpec(t *testing.T) {
 	}
 
 	if len(vd.List) != len(wantCols) {
-		t.Fatalf("ct-events list has %d columns, want %d; column count must match §8 spec exactly",
+		t.Fatalf("ct-events list has %d columns, want %d; column count must match §8 spec plus the single Status column",
 			len(vd.List), len(wantCols))
 	}
 
 	for i, want := range wantCols {
 		got := vd.List[i]
 		if got.Title != want.title {
-			t.Errorf("col %d: title = %q, want %q (§8 column order must be V/TIME/ACTOR/ORIGIN/EVENT/TARGET/OUTCOME)",
+			t.Errorf("col %d: title = %q, want %q (column order must be V/Status/TIME/ACTOR/ORIGIN/EVENT/TARGET/OUTCOME)",
 				i, got.Title, want.title)
 		}
 		if got.Width != want.width {
