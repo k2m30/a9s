@@ -162,7 +162,7 @@ func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, event
 	arnToID := make(map[string]string, len(functionArns))
 	if entry, cacheOK := cache["lambda"]; cacheOK {
 		for _, fn := range entry.Resources {
-			if arn := fn.Fields["arn"]; arn != "" {
+			if arn := fn.Fields["arn"]; arn != "" && fn.ID != "" {
 				arnToID[arn] = fn.ID
 			}
 		}

@@ -22,8 +22,8 @@ import (
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ---------------------------------------------------------------------------
@@ -310,11 +310,7 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t 
 		Append: true,
 	})
 	m = m2
-	if cmd != nil {
-		if follow := cmd(); follow != nil {
-			m, _ = relatedApplyMsg(m, follow)
-		}
-	}
+	m = applyRelatedFollowUp(m, cmd)
 
 	view := stripAnsi(relatedViewContent(m))
 	// alarm has Children[Key="enter"]=alarm_history — auto-open must open

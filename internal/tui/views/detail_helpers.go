@@ -760,6 +760,16 @@ func renderRelatedPanel(rows []app.RelatedBlock, filterActive bool, cursor, scro
 		if start < 0 {
 			start = 0
 		}
+		// Upper clamp: when the row set has shrunk (e.g. a related filter)
+		// while a larger scroll offset persists from before the shrink,
+		// start must not run past the last full window — otherwise
+		// rows[start:end] below can panic (end computed as
+		// min(start+usableHeight, len(rows)) can fall below start) or, even
+		// when it doesn't panic, needlessly render a partial trailing window
+		// instead of the fullest valid one.
+		if maxStart := max(len(rows)-usableHeight, 0); start > maxStart {
+			start = maxStart
+		}
 		end := min(start+usableHeight, len(rows))
 
 		for i, blk := range rows[start:end] {

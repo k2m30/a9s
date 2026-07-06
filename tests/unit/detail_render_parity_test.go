@@ -15,7 +15,7 @@
 //     get the body.
 //   - Call got := m.RenderDetail(body) on the SAME sized model m.
 //   - Assert got == legacy EXACTLY. On mismatch: t.Errorf with type + scenario
-//     + a full line-by-line diff. Do NOT suppress or normalise.
+//   - a full line-by-line diff. Do NOT suppress or normalise.
 //
 // Right-column note: View() uses m.rightCol.View() (scrollOffset + visibleIndexes),
 // while RenderDetail uses renderDetailRelatedFromBody (RelatedCursor-based anchor).
@@ -101,6 +101,7 @@ func newDetailController(t *testing.T, res resource.Resource, resourceType strin
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := app.New(core)
+	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenDetail},
 	})
@@ -123,21 +124,21 @@ func detailParityEC2Resource() resource.Resource {
 		ID:   "i-0abc123def456789a",
 		Name: "prod-backend-01",
 		Fields: map[string]string{
-			"instance_id":        "i-0abc123def456789a",
-			"instance_type":      "t3.medium",
-			"state":              "running",
-			"launch_time":        "2024-01-15T10:30:00Z",
-			"public_ip":          "203.0.113.42",
-			"private_ip":         "10.0.1.100",
-			"vpc_id":             "vpc-0abc12345def67890",
-			"subnet_id":          "subnet-0abc12345def67890",
-			"key_name":           "prod-keypair",
-			"image_id":           "ami-0a1b2c3d4e5f60001",
-			"availability_zone":  "us-east-1a",
-			"security_groups":    "sg-0aaa111111111111a",
+			"instance_id":          "i-0abc123def456789a",
+			"instance_type":        "t3.medium",
+			"state":                "running",
+			"launch_time":          "2024-01-15T10:30:00Z",
+			"public_ip":            "203.0.113.42",
+			"private_ip":           "10.0.1.100",
+			"vpc_id":               "vpc-0abc12345def67890",
+			"subnet_id":            "subnet-0abc12345def67890",
+			"key_name":             "prod-keypair",
+			"image_id":             "ami-0a1b2c3d4e5f60001",
+			"availability_zone":    "us-east-1a",
+			"security_groups":      "sg-0aaa111111111111a",
 			"iam_instance_profile": "acme-ec2-instance-profile",
-			"monitoring":         "enabled",
-			"architecture":       "x86_64",
+			"monitoring":           "enabled",
+			"architecture":         "x86_64",
 		},
 	}
 }
@@ -170,15 +171,15 @@ func detailParityS3Resource() resource.Resource {
 		ID:   "acme-prod-assets",
 		Name: "acme-prod-assets",
 		Fields: map[string]string{
-			"name":               "acme-prod-assets",
-			"region":             "us-east-1",
-			"creation_date":      "2022-06-15T08:00:00Z",
-			"versioning":         "Enabled",
-			"encryption":         "AES256",
-			"public_access":      "blocked",
-			"lifecycle_rules":    "3",
-			"object_count":       "15420",
-			"total_size":         "2.3 GB",
+			"name":            "acme-prod-assets",
+			"region":          "us-east-1",
+			"creation_date":   "2022-06-15T08:00:00Z",
+			"versioning":      "Enabled",
+			"encryption":      "AES256",
+			"public_access":   "blocked",
+			"lifecycle_rules": "3",
+			"object_count":    "15420",
+			"total_size":      "2.3 GB",
 		},
 	}
 }
@@ -189,16 +190,16 @@ func detailParityLambdaResource() resource.Resource {
 		ID:   "arn:aws:lambda:us-east-1:123456789012:function:acme-api-handler",
 		Name: "acme-api-handler",
 		Fields: map[string]string{
-			"function_name":  "acme-api-handler",
-			"runtime":        "python3.11",
-			"state":          "Active",
-			"handler":        "index.handler",
-			"memory_size":    "512",
-			"timeout":        "30",
-			"code_size":      "2048576",
-			"role":           "arn:aws:iam::123456789012:role/lambda-exec-role",
-			"last_modified":  "2024-03-01T12:00:00Z",
-			"architecture":   "x86_64",
+			"function_name": "acme-api-handler",
+			"runtime":       "python3.11",
+			"state":         "Active",
+			"handler":       "index.handler",
+			"memory_size":   "512",
+			"timeout":       "30",
+			"code_size":     "2048576",
+			"role":          "arn:aws:iam::123456789012:role/lambda-exec-role",
+			"last_modified": "2024-03-01T12:00:00Z",
+			"architecture":  "x86_64",
 		},
 	}
 }
@@ -227,14 +228,14 @@ func detailParityECSResource() resource.Resource {
 		ID:   "arn:aws:ecs:us-east-1:123456789012:service/acme-prod/api-service",
 		Name: "api-service",
 		Fields: map[string]string{
-			"service_name":       "api-service",
-			"cluster":            "acme-prod",
-			"status":             "ACTIVE",
-			"desired_count":      "3",
-			"running_count":      "3",
-			"pending_count":      "0",
-			"task_definition":    "acme-api:42",
-			"launch_type":        "FARGATE",
+			"service_name":        "api-service",
+			"cluster":             "acme-prod",
+			"status":              "ACTIVE",
+			"desired_count":       "3",
+			"running_count":       "3",
+			"pending_count":       "0",
+			"task_definition":     "acme-api:42",
+			"launch_type":         "FARGATE",
 			"scheduling_strategy": "REPLICA",
 		},
 	}
@@ -339,7 +340,7 @@ func TestDetailRenderParity(t *testing.T) {
 	const (
 		stdW    = 160 // wide — triggers right-column auto-show when defs registered
 		stdH    = 30
-		narrowW = 40  // narrow — right column never shown (< MinInnerContentWidth=58)
+		narrowW = 40 // narrow — right column never shown (< MinInnerContentWidth=58)
 	)
 
 	for _, tc := range detailParityTypes() {
@@ -724,5 +725,62 @@ func TestDetailRenderParity_RelatedPanel_LoadingState(t *testing.T) {
 
 			assertDetailParity(t, td.ShortName, "RelatedLoadingState", &m, body)
 		})
+	}
+}
+
+// TestDetailRenderParity_RelatedPanel_ScrollExceedsRowCount pins a real
+// production panic: when the related panel's row count shrinks (e.g. a
+// re-render after rows are filtered or reloaded) while RelatedScroll still
+// points past the new end, renderRelatedPanel must clamp the scroll window
+// instead of slicing rows[scroll:...] out of range.
+//
+// This does not go through assertDetailParity — View() and RenderDetail use
+// different scroll algorithms once cursor/scroll advance (see file header),
+// so byte-parity is not the contract here. The contract is: RenderDetail must
+// not panic, and must render a sane (in-range) window of the available rows.
+func TestDetailRenderParity_RelatedPanel_ScrollExceedsRowCount(t *testing.T) {
+	tuitest.NoColor(t)
+
+	res := resource.Resource{
+		ID:   "ec2-scroll-clamp-001",
+		Name: "scroll-clamp-01",
+		Fields: map[string]string{
+			"name":   "scroll-clamp-01",
+			"status": "active",
+		},
+	}
+
+	m := views.NewDetail(res, "ec2", nil, keys.Default())
+	m.SetSize(160, 30)
+
+	body := app.DetailBody{
+		Fields: []app.FieldRow{
+			{Key: "name", Value: "scroll-clamp-01"},
+		},
+		RelatedVisible: true,
+		Related: []app.RelatedBlock{
+			{Name: "sg", Count: 1, CountDisplay: "(1)", Actionable: true},
+			{Name: "vpc", Count: 1, CountDisplay: "(1)", Actionable: true},
+		},
+		RelatedScroll:  10,
+		RelatedFocused: false,
+		RelatedCursor:  0,
+	}
+
+	var got string
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("RenderDetail panicked with 2 related rows and RelatedScroll=10 (focused=false): %v", r)
+			}
+		}()
+		got = m.RenderDetail(body)
+	}()
+
+	if !strings.Contains(got, "sg") {
+		t.Errorf("expected clamped related panel to still show row %q, got:\n%s", "sg", got)
+	}
+	if !strings.Contains(got, "vpc") {
+		t.Errorf("expected clamped related panel to still show row %q, got:\n%s", "vpc", got)
 	}
 }

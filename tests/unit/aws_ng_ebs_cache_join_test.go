@@ -136,6 +136,91 @@ func TestRelated_NG_EBS_CacheJoin_MatchByNodegroupTag(t *testing.T) {
 	}
 }
 
+// TestRelated_NG_EBS_CacheJoin_CrossClusterNodegroupNameCollision pins the
+// "eks:cluster-name" guard: an instance tagged with the SAME nodegroup name
+// as the source ("general-pool") but a DIFFERENT cluster ("other-cluster")
+// must be excluded from the volume join, even though the source nodegroup
+// belongs to "prod-cluster". Without the cluster-name guard, two clusters
+// that happen to name a nodegroup identically would leak each other's EBS
+// volumes into the RELATED panel.
+func TestRelated_NG_EBS_CacheJoin_CrossClusterNodegroupNameCollision(t *testing.T) {
+	const ngName = "general-pool"
+	const sourceCluster = "prod-cluster"
+	const otherCluster = "other-cluster"
+
+	matchedInst := resource.Resource{
+		ID:   "i-0abc111111111aaaa",
+		Name: "i-0abc111111111aaaa",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-0abc111111111aaaa"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("eks:nodegroup-name"), Value: aws.String(ngName)},
+				{Key: aws.String("eks:cluster-name"), Value: aws.String(sourceCluster)},
+			},
+			BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
+				{
+					DeviceName: aws.String("/dev/xvda"),
+					Ebs:        &ec2types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-0abc000000000prod01")},
+				},
+			},
+		},
+	}
+	crossClusterInst := resource.Resource{
+		ID:   "i-0abc333333333cccc",
+		Name: "i-0abc333333333cccc",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-0abc333333333cccc"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("eks:nodegroup-name"), Value: aws.String(ngName)},
+				{Key: aws.String("eks:cluster-name"), Value: aws.String(otherCluster)},
+			},
+			BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
+				{
+					DeviceName: aws.String("/dev/xvda"),
+					Ebs:        &ec2types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-0abc000000000other99")},
+				},
+			},
+		},
+	}
+
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{matchedInst, crossClusterInst},
+		},
+	}
+	source := resource.Resource{
+		ID:   ngName,
+		Name: ngName,
+		Fields: map[string]string{
+			"nodegroup_name": ngName,
+			"cluster_name":   sourceCluster,
+		},
+		RawStruct: ekstypes.Nodegroup{
+			NodegroupName: aws.String(ngName),
+			ClusterName:   aws.String(sourceCluster),
+		},
+	}
+
+	checker := ngCheckerByTarget(t, "ebs")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Err != nil {
+		t.Fatalf("unexpected error: %v", result.Err)
+	}
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (cross-cluster nodegroup-name collision must be excluded)", result.Count)
+	}
+	for _, id := range result.ResourceIDs {
+		if id == "vol-0abc000000000other99" {
+			t.Errorf("ResourceIDs = %v — volume from cross-cluster instance %q (cluster %q) leaked into join for source cluster %q",
+				result.ResourceIDs, crossClusterInst.ID, otherCluster, sourceCluster)
+		}
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vol-0abc000000000prod01" {
+		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs, "vol-0abc000000000prod01")
+	}
+}
+
 func TestRelated_NG_EBS_CacheJoin_TruncatedNoMatch_ApproximateZero(t *testing.T) {
 	const ngName = "general-pool"
 

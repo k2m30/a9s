@@ -212,14 +212,8 @@ func TestRelated_Kinesis_Lambda_MappedFnNotInCache_FallsBackToARNBareName(t *tes
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1 (the API-confirmed mapping is authoritative even though its function isn't the one cached — union contract)", result.Count)
 	}
-	found := false
-	for _, id := range result.ResourceIDs {
-		if id == "process-clickstream" {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("ResourceIDs = %v, want to contain %q (bare function name parsed from the cache-missing mapping's own ARN)", result.ResourceIDs, "process-clickstream")
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "process-clickstream" {
+		t.Errorf("ResourceIDs = %v, want [process-clickstream] (bare function name parsed from the cache-missing mapping's own ARN, and nothing else)", result.ResourceIDs)
 	}
 	if fake.calls != 1 {
 		t.Errorf("ListEventSourceMappings called %d times, want exactly 1", fake.calls)

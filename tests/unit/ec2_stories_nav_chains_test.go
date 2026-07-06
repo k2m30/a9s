@@ -892,16 +892,17 @@ func TestEC2_058_CloudTrailPreFiltered(t *testing.T) {
 
 	// Simulate right-column Enter on "CloudTrail Events" row.
 	// The expected result is a pre-filtered search view for the EC2 instance ID.
-	// Since no CloudTrail resource type exists yet, this navigates to "cloudtrail"
-	// and the expectation is that the view contains the pre-filter query.
+	// The CloudTrail Events type's canonical ShortName is "ct-events" (not
+	// "cloudtrail", which is a registered alias of the separate "trail" type —
+	// see internal/aws/catalog_monitoring.go/catalog_data.go).
 	cloudtrailEvents := []resource.Resource{
 		{ID: "event-001", Name: "RunInstances",
 			Fields: map[string]string{"resource_name": "i-0a1b2c3d4e5f60001", "status": "Success"}},
 	}
-	m = chainPreloadResources(m, "cloudtrail", cloudtrailEvents)
+	m = chainPreloadResources(m, "ct-events", cloudtrailEvents)
 
 	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
-		TargetType: "cloudtrail",
+		TargetType: "ct-events",
 		RelatedIDs: []string{"event-001"},
 	})
 

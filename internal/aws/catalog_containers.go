@@ -153,7 +153,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkNGEKS, NeedsTargetCache: true},
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkNGRole, NeedsTargetCache: true},
 			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkNGASG, NeedsTargetCache: true},
-			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkNGEC2, NeedsTargetCache: true},
+			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkNGEC2},
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkNGSG},
 			{TargetType: "ami", DisplayName: "AMI", Checker: checkNGAMI},
 			{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkNGEBS},

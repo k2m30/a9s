@@ -1295,7 +1295,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ng | eks | EKS Clusters | yes |
 | ng | role | IAM Roles | yes |
 | ng | asg | Auto Scaling Groups | yes |
-| ng | ec2 | EC2 Instances | yes |
+| ng | ec2 | EC2 Instances | no |
 | ng | sg | Security Groups | no |
 | ng | ami | AMI | no |
 | ng | ebs | EBS Volumes | no |
@@ -1745,9 +1745,9 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ecr | cfn | CloudFormation Stacks | yes |
 | ecr | kms | KMS Key | no |
 | ecr | ct-events | CloudTrail Events | yes |
-| ecr | eb-rule | EventBridge Rules | no |
+| ecr | eb-rule | EventBridge Rules | yes |
 | ecr | ecs-task | ECS Tasks | yes |
-| ecr | pipeline | CodePipelines | no |
+| ecr | pipeline | CodePipelines | yes |
 | ecr | role | IAM Roles | no |
 | codeartifact | kms | KMS Key | no |
 | codeartifact | ct-events | CloudTrail Events | no |

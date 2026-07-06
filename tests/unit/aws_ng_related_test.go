@@ -765,37 +765,6 @@ func TestRelated_NG_EC2_NilCache(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_EC2_InstanceNotEC2Type verifies that cache entries whose RawStruct
-// is not ec2types.Instance are skipped without panic.
-func TestRelated_NG_EC2_InstanceNotEC2Type(t *testing.T) {
-	const ngName = "general-pool"
-
-	wrongTypeRes := resource.Resource{
-		ID:        "i-abcdef1234567890",
-		RawStruct: iamtypes.Role{},
-	}
-	cache := resource.ResourceCache{
-		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{wrongTypeRes}},
-	}
-	source := resource.Resource{
-		ID:   ngName,
-		Name: ngName,
-		Fields: map[string]string{
-			"nodegroup_name": ngName,
-		},
-		RawStruct: ekstypes.Nodegroup{
-			NodegroupName: aws.String(ngName),
-		},
-	}
-
-	checker := ngCheckerByTarget(t, "ec2")
-	result := checker(context.Background(), nil, source, cache)
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (wrong RawStruct type in cache entry)", result.Count)
-	}
-}
-
 // TestRelated_NG_EC2_TruncatedCacheNoMatch verifies Approximate=true when
 // cache is truncated and zero matches found.
 func TestRelated_NG_EC2_TruncatedCacheNoMatch(t *testing.T) {

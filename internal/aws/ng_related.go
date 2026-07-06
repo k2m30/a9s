@@ -125,10 +125,38 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 
 // checkNGEC2 scans the EC2 instance cache for instances tagged with this node
 // group's name via "eks:nodegroup-name" and optionally "eks:cluster-name".
-// Pattern C: tag-based cache scan.
-func checkNGEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	nodegroupName := res.Fields["nodegroup_name"]
-	clusterName := res.Fields["cluster_name"]
+// Pattern C: tag-based cache scan, reading the cache directly — a cold or
+// missing "ec2" cache entry must never trigger a live fetch (see
+// checkNGEBS/ngCachedEC2Instances for the shared contract).
+func checkNGEC2(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	nodegroupName, clusterName := ngIdentity(res)
+	if nodegroupName == "" {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
+	}
+
+	ec2List, truncated, ok := ngCachedEC2Instances(cache)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+	}
+
+	matches := matchingNGInstances(ec2List, nodegroupName, clusterName)
+	var ids []string
+	for _, m := range matches {
+		ids = append(ids, m.resource.ID)
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("ec2")
+	}
+	return relatedResult("ec2", ids)
+}
+
+// ngIdentity resolves a node group's nodegroup name and cluster name,
+// preferring the RawStruct's live values over the pre-extracted Fields map.
+// Shared by every NG-related checker that needs to match EC2 instances by
+// the "eks:nodegroup-name"/"eks:cluster-name" tags.
+func ngIdentity(res resource.Resource) (nodegroupName, clusterName string) {
+	nodegroupName = res.Fields["nodegroup_name"]
+	clusterName = res.Fields["cluster_name"]
 	if ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct); ok {
 		if ng.NodegroupName != nil && *ng.NodegroupName != "" {
 			nodegroupName = *ng.NodegroupName
@@ -137,19 +165,24 @@ func checkNGEC2(ctx context.Context, clients any, res resource.Resource, cache r
 			clusterName = *ng.ClusterName
 		}
 	}
-	if nodegroupName == "" {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
-	}
+	return nodegroupName, clusterName
+}
 
-	ec2List, truncated, err := ngRelatedResources(ctx, clients, cache, "ec2")
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
-	}
-	if ec2List == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
-	}
+// ngInstanceMatch pairs a matched EC2 resource.Resource with its typed
+// ec2types.Instance so callers can read whichever fields they need
+// (checkNGEC2 needs the resource ID; checkNGEBS needs BlockDeviceMappings)
+// without re-asserting RawStruct a second time.
+type ngInstanceMatch struct {
+	resource resource.Resource
+	instance ec2types.Instance
+}
 
-	var ids []string
+// matchingNGInstances scans ec2List for instances tagged with nodegroupName
+// via "eks:nodegroup-name" and, when clusterName is non-empty, also matching
+// "eks:cluster-name". Shared by checkNGEC2 and checkNGEBS, which previously
+// each carried their own verbatim copy of this tag-matching loop.
+func matchingNGInstances(ec2List []resource.Resource, nodegroupName, clusterName string) []ngInstanceMatch {
+	var matches []ngInstanceMatch
 	for _, ec2Res := range ec2List {
 		inst, ok := assertStruct[ec2types.Instance](ec2Res.RawStruct)
 		if !ok {
@@ -164,12 +197,9 @@ func checkNGEC2(ctx context.Context, clients any, res resource.Resource, cache r
 				continue
 			}
 		}
-		ids = append(ids, ec2Res.ID)
+		matches = append(matches, ngInstanceMatch{resource: ec2Res, instance: inst})
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ec2")
-	}
-	return relatedResult("ec2", ids)
+	return matches
 }
 
 // checkNGSG extracts the remote access security group from the EKS Node Group's
@@ -238,47 +268,24 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 // group's name via "eks:nodegroup-name" (and, when known, "eks:cluster-name"),
 // then collects the EBS volume IDs from each matched instance's
 // BlockDeviceMappings. Pattern C: tag-based cache scan, mirroring checkNGEC2 —
-// zero extra AWS calls beyond the shared ec2 cache join.
-func checkNGEBS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	nodegroupName := res.Fields["nodegroup_name"]
-	clusterName := res.Fields["cluster_name"]
-	if ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct); ok {
-		if ng.NodegroupName != nil && *ng.NodegroupName != "" {
-			nodegroupName = *ng.NodegroupName
-		}
-		if ng.ClusterName != nil && *ng.ClusterName != "" {
-			clusterName = *ng.ClusterName
-		}
-	}
+// zero extra AWS calls; a cold or missing "ec2" cache entry reads as unknown
+// ("?"), never as a fetch trigger (docs/resources/ng.md §2 ebs bullet).
+func checkNGEBS(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	nodegroupName, clusterName := ngIdentity(res)
 	if nodegroupName == "" {
 		return resource.RelatedCheckResult{TargetType: "ebs", Count: 0}
 	}
 
-	ec2List, truncated, err := ngRelatedResources(ctx, clients, cache, "ec2")
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ebs", Count: -1, Err: err}
-	}
-	if ec2List == nil {
+	ec2List, truncated, ok := ngCachedEC2Instances(cache)
+	if !ok {
 		return resource.RelatedCheckResult{TargetType: "ebs", Count: -1}
 	}
 
+	matches := matchingNGInstances(ec2List, nodegroupName, clusterName)
 	seen := make(map[string]struct{})
 	var ids []string
-	for _, ec2Res := range ec2List {
-		inst, ok := assertStruct[ec2types.Instance](ec2Res.RawStruct)
-		if !ok {
-			continue
-		}
-		if tagValue(inst.Tags, "eks:nodegroup-name") != nodegroupName {
-			continue
-		}
-		if clusterName != "" {
-			instCluster := tagValue(inst.Tags, "eks:cluster-name")
-			if instCluster != "" && instCluster != clusterName {
-				continue
-			}
-		}
-		for _, bdm := range inst.BlockDeviceMappings {
+	for _, m := range matches {
+		for _, bdm := range m.instance.BlockDeviceMappings {
 			if bdm.Ebs != nil && bdm.Ebs.VolumeId != nil && *bdm.Ebs.VolumeId != "" {
 				volumeID := *bdm.Ebs.VolumeId
 				if _, dup := seen[volumeID]; dup {
@@ -312,6 +319,38 @@ func checkNGSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 	}
 	return relatedResult("subnet", ids)
+}
+
+// ngCachedEC2Instances reads the "ec2" entry directly from cache — it never
+// fetches. checkNGEC2 and checkNGEBS both join against the EC2 cache purely
+// as a tag scan (Pattern C), so a cold or missing cache must surface as
+// unknown (Count:-1, "?") rather than trigger a live DescribeInstances call.
+//
+// ok is false (unknown) when:
+//   - no "ec2" entry exists in cache at all, or
+//   - the entry exists but holds at least one row and NONE of them assert to
+//     ec2types.Instance — a disk-seeded cache entry carries rows without
+//     RawStruct, so the tag-matching scan below would silently match nothing
+//     and be indistinguishable from a genuine zero. An empty (len==0) entry
+//     is a legitimate exact-zero source list and is NOT treated as unknown.
+func ngCachedEC2Instances(cache resource.ResourceCache) (rows []resource.Resource, truncated bool, ok bool) {
+	entry, present := cache["ec2"]
+	if !present {
+		return nil, false, false
+	}
+	if len(entry.Resources) > 0 {
+		structOK := false
+		for _, r := range entry.Resources {
+			if _, asserted := assertStruct[ec2types.Instance](r.RawStruct); asserted {
+				structOK = true
+				break
+			}
+		}
+		if !structOK {
+			return nil, false, false
+		}
+	}
+	return entry.Resources, entry.IsTruncated, true
 }
 
 // ngRelatedResources returns the resource list for target from cache or by fetching the first page.

@@ -80,12 +80,24 @@ type ResourcesLoadedEvent struct {
 //     tests/unit/runtime_list_open_enrich_dispatch_test.go for the pinned
 //     contract this branch satisfies.
 func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []TaskRequest) {
+	// Canonicalize once at the chokepoint: an alias-opened list ("buckets",
+	// "workgroups") must key the gen-guard map, RowStore reseed, task scope,
+	// and HasIssueEnricher lookup by the same ShortName that
+	// RowStore/EnrichmentTypeGen/ProbeResources use everywhere else — the raw
+	// alias would dispatch a task under a scope no enrichment reads and never
+	// find rows to enrich (mirrors handleEnrichmentChecked's canonicalization
+	// in handlers_availability.go).
+	resType := ev.ResourceType
+	if td := resource.FindResourceType(resType); td != nil {
+		resType = td.ShortName
+	}
+
 	intents := []UIIntent{ClearFlash{}}
 
-	if ev.ResourceType != "" && !ev.Append {
-		if !c.HasResourceCache(ev.ResourceType) {
+	if resType != "" && !ev.Append {
+		if !c.HasResourceCache(resType) {
 			intents = append(intents, PatchResourceCache{
-				ResourceType: ev.ResourceType,
+				ResourceType: resType,
 				Entry: &domain.ListViewCacheEntry{
 					Resources:  ev.Resources,
 					Pagination: ev.Pagination,
@@ -96,25 +108,25 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 
 	if ev.Err != nil {
 		intents = append(intents, FlashIntent{
-			Text:    "fetch " + ev.ResourceType + ": " + ev.Err.Error(),
+			Text:    "fetch " + resType + ": " + ev.Err.Error(),
 			IsError: true,
 		})
 	}
 
 	var tasks []TaskRequest
-	if ev.TypeGen != 0 && ev.TypeGen == c.session.EnrichmentTypeGen[ev.ResourceType] {
+	if ev.TypeGen != 0 && ev.TypeGen == c.session.EnrichmentTypeGen[resType] {
 		// task #17 wave 1 stage 2: the removed session.ProbeResources/
 		// ProbeTruncated reseed is now store-only — ObserveRows below is this
 		// reseed's only destination. The enrichment-rerun reseed is a genuine
 		// fetch result — OriginFetch, wholesale replace (mirrors the
 		// unconditional whole-slice assignment the legacy map write used to
 		// perform, not an append).
-		c.ObserveRows(ev.ResourceType, ev.Resources, ev.Pagination, session.OriginFetch, false)
+		c.ObserveRows(resType, ev.Resources, ev.Pagination, session.OriginFetch, false)
 		tasks = append(tasks, TaskRequest{
-			Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: ev.ResourceType},
+			Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: resType},
 		})
 	} else if ev.TypeGen == 0 && ev.Err == nil && !ev.Append &&
-		resource.FindResourceType(ev.ResourceType) != nil && c.HasIssueEnricher(ev.ResourceType) {
+		resource.FindResourceType(resType) != nil && c.HasIssueEnricher(resType) {
 		// List-open Wave-2 dispatch (converges the web/headless and TUI
 		// lanes onto one producer — see HandleEvent's messages.ResourcesLoaded
 		// case, which forwards only the tasks this branch returns so its own
@@ -128,7 +140,7 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 		// (unlike the rerun branch above, which is invoked in a context
 		// where that write-through is not guaranteed to have happened yet).
 		tasks = append(tasks, TaskRequest{
-			Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: ev.ResourceType},
+			Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: resType},
 		})
 	}
 

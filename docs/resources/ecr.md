@@ -204,8 +204,8 @@ ecr — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
 | cfn | CloudFormation Stacks | yes |
 | kms | KMS Key | no |
 | ct-events | CloudTrail Events | yes |
-| eb-rule | EventBridge Rules | no |
+| eb-rule | EventBridge Rules | yes |
 | ecs-task | ECS Tasks | yes |
-| pipeline | CodePipelines | no |
+| pipeline | CodePipelines | yes |
 | role | IAM Roles | no |
 <!-- END GENERATED: related -->
