@@ -194,16 +194,30 @@ func (s *Server) getOrCreateSession(sessionID string) *sessionEntry {
 // ClientsReady-time dispatch. Any startup command (-c) is no longer applied
 // here: newSession arms it via Core.SetCommand (the same runtime.Core.Session
 // .Command field tui.WithCommand sets), so BootstrapLive's HandleClientsReady
-// call below arms session.CommandArmed/PendingCommand itself, and the
-// DrainSyncProgress call's per-task interception of TaskKindEmitNavigate
-// (see drainsync.go) applies the deferred navigation the moment
-// handleAvailabilityCacheLoaded emits it — the same one lane the TUI's -c
-// flag drives (DEF-14/D11), instead of a second server-side apply racing or
-// duplicating it.
+// call below arms session.CommandArmed/PendingCommand itself, and the drain's
+// per-task interception of TaskKindEmitNavigate (see drainsync.go) applies
+// the deferred navigation the moment handleAvailabilityCacheLoaded emits it —
+// the same one lane the TUI's -c flag drives (DEF-14/D11), instead of a
+// second server-side apply racing or duplicating it.
 //
 // It runs in its own goroutine and relies on the controller's internal
 // locking (not entry.mu), so request handlers are never blocked for the
 // connect's duration — the page renders the menu while this runs.
+//
+// Uses the per-task-budget drain (DrainSyncPerTaskTimeout), not a single
+// umbrella deadline over the whole sweep: a live bootstrap fans out identity
+// + cache load + one Wave-1 probe per resource type + one Wave-2 enrichment
+// per enrichable type — on the order of 100+ tasks. A single
+// context.WithTimeout(60s) shared across that entire batch used to expire
+// mid-sweep and silently drop every remaining task (DEF: stale disk counts,
+// no issue badges, forever). Per-task budgets let the queue always finish;
+// see backgroundTaskTimeout's doc comment for why 30s is the right per-task
+// bound. The parent context here is context.Background() (cancellation-only,
+// never expires): this goroutine is not tied to any http.Request context, and
+// there is no server-lifetime context available to hang it on (the ctx
+// ListenAndServe receives is a local variable, not stored on Server) — the
+// drain is instead bounded by backgroundTaskTimeout × len(tasks) in the
+// worst case, same backstop shape as drainBackgroundTasks below.
 func (s *Server) bootstrapLiveSession(entry *sessionEntry) {
 	tasks := entry.ctrl.BootstrapLive(s.profile, s.region)
 
@@ -213,15 +227,25 @@ func (s *Server) bootstrapLiveSession(entry *sessionEntry) {
 	// progressively. Live fetches across all resource types take tens of
 	// seconds; a single notify at the end would leave the browser blank that
 	// whole time, then populate all at once.
-	app.DrainSyncProgress(entry.ctrl, tasks, func() { s.notifySubscribers(entry) })
+	app.DrainSyncPerTaskTimeout(context.Background(), entry.ctrl, tasks, backgroundTaskTimeout, func() { s.notifySubscribers(entry) })
 	s.notifySubscribers(entry)
 }
 
-// backgroundDrainTimeout bounds a single background-task drain (related-check
-// fan-out, detail enrichment, save-cache). 60s comfortably covers a live
-// (non-demo) related-check fan-out across many resource types without risking
-// an unbounded goroutine on a slow/hung AWS call.
-const backgroundDrainTimeout = 60 * time.Second
+// backgroundTaskTimeout bounds a SINGLE task's Core.ExecuteTask call within a
+// background drain (bootstrapLiveSession's availability sweep, and
+// drainBackgroundTasks' related-check fan-out / detail enrichment /
+// save-cache) — not the whole batch. Each probe/enrich task already
+// self-bounds its one AWS list-or-describe call at 10s internally
+// (Core.ProbeResourceAvailability / Core.ProbeEnrichment both wrap the call
+// in their own context.WithTimeout(ctx, 10*time.Second), inclusive of
+// RetryOnThrottle's up-to-3-attempt backoff), so 30s gives that inner
+// deadline comfortable headroom to fire first in the normal case while still
+// acting as a real backstop against a task that ignores ctx internally or
+// blocks on something other than the AWS call (e.g. a lock wait). This
+// constant replaces the old backgroundDrainTimeout, which bounded an entire
+// multi-task batch instead of one task and silently dropped everything after
+// it queued past the batch's single deadline.
+const backgroundTaskTimeout = 30 * time.Second
 
 // drainBackgroundTasks runs pending (already partitioned as background by
 // handleAction via app.DrainSyncPartition) to completion in its own
@@ -263,10 +287,10 @@ func (s *Server) drainBackgroundTasks(entry *sessionEntry, pending []runtime.Tas
 			entry.inFlightMu.Unlock()
 		}()
 
-		ctx, cancel := context.WithTimeout(context.Background(), backgroundDrainTimeout)
-		defer cancel()
-
-		app.DrainSyncContextProgress(ctx, entry.ctrl, deduped, func() { s.notifySubscribers(entry) })
+		// Cancellation-only parent (context.Background(), same rationale as
+		// bootstrapLiveSession) — the per-task budget is backgroundTaskTimeout,
+		// applied individually inside DrainSyncPerTaskTimeout.
+		app.DrainSyncPerTaskTimeout(context.Background(), entry.ctrl, deduped, backgroundTaskTimeout, func() { s.notifySubscribers(entry) })
 		s.notifySubscribers(entry)
 	}()
 }
