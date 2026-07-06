@@ -135,6 +135,20 @@ func buildECSClusters() []ecstypes.Cluster {
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
+		// Status=PROVISIONING → Warning (colorECSCluster)
+		{
+			ClusterName:                       aws.String("acme-cluster-provisioning"),
+			ClusterArn:                        aws.String("arn:aws:ecs:us-east-1:123456789012:cluster/acme-cluster-provisioning"),
+			Status:                            aws.String("PROVISIONING"),
+			RunningTasksCount:                 0,
+			PendingTasksCount:                 0,
+			ActiveServicesCount:               0,
+			RegisteredContainerInstancesCount: 0,
+			CapacityProviders:                 []string{"FARGATE"},
+			Tags: []ecstypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("dev")},
+			},
+		},
 	}
 }
 

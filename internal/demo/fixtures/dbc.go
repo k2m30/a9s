@@ -337,6 +337,20 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			StorageEncrypted:            aws.Bool(true),
 			VpcId:                       aws.String(dbcVPCID),
 		},
+		// Status=creating (transitional) → Warning (colorDBCSnap).
+		{
+			DBClusterSnapshotIdentifier: aws.String("acme-docdb-prod-snap-creating"),
+			DBClusterIdentifier:         aws.String(ProdDbcID),
+			DBClusterSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:cluster-snapshot:acme-docdb-prod-snap-creating"),
+			Status:                      aws.String("creating"),
+			Engine:                      aws.String("docdb"),
+			EngineVersion:               aws.String("5.0.0"),
+			SnapshotType:                aws.String("automated"),
+			SnapshotCreateTime:          aws.Time(time.Now().UTC().Add(-5 * time.Minute)),
+			StorageType:                 aws.String("standard"),
+			StorageEncrypted:            aws.Bool(true),
+			VpcId:                       aws.String(dbcVPCID),
+		},
 		// incompatible-restore (Broken).
 		{
 			DBClusterSnapshotIdentifier: aws.String(WarnDBCSnapIncompatibleRestoreID),

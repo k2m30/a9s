@@ -280,6 +280,18 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/awseb-e-acmeprodapi-stack/cccc5555-dddd-6666-eeee-777777777777"),
 			RoleARN:      aws.String(prodCIDeployRoleARN),
 		},
+		// DELETE_COMPLETE → Dim (cfnStackColor). DescribeStacks still reports a
+		// recently torn-down stack for a retention window after deletion.
+		{
+			StackName:         aws.String("acme-decommissioned-poc"),
+			StackStatus:       cfntypes.StackStatusDeleteComplete,
+			StackStatusReason: aws.String("User Initiated"),
+			CreationTime:      aws.Time(mustParseCFNTime("2025-08-01T10:00:00+00:00")),
+			LastUpdatedTime:   aws.Time(mustParseCFNTime("2026-04-01T09:00:00+00:00")),
+			Description:       aws.String("Decommissioned proof-of-concept environment"),
+			StackId:           aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-decommissioned-poc/dddd6666-eeee-7777-ffff-888888888888"),
+			RoleARN:           aws.String(prodCIDeployRoleARN),
+		},
 	}
 
 	stackEvents := map[string][]cfntypes.StackEvent{

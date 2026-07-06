@@ -665,6 +665,20 @@ func buildVpcs() []ec2types.Vpc {
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
+		// State=pending → wave1 finding (CodeVPCStatePending, SevWarn) → Warning.
+		{
+			VpcId:           aws.String("vpc-0pending111111111"),
+			CidrBlock:       aws.String("10.30.0.0/16"),
+			State:           ec2types.VpcStatePending,
+			IsDefault:       aws.Bool(false),
+			InstanceTenancy: ec2types.TenancyDefault,
+			DhcpOptionsId:   aws.String("dopt-0pending000000001"),
+			OwnerId:         aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-new-region-vpc")},
+				{Key: aws.String("Environment"), Value: aws.String("dev")},
+			},
+		},
 	}
 }
 
@@ -1450,6 +1464,40 @@ func buildSubnets() []ec2types.Subnet {
 		},
 	}
 
+	// State=pending → Warning (colorSubnet). State=unavailable → Broken.
+	named = append(named,
+		ec2types.Subnet{
+			SubnetId:                aws.String("subnet-0pending1111111a"),
+			VpcId:                   aws.String(fixtStagingVPCID),
+			CidrBlock:               aws.String("10.1.20.0/24"),
+			AvailabilityZone:        aws.String("us-east-1a"),
+			State:                   ec2types.SubnetStatePending,
+			AvailableIpAddressCount: aws.Int32(256),
+			MapPublicIpOnLaunch:     aws.Bool(false),
+			DefaultForAz:            aws.Bool(false),
+			OwnerId:                 aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("staging-pending-subnet")},
+				{Key: aws.String("Environment"), Value: aws.String("staging")},
+			},
+		},
+		ec2types.Subnet{
+			SubnetId:                aws.String("subnet-0unavail111111b"),
+			VpcId:                   aws.String(fixtStagingVPCID),
+			CidrBlock:               aws.String("10.1.21.0/24"),
+			AvailabilityZone:        aws.String("us-east-1b"),
+			State:                   ec2types.SubnetStateUnavailable,
+			AvailableIpAddressCount: aws.Int32(0),
+			MapPublicIpOnLaunch:     aws.Bool(false),
+			DefaultForAz:            aws.Bool(false),
+			OwnerId:                 aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("staging-unavailable-subnet")},
+				{Key: aws.String("Environment"), Value: aws.String("staging")},
+			},
+		},
+	)
+
 	vpcPool := []string{fixtProdVPCID, fixtProdVPCID, fixtStagingVPCID}
 	azPool := []string{"us-east-1a", "us-east-1b", "us-east-1c"}
 	for i := range 16 {
@@ -1566,6 +1614,37 @@ func buildRouteTables() []ec2types.RouteTable {
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
 			},
 		},
+		// Blackhole route (target deleted) → Broken (colorRTB).
+		{
+			RouteTableId: aws.String("rtb-0blackhole1111111e"),
+			VpcId:        aws.String(fixtStagingVPCID),
+			OwnerId:      aws.String("123456789012"),
+			Routes: []ec2types.Route{
+				{DestinationCidrBlock: aws.String("10.2.0.0/16"), GatewayId: aws.String("local"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRouteTable},
+				{DestinationCidrBlock: aws.String("0.0.0.0/0"), NatGatewayId: aws.String("nat-0deleted11111111f"), State: ec2types.RouteStateBlackhole, Origin: ec2types.RouteOriginCreateRoute},
+			},
+			Associations: []ec2types.RouteTableAssociation{
+				{Main: aws.Bool(false), RouteTableAssociationId: aws.String("rtbassoc-0hhh888888888888h"), RouteTableId: aws.String("rtb-0blackhole1111111e"), SubnetId: aws.String(fixtStagingSubnetB)},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("staging-blackhole-rtb")},
+				{Key: aws.String("Environment"), Value: aws.String("staging")},
+			},
+		},
+		// Zero associations, not main → Warning (colorRTB).
+		{
+			RouteTableId: aws.String("rtb-0orphan111111111f"),
+			VpcId:        aws.String(fixtStagingVPCID),
+			OwnerId:      aws.String("123456789012"),
+			Routes: []ec2types.Route{
+				{DestinationCidrBlock: aws.String("10.2.0.0/16"), GatewayId: aws.String("local"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRouteTable},
+			},
+			Associations: nil,
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("staging-orphan-rtb")},
+				{Key: aws.String("Environment"), Value: aws.String("staging")},
+			},
+		},
 	}
 }
 
@@ -1654,6 +1733,20 @@ func buildNatGateways() []ec2types.NatGateway {
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
+		// State=DELETED, no wave1 finding emitted for "deleted" → falls through
+		// to colorNAT's structural switch, which maps it to Dim.
+		{
+			NatGatewayId:     aws.String("nat-0deleted11111111f"),
+			VpcId:            aws.String(fixtStagingVPCID),
+			SubnetId:         aws.String(fixtStagingSubnetB),
+			State:            ec2types.NatGatewayStateDeleted,
+			ConnectivityType: ec2types.ConnectivityTypePublic,
+			CreateTime:       aws.Time(time.Date(2025, 5, 1, 8, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("nat-decommissioned")},
+				{Key: aws.String("Environment"), Value: aws.String("staging")},
+			},
+		},
 	}
 }
 
@@ -1683,6 +1776,16 @@ func buildInternetGateways() []ec2types.InternetGateway {
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("staging-igw")},
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
+			},
+		},
+		// No attachments → attachments_count==0 → Warning (colorIGW).
+		{
+			InternetGatewayId: aws.String("igw-0unattached111111c"),
+			OwnerId:           aws.String("123456789012"),
+			Attachments:       nil,
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("spare-unattached-igw")},
+				{Key: aws.String("Environment"), Value: aws.String("dev")},
 			},
 		},
 	}
@@ -1798,6 +1901,33 @@ func buildTransitGateways() []ec2types.TransitGateway {
 			CreationTime:      t3,
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("acme-dev-tgw")},
+				{Key: aws.String("Environment"), Value: aws.String("dev")},
+			},
+		},
+		// State=failed → wave1 finding (CodeTGWStateFailed, SevBroken) → Broken.
+		{
+			TransitGatewayId:  aws.String("tgw-0failed11111111d"),
+			TransitGatewayArn: aws.String("arn:aws:ec2:us-east-1:123456789012:transit-gateway/tgw-0failed11111111d"),
+			State:             ec2types.TransitGatewayState("failed"),
+			OwnerId:           aws.String("123456789012"),
+			Description:       aws.String("Failed transit gateway creation — quota exceeded"),
+			CreationTime:      aws.Time(time.Date(2026, 4, 1, 9, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-failed-tgw")},
+				{Key: aws.String("Environment"), Value: aws.String("dev")},
+			},
+		},
+		// State=deleted: fetcher emits no wave1 finding for "deleted" → falls
+		// through to colorTGW's structural switch, which maps it to Dim.
+		{
+			TransitGatewayId:  aws.String("tgw-0deleted11111111e"),
+			TransitGatewayArn: aws.String("arn:aws:ec2:us-east-1:123456789012:transit-gateway/tgw-0deleted11111111e"),
+			State:             ec2types.TransitGatewayStateDeleted,
+			OwnerId:           aws.String("123456789012"),
+			Description:       aws.String("Decommissioned legacy transit gateway"),
+			CreationTime:      aws.Time(time.Date(2024, 6, 1, 9, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-legacy-tgw")},
 				{Key: aws.String("Environment"), Value: aws.String("dev")},
 			},
 		},
@@ -1945,6 +2075,35 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 			CreationTimestamp: t4,
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("prod-ecr-endpoint")},
+			},
+		},
+		// State=Failed → wave1 finding (CodeVPCEStateFailed, SevBroken) → Broken.
+		{
+			VpcEndpointId:     aws.String("vpce-0failed111111111e"),
+			ServiceName:       aws.String("com.amazonaws.us-east-1.sts"),
+			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
+			State:             ec2types.StateFailed,
+			VpcId:             aws.String(fixtStagingVPCID),
+			SubnetIds:         []string{fixtStagingSubnetA},
+			PrivateDnsEnabled: aws.Bool(true),
+			OwnerId:           aws.String("123456789012"),
+			CreationTimestamp: aws.Time(time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("staging-sts-endpoint-failed")},
+			},
+		},
+		// State=Deleted: fetcher emits no wave1 finding for "Deleted" → falls
+		// through to colorVPCE's structural switch, which maps it to Dim.
+		{
+			VpcEndpointId:     aws.String("vpce-0deleted111111111f"),
+			ServiceName:       aws.String("com.amazonaws.us-east-1.sns"),
+			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
+			State:             ec2types.StateDeleted,
+			VpcId:             aws.String(fixtStagingVPCID),
+			OwnerId:           aws.String("123456789012"),
+			CreationTimestamp: aws.Time(time.Date(2025, 1, 10, 8, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("staging-sns-endpoint-deleted")},
 			},
 		},
 	}
@@ -2543,6 +2702,24 @@ func buildImages() []ec2types.Image {
 			EnaSupport: aws.Bool(true),
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("acme-app-build-failed")},
+				{Key: aws.String("Environment"), Value: aws.String("ci")},
+			},
+		},
+		// State=pending → Warning (colorAMI's state-switch branch — not the
+		// DeprecationTime path, which is unreachable: the fetcher writes a
+		// pre-formatted "deprecated" field but colorAMI reads the raw
+		// "deprecation_time" field that FetchAMIsPage never sets).
+		{
+			ImageId: aws.String("ami-0pending0build0003"), Name: aws.String("acme-app-build-inprogress"),
+			State: ec2types.ImageStatePending, Architecture: ec2types.ArchitectureValuesX8664,
+			PlatformDetails: aws.String("Linux/UNIX"), RootDeviceType: ec2types.DeviceTypeEbs,
+			RootDeviceName: aws.String("/dev/xvda"), Hypervisor: ec2types.HypervisorTypeXen,
+			VirtualizationType: ec2types.VirtualizationTypeHvm, ImageType: ec2types.ImageTypeValuesMachine,
+			CreationDate: aws.String("2026-04-28T07:30:00.000Z"), Public: aws.Bool(false),
+			OwnerId: aws.String("123456789012"), Description: aws.String("CI build in progress — image registration pending"),
+			EnaSupport: aws.Bool(true),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-app-build-inprogress")},
 				{Key: aws.String("Environment"), Value: aws.String("ci")},
 			},
 		},

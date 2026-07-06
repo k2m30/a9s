@@ -282,6 +282,20 @@ func buildIAMRoles() []iamtypes.Role {
 		MaxSessionDuration:       aws.Int32(3600),
 	})
 
+	// Issue: AssumeRolePolicyDocument with bare-string Principal="*" → Broken
+	// (colorRole matches the literal `"Principal":"*"` / `"Principal": "*"`
+	// substring — distinct from the nested-object `{"AWS":"*"}` form used by
+	// wildcard-trust-role above, which does not match that substring).
+	roles = append(roles, iamtypes.Role{
+		RoleName:                 aws.String("anyone-can-assume-role"),
+		RoleId:                   aws.String("AROAEXAMPLE787878787"),
+		Arn:                      aws.String("arn:aws:iam::123456789012:role/anyone-can-assume-role"),
+		Path:                     aws.String("/"),
+		CreateDate:               aws.Time(time.Date(2025, 9, 1, 10, 0, 0, 0, time.UTC)),
+		Description:              aws.String("Misconfigured role — bare-string wildcard principal allows any AWS account to assume it"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"sts:AssumeRole"}]}`),
+	})
+
 	// Redshift IAM roles — required for redshift→role related-panel pivot.
 	// checkRedshiftRole matches IamRoles[].IamRoleArn on the cluster; the checker
 	// extracts the role name as the last segment after "/" from each ARN.
@@ -581,12 +595,15 @@ func buildIAMPolicies() []iamtypes.Policy {
 		},
 	}
 
-	// Issue: AttachmentCount=0 → Warning (orphaned policy — never attached to any entity)
+	// Issue: AttachmentCount=0 AND IsAttachable=true → Warning (orphaned
+	// policy — never attached to any entity, but still attachable so an
+	// operator could accidentally wire it up).
 	policies = append(policies, iamtypes.Policy{
 		PolicyName:       aws.String("orphan-unattached-policy"),
 		PolicyId:         aws.String("ANPAEXAMPLE555555555"),
 		Arn:              aws.String("arn:aws:iam::123456789012:policy/orphan-unattached-policy"),
 		AttachmentCount:  aws.Int32(0),
+		IsAttachable:     true,
 		Path:             aws.String("/"),
 		CreateDate:       aws.Time(time.Date(2024, 5, 1, 11, 0, 0, 0, time.UTC)),
 		DefaultVersionId: aws.String("v1"),

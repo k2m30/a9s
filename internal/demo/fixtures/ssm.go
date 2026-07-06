@@ -115,6 +115,19 @@ var sharedSSMFixtures = sync.OnceValue(func() *SSMFixtures {
 			Description:      aws.String("Third-party API token stored as plaintext — should be SecureString"),
 			DataType:         aws.String("text"),
 		},
+		// Issue: Type=String AND name suffix=_password (exact match — colorSSM's
+		// sensitiveSuffixes are underscore-delimited, e.g. "_password", not
+		// "/password" or "-password") → Broken (plaintext credential in a
+		// non-encrypted parameter type).
+		{
+			Name:             aws.String("/acme/shared/legacy_service_password"),
+			ARN:              aws.String("arn:aws:ssm:us-east-1:123456789012:parameter/acme/shared/legacy_service_password"),
+			Type:             ssmtypes.ParameterTypeString,
+			Version:          1,
+			LastModifiedDate: aws.Time(mustParseSSMTime("2026-01-05T10:00:00+00:00")),
+			Description:      aws.String("Legacy service password stored in plaintext String parameter — should be SecureString"),
+			DataType:         aws.String("text"),
+		},
 	}
 
 	for i := range 18 {

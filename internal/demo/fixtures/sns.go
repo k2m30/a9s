@@ -79,6 +79,15 @@ var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 			SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:deploy-notifications:d4e5f6a7-b8c9-0123-def0-234567890123"),
 			Owner:           aws.String("123456789012"),
 		},
+		// Issue: SubscriptionArn=="Deleted" → Dim (subscription torn down but
+		// still enumerable via ListSubscriptions for a retention window).
+		{
+			TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:order-events"),
+			Protocol:        aws.String("email"),
+			Endpoint:        aws.String("former-partner@decommissioned.example.com"),
+			SubscriptionArn: aws.String("Deleted"),
+			Owner:           aws.String("123456789012"),
+		},
 	}
 
 	subsByTopic := map[string][]snstypes.Subscription{

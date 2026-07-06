@@ -95,24 +95,23 @@ import (
 //     regression the allowlist was never told about.
 var knownStateCoverageGaps = map[string]bool{
 	// --- bucket gaps: type never resolves to this domain.Color via td.ResolveColor ---
-	"acm:dim": true, "alarm:dim": true, "ami:warning": true,
+	"alarm:dim":    true,
 	"apigw:broken": true, "apigw:dim": true, "apigw:warning": true,
 	"asg:dim":       true,
 	"athena:broken": true, "athena:dim": true,
 	"backup:broken": true, "backup:dim": true, "backup:warning": true,
 	"cb:broken": true, "cb:dim": true, "cb:warning": true,
-	"cf:broken": true, "cf:warning": true,
-	"cfn:dim":             true,
+	"cf:broken":           true,
 	"codeartifact:broken": true, "codeartifact:dim": true, "codeartifact:warning": true,
 	"ct-events:healthy": true,
 	"dbc:dim":           true,
-	"dbc-snap:dim":      true, "dbc-snap:warning": true,
-	"dbi:dim": true, "dbi-snap:dim": true,
+	"dbc-snap:dim":      true,
+	"dbi:dim":           true, "dbi-snap:dim": true,
 	"ddb:dim":        true,
 	"eb-rule:broken": true, "eb-rule:warning": true,
 	"ebs:dim": true, "ebs-snap:dim": true,
 	"ecr:broken": true, "ecr:dim": true, "ecr:warning": true,
-	"ecs:dim": true, "ecs:warning": true, "ecs-svc:dim": true,
+	"ecs:dim": true, "ecs-svc:dim": true,
 	"efs:dim":    true,
 	"eip:broken": true, "eip:dim": true,
 	"eks:dim":    true,
@@ -120,51 +119,138 @@ var knownStateCoverageGaps = map[string]bool{
 	"eni:broken": true, "eni:dim": true,
 	"glue:broken": true, "glue:dim": true, "glue:warning": true,
 	"iam-group:broken": true, "iam-group:dim": true, "iam-group:warning": true,
-	"iam-user:broken": true, "iam-user:dim": true, "iam-user:warning": true,
-	"igw:broken": true, "igw:dim": true, "igw:warning": true,
+	"iam-user:broken": true, "iam-user:dim": true,
+	// iam-user:warning: NOT a fixture gap — colorIAMUser requires
+	// r.Fields["has_console_password"]=="true", but FetchIAMUsersPage
+	// (iam_users.go) hardcodes it to "false" at Wave 1 and EnrichIAMUserMFA
+	// (the type's only Wave-2 enricher) never writes has_console_password —
+	// it only updates "mfa" and "risk". The warning branch is unreachable
+	// under the current fetcher/enricher wiring; no fixture can bridge this.
+	"iam-user:warning": true,
+	"igw:broken":       true, "igw:dim": true,
 	"kinesis:broken": true, "kinesis:dim": true,
+	// kms:broken/dim/warning: NOT a fixture gap — colorKMS (catalog_secrets.go)
+	// reads r.Fields["key_state"], but FetchKMSKeysPage (kms.go) only ever
+	// writes r.Fields["status"]. The fixtures for Disabled/PendingDeletion/
+	// Unavailable key states already exist (kms.go fixtures) but can never
+	// reach the classifier under this field-name mismatch. Production-code
+	// fix required in internal/aws/kms.go or catalog_secrets.go, out of scope
+	// for a fixture-only pass.
 	"kms:broken": true, "kms:dim": true, "kms:warning": true,
+	// lambda:dim/healthy: NOT a fixture gap — colorLambda checks
+	// r.Fields["dlq_target_arn"]=="" (→ forces Warning) BEFORE checking
+	// state=="Inactive" (→ Dim) or falling through to Healthy, but
+	// FetchLambdaFunctionsPage (lambda.go) never writes a "dlq_target_arn"
+	// field at all. Every fixture whose last_update_status isn't "Failed",
+	// whose runtime isn't deprecated, and that carries no wave1 finding is
+	// permanently forced into Warning by the always-empty DLQ check,
+	// regardless of its actual state — both the Dim and Healthy branches
+	// downstream of that check are unreachable under the current wiring.
 	"lambda:dim": true, "lambda:healthy": true,
 	"logs:broken": true, "logs:dim": true,
 	"msk:dim":         true,
-	"nat:dim":         true,
 	"ng:dim":          true,
 	"pipeline:broken": true, "pipeline:dim": true, "pipeline:warning": true,
-	"policy:broken": true, "policy:dim": true, "policy:warning": true,
+	"policy:broken": true, "policy:dim": true,
 	"r53:broken": true, "r53:dim": true,
-	"redis:dim": true, "redshift:dim": true,
-	"role:broken": true, "role:dim": true, "role:warning": true,
-	"rtb:broken": true, "rtb:dim": true, "rtb:warning": true,
+	// redis:dim: NOT a fixture gap — colorRedis matches phrase=="deleted", but
+	// FetchRedisPage derives phrase via computeRedisFindings, whose switch has
+	// no case for a "deleted" status (only "deleting", the in-progress form;
+	// ElastiCache's real API never reports "deleted" — a torn-down replication
+	// group simply stops appearing in DescribeReplicationGroups). A fixture
+	// with a raw "deleted" status computes zero findings, so Fields["status"]
+	// resolves to "" instead of "deleted", never reaching the dim branch.
+	"redis:dim":    true,
+	"redshift:dim": true,
+	"role:dim":     true, "role:warning": true,
+	"rtb:dim":   true,
 	"s3:broken": true, "s3:dim": true, "s3:warning": true,
 	"secrets:broken": true, "secrets:dim": true,
 	"ses:dim":    true,
 	"sfn:broken": true, "sfn:dim": true, "sfn:warning": true,
 	"sg:dim": true, "sg:warning": true,
 	"sns:broken": true, "sns:dim": true, "sns:warning": true,
-	"sns-sub:broken": true, "sns-sub:dim": true,
-	"sqs:broken": true, "sqs:dim": true, "sqs:warning": true,
-	"ssm:broken": true, "ssm:dim": true,
-	"subnet:broken": true, "subnet:dim": true, "subnet:warning": true,
-	"tg:broken": true, "tg:dim": true, "tg:warning": true,
-	"tgw:broken": true, "tgw:dim": true,
+	"sns-sub:broken": true,
+	"sqs:broken":     true, "sqs:dim": true, "sqs:warning": true,
+	"ssm:dim":    true,
+	"subnet:dim": true,
+	"tg:broken":  true, "tg:dim": true, "tg:warning": true,
 	"trail:dim":  true,
-	"vpc:broken": true, "vpc:dim": true, "vpc:warning": true,
-	"vpce:broken": true, "vpce:dim": true,
+	"vpc:broken": true, "vpc:dim": true,
 	"waf:broken": true, "waf:dim": true, "waf:warning": true,
 
-	// --- finding gaps: none yet — catalog.ResourceTypeDef.Findings ([]FindingDef)
-	// has zero registrations anywhere in the codebase as of this ratchet's
-	// creation (confirmed via `grep -rn "FindingDef{"` across internal/ and
-	// cmd/ — only test doubles construct one). generateAttentionSignals in
-	// cmd/catalogen/main.go reads exactly this field to render
-	// docs/attention-signals.md, so once any type populates td.Findings this
-	// allowlist is where new, still-uncovered codes get pinned. s3 is
-	// deliberately absent and MUST stay absent: it has no FindingDef entries
-	// to be gapped in the first place, and its per-resource Wave-1/Wave-2
-	// "public access block incomplete" signal (EnrichS3PublicAccessBlock /
-	// GetPublicAccessBlockOutput fixtures) already flows into
+	// --- finding gaps: seeded 2026-07-06 from the machine findings registry
+	// (249 FindingDefs across all types). This is the burn-down inventory
+	// captured the moment the registry went from empty to populated: for
+	// each key below, no demo fixture resource of that type yet produces a
+	// domain.Finding carrying that Code (neither via Wave-1 res.Findings nor
+	// the type's registered Wave-2 IssueEnricher). Fix the fixtures (or the
+	// enricher wiring) and remove the entry in the same PR — see the
+	// BURN-DOWN branch above. s3 is deliberately absent and MUST stay
+	// absent: its per-resource Wave-1/Wave-2 "public access block
+	// incomplete" signal (EnrichS3PublicAccessBlock / GetPublicAccessBlockOutput
+	// fixtures) already flows into
 	// TestDemoIssueCoverage_EveryIssueCapableTypeHasAFlaggedFixture in
 	// qa_demo_pivot_coverage_test.go, which is unaffected by this ratchet.
+	"apigw:apigw.stage-config-issues":                  true,
+	"asg:asg.scaling-activity-failed":                  true,
+	"cfn:cfn.stack.failed":                             true,
+	"cfn:cfn.stack-drifted":                            true,
+	"dbc-snap:dbc-snap.warn.manual_unused":             true,
+	"dbi:dbi.broken.incompatible_network":              true,
+	"dbi:dbi.broken.incompatible_option_group":         true,
+	"dbi:dbi.broken.incompatible_restore":              true,
+	"ebs:ebs.volume-io-degraded":                       true,
+	"ec2:ec2.state.stopped.server":                     true,
+	"ecs:ecs.state.deprovisioning":                     true,
+	"ecs:ecs.state.inactive":                           true,
+	"ecs-task:ecs-task.state.provisioning":             true,
+	"ecs-task:ecs-task.state.activating":               true,
+	"ecs-task:ecs-task.state.deactivating":             true,
+	"ecs-task:ecs-task.state.stopping":                 true,
+	"ecs-task:ecs-task.state.deprovisioning":           true,
+	"ecs-task:ecs-task.task-failed":                    true,
+	"eks:eks.state.updating":                           true,
+	"elb:elb.misconfigured":                            true,
+	"eni:eni.state.attaching":                          true,
+	"eni:eni.state.detaching":                          true,
+	"igw:igw.state.attaching":                          true,
+	"igw:igw.state.detaching":                          true,
+	"kinesis:kinesis.warn.updating":                    true,
+	"logs:logs.missing-metric-filters":                 true,
+	"msk:msk.warn.updating":                            true,
+	"msk:msk.warn.maintenance":                         true,
+	"msk:msk.warn.healing":                             true,
+	"msk:msk.warn.deleting":                            true,
+	"msk:msk.broker-outdated":                          true,
+	"msk:msk.encryption-not-tls":                       true,
+	"ng:ng.state.creating":                             true,
+	"ng:ng.state.deleting":                             true,
+	"ng:ng.state.delete-failed":                        true,
+	"redshift:redshift.broken.incompatible_hsm":        true,
+	"redshift:redshift.broken.incompatible_parameters": true,
+	"redshift:redshift.broken.incompatible_restore":    true,
+	"redshift:redshift.warn.creating":                  true,
+	"redshift:redshift.warn.modifying":                 true,
+	"redshift:redshift.warn.renaming":                  true,
+	"redshift:redshift.warn.deleting":                  true,
+	"secrets:secrets.state.rotation_overdue":           true,
+	"secrets:secrets.state.dormant":                    true,
+	"ses:ses.account-shutdown":                         true,
+	"ses:ses.account-probation":                        true,
+	"ses:ses.quota-high":                               true,
+	"sns:sns.all-pending-confirmation":                 true,
+	"subnet:subnet.state.failed":                       true,
+	"subnet:subnet.state.failed-insufficient-capacity": true,
+	"tgw:tgw.state.pending":                            true,
+	"tgw:tgw.state.modifying":                          true,
+	"tgw:tgw.attachment-failed":                        true,
+	"tgw:tgw.attachment-transitional":                  true,
+	"vpce:vpce.state.pending_acceptance":               true,
+	"vpce:vpce.state.deleting":                         true,
+	"vpce:vpce.state.rejected":                         true,
+	"vpce:vpce.state.expired":                          true,
+	"vpce:vpce.state.partial":                          true,
 }
 
 // bucketName maps a domain.Color to the lowercase token used in

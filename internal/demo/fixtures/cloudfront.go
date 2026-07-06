@@ -214,6 +214,33 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 				Comment:          aws.String("Demo distribution backed by a9s-demo-healthy S3 bucket"),
 				LastModifiedTime: aws.Time(time.Date(2026, 1, 15, 9, 0, 0, 0, time.UTC)),
 			},
+			// Status=InProgress with Enabled=true → Warning (colorCF). The
+			// existing InProgress distribution (E3C4D5E6F7G8H9) is also
+			// Enabled=false, which colorCF checks first and resolves to Dim —
+			// this entry isolates the InProgress-only signal.
+			{
+				Id:         aws.String("E8H9I0J1K2L3M4"),
+				ARN:        aws.String("arn:aws:cloudfront::123456789012:distribution/E8H9I0J1K2L3M4"),
+				DomainName: aws.String("d888888hijklm5.cloudfront.net"),
+				Status:     aws.String("InProgress"),
+				Enabled:    aws.Bool(true),
+				Aliases: &cftypes.Aliases{
+					Quantity: aws.Int32(1),
+					Items:    []string{"new-launch.acme-corp.com"},
+				},
+				Origins: &cftypes.Origins{
+					Quantity: aws.Int32(1),
+					Items: []cftypes.Origin{
+						{
+							Id:         aws.String("s3-new-launch"),
+							DomainName: aws.String("acme-new-launch-assets.s3.amazonaws.com"),
+						},
+					},
+				},
+				PriceClass:       cftypes.PriceClassPriceClass100,
+				Comment:          aws.String("New product launch distribution — propagating config changes"),
+				LastModifiedTime: aws.Time(time.Date(2026, 4, 25, 15, 0, 0, 0, time.UTC)),
+			},
 			// Distribution fronting the PAB-issue buckets — realistic
 			// scenario: a CDN points at an origin bucket whose access
 			// policy is misconfigured. Operator pivoting from the `!`

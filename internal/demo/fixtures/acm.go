@@ -163,6 +163,21 @@ var sharedACMFixtures = sync.OnceValue(func() *ACMFixtures {
 				},
 				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
 			},
+			// Issue: Status=INACTIVE → Dim (imported cert not currently in use for TLS)
+			{
+				DomainName:     aws.String("inactive.acme-corp.com"),
+				CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/c9d0e1f2-3456-78ab-cdef-999999999999"),
+				Status:         acmtypes.CertificateStatusInactive,
+				Type:           acmtypes.CertificateTypeImported,
+				NotAfter:       aws.Time(mustParseACMTime("2027-01-01T23:59:59+00:00")),
+				InUse:          aws.Bool(false),
+				ImportedAt:     aws.Time(time.Date(2025, 1, 1, 10, 0, 0, 0, time.UTC)),
+				KeyAlgorithm:   acmtypes.KeyAlgorithmRsa2048,
+				SubjectAlternativeNameSummaries: []string{
+					"inactive.acme-corp.com",
+				},
+				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
+			},
 			// Issue: ISSUED but NotAfter in ~5 days → Broken (imminent expiry)
 			{
 				DomainName:     aws.String("expiring-soon.acme-corp.com"),
