@@ -61,69 +61,21 @@ import (
 //   - a violation NOT present here       -> FAIL unconditionally, a new
 //     regression the allowlist was never told about.
 //
-// SEEDED CENSUS (2026-07-07, first run of this gate): every entry below was
-// discovered by driving the REAL production column-resolution path
-// (app.ResolveListColumns, which mirrors resolveColumns in
-// table_render.go) against every registered top-level type's default view.
-// This is the burn-down deliverable for the conversion coder — each entry
-// names one duplicate/misnamed column that must be folded into the single
-// shared Status cell (and, for the full cause text, the detail Attention
-// block) per docs/related-resources.md's "single source of truth" doctrine
-// applied here to list columns.
-var knownStatusColumnDebt = map[string]bool{
-	// --- status-title violations: the only status-qualifying column is
-	// titled "State", not "Status" (isStatusCol matches "state" case
-	// insensitively, but the OWNER RULE requires the exact title "Status"). ---
-	"ec2:status-title":          true, // defaults_compute.go: {Title:"State", Path:"State.Name"}
-	"lambda:status-title":       true, // defaults_compute.go: {Title:"State", Key:"state", Path:"State"}
-	"ebs:status-title":          true, // defaults_compute.go: {Title:"State", Path:"State"}
-	"ebs-snap:status-title":     true, // defaults_compute.go: {Title:"State", Path:"State"}
-	"ami:status-title":          true, // defaults_compute.go: {Title:"State", Path:"State"}
-	"vpc:status-title":          true, // defaults_networking.go: {Title:"State", Path:"State"}
-	"subnet:status-title":       true, // defaults_networking.go: {Title:"State", Path:"State"}
-	"nat:status-title":          true, // defaults_networking.go: {Title:"State", Path:"State"}
-	"igw:status-title":          true, // defaults_networking.go: {Title:"State", Key:"state"}
-	"vpce:status-title":         true, // defaults_networking.go: {Title:"State", Path:"State"}
-	"tgw:status-title":          true, // defaults_networking.go: {Title:"State", Path:"State"}
-	"elb:status-title":          true, // defaults_networking.go: {Title:"State", Path:"State.Code"}
-	"eip:status-title":          true, // defaults_networking.go: {Title:"State", Key:"status"}
-	"glue:status-title":         true, // no status-qualifying column at all in defaults_data.go "glue"
-	"athena:status-title":       true, // defaults_data.go: {Title:"State", Path:"State"}
-	"alarm:status-title":        true, // defaults_monitoring.go: {Title:"State", Path:"StateValue"}
-	"msk:status-title":          true, // defaults_messaging.go: {Title:"State", Path:"State"}
-	"eb-rule:status-title":      true, // defaults_messaging.go: {Title:"State", Path:"State"}
-	"sqs:status-title":          true, // no status-qualifying column at all in defaults_messaging.go "sqs"
-	"sns:status-title":          true, // no status-qualifying column at all in defaults_messaging.go "sns"
-	"sns-sub:status-title":      true, // no status-qualifying column at all in defaults_messaging.go "sns-sub"
-	"sfn:status-title":          true, // no status-qualifying column at all in defaults_messaging.go "sfn"
-	"pipeline:status-title":     true, // no status-qualifying column at all in defaults_cicd.go "pipeline" ("Last Status" key="last_status" does not match Key=="status")
-	"cb:status-title":           true, // no status-qualifying column at all in defaults_cicd.go "cb" ("Last Build" key="last_build" does not match Key=="status")
-	"ecr:status-title":          true, // no status-qualifying column at all in defaults_cicd.go "ecr"
-	"codeartifact:status-title": true, // no status-qualifying column at all in defaults_cicd.go "codeartifact"
-	"role:status-title":         true, // no status-qualifying column at all in defaults_security.go "role"
-	"iam-user:status-title":     true, // no status-qualifying column at all in defaults_security.go "iam-user"
-	"iam-group:status-title":    true, // no status-qualifying column at all in defaults_security.go "iam-group"
-	"waf:status-title":          true, // no status-qualifying column at all in defaults_security.go "waf"
-	"policy:status-title":       true, // no status-qualifying column at all in defaults_security.go "policy" ("Risk" is the closest signal, but is not status-qualifying by key/title)
-	"r53:status-title":          true, // no status-qualifying column at all in defaults_dns_cdn.go "r53"
-	"apigw:status-title":        true, // no status-qualifying column at all in defaults_dns_cdn.go "apigw"
-	"logs:status-title":         true, // no status-qualifying column at all in defaults_monitoring.go "logs"
-	"trail:status-title":        true, // no status-qualifying column at all in defaults_monitoring.go "trail"
-	"ct-events:status-title":    true, // no status-qualifying column at all in defaults_monitoring.go "ct-events" (an audit-log child-shaped view registered as a top-level type)
-	"rtb:status-title":          true, // no status-qualifying column at all in defaults_networking.go "rtb"
-	"sg:status-title":           true, // no status-qualifying column at all in defaults_networking.go "sg" (see sg:duplicate-cause — "Risk" is the closest signal, not status-qualifying by key/title)
-	"tg:status-title":           true, // no status-qualifying column at all in defaults_networking.go "tg" (see tg:duplicate-cause — "Health" is the closest signal, not status-qualifying by key/title)
-	"ssm:status-title":          true, // no status-qualifying column at all in defaults_secrets.go "ssm" (see ssm:duplicate-cause — "Risk" is the closest signal, not status-qualifying by key/title)
-
-	// --- duplicate-cause violations: a second column beyond the true
-	// status column carries problem/cause text (issues, health_issues,
-	// risk, state reason). ---
-	"eks:duplicate-cause": true, // defaults_containers.go: {Title:"Issues", Key:"health_issues"} alongside {Title:"Status", Key:"status"}
-	"ng:duplicate-cause":  true, // defaults_containers.go: {Title:"Issues", Key:"health_issues"} alongside {Title:"Status", Key:"status"}
-	"elb:duplicate-cause": true, // defaults_networking.go: {Title:"State Reason", Path:"State.Reason"} alongside {Title:"State", Path:"State.Code"}
-	"sg:duplicate-cause":  true, // defaults_networking.go: {Title:"Risk", Key:"risk_summary"} — sg has no status column at all, so Risk is the sole cause-bearing column
-	"ssm:duplicate-cause": true, // defaults_secrets.go: {Title:"Risk", Key:"risk"} alongside {Title:"Type"} (no status column)
-}
+// SEEDED CENSUS (2026-07-07, first run of this gate): every entry originally
+// pinned here was discovered by driving the REAL production
+// column-resolution path (app.ResolveListColumns, which mirrors
+// resolveColumns in table_render.go) against every registered top-level
+// type's default view, back when the OWNER RULE required a status-qualifying
+// column to be Key-less to have its Title checked. The single-Status-column
+// conversion (list_columns.go's listExtractCellValue / resolveListStatusCol
+// title-based cascade, applied regardless of Key) burned down every single
+// pinned entry — all 36 status-title violations (State→Status column-title
+// renames, and previously keyed columns like cb's "Last Status" that now
+// route to the shared Status cell by Title) plus all 5 duplicate-cause
+// violations (eks/ng's "Issues", elb's "State Reason", sg's/ssm's "Risk" —
+// each folded into the Status cell's finding phrase). The allowlist is
+// empty: any violation below is a NEW regression, not pre-existing debt.
+var knownStatusColumnDebt = map[string]bool{}
 
 // statusColumnUniformityRuleKeys enumerates the two independent violation
 // suffixes this gate tracks, so both the seeded map and the live drive
@@ -141,10 +93,11 @@ var duplicateCausePattern = regexp.MustCompile(`(?i)^(issues|health_issues|risk|
 
 // isStatusQualifyingColumn mirrors listExtractCellValue's isStatusCol
 // predicate in internal/app/list_columns.go byte-for-byte (Key=="status" OR
-// Key==lifecycleKey OR (Key=="" AND Title case-insensitively "status" or
-// "state")), operating on the exported app.ColumnDef + the type's
-// LifecycleKey (default "state" when unset, matching production's own
-// fallback).
+// Key==lifecycleKey OR Title case-insensitively "status" or "state",
+// REGARDLESS of Key — the OWNER CONTRACT lets a keyed column like
+// {Key:"last_status", Title:"Status"} qualify too), operating on the
+// exported app.ColumnDef + the type's LifecycleKey (default "state" when
+// unset, matching production's own fallback).
 func isStatusQualifyingColumn(col app.ColumnDef, lifecycleKey string) bool {
 	if lifecycleKey == "" {
 		lifecycleKey = "state"
@@ -152,7 +105,7 @@ func isStatusQualifyingColumn(col app.ColumnDef, lifecycleKey string) bool {
 	if col.Key == "status" || col.Key == lifecycleKey {
 		return true
 	}
-	if col.Key == "" && (strings.EqualFold(col.Title, "status") || strings.EqualFold(col.Title, "state")) {
+	if strings.EqualFold(col.Title, "status") || strings.EqualFold(col.Title, "state") {
 		return true
 	}
 	return false

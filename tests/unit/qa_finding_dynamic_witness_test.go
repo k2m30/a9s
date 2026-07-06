@@ -72,21 +72,18 @@ var knownUnwitnessedFindings = map[string]bool{
 	"asg:asg.scaling-activity-failed": true,
 	"cfn:cfn.stack.failed":            true,
 	"cfn:cfn.stack-drifted":           true,
-	// dbc-snap.warn.manual_unused / dbi.broken.incompatible_* / elb.misconfigured:
-	// a parallel coder is actively wiring the elb DescribeLoadBalancerAttributes
-	// demo fake and dbc-snap/dbi-snap witnesses as of this census — confirmed
-	// still failing dynamically (not yet green) at seeding time via two
-	// consecutive test runs against the live working tree. Pin here as
-	// current, honest debt; PRUNE as soon as the coder's fix lands (this gate
-	// will fail with a "PRUNE" message the moment it does, forcing removal in
-	// the same PR).
-	"dbc-snap:dbc-snap.warn.manual_unused":             true,
+	// dbi.broken.incompatible_*: a parallel coder was actively wiring
+	// dbi-snap witnesses as of this census — confirmed still failing
+	// dynamically (not yet green) at seeding time. dbc-snap.warn.manual_unused
+	// and elb.misconfigured (the sibling entries from the same census) have
+	// since been pruned: both now fire dynamically per the coder's fixture/fake
+	// fix (elb's DescribeLoadBalancerAttributes demo fake landed, and the
+	// dbc-snap witness resolves).
 	"dbi:dbi.broken.incompatible_network":              true,
 	"dbi:dbi.broken.incompatible_option_group":         true,
 	"dbi:dbi.broken.incompatible_restore":              true,
 	"ebs:ebs.volume-io-degraded":                       true,
 	"ec2:ec2.state.stopped.server":                     true,
-	"elb:elb.misconfigured":                            true,
 	"ecs:ecs.state.deprovisioning":                     true,
 	"ecs:ecs.state.inactive":                           true,
 	"ecs-task:ecs-task.state.provisioning":             true,
