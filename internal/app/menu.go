@@ -179,6 +179,42 @@ func (c *Controller) markMenuSweepAcked(shortName string) {
 	c.menuSweepAcked[canon] = true
 }
 
+// syncMenuIssueCount applies the monotonic issue-badge guard to ms for canon:
+// only raise ms.IssueCounts[canon] (never regress it), and clear a stale
+// truncated flag once an equal-count exact (untruncated) observation lands.
+// canon must already be the canonical resource short name — callers resolve
+// aliases before calling in. Mirrors the issue-count half of the availability
+// sync Contract D pins for syncExactTotalToMenu; extracted as the single
+// chokepoint both the sweep lane (handle.go's syncExactTotalToMenu) and the
+// in-list Wave-2 enrichment lane (list_filter.go's applyEnrichmentState) call,
+// so a session with no background sweep (e.g. the web/headless lane) still
+// gets the menu badge from in-list enrichment alone. Caller must hold c.mu
+// (write).
+func (c *Controller) syncMenuIssueCount(ms *MenuState, canon string, newIssues int, newTrunc bool) {
+	curIssues := ms.IssueCounts[canon]
+	curIssueTrunc := ms.IssueTruncated[canon]
+	switch {
+	case newIssues > curIssues:
+		if ms.IssueCounts == nil {
+			ms.IssueCounts = make(map[string]int)
+		}
+		if ms.IssueKnown == nil {
+			ms.IssueKnown = make(map[string]bool)
+		}
+		if ms.IssueTruncated == nil {
+			ms.IssueTruncated = make(map[string]bool)
+		}
+		ms.IssueCounts[canon] = newIssues
+		ms.IssueKnown[canon] = true
+		ms.IssueTruncated[canon] = newTrunc
+	case newIssues == curIssues && curIssueTrunc && !newTrunc:
+		if ms.IssueTruncated == nil {
+			ms.IssueTruncated = make(map[string]bool)
+		}
+		ms.IssueTruncated[canon] = false
+	}
+}
+
 // menuRefreshing reports whether a background availability sweep is still in
 // flight: true when RowStore holds at least one OriginProbe/OriginDisk type
 // whose probe result has not yet been acked via markMenuSweepAcked. This is

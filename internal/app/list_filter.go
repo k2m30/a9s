@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"maps"
 	"reflect"
 	"sort"
 	"strconv"
@@ -314,7 +315,42 @@ func (c *Controller) applyEnrichmentState(typeName string, issueCount int, trunc
 	c.enrichmentStore[typeName] = findings
 	c.enrichmentDetails[typeName] = details
 	c.enrichmentTruncated[typeName] = truncated
-	_ = issueCount // retained for caller parity; issue count is recomputed in buildListBody
+
+	// DEF-20-follow-up: the in-list Wave-2 enrichment lane is the ONLY
+	// in-session source of the menu issue badge for renderers that run no
+	// background availability sweep (the web/headless lane) — syncing here
+	// mirrors syncExactTotalToMenu's issue-count half via the shared
+	// syncMenuIssueCount chokepoint, so a TUI-only sweep-driven badge doesn't
+	// mask this lane's inability to update it any other way.
+	canon := typeName
+	if td := resource.FindResourceType(typeName); td != nil {
+		canon = td.ShortName
+	}
+	if ms := c.rootMenuState(); ms != nil {
+		c.syncMenuIssueCount(ms, canon, issueCount, truncated)
+
+		// Persist, mirroring syncExactTotalToMenu's disk-write half (Contract
+		// D: the badge must survive a restart). Best-effort, same as the
+		// sweep lane — AmendRows (called by applyRowFindings right after this
+		// in the PatchResourceList intent path) only mutates the in-memory
+		// RowStore and never reaches store.SaveType, so without this call the
+		// badge this function just raised would be lost on the next launch
+		// even though it is visible for the rest of the session.
+		profile, region := c.core.Profile(), c.core.Region()
+		if profile != "" && region != "" {
+			avail := make(map[string]int, len(ms.Availability))
+			maps.Copy(avail, ms.Availability)
+			trunc := make(map[string]bool, len(ms.Truncated))
+			maps.Copy(trunc, ms.Truncated)
+			issueCounts := make(map[string]int, len(ms.IssueCounts))
+			maps.Copy(issueCounts, ms.IssueCounts)
+			issueTrunc := make(map[string]bool, len(ms.IssueTruncated))
+			maps.Copy(issueTrunc, ms.IssueTruncated)
+			issueKnown := make(map[string]bool, len(ms.IssueKnown))
+			maps.Copy(issueKnown, ms.IssueKnown)
+			_ = c.core.SaveAvailabilityCache(avail, trunc, issueCounts, issueTrunc, issueKnown)
+		}
+	}
 }
 
 // listEnrichmentFindings returns the per-resource finding map for typeName, or nil.

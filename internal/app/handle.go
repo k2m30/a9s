@@ -238,28 +238,7 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 	}
 
 	newIssues := c.listIssueCount(ls, canon)
-	curIssues := ms.IssueCounts[canon]
-	curIssueTrunc := ms.IssueTruncated[canon]
-	switch {
-	case newIssues > curIssues:
-		if ms.IssueCounts == nil {
-			ms.IssueCounts = make(map[string]int)
-		}
-		if ms.IssueKnown == nil {
-			ms.IssueKnown = make(map[string]bool)
-		}
-		if ms.IssueTruncated == nil {
-			ms.IssueTruncated = make(map[string]bool)
-		}
-		ms.IssueCounts[canon] = newIssues
-		ms.IssueKnown[canon] = true
-		ms.IssueTruncated[canon] = newTrunc
-	case newIssues == curIssues && curIssueTrunc && !newTrunc:
-		if ms.IssueTruncated == nil {
-			ms.IssueTruncated = make(map[string]bool)
-		}
-		ms.IssueTruncated[canon] = false
-	}
+	c.syncMenuIssueCount(ms, canon, newIssues, newTrunc)
 
 	// Persist the updated availability to disk, mirroring the "survives an
 	// app restart" half of Contract D. Best-effort — a write failure here

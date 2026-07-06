@@ -191,7 +191,16 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			// enrichment store. Resource rows themselves arrive via applyResourcesLoaded
 			// (called from the task-result lane); this intent carries Wave-2 data only.
 			if v.Enrichment != nil {
-				c.applyEnrichmentState(v.ResourceType, 0, false, v.Enrichment.Findings, v.Enrichment.AttentionDetails)
+				// v.Issues is populated by the sole PatchResourceList producer
+				// (runtime/handlers_availability.go's HandleEnrichmentChecked) with
+				// the unified cross-wave count on every emission; nil is a
+				// defensive fallback for a hypothetical future producer that
+				// forgets to set it, not an observed case today.
+				issueCount, issueTruncated := 0, false
+				if v.Issues != nil {
+					issueCount, issueTruncated = v.Issues.Count, v.Issues.Truncated
+				}
+				c.applyEnrichmentState(v.ResourceType, issueCount, issueTruncated, v.Enrichment.Findings, v.Enrichment.AttentionDetails)
 				// applyEnrichmentState only stores findings + the issue badge; the
 				// Wave-2 column updates (status/summary) must also reach the cached
 				// list rows or enriched columns render stale (ECR/WAF/CodeArtifact).

@@ -1,0 +1,177 @@
+// app_enrichment_menu_badge_test.go — RED pins for the missing menu-badge
+// sync-back on Controller.ApplyEnrichmentState (internal/app/list_filter.go).
+//
+// Defect: visiting the s3 list in the WEB session runs Wave-2 enrichment and
+// flags rows, but after Escape back to the menu the s3 row shows no issue
+// badge. Root cause: applyEnrichmentState (internal/app/list_filter.go)
+// receives issueCount/truncated and stores per-resource findings for the
+// list, but discards issueCount (`_ = issueCount`) and never touches
+// MenuState.IssueCounts/IssueKnown/IssueTruncated. The web lane runs no
+// background availability/issue sweep (unlike the TUI's ResourceListModel,
+// which separately syncs via the sweep lane), so ApplyEnrichmentState is the
+// ONLY chance the menu badge has to learn the in-session Wave-2 result.
+//
+// The menu-sync semantics pinned here mirror the monotonic guard already
+// pinned for the sweep lane in syncExactTotalToMenu (internal/app/handle.go):
+// only raise the count, set Known once any count is observed, and clear a
+// stale truncated flag once an equal-count exact (untruncated) observation
+// lands.
+package unit_test
+
+import (
+	"testing"
+
+	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/runtime"
+	"github.com/k2m30/a9s/v3/internal/session"
+)
+
+// newEnrichmentMenuBadgeController builds a Controller + its backing Core,
+// mirroring newSeededTestController in app_cache_first_seeding_test.go — a
+// small variant duplicated here per that file's own stated precedent (no
+// cross-file coupling to another test file's helper lifetime).
+func newEnrichmentMenuBadgeController(t *testing.T) *app.Controller {
+	t.Helper()
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	s := session.New()
+	s.Profile = "demo"
+	s.Region = "us-east-1"
+	core := runtime.New(s, nil)
+	return app.New(core)
+}
+
+// s3EnrichmentFindings builds n wave2-sourced findings for distinct fake S3
+// bucket IDs, matching the shape ResourceListModel.SetEnrichmentState passes
+// in production (internal/tui/views/resourcelist.go).
+func s3EnrichmentFindings(n int) map[string]domain.Finding {
+	findings := make(map[string]domain.Finding, n)
+	for i := range n {
+		id := "arn:aws:s3:::a9s-test-bucket-" + string(rune('a'+i))
+		findings[id] = domain.Finding{
+			Code:     "s3.public_access",
+			Phrase:   "public access not blocked",
+			Severity: domain.SevWarn,
+			Source:   "wave2:s3",
+		}
+	}
+	return findings
+}
+
+// menuEntryFor returns the MenuEntry for shortName from a MenuBody, or nil.
+func menuEntryFor(mb *app.MenuBody, shortName string) *app.MenuEntry {
+	if mb == nil {
+		return nil
+	}
+	for i := range mb.Entries {
+		if mb.Entries[i].ShortName == shortName {
+			return &mb.Entries[i]
+		}
+	}
+	return nil
+}
+
+// TestApplyEnrichmentState_SyncsMenuIssueBadge_S3 pins the primary defect:
+// a fresh controller with no prior issue info for "s3" must show the
+// wave-2-derived issue badge on the s3 menu entry after ApplyEnrichmentState,
+// even though no background sweep ever ran (the web/headless lane).
+func TestApplyEnrichmentState_SyncsMenuIssueBadge_S3(t *testing.T) {
+	c := newEnrichmentMenuBadgeController(t)
+
+	findings := s3EnrichmentFindings(5)
+	details := map[string]domain.AttentionDetail{}
+	c.ApplyEnrichmentState("s3", 5, true, findings, details)
+
+	if got := c.GetMenuIssueCounts()["s3"]; got != 5 {
+		t.Errorf("GetMenuIssueCounts()[s3] = %d, want 5", got)
+	}
+	if got := c.GetMenuIssueKnown()["s3"]; !got {
+		t.Errorf("GetMenuIssueKnown()[s3] = %v, want true", got)
+	}
+	if got := c.GetMenuIssueTruncated()["s3"]; !got {
+		t.Errorf("GetMenuIssueTruncated()[s3] = %v, want true", got)
+	}
+
+	snap := c.Snapshot()
+	if snap.Body.Kind != app.BodyKindMenu {
+		t.Fatalf("Body.Kind = %q, want %q", snap.Body.Kind, app.BodyKindMenu)
+	}
+	entry := menuEntryFor(snap.Body.Menu, "s3")
+	if entry == nil {
+		t.Fatal("menu has no entry for s3")
+	}
+	if entry.IssueBadge.Count != 5 {
+		t.Errorf("s3 IssueBadge.Count = %d, want 5 — this is the missing \"! 5+\" badge", entry.IssueBadge.Count)
+	}
+	if !entry.IssueBadge.Truncated {
+		t.Error("s3 IssueBadge.Truncated = false, want true")
+	}
+}
+
+// TestApplyEnrichmentState_MenuBadge_NeverLowersCount pins monotonicity: a
+// menu issue count seeded at 7 (e.g. by an earlier, fuller sweep result) must
+// not be lowered by a subsequent ApplyEnrichmentState reporting only 5.
+func TestApplyEnrichmentState_MenuBadge_NeverLowersCount(t *testing.T) {
+	c := newEnrichmentMenuBadgeController(t)
+
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PatchMenu{ResourceType: "s3", Issues: 7, Truncated: false},
+	})
+	if got := c.GetMenuIssueCounts()["s3"]; got != 7 {
+		t.Fatalf("precondition failed: GetMenuIssueCounts()[s3] = %d, want 7", got)
+	}
+
+	c.ApplyEnrichmentState("s3", 5, true, s3EnrichmentFindings(5), nil)
+
+	if got := c.GetMenuIssueCounts()["s3"]; got != 7 {
+		t.Errorf("GetMenuIssueCounts()[s3] = %d, want 7 (must never be lowered by a smaller Wave-2 result)", got)
+	}
+}
+
+// TestApplyEnrichmentState_MenuBadge_ClearsTruncationAtEqualCount pins the
+// truncation-clear rule: a menu issue count seeded as truncated at 5 becomes
+// exact once an equal-count, untruncated ApplyEnrichmentState result lands.
+func TestApplyEnrichmentState_MenuBadge_ClearsTruncationAtEqualCount(t *testing.T) {
+	c := newEnrichmentMenuBadgeController(t)
+
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PatchMenu{ResourceType: "s3", Issues: 5, Truncated: true},
+	})
+	if got := c.GetMenuIssueTruncated()["s3"]; !got {
+		t.Fatalf("precondition failed: GetMenuIssueTruncated()[s3] = %v, want true", got)
+	}
+
+	c.ApplyEnrichmentState("s3", 5, false, s3EnrichmentFindings(5), nil)
+
+	if got := c.GetMenuIssueCounts()["s3"]; got != 5 {
+		t.Errorf("GetMenuIssueCounts()[s3] = %d, want 5", got)
+	}
+	if got := c.GetMenuIssueTruncated()["s3"]; got {
+		t.Errorf("GetMenuIssueTruncated()[s3] = %v, want false (equal-count exact result must clear a stale truncation flag)", got)
+	}
+}
+
+// TestApplyEnrichmentState_MenuBadge_CanonicalizesAlias pins type-name
+// canonicalization: production always calls ApplyEnrichmentState with the
+// type's canonical ShortName (ResourceListModel passes m.typeDef.ShortName —
+// internal/tui/views/resourcelist.go), but the menu-sync chokepoint must
+// still resolve an alias variant to the canonical key, mirroring
+// handleResourcesLoadedEvent's "Resolve canonical short name (handles
+// aliases like ...)" step (internal/app/handle.go) and menuActiveKey's own
+// alias-resolution contract (internal/app/menu.go). "workgroups" is a real,
+// registered alias of the "athena" resource type (internal/aws/catalog_data.go).
+func TestApplyEnrichmentState_MenuBadge_CanonicalizesAlias(t *testing.T) {
+	c := newEnrichmentMenuBadgeController(t)
+
+	findings := map[string]domain.Finding{
+		"workgroup-1": {Code: "athena.stale_config", Phrase: "stale workgroup config", Severity: domain.SevWarn, Source: "wave2:athena"},
+	}
+	c.ApplyEnrichmentState("workgroups", 1, false, findings, nil)
+
+	if got := c.GetMenuIssueCounts()["athena"]; got != 1 {
+		t.Errorf("GetMenuIssueCounts()[athena] = %d, want 1 — alias %q must canonicalize to \"athena\"", got, "workgroups")
+	}
+	if got := c.GetMenuIssueCounts()["workgroups"]; got != 0 {
+		t.Errorf("GetMenuIssueCounts()[workgroups] = %d, want 0 — alias key must not be stored verbatim alongside the canonical key", got)
+	}
+}
