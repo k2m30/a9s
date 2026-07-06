@@ -5,7 +5,7 @@ package unit
 // Contract assertions (enricher-contract.md):
 //   - Returns EnricherResult.Findings keyed by project name (r.ID).
 //   - Severity "!" for all findings.
-//   - Summary format: "latest build FAILED (<YYYY-MM-DD>)".
+//   - Summary format: "latest build failed (<YYYY-MM-DD>)" (humanized phrase, not raw enum).
 //   - IssueCount = len(Findings).
 //   - Truncated = true when len(resources) > EnrichmentCap (50).
 //   - Empty resources slice → non-nil empty Findings map.
@@ -105,7 +105,8 @@ func TestEnrichCodeBuildStatus_FailedBuildFindingKeyedByProjectName(t *testing.T
 }
 
 // TestEnrichCodeBuildStatus_SummaryContainsDateAndStatus verifies the summary format
-// "latest build FAILED (<date>)".
+// "latest build failed (<date>)" — the raw AWS enum ("FAILED") is routed through
+// domain.HumanizeStatusPhrase before reaching the Wave-2 summary (11933a6f).
 func TestEnrichCodeBuildStatus_SummaryContainsDateAndStatus(t *testing.T) {
 	endTime := time.Date(2026, 4, 14, 12, 0, 0, 0, time.UTC)
 	fake := &codeBuildEnrichFake{
@@ -126,13 +127,12 @@ func TestEnrichCodeBuildStatus_SummaryContainsDateAndStatus(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	summary := result.Findings["proj-a"].Phrase
-	// Must contain the status (FAILED) and the date in YYYY-MM-DD format.
-	if !strings.Contains(summary, "FAILED") {
-		t.Errorf("summary %q must contain %q", summary, "FAILED")
+	wantSummary := "latest build failed (2026-04-14)"
+	if summary != wantSummary {
+		t.Errorf("summary = %q, want %q", summary, wantSummary)
 	}
-	expectedDate := "2026-04-14"
-	if !strings.Contains(summary, expectedDate) {
-		t.Errorf("summary %q must contain date %q", summary, expectedDate)
+	if strings.Contains(summary, "FAILED") {
+		t.Errorf("summary %q must NOT contain the raw AWS enum %q — humanize it", summary, "FAILED")
 	}
 }
 

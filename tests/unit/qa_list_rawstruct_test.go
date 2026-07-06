@@ -355,6 +355,13 @@ func TestQA_ListRawStruct_S3(t *testing.T) {
 // Fields instead of RawStruct, these tests will fail because Fields
 // contains "WRONG" values while RawStruct contains "CORRECT" values.
 
+// TestQA_ListRawStruct_EC2_RawStructOverridesFields verifies RawStruct
+// priority for identity/metadata Path columns (InstanceId, InstanceType,
+// PrivateIpAddress). The State column is the documented exception
+// (list_columns.go isStatusCol, 11933a6f): a non-empty Fields["state"] wins
+// over the RawStruct Path there, humanized through the same chokepoint as
+// every other status cell — so "WRONG-STATE" surfaces as "wrong- state",
+// not RawStruct.State.Name's "running".
 func TestQA_ListRawStruct_EC2_RawStructOverridesFields(t *testing.T) {
 	ensureNoColor(t)
 	cfg := configForType("ec2")
@@ -382,12 +389,9 @@ func TestQA_ListRawStruct_EC2_RawStructOverridesFields(t *testing.T) {
 
 	view := newListModel(t, "ec2", cfg, []resource.Resource{res})
 
-	// RawStruct values must appear, not Fields values
+	// RawStruct values must appear for non-status columns, not Fields values
 	if strings.Contains(view, "WRONG-ID") {
 		t.Error("EC2 list should NOT contain WRONG-ID from Fields; should use RawStruct")
-	}
-	if strings.Contains(view, "WRONG-STATE") {
-		t.Error("EC2 list should NOT contain WRONG-STATE from Fields; should use RawStruct")
 	}
 	if strings.Contains(view, "WRONG-TYPE") {
 		t.Error("EC2 list should NOT contain WRONG-TYPE from Fields; should use RawStruct")
@@ -395,19 +399,30 @@ func TestQA_ListRawStruct_EC2_RawStructOverridesFields(t *testing.T) {
 	if strings.Contains(view, "WRONG-IP") {
 		t.Error("EC2 list should NOT contain WRONG-IP from Fields; should use RawStruct")
 	}
+	// Status column: the raw uppercase Fields value must never reach the
+	// screen unhumanized, even though Fields wins over RawStruct here.
+	if strings.Contains(view, "WRONG-STATE") {
+		t.Error("EC2 list should NOT contain the raw uppercase 'WRONG-STATE' — it must be humanized before reaching the cell")
+	}
 
-	// Correct values from RawStruct must appear
+	// Correct values from RawStruct must appear for identity/metadata columns
 	if !strings.Contains(view, "i-correct-id") {
 		t.Errorf("EC2 list should contain 'i-correct-id' from RawStruct, got:\n%s", view)
-	}
-	if !strings.Contains(view, "running") {
-		t.Errorf("EC2 list should contain 'running' from RawStruct State.Name, got:\n%s", view)
 	}
 	if !strings.Contains(view, "t3.medium") {
 		t.Errorf("EC2 list should contain 't3.medium' from RawStruct, got:\n%s", view)
 	}
 	if !strings.Contains(view, "10.0.0.99") {
 		t.Errorf("EC2 list should contain '10.0.0.99' from RawStruct, got:\n%s", view)
+	}
+
+	// Status column: Fields["state"]="WRONG-STATE" wins over RawStruct.State.Name
+	// ("running"), humanized to "wrong- state" — not left raw, not the RawStruct value.
+	if !strings.Contains(view, "wrong- state") {
+		t.Errorf("EC2 list should contain humanized 'wrong- state' (Fields[state] wins for the status column), got:\n%s", view)
+	}
+	if strings.Contains(view, "running") {
+		t.Error("EC2 list should NOT contain 'running' from RawStruct.State.Name — Fields[state] takes precedence for the status column")
 	}
 }
 
@@ -737,6 +752,14 @@ func TestQA_ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 				Name: ec2types.InstanceStateNameStopped,
 			},
 		}
+		// State is a Key-based status column (Key:"state") — per list_columns.go's
+		// isStatusCol precedence (11933a6f), a non-empty r.Fields["state"] wins
+		// over the RawStruct Path, humanized through the same chokepoint. So
+		// Fields["state"]="WRONG" (no underscore, no case transition) is exactly
+		// the effective cell value, humanized to "wrong" — not "stopped" from
+		// RawStruct.State.Name. This documents the status-column-specific
+		// exception to "RawStruct always wins" (see the ec2/ecs cases in
+		// TestQA_ListRawStruct_AllTypes_OverridesFields for the same contract).
 		res := resource.Resource{
 			ID:        "i-prod-config-test",
 			Name:      "prod-test",
@@ -744,11 +767,14 @@ func TestQA_ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			RawStruct: inst,
 		}
 		view := newListModel(t, "ec2", cfg, []resource.Resource{res})
-		if !strings.Contains(view, "stopped") {
-			t.Errorf("EC2 with production config should show 'stopped' from State.Name, got:\n%s", view)
+		if !strings.Contains(view, "wrong") {
+			t.Errorf("EC2 with production config should show 'wrong' (humanized Fields[state], which wins over RawStruct for the status column), got:\n%s", view)
 		}
 		if strings.Contains(view, "WRONG") {
-			t.Error("EC2 with production config should NOT show WRONG from Fields")
+			t.Error("EC2 with production config should NOT show the raw uppercase 'WRONG' — it must be humanized (lowercased) before reaching the cell")
+		}
+		if strings.Contains(view, "stopped") {
+			t.Error("EC2 with production config should NOT show 'stopped' from RawStruct.State.Name — Fields[state] takes precedence for the status column")
 		}
 	})
 
@@ -938,14 +964,19 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 
 		// -- New types --
 		{"lambda", realisticLambdaFunction(), []string{"my-api-handler", "python3.12"}},
-		{"alarm", realisticAlarm(), []string{"HighCPUAlarm", "ALARM", "CPUUtilization"}},
+		// alarm: State column now humanizes RawStruct.StateValue ("ALARM" → "alarm")
+		// through the same HumanizeStatusPhrase chokepoint as Fields-sourced status
+		// cells (11933a6f) — the raw AWS enum no longer reaches the list.
+		{"alarm", realisticAlarm(), []string{"HighCPUAlarm", "alarm", "CPUUtilization"}},
 		{"sns", realisticSNSTopic(), []string{"arn:aws:sns:us-east-1:123456789012:my-notifications"}},
 		{"elb", realisticELB(), []string{"my-app-alb", "application", "internet-faci"}},
 		{"tg", realisticTargetGroup(), []string{"my-app-tg", "8080", "HTTP", "/health"}},
-		{"ecs", realisticECSClusterStruct(), []string{"prod-cluster", "ACTIVE"}},
-		{"ecs-svc", realisticECSService(), []string{"api-service", "ACTIVE", "FARGATE"}},
-		{"ecs-task", realisticECSTask(), []string{"RUNNING", "256", "512"}},
-		{"cfn", realisticCFNStack(), []string{"my-app-stack", "CREATE_COMPLETE"}},
+		// ecs/ecs-svc/ecs-task Status columns humanize the RawStruct enum ("ACTIVE"/"RUNNING" → lowercase).
+		{"ecs", realisticECSClusterStruct(), []string{"prod-cluster", "active"}},
+		{"ecs-svc", realisticECSService(), []string{"api-service", "active", "FARGATE"}},
+		{"ecs-task", realisticECSTask(), []string{"running", "256", "512"}},
+		// cfn Status column humanizes "CREATE_COMPLETE" (snake_case branch) → "create complete".
+		{"cfn", realisticCFNStack(), []string{"my-app-stack", "create complete"}},
 		{"role", realisticIAMRole(), []string{"lambda-exec-role", "/"}},
 		{"logs", realisticLogGroup(), []string{"/aws/lambda/my-api-handler"}},
 		{"ssm", realisticSSMParameter(), []string{"/app/config/db-host", "String"}},
@@ -956,7 +987,8 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		{"asg", realisticASG(), []string{"my-app-asg"}},
 		{"vpc", realisticVPC(), []string{"vpc-0abc1234def56789a", "10.0.0.0/16", "available"}},
 		{"sg", realisticSecurityGroup(), []string{"sg-0abc1234def56789a", "web-sg", "vpc-0abc1234"}},
-		{"ng", realisticNodeGroup(), []string{"prod-ng-01", "prod-cluster", "ACTIVE"}},
+		// ng Status column humanizes RawStruct "ACTIVE" → "active".
+		{"ng", realisticNodeGroup(), []string{"prod-ng-01", "prod-cluster", "active"}},
 		{"subnet", realisticSubnet(), []string{"subnet-0abc1234def56789a", "10.0.1.0/24", "us-east-1a"}},
 		{"nat", realisticNATGateway(), []string{"nat-0abc1234def56789a", "available"}},
 		{"igw", realisticInternetGateway(), []string{"igw-0abc1234def56789a"}},
@@ -978,7 +1010,8 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		// policy has no path: columns (all columns use key: from Fields) — tested in TestQA_List instead
 		{"iam-user", realisticIAMUser(), []string{"deploy-user", "AIDAEXAMPLEUSERID"}},
 		{"iam-group", realisticIAMGroup(), []string{"developers", "AGPAEXAMPLEGROUPID"}},
-		{"cf", realisticCFDistribution(), []string{"E1A2B3C4D5E6F7", "d1234abcdef.cloudfront.net", "Deployed"}},
+		// cf Status column humanizes RawStruct "Deployed" (already lowercase-mixed CamelCase → "deployed").
+		{"cf", realisticCFDistribution(), []string{"E1A2B3C4D5E6F7", "d1234abcdef.cloudfront.net", "deployed"}},
 		{"r53", realisticR53Zone(), []string{"/hostedzone/Z1234567890ABC", "example.com."}},
 		{"apigw", realisticAPIGW(), []string{"abc123def4", "prod-api", "HTTP"}},
 		{"ecr", realisticECR(), []string{"my-app", "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"}},
@@ -987,13 +1020,16 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		// (File System ID, Name) are asserted here. See qa_efs_test.go for the
 		// derived-status contract.
 		{"efs", realisticEFS(), []string{"fs-0abc1234def56789a"}},
-		{"eb-rule", realisticEBRule(), []string{"daily-backup-rule", "ENABLED"}},
+		// eb-rule State column humanizes RawStruct "ENABLED" → "enabled".
+		{"eb-rule", realisticEBRule(), []string{"daily-backup-rule", "enabled"}},
 		{"sfn", realisticSFN(), []string{"order-processing", "STANDARD"}},
 		{"pipeline", realisticPipeline(), []string{"deploy-pipeline", "V2"}},
-		{"kinesis", realisticKinesis(), []string{"events-stream", "ACTIVE"}},
+		// kinesis Status column humanizes RawStruct "ACTIVE" → "active".
+		{"kinesis", realisticKinesis(), []string{"events-stream", "active"}},
 		{"waf", realisticWAF(), []string{"prod-waf-acl", "a1b2c3d4-5678-90ab-cdef-EXAMPLE11111"}},
 		{"glue", realisticGlueJob(), []string{"etl-daily-job", "4.0", "G.2X"}},
-		{"eb", realisticEB(), []string{"prod-api-env", "my-web-app", "Ready"}},
+		// eb Status column humanizes RawStruct "Ready" (already lowercase-mixed CamelCase → "ready").
+		{"eb", realisticEB(), []string{"prod-api-env", "my-web-app", "ready"}},
 		{"ses", realisticSESIdentity(), []string{"example.com", "DOMAIN"}},
 		// redshift Status column now reads Fields["status"] (derived §4 phrase from
 		// the fetcher), not RawStruct.ClusterStatus. A raw-struct-only Resource
@@ -1001,12 +1037,15 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		// pull from RawStruct as before.
 		{"redshift", realisticRedshift(), []string{"analytics-cluster", "dc2.large"}},
 		{"trail", realisticTrail(), []string{"org-trail", "cloudtrail-logs-bucket"}},
-		{"athena", realisticAthena(), []string{"analytics-wg", "ENABLED"}},
+		// athena State column humanizes RawStruct "ENABLED" → "enabled".
+		{"athena", realisticAthena(), []string{"analytics-wg", "enabled"}},
 		{"codeartifact", realisticCodeArtifact(), []string{"shared-libs", "my-domain"}},
 		{"cb", realisticCodeBuild(), []string{"build-project", "CODECOMMIT"}},
 		{"opensearch", realisticOpenSearch(), []string{"search-prod", "OpenSearch_2.11"}},
-		{"kms", realisticKMS(), []string{"12345678-1234-1234-1234-123456789012", "Enabled"}},
-		{"msk", realisticMSK(), []string{"events-kafka", "PROVISIONED", "ACTIVE"}},
+		// kms Status column humanizes RawStruct "Enabled" (already lowercase-mixed CamelCase → "enabled").
+		{"kms", realisticKMS(), []string{"12345678-1234-1234-1234-123456789012", "enabled"}},
+		// msk State column humanizes RawStruct "ACTIVE" → "active".
+		{"msk", realisticMSK(), []string{"events-kafka", "PROVISIONED", "active"}},
 		{"backup", realisticBackup(), []string{"daily-backup-plan", "abc12345-1234-1234-1234-123456789012"}},
 	}
 
@@ -1048,6 +1087,16 @@ func TestQA_ListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 		wrongFields  map[string]string
 		expectInView []string // values that MUST appear from RawStruct
 	}{
+		// ec2 State is a Key-based column (Key:"state", lifecycleKey) — per
+		// list_columns.go's isStatusCol branch (11933a6f), a Key-based status
+		// column reads r.Fields[lifecycleKey] FIRST (humanized) and only falls
+		// back to the RawStruct Path when Fields carries no value at all. Since
+		// this test deliberately sets Fields["state"]="WRONG-STATE" to probe the
+		// override contract, that WRONG value — not RawStruct.State.Name — is
+		// what actually reaches the cell, humanized to "wrong- state". This is
+		// the documented status-column exception to "RawStruct always wins":
+		// identity/metadata Path columns (InstanceId, InstanceType) still take
+		// RawStruct priority; the State/Status cell does not.
 		{
 			"ec2",
 			ec2types.Instance{
@@ -1056,7 +1105,7 @@ func TestQA_ListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 				State:        &ec2types.InstanceState{Name: ec2types.InstanceStateNameRunning},
 			},
 			map[string]string{"instance_id": "WRONG-ID", "state": "WRONG-STATE"},
-			[]string{"i-correct", "running"},
+			[]string{"i-correct", "wrong- state"},
 		},
 		{
 			"lambda",
@@ -1064,11 +1113,15 @@ func TestQA_ListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 			map[string]string{"function_name": "WRONG-FN", "runtime": "WRONG-RT"},
 			[]string{"my-api-handler", "python3.12"},
 		},
+		// alarm: wrongFields keys ("alarm_name", "state_value") don't match the
+		// State column's Key/lifecycleKey ("state"), so Fields never overrides
+		// this Path-based column — RawStruct.StateValue ("ALARM") still wins,
+		// humanized to "alarm" by the same chokepoint (11933a6f).
 		{
 			"alarm",
 			realisticAlarm(),
 			map[string]string{"alarm_name": "WRONG-ALARM", "state_value": "WRONG-STATE"},
-			[]string{"HighCPUAlarm", "ALARM"},
+			[]string{"HighCPUAlarm", "alarm"},
 		},
 		{
 			"vpc",
@@ -1094,17 +1147,24 @@ func TestQA_ListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 			map[string]string{"allocation_id": "WRONG-ALLOC", "public_ip": "WRONG-IP"},
 			[]string{"eipalloc-0abc1234def56789a", "54.123.45.67"},
 		},
+		// ecs/cfn: wrongFields sets "status" (ecs's Key-based Status column key),
+		// which — per the same isStatusCol precedence as ec2's "state" case
+		// above — overrides RawStruct and reaches the cell humanized:
+		// "WRONG-STATUS" → "wrong- status". cfn's wrongFields key is
+		// "stack_status", which does NOT match its Status column's Key
+		// ("status"), so cfn's RawStruct.StackStatus ("CREATE_COMPLETE") still
+		// wins, humanized to "create complete".
 		{
 			"ecs",
 			realisticECSClusterStruct(),
 			map[string]string{"cluster_name": "WRONG-CLS", "status": "WRONG-STATUS"},
-			[]string{"prod-cluster", "ACTIVE"},
+			[]string{"prod-cluster", "wrong- status"},
 		},
 		{
 			"cfn",
 			realisticCFNStack(),
 			map[string]string{"stack_name": "WRONG-STACK", "stack_status": "WRONG-STATUS"},
-			[]string{"my-app-stack", "CREATE_COMPLETE"},
+			[]string{"my-app-stack", "create complete"},
 		},
 		{
 			"role",

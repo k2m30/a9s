@@ -126,7 +126,13 @@ var navigableContracts = []navContract{
 	{shortName: "ec2", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InstanceBlockDeviceMapping.html", fieldPath: "BlockDeviceMappings.Ebs.VolumeId", targetType: "ebs", reasoning: "Instance.BlockDeviceMappings[].Ebs.VolumeId — attached EBS volumes."},
 	{shortName: "ec2", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_GroupIdentifier.html", fieldPath: "SecurityGroups.GroupId", targetType: "sg", reasoning: "Instance.SecurityGroups[].GroupId — attached SGs."},
 	{shortName: "ec2", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InstanceNetworkInterface.html", fieldPath: "NetworkInterfaces.NetworkInterfaceId", targetType: "eni", reasoning: "Instance.NetworkInterfaces[].NetworkInterfaceId — ENIs attached to the instance."},
-	{shortName: "ec2", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_IamInstanceProfile.html", fieldPath: "IamInstanceProfile.Arn", targetType: "role", reasoning: "Instance.IamInstanceProfile.Arn — the IAM instance profile (maps to a role)."},
+	// ec2 role reachability: IamInstanceProfile.Arn is intentionally NOT a
+	// navigable field (see ef9e65f2 "ec2->role related pivot resolves through
+	// GetInstanceProfile — profile name is not role name"). The instance
+	// profile ARN identifies the profile resource, not the role itself — the
+	// role name requires an iam:GetInstanceProfile call to resolve. That
+	// resolution happens in the ec2:role related-panel checker
+	// (checkRoleEC2 / ec2_related.go), not via a direct navigable field.
 
 	// ecr — ECR Repositories
 	{shortName: "ecr", apiDoc: "https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_EncryptionConfiguration.html", fieldPath: "EncryptionConfiguration.KmsKey", targetType: "kms", reasoning: "Repository.EncryptionConfiguration.KmsKey — KMS key for image encryption when EncryptionType=KMS."},
