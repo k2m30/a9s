@@ -55,13 +55,23 @@ import (
 // tasks, without panicking.
 // =============================================================================
 
-// TestController_Handle_PRB_ResourcesLoaded_IsNoOpPassThrough verifies that
-// Handle fed a messages.ResourcesLoaded returns Snapshot() unchanged with no
-// tasks and does not panic.
+// TestController_Handle_PRB_ResourcesLoaded_DispatchesProbeEnrichForIssueCapableType
+// verifies that Handle fed a messages.ResourcesLoaded for an issue-capable
+// type (ec2 has a registered Wave-2 issue enricher, EnrichEC2InstanceStatus)
+// returns Snapshot() unchanged (the event carries no view-stack mutation of
+// its own — the controller's list-state absorption happens via the separate
+// handleResourcesLoadedEvent path) but DOES return the list-open
+// TaskKindProbeEnrich task, without panicking.
 //
-// Deferred to post-PR-C: ResourcesLoaded dispatch is blocked on relocating
-// TUI-shim pre-processing (see plan PR-B note).
-func TestController_Handle_PRB_ResourcesLoaded_IsNoOpPassThrough(t *testing.T) {
+// Formerly IsNoOpPassThrough / "Deferred to post-PR-C": that was accurate
+// when Core.HandleResourcesLoaded's list-open Wave-2 dispatch did not exist.
+// It now does (see internal/runtime/handlers_resources.go's TypeGen==0
+// branch) and HandleEvent forwards its tasks for exactly this reason — a
+// headless/web session opening a list must get row flags and the menu badge
+// without waiting for a Ctrl+R rerun. This test still pins the "no
+// view-stack mutation" half of the old no-op contract; only the "zero tasks"
+// half changes.
+func TestController_Handle_PRB_ResourcesLoaded_DispatchesProbeEnrichForIssueCapableType(t *testing.T) {
 	c := newTestController()
 
 	ev := messages.ResourcesLoaded{
@@ -89,10 +99,17 @@ func TestController_Handle_PRB_ResourcesLoaded_IsNoOpPassThrough(t *testing.T) {
 	snap := c.Snapshot()
 	assertViewStateEqualsSnapshot(t, "Handle(ResourcesLoaded)", vs, snap)
 	if vs.Body.Kind != snapBefore.Body.Kind {
-		t.Errorf("Handle(ResourcesLoaded) changed Body.Kind: before=%q after=%q — expected no-op", snapBefore.Body.Kind, vs.Body.Kind)
+		t.Errorf("Handle(ResourcesLoaded) changed Body.Kind: before=%q after=%q — expected no view-stack mutation from this event alone", snapBefore.Body.Kind, vs.Body.Kind)
 	}
-	if len(tasks) != 0 {
-		t.Errorf("Handle(ResourcesLoaded) returned %d tasks, want 0 (no-op until PR-C)", len(tasks))
+	hasProbeEnrich := false
+	for _, task := range tasks {
+		if task.Key.Kind == runtime.TaskKindProbeEnrich && task.Key.Scope == "ec2" {
+			hasProbeEnrich = true
+			break
+		}
+	}
+	if !hasProbeEnrich {
+		t.Errorf("Handle(ResourcesLoaded) for issue-capable type %q returned %d tasks, want a TaskKindProbeEnrich for %q — a headless/web list-open must dispatch Wave-2 (see handlers_resources.go's list-open branch)", ev.ResourceType, len(tasks), ev.ResourceType)
 	}
 }
 

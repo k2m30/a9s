@@ -67,6 +67,18 @@ type ResourcesLoadedEvent struct {
 //     gen captured at Ctrl+R dispatch), reseeds RowStore (OriginFetch) and
 //     emits a TaskKindProbeEnrich task. Stale rerun tokens are silently
 //     dropped.
+//   - On a normal (non-rerun), non-Append, error-free top-level list load,
+//     emits a TaskKindProbeEnrich task when the type is a registered
+//     top-level resource (not a child view) with a registered Wave-2 issue
+//     enricher. This is the list-open Wave-2 dispatch: opening a list for
+//     the first time this session must enrich it exactly like the
+//     bootstrap availability sweep does, instead of leaving row flags and
+//     the menu issue badge unset until the user happens to hit Ctrl+R.
+//     Gated OFF on Append (a load-more page must not re-trigger the probe —
+//     already enriched/queued on page 1) and on Err != nil (a failed load
+//     has nothing new and reliable to enrich). See
+//     tests/unit/runtime_list_open_enrich_dispatch_test.go for the pinned
+//     contract this branch satisfies.
 func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []TaskRequest) {
 	intents := []UIIntent{ClearFlash{}}
 
@@ -98,6 +110,23 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 		// unconditional whole-slice assignment the legacy map write used to
 		// perform, not an append).
 		c.ObserveRows(ev.ResourceType, ev.Resources, ev.Pagination, session.OriginFetch, false)
+		tasks = append(tasks, TaskRequest{
+			Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: ev.ResourceType},
+		})
+	} else if ev.TypeGen == 0 && ev.Err == nil && !ev.Append &&
+		resource.FindResourceType(ev.ResourceType) != nil && c.HasIssueEnricher(ev.ResourceType) {
+		// List-open Wave-2 dispatch (converges the web/headless and TUI
+		// lanes onto one producer — see HandleEvent's messages.ResourcesLoaded
+		// case, which forwards only the tasks this branch returns so its own
+		// intents are never double-applied on the web/headless lane).
+		// RowStore already holds this load's rows by the time this task
+		// executes: applyResourcesLoaded (both the TUI's
+		// ctrl.HandleResourcesLoadedEvent and the web/headless
+		// Controller.handleResourcesLoadedEvent path) routes a top-level
+		// canonical list's rows through Core.ObserveRows before either
+		// caller reaches this method, so no explicit reseed is needed here
+		// (unlike the rerun branch above, which is invoked in a context
+		// where that write-through is not guaranteed to have happened yet).
 		tasks = append(tasks, TaskRequest{
 			Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: ev.ResourceType},
 		})

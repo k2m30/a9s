@@ -111,20 +111,36 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 	case messages.EnrichmentChecked:
 		return c.handleEnrichmentChecked(msg)
 	case messages.ResourcesLoaded:
-		// Row-store dual-write ONLY (task #17 wave 1): this case must never
-		// return the intents/tasks HandleResourcesLoaded computes — the TUI
-		// adapter calls Core.HandleResourcesLoaded directly (bypassing
-		// HandleEvent entirely, see runtime_adapter_resources.go) and
-		// Controller.Handle (internal/app/handle.go) already runs its own,
-		// separate ResourcesLoaded pipeline (handleResourcesLoadedEvent /
+		// Row-store dual-write, PLUS the list-open Wave-2 probe task — but
+		// NEVER HandleResourcesLoaded's intents (task #17 wave 1 / DEF-20
+		// follow-up). The TUI adapter calls Core.HandleResourcesLoaded
+		// directly (bypassing HandleEvent entirely, see
+		// runtime_adapter_resources.go) and Controller.Handle
+		// (internal/app/handle.go) already runs its own, separate
+		// ResourcesLoaded pipeline (handleResourcesLoadedEvent /
 		// applyResourcesLoaded). Applying HandleResourcesLoaded's intents here
 		// too would double-apply PatchResourceCache/ClearFlash for every
 		// Controller.Handle caller (web/headless/tests) — a real internal/app
 		// behavior change this stage must not make. Feed RowStore the same
 		// canonicalization + Fetch-origin write HandleResourcesLoaded performs,
-		// then return nil, nil exactly like the pre-existing default case.
+		// then call HandleResourcesLoaded ourselves and forward ONLY its
+		// tasks: a TaskRequest is not an intent and is never double-applied
+		// by Controller.Handle (only applyIntents(intents) is), so this is
+		// the one shared producer for the Wave-2 list-open dispatch that
+		// reaches the web/headless lane. The TUI reaches the same producer
+		// via its own direct HandleResourcesLoaded call in
+		// runtime_adapter_resources.go, so this task is emitted exactly
+		// once per lane per list load.
 		c.observeResourcesLoadedRows(msg)
-		return nil, nil
+		_, tasks := c.HandleResourcesLoaded(ResourcesLoadedEvent{
+			ResourceType: msg.ResourceType,
+			Resources:    msg.Resources,
+			Pagination:   msg.Pagination,
+			Append:       msg.Append,
+			TypeGen:      msg.TypeGen,
+			Err:          msg.Err,
+		})
+		return nil, tasks
 	case messages.RelatedCheckResult:
 		// Row-store dual-write ONLY — same double-dispatch hazard as
 		// ResourcesLoaded above (Controller.Handle applies its own

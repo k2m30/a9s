@@ -74,6 +74,43 @@ func applyRelatedResourcesLoaded(m tui.Model, resourceType string, resources []r
 	return m
 }
 
+// applyRelatedFollowUp runs cmd (if any) and feeds its result message(s) back
+// through the model, same as the single-message `if cmd != nil { follow :=
+// cmd(); m, _ = relatedApplyMsg(m, follow) }` pattern used throughout this
+// file — except it is batch-safe: tui.Model.Update has no tea.BatchMsg case,
+// so a cmd that resolves to tea.Batch(navigateCmd, otherCmd) (e.g. an
+// auto-open Navigate batched alongside a ProbeEnrich task dispatch) would
+// otherwise silently drop every sub-message, including the Navigate the test
+// is waiting on. Each sub-command is applied in order, one batch level deep —
+// deep enough for the auto-open-single-detail batches this file exercises,
+// without recursing into unrelated async follow-ups (e.g. a tea.Tick-driven
+// flash-clear) the way a generic recursive drain would.
+func applyRelatedFollowUp(m tui.Model, cmd tea.Cmd) tui.Model {
+	if cmd == nil {
+		return m
+	}
+	msg := cmd()
+	if msg == nil {
+		return m
+	}
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		m, _ = relatedApplyMsg(m, msg)
+		return m
+	}
+	for _, subCmd := range batch {
+		if subCmd == nil {
+			continue
+		}
+		subMsg := subCmd()
+		if subMsg == nil {
+			continue
+		}
+		m, _ = relatedApplyMsg(m, subMsg)
+	}
+	return m
+}
+
 // ---------------------------------------------------------------------------
 // Count=1: single related resource should open DETAIL view, not list
 // ---------------------------------------------------------------------------
@@ -200,11 +237,10 @@ func TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget
 		},
 	})
 	m = m2
-	if cmd != nil {
-		if follow := cmd(); follow != nil {
-			m, _ = relatedApplyMsg(m, follow)
-		}
-	}
+	// asg is issue-capable, so the auto-open Navigate now arrives batched
+	// alongside a ProbeEnrich task dispatch (tea.Batch) — drain batch-safe so
+	// the Navigate still reaches the model instead of being silently dropped.
+	m = applyRelatedFollowUp(m, cmd)
 
 	view := stripAnsi(relatedViewContent(m))
 	// asg has Children[Key="enter"]=asg_activities — auto-open must mirror

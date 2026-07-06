@@ -541,30 +541,56 @@ func TestHandleEnrichmentChecked_DropsStaleTypeGen(t *testing.T) {
 	_ = m
 }
 
-// TestListCtrlR_NormalFetch_TypeGenZeroNeverTriggersRerun verifies that a
-// normal (non-Ctrl+R) ResourcesLoadedMsg with TypeGen=0 never triggers the
-// enrichment rerun tail branch. This is the "no regression" check.
-func TestListCtrlR_NormalFetch_TypeGenZeroNeverTriggersRerun(t *testing.T) {
+// TestListCtrlR_NormalFetch_TypeGenZeroDoesNotCorruptRerunGen verifies the
+// rerun-overlap intent this test originally guarded — that a normal
+// (non-Ctrl+R) ResourcesLoadedMsg with TypeGen=0 never goes through the
+// RERUN semantics (HandleResourcesLoaded's `ev.TypeGen != 0 &&
+// ev.TypeGen == c.session.EnrichmentTypeGen[...]` reseed/gen-match branch) —
+// while still allowing the separate, unconditional list-open Wave-2 dispatch
+// this defect fix added (internal/runtime/handlers_resources.go's
+// `ev.TypeGen == 0 && ...` branch).
+//
+// Formerly "TypeGenZeroNeverTriggersRerun": that name and its body asserted
+// cmd must never resolve to messages.EnrichmentChecked at all on TypeGen=0.
+// That assertion is no longer correct — "ec2" DOES have a registered Wave-2
+// issue enricher (EnrichEC2InstanceStatus, internal/aws/catalog_compute.go;
+// several sibling comments in this file claiming otherwise predate/are stale
+// against that registration), so a plain list-open now legitimately
+// dispatches TaskKindProbeEnrich and its cmd legitimately resolves to
+// EnrichmentChecked. Checking "no EnrichmentChecked at all" can no longer
+// distinguish the (correct, new) plain dispatch from the (still-incorrect)
+// rerun-tail firing on a non-rerun event, so this test now proves the
+// narrower, still-true claim directly: TypeGen=0 does not consume or corrupt
+// the per-type rerun-gen bookkeeping — a subsequent genuine Ctrl+R rerun
+// still dispatches cleanly afterward. Mirrors the same before/after-Ctrl+R
+// proof idiom TestListCtrlR_FetchError_NoLatentState already uses.
+func TestListCtrlR_NormalFetch_TypeGenZeroDoesNotCorruptRerunGen(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 	m = navigateToEC2List(m)
 
 	// Normal fetch (TypeGen=0) — as if navigate triggered the initial load.
-	m, cmd := rootApplyMsg(m, messages.ResourcesLoaded{
+	// The plain list-open Wave-2 dispatch fires here (ec2 is issue-capable);
+	// that cmd is allowed to be non-nil and to resolve to EnrichmentChecked —
+	// this is the defect fix, not a regression.
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    rerunEC2Resources(),
 		TypeGen:      0, // normal fetch, no rerun intent
 	})
 
-	// cmd may be non-nil for other reasons (flash clear, view state update),
-	// but it must NOT dispatch probeEnrichment. Verify: if cmd is non-nil,
-	// its result must NOT be an EnrichmentCheckedMsg directly.
-	if cmd != nil {
-		msg := cmd()
-		if _, isEnrich := msg.(messages.EnrichmentChecked); isEnrich {
-			t.Error("normal fetch TypeGen=0 must not dispatch probeEnrichment; " +
-				"got EnrichmentCheckedMsg — tail branch incorrectly fired on TypeGen=0")
-		}
+	// The rerun-overlap invariant: TypeGen=0 must not have bumped or
+	// otherwise corrupted enrichmentTypeGen["ec2"]. Proof: Ctrl+R now bumps
+	// it to 1, and a ResourcesLoadedMsg{TypeGen:1} matching that fresh token
+	// must still dispatch a rerun probe cleanly — exactly the behavior a
+	// corrupted/stale gen would break.
+	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
+	_, rerunCmd := rootApplyMsg(m, messages.ResourcesLoaded{
+		ResourceType: "ec2",
+		Resources:    rerunEC2Resources(),
+		TypeGen:      1, // matches enrichmentTypeGen["ec2"]=1 after Ctrl+R
+	})
+	if rerunCmd == nil {
+		t.Error("Ctrl+R after a prior TypeGen=0 normal fetch must still dispatch a rerun probe (rerunCmd nil) — the prior TypeGen=0 fetch must not have corrupted enrichmentTypeGen[\"ec2\"]")
 	}
-	_ = m
 }
