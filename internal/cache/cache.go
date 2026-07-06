@@ -47,6 +47,36 @@ type Row struct {
 	Findings []domain.Finding  `yaml:"findings,omitempty"`
 }
 
+// deepCopyRows returns a copy of rows in which every element's Fields map
+// and Findings slice are freshly allocated, never sharing backing storage
+// with rows itself. domain.Finding has no reference-typed fields (see its
+// doc comment), so a fresh slice with copied elements is sufficient for
+// Findings; Fields (a map) needs an explicit per-row maps.Clone.
+//
+// Required because Row.Fields commonly ALIASES a live resource.Resource's
+// own Fields map (runtime.SaveTypeRows only copies when
+// materializeResourceFields actually needs to inject a value — the common
+// case leaves Fields pointing at the exact same map the rest of the app
+// still holds and mutates). SaveType calls this immediately before
+// yaml.Marshal so the marshaled snapshot can never race a concurrent
+// mutation of that live map (see SaveType's doc comment).
+func deepCopyRows(rows []Row) []Row {
+	if rows == nil {
+		return nil
+	}
+	out := make([]Row, len(rows))
+	for i, r := range rows {
+		if r.Fields != nil {
+			r.Fields = maps.Clone(r.Fields)
+		}
+		if r.Findings != nil {
+			r.Findings = append([]domain.Finding(nil), r.Findings...)
+		}
+		out[i] = r
+	}
+	return out
+}
+
 // TypeFile is the on-disk, self-contained state for one resource type within
 // one profile+region pair. Version MUST stay the first field (C7a: a future
 // encrypted format is detected by this marker before the rest of the file is
@@ -202,11 +232,29 @@ func (s *Store) Put(shortName string, tf TypeFile) {
 // directory followed by rename. No other type's file is opened or touched
 // (C7: per-type files, no merge logic). The directory is created (0700) if
 // missing; the written file is 0600.
+//
+// tf.Rows is deep-copied before Marshal (deepCopyRows): callers stage a
+// TypeFile via Put with Rows built from live resource.Resource data (e.g.
+// runtime.SaveTypeRows aliases cache.Row.Fields directly onto
+// resource.Resource.Fields whenever materializeResourceFields finds nothing
+// left to add — no copy is made in that case). When SaveType then runs on a
+// different goroutine than the one still holding that live resource (e.g.
+// Controller's async availability-cache writer racing a controller-lane
+// applyFieldUpdatesToSlice call that mutates the same Fields map in place),
+// yaml.Marshal's reflect-based map/slice walk and that mutation can race on
+// the identical map — this was a real, reproduced data race (go test -race),
+// not a theoretical one. Deep-copying here — the single chokepoint every
+// save lane's Marshal goes through — makes the marshaled snapshot fully
+// independent of whatever live structure Rows/Fields/Findings originally
+// aliased, without requiring any caller to take a lock it doesn't already
+// hold or without SaveType itself taking one (Store has none, and adding one
+// would only re-serialize callers, not fix the aliasing).
 func (s *Store) SaveType(shortName string) error {
 	tf, ok := s.types[shortName]
 	if !ok {
 		return fmt.Errorf("cache: SaveType(%s): no staged state (call Put first)", shortName)
 	}
+	tf.Rows = deepCopyRows(tf.Rows)
 
 	dir := Dir(s.profile, s.region)
 	if dir == "" {

@@ -130,8 +130,8 @@ func fullIntegrationRunResourceBaseline(t *testing.T, clients *awsclient.Service
 	detailContext := fullIntegrationDetailContext(rt.ShortName+" baseline detail", selected)
 	t.Logf("%s selected resource: id=%s name=%q", rt.ShortName, selected.ID, selected.Name)
 	expectedRelated := fullIntegrationExpectedRelatedCounts(t, clients, rt.ShortName, selected)
-	fullIntegrationAssertRelatedResults(t, expectedRelated, relatedResults, detailContext)
-	fullIntegrationAssertRelatedCountsInView(t, m, rt.ShortName, expectedRelated, detailContext)
+	coldUnknown := fullIntegrationAssertRelatedResults(t, rt.ShortName, expectedRelated, relatedResults, detailContext)
+	fullIntegrationAssertRelatedCountsInView(t, m, rt.ShortName, expectedRelated, coldUnknown, detailContext)
 }
 
 func fullIntegrationRunRelatedHopScenario(t *testing.T, clients *awsclient.ServiceClients, m *tui.Model, expectedTopLevel map[string]fullIntegrationCountExpectation, scenario fullIntegrationRelatedHopScenario) {
@@ -156,15 +156,15 @@ func fullIntegrationRunRelatedHopScenario(t *testing.T, clients *awsclient.Servi
 	sourceContext := fullIntegrationDetailContext(scenario.name+" source detail", firstResource)
 	t.Logf("%s source selected resource: id=%s name=%q", scenario.name, firstResource.ID, firstResource.Name)
 	expectedFirst := fullIntegrationExpectedRelatedCounts(t, clients, scenario.sourceType, firstResource)
-	fullIntegrationAssertRelatedResults(t, expectedFirst, firstResults, sourceContext)
-	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.sourceType, expectedFirst, sourceContext)
+	coldUnknownFirst := fullIntegrationAssertRelatedResults(t, scenario.sourceType, expectedFirst, firstResults, sourceContext)
+	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.sourceType, expectedFirst, coldUnknownFirst, sourceContext)
 
 	relatedResource, relatedResults := fullIntegrationEnterRelatedSingleDetail(t, m, scenario.firstTargetType, scenario.firstDisplayName)
 	firstRelatedContext := fullIntegrationDetailContext(scenario.name+" first related detail", relatedResource)
 	t.Logf("%s first related selected resource: id=%s name=%q", scenario.name, relatedResource.ID, relatedResource.Name)
 	expectedRelated := fullIntegrationExpectedRelatedCounts(t, clients, scenario.firstTargetType, relatedResource)
-	fullIntegrationAssertRelatedResults(t, expectedRelated, relatedResults, firstRelatedContext)
-	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.firstTargetType, expectedRelated, firstRelatedContext)
+	coldUnknownRelated := fullIntegrationAssertRelatedResults(t, scenario.firstTargetType, expectedRelated, relatedResults, firstRelatedContext)
+	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.firstTargetType, expectedRelated, coldUnknownRelated, firstRelatedContext)
 
 	returnCount := expectedRelated[scenario.returnDisplayName]
 	if returnCount <= 0 {
@@ -182,8 +182,8 @@ func fullIntegrationRunRelatedHopScenario(t *testing.T, clients *awsclient.Servi
 	returnContext := fullIntegrationDetailContext(scenario.name+" return detail", returnResource)
 	t.Logf("%s return selected resource: id=%s name=%q", scenario.name, returnResource.ID, returnResource.Name)
 	expectedReturn := fullIntegrationExpectedRelatedCounts(t, clients, scenario.returnTargetType, returnResource)
-	fullIntegrationAssertRelatedResults(t, expectedReturn, returnResults, returnContext)
-	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.returnTargetType, expectedReturn, returnContext)
+	coldUnknownReturn := fullIntegrationAssertRelatedResults(t, scenario.returnTargetType, expectedReturn, returnResults, returnContext)
+	fullIntegrationAssertRelatedCountsInView(t, *m, scenario.returnTargetType, expectedReturn, coldUnknownReturn, returnContext)
 }
 
 func fullIntegrationNewReadyModelWithClients(t *testing.T, profile, region string, clients *awsclient.ServiceClients) tui.Model {
@@ -459,31 +459,53 @@ func fullIntegrationCollectMessages(msg tea.Msg) []tea.Msg {
 	}
 }
 
-func fullIntegrationAssertRelatedResults(t *testing.T, expected map[string]int, got []messages.RelatedCheckResult, context string) {
+// fullIntegrationAssertRelatedResults compares the app's related results
+// against the oracle's expectations and returns the display names accepted as
+// cold-cache unknowns: the oracle prefetches EVERY target cache before calling
+// a checker, while the app prefetches only for defs registered with
+// NeedsTargetCache — a no-prefetch checker answering -1 ("?") where the
+// oracle computed a real count is the documented cold-cache contract, not a
+// mismatch. The returned set lets the view assertion skip those rows.
+func fullIntegrationAssertRelatedResults(t *testing.T, sourceType string, expected map[string]int, got []messages.RelatedCheckResult, context string) map[string]bool {
 	t.Helper()
+	prefetched := make(map[string]bool)
+	for _, def := range resource.GetRelated(sourceType) {
+		prefetched[def.DisplayName] = def.NeedsTargetCache
+	}
 	gotByName := make(map[string]int, len(got))
 	for _, result := range got {
 		gotByName[result.DefDisplayName] = result.Result.Count
 	}
+	coldUnknown := make(map[string]bool)
 	for name, want := range expected {
 		if gotCount, ok := gotByName[name]; !ok {
 			t.Fatalf("%s: missing related result %q; got %v", context, name, gotByName)
 		} else {
 			t.Logf("%s related result %s: actual=%d expected=%d", context, name, gotCount, want)
 			if gotCount != want {
+				if gotCount == -1 && !prefetched[name] {
+					coldUnknown[name] = true
+					t.Logf("%s: related %q answered ? (cold cache, no prefetch registered); oracle computed %d from its own prefetched cache", context, name, want)
+					continue
+				}
 				t.Fatalf("%s: related result %q count = %d, expected %d; all results %v", context, name, gotCount, want, gotByName)
 			}
 		}
 	}
+	return coldUnknown
 }
 
-func fullIntegrationAssertRelatedCountsInView(t *testing.T, m tui.Model, sourceType string, expected map[string]int, context string) {
+func fullIntegrationAssertRelatedCountsInView(t *testing.T, m tui.Model, sourceType string, expected map[string]int, coldUnknown map[string]bool, context string) {
 	t.Helper()
 	plain := fullIntegrationStripANSI(fullIntegrationViewContent(m))
 	if !strings.Contains(plain, "RELATED") {
 		t.Fatalf("%s: view does not contain RELATED panel:\n%s", context, plain)
 	}
 	for name, count := range expected {
+		if coldUnknown[name] {
+			t.Logf("%s related view %s: displayed=<?> (cold-cache unknown) expected=%d", context, name, count)
+			continue
+		}
 		if fullIntegrationIsHiddenSelfPivotZero(sourceType, name, count) {
 			t.Logf("%s related view %s: displayed=<hidden self-pivot zero> expected=%d", context, name, count)
 			continue
