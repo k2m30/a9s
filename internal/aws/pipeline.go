@@ -40,10 +40,9 @@ func FetchCodePipelinesPage(ctx context.Context, api CodePipelineListPipelinesAP
 
 // FetchCodePipelinesPageWithClients fetches a single page of CodePipeline
 // pipelines and constructs Fields["arn"] for each pipeline
-// (arn:aws:codepipeline:<region>:<account>:pipeline/<name>) using the
-// session's resolved region/account. Account resolution is best-effort — on
-// failure Fields["arn"] is left empty rather than constructed from a wrong
-// account.
+// (arn:aws:codepipeline:<region>:<account>:<name>) using the session's
+// resolved region/account. Account resolution is best-effort — on failure
+// Fields["arn"] is left empty rather than constructed from a wrong account.
 func FetchCodePipelinesPageWithClients(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 	account := accountIDFromClients(ctx, c, c.IdentityStore())
 	region := c.Region
@@ -55,7 +54,9 @@ func FetchCodePipelinesPageWithClients(ctx context.Context, c *ServiceClients, c
 
 // fetchCodePipelinesPage is the shared implementation. When region and
 // account are both non-empty, Fields["arn"] is constructed as
-// arn:aws:codepipeline:<region>:<account>:pipeline/<name>; otherwise it is "".
+// arn:aws:codepipeline:<region>:<account>:<name> — CodePipeline ARNs have no
+// "pipeline/" resource-type segment, unlike most other services; otherwise
+// it is "".
 func fetchCodePipelinesPage(ctx context.Context, api CodePipelineListPipelinesAPI, region, account, continuationToken string) (resource.FetchResult, error) {
 	input := &codepipeline.ListPipelinesInput{
 		MaxResults: aws.Int32(DefaultPageSize),
@@ -96,7 +97,7 @@ func fetchCodePipelinesPage(ctx context.Context, api CodePipelineListPipelinesAP
 
 		arn := ""
 		if region != "" && account != "" && name != "" {
-			arn = "arn:aws:codepipeline:" + region + ":" + account + ":pipeline/" + name
+			arn = "arn:aws:codepipeline:" + region + ":" + account + ":" + name
 		}
 
 		r := resource.Resource{

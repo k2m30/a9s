@@ -118,8 +118,15 @@ func relatedResult(target string, ids []string) resource.RelatedCheckResult {
 // checkMSKLambda. Both pivots need the same mechanism: a stream/cluster ARN
 // is the Lambda event source, and lambda:ListEventSourceMappings filtered by
 // EventSourceArn (one call per open resource — budget rule 7 in
-// docs/related-resources.md) returns the mappings' FunctionArn values, which
-// are matched against the already-loaded lambda cache's Fields["arn"].
+// docs/related-resources.md) is itself the authoritative mechanism per
+// kinesis.md/msk.md §2 — its FunctionArn values are the definitive answer.
+// The already-loaded lambda cache, when present, only enriches: it resolves
+// each FunctionArn to the bare function name the lambda drill/detail view
+// navigates by (resource.Resource.ID for a Lambda function is its bare
+// FunctionName — see FetchLambdaFunctionsPageWithEventSources). When the
+// cache is absent, the bare name is instead parsed out of the FunctionArn
+// (arn:aws:lambda:region:account:function:name[:qualifier]) so cache
+// presence never changes the count.
 func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, eventSourceArn string, cache resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
@@ -149,9 +156,15 @@ func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, event
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 	}
 
-	entry, ok := cache["lambda"]
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "lambda"}
+	entry, cacheOK := cache["lambda"]
+	if !cacheOK {
+		ids := make([]string, 0, len(functionArns))
+		for arn := range functionArns {
+			if name := lambdaFunctionNameFromARN(arn); name != "" {
+				ids = append(ids, name)
+			}
+		}
+		return relatedResult("lambda", ids)
 	}
 
 	var ids []string
@@ -165,4 +178,16 @@ func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, event
 		return resource.ApproximateZero("lambda")
 	}
 	return result
+}
+
+// lambdaFunctionNameFromARN extracts the bare function name from a Lambda
+// function ARN (arn:aws:lambda:region:account:function:name[:qualifier]).
+// Returns "" if the ARN does not have the expected "function:" segment.
+func lambdaFunctionNameFromARN(functionArn string) string {
+	_, name, ok := strings.Cut(functionArn, ":function:")
+	if !ok {
+		return ""
+	}
+	name, _, _ = strings.Cut(name, ":")
+	return name
 }

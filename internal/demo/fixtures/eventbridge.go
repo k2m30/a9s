@@ -198,7 +198,7 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 		"acme-api-deploy-trigger": {
 			{
 				Id:  aws.String("CodePipelineAcmeApiDeploy"),
-				Arn: aws.String("arn:aws:codepipeline:us-east-1:123456789012:pipeline/acme-api-deploy"),
+				Arn: aws.String("arn:aws:codepipeline:us-east-1:123456789012:acme-api-deploy"),
 			},
 		},
 	}

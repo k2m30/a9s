@@ -521,8 +521,10 @@ func TestLogs_Related_ECSTask_MatchesFamilyFromTaskDefinitionField(t *testing.T)
 // a key FetchCodePipelinesPage (internal/aws/pipeline.go:74-80) never
 // populates (only name/pipeline_type/created/updated/version are set). The
 // correct mechanism constructs the ARN
-// (arn:aws:codepipeline:<region>:<account>:pipeline/<name>) with no extra
-// API call, since region+account are already known from the client context.
+// (arn:aws:codepipeline:<region>:<account>:<name> — AWS CodePipeline
+// resource ARNs have no "pipeline/" segment, unlike e.g. IAM policy ARNs)
+// with no extra API call, since region+account are already known from the
+// client context.
 // ---------------------------------------------------------------------------
 
 type fakeEventBridgeListRuleNamesByTarget struct {
@@ -547,7 +549,7 @@ func (f *fakeCodePipelineListPipelinesOnly) ListPipelines(_ context.Context, _ *
 }
 
 func TestPipeline_Related_EbRule_ResolvesViaRealFetcherOutput(t *testing.T) {
-	pipelineARN := "arn:aws:codepipeline:us-east-1:123456789012:pipeline/checkout-deploy"
+	pipelineARN := "arn:aws:codepipeline:us-east-1:123456789012:checkout-deploy"
 
 	listAPI := &fakeCodePipelineListPipelinesOnly{
 		pipelines: []cptypes.PipelineSummary{{Name: aws.String("checkout-deploy")}},
@@ -566,7 +568,7 @@ func TestPipeline_Related_EbRule_ResolvesViaRealFetcherOutput(t *testing.T) {
 		t.Fatalf("got %d resources, want 1", len(fetchResult.Resources))
 	}
 	if got := fetchResult.Resources[0].Fields["arn"]; got != pipelineARN {
-		t.Fatalf("Fields[arn] = %q, want %q — the pipeline fetcher must construct the ARN (region+account are already known from the client context; spec pipeline.md)", got, pipelineARN)
+		t.Fatalf("Fields[arn] = %q, want %q — the pipeline fetcher must construct the ARN with no \"pipeline/\" segment (region+account are already known from the client context; AWS CodePipeline resource ARN format)", got, pipelineARN)
 	}
 
 	fake := &fakeEventBridgeListRuleNamesByTarget{

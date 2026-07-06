@@ -387,31 +387,45 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetVpcLinksOutput, error) {
-		return vpcLinkAPI.GetVpcLinks(ctx, &apigatewayv2.GetVpcLinksInput{})
-	})
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
-	}
-	if out == nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
-	}
 
 	wantedSubnets := make(map[string]struct{})
 	wantedSGs := make(map[string]struct{})
-	for _, link := range out.Items {
-		if link.VpcLinkId == nil {
-			continue
+	var nextToken *string
+	// GetVpcLinks is account-wide and paginated; VpcLinks are few per
+	// account, but the token is honored until exhausted rather than assuming
+	// a single page.
+	for {
+		var input apigatewayv2.GetVpcLinksInput
+		if nextToken != nil {
+			input.NextToken = nextToken
 		}
-		if _, wanted := seenLinks[*link.VpcLinkId]; !wanted {
-			continue
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetVpcLinksOutput, error) {
+			return vpcLinkAPI.GetVpcLinks(ctx, &input)
+		})
+		if err != nil {
+			return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
 		}
-		for _, s := range link.SubnetIds {
-			wantedSubnets[s] = struct{}{}
+		if out == nil {
+			break
 		}
-		for _, sg := range link.SecurityGroupIds {
-			wantedSGs[sg] = struct{}{}
+		for _, link := range out.Items {
+			if link.VpcLinkId == nil {
+				continue
+			}
+			if _, wanted := seenLinks[*link.VpcLinkId]; !wanted {
+				continue
+			}
+			for _, s := range link.SubnetIds {
+				wantedSubnets[s] = struct{}{}
+			}
+			for _, sg := range link.SecurityGroupIds {
+				wantedSGs[sg] = struct{}{}
+			}
 		}
+		if out.NextToken == nil || *out.NextToken == "" {
+			break
+		}
+		nextToken = out.NextToken
 	}
 	if len(wantedSubnets) == 0 && len(wantedSGs) == 0 {
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
