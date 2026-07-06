@@ -77,7 +77,7 @@ func ExpectedTopLevelCounts() map[string]int {
 		"policy":       countTopLevelIAMPolicies(iam),
 		"iam-user":     len(iam.Users),
 		"iam-group":    len(iam.Groups),
-		"waf":          len(NewWAFFixtures().WebACLSummaries),
+		"waf":          len(NewWAFFixtures().WebACLSummaries) + len(NewWAFFixtures().CloudFrontWebACLSummaries),
 		"cfn":          len(NewCFNFixtures().Stacks),
 		"pipeline":     len(NewCodePipelineFixtures().Pipelines),
 		"cb":           len(NewCodeBuildFixtures().Projects),

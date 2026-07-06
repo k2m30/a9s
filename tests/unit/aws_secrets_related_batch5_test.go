@@ -353,24 +353,6 @@ func TestRelated_Secrets_ECSTask_MatchBySecretsValueFrom(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_ECSTask_MissingCache verifies that checkSecretsECSTask
-// returns Count=0 when ecs-task cache is missing.
-func TestRelated_Secrets_ECSTask_MissingCache(t *testing.T) {
-	source := secretsSourceWithARN(
-		"arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password",
-		"prod/db/password",
-	)
-
-	checker := secretsCheckerByTarget(t, "ecs-task")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (missing cache)", result.Count)
-	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
-	}
-}
 
 // TestRelated_Secrets_ECSTask_Truncated verifies that checkSecretsECSTask
 // propagates Approximate=true when the ecs-task cache is truncated.

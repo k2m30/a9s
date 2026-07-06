@@ -192,7 +192,7 @@ func checkECREbRule(_ context.Context, _ any, res resource.Resource, cache resou
 
 	entry, ok := cache["eb-rule"]
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eb-rule"}
+		return resource.UnknownRelated("eb-rule")
 	}
 
 	var ids []string

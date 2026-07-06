@@ -206,7 +206,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECRCFN, NeedsTargetCache: true},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkECRKMS},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECRCTEvents, NeedsTargetCache: true},
-			{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkECREbRule},
+			{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkECREbRule, NeedsTargetCache: true},
 			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECRECSTask, NeedsTargetCache: true},
 			{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkECRPipeline, NeedsTargetCache: true},
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkECRRole},

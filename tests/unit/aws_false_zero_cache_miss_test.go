@@ -15,6 +15,11 @@
 //   - checkSecretsEB         (internal/aws/secrets_related_extra.go:88)
 //   - checkKinesisDDB        (internal/aws/kinesis_related.go:179)
 //   - checkECSSvcSFN         (internal/aws/ecs_svc_related_extra.go:397)
+//
+// Round 2 (hyphenated cache keys missed by the first sweep):
+//   - checkSecretsECSTask    (internal/aws/secrets_related_extra.go:167, cache["ecs-task"])
+//   - checkECREbRule         (internal/aws/ecr_related.go:193, cache["eb-rule"])
+//   - checkECSSvcEbRule      (internal/aws/ecs_svc_related_extra.go:157, cache["eb-rule"])
 package unit_test
 
 import (
@@ -242,6 +247,142 @@ func TestRelated_ECSSvc_SFN_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.T
 	}
 
 	checker := ecsSvcCheckerByTarget(t, "sfn")
+	result := checker(context.Background(), nil, ecsSvcSourceResource("api-service", "prod-cluster", taskDefARN), cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (present-but-empty cache is a definitive zero)", result.Count)
+	}
+}
+
+// --- 6. secrets -> ecs-task (checkSecretsECSTask, internal/aws/secrets_related_extra.go:167) ---
+
+// TestRelated_Secrets_ECSTask_CacheMiss_ReturnsUnknown verifies that when the
+// "ecs-task" cache key is entirely absent, checkSecretsECSTask returns
+// Count:-1 (unknown), not a false zero. The cache-miss check runs before the
+// ServiceClients-nil guard, so nil clients still isolate the cache-miss
+// behavior specifically.
+func TestRelated_Secrets_ECSTask_CacheMiss_ReturnsUnknown(t *testing.T) {
+	source := secretsSourceWithARN(
+		"arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/db-password",
+		"prod/api/db-password",
+	)
+
+	checker := secretsCheckerByTarget(t, "ecs-task")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (missing ecs-task cache is unknown, not a definitive zero)", result.Count)
+	}
+}
+
+// TestRelated_Secrets_ECSTask_PresentEmptyCache_ReturnsDefinitiveZero verifies
+// that a present-but-empty "ecs-task" cache entry still returns a definitive
+// Count:0. A non-nil ServiceClients with an ECS client satisfying
+// ECSDescribeTaskDefinitionAPI is required to pass the client/API-assertion
+// guards that run immediately after the cache-presence check.
+func TestRelated_Secrets_ECSTask_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.T) {
+	source := secretsSourceWithARN(
+		"arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/db-password",
+		"prod/api/db-password",
+	)
+	clients := &awsclient.ServiceClients{ECS: &fakeECSBatch4{}}
+	cache := resource.ResourceCache{
+		"ecs-task": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{},
+			IsTruncated: false,
+		},
+	}
+
+	checker := secretsCheckerByTarget(t, "ecs-task")
+	result := checker(context.Background(), clients, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (present-but-empty cache is a definitive zero)", result.Count)
+	}
+}
+
+// --- 7. ecr -> eb-rule (checkECREbRule, internal/aws/ecr_related.go:193) ---
+
+// ecrEbRuleSourceResource returns an ECR repository source resource with the
+// given name — the shape checkECREbRule expects (assertStruct[ecrtypes.Repository]).
+func ecrEbRuleSourceResource(repoName string) resource.Resource {
+	return resource.Resource{
+		ID:   repoName,
+		Name: repoName,
+		Fields: map[string]string{
+			"uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/" + repoName,
+		},
+		RawStruct: ecrtypes.Repository{
+			RepositoryName: aws.String(repoName),
+			RepositoryArn:  aws.String("arn:aws:ecr:us-east-1:123456789012:repository/" + repoName),
+		},
+	}
+}
+
+// TestRelated_ECR_EbRule_CacheMiss_ReturnsUnknown verifies that when the
+// "eb-rule" cache key is entirely absent, checkECREbRule returns Count:-1
+// (unknown), not a false zero. No client-nil guard sits in front of the
+// cache-presence check, so nil clients isolate the cache-miss behavior
+// specifically.
+func TestRelated_ECR_EbRule_CacheMiss_ReturnsUnknown(t *testing.T) {
+	checker := ecrCheckerByTarget(t, "eb-rule")
+	result := checker(context.Background(), nil, ecrEbRuleSourceResource("acme/api-service"), resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (missing eb-rule cache is unknown, not a definitive zero)", result.Count)
+	}
+}
+
+// TestRelated_ECR_EbRule_PresentEmptyCache_ReturnsDefinitiveZero verifies that
+// a present-but-empty "eb-rule" cache entry still returns a definitive
+// Count:0.
+func TestRelated_ECR_EbRule_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.T) {
+	cache := resource.ResourceCache{
+		"eb-rule": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{},
+			IsTruncated: false,
+		},
+	}
+
+	checker := ecrCheckerByTarget(t, "eb-rule")
+	result := checker(context.Background(), nil, ecrEbRuleSourceResource("acme/api-service"), cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (present-but-empty cache is a definitive zero)", result.Count)
+	}
+}
+
+// --- 8. ecs-svc -> eb-rule (checkECSSvcEbRule, internal/aws/ecs_svc_related_extra.go:157) ---
+
+// TestRelated_ECSSvc_EbRule_CacheMiss_ReturnsUnknown verifies that when the
+// "eb-rule" cache key is entirely absent, checkECSSvcEbRule returns Count:-1
+// (unknown), not a false zero. No client-nil guard sits in front of the
+// cache-presence check, so nil clients isolate the cache-miss behavior
+// specifically.
+func TestRelated_ECSSvc_EbRule_CacheMiss_ReturnsUnknown(t *testing.T) {
+	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
+
+	checker := ecsSvcCheckerByTarget(t, "eb-rule")
+	result := checker(context.Background(), nil, ecsSvcSourceResource("api-service", "prod-cluster", taskDefARN), resource.ResourceCache{})
+
+	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (missing eb-rule cache is unknown, not a definitive zero)", result.Count)
+	}
+}
+
+// TestRelated_ECSSvc_EbRule_PresentEmptyCache_ReturnsDefinitiveZero verifies
+// that a present-but-empty "eb-rule" cache entry still returns a definitive
+// Count:0.
+func TestRelated_ECSSvc_EbRule_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.T) {
+	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
+	cache := resource.ResourceCache{
+		"eb-rule": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{},
+			IsTruncated: false,
+		},
+	}
+
+	checker := ecsSvcCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, ecsSvcSourceResource("api-service", "prod-cluster", taskDefARN), cache)
 
 	if result.Count != 0 {

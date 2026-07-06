@@ -166,7 +166,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 
 	entry, ok := cache["ecs-task"]
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ecs-task"}
+		return resource.UnknownRelated("ecs-task")
 	}
 
 	c, cok := clients.(*ServiceClients)

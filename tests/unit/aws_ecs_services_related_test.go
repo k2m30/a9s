@@ -458,17 +458,6 @@ func TestRelated_ECSSvc_EbRule_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_EbRule_MissingCache verifies that a missing "eb-rule" cache
-// key returns the zero-value (Count=0, not -1), per the cache-miss contract.
-func TestRelated_ECSSvc_EbRule_MissingCache(t *testing.T) {
-	checker := ecsSvcCheckerByTarget(t, "eb-rule")
-	result := checker(context.Background(), nil, ecsSvcSourceResource("api-service", "prod-cluster", ""), resource.ResourceCache{})
-
-	// cache miss → entry not present, checker returns RelatedCheckResult{} which has Count=0
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (cache key missing returns zero-value)", result.Count)
-	}
-}
 
 // TestRelated_ECSSvc_EbRule_FetchFilter verifies that the checker does NOT populate
 // FetchFilter — reverse-scan checkers must not set FetchFilter (Fix 3).
