@@ -1,9 +1,9 @@
 // aws_ses_issue_enrichment_test.go — Behavioral tests for EnrichSESAccount (Wave 2).
 //
 // Contract assertions (current implementation):
-//   - SHUTDOWN → finding per identity row, severity="!", Summary="account SHUTDOWN",
+//   - SHUTDOWN → finding per identity row, severity="!", Summary="sending paused by AWS (shutdown)",
 //     IssueCount=1 (counted once, not N times for N identities).
-//   - PROBATION → finding per identity row, severity="!", Summary="account PROBATION",
+//   - PROBATION → finding per identity row, severity="!", Summary="account under review (probation)",
 //     IssueCount=1.
 //   - quota SentLast24Hours > 0.8*Max24HourSend (strict >) → severity="~",
 //     Summary="quota 80%+ used", IssueCount=0.
@@ -105,8 +105,8 @@ func TestEnrichSESAccount_ShutdownFindingPerRow(t *testing.T) {
 		if f.Severity != domain.SevBroken {
 			t.Errorf("identity %q: Severity = %v, want SevBroken", id, f.Severity)
 		}
-		if f.Phrase != "account SHUTDOWN" {
-			t.Errorf("identity %q: Summary = %q, want %q", id, f.Phrase, "account SHUTDOWN")
+		if f.Phrase != "sending paused by AWS (shutdown)" {
+			t.Errorf("identity %q: Summary = %q, want %q", id, f.Phrase, "sending paused by AWS (shutdown)")
 		}
 	}
 }
@@ -213,8 +213,8 @@ func TestEnrichSESAccount_ProbationFindingPerRow(t *testing.T) {
 	if f.Severity != domain.SevBroken {
 		t.Errorf("Severity = %v, want %q (PROBATION is severity !)", f.Severity, "!")
 	}
-	if f.Phrase != "account PROBATION" {
-		t.Errorf("Summary = %q, want %q", f.Phrase, "account PROBATION")
+	if f.Phrase != "account under review (probation)" {
+		t.Errorf("Summary = %q, want %q", f.Phrase, "account under review (probation)")
 	}
 }
 
@@ -363,8 +363,8 @@ func TestEnrichSESAccount_ProbationBeatsQuota(t *testing.T) {
 	if !ok {
 		t.Fatal("expected finding for PROBATION+quota case")
 	}
-	if f.Phrase != "account PROBATION" {
-		t.Errorf("Summary = %q, want %q (PROBATION must win over quota)", f.Phrase, "account PROBATION")
+	if f.Phrase != "account under review (probation)" {
+		t.Errorf("Summary = %q, want %q (PROBATION must win over quota)", f.Phrase, "account under review (probation)")
 	}
 }
 
@@ -652,8 +652,8 @@ func TestEnrichSESAccount_FixtureHealthyAccountProducesNoFindings(t *testing.T) 
 // classification via r.Findings, not via Fields["status"].
 //
 // Without this path, pure-Wave-2 rows would silently render ColorHealthy after
-// AS-1397 even though phraseFromFindings still surfaces "account SHUTDOWN" in
-// the Status column.
+// AS-1397 even though phraseFromFindings still surfaces "sending paused by AWS
+// (shutdown)" in the Status column.
 func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 	td := resource.FindResourceType("ses")
 	if td == nil {
@@ -678,7 +678,7 @@ func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 			r: resource.Resource{
 				ID: "acme-corp.com",
 				Findings: []domain.Finding{
-					wave2("ses.account-shutdown", "account SHUTDOWN", domain.SevBroken),
+					wave2("ses.account-shutdown", "sending paused by AWS (shutdown)", domain.SevBroken),
 				},
 				Fields: map[string]string{
 					"verification_status": "SUCCESS",
@@ -692,7 +692,7 @@ func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 			r: resource.Resource{
 				ID: "noreply@acme-corp.com",
 				Findings: []domain.Finding{
-					wave2("ses.account-probation", "account PROBATION", domain.SevBroken),
+					wave2("ses.account-probation", "account under review (probation)", domain.SevBroken),
 				},
 				Fields: map[string]string{
 					"verification_status": "SUCCESS",
@@ -734,7 +734,7 @@ func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 						Code: awsclient.CodeSESSendingDisabled, Phrase: "sending disabled",
 						Severity: domain.SevWarn, Source: "wave1",
 					},
-					wave2("ses.account-shutdown", "account SHUTDOWN", domain.SevBroken),
+					wave2("ses.account-shutdown", "sending paused by AWS (shutdown)", domain.SevBroken),
 				},
 				Fields: map[string]string{
 					"verification_status": "SUCCESS",

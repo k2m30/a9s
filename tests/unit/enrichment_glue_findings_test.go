@@ -5,7 +5,8 @@ package unit
 // Contract assertions (enricher-contract.md):
 //   - Returns EnricherResult.Findings keyed by job name (r.Name).
 //   - Severity "!" for all findings.
-//   - Summary "latest run FAILED" / "latest run ERROR" / "latest run TIMEOUT".
+//   - Summary "latest run failed" / "latest run error" / "latest run timeout"
+//     (humanized phrase via domain.HumanizeStatusPhrase, not the raw AWS enum).
 //   - IssueCount = len(Findings).
 //   - Truncated = true when len(resources) > EnrichmentCap.
 //   - Jobs with SUCCEEDED/RUNNING latest run must NOT appear in Findings.
@@ -72,7 +73,8 @@ func TestEnrichGlueJobStatus_FailedFindingKeyedByJobName(t *testing.T) {
 	}
 }
 
-// TestEnrichGlueJobStatus_SummaryContainsFAILED verifies the summary for FAILED state.
+// TestEnrichGlueJobStatus_SummaryContainsFAILED verifies the summary for FAILED
+// state is humanized to "failed" and never leaks the raw AWS enum (11933a6f).
 func TestEnrichGlueJobStatus_SummaryContainsFAILED(t *testing.T) {
 	fake := &glueJobFake{
 		jobRuns: map[string]gluetypes.JobRunState{
@@ -87,12 +89,17 @@ func TestEnrichGlueJobStatus_SummaryContainsFAILED(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	summary := result.Findings["fail-job"].Phrase
-	if !strings.Contains(summary, "FAILED") {
-		t.Errorf("summary %q must contain %q", summary, "FAILED")
+	wantSummary := "latest run failed"
+	if summary != wantSummary {
+		t.Errorf("summary = %q, want %q", summary, wantSummary)
+	}
+	if strings.Contains(summary, "FAILED") {
+		t.Errorf("summary %q must NOT contain the raw AWS enum %q — humanize it", summary, "FAILED")
 	}
 }
 
-// TestEnrichGlueJobStatus_SummaryContainsERROR verifies the summary for ERROR state.
+// TestEnrichGlueJobStatus_SummaryContainsERROR verifies the summary for ERROR
+// state is humanized to "error" and never leaks the raw AWS enum (11933a6f).
 func TestEnrichGlueJobStatus_SummaryContainsERROR(t *testing.T) {
 	fake := &glueJobFake{
 		jobRuns: map[string]gluetypes.JobRunState{
@@ -107,12 +114,21 @@ func TestEnrichGlueJobStatus_SummaryContainsERROR(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	summary := result.Findings["err-job"].Phrase
-	if !strings.Contains(summary, "ERROR") {
-		t.Errorf("summary %q must contain %q", summary, "ERROR")
+	wantSummary := "latest run error"
+	if summary != wantSummary {
+		t.Errorf("summary = %q, want %q", summary, wantSummary)
+	}
+	if strings.Contains(summary, "ERROR") {
+		t.Errorf("summary %q must NOT contain the raw AWS enum %q — humanize it", summary, "ERROR")
 	}
 }
 
-// TestEnrichGlueJobStatus_SummaryContainsTIMEOUT verifies the summary for TIMEOUT state.
+// TestEnrichGlueJobStatus_SummaryContainsTIMEOUT verifies the summary for
+// TIMEOUT state is humanized to "timeout" and never leaks the raw AWS enum
+// (11933a6f). Unlike sfn's "TIMED_OUT" (has an underscore, humanizes to
+// "timed out"), glue's "TIMEOUT" is a single all-upper word with no
+// underscore — HumanizeStatusPhrase's camelCase branch lowercases it in
+// place with no inserted space.
 func TestEnrichGlueJobStatus_SummaryContainsTIMEOUT(t *testing.T) {
 	fake := &glueJobFake{
 		jobRuns: map[string]gluetypes.JobRunState{
@@ -127,8 +143,12 @@ func TestEnrichGlueJobStatus_SummaryContainsTIMEOUT(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	summary := result.Findings["timeout-job"].Phrase
-	if !strings.Contains(summary, "TIMEOUT") {
-		t.Errorf("summary %q must contain %q", summary, "TIMEOUT")
+	wantSummary := "latest run timeout"
+	if summary != wantSummary {
+		t.Errorf("summary = %q, want %q", summary, wantSummary)
+	}
+	if strings.Contains(summary, "TIMEOUT") {
+		t.Errorf("summary %q must NOT contain the raw AWS enum %q — humanize it", summary, "TIMEOUT")
 	}
 }
 

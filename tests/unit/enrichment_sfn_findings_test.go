@@ -6,7 +6,8 @@ package unit
 //   - Returns EnricherResult.Findings keyed by r.ID (the bare state-machine name
 //     set by the sfn fetcher); ListExecutions is called with r.Fields["arn"].
 //   - Severity "!" for all findings.
-//   - Summary: "latest execution FAILED" / "latest execution TIMED_OUT" / "latest execution ABORTED".
+//   - Summary: "latest execution failed" / "latest execution timed out" / "latest execution aborted"
+//     (humanized phrase via domain.HumanizeStatusPhrase, not the raw AWS enum).
 //   - IssueCount = len(Findings).
 //   - Truncated = true when len(resources) > EnrichmentCap.
 //   - State machines with SUCCEEDED/RUNNING latest execution must NOT appear in Findings.
@@ -76,7 +77,8 @@ func TestEnrichStepFunctionsStatus_FailedFindingKeyedByID(t *testing.T) {
 	}
 }
 
-// TestEnrichStepFunctionsStatus_SummaryContainsFAILED verifies the summary for FAILED status.
+// TestEnrichStepFunctionsStatus_SummaryContainsFAILED verifies the summary for
+// FAILED status is humanized to "failed" and never leaks the raw AWS enum (11933a6f).
 func TestEnrichStepFunctionsStatus_SummaryContainsFAILED(t *testing.T) {
 	smName := "sum-sm"
 	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:sum-sm"
@@ -89,12 +91,19 @@ func TestEnrichStepFunctionsStatus_SummaryContainsFAILED(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	summary := result.Findings[smName].Phrase
-	if !strings.Contains(summary, "FAILED") {
-		t.Errorf("summary %q must contain %q", summary, "FAILED")
+	wantSummary := "latest execution failed"
+	if summary != wantSummary {
+		t.Errorf("summary = %q, want %q", summary, wantSummary)
+	}
+	if strings.Contains(summary, "FAILED") {
+		t.Errorf("summary %q must NOT contain the raw AWS enum %q — humanize it", summary, "FAILED")
 	}
 }
 
-// TestEnrichStepFunctionsStatus_SummaryTimedOut verifies the summary for TIMED_OUT.
+// TestEnrichStepFunctionsStatus_SummaryTimedOut verifies the summary for
+// TIMED_OUT is humanized to "timed out" (the underscore splits into a space
+// per domain.HumanizeStatusPhrase's snake_case branch) and never leaks the
+// raw AWS enum "TIMED_OUT" (11933a6f).
 func TestEnrichStepFunctionsStatus_SummaryTimedOut(t *testing.T) {
 	smName := "to-sm"
 	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:to-sm"
@@ -107,13 +116,17 @@ func TestEnrichStepFunctionsStatus_SummaryTimedOut(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	summary := result.Findings[smName].Phrase
-	// Status token from SDK is "TIMED_OUT" — just verify it contains the key distinguisher
-	if !strings.Contains(summary, "TIMED_OUT") {
-		t.Errorf("summary %q must contain %q", summary, "TIMED_OUT")
+	wantSummary := "latest execution timed out"
+	if summary != wantSummary {
+		t.Errorf("summary = %q, want %q", summary, wantSummary)
+	}
+	if strings.Contains(summary, "TIMED_OUT") {
+		t.Errorf("summary %q must NOT contain the raw AWS enum %q — humanize it", summary, "TIMED_OUT")
 	}
 }
 
-// TestEnrichStepFunctionsStatus_SummaryAborted verifies the summary for ABORTED.
+// TestEnrichStepFunctionsStatus_SummaryAborted verifies the summary for
+// ABORTED is humanized to "aborted" and never leaks the raw AWS enum (11933a6f).
 func TestEnrichStepFunctionsStatus_SummaryAborted(t *testing.T) {
 	smName := "ab-sm"
 	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:ab-sm"
@@ -126,8 +139,12 @@ func TestEnrichStepFunctionsStatus_SummaryAborted(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	summary := result.Findings[smName].Phrase
-	if !strings.Contains(summary, "ABORTED") {
-		t.Errorf("summary %q must contain %q", summary, "ABORTED")
+	wantSummary := "latest execution aborted"
+	if summary != wantSummary {
+		t.Errorf("summary = %q, want %q", summary, wantSummary)
+	}
+	if strings.Contains(summary, "ABORTED") {
+		t.Errorf("summary %q must NOT contain the raw AWS enum %q — humanize it", summary, "ABORTED")
 	}
 }
 

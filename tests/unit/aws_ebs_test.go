@@ -3,6 +3,7 @@ package unit
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // ---------------------------------------------------------------------------
@@ -76,7 +78,8 @@ func TestFetchEBSVolumes_ParsesMultipleVolumes(t *testing.T) {
 		t.Errorf("resource[0].Findings: expected 0 for in-use volume, got %d", len(r0.Findings))
 	}
 
-	// Verify second volume (available, no Name tag, no attachment)
+	// Verify second volume (available, no Name tag, no attachment, created
+	// 2025-03-10 — well past the 7-day orphan-age threshold at test run time).
 	r1 := resources[1]
 	if r1.ID != "vol-222ddeeff" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "vol-222ddeeff", r1.ID)
@@ -84,9 +87,24 @@ func TestFetchEBSVolumes_ParsesMultipleVolumes(t *testing.T) {
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty string (no Name tag), got %q", r1.Name)
 	}
-	// Post-fold contract: available state is healthy for EBS volumes → no Status, no Finding.
-	if len(r1.Findings) != 0 {
-		t.Errorf("resource[1].Findings: expected 0 for available volume, got %d", len(r1.Findings))
+	// Post-fold contract (3018ae98): an unattached "available" volume older
+	// than ebsOrphanAge (7 days) emits a CodeEBSOrphanUnattached SevWarn
+	// finding so the Status cell / Attention block explain the yellow row.
+	if len(r1.Findings) != 1 {
+		t.Fatalf("resource[1].Findings: expected 1 orphan finding for aged unattached volume, got %d: %+v", len(r1.Findings), r1.Findings)
+	}
+	orphanFinding := r1.Findings[0]
+	if orphanFinding.Code != awsclient.CodeEBSOrphanUnattached {
+		t.Errorf("resource[1].Findings[0].Code = %q, want %q", orphanFinding.Code, awsclient.CodeEBSOrphanUnattached)
+	}
+	if orphanFinding.Severity != domain.SevWarn {
+		t.Errorf("resource[1].Findings[0].Severity = %v, want %v (orphan is a warning, not broken)", orphanFinding.Severity, domain.SevWarn)
+	}
+	if orphanFinding.Source != "wave1" {
+		t.Errorf("resource[1].Findings[0].Source = %q, want %q", orphanFinding.Source, "wave1")
+	}
+	if !strings.HasPrefix(orphanFinding.Phrase, "orphan: unattached ") || !strings.HasSuffix(orphanFinding.Phrase, "d") {
+		t.Errorf("resource[1].Findings[0].Phrase = %q, want shape %q", orphanFinding.Phrase, "orphan: unattached <N>d")
 	}
 }
 
