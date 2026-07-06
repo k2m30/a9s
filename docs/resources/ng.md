@@ -195,6 +195,14 @@ ng — CONTAINERS. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| ng.state.creating | creating | warn | wave1 |
+| ng.state.updating | updating | warn | wave1 |
+| ng.state.deleting | deleting | warn | wave1 |
+| ng.state.create-failed | create failed | broken | wave1 |
+| ng.state.delete-failed | delete failed | broken | wave1 |
+| ng.state.degraded | degraded | broken | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

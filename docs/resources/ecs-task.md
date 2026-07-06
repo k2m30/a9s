@@ -225,6 +225,15 @@ ecs-task — COMPUTE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| ecs-task.state.provisioning | provisioning | warn | wave1 |
+| ecs-task.state.pending | pending | warn | wave1 |
+| ecs-task.state.activating | activating | warn | wave1 |
+| ecs-task.state.deactivating | deactivating | warn | wave1 |
+| ecs-task.state.stopping | stopping | warn | wave1 |
+| ecs-task.state.deprovisioning | deprovisioning | warn | wave1 |
+| ecs-task.task-failed | <stop code or container> failed | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
@@ -233,14 +242,14 @@ ecs-task — COMPUTE. Lifecycle key: `status`.
 | ecs-svc | ECS Services | no |
 | ecs | ECS Clusters | no |
 | logs | Log Groups | yes |
-| role | IAM Role | no |
+| role | IAM Role | yes |
 | alarm | CloudWatch Alarms | yes |
 | ct-events | CloudTrail Events | yes |
 | ec2 | EC2 Instances | no |
 | ecr | ECR Repositories | no |
 | eni | Network Interfaces | no |
-| secrets | Secrets | no |
-| sg | Security Groups | no |
-| ssm | SSM Parameters | no |
+| secrets | Secrets | yes |
+| sg | Security Groups | yes |
+| ssm | SSM Parameters | yes |
 | subnet | Subnets | no |
 <!-- END GENERATED: related -->

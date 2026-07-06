@@ -221,6 +221,15 @@ redis — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| redis.broken.create_failed | create failed — see events | broken | wave1 |
+| redis.warn.creating | creating — new group | warn | wave1 |
+| redis.warn.deleting | deleting — teardown | warn | wave1 |
+| redis.warn.modifying | modifying — config change | warn | wave1 |
+| redis.warn.snapshotting | snapshotting — backup running | warn | wave1 |
+| redis.warn.shard_issue | shard <NodeGroupId>: <status> | warn | wave1 |
+| redis.warn.multiaz_without_auto_failover | multi-AZ without auto-failover | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

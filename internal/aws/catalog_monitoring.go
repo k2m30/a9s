@@ -119,6 +119,11 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkAlarmWAF},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkAlarmCTEvents, NeedsTargetCache: true},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeAlarmStateAlarm, Phrase: "ALARM", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeAlarmStateInsufficient, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeAlarmNoActions, Phrase: "no actions", Severity: domain.SevWarn, Source: "wave1"},
+		},
 	},
 	{
 		Name:          "CloudWatch Log Groups",
@@ -161,6 +166,10 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: logsCodeRetentionNeverExpire, Phrase: "retention: never expire", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: logsCodeMissingMetricFilters, Phrase: "audit log group missing metric filters", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -210,6 +219,12 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "SnsTopicARN", TargetType: "sns"},
 			{FieldPath: "CloudWatchLogsLogGroupArn", TargetType: "logs"},
 			{FieldPath: "CloudWatchLogsRoleArn", TargetType: "role"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeTrailLogFileValidationDisabled, Phrase: "log file validation disabled", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeTrailNotLogging, Phrase: "not logging", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeTrailDeliveryError, Phrase: "delivery error: <LatestDeliveryError>", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeTrailDeliveryStale, Phrase: "delivery stale since <LatestDeliveryTime>", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -267,6 +282,10 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "user", TargetType: "iam-user"},
 			{FieldPath: "role_name", TargetType: "role"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeCTEventDanger, Phrase: "danger", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCTEventAttention, Phrase: "attention", Severity: domain.SevWarn, Source: "wave1"},
+		},
 	},
 }
 
@@ -303,6 +322,10 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
 			return FetchLogEvents(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"], continuationToken)
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeCWLogError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCWLogWarn, Phrase: "warning", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{

@@ -176,6 +176,16 @@ ses — MESSAGING. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| ses.verification.failed | verification failed | broken | wave1 |
+| ses.verification.temp_failure | verify: temp failure | broken | wave1 |
+| ses.verification.not_started | verification not started | broken | wave1 |
+| ses.verification.pending | pending verification | warn | wave1 |
+| ses.sending.disabled | sending disabled | warn | wave1 |
+| ses.account-shutdown | account SHUTDOWN | broken | wave2 |
+| ses.account-probation | account PROBATION | broken | wave2 |
+| ses.quota-high | quota 80%+ used | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

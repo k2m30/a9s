@@ -117,6 +117,11 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
 			{FieldPath: "RotationLambdaARN", TargetType: "lambda"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeSecretStateDeleted, Phrase: "deleted", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeSecretStateRotationOverdue, Phrase: "rotation overdue", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeSecretStateDormant, Phrase: "dormant", Severity: domain.SevWarn, Source: "wave1"},
+		},
 	},
 	{
 		Name:          "SSM Parameters",
@@ -193,6 +198,12 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkKMSS3, NeedsTargetCache: false},
 			{TargetType: "role", DisplayName: "IAM Roles (grants)", Checker: checkKMSRole, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("kms")},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeKMSStatePendingDeletion, Phrase: "pending deletion", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeKMSStateDisabled, Phrase: "disabled", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeKMSStateUnavailable, Phrase: "<key state>", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: kmsCodeRotationDisabled, Phrase: "key rotation disabled (CIS KMS.1)", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 }

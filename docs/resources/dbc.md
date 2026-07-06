@@ -233,6 +233,17 @@ dbc — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| dbc.broken.failed | failed: cluster operation | broken | wave1 |
+| dbc.broken.encryption_key_unreachable | encryption key unreachable | broken | wave1 |
+| dbc.broken.incompatible_parameters | parameter group incompatible | broken | wave1 |
+| dbc.broken.no_writer | no writer: reads only | broken | wave1 |
+| dbc.warn.transitional | <status>: in progress | warn | wave1 |
+| dbc.warn.deletion_protection_off | delete-protection off | warn | wave1 |
+| dbc.warn.not_encrypted_at_rest | not encrypted at rest | warn | wave1 |
+| dbc.warn.no_automated_backups | no automated backups | warn | wave1 |
+| dbc.maintenance-overdue | maintenance overdue | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

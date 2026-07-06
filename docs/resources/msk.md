@@ -224,6 +224,17 @@ msk — MESSAGING. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| msk.warn.creating | creating | warn | wave1 |
+| msk.warn.updating | updating | warn | wave1 |
+| msk.warn.maintenance | maintenance | warn | wave1 |
+| msk.warn.rebooting_broker | rebooting broker | warn | wave1 |
+| msk.warn.healing | healing | warn | wave1 |
+| msk.warn.deleting | deleting | warn | wave1 |
+| msk.broken.failed | failed | broken | wave1 |
+| msk.broker-outdated | broker software outdated | warn | wave2 |
+| msk.encryption-not-tls | encryption in transit not enforced | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

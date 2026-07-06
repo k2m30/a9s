@@ -57,6 +57,13 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{FieldPath: "NotificationARNs", TargetType: "sns"},
 		},
 		IssueEnricherFieldKeys: []string{"drift_status"},
+		Findings: []catalog.FindingDef{
+			{Code: CodeCFNStackFailed, Phrase: "<status, lowercased>", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCFNStackRollback, Phrase: "<status, lowercased>", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCFNStackInProgress, Phrase: "<status, lowercased>", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: cfnCodeRecentResourceFailure, Phrase: "recent resource failure: <ResourceType/LogicalResourceId>", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: cfnCodeStackDrifted, Phrase: "stack drifted from template", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "CodePipelines",
@@ -101,6 +108,9 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{TargetType: "s3", DisplayName: "S3 Buckets (artifacts)", Checker: checkPipelineS3, NeedsTargetCache: false},
 			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkPipelineSNS, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("pipeline"), NeedsTargetCache: false},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: pipelineCodeStageFailed, Phrase: "stage <stage> failed", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -154,6 +164,9 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{FieldPath: "VpcConfig.Subnets", TargetType: "subnet"},
 			{FieldPath: "VpcConfig.SecurityGroupIds", TargetType: "sg"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: cbCodeLatestBuildFailed, Phrase: "latest build <status> (<date>)", Severity: domain.SevBroken, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "ECR Repositories",
@@ -201,6 +214,9 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Navigable: []domain.NavigableField{
 			{FieldPath: "EncryptionConfiguration.KmsKey", TargetType: "kms"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: ecrCodeVulnerabilities, Phrase: "<N> CRITICAL findings across <M> image(s)", Severity: domain.SevBroken, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "CodeArtifact Repos",
@@ -228,6 +244,10 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Related: []domain.RelatedDef{
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkCodeartifactKMS, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("codeartifact"), NeedsTargetCache: false},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: codeartifactCodeNoPermissionsPolicy, Phrase: "no permissions policy", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: codeartifactCodePublicAccessPolicy, Phrase: "public access policy", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 }
@@ -267,6 +287,13 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
 			return FetchCBBuilds(ctx, c.CodeBuild, c.CodeBuild, parentCtx, continuationToken)
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeCBBuildFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCBBuildFault, Phrase: "fault", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCBBuildTimedOut, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCBBuildInProgress, Phrase: "in progress", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeCBBuildStopped, Phrase: "stopped", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},
 	{

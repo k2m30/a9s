@@ -209,6 +209,11 @@ secrets — SECRETS & CONFIG. Lifecycle key: none (the list API returns no lifec
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| secrets.state.deleted | deleted | broken | wave1 |
+| secrets.state.rotation_overdue | rotation overdue | warn | wave1 |
+| secrets.state.dormant | dormant | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

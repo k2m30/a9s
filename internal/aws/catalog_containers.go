@@ -118,6 +118,11 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{FieldPath: "ResourcesVpcConfig.SecurityGroupIds", TargetType: "sg"},
 			{FieldPath: "RoleArn", TargetType: "role"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeEKSStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEKSStateUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEKSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+		},
 	},
 	{
 		Name:          "EKS Node Groups",
@@ -159,6 +164,14 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{FieldPath: "ClusterName", TargetType: "eks"},
 			{FieldPath: "NodeRole", TargetType: "role"},
 			{FieldPath: "Subnets", TargetType: "subnet"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeNGStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeNGStateUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeNGStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeNGStateCreateFailed, Phrase: "create failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeNGStateDegraded, Phrase: "degraded", Severity: domain.SevBroken, Source: "wave1"},
 		},
 	},
 }

@@ -140,6 +140,9 @@ policy — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycl
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| iam-policy.admin-star | admin star (CIS IAM.16) | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -198,6 +198,14 @@ dbc-snap — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| dbc-snap.broken.failed | failed | broken | wave1 |
+| dbc-snap.broken.incompatible | <incompatible-* status> | broken | wave1 |
+| dbc-snap.warn.creating | creating | warn | wave1 |
+| dbc-snap.warn.manual_unused | manual, unused <N>d | warn | wave1 |
+| dbc-snap.orphan | orphan: source cluster deleted | broken | wave2 |
+| dbc-snap.past-retention | automated, <N>d past retention | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

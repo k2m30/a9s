@@ -214,6 +214,10 @@ ct-events — MONITORING. Lifecycle key: none (the list API returns no lifecycle
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| ct_event.severity.danger | danger | broken | wave1 |
+| ct_event.severity.attention | attention | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

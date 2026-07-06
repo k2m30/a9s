@@ -261,6 +261,15 @@ vpce — NETWORKING. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| vpce.state.pending_acceptance | pending acceptance | warn | wave1 |
+| vpce.state.pending | pending | warn | wave1 |
+| vpce.state.deleting | deleting | warn | wave1 |
+| vpce.state.failed | failed | broken | wave1 |
+| vpce.state.rejected | rejected | broken | wave1 |
+| vpce.state.expired | expired | broken | wave1 |
+| vpce.state.partial | partial | broken | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

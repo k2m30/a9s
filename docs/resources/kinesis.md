@@ -171,6 +171,11 @@ kinesis — MESSAGING. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| kinesis.warn.creating | creating | warn | wave1 |
+| kinesis.warn.updating | updating | warn | wave1 |
+| kinesis.warn.deleting | deleting | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

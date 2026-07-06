@@ -167,6 +167,9 @@ role — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle 
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| iam-role.dormant | dormant role (>90d) | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

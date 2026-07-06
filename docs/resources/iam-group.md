@@ -126,6 +126,9 @@ iam-group — SECURITY & IAM. Lifecycle key: none (the list API returns no lifec
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| iam-group.orphan-or-noop | group has no members (orphan) | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

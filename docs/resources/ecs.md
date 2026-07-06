@@ -190,6 +190,13 @@ ecs — COMPUTE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| ecs.state.provisioning | provisioning | warn | wave1 |
+| ecs.state.deprovisioning | deprovisioning | warn | wave1 |
+| ecs.state.failed | failed | broken | wave1 |
+| ecs.state.inactive | inactive | broken | wave1 |
+| ecs.cluster-issue | <N> pending tasks | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

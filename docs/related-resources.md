@@ -1212,15 +1212,15 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ecs-task | ecs-svc | ECS Services | no |
 | ecs-task | ecs | ECS Clusters | no |
 | ecs-task | logs | Log Groups | yes |
-| ecs-task | role | IAM Role | no |
+| ecs-task | role | IAM Role | yes |
 | ecs-task | alarm | CloudWatch Alarms | yes |
 | ecs-task | ct-events | CloudTrail Events | yes |
 | ecs-task | ec2 | EC2 Instances | no |
 | ecs-task | ecr | ECR Repositories | no |
 | ecs-task | eni | Network Interfaces | no |
-| ecs-task | secrets | Secrets | no |
-| ecs-task | sg | Security Groups | no |
-| ecs-task | ssm | SSM Parameters | no |
+| ecs-task | secrets | Secrets | yes |
+| ecs-task | sg | Security Groups | yes |
+| ecs-task | ssm | SSM Parameters | yes |
 | ecs-task | subnet | Subnets | no |
 | lambda | role | IAM Roles | yes |
 | lambda | alarm | CW Alarms | yes |
@@ -1263,14 +1263,14 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ebs | ebs-snap | EBS Snapshots | yes |
 | ebs | kms | KMS Key | no |
 | ebs | alarm | CW Alarms | yes |
-| ebs | backup | Backup | no |
+| ebs | backup | Backup | yes |
 | ebs | cfn | CloudFormation | yes |
 | ebs | ct-events | CloudTrail Events | no |
 | ebs-snap | ami | AMIs | yes |
 | ebs-snap | ebs | EBS Volume | no |
 | ebs-snap | ec2 | EC2 Instance | no |
 | ebs-snap | kms | KMS Key | no |
-| ebs-snap | backup | Backup | no |
+| ebs-snap | backup | Backup | yes |
 | ebs-snap | ct-events | CloudTrail Events | no |
 | ami | ec2 | EC2 Instances | yes |
 | ami | ebs-snap | EBS Snapshots | no |

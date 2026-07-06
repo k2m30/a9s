@@ -195,6 +195,11 @@ ebs — COMPUTE. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| ebs.state.creating | creating | warn | wave1 |
+| ebs.state.error | error | broken | wave1 |
+| ebs.volume-io-degraded | volume I/O degraded | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
@@ -204,7 +209,7 @@ ebs — COMPUTE. Lifecycle key: `state`.
 | ebs-snap | EBS Snapshots | yes |
 | kms | KMS Key | no |
 | alarm | CW Alarms | yes |
-| backup | Backup | no |
+| backup | Backup | yes |
 | cfn | CloudFormation | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

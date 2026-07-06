@@ -175,6 +175,9 @@ glue — DATA & ANALYTICS. Lifecycle key: none (the list API returns no lifecycl
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| glue.latest-run-failed | latest run <STATUS> | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

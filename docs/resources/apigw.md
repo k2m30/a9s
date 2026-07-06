@@ -211,6 +211,10 @@ apigw — DNS & CDN. Lifecycle key: none (the list API returns no lifecycle fiel
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| apigw.no-deployed-stages | no deployed stages | warn | wave2 |
+| apigw.stage-config-issues | no throttling configured (DoS risk); access logs disabled | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

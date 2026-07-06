@@ -45,6 +45,10 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("backup")},
 		},
 		IssueEnricherFieldKeys: []string{"status"},
+		Findings: []catalog.FindingDef{
+			{Code: backupCodeJobFailed, Phrase: "<N> jobs failed in last 24h", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: backupCodeJobPartial, Phrase: "partial: <N> of <M> resources skipped", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 }
 
@@ -65,6 +69,11 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 			}
 			return FetchCfnEvents(ctx, c.CloudFormation, parentCtx["stack_name"], continuationToken)
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeCfnEventFailed, Phrase: "<status, lowercased>", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCfnEventInProgress, Phrase: "<status, lowercased>", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeCfnEventDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
+		},
 	},
 	{
 		Name:      "Stack Resources",
@@ -81,6 +90,11 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
 			return FetchCfnResources(ctx, c.CloudFormation, parentCtx["stack_name"], continuationToken)
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeCfnResourceFailed, Phrase: "<status, lowercased>", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCfnResourceInProgress, Phrase: "<status, lowercased>", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeCfnResourceDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},
 }

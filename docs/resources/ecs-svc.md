@@ -273,6 +273,11 @@ ecs-svc — COMPUTE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| ecs-svc.state.inactive | inactive | broken | wave1 |
+| ecs-svc.state.draining | draining | warn | wave1 |
+| ecs-svc.deployment-failed | deployment failed | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

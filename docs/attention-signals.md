@@ -184,4 +184,229 @@ resource-list frame title. The frame-title rules:
 <!-- BEGIN GENERATED: findings-table -->
 | Type | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- | --- |
+| ec2 | ec2.state.pending | pending | warn | wave1 |
+| ec2 | ec2.state.stopping | stopping | warn | wave1 |
+| ec2 | ec2.state.stopped | stopped | warn | wave1 |
+| ec2 | ec2.state.stopped.server | stopped | broken | wave1 |
+| ec2 | ec2.instance-status-impaired | impaired: system checks failing | broken | wave2 |
+| ecs-svc | ecs-svc.state.inactive | inactive | broken | wave1 |
+| ecs-svc | ecs-svc.state.draining | draining | warn | wave1 |
+| ecs-svc | ecs-svc.deployment-failed | deployment failed | broken | wave2 |
+| ecs | ecs.state.provisioning | provisioning | warn | wave1 |
+| ecs | ecs.state.deprovisioning | deprovisioning | warn | wave1 |
+| ecs | ecs.state.failed | failed | broken | wave1 |
+| ecs | ecs.state.inactive | inactive | broken | wave1 |
+| ecs | ecs.cluster-issue | <N> pending tasks | warn | wave2 |
+| ecs-task | ecs-task.state.provisioning | provisioning | warn | wave1 |
+| ecs-task | ecs-task.state.pending | pending | warn | wave1 |
+| ecs-task | ecs-task.state.activating | activating | warn | wave1 |
+| ecs-task | ecs-task.state.deactivating | deactivating | warn | wave1 |
+| ecs-task | ecs-task.state.stopping | stopping | warn | wave1 |
+| ecs-task | ecs-task.state.deprovisioning | deprovisioning | warn | wave1 |
+| ecs-task | ecs-task.task-failed | <stop code or container> failed | broken | wave2 |
+| lambda | lambda.state.pending | pending | warn | wave1 |
+| lambda | lambda.state.failed | failed | broken | wave1 |
+| asg | asg.state.deleting | delete in progress | warn | wave1 |
+| asg | asg.scaling-activity-failed | latest scaling activity failed | broken | wave2 |
+| ebs | ebs.state.creating | creating | warn | wave1 |
+| ebs | ebs.state.error | error | broken | wave1 |
+| ebs | ebs.volume-io-degraded | volume I/O degraded | broken | wave2 |
+| ebs-snap | ebs-snap.state.pending | pending | warn | wave1 |
+| ebs-snap | ebs-snap.state.error | error | broken | wave1 |
+| ami | ami.state.pending | pending | warn | wave1 |
+| ami | ami.state.failed | failed | broken | wave1 |
+| eks | eks.state.creating | creating | warn | wave1 |
+| eks | eks.state.updating | updating | warn | wave1 |
+| eks | eks.state.failed | failed | broken | wave1 |
+| ng | ng.state.creating | creating | warn | wave1 |
+| ng | ng.state.updating | updating | warn | wave1 |
+| ng | ng.state.deleting | deleting | warn | wave1 |
+| ng | ng.state.create-failed | create failed | broken | wave1 |
+| ng | ng.state.delete-failed | delete failed | broken | wave1 |
+| ng | ng.state.degraded | degraded | broken | wave1 |
+| elb | elb.state.provisioning | provisioning | warn | wave1 |
+| elb | elb.state.active_impaired | active impaired | warn | wave1 |
+| elb | elb.state.failed | failed | broken | wave1 |
+| elb | elb.misconfigured | Deletion Protection: disabled | warn | wave2 |
+| tg | tg.unhealthy-targets | unhealthy targets: <N>/<M> | broken | wave2 |
+| vpc | vpc.state.pending | pending | warn | wave1 |
+| vpc | vpc.no-flow-logs | no active VPC flow logs (CIS EC2.6) | warn | wave2 |
+| subnet | subnet.state.pending | pending | warn | wave1 |
+| subnet | subnet.state.unavailable | unavailable | broken | wave1 |
+| subnet | subnet.state.failed | failed | broken | wave1 |
+| subnet | subnet.state.failed-insufficient-capacity | failed-insufficient-capacity | broken | wave1 |
+| nat | nat.state.pending | pending | warn | wave1 |
+| nat | nat.state.deleting | deleting | warn | wave1 |
+| nat | nat.state.failed | failed | broken | wave1 |
+| igw | igw.state.attaching | attaching | warn | wave1 |
+| igw | igw.state.detaching | detaching | warn | wave1 |
+| eip | eip.unassociated | unassociated | warn | wave1 |
+| vpce | vpce.state.pending_acceptance | pending acceptance | warn | wave1 |
+| vpce | vpce.state.pending | pending | warn | wave1 |
+| vpce | vpce.state.deleting | deleting | warn | wave1 |
+| vpce | vpce.state.failed | failed | broken | wave1 |
+| vpce | vpce.state.rejected | rejected | broken | wave1 |
+| vpce | vpce.state.expired | expired | broken | wave1 |
+| vpce | vpce.state.partial | partial | broken | wave1 |
+| tgw | tgw.state.pending | pending | warn | wave1 |
+| tgw | tgw.state.modifying | modifying | warn | wave1 |
+| tgw | tgw.state.deleting | deleting | warn | wave1 |
+| tgw | tgw.state.failed | failed | broken | wave1 |
+| tgw | tgw.attachment-failed | attachment <id> failed | broken | wave2 |
+| tgw | tgw.attachment-transitional | attachment <id> <state> | warn | wave2 |
+| eni | eni.state.attaching | attaching | warn | wave1 |
+| eni | eni.state.detaching | detaching | warn | wave1 |
+| eni | eni.state.available | available | warn | wave1 |
+| dbi | dbi.broken.failed | failed | broken | wave1 |
+| dbi | dbi.broken.storage_full | storage-full | broken | wave1 |
+| dbi | dbi.broken.incompatible_network | incompatible-network | broken | wave1 |
+| dbi | dbi.broken.incompatible_option_group | incompatible-option-group | broken | wave1 |
+| dbi | dbi.broken.incompatible_parameters | incompatible-parameters | broken | wave1 |
+| dbi | dbi.broken.incompatible_restore | incompatible-restore | broken | wave1 |
+| dbi | dbi.broken.restore_error | restore-error | broken | wave1 |
+| dbi | dbi.broken.encryption_key_unavailable | encryption key unavailable | broken | wave1 |
+| dbi | dbi.broken.stopped | stopped | broken | wave1 |
+| dbi | dbi.warn.transitional | <status>: <pending field> | warn | wave1 |
+| dbi | dbi.warn.no_automated_backups | no automated backups | warn | wave1 |
+| dbi | dbi.warn.publicly_accessible | publicly accessible | warn | wave1 |
+| dbi | dbi.warn.unencrypted_storage | unencrypted storage | warn | wave1 |
+| dbi | dbi.warn.deletion_protection_off | deletion protection off | warn | wave1 |
+| dbi | dbi.pending-maintenance | maintenance scheduled | warn | wave2 |
+| s3 | s3.public-access-block-incomplete | public access block incomplete | broken | wave2 |
+| redis | redis.broken.create_failed | create failed — see events | broken | wave1 |
+| redis | redis.warn.creating | creating — new group | warn | wave1 |
+| redis | redis.warn.deleting | deleting — teardown | warn | wave1 |
+| redis | redis.warn.modifying | modifying — config change | warn | wave1 |
+| redis | redis.warn.snapshotting | snapshotting — backup running | warn | wave1 |
+| redis | redis.warn.shard_issue | shard <NodeGroupId>: <status> | warn | wave1 |
+| redis | redis.warn.multiaz_without_auto_failover | multi-AZ without auto-failover | warn | wave1 |
+| dbc | dbc.broken.failed | failed: cluster operation | broken | wave1 |
+| dbc | dbc.broken.encryption_key_unreachable | encryption key unreachable | broken | wave1 |
+| dbc | dbc.broken.incompatible_parameters | parameter group incompatible | broken | wave1 |
+| dbc | dbc.broken.no_writer | no writer: reads only | broken | wave1 |
+| dbc | dbc.warn.transitional | <status>: in progress | warn | wave1 |
+| dbc | dbc.warn.deletion_protection_off | delete-protection off | warn | wave1 |
+| dbc | dbc.warn.not_encrypted_at_rest | not encrypted at rest | warn | wave1 |
+| dbc | dbc.warn.no_automated_backups | no automated backups | warn | wave1 |
+| dbc | dbc.maintenance-overdue | maintenance overdue | broken | wave2 |
+| ddb | ddb.broken.kms_key_inaccessible | kms key inaccessible | broken | wave1 |
+| ddb | ddb.broken.archived_kms_lost | archived: kms key lost | broken | wave1 |
+| ddb | ddb.warn.creating | creating | warn | wave1 |
+| ddb | ddb.warn.updating | updating | warn | wave1 |
+| ddb | ddb.warn.deleting | deleting | warn | wave1 |
+| ddb | ddb.warn.archiving | archiving | warn | wave1 |
+| ddb | ddb.pitr-off | PITR off | warn | wave2 |
+| opensearch | opensearch.dim.deleting | deleting: removal in progress | dim | wave1 |
+| opensearch | opensearch.broken.isolated | isolated: quarantined by AWS | broken | wave1 |
+| opensearch | opensearch.warn.processing | processing: config change in flight | warn | wave1 |
+| opensearch | opensearch.update-forced | software update forced soon | broken | wave2 |
+| opensearch | opensearch.encryption-off | encryption at rest off | warn | wave2 |
+| redshift | redshift.broken.incompatible_hsm | incompatible-hsm | broken | wave1 |
+| redshift | redshift.broken.incompatible_network | incompatible-network | broken | wave1 |
+| redshift | redshift.broken.incompatible_parameters | incompatible-parameters | broken | wave1 |
+| redshift | redshift.broken.incompatible_restore | incompatible-restore | broken | wave1 |
+| redshift | redshift.broken.hardware_failure | hardware-failure | broken | wave1 |
+| redshift | redshift.broken.storage_full | storage-full | broken | wave1 |
+| redshift | redshift.broken.unavailable | unavailable | broken | wave1 |
+| redshift | redshift.broken.failed | failed | broken | wave1 |
+| redshift | redshift.warn.creating | creating | warn | wave1 |
+| redshift | redshift.warn.modifying | modifying | warn | wave1 |
+| redshift | redshift.warn.resizing | resizing | warn | wave1 |
+| redshift | redshift.warn.rebooting | rebooting | warn | wave1 |
+| redshift | redshift.warn.renaming | renaming | warn | wave1 |
+| redshift | redshift.warn.deleting | deleting | warn | wave1 |
+| redshift | redshift.warn.maintenance | maintenance | warn | wave1 |
+| redshift | redshift.warn.availability_modifying | modifying | warn | wave1 |
+| redshift | redshift.warn.pending_change | pending change queued | warn | wave1 |
+| redshift | redshift.warn.maintenance_deferred | maintenance deferred | warn | wave1 |
+| redshift | redshift.warn.publicly_accessible | publicly accessible | warn | wave1 |
+| redshift | redshift.warn.unencrypted_at_rest | unencrypted at rest | warn | wave1 |
+| efs | efs.broken.error | error | broken | wave1 |
+| efs | efs.broken.no_mount_targets | no mount targets | broken | wave1 |
+| efs | efs.warn.creating | creating | warn | wave1 |
+| efs | efs.warn.updating | updating | warn | wave1 |
+| efs | efs.warn.deleting | deleting | warn | wave1 |
+| efs | efs.mount-target-down | mount target down | broken | wave2 |
+| dbi-snap | dbi-snap.broken.failed | failed | broken | wave1 |
+| dbi-snap | dbi-snap.broken.incompatible | <incompatible-* status> | broken | wave1 |
+| dbi-snap | dbi-snap.warn.creating | creating: <pct>% | warn | wave1 |
+| dbi-snap | dbi-snap.warn.unencrypted | unencrypted | warn | wave1 |
+| dbi-snap | dbi-snap.orphan | orphan: source DB deleted | broken | wave2 |
+| dbi-snap | dbi-snap.past-retention | automated, <N>d past retention | broken | wave2 |
+| dbc-snap | dbc-snap.broken.failed | failed | broken | wave1 |
+| dbc-snap | dbc-snap.broken.incompatible | <incompatible-* status> | broken | wave1 |
+| dbc-snap | dbc-snap.warn.creating | creating | warn | wave1 |
+| dbc-snap | dbc-snap.warn.manual_unused | manual, unused <N>d | warn | wave1 |
+| dbc-snap | dbc-snap.orphan | orphan: source cluster deleted | broken | wave2 |
+| dbc-snap | dbc-snap.past-retention | automated, <N>d past retention | broken | wave2 |
+| alarm | alarm.state.alarm | ALARM | broken | wave1 |
+| alarm | alarm.state.insufficient_data | insufficient data | warn | wave1 |
+| alarm | alarm.no_actions | no actions | warn | wave1 |
+| logs | logs.retention-never-expire | retention: never expire | warn | wave1 |
+| logs | logs.missing-metric-filters | audit log group missing metric filters | warn | wave2 |
+| trail | trail.log-file-validation.disabled | log file validation disabled | warn | wave1 |
+| trail | trail.not-logging | not logging | broken | wave2 |
+| trail | trail.delivery-error | delivery error: <LatestDeliveryError> | broken | wave2 |
+| trail | trail.delivery-stale | delivery stale since <LatestDeliveryTime> | broken | wave2 |
+| ct-events | ct_event.severity.danger | danger | broken | wave1 |
+| ct-events | ct_event.severity.attention | attention | warn | wave1 |
+| sqs | sqs.missing-dlq | no DLQ configured | warn | wave2 |
+| sns | sns.no-subscribers | topic has no subscribers | warn | wave2 |
+| sns | sns.all-pending-confirmation | all pending confirmation | warn | wave2 |
+| eb | eb.environment-causes | EB causes: <first cause> | warn | wave2 |
+| eb-rule | eb-rule.target-issue | enabled rule has no targets (rule matches but goes nowhere) | broken | wave2 |
+| kinesis | kinesis.warn.creating | creating | warn | wave1 |
+| kinesis | kinesis.warn.updating | updating | warn | wave1 |
+| kinesis | kinesis.warn.deleting | deleting | warn | wave1 |
+| msk | msk.warn.creating | creating | warn | wave1 |
+| msk | msk.warn.updating | updating | warn | wave1 |
+| msk | msk.warn.maintenance | maintenance | warn | wave1 |
+| msk | msk.warn.rebooting_broker | rebooting broker | warn | wave1 |
+| msk | msk.warn.healing | healing | warn | wave1 |
+| msk | msk.warn.deleting | deleting | warn | wave1 |
+| msk | msk.broken.failed | failed | broken | wave1 |
+| msk | msk.broker-outdated | broker software outdated | warn | wave2 |
+| msk | msk.encryption-not-tls | encryption in transit not enforced | warn | wave2 |
+| sfn | sfn.latest-execution-failed | latest execution <STATUS> | broken | wave2 |
+| ses | ses.verification.failed | verification failed | broken | wave1 |
+| ses | ses.verification.temp_failure | verify: temp failure | broken | wave1 |
+| ses | ses.verification.not_started | verification not started | broken | wave1 |
+| ses | ses.verification.pending | pending verification | warn | wave1 |
+| ses | ses.sending.disabled | sending disabled | warn | wave1 |
+| ses | ses.account-shutdown | account SHUTDOWN | broken | wave2 |
+| ses | ses.account-probation | account PROBATION | broken | wave2 |
+| ses | ses.quota-high | quota 80%+ used | warn | wave2 |
+| secrets | secrets.state.deleted | deleted | broken | wave1 |
+| secrets | secrets.state.rotation_overdue | rotation overdue | warn | wave1 |
+| secrets | secrets.state.dormant | dormant | warn | wave1 |
+| kms | kms.state.pending_deletion | pending deletion | broken | wave1 |
+| kms | kms.state.disabled | disabled | warn | wave1 |
+| kms | kms.state.unavailable | <key state> | warn | wave1 |
+| kms | kms.rotation-disabled | key rotation disabled (CIS KMS.1) | warn | wave2 |
+| r53 | r53.orphan-private-zone | private zone with no VPC associations (orphan) | warn | wave2 |
+| cf | cf.insecure-protocol | no HTTPS redirect (insecure); origin without TLS | warn | wave2 |
+| acm | acm.expires-soon | expires in <N> days | broken | wave2 |
+| acm | acm.orphan | certificate not in use (orphan) | warn | wave2 |
+| apigw | apigw.no-deployed-stages | no deployed stages | warn | wave2 |
+| apigw | apigw.stage-config-issues | no throttling configured (DoS risk); access logs disabled | warn | wave2 |
+| role | iam-role.dormant | dormant role (>90d) | warn | wave2 |
+| policy | iam-policy.admin-star | admin star (CIS IAM.16) | broken | wave2 |
+| iam-user | iam-user.no-mfa | console user without MFA (CIS IAM.5) | broken | wave2 |
+| iam-user | iam-user.old-key | key <keyID> >90d (rotation) | warn | wave2 |
+| iam-group | iam-group.orphan-or-noop | group has no members (orphan) | warn | wave2 |
+| waf | waf.no-logging | no logging configuration | warn | wave2 |
+| cfn | cfn.stack.failed | <status, lowercased> | broken | wave1 |
+| cfn | cfn.stack.rollback | <status, lowercased> | broken | wave1 |
+| cfn | cfn.stack.in_progress | <status, lowercased> | warn | wave1 |
+| cfn | cfn.recent-resource-failure | recent resource failure: <ResourceType/LogicalResourceId> | broken | wave2 |
+| cfn | cfn.stack-drifted | stack drifted from template | warn | wave2 |
+| pipeline | pipeline.stage-failed | stage <stage> failed | broken | wave2 |
+| cb | cb.latest-build-failed | latest build <status> (<date>) | broken | wave2 |
+| ecr | ecr.vulnerabilities | <N> CRITICAL findings across <M> image(s) | broken | wave2 |
+| codeartifact | codeartifact.no-permissions-policy | no permissions policy | warn | wave2 |
+| codeartifact | codeartifact.public-access-policy | public access policy | broken | wave2 |
+| glue | glue.latest-run-failed | latest run <STATUS> | broken | wave2 |
+| athena | athena.governance-misconfigured | EnforceWorkGroupConfiguration (<N> findings) | warn | wave2 |
+| backup | backup.job-failed | <N> jobs failed in last 24h | broken | wave2 |
+| backup | backup.job-partial | partial: <N> of <M> resources skipped | warn | wave2 |
 <!-- END GENERATED: findings-table -->

@@ -195,6 +195,9 @@ sqs — MESSAGING. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| sqs.missing-dlq | no DLQ configured | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

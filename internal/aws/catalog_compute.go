@@ -508,6 +508,13 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "NetworkInterfaces.NetworkInterfaceId", TargetType: "eni"},
 			{FieldPath: "IamInstanceProfile.Arn", TargetType: "role"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeEC2StatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEC2StateStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEC2StateStopped, Phrase: "stopped", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEC2StateStoppedServer, Phrase: "stopped", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: ec2CodeInstanceStatusImpaired, Phrase: "impaired: system checks failing", Severity: domain.SevBroken, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "ECS Services",
@@ -582,6 +589,11 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "NetworkConfiguration.AwsvpcConfiguration.SecurityGroups", TargetType: "sg"},
 			{FieldPath: "LoadBalancers.TargetGroupArn", TargetType: "tg"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeECSSvcStateInactive, Phrase: "inactive", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeECSSvcStateDraining, Phrase: "draining", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: ecsSvcCodeDeploymentFailed, Phrase: "deployment failed", Severity: domain.SevBroken, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "ECS Clusters",
@@ -620,6 +632,13 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "Configuration.ExecuteCommandConfiguration.KmsKeyId", TargetType: "kms"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeECSStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeECSStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeECSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeECSStateInactive, Phrase: "inactive", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: ecsCodeClusterIssue, Phrase: "<N> pending tasks", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -669,6 +688,15 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		// ecstypes.Task: ClusterArn (parent cluster for this task execution)
 		Navigable: []domain.NavigableField{
 			{FieldPath: "ClusterArn", TargetType: "ecs"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeECSTaskStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeECSTaskStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeECSTaskStateActivating, Phrase: "activating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeECSTaskStateDeactivating, Phrase: "deactivating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeECSTaskStateStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeECSTaskStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: ecsTaskCodeTaskFailed, Phrase: "<stop code or container> failed", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -740,6 +768,10 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "VpcConfig.SubnetIds", TargetType: "subnet"},
 			{FieldPath: "VpcConfig.SecurityGroupIds", TargetType: "sg"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeLambdaStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeLambdaStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+		},
 	},
 	{
 		Name:          "Auto Scaling Groups",
@@ -791,6 +823,10 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "TargetGroupARNs", TargetType: "tg"},
 			{FieldPath: "VPCZoneIdentifier", TargetType: "subnet"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeASGStateDeleting, Phrase: "delete in progress", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: asgCodeScalingActivityFailed, Phrase: "latest scaling activity failed", Severity: domain.SevBroken, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "EBS Volumes",
@@ -832,6 +868,11 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Navigable: []domain.NavigableField{
 			{FieldPath: "Attachments.InstanceId", TargetType: "ec2"},
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeEBSStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEBSStateError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: ebsCodeVolumeIODegraded, Phrase: "volume I/O degraded", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -878,6 +919,10 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VolumeId", TargetType: "ebs"},
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeEBSSnapStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEBSSnapStateError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
 		},
 	},
 	{
@@ -938,6 +983,10 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "BlockDeviceMappings.Ebs.SnapshotId", TargetType: "ebs-snap"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeAMIStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeAMIStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 		},
 	},
 }

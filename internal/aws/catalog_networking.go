@@ -223,6 +223,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "SecurityGroups", TargetType: "sg"},
 			{FieldPath: "AvailabilityZones.SubnetId", TargetType: "subnet"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeELBStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeELBStateActiveImpaired, Phrase: "active impaired", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeELBStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: elbCodeMisconfigured, Phrase: "Deletion Protection: disabled", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "Target Groups",
@@ -279,6 +285,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
 			{FieldPath: "LoadBalancerArns", TargetType: "elb"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: tgCodeUnhealthyTargets, Phrase: "unhealthy targets: <N>/<M>", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -354,6 +363,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "tgw", DisplayName: "Transit Gateways", Checker: checkVPCTGW, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("vpc")},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeVPCStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: vpcCodeNoFlowLogs, Phrase: "no active VPC flow logs (CIS EC2.6)", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "Subnets",
@@ -395,6 +408,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeSubnetStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeSubnetStateUnavailable, Phrase: "unavailable", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeSubnetStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeSubnetStateFailedInsufficientCapacity, Phrase: "failed-insufficient-capacity", Severity: domain.SevBroken, Source: "wave1"},
 		},
 	},
 	{
@@ -477,6 +496,11 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "SubnetId", TargetType: "subnet"},
 			{FieldPath: "NatGatewayAddresses.AllocationId", TargetType: "eip"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeNATStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeNATStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeNATStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+		},
 	},
 	{
 		Name:          "Internet Gateways",
@@ -506,6 +530,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "Attachments.VpcId", TargetType: "vpc"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeIGWStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeIGWStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -555,6 +583,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "InstanceId", TargetType: "ec2"},
 			{FieldPath: "NetworkInterfaceId", TargetType: "eni"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeEIPUnassociated, Phrase: "unassociated", Severity: domain.SevWarn, Source: "wave1"},
+		},
 	},
 	{
 		Name:          "VPC Endpoints",
@@ -601,6 +632,15 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "Groups.GroupId", TargetType: "sg"},
 			{FieldPath: "RouteTableIds", TargetType: "rtb"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeVPCEStatePendingAcceptance, Phrase: "pending acceptance", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeVPCEStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeVPCEStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeVPCEStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeVPCEStateRejected, Phrase: "rejected", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeVPCEStateExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeVPCEStatePartial, Phrase: "partial", Severity: domain.SevBroken, Source: "wave1"},
+		},
 	},
 	{
 		Name:          "Transit Gateways",
@@ -632,6 +672,14 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "role", DisplayName: "IAM Role", Checker: checkTGWRole, NeedsTargetCache: false},
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkTGWSubnet, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("tgw")},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeTGWStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeTGWStateModifying, Phrase: "modifying", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeTGWStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeTGWStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: tgwCodeAttachmentFailed, Phrase: "attachment <id> failed", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: tgwCodeAttachmentTransitional, Phrase: "attachment <id> <state>", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -676,6 +724,11 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "Groups.GroupId", TargetType: "sg"},
 			{FieldPath: "Attachment.InstanceId", TargetType: "ec2"},
 			{FieldPath: "Association.AllocationId", TargetType: "eip"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeENIStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeENIStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeENIStateAvailable, Phrase: "available", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 }

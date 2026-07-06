@@ -191,6 +191,13 @@ opensearch — DATABASES & STORAGE. Lifecycle key: none (the list API returns no
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| opensearch.dim.deleting | deleting: removal in progress | dim | wave1 |
+| opensearch.broken.isolated | isolated: quarantined by AWS | broken | wave1 |
+| opensearch.warn.processing | processing: config change in flight | warn | wave1 |
+| opensearch.update-forced | software update forced soon | broken | wave2 |
+| opensearch.encryption-off | encryption at rest off | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

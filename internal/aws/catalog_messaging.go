@@ -212,6 +212,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSQSKMS},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("sqs")},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: sqsCodeMissingDLQ, Phrase: "no DLQ configured", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "SNS Topics",
@@ -250,6 +253,10 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSNSKMS, NeedsTargetCache: false},
 			{TargetType: "role", DisplayName: "IAM Role", Checker: checkSNSRole, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("sns")},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: snsCodeNoSubscribers, Phrase: "topic has no subscribers", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: snsCodeAllPending, Phrase: "all pending confirmation", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -327,6 +334,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkEbS3, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("eb")},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: ebCodeEnvironmentCauses, Phrase: "EB causes: <first cause>", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "EventBridge Rules",
@@ -371,6 +381,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Navigable: []domain.NavigableField{
 			{FieldPath: "RoleArn", TargetType: "role"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: ebRuleCodeTargetIssue, Phrase: "enabled rule has no targets (rule matches but goes nowhere)", Severity: domain.SevBroken, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "Kinesis Streams",
@@ -401,6 +414,11 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "ddb", DisplayName: "DynamoDB Streams", Checker: checkKinesisDDB, NeedsTargetCache: true},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkKinesisKMS},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("kinesis")},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeKinesisCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeKinesisUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeKinesisDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -440,6 +458,17 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId", TargetType: "kms"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeMSKCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeMSKUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeMSKMaintenance, Phrase: "maintenance", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeMSKRebootingBroker, Phrase: "rebooting broker", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeMSKHealing, Phrase: "healing", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeMSKDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeMSKFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: mskCodeBrokerOutdated, Phrase: "broker software outdated", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: mskCodeEncryptionNotTLS, Phrase: "encryption in transit not enforced", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -491,6 +520,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Navigable: []domain.NavigableField{
 			{FieldPath: "RoleArn", TargetType: "role"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: sfnCodeLatestExecutionFailed, Phrase: "latest execution <STATUS>", Severity: domain.SevBroken, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "SES Identities",
@@ -521,6 +553,16 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkSESS3, NeedsTargetCache: false},
 			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkSESSns, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ses")},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeSESVerificationFailed, Phrase: "verification failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeSESVerificationTempFail, Phrase: "verify: temp failure", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeSESVerificationNotStarted, Phrase: "verification not started", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeSESVerificationPending, Phrase: "pending verification", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeSESSendingDisabled, Phrase: "sending disabled", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: sesCodeShutdown, Phrase: "account SHUTDOWN", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: sesCodeProbation, Phrase: "account PROBATION", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: sesCodeQuota, Phrase: "quota 80%+ used", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 }

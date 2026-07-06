@@ -64,6 +64,9 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{TargetType: "vpc", DisplayName: "VPCs", Checker: checkR53VPC},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("r53")},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: r53CodeOrphanPrivateZone, Phrase: "private zone with no VPC associations (orphan)", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "CloudFront Distributions",
@@ -107,6 +110,9 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		// cftypes.DistributionSummary: no NavigableFields — Origins[].DomainName is a hostname
 		// (e.g. bucket.s3.amazonaws.com), not a bucket name ID; all relationships handled by
 		// checkCf* related checkers at runtime. WebACLId is on GetDistributionConfig, not the summary.
+		Findings: []catalog.FindingDef{
+			{Code: cfCodeInsecureProtocol, Phrase: "no HTTPS redirect (insecure); origin without TLS", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "ACM Certificates",
@@ -140,6 +146,10 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("acm")},
 		},
 		// No NavigableFields — CertificateSummary has no forward refs to other resource types
+		Findings: []catalog.FindingDef{
+			{Code: acmCodeExpiresSoon, Phrase: "expires in <N> days", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: acmCodeOrphan, Phrase: "certificate not in use (orphan)", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "API Gateways",
@@ -182,6 +192,10 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkApigwSNS},
 			{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkApigwVPCE},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("apigw")},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: apigwCodeNoDeployedStages, Phrase: "no deployed stages", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: apigwCodeStageConfigIssues, Phrase: "no throttling configured (DoS risk); access logs disabled", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 }

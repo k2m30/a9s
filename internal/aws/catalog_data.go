@@ -67,6 +67,9 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{FieldPath: "Role", TargetType: "role"},
 		},
 		IssueEnricherFieldKeys: []string{"last_run"},
+		Findings: []catalog.FindingDef{
+			{Code: glueCodeLatestRunFailed, Phrase: "latest run <STATUS>", Severity: domain.SevBroken, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "Athena Workgroups",
@@ -98,6 +101,9 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkAthenaRole},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("athena")},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: athenaCodeGovernanceMisconfigured, Phrase: "EnforceWorkGroupConfiguration (<N> findings)", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 }
 
@@ -119,6 +125,17 @@ var dataChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
 			return FetchGlueJobRuns(ctx, c.Glue, parentCtx["job_name"], continuationToken)
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeGlueRunFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeGlueRunTimeout, Phrase: "timeout", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeGlueRunError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeGlueRunExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeGlueRunRunning, Phrase: "running", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeGlueRunStarting, Phrase: "starting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeGlueRunStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeGlueRunWaiting, Phrase: "waiting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeGlueRunStopped, Phrase: "stopped", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},
 	{

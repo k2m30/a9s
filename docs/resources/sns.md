@@ -152,6 +152,10 @@ sns — MESSAGING. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| sns.no-subscribers | topic has no subscribers | warn | wave2 |
+| sns.all-pending-confirmation | all pending confirmation | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

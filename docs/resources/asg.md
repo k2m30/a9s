@@ -195,6 +195,10 @@ asg — COMPUTE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| asg.state.deleting | delete in progress | warn | wave1 |
+| asg.scaling-activity-failed | latest scaling activity failed | broken | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

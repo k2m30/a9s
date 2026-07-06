@@ -244,6 +244,23 @@ dbi — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| dbi.broken.failed | failed | broken | wave1 |
+| dbi.broken.storage_full | storage-full | broken | wave1 |
+| dbi.broken.incompatible_network | incompatible-network | broken | wave1 |
+| dbi.broken.incompatible_option_group | incompatible-option-group | broken | wave1 |
+| dbi.broken.incompatible_parameters | incompatible-parameters | broken | wave1 |
+| dbi.broken.incompatible_restore | incompatible-restore | broken | wave1 |
+| dbi.broken.restore_error | restore-error | broken | wave1 |
+| dbi.broken.encryption_key_unavailable | encryption key unavailable | broken | wave1 |
+| dbi.broken.stopped | stopped | broken | wave1 |
+| dbi.warn.transitional | <status>: <pending field> | warn | wave1 |
+| dbi.warn.no_automated_backups | no automated backups | warn | wave1 |
+| dbi.warn.publicly_accessible | publicly accessible | warn | wave1 |
+| dbi.warn.unencrypted_storage | unencrypted storage | warn | wave1 |
+| dbi.warn.deletion_protection_off | deletion protection off | warn | wave1 |
+| dbi.pending-maintenance | maintenance scheduled | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

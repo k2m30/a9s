@@ -191,6 +191,15 @@ ddb — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| ddb.broken.kms_key_inaccessible | kms key inaccessible | broken | wave1 |
+| ddb.broken.archived_kms_lost | archived: kms key lost | broken | wave1 |
+| ddb.warn.creating | creating | warn | wave1 |
+| ddb.warn.updating | updating | warn | wave1 |
+| ddb.warn.deleting | deleting | warn | wave1 |
+| ddb.warn.archiving | archiving | warn | wave1 |
+| ddb.pitr-off | PITR off | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

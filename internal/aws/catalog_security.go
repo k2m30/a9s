@@ -101,6 +101,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{TargetType: "iam-user", DisplayName: "IAM Users (trust)", Checker: checkRoleIamUser, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("role"), NeedsTargetCache: false},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: iamRoleCodeDormant, Phrase: "dormant role (>90d)", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "IAM Policies",
@@ -166,6 +169,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("policy"), NeedsTargetCache: false},
 		},
 		DetailEnrich: enrichPolicy,
+		Findings: []catalog.FindingDef{
+			{Code: iamPolicyCodeAdminStar, Phrase: "admin star (CIS IAM.16)", Severity: domain.SevBroken, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "IAM Users",
@@ -198,6 +204,10 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkUserGroup, NeedsTargetCache: false},
 			{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkUserPolicy, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkIAMUserCtEvents, NeedsTargetCache: false},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: iamUserCodeNoMFA, Phrase: "console user without MFA (CIS IAM.5)", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: iamUserCodeOldKey, Phrase: "key <keyID> >90d (rotation)", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -235,6 +245,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkGroupPolicy, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("iam-group"), NeedsTargetCache: false},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: iamGroupCodeOrphanOrNoop, Phrase: "group has no members (orphan)", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "WAF Web ACLs",
@@ -268,6 +281,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		},
 		// wafv2types.WebACLSummary: no cross-ref fields — Name, Id, ARN, Description, LockToken only.
 		// Associations (ELB/APIGW/CF) are resolved via checkWAF* related checkers at runtime.
+		Findings: []catalog.FindingDef{
+			{Code: wafCodeNoLogging, Phrase: "no logging configuration", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 }
 
@@ -305,5 +321,9 @@ var securityChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals //
 			return FetchRolePolicies(ctx, c.IAM, c.IAM, parentCtx, continuationToken)
 		},
 		DetailEnrich: enrichRolePolicy,
+		Findings: []catalog.FindingDef{
+			{Code: CodeRolePolicyOverPrivileged, Phrase: "over-privileged", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeRolePolicyInline, Phrase: "inline", Severity: domain.SevDim, Source: "wave1"},
+		},
 	},
 }

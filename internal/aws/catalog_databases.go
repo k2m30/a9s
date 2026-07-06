@@ -337,6 +337,23 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{FieldPath: "DBSubnetGroup.Subnets.SubnetIdentifier", TargetType: "subnet"},
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeDBIFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBIStorageFull, Phrase: "storage-full", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBIIncompatibleNetwork, Phrase: "incompatible-network", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBIIncompatibleOptionGroup, Phrase: "incompatible-option-group", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBIIncompatibleParameters, Phrase: "incompatible-parameters", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBIIncompatibleRestore, Phrase: "incompatible-restore", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBIRestoreError, Phrase: "restore-error", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBIEncryptionKeyUnavailable, Phrase: "encryption key unavailable", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBIStopped, Phrase: "stopped", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBITransitional, Phrase: "<status>: <pending field>", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBINoAutomatedBackups, Phrase: "no automated backups", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBIPubliclyAccessible, Phrase: "publicly accessible", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBIUnencryptedStorage, Phrase: "unencrypted storage", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBIDeletionProtectionOff, Phrase: "deletion protection off", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: dbiCodePendingMaintenance, Phrase: "maintenance scheduled", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "S3 Buckets",
@@ -396,6 +413,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("s3")},
 		},
 		IssueEnricherFieldKeys: []string{"status"},
+		Findings: []catalog.FindingDef{
+			{Code: s3CodePublicAccessBlockIncomplete, Phrase: "public access block incomplete", Severity: domain.SevBroken, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "ElastiCache Redis",
@@ -434,6 +454,15 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeRedisCreateFailed, Phrase: "create failed — see events", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeRedisCreating, Phrase: "creating — new group", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedisDeleting, Phrase: "deleting — teardown", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedisModifying, Phrase: "modifying — config change", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedisSnapshotting, Phrase: "snapshotting — backup running", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedisShardIssue, Phrase: "shard <NodeGroupId>: <status>", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedisMultiAZWithoutAutoFailover, Phrase: "multi-AZ without auto-failover", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -530,6 +559,17 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{FieldPath: "VpcSecurityGroups.VpcSecurityGroupId", TargetType: "sg"},
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeDBCFailed, Phrase: "failed: cluster operation", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBCEncryptionKeyUnreachable, Phrase: "encryption key unreachable", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBCIncompatibleParameters, Phrase: "parameter group incompatible", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBCNoWriter, Phrase: "no writer: reads only", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBCTransitional, Phrase: "<status>: in progress", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBCDeletionProtectionOff, Phrase: "delete-protection off", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBCNotEncryptedAtRest, Phrase: "not encrypted at rest", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBCNoAutomatedBackups, Phrase: "no automated backups", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: dbcCodeMaintenanceOverdue, Phrase: "maintenance overdue", Severity: domain.SevBroken, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "DynamoDB Tables",
@@ -567,6 +607,15 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "SSEDescription.KMSMasterKeyArn", TargetType: "kms"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeDDBKMSKeyInaccessible, Phrase: "kms key inaccessible", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDDBArchivedKMSLost, Phrase: "archived: kms key lost", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDDBCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDDBUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDDBDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDDBArchiving, Phrase: "archiving", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: ddbCodePITROff, Phrase: "PITR off", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -622,6 +671,13 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{FieldPath: "VPCOptions.SubnetIds", TargetType: "subnet"},
 			{FieldPath: "VPCOptions.SecurityGroupIds", TargetType: "sg"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeOpenSearchDeleting, Phrase: "deleting: removal in progress", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeOpenSearchIsolated, Phrase: "isolated: quarantined by AWS", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeOpenSearchProcessing, Phrase: "processing: config change in flight", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: opensearchCodeUpdateForced, Phrase: "software update forced soon", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: opensearchCodeEncryptionOff, Phrase: "encryption at rest off", Severity: domain.SevWarn, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "Redshift Clusters",
@@ -666,6 +722,28 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeRedshiftIncompatibleHSM, Phrase: "incompatible-hsm", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeRedshiftIncompatibleNetwork, Phrase: "incompatible-network", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeRedshiftIncompatibleParameters, Phrase: "incompatible-parameters", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeRedshiftIncompatibleRestore, Phrase: "incompatible-restore", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeRedshiftHardwareFailure, Phrase: "hardware-failure", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeRedshiftStorageFull, Phrase: "storage-full", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeRedshiftUnavailable, Phrase: "unavailable", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeRedshiftFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeRedshiftCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedshiftModifying, Phrase: "modifying", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedshiftResizing, Phrase: "resizing", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedshiftRebooting, Phrase: "rebooting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedshiftRenaming, Phrase: "renaming", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedshiftDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedshiftMaintenance, Phrase: "maintenance", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedshiftAvailabilityModifying, Phrase: "modifying", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedshiftPendingChange, Phrase: "pending change queued", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedshiftMaintenanceDeferred, Phrase: "maintenance deferred", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedshiftPubliclyAccessible, Phrase: "publicly accessible", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeRedshiftUnencryptedAtRest, Phrase: "unencrypted at rest", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -715,6 +793,14 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Navigable: []domain.NavigableField{
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeEFSError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeEFSNoMountTargets, Phrase: "no mount targets", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeEFSCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEFSUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEFSDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: efsCodeMountTargetDown, Phrase: "mount target down", Severity: domain.SevBroken, Source: "wave2"},
+		},
 	},
 	{
 		Name:          "DB Instance Snapshots",
@@ -750,6 +836,14 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Navigable: []domain.NavigableField{
 			{FieldPath: "DBInstanceIdentifier", TargetType: "dbi"},
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeDBISnapFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBISnapIncompatible, Phrase: "<incompatible-* status>", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBISnapCreating, Phrase: "creating: <pct>%", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBISnapUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: dbiSnapOrphanCode, Phrase: "orphan: source DB deleted", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: dbiSnapPastRetentionCode, Phrase: "automated, <N>d past retention", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -841,6 +935,14 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeDBCSnapFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBCSnapIncompatible, Phrase: "<incompatible-* status>", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBCSnapCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBCSnapManualUnused, Phrase: "manual, unused <N>d", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: dbcSnapOrphanCode, Phrase: "orphan: source cluster deleted", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: dbcSnapPastRetentionCode, Phrase: "automated, <N>d past retention", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 }

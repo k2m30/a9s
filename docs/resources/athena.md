@@ -165,6 +165,9 @@ athena — DATA & ANALYTICS. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| athena.governance-misconfigured | EnforceWorkGroupConfiguration (<N> findings) | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

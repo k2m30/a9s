@@ -174,6 +174,10 @@ ebs-snap — COMPUTE. Lifecycle key: `state`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| ebs-snap.state.pending | pending | warn | wave1 |
+| ebs-snap.state.error | error | broken | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
@@ -183,6 +187,6 @@ ebs-snap — COMPUTE. Lifecycle key: `state`.
 | ebs | EBS Volume | no |
 | ec2 | EC2 Instance | no |
 | kms | KMS Key | no |
-| backup | Backup | no |
+| backup | Backup | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

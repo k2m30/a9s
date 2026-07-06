@@ -177,6 +177,10 @@ logs — MONITORING. Lifecycle key: none (the list API returns no lifecycle fiel
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| logs.retention-never-expire | retention: never expire | warn | wave1 |
+| logs.missing-metric-filters | audit log group missing metric filters | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

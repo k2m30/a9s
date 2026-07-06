@@ -231,6 +231,11 @@ eks — CONTAINERS. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| eks.state.creating | creating | warn | wave1 |
+| eks.state.updating | updating | warn | wave1 |
+| eks.state.failed | failed | broken | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

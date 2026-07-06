@@ -147,6 +147,10 @@ iam-user — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecy
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| iam-user.no-mfa | console user without MFA (CIS IAM.5) | broken | wave2 |
+| iam-user.old-key | key <keyID> >90d (rotation) | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
