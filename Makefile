@@ -156,9 +156,24 @@ snapshot-update:
 	UPDATE_GOLDEN=1 go test ./tests/unit/ -run 'Golden|Scenario' -count=1
 	UPDATE_GOLDEN=1 go test -tags integration ./tests/integration/ -run 'Visual|Scenario' -count=1
 
+# smoke drives the real binary in a headless tmux session over the demo
+# fixtures and asserts the rendered surfaces end to end (menu counts,
+# humanized statuses, per-row issue causes, the reference bucket's related
+# panel). ~30s. Requires tmux.
+smoke:
+	./scripts/smoke-demo.sh
+
+# smoke-live drives the same walk against a real *readonly* AWS profile with
+# data-independent assertions (sweep reaches verified, no raw enum cells, no
+# fetch errors on drills). Companion to the Stage 6 live sub-rule; not part
+# of ready-to-push (needs credentials).
+# Usage: make smoke-live [PROFILE=gobubble-dev-readonly] [REGION=eu-west-2]
+smoke-live:
+	PROFILE="$(PROFILE)" REGION="$(REGION)" ./scripts/smoke-readonly.sh
+
 # Stage 6 — Pre-push gate. The single command every PR must pass before push.
 # See docs/development-process.md.
-ready-to-push: test-race lint security gofix verify-readonly verify-zero-init check-readme snapshot mdlint
+ready-to-push: test-race lint security gofix verify-readonly verify-zero-init check-readme snapshot mdlint smoke
 	@echo "PASS: ready-to-push gate green"
 
 # Stage 7 — Pre-release gate. Run before tagging a release. Subsumes ready-to-push
