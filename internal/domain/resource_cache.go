@@ -2,15 +2,14 @@
 //
 // resource_cache.go owns the platform-agnostic list-view cache entry shape
 // used to restore a top-level resource list when the user re-enters it
-// from the main menu. The concrete map (`Session.ResourceCache`) lives in
-// internal/session and is mutated by runtime handlers; this file owns the
-// per-entry value type so renderer adapters and the session package can
-// both reference it without an import cycle.
+// from the main menu. The concrete store (session.Session.RowStore) lives
+// in internal/session and is mutated by runtime handlers (via
+// Core.SetResourceCache and friends); this file owns the per-entry value
+// type so renderer adapters and the session package can both reference it
+// without an import cycle.
 //
-// ListViewCacheEntry — session.ResourceCacheEntry is a type alias to this
-// struct (see internal/session/session.go). The name ListViewCacheEntry
-// disambiguates against domain.ResourceCacheEntry above (related-checker
-// cache snapshot — different shape, different purpose).
+// ListViewCacheEntry disambiguates against domain.ResourceCacheEntry above
+// (related-checker cache snapshot — different shape, different purpose).
 //
 // Resources / Pagination drive the next render; FilterText, AttentionOnly,
 // SortColIdx, SortAsc, CursorPos, HScrollOffset preserve the list view's
@@ -20,10 +19,6 @@ package domain
 // ListViewCacheEntry stores the state of a previously-viewed resource list.
 // Used to restore the list when the user re-enters the same resource type
 // from the main menu, avoiding redundant API calls.
-//
-// The session-side type alias (`type ResourceCacheEntry = domain.ListViewCacheEntry`)
-// keeps the `session.ResourceCacheEntry` name available for callers (tests,
-// runtime handlers) that reference it.
 type ListViewCacheEntry struct {
 	Resources     []Resource
 	Pagination    *PaginationMeta

@@ -202,30 +202,17 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 
 	// T034: retain prefetch resources for Wave-2 enrichment. Fetcher-emitted
 	// rows already carry Findings; no re-derive needed (W1.4b.3 dropped the
-	// legacy Status/Issues bridge). task #17 wave 1 stage 2: store-only —
-	// the removed session.ProbeResources/ProbeTruncated dual-write is gone,
-	// ObserveRows below is now this write's only destination for the
-	// Wave-2-retained-rows role.
+	// legacy Status/Issues bridge). task #17 wave 1 stage 3: store-only —
+	// the former ResourceCache map write is gone, ObserveRows below is this
+	// write's only destination. A synchronous prefetch is a live, full
+	// result — OriginFetch, wholesale replace.
 	if msg.Resources != nil {
-		if c.session.ResourceCache == nil {
-			c.session.ResourceCache = make(map[string]*session.ResourceCacheEntry, len(msg.Resources))
-		}
 		for rt, resources := range msg.Resources {
 			pageMeta := msg.Pagination[rt]
 			if pageMeta == nil {
 				pageMeta = &resource.PaginationMeta{IsTruncated: msg.Truncated[rt]}
 			}
-			// A synchronous prefetch is a live, full result — OriginFetch —
-			// regardless of whether the legacy ResourceCache write below is
-			// skipped by the exists-guard.
 			c.ObserveRows(rt, resources, pageMeta, session.OriginFetch, false)
-			if _, exists := c.session.ResourceCache[rt]; exists {
-				continue
-			}
-			c.session.ResourceCache[rt] = &session.ResourceCacheEntry{
-				Resources:  resources,
-				Pagination: pageMeta,
-			}
 		}
 	}
 
@@ -428,24 +415,11 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		// every cached row of this type.
 		c.applyEnrichment(msg.ResourceType, msg.Findings, msg.AttentionDetails)
 
-		// Merge FieldUpdates into ResourceCache and RowStore. The
-		// session.ProbeResources leg (task #17 wave 1 stage 2) is gone — the
-		// AmendRows fold below is now this merge's only per-type-row
-		// destination for that removed leg.
+		// Merge FieldUpdates into RowStore (task #17 wave 1 stage 3 — the
+		// former ResourceCache map leg is gone; a type's rows live in exactly
+		// one RowStore entry, so AmendRows' copy-on-write fold below is now
+		// this merge's only per-type-row destination).
 		if len(msg.FieldUpdates) > 0 {
-			if entry, ok := c.session.ResourceCache[msg.ResourceType]; ok {
-				for i := range entry.Resources {
-					if updates, ok := msg.FieldUpdates[entry.Resources[i].ID]; ok {
-						if entry.Resources[i].Fields == nil {
-							entry.Resources[i].Fields = make(map[string]string, len(updates))
-						}
-						maps.Copy(entry.Resources[i].Fields, updates)
-					}
-				}
-			}
-
-			// task #17 wave 1 stage 2: apply FieldUpdates onto RowStore's copy
-			// via copy-on-write Amend.
 			c.AmendRows(msg.ResourceType, func(rows []resource.Resource) []resource.Resource {
 				out := make([]resource.Resource, len(rows))
 				for i, r := range rows {
@@ -608,6 +582,14 @@ func (c *Core) snapshotRowStoreForSave(wave2Complete bool) *SaveCachePayload {
 // Truncated). Excludes Partial-only entries and any Rows-empty entry (C6a:
 // a counts-only ObserveCount write must never surface here as a
 // zero-resource, zero-value-Truncated row-carrying entry).
+//
+// A nil tr.Pagination reports truncated=true (C5: nil pagination is never
+// exact — mirrors availabilityFromResourceCache's identical guard), never
+// truncated=false. A bare Pagination-present check here previously let a
+// nil-Pagination entry (the exact shape HandleResourcesLoaded's
+// PatchResourceCache/SetResourceCache carries before any real page-boundary
+// observation) read as exact, so a downstream Exact-count derivation could
+// silently downgrade an already-deeper stored-exact total (DEF-18).
 func (c *Core) rowStoreResourcesAndTruncated() (map[string][]resource.Resource, map[string]bool) {
 	all := c.session.RowStore.SnapshotAll(false)
 	resources := make(map[string][]resource.Resource, len(all))
@@ -617,7 +599,13 @@ func (c *Core) rowStoreResourcesAndTruncated() (map[string][]resource.Resource, 
 			continue
 		}
 		resources[shortName] = tr.Rows
-		truncated[shortName] = tr.Pagination != nil && tr.Pagination.IsTruncated
+		// C5: nil Pagination means this entry's truncation state was never
+		// observed — treat as unknown/conservatively truncated, mirroring
+		// availabilityFromResourceCache's identical guard. A bare `!= nil &&
+		// .IsTruncated` here would let an unobserved (nil-Pagination) entry
+		// read as exact, letting a downstream Exact-count derivation silently
+		// downgrade a genuinely deeper stored-exact total (DEF-18).
+		truncated[shortName] = tr.Pagination == nil || tr.Pagination.IsTruncated
 	}
 	return resources, truncated
 }

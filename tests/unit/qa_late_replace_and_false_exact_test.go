@@ -35,6 +35,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/cache"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -168,7 +169,7 @@ func TestNilPaginationEntry_IsNotExact(t *testing.T) {
 	// Directly seed session.ResourceCache with the exact shape
 	// HandleResourcesLoaded's PatchResourceCache intent carries: Resources
 	// set, Pagination nil.
-	core.SetResourceCache("s3", &session.ResourceCacheEntry{
+	core.SetResourceCache("s3", &domain.ListViewCacheEntry{
 		Resources: page1Resources(50),
 	})
 

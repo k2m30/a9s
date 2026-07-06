@@ -12,7 +12,6 @@ package runtime
 
 import (
 	"fmt"
-	"maps"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/session"
@@ -179,20 +178,15 @@ func (c *Core) RelatedCachedResource(targetType, id string) (resource.Resource, 
 }
 
 // relatedFetchTasks decides what fetch task (if any) is needed for a
-// RelatedIDs-based filtered list. It checks ResourceCache and LazyResourceCache
-// to determine coverage before emitting a task.
+// RelatedIDs-based filtered list. Reads RowStore directly (task #17 wave 1
+// stage 3 — the former ResourceCache/LazyResourceCache maps are gone; a
+// type's rows live in exactly one RowStore entry, full or Partial alike).
 func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []string) []TaskRequest {
-	entry := s.ResourceCache[targetType]
-	lazy := s.LazyResourceCache[targetType]
+	tr := s.RowStore.Snapshot(targetType)
 
 	// Count how many of the requested IDs are already covered.
 	covered := make(map[string]struct{}, len(relatedIDs))
-	if entry != nil {
-		for _, r := range entry.Resources {
-			covered[r.ID] = struct{}{}
-		}
-	}
-	for _, r := range lazy {
+	for _, r := range tr.Rows {
 		covered[r.ID] = struct{}{}
 	}
 	missing := 0
@@ -209,12 +203,15 @@ func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []strin
 
 	// Some IDs are missing. If the cache has more pages, ask for more and
 	// carry the continuation token as a structured payload
-	// so the adapter is a pure pass-through.
-	if entry != nil && entry.Pagination != nil && entry.Pagination.IsTruncated {
+	// so the adapter is a pure pass-through. A Partial (lazy-only) entry
+	// never carries a continuation token of its own (ObservePartial leaves
+	// Pagination untouched), so this branch only fires for a full entry's
+	// own pagination state, matching the former ResourceCache-only check.
+	if tr.Gen != 0 && !tr.Partial && tr.Pagination != nil && tr.Pagination.IsTruncated {
 		return []TaskRequest{{
 			Key:     TaskKey{Kind: KindFetchMore, Scope: targetType},
 			Cache:   CacheNone,
-			Payload: FetchMorePayload{ContinuationToken: entry.Pagination.NextToken},
+			Payload: FetchMorePayload{ContinuationToken: tr.Pagination.NextToken},
 		}}
 	}
 
@@ -226,27 +223,16 @@ func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []strin
 }
 
 // relatedCacheSnapshot returns a flat map[string][]resource.Resource snapshot
-// of the session caches suitable for the navigation resolver. On ID collision
-// ResourceCache wins over LazyResourceCache.
+// suitable for the navigation resolver, reading directly from RowStore (task
+// #17 wave 1 stage 3). A type's rows now live in exactly one RowStore entry
+// (full or Partial), so there is no merge-precedence to apply — the former
+// two-map "ResourceCache wins over LazyResourceCache on ID collision" rule
+// is now vacuous (the store itself is the single source for both roles).
 func relatedCacheSnapshot(s *session.Session) map[string][]resource.Resource {
-	snap := make(map[string][]resource.Resource, len(s.ResourceCache)+len(s.LazyResourceCache))
-	maps.Copy(snap, s.LazyResourceCache)
-	for shortName, entry := range s.ResourceCache {
-		if existing, ok := snap[shortName]; ok {
-			known := make(map[string]struct{}, len(entry.Resources))
-			for _, r := range entry.Resources {
-				known[r.ID] = struct{}{}
-			}
-			merged := append([]resource.Resource(nil), entry.Resources...)
-			for _, r := range existing {
-				if _, dup := known[r.ID]; !dup {
-					merged = append(merged, r)
-				}
-			}
-			snap[shortName] = merged
-		} else {
-			snap[shortName] = entry.Resources
-		}
+	all := s.RowStore.SnapshotAll(true)
+	snap := make(map[string][]resource.Resource, len(all))
+	for shortName, tr := range all {
+		snap[shortName] = tr.Rows
 	}
 	return snap
 }

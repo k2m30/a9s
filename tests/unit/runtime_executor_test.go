@@ -32,10 +32,10 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -742,7 +742,7 @@ func TestExecuteTask_RelatedCheck_ReadsCoreNotTUI(t *testing.T) {
 
 	c := newExecutorCore(t)
 	// Seed ResourceCache for s3 so SnapshotCache returns a non-empty map.
-	c.SetResourceCache("s3", &session.ResourceCacheEntry{
+	c.SetResourceCache("s3", &domain.ListViewCacheEntry{
 		Resources: []resource.Resource{{ID: "my-bucket-000000000000", Name: "my-bucket"}},
 	})
 
@@ -774,7 +774,7 @@ func TestExecuteTask_SaveCache_ReadsCoreNotTUI(t *testing.T) {
 	})
 
 	// Seed one cache entry so availabilityFromResourceCache returns non-nil.
-	c.SetResourceCache("ec2", &session.ResourceCacheEntry{
+	c.SetResourceCache("ec2", &domain.ListViewCacheEntry{
 		Resources: []resource.Resource{{ID: "i-0000000000000001", Name: "test-instance"}},
 	})
 

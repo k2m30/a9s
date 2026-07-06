@@ -110,8 +110,8 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		}
 		c.ensureListState()
 		top := &c.stack[len(c.stack)-1]
-		// For the cache-hit path (a previous visit's session.ResourceCache),
-		// populate rows immediately from the cache entry so headless/web
+		// For the cache-hit path (a previous visit's RowStore-retained full
+		// entry), populate rows immediately from the cache entry so headless/web
 		// callers see data without waiting for a fetch round-trip — then mark
 		// Refreshing and dispatch a fresh fetch task so the seeded rows are
 		// confirmed/replaced (Contract A: cache-first seeding never skips the

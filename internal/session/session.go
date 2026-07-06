@@ -4,17 +4,19 @@
 // results on profile/region switch or refresh.
 //
 // Session is held as Session *session.Session on tui.Model. Access sites use
-// m.Session.ResourceCache, m.Session.RelatedGen etc. directly; Wave-1 probe
-// rows go through RowStore (see rowstore.go) rather than a session field.
+// m.Session.RelatedGen etc. directly for scalar fields; every cached
+// resource-list row (top-level fetch, Wave-1 probe, disk seed, or sparse
+// FetchByIDs drill) goes through RowStore (see rowstore.go) rather than a
+// session map — there is no separate ResourceCache/LazyResourceCache field.
 //
 // Rules of ownership:
 //
 //   - Only session-scoped orchestration state belongs here. UI shell concerns
 //     (view stack, header, input mode, theme) stay on the surrounding Model.
-//   - Maps that handler paths write into directly (ResourceCache,
-//     EnrichmentRan, EnrichmentTypeGen, EnrichmentTruncatedIDs) MUST be
-//     constructed by New(). The availability/enrich queues stay nil until a
-//     probe retains its first batch — they are built in place.
+//   - Maps that handler paths write into directly (EnrichmentRan,
+//     EnrichmentTypeGen, EnrichmentTruncatedIDs) MUST be constructed by
+//     New(). The availability/enrich queues stay nil until a probe retains
+//     its first batch — they are built in place.
 //   - There is no parallel EnrichmentFindings map on tui.Model or on Session;
 //     Wave 2 findings are written directly onto each cached
 //     `resource.Resource.Findings` slice
@@ -33,19 +35,8 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
-
-// ResourceCacheEntry stores the state of a previously-viewed resource list.
-// Used to restore the list when the user re-enters the same resource type
-// from the main menu, avoiding redundant API calls.
-//
-// Defined as an alias to domain.ListViewCacheEntry so renderer adapters can
-// construct entries without importing internal/session. The
-// `session.ResourceCacheEntry` name stays available for callers (tests,
-// runtime handlers) that reference it. Field set is unchanged.
-type ResourceCacheEntry = domain.ListViewCacheEntry
 
 // Session owns the in-memory orchestration state for the active
 // profile/region session.
@@ -174,24 +165,20 @@ type Session struct {
 	EnrichmentTypeGen      map[string]domain.Gen
 	EnrichmentTruncatedIDs map[string]map[string]bool
 
-	// RowStore is the session-scoped, per-type row store (task #17 wave 1 —
-	// row-store unification). Introduced as dual-write scaffolding behind
-	// ProbeResources/ResourceCache/LazyResourceCache below: every chokepoint
-	// that writes one of those maps also feeds RowStore, but nothing yet
-	// reads from it (Stage 2/3 re-point reads). Never nil after New()/Rotate.
+	// RowStore is the session-scoped, per-type row store (task #17 wave 1/3 —
+	// row-store unification). The single source of truth for every cached
+	// resource-list row this session has observed, replacing the former
+	// ResourceCache/LazyResourceCache maps entirely (Stage 3): a type's rows
+	// live in exactly one TypeRows entry regardless of which lane last wrote
+	// them (Wave-1 probe, disk seed, top-level fetch, or a sparse FetchByIDs
+	// drill — see Origin/Partial). Never nil after New()/Rotate.
 	RowStore *RowStore
 
 	// Session-scoped caches + stale-result guards.
-	ResourceCache map[string]*ResourceCacheEntry
-	// LazyResourceCache holds resources pulled via FetchByIDs for filtered-target
-	// drills. Consulted by related-navigation only; NEVER by top-level list
-	// navigation. Ensures lazy-added out-of-scope entries (e.g. AWS-managed KMS
-	// keys) do not pollute the scope-filtered main-menu list.
-	LazyResourceCache map[string][]resource.Resource
-	RelatedCache      *RelatedCacheLRU
-	RelatedGen        domain.Gen // bumped on refresh/profile/region switch
-	EnrichGen         domain.Gen // bumped on refresh/profile/region switch (detail-enrichment only)
-	EnrichResKey      string     // "resourceType:resourceID" of last detail-enrichment dispatch
+	RelatedCache *RelatedCacheLRU
+	RelatedGen   domain.Gen // bumped on refresh/profile/region switch
+	EnrichGen    domain.Gen // bumped on refresh/profile/region switch (detail-enrichment only)
+	EnrichResKey string     // "resourceType:resourceID" of last detail-enrichment dispatch
 
 	// Feature-specific session caches. These used to hang off *ServiceClients
 	// but that blurred the AWS-transport/session-state boundary; they live
@@ -239,8 +226,6 @@ func New() *Session {
 		EnrichmentTypeGen:      make(map[string]domain.Gen),
 		EnrichmentTruncatedIDs: make(map[string]map[string]bool),
 		RowStore:               NewRowStore(),
-		ResourceCache:          make(map[string]*ResourceCacheEntry),
-		LazyResourceCache:      make(map[string][]resource.Resource),
 		RelatedCache:           NewRelatedCacheLRU(MaxRelatedCacheEntries),
 		RelatedGen:             1,
 		EnrichGen:              1,
@@ -411,8 +396,6 @@ func (s *Session) Rotate() {
 	s.EnrichChecked = 0
 	s.EnrichTotal = 0
 	s.RowStore.Clear()
-	s.ResourceCache = make(map[string]*ResourceCacheEntry)
-	s.LazyResourceCache = make(map[string][]resource.Resource)
 	s.EnrichmentRan = make(map[string]bool)
 	s.EnrichmentTypeGen = make(map[string]domain.Gen)
 	s.EnrichmentTruncatedIDs = make(map[string]map[string]bool)

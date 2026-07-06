@@ -25,7 +25,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/session"
 )
 
-
 // newRuntimeCore returns a fresh *runtime.Core bound to a clean session and
 // the static catalog. Test cases mutate the returned session's caches
 // directly to seed each branch.
@@ -85,9 +84,7 @@ func TestHandleRelatedNavigate_ChildType_EnterChildView(t *testing.T) {
 // Case C — top-level cache hit via TargetID → Detail, no tasks.
 func TestHandleRelatedNavigate_TopLevelCacheHit_TargetID_Detail(t *testing.T) {
 	c, s := newRuntimeCore(t)
-	s.ResourceCache["ec2"] = &session.ResourceCacheEntry{
-		Resources: []resource.Resource{{ID: "i-1"}},
-	}
+	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, nil, session.OriginFetch, false)
 
 	result, tasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
 		TargetType: "ec2",
@@ -108,9 +105,7 @@ func TestHandleRelatedNavigate_TopLevelCacheHit_TargetID_Detail(t *testing.T) {
 // Case D — top-level cache hit via single RelatedIDs → Detail, no tasks.
 func TestHandleRelatedNavigate_TopLevelCacheHit_SingleRelatedID_Detail(t *testing.T) {
 	c, s := newRuntimeCore(t)
-	s.ResourceCache["ec2"] = &session.ResourceCacheEntry{
-		Resources: []resource.Resource{{ID: "i-1"}},
-	}
+	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, nil, session.OriginFetch, false)
 
 	result, tasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
 		TargetType: "ec2",
@@ -219,10 +214,7 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_CacheMiss_FetchResources(t *te
 // the continuation token rides on the TaskRequest as a FetchMorePayload.
 func TestHandleRelatedNavigate_MultipleRelatedIDs_PartialCoverage_Truncated_FetchMore(t *testing.T) {
 	c, s := newRuntimeCore(t)
-	s.ResourceCache["ec2"] = &session.ResourceCacheEntry{
-		Resources:  []resource.Resource{{ID: "i-1"}},
-		Pagination: &domain.PaginationMeta{IsTruncated: true, NextToken: "next-tok-xyz"},
-	}
+	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, &domain.PaginationMeta{IsTruncated: true, NextToken: "next-tok-xyz"}, session.OriginFetch, false)
 
 	result, tasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
 		TargetType: "ec2",
@@ -246,9 +238,7 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_PartialCoverage_Truncated_Fetc
 // with no fetch task.
 func TestHandleRelatedNavigate_MultipleRelatedIDs_FullyCached_NoFetch(t *testing.T) {
 	c, s := newRuntimeCore(t)
-	s.ResourceCache["ec2"] = &session.ResourceCacheEntry{
-		Resources: []resource.Resource{{ID: "i-1"}, {ID: "i-2"}},
-	}
+	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}, {ID: "i-2"}}, nil, session.OriginFetch, false)
 
 	result, tasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
 		TargetType: "ec2",
@@ -284,14 +274,14 @@ func TestHandleRelatedNavigate_NoIDsNoFilter_ResourceList(t *testing.T) {
 	}
 }
 
-// Case K — pure-lazy passthrough for Detail: TargetID hit lives only in
-// LazyResourceCache; ResourceCache has no entry for the type.
+// Case K — pure-lazy passthrough for Detail: TargetID hit lives only in a
+// Partial RowStore entry (ObservePartial); no full Observe ever landed.
 //
-// This proves relatedCacheSnapshot includes LazyResourceCache when resolving
-// the TargetID Detail branch.
+// This proves relatedCacheSnapshot includes Partial RowStore entries when
+// resolving the TargetID Detail branch.
 func TestHandleRelatedNavigate_PureLazyCacheHit_Detail(t *testing.T) {
 	c, s := newRuntimeCore(t)
-	s.LazyResourceCache["ec2"] = []resource.Resource{{ID: "i-1"}}
+	s.RowStore.ObservePartial("ec2", []resource.Resource{{ID: "i-1"}})
 
 	result, tasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
 		TargetType: "ec2",
@@ -410,9 +400,7 @@ func TestHandleRelatedNavigate_ByIDCapableType_CacheHit_Detail_NoFetchTask(t *te
 	t.Cleanup(func() { resource.CleanupPaginatedForTest(targetType) })
 
 	c, s := newRuntimeCore(t)
-	s.ResourceCache[targetType] = &session.ResourceCacheEntry{
-		Resources: []resource.Resource{{ID: "snap-cached"}},
-	}
+	s.RowStore.Observe(targetType, []resource.Resource{{ID: "snap-cached"}}, nil, session.OriginFetch, false)
 
 	result, tasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
 		TargetType: targetType,

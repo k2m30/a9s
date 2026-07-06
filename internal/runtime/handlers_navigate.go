@@ -16,8 +16,8 @@ import (
 	"fmt"
 
 	"github.com/k2m30/a9s/v3/internal/cache"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // NavigateTarget enumerates the navigation targets the runtime knows how
@@ -78,7 +78,7 @@ type NavigateResult struct {
 	DisplayAlias    string                      // empty when same as ResolvedType
 	ReplaceCurrent  bool                        // mirrors NavigateEvent.ReplaceCurrent
 	Resource        *resource.Resource          // for Push{Detail,YAML,JSON} and FetchReveal
-	CachedEntry     *session.ResourceCacheEntry // for PushResourceListCached
+	CachedEntry     *domain.ListViewCacheEntry  // for PushResourceListCached
 	DispatchEnrich  bool                        // for Push{Detail,YAML,JSON}
 	DispatchRelated bool                        // for PushDetail
 	FlashMessage    string
@@ -165,7 +165,7 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 			alias = ""
 		}
 		canon := rt.ShortName
-		if entry, ok := c.session.ResourceCache[canon]; ok {
+		if entry, ok := c.ResourceCache(canon); ok {
 			// Cached resources already carry fetcher-emitted Findings; no
 			// re-derive needed (W1.4b.3 dropped the legacy Status/Issues bridge).
 			return NavigateResult{
@@ -184,15 +184,17 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 			DisplayAlias: alias,
 		}
 		// The seed rides the miss branch, not a NavigateKindPushResourceListCached
-		// promotion: RowStore's OriginProbe/OriginDisk rows hold disk-cached/probe
-		// knowledge that is distinct from session.ResourceCache (DEF-12 C1 +
-		// Goal 4) — the fetch must still run to confirm/replace what the probe
-		// retained, so Kind and the KindFetchResources task below are unchanged.
+		// promotion: this check above (c.ResourceCache(canon)) only hits a FULL
+		// (non-Partial, OriginFetch) RowStore entry (DEF-12 C1 + Goal 4) — an
+		// OriginProbe/OriginDisk entry retained below is knowledge the probe
+		// gathered, not a verified live fetch, so the fetch must still run to
+		// confirm/replace what the probe retained; Kind and the
+		// KindFetchResources task below are unchanged.
 		//
-		// task #17 wave 1 stage 2: RowStore retains rows for the session (no
-		// enrichment-completion free — see RowStore.Amend's doc comment), so the
-		// DEF-15 free-then-disk-fallback race this comment used to describe
-		// against session.ProbeResources no longer exists; the store is read
+		// task #17 wave 1 stage 3: a type's rows live in exactly one RowStore
+		// entry regardless of which lane wrote them, so the free-then-disk-
+		// fallback race this comment used to describe against a separate
+		// session.ProbeResources map no longer exists; the store is read
 		// directly instead.
 		//
 		// DEF-15/P2: the disk fallback fires only when this session never
@@ -211,7 +213,7 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		tr := c.session.RowStore.Snapshot(canon)
 		if tr.Gen != 0 {
 			if len(tr.Rows) > 0 {
-				result.CachedEntry = &session.ResourceCacheEntry{
+				result.CachedEntry = &domain.ListViewCacheEntry{
 					Resources: tr.Rows,
 					Pagination: &resource.PaginationMeta{
 						IsTruncated: tr.Pagination != nil && tr.Pagination.IsTruncated,
@@ -224,7 +226,7 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 					return nil
 				}
 				if tf, ok := store.Type(canon); ok && len(tf.Rows) > 0 {
-					result.CachedEntry = &session.ResourceCacheEntry{
+					result.CachedEntry = &domain.ListViewCacheEntry{
 						Resources: rowsFromCacheRows(canon, tf.Rows),
 						Pagination: &resource.PaginationMeta{
 							IsTruncated: !tf.Exact,

@@ -87,9 +87,7 @@ func TestHandleResourcesLoaded_NotCachedYet_EmitsPatchResourceCache(t *testing.T
 // the view-side cacheTopLevelResourceList just wrote.
 func TestHandleResourcesLoaded_AlreadyCached_SkipsPatch(t *testing.T) {
 	sess := session.New()
-	sess.ResourceCache["ec2"] = &session.ResourceCacheEntry{
-		Resources: []resource.Resource{{ID: "pre-existing"}},
-	}
+	sess.RowStore.Observe("ec2", []resource.Resource{{ID: "pre-existing"}}, nil, session.OriginFetch, false)
 	c := New(sess, catalog.All())
 
 	intents, _ := c.HandleResourcesLoaded(ResourcesLoadedEvent{
@@ -279,9 +277,9 @@ func TestHandleRelatedCheckResult_LazyAddError_EmitsFlash(t *testing.T) {
 // canonicalises to a type already in LazyResourceCache) is skipped.
 func TestHandleRelatedCheckResult_CachedPagesMerge(t *testing.T) {
 	sess := session.New()
-	// Pre-seed LazyResourceCache for "kms" so the matching CachedPages
-	// entry is skipped.
-	sess.LazyResourceCache["kms"] = []resource.Resource{{ID: "pre-lazy"}}
+	// Pre-seed a Partial RowStore entry for "kms" so the matching CachedPages
+	// entry is skipped (Gen!=0 is the "already has an entry" test).
+	sess.RowStore.ObservePartial("kms", []resource.Resource{{ID: "pre-lazy"}})
 	c := New(sess, catalog.All())
 
 	intents, _ := c.HandleRelatedCheckResult(RelatedCheckResultEvent{

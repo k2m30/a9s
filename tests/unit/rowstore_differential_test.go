@@ -398,13 +398,15 @@ func TestDifferential_EnrichmentChecked_AllDone_RowStoreSurvivesLegacyFree(t *te
 
 // TestDifferential_RelatedLazyAdd_MatchesLazyResourceCache drives a related
 // lazy-add result (e.g. a KMS customer-managed-key pivot outside the
-// top-level fetcher's filter) through BOTH dual-write lanes that
-// legitimately exist for this message today:
+// top-level fetcher's filter) through BOTH lanes that legitimately exist
+// for this message today:
 //
 //  1. runtime.Core.HandleRelatedCheckResult (the intent-returning method) +
-//     Controller.ApplyIntents — this is what actually populates the legacy
-//     session.LazyResourceCache map (via PatchLazyResourceCache), exactly as
-//     the TUI adapter and the headless RelatedCheckBatch executor do.
+//     Controller.ApplyIntents — this is what populates RowStore's Partial
+//     entry (via PatchLazyResourceCache, task #17 wave 1 stage 3: the
+//     legacy session.LazyResourceCache map this intent used to write is
+//     gone; the intent now feeds RowStore.ObservePartial), exactly as the
+//     TUI adapter and the headless RelatedCheckBatch executor do.
 //  2. app.Controller.Handle(messages.RelatedCheckResult{...}) — this is what
 //     feeds RowStore (via core.HandleEvent's dedicated
 //     observeRelatedCheckResultRows case, deliberately side-effect-only so
@@ -414,9 +416,9 @@ func TestDifferential_EnrichmentChecked_AllDone_RowStoreSurvivesLegacyFree(t *te
 // A real production caller normally only exercises ONE of these two paths
 // per message (TUI/headless-executor calls HandleRelatedCheckResult
 // directly; a hypothetical generic HandleEvent-only caller would only get
-// RowStore's side). Driving both here is deliberate: it is the only way,
-// at Stage 1, to observe the two dual-write targets side by side and catch
-// them drifting apart before Stage 2+ unifies the read path.
+// RowStore's side). Driving both here is deliberate: it is the only way to
+// observe the two RowStore-writing lanes side by side and catch them
+// drifting apart.
 func TestDifferential_RelatedLazyAdd_MatchesLazyResourceCache(t *testing.T) {
 	s, core, c := newDifferentialTestController(t)
 
@@ -440,9 +442,9 @@ func TestDifferential_RelatedLazyAdd_MatchesLazyResourceCache(t *testing.T) {
 		LazyAddedResources: map[string][]resource.Resource{"kms": lazyRows},
 	})
 
-	legacy := s.LazyResourceCache["kms"]
-	if len(legacy) != 1 || legacy[0].ID != "key-lazy-1" {
-		t.Fatalf("precondition: legacy LazyResourceCache[kms] = %+v, want [key-lazy-1] populated via PatchLazyResourceCache", legacy)
+	afterLane1 := s.RowStore.Snapshot("kms")
+	if len(afterLane1.Rows) != 1 || afterLane1.Rows[0].ID != "key-lazy-1" {
+		t.Fatalf("precondition: RowStore.Snapshot(kms) after lane 1 (PatchLazyResourceCache) = %+v, want [key-lazy-1]", afterLane1.Rows)
 	}
 
 	all := s.RowStore.SnapshotAll(true)

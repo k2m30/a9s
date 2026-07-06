@@ -140,7 +140,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 
 		// RelatedIDs-based filtered list (multi or single cache miss).
 		if len(result.RelatedIDs) > 0 {
-			if entry, ok := m.core.ResourceCache(msg.TargetType); ok && entry != nil {
+			if entry, ok := m.core.AnyOriginResourceCache(msg.TargetType); ok && entry != nil {
 				idSet := make(map[string]bool, len(result.RelatedIDs))
 				for _, id := range result.RelatedIDs {
 					idSet[id] = true
@@ -324,7 +324,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 		}
 		var detailRes resource.Resource
 		var detailFound bool
-		if entry, ok := m.core.ResourceCache(msg.TargetType); ok && entry != nil {
+		if entry, ok := m.core.AnyOriginResourceCache(msg.TargetType); ok && entry != nil {
 			detailRes, detailFound = resolveDetailResource(entry.Resources)
 		}
 		if !detailFound {

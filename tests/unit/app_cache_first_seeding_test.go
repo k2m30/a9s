@@ -240,12 +240,7 @@ func TestListOpen_SeedsFromResourceCache_PreviousVisit(t *testing.T) {
 	priorVisitRows := []resource.Resource{
 		{ID: "i-0prevvisit0001", Name: "cached-1", Type: "ec2", Fields: map[string]string{"state": "running"}},
 	}
-	core.Session().ResourceCache = map[string]*session.ResourceCacheEntry{
-		"ec2": {Resources: priorVisitRows, Pagination: &resource.PaginationMeta{IsTruncated: false}},
-	}
-	// Deliberately no RowStore rows seeded — this test isolates the
-	// ResourceCache seeding source from the RowStore seeding source pinned
-	// above.
+	core.Session().RowStore.Observe("ec2", priorVisitRows, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
 
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	snap := c.Snapshot()

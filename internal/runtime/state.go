@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // RuntimeState is the view-ready snapshot that adapters render from when
@@ -10,9 +9,9 @@ import (
 // overlays, future IPC bridges). It is a snapshot, not a live handle —
 // adapters should still react to UIIntent for incremental updates.
 type RuntimeState struct {
-	// ResourceCache mirrors session.Session.ResourceCache for the active
-	// session: per-resource-type cached list state.
-	ResourceCache map[string]*session.ResourceCacheEntry
+	// ResourceCache mirrors RowStore's retained full (non-Partial) entries
+	// for the active session: per-resource-type cached list state.
+	ResourceCache map[string]*domain.ListViewCacheEntry
 
 	// EnrichmentFindings carries the most-recent Wave 2 findings per
 	// resource type, keyed by ResourceType -> ResourceID -> finding.

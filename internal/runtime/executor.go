@@ -131,9 +131,8 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 	// Single save path for both renderers: TUI and web both route
 	// TaskKindSaveCache through this executor case, so availability counts
 	// and per-type rows/findings persist identically regardless of host.
-	// Entries derive from c.session.ResourceCache rather than any
-	// renderer-local model state (e.g. MainMenuModel), keeping this path
-	// renderer-neutral.
+	// Entries derive from RowStore rather than any renderer-local model
+	// state (e.g. MainMenuModel), keeping this path renderer-neutral.
 	case TaskKindSaveCache:
 		if snap.NoCache {
 			return nil, nil
@@ -451,9 +450,9 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 	}
 }
 
-// availabilityFromResourceCache derives availability entries from the session's
-// ResourceCache. Used by the save-cache executor path as a renderer-neutral
-// alternative to reading counts from MainMenuModel.
+// availabilityFromResourceCache derives availability entries from RowStore's
+// retained full (non-Partial) entries. Used by the save-cache executor path
+// as a renderer-neutral alternative to reading counts from MainMenuModel.
 func (c *Core) availabilityFromResourceCache() (
 	entries map[string]int,
 	truncated map[string]bool,
@@ -461,20 +460,18 @@ func (c *Core) availabilityFromResourceCache() (
 	issueTruncated map[string]bool,
 	issueKnown map[string]bool,
 ) {
-	if len(c.session.ResourceCache) == 0 {
+	all := c.session.RowStore.SnapshotAll(false)
+	if len(all) == 0 {
 		return nil, nil, nil, nil, nil
 	}
-	entries = make(map[string]int, len(c.session.ResourceCache))
+	entries = make(map[string]int, len(all))
 	truncated = make(map[string]bool)
 	issueCounts = make(map[string]int)
 	issueTruncated = make(map[string]bool)
 	issueKnown = make(map[string]bool)
 	typeCache := make(map[string]*resource.ResourceTypeDef)
-	for rt, entry := range c.session.ResourceCache {
-		if entry == nil {
-			continue
-		}
-		entries[rt] = len(entry.Resources)
+	for rt, tr := range all {
+		entries[rt] = len(tr.Rows)
 		// C5: a nil Pagination means this entry's truncation state was never
 		// observed (e.g. a partial/legacy cache write) — treat as unknown,
 		// which must NOT be conflated with a genuine "not truncated"
@@ -483,7 +480,7 @@ func (c *Core) availabilityFromResourceCache() (
 		// promotes an unobserved page-1-shaped count to Exact (DEF-18
 		// mechanism B: a false Exact=true silently downgraded a real exact
 		// 55 to a false exact 50 and then dropped the stored Rows).
-		isTrunc := entry.Pagination == nil || entry.Pagination.IsTruncated
+		isTrunc := tr.Pagination == nil || tr.Pagination.IsTruncated
 		if isTrunc {
 			truncated[rt] = true
 			issueTruncated[rt] = true
@@ -494,7 +491,7 @@ func (c *Core) availabilityFromResourceCache() (
 			typeCache[rt] = td
 		}
 		issues := 0
-		for _, r := range entry.Resources {
+		for _, r := range tr.Rows {
 			if td != nil && !td.ExcludeFromIssueBadge && td.ResolveColor(r).IsIssue() {
 				issues++
 			}

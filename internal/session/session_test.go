@@ -30,11 +30,8 @@ func TestSession_New_InitializesMaps(t *testing.T) {
 	if s.EnrichmentTruncatedIDs == nil {
 		t.Error("EnrichmentTruncatedIDs must be non-nil after New()")
 	}
-	if s.ResourceCache == nil {
-		t.Error("ResourceCache must be non-nil after New()")
-	}
-	if s.LazyResourceCache == nil {
-		t.Error("LazyResourceCache must be non-nil after New()")
+	if s.RowStore == nil {
+		t.Error("RowStore must be non-nil after New()")
 	}
 	if s.RelatedCache == nil {
 		t.Error("RelatedCache must be non-nil after New()")
@@ -104,8 +101,8 @@ func TestSession_Rotate_ClearsCaches(t *testing.T) {
 	// Note: EnrichmentFindings was moved to tui.Model in PR-03a-fold and is
 	// no longer on Session; it is cleared explicitly by profile/region switch
 	// handlers in handleProfileSelected / handleRegionSelected.
-	s.ResourceCache["ec2"] = &session.ResourceCacheEntry{}
-	s.LazyResourceCache["ec2"] = nil
+	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-001"}}, nil, session.OriginFetch, false)
+	s.RowStore.ObservePartial("rds", []resource.Resource{{ID: "db-001"}})
 	s.EnrichmentRan["ec2"] = true
 	s.EnrichmentTypeGen["ec2"] = 42
 	s.EnrichmentTruncatedIDs["ec2"] = map[string]bool{"i-x": true}
@@ -115,11 +112,11 @@ func TestSession_Rotate_ClearsCaches(t *testing.T) {
 
 	s.Rotate()
 
-	if len(s.ResourceCache) != 0 {
-		t.Errorf("ResourceCache not empty after Rotate(): len=%d", len(s.ResourceCache))
+	if tr := s.RowStore.Snapshot("ec2"); tr.Gen != 0 {
+		t.Errorf("RowStore.Snapshot(\"ec2\").Gen after Rotate() = %d, want 0 (never observed this session)", tr.Gen)
 	}
-	if len(s.LazyResourceCache) != 0 {
-		t.Errorf("LazyResourceCache not empty after Rotate(): len=%d", len(s.LazyResourceCache))
+	if tr := s.RowStore.Snapshot("rds"); tr.Gen != 0 {
+		t.Errorf("RowStore.Snapshot(\"rds\").Gen after Rotate() = %d, want 0 (never observed this session)", tr.Gen)
 	}
 	// EnrichmentFindings is on tui.Model (not Session) after PR-03a-fold;
 	// Session.Rotate() no longer clears it — the handler does so explicitly.

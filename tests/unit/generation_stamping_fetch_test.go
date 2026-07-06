@@ -511,9 +511,9 @@ func TestAvailabilityPrefetched_Stale_Dropped(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, staleMsg)
 
-	// ResourceCache must NOT have been seeded — the stale prefetch was dropped.
-	if entry, ok := m.Core().Session().ResourceCache[targetType]; ok {
-		t.Errorf("stale AvailabilityPrefetched was NOT dropped: ResourceCache[%q]=%+v — post-rotate session contaminated by pre-rotate prefetch (AS-648-h4 regression)", targetType, entry)
+	// RowStore must NOT have been seeded — the stale prefetch was dropped.
+	if tr := m.Core().Session().RowStore.Snapshot(targetType); tr.Gen != 0 {
+		t.Errorf("stale AvailabilityPrefetched was NOT dropped: RowStore.Snapshot(%q)=%+v — post-rotate session contaminated by pre-rotate prefetch (AS-648-h4 regression)", targetType, tr)
 	}
 }
 
@@ -539,8 +539,8 @@ func TestAvailabilityPrefetched_ZeroGen_Dropped(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, zeroMsg)
 
-	if entry, ok := m.Core().Session().ResourceCache[targetType]; ok {
-		t.Errorf("zero-stamped AvailabilityPrefetched was NOT dropped: ResourceCache[%q]=%+v — guard regression: AcceptZeroGen() must remain false", targetType, entry)
+	if tr := m.Core().Session().RowStore.Snapshot(targetType); tr.Gen != 0 {
+		t.Errorf("zero-stamped AvailabilityPrefetched was NOT dropped: RowStore.Snapshot(%q)=%+v — guard regression: AcceptZeroGen() must remain false", targetType, tr)
 	}
 }
 

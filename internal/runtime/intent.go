@@ -5,7 +5,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // UIIntent is the contract by which the runtime tells an adapter to
@@ -267,19 +266,19 @@ type RefreshActiveListIntent struct{}
 
 func (RefreshActiveListIntent) isIntent() {}
 
-// PatchResourceCache writes a single ResourceCacheEntry into the
-// session-owned ResourceCache. Emitted by HandleResourcesLoaded when the
-// loaded slice should be cached without the view-side write-through path
-// (i.e. the active view is not the ResourceListModel for this type, so
-// cacheTopLevelResourceList will not fire). Entry may be nil to signal a
-// clear (no current emitter exercises that branch — kept for symmetry).
+// PatchResourceCache writes a single top-level resource-list entry into
+// RowStore (via Core.SetResourceCache). Emitted by HandleResourcesLoaded
+// when the loaded slice should be cached without the view-side
+// write-through path (i.e. the active view is not the ResourceListModel for
+// this type, so cacheTopLevelResourceList will not fire). Entry may be nil
+// to signal a clear (no current emitter exercises that branch — kept for
+// symmetry).
 //
-// Entry is *session.ResourceCacheEntry (a type alias to
-// *domain.ListViewCacheEntry); adapters apply the intent with a direct map
-// assignment.
+// Entry is *domain.ListViewCacheEntry; adapters apply the intent via
+// Core.SetResourceCache (RowStore-backed — task #17 wave 1 stage 3).
 type PatchResourceCache struct {
 	ResourceType string
-	Entry        *session.ResourceCacheEntry
+	Entry        *domain.ListViewCacheEntry
 }
 
 func (PatchResourceCache) isIntent() {}

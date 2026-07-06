@@ -87,12 +87,21 @@ func TestHandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask(t *testing.T)
 		{ID: "arn:aws:s3:::def12-warm-bucket-2", Name: "def12-warm-bucket-2", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
 	}
 	sess.RowStore.Observe("s3", probeRows, &resource.PaginationMeta{IsTruncated: true}, session.OriginProbe, false)
-	// Explicitly confirm the fixture is a genuine cache MISS.
-	if _, hit := sess.ResourceCache["s3"]; hit {
-		t.Fatal("test setup: session.ResourceCache[s3] unexpectedly populated — this test requires a genuine cache miss")
-	}
 
 	core := runtime.New(sess, catalog.All())
+
+	// Explicitly confirm the fixture is a genuine cache MISS. handlers_navigate.go's
+	// own doc comment (the NavigateTargetResourceList case, "this check above
+	// (c.ResourceCache(canon)) only hits a FULL (non-Partial, OriginFetch)
+	// RowStore entry") states that an OriginProbe-only entry must NOT satisfy
+	// core.HasResourceCache. If this precondition fails, RowStore.Observe's
+	// Partial-clearing rule (session/rowstore.go: "a plain Observe is by
+	// definition a full, non-partial observation", applied identically
+	// regardless of Origin) has drifted from that stated contract — a
+	// production defect in the Origin/Partial semantics, not a stale test.
+	if core.HasResourceCache("s3") {
+		t.Fatal("test setup: core.HasResourceCache(s3) unexpectedly true after only an OriginProbe Observe — this test requires a genuine cache miss per handlers_navigate.go's own documented contract")
+	}
 
 	result, tasks := core.HandleNavigate(runtime.NavigateEvent{
 		Target:       runtime.NavigateTargetResourceList,

@@ -706,11 +706,18 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 // ProbeOriginTypeNames here would silently skip Wave-2 enrichment for every
 // observed-empty type, a real behavior regression this membership test must
 // not introduce.
+//
+// tr.Partial additionally excludes a type that has ONLY ever received a
+// lazy related-add (ObservePartial) and no canonical Observe/ObserveCount
+// (C6 scope boundary): ObservePartial always bumps Gen even for a
+// never-canonically-observed type, so the Gen!=0 check alone is not
+// sufficient to keep a lazy-add-only type out of the Wave-2 queue.
 func (c *Core) BuildEnrichQueue() []string {
 	all := awsclient.AllWave2()
 	queue := make([]string, 0, len(all))
 	for _, e := range all {
-		if tr := c.session.RowStore.Snapshot(e.ShortName); tr.Gen == 0 {
+		tr := c.session.RowStore.Snapshot(e.ShortName)
+		if tr.Gen == 0 || tr.Partial {
 			continue
 		}
 		queue = append(queue, e.ShortName)
@@ -723,13 +730,13 @@ func (c *Core) BuildEnrichQueue() []string {
 // c.session.EnrichmentTypeGen at call time is the caller's responsibility;
 // the caller embeds it in the adapter message for stale-result rejection.
 //
-// Builds a ResourceCache snapshot via buildResourceCacheSnapshot — it merges
-// RowStore's retained rows (task #17 wave 1 stage 2 — first-page rows
-// retained by the availability probe, replacing the removed
-// session.ProbeResources) AND c.session.LazyResourceCache AND
-// c.session.ResourceCache. On the normal startup path c.session.ResourceCache
-// is empty until the user opens a list, so building from ResourceCache alone
-// would leave the first enrichment pass blind to siblings.
+// Builds a ResourceCache snapshot via BuildResourceCacheSnapshot, backed
+// entirely by RowStore (task #17 wave 1 stage 3 — a type's rows live in
+// exactly one RowStore entry regardless of which lane wrote them: Wave-1
+// probe, top-level fetch, or a sparse FetchByIDs drill). On the normal
+// startup path no list has been opened yet, so building from full-only
+// entries would leave the first enrichment pass blind to siblings the
+// probe alone has retained.
 // Regression pin: TestProbeEnrichment_CacheSnapshotMergesProbeResources.
 func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceClients, shortName string) ProbeEnrichmentResult {
 	if clients == nil {
@@ -767,85 +774,39 @@ func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceCl
 }
 
 // BuildResourceCacheSnapshot returns a read-only snapshot of currently-loaded
-// resource lists, keyed by resource short name. Merges ResourceCache,
-// LazyResourceCache, and RowStore's retained rows so enrichers see the full
-// set (including out-of-scope entries pulled via FetchByIDs). On ID
-// collision, ResourceCache wins (it is the scope-filtered authoritative
-// source).
+// resource lists, keyed by resource short name, so enrichers see the full
+// set (including out-of-scope entries pulled via FetchByIDs). Backed
+// entirely by RowStore (task #17 wave 1 stage 3 — the former
+// ResourceCache/LazyResourceCache maps are gone; a type's rows live in
+// exactly one RowStore entry regardless of which lane wrote them, so there
+// is no merge-precedence left to apply).
 //
-// LazyResourceCache entries are marked IsTruncated=true because they are
-// sparse (FetchByIDs, not a full first page). RowStore's retained rows (task
-// #17 wave 1 stage 2 — replaces the removed session.ProbeResources/
-// ProbeTruncated merge; SnapshotAll(false) excludes Partial-only entries per
-// C6 scope) carry their own per-type Pagination.IsTruncated — first-page-only
+// A Partial (lazy-add) entry is marked IsTruncated=true because it is
+// sparse (FetchByIDs, not a full first page); a full entry's own
+// Pagination.IsTruncated carries through unchanged — first-page-only
 // probe/disk rows are marked truncated so the orphan rule in cross-ref
 // enrichers treats parent-not-found as "unknown, skip" rather than
 // "definitively deleted" per spec §3.1.
+//
+// A type observed with a zero-length Rows slice (Gen != 0, e.g. a live
+// checker's CachedPages write-back reporting a genuinely empty-but-truncated
+// or empty-complete first page — issue #233) still gets a snapshot entry:
+// only a never-observed type (Gen == 0) is skipped. Dropping an
+// observed-empty entry here would make FetchRelatedTarget's `cache[target]`
+// lookup miss and fall through to its own live re-fetch, discarding the
+// exact IsTruncated signal this method exists to carry — the #233
+// regression this comment documents against reintroduction.
 func (c *Core) BuildResourceCacheSnapshot() resource.ResourceCache {
-	s := c.session
-	rowStoreAll := s.RowStore.SnapshotAll(false)
-	snap := make(resource.ResourceCache, len(s.ResourceCache)+len(s.LazyResourceCache)+len(rowStoreAll))
-
-	// Seed from LazyResourceCache first; ResourceCache entries will overwrite.
-	for shortName, rows := range s.LazyResourceCache {
-		snap[shortName] = resource.ResourceCacheEntry{
-			Resources:   rows,
-			IsTruncated: true,
-		}
-	}
-	// Merge RowStore's retained rows — first-page rows retained by the
-	// Wave-1 probe/disk-seed/fetch pass.
+	rowStoreAll := c.session.RowStore.SnapshotAll(true)
+	snap := make(resource.ResourceCache, len(rowStoreAll))
 	for shortName, tr := range rowStoreAll {
-		if len(tr.Rows) == 0 {
+		if tr.Gen == 0 {
 			continue
 		}
-		probeTrunc := tr.Pagination != nil && tr.Pagination.IsTruncated
-		if existing, ok := snap[shortName]; ok {
-			known := make(map[string]struct{}, len(existing.Resources))
-			for _, r := range existing.Resources {
-				known[r.ID] = struct{}{}
-			}
-			merged := append([]resource.Resource(nil), existing.Resources...)
-			for _, r := range tr.Rows {
-				if _, dup := known[r.ID]; !dup {
-					merged = append(merged, r)
-				}
-			}
-			snap[shortName] = resource.ResourceCacheEntry{
-				Resources:   merged,
-				IsTruncated: existing.IsTruncated || probeTrunc,
-			}
-		} else {
-			snap[shortName] = resource.ResourceCacheEntry{
-				Resources:   tr.Rows,
-				IsTruncated: probeTrunc,
-			}
-		}
-	}
-	// ResourceCache is authoritative — overwrite anything from lazy/probe.
-	for shortName, entry := range s.ResourceCache {
-		rowStoreTrunc := rowStoreAll[shortName].Pagination != nil && rowStoreAll[shortName].Pagination.IsTruncated
-		cacheIsTruncated := (entry.Pagination != nil && entry.Pagination.IsTruncated) || rowStoreTrunc
-		if existing, ok := snap[shortName]; ok {
-			known := make(map[string]struct{}, len(entry.Resources))
-			for _, r := range entry.Resources {
-				known[r.ID] = struct{}{}
-			}
-			merged := append([]resource.Resource(nil), entry.Resources...)
-			for _, r := range existing.Resources {
-				if _, dup := known[r.ID]; !dup {
-					merged = append(merged, r)
-				}
-			}
-			snap[shortName] = resource.ResourceCacheEntry{
-				Resources:   merged,
-				IsTruncated: cacheIsTruncated,
-			}
-		} else {
-			snap[shortName] = resource.ResourceCacheEntry{
-				Resources:   entry.Resources,
-				IsTruncated: cacheIsTruncated,
-			}
+		isTruncated := tr.Partial || (tr.Pagination != nil && tr.Pagination.IsTruncated)
+		snap[shortName] = resource.ResourceCacheEntry{
+			Resources:   tr.Rows,
+			IsTruncated: isTruncated,
 		}
 	}
 	return snap

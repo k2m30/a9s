@@ -160,11 +160,9 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 		t.Run(tc.name+"/ResourceCache", func(t *testing.T) {
 			m := newRootModel()
 
-			m.Core().Session().ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
-				Resources: []resource.Resource{
-					{ID: rid, Name: "test-" + tc.canonShort, Fields: map[string]string{"status": "running"}},
-				},
-			}
+			m.Core().Session().RowStore.Observe(tc.canonShort, []resource.Resource{
+				{ID: rid, Name: "test-" + tc.canonShort, Fields: map[string]string{"status": "running"}},
+			}, nil, session.OriginFetch, false)
 
 			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType:     msgType,
@@ -174,11 +172,11 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 				TypeGen:          0,
 			})
 
-			entry, ok := m.Core().Session().ResourceCache[tc.canonShort]
-			if !ok || len(entry.Resources) == 0 {
-				t.Fatalf("ResourceCache[%q] is empty after EnrichmentCheckedMsg", tc.canonShort)
+			tr := m.Core().Session().RowStore.Snapshot(tc.canonShort)
+			if tr.Gen == 0 || len(tr.Rows) == 0 {
+				t.Fatalf("RowStore.Snapshot(%q) is empty after EnrichmentCheckedMsg", tc.canonShort)
 			}
-			r := entry.Resources[0]
+			r := tr.Rows[0]
 
 			// After fold: "running" is a lifecycle phrase → filtered by wave1.
 			// The single finding must be the wave2 entry from the EnrichmentFinding.
@@ -214,9 +212,9 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 		t.Run(tc.name+"/LazyResourceCache", func(t *testing.T) {
 			m := newRootModel()
 
-			m.Core().Session().LazyResourceCache[tc.canonShort] = []resource.Resource{
+			m.Core().Session().RowStore.ObservePartial(tc.canonShort, []resource.Resource{
 				{ID: rid, Name: "lazy-" + tc.canonShort, Fields: map[string]string{"status": "running"}},
-			}
+			})
 
 			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType:     msgType,
@@ -226,11 +224,11 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 				TypeGen:          0,
 			})
 
-			lazySlice, ok := m.Core().Session().LazyResourceCache[tc.canonShort]
-			if !ok || len(lazySlice) == 0 {
-				t.Fatalf("LazyResourceCache[%q] is empty after EnrichmentCheckedMsg", tc.canonShort)
+			tr := m.Core().Session().RowStore.Snapshot(tc.canonShort)
+			if tr.Gen == 0 || len(tr.Rows) == 0 {
+				t.Fatalf("RowStore.Snapshot(%q) is empty after EnrichmentCheckedMsg", tc.canonShort)
 			}
-			r := lazySlice[0]
+			r := tr.Rows[0]
 
 			if len(r.Findings) != 1 {
 				t.Errorf("LazyResourceCache[%q][0].Findings: got len=%d, want 1 (wave2 only; wave1 'running' is lifecycle-filtered)", tc.canonShort, len(r.Findings))
@@ -347,22 +345,20 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 			}
 
 			m := newRootModel()
-			m.Core().Session().ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
-				Resources: []resource.Resource{
-					{
-						ID:   rid,
-						Name: "test-" + tc.canonShort,
-						// W1.4a: fetchers populate Findings directly; mirror what the
-						// removed derive shim produced from Status: "impaired".
-						Findings: []domain.Finding{{
-							Code:     domain.FindingCode(tc.canonShort + ".impaired"),
-							Phrase:   "impaired",
-							Severity: domain.SevBroken,
-							Source:   "wave1",
-						}},
-					},
+			m.Core().Session().RowStore.Observe(tc.canonShort, []resource.Resource{
+				{
+					ID:   rid,
+					Name: "test-" + tc.canonShort,
+					// W1.4a: fetchers populate Findings directly; mirror what the
+					// removed derive shim produced from Status: "impaired".
+					Findings: []domain.Finding{{
+						Code:     domain.FindingCode(tc.canonShort + ".impaired"),
+						Phrase:   "impaired",
+						Severity: domain.SevBroken,
+						Source:   "wave1",
+					}},
 				},
-			}
+			}, nil, session.OriginFetch, false)
 
 			// First enrichment: wave2 = summaryA
 			m = applyMsg(m, messages.EnrichmentChecked{
@@ -380,11 +376,11 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 				TypeGen:      0,
 			})
 
-			entry, ok := m.Core().Session().ResourceCache[tc.canonShort]
-			if !ok || len(entry.Resources) == 0 {
-				t.Fatalf("ResourceCache[%q] is empty", tc.canonShort)
+			tr := m.Core().Session().RowStore.Snapshot(tc.canonShort)
+			if tr.Gen == 0 || len(tr.Rows) == 0 {
+				t.Fatalf("RowStore.Snapshot(%q) is empty", tc.canonShort)
 			}
-			r := entry.Resources[0]
+			r := tr.Rows[0]
 
 			// Expect exactly 2: wave1 (impaired) + wave2 (summaryB only).
 			// If fold appends instead of replacing, we'd get 3 (wave1 + both wave2s).
@@ -473,22 +469,20 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 			}
 
 			m := newRootModel()
-			m.Core().Session().ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
-				Resources: []resource.Resource{
-					{
-						ID:   rid,
-						Name: "test-" + tc.canonShort,
-						// W1.4a: fetchers populate Findings directly; mirror what the
-						// removed derive shim produced from Status: "impaired".
-						Findings: []domain.Finding{{
-							Code:     domain.FindingCode(tc.canonShort + ".impaired"),
-							Phrase:   "impaired",
-							Severity: domain.SevBroken,
-							Source:   "wave1",
-						}},
-					},
+			m.Core().Session().RowStore.Observe(tc.canonShort, []resource.Resource{
+				{
+					ID:   rid,
+					Name: "test-" + tc.canonShort,
+					// W1.4a: fetchers populate Findings directly; mirror what the
+					// removed derive shim produced from Status: "impaired".
+					Findings: []domain.Finding{{
+						Code:     domain.FindingCode(tc.canonShort + ".impaired"),
+						Phrase:   "impaired",
+						Severity: domain.SevBroken,
+						Source:   "wave1",
+					}},
 				},
-			}
+			}, nil, session.OriginFetch, false)
 
 			// Seed wave2 finding.
 			m = applyMsg(m, messages.EnrichmentChecked{
@@ -501,12 +495,12 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 
 			// Verify wave2 was set before clearing.
 			{
-				entry := m.Core().Session().ResourceCache[tc.canonShort]
-				if entry == nil || len(entry.Resources) == 0 {
-					t.Fatalf("ResourceCache[%q] empty after initial enrichment", tc.canonShort)
+				tr := m.Core().Session().RowStore.Snapshot(tc.canonShort)
+				if tr.Gen == 0 || len(tr.Rows) == 0 {
+					t.Fatalf("RowStore.Snapshot(%q) empty after initial enrichment", tc.canonShort)
 				}
 				hasWave2 := false
-				for _, f := range entry.Resources[0].Findings {
+				for _, f := range tr.Rows[0].Findings {
 					if f.Source == wantWave2Source {
 						hasWave2 = true
 						break
@@ -525,11 +519,11 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 				TypeGen:      0,
 			})
 
-			entry, ok := m.Core().Session().ResourceCache[tc.canonShort]
-			if !ok || len(entry.Resources) == 0 {
-				t.Fatalf("ResourceCache[%q] is empty after empty EnrichmentCheckedMsg", tc.canonShort)
+			tr := m.Core().Session().RowStore.Snapshot(tc.canonShort)
+			if tr.Gen == 0 || len(tr.Rows) == 0 {
+				t.Fatalf("RowStore.Snapshot(%q) is empty after empty EnrichmentCheckedMsg", tc.canonShort)
 			}
-			r := entry.Resources[0]
+			r := tr.Rows[0]
 
 			// After clearing: only wave1 ("impaired") should remain.
 			for _, f := range r.Findings {
@@ -615,13 +609,11 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 
 	m := newRootModel()
 
-	// Step 1: seed ResourceCache so NavigateMsg gets a cache hit and creates
+	// Step 1: seed RowStore so NavigateMsg gets a cache hit and creates
 	// a ResourceListModel holding this slice.
-	m.Core().Session().ResourceCache["ec2"] = &session.ResourceCacheEntry{
-		Resources: []resource.Resource{
-			{ID: rid, Name: "test-ec2", Fields: map[string]string{"status": "running"}},
-		},
-	}
+	m.Core().Session().RowStore.Observe("ec2", []resource.Resource{
+		{ID: rid, Name: "test-ec2", Fields: map[string]string{"status": "running"}},
+	}, nil, session.OriginFetch, false)
 
 	// Step 2: stamp wave2 findings into the cached row via EnrichmentCheckedMsg.
 	m = applyMsg(m, messages.EnrichmentChecked{
@@ -754,17 +746,13 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 	m = applyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = applyMsg(m, messages.ClientsReady{Clients: nil})
 
-	// Step 1: seed ResourceCache for ec2 and s3 with running resources.
-	m.Core().Session().ResourceCache[ec2Short] = &session.ResourceCacheEntry{
-		Resources: []resource.Resource{
-			{ID: ec2ID, Name: "test-ec2", Fields: map[string]string{"status": "running"}},
-		},
-	}
-	m.Core().Session().ResourceCache[s3Short] = &session.ResourceCacheEntry{
-		Resources: []resource.Resource{
-			{ID: s3ID, Name: "test-bucket", Fields: map[string]string{"status": "running"}},
-		},
-	}
+	// Step 1: seed RowStore for ec2 and s3 with running resources.
+	m.Core().Session().RowStore.Observe(ec2Short, []resource.Resource{
+		{ID: ec2ID, Name: "test-ec2", Fields: map[string]string{"status": "running"}},
+	}, nil, session.OriginFetch, false)
+	m.Core().Session().RowStore.Observe(s3Short, []resource.Resource{
+		{ID: s3ID, Name: "test-bucket", Fields: map[string]string{"status": "running"}},
+	}, nil, session.OriginFetch, false)
 
 	// Step 2: stamp wave2 findings via EnrichmentCheckedMsg for both types.
 	m = applyMsg(m, messages.EnrichmentChecked{
@@ -791,12 +779,12 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 		{ec2Short, ec2ID, "wave2:" + ec2Short},
 		{s3Short, s3ID, "wave2:" + s3Short},
 	} {
-		entry, ok := m.Core().Session().ResourceCache[tc.short]
-		if !ok || len(entry.Resources) == 0 {
-			t.Fatalf("pre-Ctrl+R: ResourceCache[%q] empty — enrichment not wired", tc.short)
+		tr := m.Core().Session().RowStore.Snapshot(tc.short)
+		if tr.Gen == 0 || len(tr.Rows) == 0 {
+			t.Fatalf("pre-Ctrl+R: RowStore.Snapshot(%q) empty — enrichment not wired", tc.short)
 		}
 		hasWave2 := false
-		for _, f := range entry.Resources[0].Findings {
+		for _, f := range tr.Rows[0].Findings {
 			if f.Source == tc.source {
 				hasWave2 = true
 				break
@@ -810,10 +798,10 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 	// Step 4: send Ctrl+R while on the main menu.
 	m = applyMsg(m, tea.KeyPressMsg{Code: -1, Text: "\x12"})
 
-	// Assertion: ResourceCache entries for both types must have NO wave2 findings.
-	// Pre-fix: ResourceCache is untouched by main-menu Ctrl+R, so wave2 persists.
+	// Assertion: RowStore entries for both types must have NO wave2 findings.
+	// Pre-fix: RowStore is untouched by main-menu Ctrl+R, so wave2 persists.
 	// Post-fix: handleRefresh on main-menu path must also clear wave2 from all
-	// cached rows (iterate over ResourceCache and call applyEnrichment per type).
+	// cached rows (iterate over RowStore and call applyEnrichment per type).
 	for _, tc := range []struct {
 		short  string
 		source string
@@ -821,16 +809,16 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 		{ec2Short, "wave2:" + ec2Short},
 		{s3Short, "wave2:" + s3Short},
 	} {
-		entry, ok := m.Core().Session().ResourceCache[tc.short]
-		if !ok {
+		tr := m.Core().Session().RowStore.Snapshot(tc.short)
+		if tr.Gen == 0 {
 			// Cache entry deleted on Ctrl+R is also acceptable — no stale wave2.
 			continue
 		}
-		for _, r := range entry.Resources {
+		for _, r := range tr.Rows {
 			for _, f := range r.Findings {
 				if f.Source == tc.source {
 					t.Errorf(
-						"ResourceCache[%q][%q] still has stale wave2 finding after main-menu Ctrl+R: "+
+						"RowStore.Snapshot(%q)[%q] still has stale wave2 finding after main-menu Ctrl+R: "+
 							"Source=%q Phrase=%q; fix: main-menu Ctrl+R must clear wave2 from all cached rows",
 						tc.short, r.ID, f.Source, f.Phrase,
 					)
@@ -932,11 +920,11 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 
 			// Verify entry-point wave1 was set (shim site #4 must be wired for this to hold).
 			{
-				entry := m.Core().Session().ResourceCache[tc.canonShort]
-				if entry == nil || len(entry.Resources) == 0 {
-					t.Fatalf("ResourceCache[%q] empty after RelatedCheckResultMsg — site 4 shim not wired", tc.canonShort)
+				tr := m.Core().Session().RowStore.Snapshot(tc.canonShort)
+				if tr.Gen == 0 || len(tr.Rows) == 0 {
+					t.Fatalf("RowStore.Snapshot(%q) empty after RelatedCheckResultMsg — site 4 shim not wired", tc.canonShort)
 				}
-				if len(entry.Resources[0].Findings) == 0 {
+				if len(tr.Rows[0].Findings) == 0 {
 					t.Logf("wave1 Finding not yet set at entry point for %q — site 4 shim not wired; will still assert post-enrichment state", tc.canonShort)
 				}
 			}
@@ -950,11 +938,11 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 				TypeGen:          0,
 			})
 
-			entry, ok := m.Core().Session().ResourceCache[tc.canonShort]
-			if !ok || len(entry.Resources) == 0 {
-				t.Fatalf("ResourceCache[%q] is empty after EnrichmentCheckedMsg", tc.canonShort)
+			tr := m.Core().Session().RowStore.Snapshot(tc.canonShort)
+			if tr.Gen == 0 || len(tr.Rows) == 0 {
+				t.Fatalf("RowStore.Snapshot(%q) is empty after EnrichmentCheckedMsg", tc.canonShort)
 			}
-			r := entry.Resources[0]
+			r := tr.Rows[0]
 
 			// Both wave1 and wave2 must coexist.
 			if len(r.Findings) != 2 {

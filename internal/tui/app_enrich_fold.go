@@ -23,12 +23,13 @@ import (
 //  3. Write attentionDetails[r.ID] into r.AttentionDetails under the
 //     Finding's Code (the fold-layer Resource.ID → FindingCode re-key).
 //
-// Walks ResourceCache and LazyResourceCache in place (both legs stay
-// map-mutation, Stage 3 scope). The RowStore leg (replacing the former
-// ProbeResources walk) instead goes through m.core.AmendRows' copy-on-write
-// fold (task #17 wave 1 stage 2) — see RowStore.Amend's doc comment for why
-// in-place mutation is no longer valid for this leg. Cached rows hold their
-// own Findings/AttentionDetails directly; views read from r.Findings.
+// Folds Wave-2 findings into RowStore's retained rows for canon via
+// m.core.AmendRows' copy-on-write mutation (task #17 wave 1 stage 3 — the
+// former ResourceCache/LazyResourceCache in-place-mutation legs are gone; a
+// type's rows live in exactly one RowStore entry, so this is the only
+// per-type-row destination left). See RowStore.Amend's doc comment for why
+// in-place mutation is not valid here. Cached rows hold their own
+// Findings/AttentionDetails directly; views read from r.Findings.
 func (m *Model) applyEnrichment(
 	resourceType string,
 	findings map[string]domain.Finding,
@@ -43,18 +44,6 @@ func (m *Model) applyEnrichment(
 		td = resource.ResourceTypeDef{ShortName: canon}
 	}
 
-	apply := func(rows []resource.Resource) {
-		for i := range rows {
-			applyWave2ToRow(&rows[i], td, findings, attentionDetails)
-		}
-	}
-
-	if entry, ok := m.core.ResourceCache(canon); ok && entry != nil {
-		apply(entry.Resources)
-	}
-	if rows, ok := m.core.LazyResourceCache(canon); ok {
-		apply(rows)
-	}
 	m.core.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
 		if len(rows) == 0 {
 			return rows
@@ -164,28 +153,34 @@ func stripWave2(findings []domain.Finding) []domain.Finding {
 	return out
 }
 
-// clearAllWave2 strips wave2 findings from every row in every session-scoped
-// cache. Used by main-menu Ctrl+R to ensure the next list-open doesn't
-// rehydrate stale wave2 attention state via findingsFromRows.
+// clearAllWave2 strips wave2 findings from every row RowStore retains for
+// every type this session has touched. Used by main-menu Ctrl+R to ensure
+// the next list-open doesn't rehydrate stale wave2 attention state via
+// findingsFromRows.
+//
+// Every retained type's rows live in exactly one RowStore entry (task #17
+// wave 1 stage 3 — the former ResourceCache/LazyResourceCache/ProbeResources
+// three-leg walk collapses to one), so the type-name set is the union of the
+// full (ResourceCacheKeys) and Partial (lazy, via ForEachLazyResourceCache)
+// entries, and ProbeOriginTypeNames' Origin=Probe/Disk entries — every one
+// of those is also reachable through the full/Partial split, so gathering
+// via all three sources and deduping is defensive against any entry this
+// enumeration might otherwise miss. AmendRows' copy-on-write fold is the
+// store's only valid mutation path — ForEach{Resource,LazyResource}Cache now
+// hand out a defensive copy (RowStore.Snapshot*), so mutating the callback's
+// rows/entry slice in place would be a silent no-op.
 func clearAllWave2(m *Model) {
-	m.core.ForEachResourceCache(func(_ string, entry *domain.ListViewCacheEntry) {
-		for i := range entry.Resources {
-			entry.Resources[i].Findings = stripWave2(entry.Resources[i].Findings)
-			entry.Resources[i].AttentionDetails = nil
-		}
+	canons := make(map[string]struct{})
+	for _, c := range m.core.ResourceCacheKeys() {
+		canons[c] = struct{}{}
+	}
+	m.core.ForEachLazyResourceCache(func(rt string, _ []resource.Resource) {
+		canons[rt] = struct{}{}
 	})
-	m.core.ForEachLazyResourceCache(func(_ string, rows []resource.Resource) {
-		for i := range rows {
-			rows[i].Findings = stripWave2(rows[i].Findings)
-			rows[i].AttentionDetails = nil
-		}
-	})
-	// RowStore leg (task #17 wave 1 stage 2 — replaces the former
-	// ForEachProbeResources in-place walk): ForEachProbeResources now hands
-	// out a defensive copy (RowStore.SnapshotAll), so mutating the callback's
-	// rows slice in place would be a silent no-op. AmendRows' copy-on-write
-	// fold is the store's only valid mutation path.
-	for _, canon := range m.core.ProbeOriginTypeNames() {
+	for _, c := range m.core.ProbeOriginTypeNames() {
+		canons[c] = struct{}{}
+	}
+	for canon := range canons {
 		m.core.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
 			if len(rows) == 0 {
 				return rows

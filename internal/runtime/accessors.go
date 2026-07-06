@@ -13,8 +13,6 @@
 package runtime
 
 import (
-	"maps"
-
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/catalog"
@@ -239,86 +237,190 @@ func (c *Core) Identity() *domain.CallerIdentity {
 }
 
 // ResourceCache returns the cached top-level resource-list entry for the
-// given resource short name, or (nil, false) when no entry is cached.
-// Renderer adapters use this in place of indexing the session map
-// directly. The return type is the list-view cache entry shape, distinct
-// from the related-checker snapshot's domain.ResourceCacheEntry.
+// given resource short name, or (nil, false) when no FULL (non-Partial),
+// OriginFetch entry is cached. Renderer adapters use this in place of
+// indexing a session map directly. Backed by RowStore (task #17 wave 1
+// stage 3 — the former session.ResourceCache map is gone; a type's rows
+// live in exactly one RowStore entry). The returned entry is freshly built
+// from the store's defensive-copy Snapshot on every call — mutating it does
+// not write back into RowStore (callers wishing to mutate content use
+// SetResourceCache, AmendRows, or the Observe* family).
+//
+// Origin-gated to OriginFetch only (not Probe/Disk): a Wave-1
+// availability-probe or disk-seeded entry is knowledge the probe/disk
+// gathered, not a verified live top-level fetch, so it must never satisfy a
+// "this list is already cached" check — HandleNavigate's own promotion
+// decision (NavigateKindPushResourceListCached vs. a miss that still
+// dispatches KindFetchResources) depends on this distinction. Callers that
+// want an any-origin lookup (e.g. related-navigate's cache-hit resolution,
+// which already consulted an any-origin RowStore snapshot to decide the hit)
+// must read RowStore directly rather than through this accessor.
 func (c *Core) ResourceCache(rt string) (*domain.ListViewCacheEntry, bool) {
-	e, ok := c.session.ResourceCache[rt]
-	return e, ok
+	tr := c.session.RowStore.Snapshot(rt)
+	if tr.Gen == 0 || tr.Partial || tr.Origin != session.OriginFetch {
+		return nil, false
+	}
+	return listViewCacheEntryFromTypeRows(tr), true
+}
+
+// AnyOriginResourceCache returns the cached top-level resource-list entry
+// for the given resource short name regardless of which lane populated it
+// (OriginFetch, OriginProbe, or OriginDisk), or (nil, false) when no FULL
+// (non-Partial) entry exists at all. Renderer adapters use this instead of
+// ResourceCache when the caller has already established a cache hit against
+// an any-origin RowStore snapshot (e.g. ResolveRelatedNavigate's
+// NavigationKindDetail/NavigationKindFilteredList resolution, which reads
+// RowStore.SnapshotAll(true) directly) and merely needs to re-fetch that
+// same entry's rows — narrowing to OriginFetch here would make the lookup
+// miss for a Probe/Disk-origin entry the caller already confirmed exists,
+// silently dropping a related-navigate cache hit back to a flash error.
+func (c *Core) AnyOriginResourceCache(rt string) (*domain.ListViewCacheEntry, bool) {
+	tr := c.session.RowStore.Snapshot(rt)
+	if tr.Gen == 0 || tr.Partial {
+		return nil, false
+	}
+	return listViewCacheEntryFromTypeRows(tr), true
+}
+
+// listViewCacheEntryFromTypeRows builds the renderer-facing
+// domain.ListViewCacheEntry from a RowStore TypeRows snapshot, threading
+// through the retained ListViewState (filter/sort/cursor/h-scroll) alongside
+// Resources/Pagination/TotalCount — shared by ResourceCache and
+// AnyOriginResourceCache so both cache-hit paths restore the exact same
+// warm-reentry view state a list was left in.
+func listViewCacheEntryFromTypeRows(tr session.TypeRows) *domain.ListViewCacheEntry {
+	return &domain.ListViewCacheEntry{
+		Resources:     tr.Rows,
+		Pagination:    tr.Pagination,
+		TotalCount:    tr.TotalCount,
+		FilterText:    tr.ViewState.FilterText,
+		AttentionOnly: tr.ViewState.AttentionOnly,
+		SortColIdx:    tr.ViewState.SortColIdx,
+		SortAsc:       tr.ViewState.SortAsc,
+		CursorPos:     tr.ViewState.CursorPos,
+		HScrollOffset: tr.ViewState.HScrollOffset,
+	}
 }
 
 // SetResourceCache stores the cached top-level resource-list entry for the
-// given resource short name. nil entries are stored as-is (callers wishing
-// to drop an entry should use DeleteResourceCache).
+// given resource short name as a full (non-Partial), OriginFetch RowStore
+// observation — replacing the rows wholesale (mirrors the former map's bare
+// assignment semantics; Observe's own stale-replace guard still applies for
+// a smaller/truncated/subset replace). A nil entry drops the cached entry
+// entirely so the next ResourceCache/HasResourceCache call reports a miss,
+// matching the former map's `m[rt] = nil` behavior (which HasResourceCache
+// already treated as absent).
+//
+// e's interactive-state fields (FilterText/AttentionOnly/SortColIdx/
+// SortAsc/CursorPos/HScrollOffset) are written to the entry's ListViewState
+// via SetViewState — a separate RowStore write from the rows-carrying
+// Observe/ObserveCount above (TypeRows.ViewState's doc comment explains why
+// the two are orthogonal). Without this, a warm re-entry into a cached list
+// would restore the rows but silently drop the sort column/direction and
+// cursor position the user left the list in.
 func (c *Core) SetResourceCache(rt string, e *domain.ListViewCacheEntry) {
-	c.session.ResourceCache[rt] = e
+	if e == nil {
+		c.session.RowStore.Delete(rt)
+		return
+	}
+	c.session.RowStore.Observe(rt, e.Resources, e.Pagination, session.OriginFetch, false)
+	if e.TotalCount != 0 {
+		c.session.RowStore.ObserveCount(rt, e.TotalCount)
+	}
+	c.session.RowStore.SetViewState(rt, session.ListViewState{
+		FilterText:    e.FilterText,
+		AttentionOnly: e.AttentionOnly,
+		SortColIdx:    e.SortColIdx,
+		SortAsc:       e.SortAsc,
+		CursorPos:     e.CursorPos,
+		HScrollOffset: e.HScrollOffset,
+	})
 }
 
 // DeleteResourceCache drops the cached resource-list entry for the given
-// resource short name, so the next list-open re-fetches.
-func (c *Core) DeleteResourceCache(rt string) { delete(c.session.ResourceCache, rt) }
+// resource short name, so the next list-open re-fetches. Backed by
+// RowStore.Delete — the entry is removed entirely (Gen resets to 0), not
+// merely emptied, so a subsequent Snapshot reports "never observed" rather
+// than "observed empty".
+func (c *Core) DeleteResourceCache(rt string) { c.session.RowStore.Delete(rt) }
 
-// HasResourceCache reports whether a non-nil cached entry exists for the
-// given resource short name (without exposing the entry itself or any
-// other type). Renderer adapters that only need the existence signal use
-// this in place of `m.core.ResourceCache(rt)` to avoid binding to the
-// entry shape.
+// HasResourceCache reports whether a full (non-Partial), OriginFetch cached
+// entry exists for the given resource short name (without exposing the
+// entry itself or any other type). Renderer adapters that only need the
+// existence signal use this in place of `m.core.ResourceCache(rt)` to avoid
+// binding to the entry shape. Origin-gated identically to ResourceCache —
+// see its doc comment for why a Probe/Disk-origin entry must not report a
+// hit here.
 func (c *Core) HasResourceCache(rt string) bool {
-	e, ok := c.session.ResourceCache[rt]
-	return ok && e != nil
+	tr := c.session.RowStore.Snapshot(rt)
+	return tr.Gen != 0 && !tr.Partial && tr.Origin == session.OriginFetch
 }
 
 // ResourceCacheKeys returns the set of resource short names that currently
-// have a cached top-level list entry. Snapshot semantics — the returned
-// slice is decoupled from the underlying map.
+// have a full (non-Partial) cached top-level list entry. Snapshot semantics
+// — the returned slice is decoupled from the underlying store.
 func (c *Core) ResourceCacheKeys() []string {
-	keys := make([]string, 0, len(c.session.ResourceCache))
-	for k := range c.session.ResourceCache {
+	all := c.session.RowStore.SnapshotAll(false)
+	keys := make([]string, 0, len(all))
+	for k := range all {
 		keys = append(keys, k)
 	}
 	return keys
 }
 
-// ForEachResourceCache invokes fn for every non-nil cached resource-list
-// entry. The entry pointer is passed by reference; the callback may mutate
-// the entry's slice elements in-place (used by Ctrl+R wave2 cleanup).
+// ForEachResourceCache invokes fn for every full (non-Partial) cached
+// resource-list entry. Each entry is freshly built from the store's
+// defensive-copy SnapshotAll, so the callback's in-place mutation of
+// entry.Resources[i] fields is safe (it mutates the copy, not RowStore's
+// backing array) but does NOT propagate back into the store — callers
+// needing the mutation to stick call SetResourceCache/AmendRows explicitly
+// afterward (mirrors the former map's shared-backing-array semantics for
+// the read side only; the write-back is now explicit, not implicit).
 func (c *Core) ForEachResourceCache(fn func(rt string, entry *domain.ListViewCacheEntry)) {
-	for rt, entry := range c.session.ResourceCache {
-		if entry == nil {
-			continue
+	for rt, tr := range c.session.RowStore.SnapshotAll(false) {
+		entry := &domain.ListViewCacheEntry{
+			Resources:  tr.Rows,
+			Pagination: tr.Pagination,
+			TotalCount: tr.TotalCount,
 		}
 		fn(rt, entry)
 	}
 }
 
 // LazyResourceCache returns the lazy-cache slice for the given resource
-// short name (resources pulled via FetchByIDs for filtered-target
-// drills). The bool reports whether any lazy-cache entry exists for
-// the type — distinct from a non-nil empty slice.
+// short name (resources pulled via FetchByIDs for filtered-target drills).
+// The bool reports whether a Partial RowStore entry exists for the type —
+// distinct from a non-nil empty slice. Backed by RowStore (task #17 wave 1
+// stage 3 — the former session.LazyResourceCache map is gone).
 func (c *Core) LazyResourceCache(rt string) ([]domain.Resource, bool) {
-	rows, ok := c.session.LazyResourceCache[rt]
-	return rows, ok
+	tr := c.session.RowStore.Snapshot(rt)
+	if tr.Gen == 0 || !tr.Partial {
+		return nil, false
+	}
+	return tr.Rows, true
 }
 
-// ForEachLazyResourceCache invokes fn for every lazy-cache slice. The slice
-// is passed by value but the underlying array is shared, so the callback
-// may mutate rows[i] fields in-place.
+// ForEachLazyResourceCache invokes fn for every Partial RowStore entry. The
+// slice is a defensive copy (RowStore.SnapshotAll); the callback's in-place
+// mutation of rows[i] fields does not propagate back into the store.
 func (c *Core) ForEachLazyResourceCache(fn func(rt string, rows []resource.Resource)) {
-	for rt, rows := range c.session.LazyResourceCache {
-		fn(rt, rows)
+	for rt, tr := range c.session.RowStore.SnapshotAll(true) {
+		if !tr.Partial {
+			continue
+		}
+		fn(rt, tr.Rows)
 	}
 }
 
 // ExtendLazyResourceCache merges the given per-type rows into the lazy
-// cache. Used by the PatchLazyResourceCache intent dispatcher in place of
-// `maps.Copy(m.core.Session().LazyResourceCache, ...)`.
+// cache. Used by the PatchLazyResourceCache intent dispatcher. Backed
+// entirely by RowStore.ObservePartial (task #17 wave 1 stage 3 — the former
+// session.LazyResourceCache map dual-write is gone; ObservePartial is now
+// the sole write path). Each adds[rt] is already the full merged slice
+// HandleRelatedCheckResult computed (dedup-appended against the prior
+// lazy-cache entry) — ObservePartial's own dedup-append makes re-merging it
+// against the store idempotent.
 func (c *Core) ExtendLazyResourceCache(adds map[string][]resource.Resource) {
-	maps.Copy(c.session.LazyResourceCache, adds)
-	// Dual-write (task #17 wave 1): each adds[rt] is already the full
-	// merged slice HandleRelatedCheckResult computed (dedup-appended against
-	// the prior LazyResourceCache entry) — ObservePartial's own dedup-append
-	// makes re-merging it against the store idempotent.
 	for rt, rows := range adds {
 		c.ObservePartialRows(rt, rows)
 	}

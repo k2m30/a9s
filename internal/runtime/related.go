@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"maps"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -116,31 +115,15 @@ func MissingFromCache(cache resource.ResourceCache, targetType string, ids []str
 // related-check fan-out in runtime_adapter_related.go calls Core.BuildResourceCacheSnapshot
 // directly, so no wrapper is needed here.
 
-// SnapshotCache returns a flat map snapshot combining ResourceCache and
-// LazyResourceCache. ResourceCache wins on ID collision.
+// SnapshotCache returns a flat map snapshot of every RowStore-retained type
+// (task #17 wave 1 stage 3 — the former ResourceCache/LazyResourceCache
+// two-map merge is gone; a type's rows live in exactly one RowStore entry,
+// full or Partial alike, so there is no merge-precedence left to apply).
 func (c *Core) SnapshotCache() map[string][]resource.Resource {
-	s := c.session
-	snap := make(map[string][]resource.Resource, len(s.ResourceCache)+len(s.LazyResourceCache))
-	maps.Copy(snap, s.LazyResourceCache)
-	for shortName, entry := range s.ResourceCache {
-		if entry == nil {
-			continue
-		}
-		if existing, ok := snap[shortName]; ok {
-			known := make(map[string]struct{}, len(entry.Resources))
-			for _, r := range entry.Resources {
-				known[r.ID] = struct{}{}
-			}
-			merged := append([]resource.Resource(nil), entry.Resources...)
-			for _, r := range existing {
-				if _, dup := known[r.ID]; !dup {
-					merged = append(merged, r)
-				}
-			}
-			snap[shortName] = merged
-		} else {
-			snap[shortName] = entry.Resources
-		}
+	all := c.session.RowStore.SnapshotAll(true)
+	snap := make(map[string][]resource.Resource, len(all))
+	for shortName, tr := range all {
+		snap[shortName] = tr.Rows
 	}
 	return snap
 }

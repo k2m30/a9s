@@ -71,10 +71,10 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 	intents := []UIIntent{ClearFlash{}}
 
 	if ev.ResourceType != "" && !ev.Append {
-		if _, alreadyCached := c.session.ResourceCache[ev.ResourceType]; !alreadyCached {
+		if !c.HasResourceCache(ev.ResourceType) {
 			intents = append(intents, PatchResourceCache{
 				ResourceType: ev.ResourceType,
-				Entry: &session.ResourceCacheEntry{
+				Entry: &domain.ListViewCacheEntry{
 					Resources:  ev.Resources,
 					Pagination: ev.Pagination,
 				},
@@ -187,10 +187,11 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 		if _, dup := addedInBatch[shortName]; dup {
 			continue
 		}
-		if _, exists := c.session.ResourceCache[shortName]; exists {
-			continue
-		}
-		if _, lazyExists := c.session.LazyResourceCache[shortName]; lazyExists {
+		// A type's rows now live in exactly one RowStore entry regardless of
+		// which lane wrote them (task #17 wave 1 stage 3) — Gen!=0 alone
+		// (full OR Partial) is the "already has an entry" test that used to
+		// require checking two separate maps.
+		if c.session.RowStore.Snapshot(shortName).Gen != 0 {
 			continue
 		}
 		pagination := entry.Pagination
@@ -199,7 +200,7 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 		}
 		intents = append(intents, PatchResourceCache{
 			ResourceType: shortName,
-			Entry: &session.ResourceCacheEntry{
+			Entry: &domain.ListViewCacheEntry{
 				Resources:  entry.Resources,
 				Pagination: pagination,
 			},
@@ -207,8 +208,8 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 		addedInBatch[shortName] = struct{}{}
 	}
 
-	// LazyAddedResources: append-dedup merge into LazyResourceCache.
-	// Core computes the merged slices and emits a single
+	// LazyAddedResources: append-dedup merge into the lazy (Partial) RowStore
+	// entry. Core computes the merged slices and emits a single
 	// PatchLazyResourceCache carrying the full Adds map.
 	var lazyAdds map[string][]resource.Resource
 	for aliasName, extra := range ev.LazyAddedResources {
@@ -216,7 +217,7 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 			continue
 		}
 		shortName := canonShortName(aliasName)
-		existing := c.session.LazyResourceCache[shortName]
+		existing := c.session.RowStore.Snapshot(shortName).Rows
 		known := make(map[string]struct{}, len(existing))
 		for _, r := range existing {
 			known[r.ID] = struct{}{}

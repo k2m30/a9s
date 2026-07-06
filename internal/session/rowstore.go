@@ -1,13 +1,14 @@
-// rowstore.go — session-scoped, per-type row store (task #17 wave 1, the
-// row-store unification effort). See docs/design/cache-requirements.md and
-// the row-store unification plan for the target design this file implements
-// the first stage of.
+// rowstore.go — session-scoped, per-type row store (task #17, the row-store
+// unification effort). See docs/design/cache-requirements.md and the
+// row-store unification plan for the target design this file implements.
 //
-// RowStore is introduced BEHIND the existing type-keyed maps
-// (session.ProbeResources, session.ResourceCache, session.LazyResourceCache)
-// as dual-write scaffolding: every chokepoint that writes one of those maps
-// ALSO feeds RowStore, but nothing yet reads from it. Stage 2/3 re-point
-// reads; this stage changes zero observable behavior.
+// As of Stage 3, RowStore is the SOLE per-type row store: the former
+// type-keyed maps (session.ProbeResources, session.ResourceCache,
+// session.LazyResourceCache) are gone. A type's rows live in exactly one
+// TypeRows entry regardless of which lane wrote them (Wave-1 probe, disk
+// seed, top-level fetch, or a sparse FetchByIDs drill) — see Origin/Partial
+// below for how that entry distinguishes the roles those three maps used to
+// play independently.
 //
 // Semantics mirror the two in-memory reconciliation rules that already exist
 // independently for the per-screen ListState (internal/app/list_body.go:
@@ -41,11 +42,12 @@ const (
 	// has already landed must not regress the session's live knowledge.
 	OriginDisk Origin = iota
 	// OriginProbe marks rows retained by the Wave-1 availability probe
-	// (first-page-only, session.ProbeResources' role today).
+	// (first-page-only — the role the removed session.ProbeResources map
+	// used to play).
 	OriginProbe
-	// OriginFetch marks rows landed from a top-level list fetch
-	// (session.ResourceCache's role today) — the richest, most page-complete
-	// source.
+	// OriginFetch marks rows landed from a top-level list fetch — the
+	// richest, most page-complete source (the role the removed
+	// session.ResourceCache map used to play).
 	OriginFetch
 )
 
@@ -79,11 +81,49 @@ type TypeRows struct {
 	// Partial marks this entry as sourced from a sparse/lazy read (the
 	// LazyResourceCache role — FetchByIDs drills, not a full first page).
 	// A subsequent full Observe clears Partial (full-beats-partial).
+	//
+	// Partial is a TYPE-level flag, not a per-row one: ObservePartial on a
+	// type whose entry is already full (Gen!=0 && !Partial) still appends
+	// its rows as genuine deeper coverage (dedup-by-ID, same as any other
+	// partial add) but leaves Partial=false — a full entry is never
+	// downgraded back to partial by a subsequent sparse add. ObservePartial
+	// on an unobserved or already-partial entry keeps/sets Partial=true. A
+	// full Observe on a partial entry always flips Partial=false
+	// (full-beats-partial, see Observe's doc comment).
 	Partial bool
 	// Gen increments on every accepted write (Observe, ObservePartial,
 	// Amend, ObserveCount) so callers can detect whether their prior
 	// Snapshot is stale.
 	Gen domain.Gen
+	// ViewState carries the top-level resource list's interactive state
+	// (filter/sort/cursor/h-scroll) across a re-entry into the same
+	// resource type. It is orthogonal to Rows/Pagination/TotalCount/Origin/
+	// Partial/Gen: Observe/ObserveCount/ObservePartial/Amend all preserve
+	// the existing entry's ViewState untouched (a rows-carrying write is
+	// never itself a view-state write) — only SetViewState mutates it, and
+	// it never touches Rows/Pagination/TotalCount/Origin/Partial/Gen in
+	// return. This split is what lets a warm re-entry into a cached list
+	// (Core.ResourceCache) restore the exact sort column, sort direction,
+	// cursor row, and horizontal scroll offset the user left the list in,
+	// without requiring the fetch-result write path (Observe) to know
+	// anything about renderer-side interactive state.
+	ViewState ListViewState
+}
+
+// ListViewState is the renderer-owned interactive state of a top-level
+// resource list, retained alongside its rows so a warm re-entry restores
+// the exact view the user left (filter text, ctrl+z attention-only toggle,
+// sort column/direction, cursor row, horizontal scroll offset). Mirrors the
+// subset of domain.ListViewCacheEntry's fields that are NOT derived from
+// the fetch result itself (Resources/Pagination/TotalCount already live on
+// TypeRows directly).
+type ListViewState struct {
+	FilterText    string
+	AttentionOnly bool
+	SortColIdx    int
+	SortAsc       bool
+	CursorPos     int
+	HScrollOffset int
 }
 
 // RowStore is the session-scoped, per-type row store: one row set per
@@ -233,6 +273,7 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 		Origin:     origin,
 		Partial:    false,
 		Gen:        existing.Gen + 1,
+		ViewState:  existing.ViewState,
 	}
 	s.types[canon] = next
 	return next.Rows, next.Gen
@@ -244,7 +285,10 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 // TotalCount only and never touches Rows, even when this leaves TotalCount
 // numerically disagreeing with len(Rows)). Existing Rows, Pagination,
 // Origin, and Partial are all carried forward untouched. Creates an entry
-// even for a canon RowStore has never seen rows for.
+// even for a canon RowStore has never seen rows for. Every observation
+// (counts-only included) is a write, so Gen is bumped unconditionally —
+// callers relying on Gen monotonicity to detect "something changed" must
+// see this reflected even when Rows itself is untouched.
 func (s *RowStore) ObserveCount(canon string, totalCount int) domain.Gen {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -276,13 +320,21 @@ func (s *RowStore) ObservePartial(canon string, rows []resource.Resource) ([]res
 	existing := s.types[canon]
 	merged := append(append([]resource.Resource(nil), existing.Rows...), dedupAgainstExistingRows(existing.Rows, rows)...)
 
+	// Partial is a TYPE-level flag: a sparse add against an already-full
+	// entry (Gen!=0 && !Partial) is genuine deeper coverage, not a
+	// downgrade — the entry stays full. Every other case (unobserved or
+	// already-partial) keeps/sets Partial=true, since a partial add is
+	// never itself a verified full replace (see doc comment above).
+	partial := existing.Gen == 0 || existing.Partial
+
 	next := TypeRows{
 		Rows:       merged,
 		Pagination: existing.Pagination,
 		TotalCount: existing.TotalCount,
 		Origin:     existing.Origin,
-		Partial:    true,
+		Partial:    partial,
 		Gen:        existing.Gen + 1,
+		ViewState:  existing.ViewState,
 	}
 	s.types[canon] = next
 	return next.Rows, next.Gen
@@ -307,6 +359,27 @@ func (s *RowStore) Amend(canon string, fn func([]resource.Resource) []resource.R
 	existing := s.types[canon]
 	next := existing
 	next.Rows = fn(existing.Rows)
+	next.Gen = existing.Gen + 1
+	s.types[canon] = next
+	return next.Gen
+}
+
+// SetViewState writes canon's ListViewState (filter/sort/cursor/h-scroll)
+// without touching Rows, Pagination, TotalCount, Origin, or Partial —
+// the renderer-side counterpart to Observe/ObserveCount/ObservePartial/
+// Amend, which in turn never touch ViewState (see TypeRows.ViewState's doc
+// comment for why the two are kept orthogonal). Creates an entry even for a
+// canon RowStore has never observed rows for, mirroring ObserveCount's same
+// allowance — a list can be closed (and its view state cached) before any
+// row-carrying write has landed for it in a from-cache seed scenario.
+// Bumps Gen unconditionally, matching every other RowStore write.
+func (s *RowStore) SetViewState(canon string, vs ListViewState) domain.Gen {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	existing := s.types[canon]
+	next := existing
+	next.ViewState = vs
 	next.Gen = existing.Gen + 1
 	s.types[canon] = next
 	return next.Gen
@@ -348,6 +421,19 @@ func (s *RowStore) SnapshotAll(includePartial bool) map[string]TypeRows {
 	return out
 }
 
+// Delete drops canon's retained type entry entirely, so a subsequent
+// Snapshot(canon) sees the zero value (Gen==0, "never observed") rather than
+// a Gen!=0 entry with an empty Rows slice ("observed empty this session").
+// Callers that need "reset to never-observed" (as opposed to "observed
+// empty", which ObserveCount/Observe with an empty rows slice already
+// express) use this instead of writing a zero-value TypeRows back in.
+func (s *RowStore) Delete(canon string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.types, canon)
+}
+
 // Clear drops every retained type entry. Called from Session.Rotate (C9:
 // pair switch discards in-memory state atomically) so a stale pair's rows
 // can never leak into the next session.
@@ -375,19 +461,27 @@ func (s *RowStore) ClearProbeOrigin() {
 	}
 }
 
-// ProbeOriginTypeNames returns the canonical short names of every type
-// currently retaining a rows-carrying OriginProbe or OriginDisk entry (the
-// Wave-1-probe/disk-seed role the removed session.ProbeResources map used to
-// play). Used by callers that need the same "has this type been retained by
-// a Wave-1 probe/disk seed this session" membership test the old map
-// provided, without exposing the rows themselves.
+// ProbeOriginTypeNames returns the canonical short names of every type this
+// session has observed via OriginProbe or OriginDisk at least once (Gen!=0),
+// the Wave-1-probe/disk-seed role the removed session.ProbeResources map
+// used to play. Used by callers that need the same "has this type been
+// retained by a Wave-1 probe/disk seed this session" membership test the old
+// map provided, without exposing the rows themselves.
+//
+// Deliberately NOT gated on len(tr.Rows) > 0: an observed-empty type (a live
+// Wave-1 probe or disk seed confirmed zero rows this session, Gen!=0 with an
+// empty Rows slice — see Observe's Gen-monotonicity contract) is still a
+// completed observation and must be included, so a caller sweeping "every
+// type the probe/disk-seed pass has touched this round" (e.g. the
+// menuRefreshing ack loop) does not stall waiting for an ack that will never
+// arrive for a type that legitimately has nothing to show.
 func (s *RowStore) ProbeOriginTypeNames() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	names := make([]string, 0, len(s.types))
 	for canon, tr := range s.types {
-		if (tr.Origin == OriginProbe || tr.Origin == OriginDisk) && len(tr.Rows) > 0 {
+		if (tr.Origin == OriginProbe || tr.Origin == OriginDisk) && tr.Gen != 0 {
 			names = append(names, canon)
 		}
 	}

@@ -24,11 +24,12 @@ import (
 //  3. Writes attentionDetails[r.ID] into r.AttentionDetails under the matching
 //     FindingCode (the fold-layer re-keying from Resource.ID to FindingCode).
 //
-// Walks ResourceCache and LazyResourceCache in place (both legs stay
-// map-mutation, Stage 3 scope). The RowStore leg (replacing the former
-// session.ProbeResources walk) instead goes through AmendRows' copy-on-write
-// fold (task #17 wave 1 stage 2 — DEF-7's mutate-in-place bug class is
-// exactly what Amend exists to remove; see RowStore.Amend's doc comment).
+// Folds Wave-2 findings into RowStore's retained rows for canon via
+// AmendRows' copy-on-write mutation (task #17 wave 1 stage 3 — the former
+// ResourceCache/LazyResourceCache in-place-mutation legs are gone; a type's
+// rows live in exactly one RowStore entry, so this is the only per-type-row
+// destination left). DEF-7's mutate-in-place bug class is exactly what
+// Amend exists to remove — see RowStore.Amend's doc comment.
 func (c *Core) applyEnrichment(
 	resourceType string,
 	findings map[string]domain.Finding,
@@ -43,18 +44,6 @@ func (c *Core) applyEnrichment(
 		td = resource.ResourceTypeDef{ShortName: canon}
 	}
 
-	apply := func(rows []resource.Resource) {
-		for i := range rows {
-			ApplyWave2ToRow(&rows[i], td, findings, attentionDetails)
-		}
-	}
-
-	if entry, ok := c.session.ResourceCache[canon]; ok {
-		apply(entry.Resources)
-	}
-	if rows, ok := c.session.LazyResourceCache[canon]; ok {
-		apply(rows)
-	}
 	c.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
 		if len(rows) == 0 {
 			return rows
