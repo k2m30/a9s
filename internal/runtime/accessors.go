@@ -434,16 +434,26 @@ func (c *Core) ProbeOriginTypeNames() []string {
 	return c.session.RowStore.ProbeOriginTypeNames()
 }
 
-// ProbeResources returns the Wave-1/disk-seed retained rows for the given
-// resource short name, read from RowStore (task #17 wave 1 stage 2 —
-// replaces the removed session.ProbeResources map). ok reports whether
-// RowStore currently holds an OriginProbe/OriginDisk entry with rows for rt;
-// the returned slice is a defensive copy (RowStore.Snapshot), so callers
+// ProbeResources returns the canonical retained rows for the given resource
+// short name, read from RowStore (task #17 wave 1 stage 2 — replaces the
+// removed session.ProbeResources map). Any full-population origin qualifies —
+// Disk, Probe, or Fetch: a top-level list fetch REPLACES the probe/disk entry
+// for its type (one RowStore entry per type), so an origin gate here would
+// blind every probe-lane reader (ProbeEnrichment's enricher input,
+// handleEnrichmentChecked's unifiedIssueCount, handleAvailabilityChecked's
+// D17 Wave-2 carry) for exactly the type whose list is open on screen — the
+// open type's Wave-2 findings would silently vanish while every other type
+// enriches normally. Mirrors BuildEnrichQueue's observed-at-all membership
+// rule (see its Gen != 0 doc comment). Only a Partial (sparse lazy-add)
+// entry is excluded: it is not the type's canonical population, matching
+// SnapshotAll(false)'s scope.
+//
+// The returned slice is a defensive copy (RowStore.Snapshot), so callers
 // wishing to mutate row content must go through AmendRows instead of writing
 // into the returned slice in place.
 func (c *Core) ProbeResources(rt string) ([]resource.Resource, bool) {
 	tr := c.session.RowStore.Snapshot(rt)
-	if len(tr.Rows) == 0 || (tr.Origin != session.OriginProbe && tr.Origin != session.OriginDisk) {
+	if len(tr.Rows) == 0 || tr.Partial {
 		return nil, false
 	}
 	return tr.Rows, true
