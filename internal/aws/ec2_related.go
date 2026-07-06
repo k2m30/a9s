@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
@@ -13,6 +14,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
@@ -484,18 +486,65 @@ func checkEC2VPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("vpc", []string{vpcID})
 }
 
-// checkEC2Role extracts the IAM instance profile role name from the EC2 Instance's
-// IamInstanceProfile.Arn field. The instance profile ARN has the form
-// arn:aws:iam::ACCOUNT:instance-profile/ROLE-NAME; the role name is the last
-// segment after "/".
-func checkEC2Role(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkEC2Role resolves the IAM role backing the EC2 Instance's instance
+// profile (Instance.IamInstanceProfile.Arn, form
+// arn:aws:iam::ACCOUNT:instance-profile/PROFILE-NAME). The last ARN segment
+// is the PROFILE name, not the role name — they only coincide in manual
+// setups; EKS/ASG-generated profiles commonly use a different name for the
+// role they carry. Manual setups (profile name == role name) are the common
+// case, so the already-loaded role cache is checked first for a zero-call
+// match; only on a cache miss does this fall back to a single
+// iam:GetInstanceProfile call to resolve the real role(s), mirroring
+// asgInstanceProfileToRoles (asg_related.go) which resolves the same
+// ARN/name ambiguity for ASG launch configs/templates.
+func checkEC2Role(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	inst, ok := assertStruct[ec2types.Instance](res.RawStruct)
 	if !ok || inst.IamInstanceProfile == nil || inst.IamInstanceProfile.Arn == nil || *inst.IamInstanceProfile.Arn == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
 	arn := *inst.IamInstanceProfile.Arn
-	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-		return relatedResult("role", []string{arn[idx+1:]})
+	idx := strings.LastIndex(arn, "/")
+	if idx < 0 || idx >= len(arn)-1 {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	profileName := arn[idx+1:]
+
+	roleList, truncated, err := ec2RelatedResources(ctx, clients, cache, "role")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+	}
+	for _, roleRes := range roleList {
+		if roleRes.Name == profileName || roleRes.Fields["role_name"] == profileName {
+			return relatedResult("role", []string{profileName})
+		}
+	}
+	if roleList == nil && truncated {
+		return resource.ApproximateZero("role")
+	}
+
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.IAM == nil {
+		if truncated {
+			return resource.ApproximateZero("role")
+		}
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetInstanceProfileOutput, error) {
+		return c.IAM.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{
+			InstanceProfileName: aws.String(profileName),
+		})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+	}
+	if out == nil || out.InstanceProfile == nil || len(out.InstanceProfile.Roles) == 0 {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	var ids []string
+	for _, r := range out.InstanceProfile.Roles {
+		if r.RoleName != nil && *r.RoleName != "" {
+			ids = append(ids, *r.RoleName)
+		}
+	}
+	return relatedResult("role", ids)
 }

@@ -267,8 +267,16 @@ func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ 
 }
 
 // checkRoleEC2 scans the EC2 instance cache for instances whose IamInstanceProfile
-// ARN contains this role's name. Instance profiles often share the role name.
-// Pattern C: cache scan with ARN-contains approximation.
+// ARN last segment (the profile name) equals this role's name — the common
+// one-profile-per-role convention (docs/resources/role.md §2 ec2). This is an
+// exact-boundary match, not a substring match: "my-role" must not match a
+// profile named "my-role-2". Profiles whose name differs from the role name
+// (EKS/ASG-generated profiles) are not resolved here — that would require a
+// per-profile iam:GetInstanceProfile fan-out across all distinct profile ARNs
+// in the ec2 cache, which is out of the zero/one-call budget this checker is
+// scoped to; see checkEC2Role (ec2_related.go) for the reverse direction,
+// which resolves the same ambiguity per-instance with a bounded single call.
+// Pattern C: cache scan with exact-name approximation.
 func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	roleName := res.ID
 	if roleName == "" {
@@ -298,9 +306,7 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 			continue
 		}
 		profileARN := *inst.IamInstanceProfile.Arn
-		// Instance profile ARN contains the profile name, which commonly matches
-		// the role name (e.g. arn:aws:iam::123:instance-profile/my-role).
-		if strings.Contains(profileARN, "/"+roleName) {
+		if roleNameFromARN(profileARN) == roleName {
 			ids = append(ids, ec2Res.ID)
 		}
 	}
