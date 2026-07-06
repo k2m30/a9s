@@ -80,10 +80,11 @@ func (m Model) View() tea.View {
 	rightContent := m.headerRight()
 	badge := m.accountBadge()
 	role := m.identityRoleName()
-	// §7.4: when stack depth exceeds 4, show "[N]" in place of the version string.
+	// §7.4: when stack depth exceeds 4, append "[N]" alongside the version string
+	// (the depth badge augments the version; it never displaces it).
 	displayVersion := Version
 	if len(m.stack) > 4 {
-		displayVersion = fmt.Sprintf("[%d]", len(m.stack))
+		displayVersion = fmt.Sprintf("%s [%d]", Version, len(m.stack))
 	}
 	cacheKey := headerProfile + ":" + headerRegion + ":" + displayVersion + ":" + rightContent + ":" + badge + ":" + role + ":" + fmt.Sprintf("%d", m.width)
 	header := m.headerCache

@@ -201,3 +201,75 @@ func TestRelatedFocusEntry_Tab_MatchesMoveTopLanding(t *testing.T) {
 		t.Errorf("Tab focus-entry landed on index %d, want 2 (first actionable row in the fixture)", tabCursor)
 	}
 }
+
+// =============================================================================
+// 5. Circular-reentry cursor guard: replay leaves some rows bare (never
+//    resolved) and others actionable (resolved from cache) — Tab must still
+//    land on an actionable row rather than a bare one, and an all-bare panel
+//    must not trap focus.
+// =============================================================================
+//
+// This mirrors the live circular-drill defect (detail A -> drill -> detail B
+// -> drill back to A) pinned end-to-end in
+// tests/unit/related_circular_reentry_test.go: a bare row is a
+// DetailRelatedRow at its zero value (Count=0, Loading=false, Err="") —
+// exactly what relatedRow(name, 0) already produces, and exactly what
+// resource.IsRelatedActionable treats as non-actionable via its count==0
+// branch. These tests extend (not duplicate) the existing all-dimmed /
+// leading-dimmed pins above by exercising the specific row-shape a partial
+// cache replay produces: a mix of never-touched bare rows and
+// cache-resolved actionable rows in arbitrary order.
+
+// TestRelatedFocusEntry_Tab_PartialReplayMix_SkipsBareRows verifies that
+// when a related panel holds a mix of bare (never-replayed) rows and
+// actionable (cache-replayed) rows — the exact shape a circular-reentry
+// cache replay leaves when it only partially reseeds the panel — Tab still
+// lands on the first actionable row, never on a bare one.
+func TestRelatedFocusEntry_Tab_PartialReplayMix_SkipsBareRows(t *testing.T) {
+	rows := []app.DetailRelatedRow{
+		relatedRow("target-group", 0), // index 0: bare (never replayed)
+		relatedRow("subnet", 0),       // index 1: bare (never replayed)
+		relatedRow("vpc", 1),          // index 2: actionable (replayed from cache)
+		relatedRow("security-group", 0), // index 3: bare (never replayed)
+	}
+	c := newRelatedFocusEntryController(t, rows)
+
+	vs, _ := c.Apply(app.Action{Kind: app.ActionToggleFocus})
+
+	if !vs.Body.Detail.RelatedFocused {
+		t.Fatal("ActionToggleFocus did not grant RelatedFocus")
+	}
+	cursor, actionable := relatedCursorAndActionable(t, vs)
+	if cursor != 2 {
+		t.Errorf("RelatedCursor after Tab on a partial-replay-mix panel = %d, want 2 (the only actionable row, skipping bare indices 0, 1, 3)", cursor)
+	}
+	if !actionable {
+		t.Errorf("row at RelatedCursor=%d is not actionable — Tab must never land on a bare row produced by a partial cache replay", cursor)
+	}
+}
+
+// TestRelatedFocusEntry_Tab_AllRowsBareFromReplay_DoesNotTrapFocus verifies
+// that when EVERY row in the panel is bare (the live defect's worst case: a
+// cache-miss circular reentry that reseeds nothing at all), Tab still grants
+// RelatedFocus — the user can leave the panel again with a second Tab — and
+// does not hang or panic hunting for a nonexistent actionable row.
+func TestRelatedFocusEntry_Tab_AllRowsBareFromReplay_DoesNotTrapFocus(t *testing.T) {
+	rows := []app.DetailRelatedRow{
+		relatedRow("target-group", 0),
+		relatedRow("subnet", 0),
+		relatedRow("vpc", 0),
+	}
+	c := newRelatedFocusEntryController(t, rows)
+
+	vs, _ := c.Apply(app.Action{Kind: app.ActionToggleFocus})
+	if !vs.Body.Detail.RelatedFocused {
+		t.Fatal("ActionToggleFocus did not grant RelatedFocus even though every related row is bare")
+	}
+
+	// Focus must still be released by a second Tab — an all-bare panel must
+	// not trap the user permanently in related-focus.
+	vs, _ = c.Apply(app.Action{Kind: app.ActionToggleFocus})
+	if vs.Body.Detail.RelatedFocused {
+		t.Fatal("second Tab did not release RelatedFocus on an all-bare related panel — focus is trapped")
+	}
+}

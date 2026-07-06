@@ -536,12 +536,13 @@ stack (stored in the app model, not per-view).
 
 ### 7.4 Depth Indicator
 
-When view stack depth exceeds 4, the header shows `[N]` replacing the
-version number (unchanged from v3.0 design):
+When view stack depth exceeds 4, the header appends a `[N]` depth badge
+next to the version number. The badge augments the version — it never
+displaces it:
 
 ```
-Normal (depth <= 4):  a9s v3.28.0  prod:us-east-1            ? for help
-Deep   (depth > 4):   a9s [6]      prod:us-east-1            ? for help
+Normal (depth <= 4):  a9s v3.28.0        prod:us-east-1            ? for help
+Deep   (depth > 4):   a9s v3.28.0 [6]    prod:us-east-1            ? for help
 ```
 
 ---

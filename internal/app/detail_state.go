@@ -272,10 +272,15 @@ func (c *Controller) ApplyDetailRelated(rows []DetailRelatedRow) {
 }
 
 // ApplyDetailRelatedResultForResource merges one checker result into the RelatedRows
-// of the stacked detail whose resource matches (sourceType, sourceID) — not the top,
-// since a check in flight can complete after the user has navigated to another
-// detail. Delegates to mergeDetailRelatedRow so ResourceIDs are preserved (the
-// controller-owned Enter navigation reads them). No-op when no stacked detail matches.
+// of every stacked detail whose resource matches (sourceType, sourceID) — not just
+// the top, since a check in flight can complete after the user has navigated to
+// another detail. Applies to ALL matches rather than stopping at the first: a
+// circular drill (e.g. bucket -> trail -> back to the same bucket) pushes a second
+// ScreenDetail for the same (sourceType, sourceID) without popping the first, so
+// stopping at the first match would merge into the buried screen while the visible
+// top screen (read by Snapshot()) never sees the update. Delegates to
+// mergeDetailRelatedRow so ResourceIDs are preserved (the controller-owned Enter
+// navigation reads them). No-op when no stacked detail matches.
 func (c *Controller) ApplyDetailRelatedResultForResource(sourceType, sourceID, displayName, targetType string, count int, loading bool, errMsg string, approximate bool, resourceIDs []string, fetchFilter map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -285,7 +290,6 @@ func (c *Controller) ApplyDetailRelatedResultForResource(sourceType, sourceID, d
 		}
 		if ds := c.stack[i].State.Detail; ds != nil && ds.Resource.ID == sourceID && ds.ResourceType == sourceType {
 			mergeDetailRelatedRow(ds, displayName, targetType, count, loading, errMsg, approximate, resourceIDs, fetchFilter)
-			return
 		}
 	}
 }

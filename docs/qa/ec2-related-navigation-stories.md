@@ -784,7 +784,7 @@ Multi-hop: instance -> volume IDs -> snapshots of those volumes.
 **Action:** User presses `Tab` to focus right column, moves cursor to "Subnets (6)", presses `Enter`
 
 **Screen 3 -- Filtered subnet list (depth 5):**
-- Header changes to: `a9s [5]  prod:us-east-1` (depth > 4, depth indicator replaces version)
+- Header changes to: `a9s v<version> [5]  prod:us-east-1` (depth > 4, depth indicator appears next to the version)
 - Frame title: `subnets(6) -- vpc-0abc123def456789a (production-vpc)`
 - List shows exactly 6 subnets
 
