@@ -11,7 +11,7 @@ import (
 )
 
 func colorELB(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	switch r.Fields["state"] {
@@ -39,7 +39,7 @@ func colorSG(r domain.Resource) domain.Color {
 }
 
 func colorVPC(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	switch r.Fields["state"] {
@@ -138,7 +138,7 @@ func colorVPCE(r domain.Resource) domain.Color {
 }
 
 func colorTGW(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	switch r.Fields["state"] {

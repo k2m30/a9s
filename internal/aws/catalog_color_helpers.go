@@ -72,6 +72,32 @@ func colorFromWave1(r domain.Resource) (domain.Color, bool) {
 	return domain.ColorHealthy, false
 }
 
+// colorFromAnyFinding returns the Color for the worst-severity Finding on r
+// (wave1 or wave2, source prefix "wave2:") and ok=true. ok=false signals no
+// Finding at all — the caller should fall through to its structural
+// classifier. Unlike colorFromWave1, this also surfaces wave2-only findings
+// (e.g. elb's deletion-protection check, vpc's flow-logs check, tgw's
+// attachment-health check) that a wave1-only lookup silently drops.
+func colorFromAnyFinding(r domain.Resource) (domain.Color, bool) {
+	found := false
+	worst := domain.SevDim
+	for i := range r.Findings {
+		s := r.Findings[i].Source
+		if s != "wave1" && !strings.HasPrefix(s, "wave2:") {
+			continue
+		}
+		sev := r.Findings[i].Severity
+		if !found || sev > worst {
+			worst = sev
+			found = true
+		}
+	}
+	if !found {
+		return domain.ColorHealthy, false
+	}
+	return colorFromSeverity(worst), true
+}
+
 // colorWave1OrHealthy classifies r from its first wave1 Finding, defaulting to
 // healthy when none is present. Used by child-type catalog entries whose only
 // severity signal comes from fetcher-emitted wave1 Findings (cb_builds,
