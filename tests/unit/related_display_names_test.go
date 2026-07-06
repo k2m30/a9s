@@ -99,11 +99,11 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"sg", "cfn"}: "CloudFormation",
 		{"sg", "sg"}:  "Referencing SGs",
 
-		// elb
+		// elb (r53 removed along with its registration: checkELBR53 was
+		// hardcoded to Count:-1 for any real ELB with a dns_name)
 		{"elb", "tg"}:    "Target Groups",
 		{"elb", "alarm"}: "CW Alarms",
 		{"elb", "cfn"}:   "CloudFormation",
-		{"elb", "r53"}:   "Route 53 Records",
 
 		// lambda
 		{"lambda", "role"}:    "IAM Roles",
@@ -147,11 +147,12 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"asg", "alarm"}:  "CloudWatch Alarms",
 		{"asg", "ng"}:     "EKS Node Groups",
 
-		// kms
+		// kms (s3 removed along with its registration: checkKMSS3 was
+		// hardcoded to Count:-1 for any real fixture — S3 does not expose
+		// KMS key IDs in Fields or RawStruct)
 		{"kms", "ebs"}:     "EBS Volumes",
 		{"kms", "dbi"}:     "RDS Instances",
 		{"kms", "secrets"}: "Secrets Manager",
-		{"kms", "s3"}:      "S3 Buckets",
 
 		// secrets
 		{"secrets", "kms"}:    "KMS Keys",
@@ -240,10 +241,10 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"acm", "apigw"}: "API Gateways",
 		{"acm", "r53"}:   "Route 53 Zones",
 
-		// apigw
+		// apigw (waf removed along with its registration: checkApigwWAF was
+		// hardcoded to Count:-1 for any real fixture)
 		{"apigw", "lambda"}: "Lambda Functions",
 		{"apigw", "logs"}:   "Log Groups",
-		{"apigw", "waf"}:    "WAF Web ACLs",
 
 		// waf
 		{"waf", "elb"}:   "Load Balancers",

@@ -258,9 +258,15 @@ func TestRelated_EIP_ASG_NilCacheNoClients(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkEIPECS / checkEIPECSSvc / checkEIPECSTask / checkEIPLogs
+// checkEIPECS / checkEIPECSSvc / checkEIPECSTask
 // Each returns Count:-1 for a non-empty ID (outside 1-call budget) and
 // Count:0 for an empty ID (no EIP → no association possible).
+//
+// checkEIPLogs (same shape) was removed along with its eip:logs
+// registration: EIP flow logs require per-ENI DescribeFlowLogs, explicitly
+// outside the 1-call budget, with no fixture able to change that. See
+// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
+// comment for the burn-down precedent this deletion follows.
 // ---------------------------------------------------------------------------
 
 func TestRelated_EIP_ECS_EmptyIDReturnsZero(t *testing.T) {
@@ -309,23 +315,5 @@ func TestRelated_EIP_ECSTask_EmptyIDReturnsZero(t *testing.T) {
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (empty EIP ID)", result.Count)
-	}
-}
-
-func TestRelated_EIP_Logs_EmptyIDReturnsZero(t *testing.T) {
-	source := resource.Resource{ID: ""}
-	checker := eipCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty EIP ID)", result.Count)
-	}
-}
-
-func TestRelated_EIP_Logs_NonEmptyIDReturnsMinusOne(t *testing.T) {
-	source := resource.Resource{ID: "eipalloc-0a1b2c3d4e5f60001"}
-	checker := eipCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (outside 1-call budget)", result.Count)
 	}
 }

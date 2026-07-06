@@ -247,49 +247,12 @@ func TestRelated_VPCE_VPC_EmptyVPCID(t *testing.T) {
 	}
 }
 
-// --- ACM checker (Pattern stub — empty ID → 0, non-empty → -1) ---
-
-// TestRelated_VPCE_ACM_EmptyID verifies Count=0 for empty endpoint ID.
-func TestRelated_VPCE_ACM_EmptyID(t *testing.T) {
-	res := resource.Resource{ID: "", Fields: map[string]string{}}
-	checker := vpceCheckerByTarget(t, "acm")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
-	}
-}
-
-// TestRelated_VPCE_ACM_NonEmptyID verifies Count=-1 for a real endpoint ID.
-func TestRelated_VPCE_ACM_NonEmptyID(t *testing.T) {
-	res := vpceSrcInterfaceResource()
-	checker := vpceCheckerByTarget(t, "acm")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (non-empty ID, cannot determine ACM from list API)", result.Count)
-	}
-}
-
-// --- CF checker (Pattern stub — empty ID → 0, non-empty → -1) ---
-
-// TestRelated_VPCE_CF_EmptyID verifies Count=0 for empty endpoint ID.
-func TestRelated_VPCE_CF_EmptyID(t *testing.T) {
-	res := resource.Resource{ID: "", Fields: map[string]string{}}
-	checker := vpceCheckerByTarget(t, "cf")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
-	}
-}
-
-// TestRelated_VPCE_CF_NonEmptyID verifies Count=-1 for a real endpoint ID.
-func TestRelated_VPCE_CF_NonEmptyID(t *testing.T) {
-	res := vpceSrcInterfaceResource()
-	checker := vpceCheckerByTarget(t, "cf")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (CloudFront VPC Origins not in list response)", result.Count)
-	}
-}
+// vpce:acm, vpce:cf (checkVPCEACM/CF) were removed along with their
+// registrations: both were hardcoded to Count:-1 whenever res.ID != "" (i.e.
+// always, for any real fixture), with no AWS API path to resolve a concrete
+// match from a VPC endpoint listing alone. See
+// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
+// comment for the burn-down precedent this deletion follows.
 
 // --- R53 checker (Pattern stub — empty ID → 0, non-empty → -1) ---
 
@@ -313,71 +276,14 @@ func TestRelated_VPCE_R53_NonEmptyID(t *testing.T) {
 	}
 }
 
-// --- S3 checker (Pattern stub — empty ID → 0, non-empty → -1) ---
-
-// TestRelated_VPCE_S3_EmptyID verifies Count=0 for empty endpoint ID.
-func TestRelated_VPCE_S3_EmptyID(t *testing.T) {
-	res := resource.Resource{ID: "", Fields: map[string]string{}}
-	checker := vpceCheckerByTarget(t, "s3")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
-	}
-}
-
-// TestRelated_VPCE_S3_NonEmptyID verifies Count=-1 for a real endpoint ID.
-func TestRelated_VPCE_S3_NonEmptyID(t *testing.T) {
-	res := vpceSrcGatewayResource()
-	checker := vpceCheckerByTarget(t, "s3")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (policy interpretation not available from list)", result.Count)
-	}
-}
-
-// --- TG checker (Pattern stub — empty ID → 0, non-empty → -1) ---
-
-// TestRelated_VPCE_TG_EmptyID verifies Count=0 for empty endpoint ID.
-func TestRelated_VPCE_TG_EmptyID(t *testing.T) {
-	res := resource.Resource{ID: "", Fields: map[string]string{}}
-	checker := vpceCheckerByTarget(t, "tg")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
-	}
-}
-
-// TestRelated_VPCE_TG_NonEmptyID verifies Count=-1 for a real endpoint ID.
-func TestRelated_VPCE_TG_NonEmptyID(t *testing.T) {
-	res := vpceSrcInterfaceResource()
-	checker := vpceCheckerByTarget(t, "tg")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (DescribeTargetHealth needed, not in cache)", result.Count)
-	}
-}
-
-// --- WAF checker (Pattern stub — empty ID → 0, non-empty → -1) ---
-
-// TestRelated_VPCE_WAF_EmptyID verifies Count=0 for empty endpoint ID.
-func TestRelated_VPCE_WAF_EmptyID(t *testing.T) {
-	res := resource.Resource{ID: "", Fields: map[string]string{}}
-	checker := vpceCheckerByTarget(t, "waf")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
-	}
-}
-
-// TestRelated_VPCE_WAF_NonEmptyID verifies Count=-1 for a real endpoint ID.
-func TestRelated_VPCE_WAF_NonEmptyID(t *testing.T) {
-	res := vpceSrcInterfaceResource()
-	checker := vpceCheckerByTarget(t, "waf")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (WAF associations resolved from WAF side)", result.Count)
-	}
-}
+// vpce:s3, vpce:tg, vpce:waf (checkVPCES3/TG/WAF) were removed along with
+// their registrations: each was hardcoded to Count:-1 whenever res.ID != ""
+// (i.e. always, for any real fixture) — S3 gateway access needs
+// policy-document JSON interpretation, TG/WAF associations require
+// DescribeTargetHealth / wafv2:ListResourcesForWebACL from the other side,
+// none of it resolvable from a VPC endpoint listing alone. See
+// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
+// comment for the burn-down precedent this deletion follows.
 
 // --- Alarm checker (Pattern C — cache scan, VpcEndpointId dimension) ---
 

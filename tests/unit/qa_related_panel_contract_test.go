@@ -343,7 +343,7 @@ func parseExcludedPairs(doc string) map[string]map[string]struct{} {
 // TestRelatedPanel_NoExcludedPairsRegistered is the T109 regression guard.
 //
 // It parses the "Explicitly excluded" section of docs/related-resources.md and
-// asserts that none of the 57 listed parent→target pairs appear in any
+// asserts that none of the listed parent→target pairs appear in any
 // SetRelatedForTest call. Re-adding an excluded pair without removing it from the
 // doc first will cause this test to fail with a clear message.
 //
@@ -356,12 +356,12 @@ func TestRelatedPanel_NoExcludedPairsRegistered(t *testing.T) {
 	}
 	excluded := parseExcludedPairs(string(raw))
 
-	// Count the total excluded entries and verify the doc still has all 58.
+	// Count the total excluded entries and verify the doc still has all 79.
 	total := 0
 	for _, targets := range excluded {
 		total += len(targets)
 	}
-	const wantTotal = 58
+	const wantTotal = 79
 	if total != wantTotal {
 		t.Errorf("Explicitly excluded section has %d entries, want %d — was a pair accidentally added or removed from docs/related-resources.md?", total, wantTotal)
 	}

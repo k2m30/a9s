@@ -10,7 +10,11 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// TestRelated_APIGW_Registered verifies all 3 related defs are registered with correct checker presence.
+// TestRelated_APIGW_Registered verifies all related defs are registered with correct checker presence.
+// waf was removed along with its registration (checkApigwWAF was hardcoded
+// to Count:-1 for any real fixture); see
+// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
+// comment for the burn-down precedent this deletion follows.
 func TestRelated_APIGW_Registered(t *testing.T) {
 	defs := resource.GetRelated("apigw")
 	if len(defs) == 0 {
@@ -24,7 +28,6 @@ func TestRelated_APIGW_Registered(t *testing.T) {
 	expected := map[string]expectation{
 		"lambda": {"Lambda Functions", true},
 		"logs":   {"Log Groups", true},
-		"waf":    {"WAF Web ACLs", true},
 	}
 	for target, want := range expected {
 		found := false
@@ -195,37 +198,12 @@ func TestRelated_APIGW_Lambda_EmptyInput(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkApigwWAF tests (requires ListResourcesForWebACL per Web ACL — outside budget)
-// ---------------------------------------------------------------------------
-
-// TestRelated_APIGW_WAF_Unknown: valid API → Count: -1 (Web ACL links resolved from WAF side).
-func TestRelated_APIGW_WAF_Unknown(t *testing.T) {
-	res := resource.Resource{
-		ID:     "api-abc123",
-		Name:   "my-api",
-		Fields: map[string]string{},
-	}
-	checker := apigwCheckerByTarget(t, "waf")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (unknown: WAF associations require ListResourcesForWebACL)", result.Count)
-	}
-	if result.TargetType != "waf" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "waf")
-	}
-}
-
-// TestRelated_APIGW_WAF_EmptyInput: empty API id → Count: 0.
-func TestRelated_APIGW_WAF_EmptyInput(t *testing.T) {
-	res := resource.Resource{ID: "", Fields: map[string]string{}}
-	checker := apigwCheckerByTarget(t, "waf")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty API id)", result.Count)
-	}
-}
+// apigw:waf (checkApigwWAF) was removed along with its registration: it was
+// hardcoded to Count:-1 whenever res.ID != "" (i.e. always, for any real
+// fixture) — Web ACL associations are only resolvable from the WAF side via
+// ListResourcesForWebACL, outside this checker's call budget. See
+// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
+// comment for the burn-down precedent this deletion follows.
 
 // ---------------------------------------------------------------------------
 // checkApigwKMS tests (Pattern C: GetIntegrations + GetFunction per Lambda).

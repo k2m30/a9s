@@ -220,7 +220,7 @@ func (m RightColumnModel) View() string {
 			Name:         row.displayName,
 			Loading:      row.loading,
 			Err:          row.err != nil,
-			CountDisplay: resource.FormatRelatedCount(row.count),
+			CountDisplay: resource.FormatRelatedCount(row.count, len(row.fetchFilter) > 0),
 			Actionable:   isActionableRow(row),
 		}
 		if idx == m.cursor {

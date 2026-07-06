@@ -187,7 +187,6 @@ kms — SECRETS & CONFIG. Lifecycle key: `status`.
 | ebs | EBS Volumes | yes |
 | dbi | RDS Instances | yes |
 | secrets | Secrets Manager | yes |
-| s3 | S3 Buckets | no |
 | role | IAM Roles (grants) | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

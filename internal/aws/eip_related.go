@@ -306,17 +306,6 @@ func checkEIPECS(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("ecs", []string{clusterName})
 }
 
-// checkEIPLogs reports CloudWatch log groups related to this EIP.
-// EIPs themselves do not emit logs; flow logs attached to the associated
-// ENI/subnet/VPC cover the traffic but are not identifiable from EIP ID
-// without per-ENI DescribeFlowLogs — outside the 1-call budget.
-func checkEIPLogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
-}
-
 // eipRelatedResources returns the resource list for target from cache or fetches
 // the first page via the registered paginated fetcher.
 func eipRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {

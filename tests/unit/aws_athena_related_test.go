@@ -252,23 +252,9 @@ func TestRelated_Athena_Role_NoRole(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkAthenaGlue — always returns Count: 0 (no structured Glue field)
-// ---------------------------------------------------------------------------
-
-// TestRelated_Athena_Glue_AlwaysZero verifies the glue checker always returns 0
-// because no structured per-job Glue linkage is available on the WorkGroup config.
-// Requires a non-nil Configuration with a non-nil EngineVersion (so the EngineVersion
-// nil-check branch returns 0, not the top-level cfg==nil branch returning -1).
-func TestRelated_Athena_Glue_AlwaysZero(t *testing.T) {
-	res := resource.Resource{ID: "primary", Fields: map[string]string{}}
-	clients := &awsclient.ServiceClients{
-		Athena: newFakeAthenaWithEmptyConfig(),
-	}
-	checker := athenaCheckerByTarget(t, "glue")
-	result := checker(context.Background(), clients, res, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no structured Glue linkage on WG config)", result.Count)
-	}
-}
+// athena:glue (checkAthenaGlue) was removed along with its registration: its
+// own comment documented that no structured glue job/catalog field exists on
+// the WorkGroup config, so resolving which specific Glue jobs share a
+// catalog would require a catalog crawl outside this checker's scope. See
+// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
+// comment for the burn-down precedent this deletion follows.

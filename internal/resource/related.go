@@ -270,16 +270,24 @@ func IsRelatedActionable(count int, approximate, hasFetchFilter, loading, hasErr
 // consumed by the TUI right column and — via RelatedBlock.CountDisplay computed
 // in the controller — the web template, so the displayed count cannot drift.
 //
-//   - count == -1 (unknown) → ""  (no badge — the row shows its name only)
-//   - count >= 0            → "(N)"
+//   - count == -1, hasFetchFilter → ""    (actionable navigation link, e.g.
+//     ct-events; the row reads as a drill-in, not an unresolved count, and the
+//     filtered fetch will resolve the real count once entered)
+//   - count == -1, no filter      → "(?)" (resolved unknown — budget-excluded
+//     or structurally uncomputable pivot, e.g. kms→s3; must be visually
+//     distinct from the loading state, which never reaches this function)
+//   - count >= 0                  → "(N)"
 //
 // Approximate-ness is intentionally NOT marked in the text (no "N+"): per the
 // design spec it is conveyed by row style alone, and the integration tests
 // assert a literal "(<N>)" substring. Loading and error states are handled by
 // the renderers (spinner / em-dash), not here.
-func FormatRelatedCount(count int) string {
+func FormatRelatedCount(count int, hasFetchFilter bool) string {
 	if count < 0 {
-		return ""
+		if hasFetchFilter {
+			return ""
+		}
+		return "(?)"
 	}
 	return fmt.Sprintf("(%d)", count)
 }

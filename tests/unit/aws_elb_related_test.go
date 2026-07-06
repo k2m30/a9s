@@ -312,33 +312,9 @@ func TestRelated_ELB_CFN_EmptyInput(t *testing.T) {
 	}
 }
 
-// --- elb→r53: requires per-zone ListResourceRecordSets (outside cache budget) ---
-
-// TestRelated_ELB_R53_Unknown: ELB with dns_name → Count: -1 (records per-zone).
-func TestRelated_ELB_R53_Unknown(t *testing.T) {
-	source := resource.Resource{
-		ID:   "acme-prod-web",
-		Name: "acme-prod-web",
-		Fields: map[string]string{
-			"dns_name": "acme-prod-web-1234.us-east-1.elb.amazonaws.com",
-		},
-	}
-	checker := elbCheckerByTarget(t, "r53")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (unknown: alias records per-zone)", result.Count)
-	}
-	if result.TargetType != "r53" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "r53")
-	}
-}
-
-// TestRelated_ELB_R53_EmptyInput: no dns_name → Count: 0.
-func TestRelated_ELB_R53_EmptyInput(t *testing.T) {
-	source := resource.Resource{ID: "", Fields: map[string]string{}}
-	checker := elbCheckerByTarget(t, "r53")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty dns_name)", result.Count)
-	}
-}
+// elb:r53 (checkELBR53) was removed along with its registration: it was
+// hardcoded to Count:-1 whenever Fields["dns_name"] != "" (i.e. always, for
+// any real ELB), with no AWS API path to resolve which R53 records alias to
+// the LB's DNS name from cache alone. See qa_demo_pivot_coverage_test.go's
+// knownDisconnectedPivots terminal-state comment for the burn-down
+// precedent this deletion follows.

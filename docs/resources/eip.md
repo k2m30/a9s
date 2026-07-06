@@ -200,6 +200,5 @@ eip — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field
 | ecs | ECS Clusters | no |
 | ecs-svc | ECS Services | no |
 | ecs-task | ECS Tasks | no |
-| logs | Log Groups | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

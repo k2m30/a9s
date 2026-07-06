@@ -222,16 +222,11 @@ apigw — DNS & CDN. Lifecycle key: none (the list API returns no lifecycle fiel
 | --- | --- | --- |
 | logs | Log Groups | yes |
 | lambda | Lambda Functions | no |
-| waf | WAF Web ACLs | no |
 | acm | ACM Certificates | no |
 | alarm | CloudWatch Alarms | yes |
 | cf | CloudFront | no |
 | elb | Load Balancers | no |
 | kms | KMS Keys | no |
-| r53 | Route 53 Zones | no |
 | role | IAM Role | no |
-| sfn | Step Functions | no |
-| sns | SNS Topics | no |
-| vpce | VPC Endpoints | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

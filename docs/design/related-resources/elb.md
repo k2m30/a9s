@@ -14,7 +14,7 @@
 
 | Related Resource | How to Find | Scenario | Priority |
 |-----------------|-------------|----------|----------|
-| Route 53 Records (r53) | Search Route 53 hosted zones for alias records where `AliasTarget.DNSName` matches this ELB's DNS name and `AliasTarget.HostedZoneId` matches the ELB's canonical hosted zone ID. If a9s has R53 data cached, search in-memory. | "What domains point to this ELB?" Must find all DNS entries before decommission or migration. | P0 |
+| Route 53 Records (r53) | Search Route 53 hosted zones for alias records where `AliasTarget.DNSName` matches this ELB's DNS name and `AliasTarget.HostedZoneId` matches the ELB's canonical hosted zone ID. If a9s has R53 data cached, search in-memory. | "What domains point to this ELB?" Must find all DNS entries before decommission or migration. | P0 — excluded (Policy rule 7: needs per-zone record scans, structurally uncomputable within the call budget) |
 | CloudFront Distributions (cf) | Search CF distributions for origins where `DomainName` matches this ELB's DNS name. | "Is this ELB behind a CDN?" CloudFront → ALB is a common pattern for web apps. | P1 |
 | WAF Web ACLs (waf) | `wafv2:GetWebACLForResource` with this ALB's ARN. Returns the associated WAF Web ACL, if any. Only works for ALBs (not NLBs or CLBs). | "Is this ALB protected by WAF rules?" Security audit — unprotected internet-facing ALBs are a finding. | P1 |
 | CloudWatch Alarms (alarm) | Search alarms with `LoadBalancer` dimension matching the ELB's ARN suffix (format: `app/{name}/{id}` for ALB, `net/{name}/{id}` for NLB). | "What monitoring watches this ELB?" Alarms on 5XX count, target response time, unhealthy host count. | P1 |

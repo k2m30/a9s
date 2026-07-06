@@ -175,7 +175,6 @@ athena — DATA & ANALYTICS. Lifecycle key: `state`.
 | --- | --- | --- |
 | s3 | S3 Buckets (results) | no |
 | kms | KMS Keys | no |
-| glue | Glue Data Catalog | no |
 | logs | Log Groups | no |
 | role | IAM Roles | no |
 | ct-events | CloudTrail Events | no |

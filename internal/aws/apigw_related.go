@@ -187,20 +187,6 @@ func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, _
 	return relatedResult("lambda", ids)
 }
 
-// checkApigwWAF reports WAF Web ACL associations for this API Gateway.
-// Only REST APIs (v1) can associate a Web ACL via apigateway:GetWebACL, and
-// HTTP/WebSocket APIs (v2, which this fetcher lists) do not carry Web ACL
-// bindings in GetApis. Resolving the relationship from the WAF side requires
-// wafv2:ListResourcesForWebACL per Web ACL (O(N)), which is outside the
-// 1-call budget for forward (apigw→waf) checkers.
-// Returns Count: -1 (unknown) to signal the data is not available.
-func checkApigwWAF(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "waf", Count: -1}
-}
-
 // checkApigwACM reports ACM certificates attached to this API's custom domain names.
 // Enumerates GetDomainNames, then per domain calls GetApiMappings to check if the
 // domain maps to this API. For matching domains, harvests CertificateArn from each
@@ -472,15 +458,6 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResult("elb", ids)
 }
 
-// checkApigwR53 reports Route 53 zones with alias records for this API's
-// custom domain. Records live per-zone — not cached. Returns Count: -1.
-func checkApigwR53(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
-}
-
 // checkApigwRole reports IAM roles this API assumes to call the integration
 // target or to run a request authorizer. Pattern C: reuses the
 // apigatewayv2:GetIntegrations call (Integration.CredentialsArn) already
@@ -537,94 +514,6 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 
 	return relatedResult("role", mapKeys(seen))
-}
-
-// checkApigwSFN reports Step Functions state machines integrated as targets.
-// Pattern C: one GetIntegrations call; look for StartExecution target ARNs.
-func checkApigwSFN(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	apiID := res.ID
-	if apiID == "" {
-		return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
-	}
-	items, err := apigwListIntegrations(ctx, clients, apiID)
-	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return resource.RelatedCheckResult{TargetType: "sfn", Count: -1}
-		}
-		return resource.RelatedCheckResult{TargetType: "sfn", Count: -1, Err: err}
-	}
-	seen := make(map[string]bool)
-	var ids []string
-	for _, item := range items {
-		if item.IntegrationUri == nil {
-			continue
-		}
-		uri := *item.IntegrationUri
-		// SFN integration URI: arn:aws:apigateway:REGION:states:action/StartExecution
-		// The target state-machine ARN is in the request template, not the URI.
-		// The URI only tells us "this API talks to States". Extract nothing
-		// specific; the precise state machine requires parsing the request
-		// template on each Route — outside budget.
-		if !strings.Contains(uri, ":states:action/") {
-			continue
-		}
-		// Fall back to tagging the integration id so there is at least one
-		// datapoint reported; without template parsing we cannot identify
-		// the state machine name.
-		if item.IntegrationId != nil && !seen[*item.IntegrationId] {
-			seen[*item.IntegrationId] = true
-			ids = append(ids, *item.IntegrationId)
-		}
-	}
-	// If we saw SFN integrations but can't name the state machine, return
-	// Count:-1 so the UI shows "?" rather than a misleading integration-id.
-	if len(ids) > 0 {
-		return resource.RelatedCheckResult{TargetType: "sfn", Count: -1}
-	}
-	return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
-}
-
-// checkApigwSNS reports SNS topics targeted by this API's integrations.
-// Pattern C: one GetIntegrations call; look for SNS Publish target ARNs.
-func checkApigwSNS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	apiID := res.ID
-	if apiID == "" {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
-	}
-	items, err := apigwListIntegrations(ctx, clients, apiID)
-	if err != nil {
-		if errors.Is(err, errClientMissing) {
-			return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
-		}
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: err}
-	}
-	sawSNS := false
-	for _, item := range items {
-		if item.IntegrationUri == nil {
-			continue
-		}
-		if strings.Contains(*item.IntegrationUri, ":sns:action/") {
-			sawSNS = true
-			break
-		}
-	}
-	if !sawSNS {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
-	}
-	// SNS topic ARN lives in the route request template, not the integration
-	// URI. Identifying the topic requires template parsing. Return -1.
-	return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
-}
-
-// checkApigwVPCE reports VPC endpoints this private API exposes through.
-// Private-API endpoint IDs live on the Api.EndpointConfiguration — not on
-// the v2 GetApis Item (endpoint_configuration is v1-only). Returns -1 if
-// this API is private, else 0.
-func checkApigwVPCE(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "vpce", Count: -1}
 }
 
 // apigwRelatedResources returns the resource list for target from cache or by fetching the first page.

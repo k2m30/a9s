@@ -167,19 +167,6 @@ func checkELBCFN(ctx context.Context, clients any, res resource.Resource, _ reso
 	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 }
 
-// checkELBR53 reports Route 53 records (alias targets) pointing at this load
-// balancer's DNS name. Resource record sets live on route53:ListResourceRecordSets
-// (per-zone) and are not cached at the hosted-zone cache level, so identifying
-// the records that alias this ELB requires O(N) record-set queries across all
-// zones — outside the 1-call budget for related-panel checkers.
-// Returns Count: -1 (unknown) to signal the data is not available.
-func checkELBR53(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.Fields["dns_name"] == "" {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
-}
-
 // checkELBACM reports ACM certificates attached to this ELB's HTTPS/TLS
 // listeners. Pattern C: one elbv2:DescribeListeners call per ELB; extract
 // Certificates[].CertificateArn from each listener.

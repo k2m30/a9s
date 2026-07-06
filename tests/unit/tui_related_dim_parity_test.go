@@ -155,7 +155,7 @@ func TestRelatedDim_ApproximateZero_SameStyleAsExactZero(t *testing.T) {
 				Approximate:  true,
 				TargetType:   "ct-events",
 				Actionable:   resource.IsRelatedActionable(0, true, false, false, false),
-				CountDisplay: resource.FormatRelatedCount(0),
+				CountDisplay: resource.FormatRelatedCount(0, false),
 			}
 			exactBlock := app.RelatedBlock{
 				Name:         "Backup Plans",
@@ -163,7 +163,7 @@ func TestRelatedDim_ApproximateZero_SameStyleAsExactZero(t *testing.T) {
 				Approximate:  false,
 				TargetType:   "backup",
 				Actionable:   resource.IsRelatedActionable(0, false, false, false, false),
-				CountDisplay: resource.FormatRelatedCount(0),
+				CountDisplay: resource.FormatRelatedCount(0, false),
 			}
 			if approxBlock.Actionable {
 				t.Fatal("test setup: approxBlock.Actionable must be false (resolved zero is never actionable)")
@@ -245,7 +245,7 @@ func relatedDimParitySweepCases() []relatedDimParityCase {
 			Actionable:  actionable,
 		}
 		if !loading && !hasErr {
-			blk.CountDisplay = resource.FormatRelatedCount(count)
+			blk.CountDisplay = resource.FormatRelatedCount(count, hasFilter)
 		}
 		return relatedDimParityCase{name: name, block: blk, wantActionable: actionable}
 	}
@@ -273,10 +273,8 @@ func expectedRelatedRowText(c relatedDimParityCase) string {
 		return "  " + blk.Name
 	case blk.Err:
 		return "  " + blk.Name + "  —"
-	case blk.Count == -1:
-		return "  " + blk.Name
 	default:
-		display := resource.FormatRelatedCount(blk.Count)
+		display := resource.FormatRelatedCount(blk.Count, len(blk.FetchFilter) > 0)
 		if display == "" {
 			return "  " + blk.Name
 		}

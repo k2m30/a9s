@@ -16,7 +16,7 @@ KMS keys are the most transitively referenced resource in AWS — almost every e
 |-----------------|-------------|----------|----------|
 | EBS Volumes (ebs) | `ec2:DescribeVolumes` with `Filters=[{Name=encrypted, Values=[true]}]`, then filter by `KmsKeyId` matching this key. Or if a9s has EBS data cached, search in-memory. | "Which volumes does this key encrypt?" Volume data becomes inaccessible if the key is deleted. | P0 |
 | RDS Instances (dbi) | Search RDS instances where `KmsKeyId` matches. If a9s has RDS data cached, search in-memory. | "Which databases does this key encrypt?" | P0 |
-| S3 Buckets (s3) | Search bucket encryption configurations for this key. Requires `s3:GetBucketEncryption` per bucket. Expensive. | "Which buckets use this key for SSE-KMS?" | P0 |
+| S3 Buckets (s3) | Search bucket encryption configurations for this key. Requires `s3:GetBucketEncryption` per bucket. Expensive. | "Which buckets use this key for SSE-KMS?" | P0 — excluded (Policy rule 7: per-bucket GetBucketEncryption, structurally uncomputable within the call budget) |
 | Secrets Manager (secrets) | Search secrets where `KmsKeyId` matches. If a9s has secrets data cached, search in-memory. | "Which secrets does this key encrypt?" | P1 |
 | EBS Snapshots (ebs-snap) | `ec2:DescribeSnapshots` with `Filters=[{Name=encrypted, Values=[true]}]`, filter by `KmsKeyId`. | "Which snapshots depend on this key?" | P1 |
 | DynamoDB Tables (ddb) | Search tables where `SSEDescription.KMSMasterKeyArn` matches. | "Which DynamoDB tables use this key?" | P1 |

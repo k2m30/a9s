@@ -238,15 +238,8 @@ tg — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field)
 | asg | Auto Scaling Groups | yes |
 | alarm | CW Alarms | yes |
 | vpc | VPC | no |
-| backup | Backup Plans | no |
 | cfn | CloudFormation | no |
-| dbc | DocumentDB Clusters | no |
-| dbi | RDS Instances | no |
 | ec2 | EC2 Instances | no |
 | lambda | Lambda Functions | no |
-| logs | Log Groups | no |
-| dbi-snap | DB Instance Snapshots | no |
-| sg | Security Groups | no |
-| subnet | Subnets | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

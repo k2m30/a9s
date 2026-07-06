@@ -49,13 +49,20 @@
    one extra AWS API call beyond reading the already-loaded sibling caches
    (`resource.ResourceCache`); per-item fan-outs over the OPEN resource's own
    sub-objects are inside the budget, fan-outs over the TARGET type's whole
-   population are not. A pivot whose documented mechanism cannot resolve
-   within that budget returns `Count: -1` (unknown — renders as the bare row
-   name, no badge, not drillable) and MUST (a) say so in a one-line checker
-   comment citing this rule, and (b) be marked `budget-excluded` in its
-   per-type row here and in `docs/resources/<type>.md` §2. An undocumented
-   `Count: -1` is a defect, not a decision. Lifting one out of exclusion
-   requires the same evidence bar as rule 1.
+   population are not. A mechanism that cannot resolve within that budget on
+   ANY cache state is NOT REGISTERED — it is documented under
+   **Explicitly excluded** below instead of shipping a checker that always
+   returns `Count: -1`. A permanently-unknowable row (never drillable, never
+   countable) is noise, not a decision the operator can act on. `Count: -1`
+   remains legitimate only as the TRANSIENT answer of a REGISTERED,
+   computable checker hitting a cold cache or a not-yet-loaded sibling type
+   (unknown — renders a `(?)` badge, dimmed and not drillable; a `-1` row
+   that carries a `FetchFilter` is a working drill-in link instead and stays
+   bare, no badge) — such a checker MUST (a) say so in a one-line comment
+   citing this rule, and (b) be marked `budget-excluded` in its per-type row
+   here and in `docs/resources/<type>.md` §2. An undocumented, always-`-1`
+   `Count: -1` is a defect, not a decision. Lifting a pivot back into the
+   registry requires the same evidence bar as rule 1.
 
 ## Per-type contract
 
@@ -64,9 +71,9 @@
 | `acm` | [API_CertificateDetail](https://docs.aws.amazon.com/acm/latest/APIReference/API_CertificateDetail.html) | `apigw`, `cf`, `ct-events`, `elb`, `r53` |
 | `alarm` | [API_MetricAlarm](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_MetricAlarm.html) | `apigw`, `asg`, `cb`, `ct-events`, `dbi`, `ec2`, `ecs`, `eks`, `kms`, `lambda`, `logs`, `s3`, `sfn`, `sns`, `waf` |
 | `ami` | [API_Image](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Image.html) | `asg`, `cfn`, `ct-events`, `ebs-snap`, `ec2`, `kms`, `ng` |
-| `apigw` | [apis](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis.html) | `acm`, `alarm`, `cf`, `ct-events`, `elb`, `kms`, `lambda`, `logs`, `r53`, `role`, `sfn`, `sns`, `vpce`, `waf` |
+| `apigw` | [apis](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis.html) | `acm`, `alarm`, `cf`, `ct-events`, `elb`, `kms`, `lambda`, `logs`, `role` |
 | `asg` | [API_AutoScalingGroup](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_AutoScalingGroup.html) | `alarm`, `ami`, `ct-events`, `ec2`, `elb`, `ng`, `role`, `sg`, `sns`, `subnet`, `tg`, `vpc` |
-| `athena` | [API_WorkGroup](https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroup.html) | `ct-events`, `glue`, `kms`, `logs`, `role`, `s3` |
+| `athena` | [API_WorkGroup](https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroup.html) | `ct-events`, `kms`, `logs`, `role`, `s3` |
 | `backup` | [API_BackupPlan](https://docs.aws.amazon.com/aws-backup/latest/devguide/API_BackupPlan.html) | `ct-events`, `kms`, `role`, `sns` |
 | `cb` | [API_Project](https://docs.aws.amazon.com/codebuild/latest/APIReference/API_Project.html) | `alarm`, `ct-events`, `ecr`, `kms`, `logs`, `pipeline`, `role`, `s3`, `secrets`, `sg`, `ssm`, `subnet`, `vpc` |
 | `cf` | [API_Distribution](https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_Distribution.html) | `acm`, `alarm`, `ct-events`, `elb`, `lambda`, `logs`, `r53`, `s3`, `waf` |
@@ -87,16 +94,16 @@
 | `ecs-svc` | [API_Service](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.html) | `alarm`, `cfn`, `ct-events`, `eb-rule`, `ecr`, `ecs`, `ecs-task`, `elb`, `logs`, `role`, `secrets`, `sfn`, `sg`, `subnet`, `tg`, `vpc` |
 | `ecs-task` | [API_Task](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Task.html) | `alarm`, `ct-events`, `ec2`, `ecr`, `ecs`, `ecs-svc`, `eni`, `logs`, `role`, `secrets`, `sg`, `ssm`, `subnet` |
 | `efs` | [API_FileSystemDescription](https://docs.aws.amazon.com/efs/latest/ug/API_FileSystemDescription.html) | `alarm`, `backup`, `cfn`, `ct-events`, `ecs-task`, `eni`, `kms`, `lambda`, `sg`, `subnet`, `vpc` |
-| `eip` | [API_Address](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `logs`, `nat` |
+| `eip` | [API_Address](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `nat` |
 | `eks` | [API_Cluster](https://docs.aws.amazon.com/eks/latest/APIReference/API_Cluster.html) | `alarm`, `ami`, `asg`, `cfn`, `ct-events`, `ec2`, `kms`, `logs`, `ng`, `role`, `sg`, `subnet`, `vpc` |
-| `elb` | [API_LoadBalancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancer.html) | `acm`, `alarm`, `cf`, `cfn`, `ct-events`, `eni`, `r53`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf` |
+| `elb` | [API_LoadBalancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancer.html) | `acm`, `alarm`, `cf`, `cfn`, `ct-events`, `eni`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf` |
 | `eni` | [API_NetworkInterface](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NetworkInterface.html) | `ct-events`, `ec2`, `eip`, `elb`, `lambda`, `nat`, `sg`, `subnet`, `vpc`, `vpce` |
 | `glue` | [API_Job](https://docs.aws.amazon.com/glue/latest/webapi/API_Job.html) | `alarm`, `athena`, `cfn`, `ct-events`, `kms`, `logs`, `role`, `s3`, `secrets` |
 | `iam-group` | [API_Group](https://docs.aws.amazon.com/IAM/latest/APIReference/API_Group.html) | `ct-events`, `iam-user`, `policy` |
 | `iam-user` | [API_User](https://docs.aws.amazon.com/IAM/latest/APIReference/API_User.html) | `ct-events`, `iam-group`, `policy` |
 | `igw` | [API_InternetGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InternetGateway.html) | `ct-events`, `rtb`, `vpc` |
 | `kinesis` | [API_StreamDescription](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_StreamDescription.html) | `alarm`, `cfn`, `ct-events`, `ddb`, `kms`, `lambda` |
-| `kms` | [API_KeyMetadata](https://docs.aws.amazon.com/kms/latest/APIReference/API_KeyMetadata.html) | `ct-events`, `dbi`, `ebs`, `role`, `s3`, `secrets` |
+| `kms` | [API_KeyMetadata](https://docs.aws.amazon.com/kms/latest/APIReference/API_KeyMetadata.html) | `ct-events`, `dbi`, `ebs`, `role`, `secrets` |
 | `lambda` | [API_FunctionConfiguration](https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html) | `alarm`, `apigw`, `cf`, `cfn`, `ct-events`, `ddb`, `eb-rule`, `ecr`, `efs`, `eni`, `kinesis`, `kms`, `logs`, `msk`, `role`, `s3`, `secrets`, `sg`, `sns`, `sns-sub`, `sqs`, `ssm`, `subnet`, `tg`, `vpc` |
 | `logs` | [API_LogGroup](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_LogGroup.html) | `alarm`, `apigw`, `ct-events`, `ecs-task`, `kinesis`, `kms`, `lambda`, `s3` |
 | `msk` | [v1-clusters](https://docs.aws.amazon.com/msk/1.0/apireference/v1-clusters.html) | `alarm`, `cfn`, `ct-events`, `kms`, `lambda`, `logs`, `s3`, `secrets`, `sg`, `subnet`, `vpc` |
@@ -121,11 +128,11 @@
 | `sqs` | [API_GetQueueAttributes](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_GetQueueAttributes.html) | `alarm`, `ct-events`, `eb-rule`, `kms`, `lambda`, `sns`, `sns-sub`, `sqs` |
 | `ssm` | [API_ParameterMetadata](https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_ParameterMetadata.html) | `ct-events`, `kms` |
 | `subnet` | [API_Subnet](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Subnet.html) | `asg`, `cfn`, `ct-events`, `ec2`, `efs`, `eks`, `elb`, `eni`, `nat`, `rtb`, `vpc`, `vpce` |
-| `tg` | [API_TargetGroup](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_TargetGroup.html) | `alarm`, `asg`, `backup`, `cfn`, `ct-events`, `dbc`, `dbi`, `ec2`, `ecs-svc`, `elb`, `lambda`, `logs`, `dbi-snap`, `sg`, `subnet`, `vpc` |
+| `tg` | [API_TargetGroup](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_TargetGroup.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs-svc`, `elb`, `lambda`, `vpc` |
 | `tgw` | [API_TransitGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html) | `ct-events`, `role`, `rtb`, `subnet`, `vpc` |
 | `trail` | [API_Trail](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Trail.html) | `ct-events`, `kms`, `logs`, `role`, `s3`, `sns` |
 | `vpc` | [API_Vpc](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html) | `cfn`, `ct-events`, `ec2`, `elb`, `eni`, `igw`, `nat`, `rtb`, `sg`, `subnet`, `tgw`, `vpce` |
-| `vpce` | [API_VpcEndpoint](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html) | `acm`, `alarm`, `cf`, `ct-events`, `eni`, `logs`, `r53`, `rtb`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf` |
+| `vpce` | [API_VpcEndpoint](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html) | `alarm`, `ct-events`, `eni`, `logs`, `r53`, `rtb`, `sg`, `subnet`, `vpc` |
 | `waf` | [API_WebACL](https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html) | `alarm`, `apigw`, `cf`, `ct-events`, `elb`, `logs` |
 
 ## Per-target reasoning
@@ -187,12 +194,7 @@ AWS API: <https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis.htm
 - **`kms`** — KMS key referenced by Lambda integrations (weak pair: no direct API GW KMS field; follows Lambda integration FunctionConfiguration.KMSKeyArn).
 - **`lambda`** — Lambda integrations.
 - **`logs`** — API access log destination.
-- **`r53`** — R53 alias records for custom domains. `budget-excluded` (Policy rule 7): alias records live on per-zone `ListResourceRecordSets` and are not cached as joinable record sets (the r53 fetcher summarizes alias targets into one Fields string); resolving custom-domain aliases needs `GetDomainNames` plus per-zone record scans — checker returns Count -1.
 - **`role`** — Invocation/authorizer role (`GetIntegrations` `CredentialsArn` + `GetAuthorizers` `AuthorizerCredentialsArn` matched against the loaded `role` cache).
-- **`sfn`** — Step Functions integration target: the integration URI only reveals the `:states:action/` service slug — the target state-machine ARN lives in the route REQUEST TEMPLATE, not the IntegrationUri. `budget-excluded` (Policy rule 7): identifying the state machine requires per-route request-template parsing — checker returns Count -1.
-- **`sns`** — APIGW -> SNS via integration: the integration URI only reveals `:sns:action/Publish` — the topic ARN lives in the route REQUEST TEMPLATE, not the IntegrationUri. `budget-excluded` (Policy rule 7): identifying the topic requires per-route request-template parsing — checker returns Count -1.
-- **`vpce`** — Private APIs expose via VPC endpoint. `budget-excluded` (Policy rule 7): endpoint IDs live on v1 `RestApi.EndpointConfiguration` only; the v2 `GetApis` items carry none, and the v2 path is a brittle resource-policy parse (policy-parse gap) — checker returns Count -1.
-- **`waf`** — WebACL attached to the API stage. `budget-excluded` (Policy rule 7): v2 APIs carry no Web ACL binding on `GetApis`; WAF-side resolution requires `wafv2:ListResourcesForWebACL` per Web ACL (O(N)) — checker returns Count -1.
 
 ### `asg`
 
@@ -216,7 +218,6 @@ AWS API: <https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_AutoScali
 AWS API: <https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroup.html>
 
 - **`ct-events`** — Audit trail for workgroup changes.
-- **`glue`** — Glue Data Catalog backing Athena.
 - **`kms`** — Result-encryption key.
 - **`logs`** — Workgroup query logs.
 - **`role`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
@@ -537,7 +538,6 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.htm
 - **`ecs-svc`** — Service owning the task whose ENI carries this EIP — zero-call join via the same `ecs-task` cache match, then the task's `service:` group to the `ecs-svc` cache.
 - **`ecs-task`** — Task whose ENI carries this EIP — zero-call join: `Address.NetworkInterfaceId` matched against task ENI attachments in the already-loaded `ecs-task` cache.
 - **`eni`** — Associated ENI.
-- **`logs`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): EIPs emit no logs; flow logs on the associated ENI/subnet/VPC are not identifiable from the EIP without per-ENI `DescribeFlowLogs` — checker returns Count -1.
 - **`nat`** — NAT gateway consuming this EIP.
 
 ### `eks`
@@ -568,7 +568,6 @@ AWS API: <https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/A
 - **`cfn`** — CloudFormation stack that created the LB.
 - **`ct-events`** — Audit trail for LB config changes.
 - **`eni`** — LB creates ENIs per AZ.
-- **`r53`** — Route 53 alias/records pointing at this LB. `budget-excluded` (Policy rule 7): record sets live on per-zone `ListResourceRecordSets` and are not cached as joinable structures (the r53 fetcher summarizes alias targets into one Fields string); identifying the aliasing records requires O(N) per-zone record-set queries — checker returns Count -1.
 - **`s3`** — Access-log S3 destination.
 - **`sg`** — Attached security groups (ALB only).
 - **`subnet`** — AZ subnets the LB listens in.
@@ -648,7 +647,6 @@ AWS API: <https://docs.aws.amazon.com/kms/latest/APIReference/API_KeyMetadata.ht
 - **`dbi`** — RDS instances using this key.
 - **`ebs`** — EBS volumes using this key.
 - **`role`** — Key policy trusts roles.
-- **`s3`** — S3 buckets using this key for SSE-KMS. `budget-excluded` (Policy rule 7): bucket encryption config is not on `ListBuckets` and not cached; resolving consumers requires `GetBucketEncryption` per bucket — checker returns Count -1.
 - **`secrets`** — Secrets encrypted with this key.
 
 ### `lambda`
@@ -1002,19 +1000,12 @@ AWS API: <https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/A
 
 - **`alarm`** — TG health/unhealthy-host count alarms.
 - **`asg`** — ASGs registering into this TG.
-- **`backup`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): AWS Backup does not support target groups; no AWS field links a TG to a plan or recovery point — checker returns Count -1.
 - **`cfn`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`ct-events`** — Audit trail for TG changes.
-- **`dbc`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): TG target types are instance/ip/lambda/alb; no AWS field references a DocumentDB cluster — checker returns Count -1.
-- **`dbi`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): TG target types are instance/ip/lambda/alb; no AWS field references an RDS instance — checker returns Count -1.
 - **`ec2`** — Instance targets.
 - **`ecs-svc`** — ECS services routing to this TG.
 - **`elb`** — Load balancers using this TG.
 - **`lambda`** — Lambda targets.
-- **`logs`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): target groups do not emit CloudWatch Logs; ELB access logs go to S3 on the parent LB — checker returns Count -1.
-- **`dbi-snap`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): no AWS field links a TG to an RDS snapshot — checker returns Count -1.
-- **`sg`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): `TargetGroup` has no SecurityGroups field; the SG pivot belongs to the parent `elb` — checker returns Count -1.
-- **`subnet`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): `TargetGroup` has no subnet field; the subnet pivot belongs to the parent `elb` via `AvailabilityZones[].SubnetId` — checker returns Count -1.
 - **`vpc`** — TargetGroup.VpcId.
 
 ### `tgw`
@@ -1059,20 +1050,15 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html>
 
 AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html>
 
-- **`acm`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): the list response carries no cert reference; resolution requires `PrivateDnsNameConfiguration` lookups per endpoint service — checker returns Count -1.
 - **`alarm`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`cf`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): the CloudFront→VPCE link goes through CloudFront VPC Origins, which are not on `DistributionSummary` — checker returns Count -1.
 - **`ct-events`** — Audit trail for endpoint changes.
 - **`eni`** — ENIs backing interface endpoints.
 - **`logs`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`r53`** — Private DNS → R53 private zones (`route53:ListHostedZonesByVPC` per endpoint, keyed by the endpoint's `VpcId`; results matched against the loaded `r53` cache).
 - **`rtb`** — Route tables for gateway endpoints.
-- **`s3`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): identifying reachable buckets requires interpreting `VpcEndpoint.PolicyDocument` JSON against bucket policies — no deterministic join within the checker budget; checker returns Count -1.
 - **`sg`** — SGs attached to interface endpoints.
 - **`subnet`** — Interface endpoint subnets.
-- **`tg`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): the TG cache carries no registered targets; matching endpoint IPs requires `DescribeTargetHealth` per TG — checker returns Count -1.
 - **`vpc`** — Parent VPC.
-- **`waf`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot. `budget-excluded` (Policy rule 7): the endpoint list response has no Web ACL binding; WAF associations resolve only from the WAF side via `wafv2:ListResourcesForWebACL` per ACL — checker returns Count -1.
 
 ### `waf`
 
@@ -1087,13 +1073,47 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 
 ## Explicitly excluded
 
-> **Do not re-add.** These 58 parent→related pairs were audited by five
-> independent DevOps reviewers and found to have no implementable linkage in
-> the AWS API surface (beyond heuristic reverse-scans that would lie to users
+> **Do not re-add.** These 79 parent→related pairs (58 from the original
+> five-reviewer DevOps audit, 21 budget-excluded pivots deregistered on
+> 2026-07-06) have no implementable linkage in the AWS API surface within
+> the call budget (beyond heuristic reverse-scans that would lie to users
 > with false positives or silent zeros). See
 > [related-panel-devops-consensus.md](./historical/019-related-panel/related-panel-devops-consensus.md)
 > for the evidence trail. Re-adding any of these pairs requires new AWS API
 > evidence cited per the Policy section at the top of this file.
+
+### Budget-excluded — structurally uncomputable on any cache state (21)
+
+> These pivots were REMOVED from the registry (not merely marked
+> `budget-excluded` in a per-type row) because their checkers were
+> hardcoded to `Count: -1` unconditionally — no cache state, no fixture,
+> no AWS account can ever make them resolve a real count or a working
+> drill-in. A row that can never show a count and can never be drilled is
+> noise, not a decision an operator can act on (Policy rule 7). Each
+> citation below is the exact reasoning that previously lived in the
+> per-type row/bullet before removal.
+
+- `apigw` → `r53` — alias records live on per-zone `ListResourceRecordSets` and are not cached as joinable record sets (the r53 fetcher summarizes alias targets into one Fields string); resolving custom-domain aliases needs `GetDomainNames` plus per-zone record scans — checker returns Count -1.
+- `apigw` → `vpce` — endpoint IDs live on v1 `RestApi.EndpointConfiguration` only; the v2 `GetApis` items carry none, and the v2 path is a brittle resource-policy parse (policy-parse gap) — checker returns Count -1.
+- `apigw` → `waf` — v2 APIs carry no Web ACL binding on `GetApis`; WAF-side resolution requires `wafv2:ListResourcesForWebACL` per Web ACL (O(N)) — checker returns Count -1.
+- `apigw` → `sfn` — Step Functions integration target: the integration URI only reveals the `:states:action/` service slug — the target state-machine ARN lives in the route REQUEST TEMPLATE, not the IntegrationUri; identifying the state machine requires per-route request-template parsing — checker returns Count -1.
+- `apigw` → `sns` — APIGW -> SNS via integration: the integration URI only reveals `:sns:action/Publish` — the topic ARN lives in the route REQUEST TEMPLATE, not the IntegrationUri; identifying the topic requires per-route request-template parsing — checker returns Count -1.
+- `athena` → `glue` — every Athena workgroup queries the account's default Glue Data Catalog implicitly; no structured "glue job/catalog" field exists on the WorkGroupConfiguration to name a specific Glue resource, so the checker can only ever return Count 0 or Count -1 — never a real count.
+- `eip` → `logs` — EIPs emit no logs; flow logs on the associated ENI/subnet/VPC are not identifiable from the EIP without per-ENI `DescribeFlowLogs` — checker returns Count -1.
+- `elb` → `r53` — record sets live on per-zone `ListResourceRecordSets` and are not cached as joinable structures (the r53 fetcher summarizes alias targets into one Fields string); identifying the aliasing records requires O(N) per-zone record-set queries — checker returns Count -1.
+- `kms` → `s3` — S3 bucket resources assembled by `FetchS3BucketsPage` do not store KMS key info in Fields or RawStruct, so the relationship cannot be determined from cache alone — checker returns Count -1.
+- `tg` → `backup` — AWS Backup does not support target groups; no AWS field links a TG to a plan or recovery point — checker returns Count -1.
+- `tg` → `dbc` — TG target types are instance/ip/lambda/alb; no AWS field references a DocumentDB cluster — checker returns Count -1.
+- `tg` → `dbi` — TG target types are instance/ip/lambda/alb; no AWS field references an RDS instance — checker returns Count -1.
+- `tg` → `dbi-snap` — no AWS field links a TG to an RDS snapshot — checker returns Count -1.
+- `tg` → `logs` — target groups do not emit CloudWatch Logs; ELB access logs go to S3 on the parent LB — checker returns Count -1.
+- `tg` → `sg` — `TargetGroup` has no SecurityGroups field; the SG pivot belongs to the parent `elb` — checker returns Count -1.
+- `tg` → `subnet` — `TargetGroup` has no subnet field; the subnet pivot belongs to the parent `elb` via `AvailabilityZones[].SubnetId` — checker returns Count -1.
+- `vpce` → `acm` — the list response carries no cert reference; resolution requires `PrivateDnsNameConfiguration` lookups per endpoint service — checker returns Count -1.
+- `vpce` → `cf` — the CloudFront→VPCE link goes through CloudFront VPC Origins, which are not on `DistributionSummary` — checker returns Count -1.
+- `vpce` → `s3` — identifying reachable buckets requires interpreting `VpcEndpoint.PolicyDocument` JSON against bucket policies — no deterministic join within the checker budget; checker returns Count -1.
+- `vpce` → `tg` — the TG cache carries no registered targets; matching endpoint IPs requires `DescribeTargetHealth` per TG — checker returns Count -1.
+- `vpce` → `waf` — the endpoint list response has no Web ACL binding; WAF associations resolve only from the WAF side via `wafv2:ListResourcesForWebACL` per ACL — checker returns Count -1.
 
 ### Unanimous `no` (13)
 
@@ -1306,7 +1326,6 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | elb | sg | Security Groups | no |
 | elb | vpc | VPC | no |
 | elb | cfn | CloudFormation | no |
-| elb | r53 | Route 53 Records | no |
 | elb | acm | ACM Certificates | no |
 | elb | cf | CloudFront | no |
 | elb | eni | Network Interfaces | yes |
@@ -1319,16 +1338,9 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | tg | asg | Auto Scaling Groups | yes |
 | tg | alarm | CW Alarms | yes |
 | tg | vpc | VPC | no |
-| tg | backup | Backup Plans | no |
 | tg | cfn | CloudFormation | no |
-| tg | dbc | DocumentDB Clusters | no |
-| tg | dbi | RDS Instances | no |
 | tg | ec2 | EC2 Instances | no |
 | tg | lambda | Lambda Functions | no |
-| tg | logs | Log Groups | no |
-| tg | dbi-snap | DB Instance Snapshots | no |
-| tg | sg | Security Groups | no |
-| tg | subnet | Subnets | no |
 | tg | ct-events | CloudTrail Events | no |
 | sg | vpc | VPC | no |
 | sg | ec2 | EC2 Instances | yes |
@@ -1390,21 +1402,15 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | eip | ecs | ECS Clusters | no |
 | eip | ecs-svc | ECS Services | no |
 | eip | ecs-task | ECS Tasks | no |
-| eip | logs | Log Groups | no |
 | eip | ct-events | CloudTrail Events | no |
 | vpce | subnet | Subnets | no |
 | vpce | sg | Security Groups | no |
 | vpce | rtb | Route Tables | no |
 | vpce | eni | Network Interfaces | no |
 | vpce | vpc | VPC | no |
-| vpce | acm | ACM Certificates | no |
 | vpce | alarm | CloudWatch Alarms | no |
-| vpce | cf | CloudFront | no |
 | vpce | logs | Log Groups | no |
 | vpce | r53 | Route 53 Zones | no |
-| vpce | s3 | S3 Buckets | no |
-| vpce | tg | Target Groups | no |
-| vpce | waf | WAF Web ACLs | no |
 | vpce | ct-events | CloudTrail Events | no |
 | tgw | vpc | VPCs | no |
 | tgw | rtb | Route Tables | yes |
@@ -1645,7 +1651,6 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | kms | ebs | EBS Volumes | yes |
 | kms | dbi | RDS Instances | yes |
 | kms | secrets | Secrets Manager | yes |
-| kms | s3 | S3 Buckets | no |
 | kms | role | IAM Roles (grants) | no |
 | kms | ct-events | CloudTrail Events | no |
 | r53 | elb | Load Balancers | yes |
@@ -1672,17 +1677,12 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | acm | ct-events | CloudTrail Events | no |
 | apigw | logs | Log Groups | yes |
 | apigw | lambda | Lambda Functions | no |
-| apigw | waf | WAF Web ACLs | no |
 | apigw | acm | ACM Certificates | no |
 | apigw | alarm | CloudWatch Alarms | yes |
 | apigw | cf | CloudFront | no |
 | apigw | elb | Load Balancers | no |
 | apigw | kms | KMS Keys | no |
-| apigw | r53 | Route 53 Zones | no |
 | apigw | role | IAM Role | no |
-| apigw | sfn | Step Functions | no |
-| apigw | sns | SNS Topics | no |
-| apigw | vpce | VPC Endpoints | no |
 | apigw | ct-events | CloudTrail Events | no |
 | role | lambda | Lambda Functions | yes |
 | role | glue | Glue Jobs | yes |
@@ -1762,7 +1762,6 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | glue | ct-events | CloudTrail Events | no |
 | athena | s3 | S3 Buckets (results) | no |
 | athena | kms | KMS Keys | no |
-| athena | glue | Glue Data Catalog | no |
 | athena | logs | Log Groups | no |
 | athena | role | IAM Roles | no |
 | athena | ct-events | CloudTrail Events | no |

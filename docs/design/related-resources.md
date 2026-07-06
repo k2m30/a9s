@@ -393,6 +393,7 @@ Row indent: 2 spaces from the separator (left padding inside right column).
 | Header (`RELATED`) | Dim text `#565f89` | Cursor skips |
 | Available (count known) | Normal text `#c0caf5` with `(N)` | Selectable |
 | Available (no count) | Normal text `#c0caf5` | Selectable |
+| Unknown (resolved `-1`, no filter) | Dim text `#565f89` with `(?)` | Cursor skips |
 | Unavailable | Dim text `#565f89` | Cursor skips |
 | Selected | Full-width highlight `#7aa2f7` bg | Current row |
 | Checking (initial load) | Dim text `#565f89` | Cursor skips |

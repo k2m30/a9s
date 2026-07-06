@@ -1,6 +1,15 @@
 // aws_tg_related_extra_test.go covers TG related checkers skipped in prior wave:
-// checkTGVPC, checkTGBackup, checkTGCFN, checkTGDBC, checkTGDBI, checkTGEC2,
-// checkTGLambda, checkTGLogs, checkTGDBISnap, checkTGSG, checkTGSubnet.
+// checkTGVPC, checkTGCFN, checkTGEC2, checkTGLambda.
+//
+// checkTGBackup, checkTGDBC, checkTGDBI, checkTGLogs, checkTGDBISnap, checkTGSG,
+// checkTGSubnet were removed along with their registrations: each was
+// hardcoded to Count:-1 whenever the TG had an ARN (or, for sg/subnet,
+// whenever Fields["vpc_id"] != ""), with no AWS API path to resolve target
+// identity from cache alone (DescribeTargetHealth + matching IP addresses
+// against instance/DB ENIs, or resolving to the parent ELB's access logs —
+// all outside the checker's call budget). See
+// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
+// comment for the burn-down precedent this deletion follows.
 package unit_test
 
 import (
@@ -49,165 +58,6 @@ func TestRelated_TG_VPC_Empty(t *testing.T) {
 
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (empty vpc_id)", result.Count)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// checkTGBackup — returns 0 when no TG ARN, -1 when TG has ARN (stub)
-// The boundary between 0 and -1 is the real logic worth testing.
-// ---------------------------------------------------------------------------
-
-func TestRelated_TG_Backup_HasARN(t *testing.T) {
-	res := tgSrcResource()
-	checker := tgCheckerByTarget(t, "backup")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (has TG ARN → unknown)", result.Count)
-	}
-}
-
-func TestRelated_TG_Backup_NoARN(t *testing.T) {
-	res := resource.Resource{
-		ID:     "no-arn-tg",
-		Name:   "no-arn-tg",
-		Fields: map[string]string{},
-	}
-	checker := tgCheckerByTarget(t, "backup")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no TG ARN)", result.Count)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// checkTGDBC and checkTGDBI — same boundary logic as Backup
-// ---------------------------------------------------------------------------
-
-func TestRelated_TG_DBC_HasARN(t *testing.T) {
-	res := tgSrcResource()
-	checker := tgCheckerByTarget(t, "dbc")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1", result.Count)
-	}
-}
-
-func TestRelated_TG_DBI_HasARN(t *testing.T) {
-	res := tgSrcResource()
-	checker := tgCheckerByTarget(t, "dbi")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1", result.Count)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// checkTGLogs — returns 0 when no TG ARN, -1 when TG has ARN (stub)
-// ---------------------------------------------------------------------------
-
-func TestRelated_TG_Logs_HasARN(t *testing.T) {
-	res := tgSrcResource()
-	checker := tgCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1", result.Count)
-	}
-}
-
-func TestRelated_TG_Logs_NoARN(t *testing.T) {
-	res := resource.Resource{
-		ID:     "no-arn-tg",
-		Name:   "no-arn-tg",
-		Fields: map[string]string{},
-	}
-	checker := tgCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no TG ARN)", result.Count)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// checkTGDBISnap — same boundary as Logs
-// ---------------------------------------------------------------------------
-
-func TestRelated_TG_DBISnap_HasARN(t *testing.T) {
-	res := tgSrcResource()
-	checker := tgCheckerByTarget(t, "dbi-snap")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1", result.Count)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// checkTGSG — returns -1 when vpc_id present, 0 otherwise
-// ---------------------------------------------------------------------------
-
-func TestRelated_TG_SG_VPCScopedReturnsUnknown(t *testing.T) {
-	res := tgSrcResource() // Fields["vpc_id"] = "vpc-abc123"
-	checker := tgCheckerByTarget(t, "sg")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (vpc_id present → sg lookup not in scope)", result.Count)
-	}
-}
-
-func TestRelated_TG_SG_NoVPCReturnsZero(t *testing.T) {
-	tgARNVal := tgTestARN
-	res := resource.Resource{
-		ID:   "lambda-tg",
-		Name: "lambda-tg",
-		Fields: map[string]string{
-			"target_group_arn": tgARNVal,
-			"vpc_id":           "",
-		},
-		RawStruct: elbv2types.TargetGroup{
-			TargetGroupArn: &tgARNVal,
-			TargetType:     elbv2types.TargetTypeEnumLambda,
-		},
-	}
-	checker := tgCheckerByTarget(t, "sg")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no vpc_id)", result.Count)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// checkTGSubnet — same vpc_id boundary as SG
-// ---------------------------------------------------------------------------
-
-func TestRelated_TG_Subnet_VPCScopedReturnsUnknown(t *testing.T) {
-	res := tgSrcResource() // vpc_id present
-	checker := tgCheckerByTarget(t, "subnet")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1", result.Count)
-	}
-}
-
-func TestRelated_TG_Subnet_NoVPCReturnsZero(t *testing.T) {
-	tgARNVal := tgTestARN
-	res := resource.Resource{
-		ID:   "lambda-tg",
-		Name: "lambda-tg",
-		Fields: map[string]string{
-			"target_group_arn": tgARNVal,
-			"vpc_id":           "",
-		},
-		RawStruct: elbv2types.TargetGroup{
-			TargetGroupArn: &tgARNVal,
-		},
-	}
-	checker := tgCheckerByTarget(t, "subnet")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
 	}
 }
 

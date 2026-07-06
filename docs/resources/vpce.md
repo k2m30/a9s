@@ -280,13 +280,8 @@ vpce — NETWORKING. Lifecycle key: `state`.
 | rtb | Route Tables | no |
 | eni | Network Interfaces | no |
 | vpc | VPC | no |
-| acm | ACM Certificates | no |
 | alarm | CloudWatch Alarms | no |
-| cf | CloudFront | no |
 | logs | Log Groups | no |
 | r53 | Route 53 Zones | no |
-| s3 | S3 Buckets | no |
-| tg | Target Groups | no |
-| waf | WAF Web ACLs | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

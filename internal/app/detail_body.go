@@ -433,7 +433,7 @@ func buildDetailRelatedBlocks(ds *DetailState) []RelatedBlock {
 			FetchFilter:  row.FetchFilter,
 			TargetType:   row.TargetType,
 			Actionable:   isActionableDetailRow(row),
-			CountDisplay: resource.FormatRelatedCount(row.Count),
+			CountDisplay: resource.FormatRelatedCount(row.Count, len(row.FetchFilter) > 0),
 		})
 	}
 	return blocks

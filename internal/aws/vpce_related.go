@@ -82,16 +82,6 @@ func checkVPCEVPC(_ context.Context, _ any, res resource.Resource, _ resource.Re
 	return relatedResult("vpc", []string{vpcID})
 }
 
-// checkVPCEACM reports the ACM cert on a PrivateLink/Gateway endpoint's custom
-// DNS. The list response doesn't carry cert details — requires
-// ModifyVpcEndpoint + PrivateDnsNameConfiguration per endpoint. Returns -1.
-func checkVPCEACM(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
-}
-
 // checkVPCEAlarm reports CloudWatch alarms on this VPC endpoint.
 // PrivateLink interface endpoints have per-endpoint alarms using dimension
 // "VpcEndpointId". The endpoint ID is the res.ID; alarm cache is scanned.
@@ -130,16 +120,6 @@ func checkVPCEAlarm(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
-}
-
-// checkVPCECF reports CloudFront distributions fronting this VPC endpoint.
-// CloudFront->VPCE mapping goes through CloudFront VPC Origins, which is not
-// on DistributionSummary. Returns Count: -1.
-func checkVPCECF(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
 }
 
 // checkVPCELogs reports CloudWatch Logs groups receiving VPC Flow Logs for
@@ -239,36 +219,3 @@ func checkVPCER53(ctx context.Context, clients any, res resource.Resource, _ res
 	return relatedResult("r53", ids)
 }
 
-// checkVPCES3 reports S3 buckets associated with a Gateway-type VPC endpoint
-// via its policy/allow-list. Policy text lives on VpcEndpoint.PolicyDocument —
-// parsing reliably requires JSON parsing and authoritative bucket matching.
-// For Gateway endpoints the service name indicates com.amazonaws.<region>.s3;
-// determining which buckets are accessible needs policy interpretation — not
-// straightforward. Returns Count: -1.
-func checkVPCES3(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
-}
-
-// checkVPCETG reports target groups pointing at this VPC endpoint as a target.
-// Target groups with target_type=ip can target VPCE IP addresses, but the TG
-// list cache does not include registered targets — DescribeTargetHealth per TG
-// is required. Returns Count: -1.
-func checkVPCETG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
-}
-
-// checkVPCEWAF reports WAF Web ACLs associated with this endpoint. VPCE itself
-// has no Web ACL binding in the list response; WAF associations are resolved
-// from the WAF side via wafv2:ListResourcesForWebACL. Returns Count: -1.
-func checkVPCEWAF(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.ID == "" {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "waf", Count: -1}
-}

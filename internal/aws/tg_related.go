@@ -191,17 +191,6 @@ func checkTGVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	return relatedResult("vpc", []string{vpcID})
 }
 
-// checkTGBackup reports backup plans that cover this target group.
-// TGs are not a protectable AWS Backup resource directly — the DevOps link is
-// via backup plans on the targets' instances/dbs. Not determinable from
-// caches alone. Returns Count: -1.
-func checkTGBackup(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if tgARN(res) == "" {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
-}
-
 // checkTGCFN reports the CloudFormation stack owning this TG via
 // aws:cloudformation:stack-name tag. Pattern C: one elbv2:DescribeTags call
 // keyed by the TargetGroup ARN.
@@ -232,26 +221,6 @@ func checkTGCFN(ctx context.Context, clients any, res resource.Resource, _ resou
 		}
 	}
 	return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
-}
-
-// checkTGDBC reports DocumentDB clusters targeted by this TG. DB clusters are
-// not directly registered as TG targets in AWS ELBv2; target identity requires
-// DescribeTargetHealth per TG and matching IP addresses against DocDB ENIs —
-// outside the 1-call budget. Returns Count: -1.
-func checkTGDBC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if tgARN(res) == "" {
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
-}
-
-// checkTGDBI reports RDS instances targeted by this TG. Same limitation as dbc:
-// DescribeTargetHealth required. Returns Count: -1.
-func checkTGDBI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if tgARN(res) == "" {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
 }
 
 // checkTGEC2 reports EC2 instances registered as targets of this TG.
@@ -341,47 +310,6 @@ func checkTGLambda(ctx context.Context, clients any, res resource.Resource, _ re
 		}
 	}
 	return relatedResult("lambda", ids)
-}
-
-// checkTGLogs reports CloudWatch log groups related to this TG.
-// Target groups themselves do not emit logs; the relevant logs are on the
-// parent ELB (access logs). Not directly determinable from TG fields alone.
-// Returns Count: -1 when the TG has an ARN.
-func checkTGLogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if tgARN(res) == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
-}
-
-// checkTGDBISnap reports RDS snapshots related to RDS instances targeted by
-// this TG. Requires two hops (target instance → snapshots) and per-TG target
-// enumeration. Returns Count: -1.
-func checkTGDBISnap(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if tgARN(res) == "" {
-		return resource.RelatedCheckResult{TargetType: "dbi-snap", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "dbi-snap", Count: -1}
-}
-
-// checkTGSG reports security groups of the TG's targets. DescribeTargetGroups
-// does not carry SG references directly (they are on the ENIs of targets).
-// Returns Count: -1 when TG has VPC scope.
-func checkTGSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.Fields["vpc_id"] == "" {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
-}
-
-// checkTGSubnet reports the subnets a TG's targets reside in. Target
-// networking requires DescribeTargetHealth + ENI lookup — outside budget.
-// Returns Count: -1 when TG has a VPC; 0 otherwise.
-func checkTGSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	if res.Fields["vpc_id"] == "" {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-	}
-	return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
 }
 
 // tgRelatedResources returns the resource list for target from cache or by

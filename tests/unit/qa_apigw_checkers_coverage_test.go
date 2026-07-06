@@ -1,7 +1,16 @@
 // qa_apigw_checkers_coverage_test.go — Behavioral coverage tests for APIGW related-resource checkers.
 //
 // Tests cover functions with zero coverage: checkApigwACM, checkApigwAlarm, checkApigwCF,
-// checkApigwELB, checkApigwR53, checkApigwRole, checkApigwSFN, checkApigwSNS, checkApigwVPCE.
+// checkApigwELB, checkApigwRole.
+//
+// checkApigwR53, checkApigwSFN, checkApigwSNS, checkApigwVPCE were removed
+// along with their registrations: each was hardcoded to Count:-1/0, never a
+// witnessable Count>0, with no AWS API path to resolve a concrete match from
+// GetApis/GetIntegrations alone (R53/VPCE: private-API endpoint id and
+// alias-record resolution are outside GetApis; SFN/SNS: the target ARN lives
+// in the per-route request template, not the integration URI). See
+// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
+// comment for the burn-down precedent this deletion follows.
 //
 // Each test exercises the real checker logic (no mocking the checker itself).
 // Tests in this file should PASS against current main — they cover existing, correct code.
@@ -12,11 +21,9 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	apigwv2types "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -293,33 +300,6 @@ func TestRelated_APIGW_ELB_EmptyID(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkApigwR53 — stub: returns Count:-1 for non-empty API ID.
-// ---------------------------------------------------------------------------
-
-func TestRelated_APIGW_R53_Unknown(t *testing.T) {
-	checker := apigwCheckerByTarget(t, "r53")
-	res := resource.Resource{ID: "api-r53-test", Fields: map[string]string{}}
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-
-	if result.TargetType != "r53" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "r53")
-	}
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (R53 alias records live per-zone, not in GetApis)", result.Count)
-	}
-}
-
-func TestRelated_APIGW_R53_EmptyID(t *testing.T) {
-	checker := apigwCheckerByTarget(t, "r53")
-	res := resource.Resource{ID: "", Fields: map[string]string{}}
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
-	}
-}
-
-// ---------------------------------------------------------------------------
 // checkApigwRole — stub: returns Count:-1 for non-empty API ID.
 // ---------------------------------------------------------------------------
 
@@ -346,184 +326,13 @@ func TestRelated_APIGW_Role_EmptyID(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkApigwSFN — Pattern C: GetIntegrations → look for :states:action/ URIs.
-// When SFN integration found, Count:-1 (state machine name requires template parsing).
-// When no SFN integration, Count:0.
-// ---------------------------------------------------------------------------
-
-func TestRelated_APIGW_SFN_FoundIntegration_ReturnsUnknown(t *testing.T) {
-	// An integration URI pointing at Step Functions.
-	sfnURI := "arn:aws:apigateway:us-east-1:states:action/StartExecution"
-	fake := &fakeAPIGWV2US1{
-		integrations: []apigwv2types.Integration{
-			{
-				IntegrationId:  aws.String("integration-sfn-001"),
-				IntegrationUri: aws.String(sfnURI),
-			},
-		},
-	}
-	clients := &awsclient.ServiceClients{
-		APIGatewayV2: fake,
-	}
-
-	checker := apigwCheckerByTarget(t, "sfn")
-	res := resource.Resource{ID: "api-sfn-test", Fields: map[string]string{}}
-	result := checker(context.Background(), clients, res, resource.ResourceCache{})
-
-	if result.TargetType != "sfn" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "sfn")
-	}
-	// SFN integration found but state machine name requires template parsing → Count:-1.
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (SFN found but state machine name requires template parsing)", result.Count)
-	}
-}
-
-func TestRelated_APIGW_SFN_NoSFNIntegration_ReturnsZero(t *testing.T) {
-	// Integration URI pointing at Lambda, not SFN.
-	lambdaURI := "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:123456789012:function:my-fn/invocations"
-	fake := &fakeAPIGWV2US1{
-		integrations: []apigwv2types.Integration{
-			{
-				IntegrationId:  aws.String("integration-lambda-001"),
-				IntegrationUri: aws.String(lambdaURI),
-			},
-		},
-	}
-	clients := &awsclient.ServiceClients{
-		APIGatewayV2: fake,
-	}
-
-	checker := apigwCheckerByTarget(t, "sfn")
-	res := resource.Resource{ID: "api-sfn-none", Fields: map[string]string{}}
-	result := checker(context.Background(), clients, res, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no SFN integrations found)", result.Count)
-	}
-}
-
-func TestRelated_APIGW_SFN_NilClients_ReturnsUnknown(t *testing.T) {
-	checker := apigwCheckerByTarget(t, "sfn")
-	res := resource.Resource{ID: "api-sfn-nil", Fields: map[string]string{}}
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (nil clients → can't call GetIntegrations)", result.Count)
-	}
-}
-
-func TestRelated_APIGW_SFN_EmptyID(t *testing.T) {
-	checker := apigwCheckerByTarget(t, "sfn")
-	res := resource.Resource{ID: "", Fields: map[string]string{}}
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty API ID)", result.Count)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// checkApigwSNS — Pattern C: GetIntegrations → look for :sns:action/ URIs.
-// When SNS integration found, Count:-1 (topic ARN requires template parsing).
-// When no SNS integration, Count:0.
-// ---------------------------------------------------------------------------
-
-func TestRelated_APIGW_SNS_FoundIntegration_ReturnsUnknown(t *testing.T) {
-	snsURI := "arn:aws:apigateway:us-east-1:sns:action/Publish"
-	fake := &fakeAPIGWV2US1{
-		integrations: []apigwv2types.Integration{
-			{
-				IntegrationId:  aws.String("integration-sns-001"),
-				IntegrationUri: aws.String(snsURI),
-			},
-		},
-	}
-	clients := &awsclient.ServiceClients{
-		APIGatewayV2: fake,
-	}
-
-	checker := apigwCheckerByTarget(t, "sns")
-	res := resource.Resource{ID: "api-sns-test", Fields: map[string]string{}}
-	result := checker(context.Background(), clients, res, resource.ResourceCache{})
-
-	if result.TargetType != "sns" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "sns")
-	}
-	// Topic ARN lives in the route request template → Count:-1.
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (SNS topic ARN requires template parsing)", result.Count)
-	}
-}
-
-func TestRelated_APIGW_SNS_NoSNSIntegration_ReturnsZero(t *testing.T) {
-	// Integration pointing at DynamoDB, not SNS.
-	ddbURI := "arn:aws:apigateway:us-east-1:dynamodb:action/PutItem"
-	fake := &fakeAPIGWV2US1{
-		integrations: []apigwv2types.Integration{
-			{
-				IntegrationId:  aws.String("integration-ddb-001"),
-				IntegrationUri: aws.String(ddbURI),
-			},
-		},
-	}
-	clients := &awsclient.ServiceClients{
-		APIGatewayV2: fake,
-	}
-
-	checker := apigwCheckerByTarget(t, "sns")
-	res := resource.Resource{ID: "api-no-sns", Fields: map[string]string{}}
-	result := checker(context.Background(), clients, res, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no SNS integrations)", result.Count)
-	}
-}
-
-func TestRelated_APIGW_SNS_NilClients_ReturnsUnknown(t *testing.T) {
-	checker := apigwCheckerByTarget(t, "sns")
-	res := resource.Resource{ID: "api-sns-nil", Fields: map[string]string{}}
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (nil clients → can't call GetIntegrations)", result.Count)
-	}
-}
-
-func TestRelated_APIGW_SNS_EmptyID(t *testing.T) {
-	checker := apigwCheckerByTarget(t, "sns")
-	res := resource.Resource{ID: "", Fields: map[string]string{}}
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty API ID)", result.Count)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// checkApigwVPCE — stub: returns Count:-1 for non-empty API ID.
-// ---------------------------------------------------------------------------
-
-func TestRelated_APIGW_VPCE_Unknown(t *testing.T) {
-	checker := apigwCheckerByTarget(t, "vpce")
-	res := resource.Resource{ID: "api-vpce-test", Fields: map[string]string{}}
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-
-	if result.TargetType != "vpce" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "vpce")
-	}
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (endpoint_configuration is v1-only, not available via v2 GetApis)", result.Count)
-	}
-}
-
-func TestRelated_APIGW_VPCE_EmptyID(t *testing.T) {
-	checker := apigwCheckerByTarget(t, "vpce")
-	res := resource.Resource{ID: "", Fields: map[string]string{}}
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
-	}
-}
+// checkApigwSFN, checkApigwSNS, checkApigwVPCE (Pattern C GetIntegrations /
+// v1-endpoint stubs) were removed along with their registrations: SFN/SNS
+// could detect that an integration existed but the target ARN lives in the
+// per-route request template (not the integration URI), and VPCE's
+// endpoint_configuration is v1-only, unavailable via v2 GetApis — none ever
+// witnessable. apigwListIntegrations itself (the shared GetIntegrations
+// helper) remains covered via checkApigwLambda's tests in
+// aws_apigw_related_test.go. See qa_demo_pivot_coverage_test.go's
+// knownDisconnectedPivots terminal-state comment for the burn-down
+// precedent this deletion follows.

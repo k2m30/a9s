@@ -234,33 +234,12 @@ func TestRelated_Lambda_EbRule_UnknownWithoutClients(t *testing.T) {
 	}
 }
 
-// TestRelated_ELB_R53_WithDNSReturnsUnknown: real ELB with dns_name → -1 (records per-zone).
-func TestRelated_ELB_R53_WithDNSReturnsUnknown(t *testing.T) {
-	checker := checkerByTargetUncovered(t, "elb", "r53")
-	res := resource.Resource{
-		ID: "my-alb",
-		Fields: map[string]string{
-			"dns_name": "my-alb-1234.us-east-1.elb.amazonaws.com",
-		},
-	}
-	got := checker(context.Background(), nil, res, nil)
-	if got.Count != -1 {
-		t.Errorf("expected Count=-1 (alias records per-zone), got %d", got.Count)
-	}
-	if got.TargetType != "r53" {
-		t.Errorf("expected TargetType=r53, got %q", got.TargetType)
-	}
-}
-
-// TestRelated_ELB_R53_EmptyDNSReturnsZero: ELB without dns_name → 0 (nothing to resolve).
-func TestRelated_ELB_R53_EmptyDNSReturnsZero(t *testing.T) {
-	checker := checkerByTargetUncovered(t, "elb", "r53")
-	res := resource.Resource{ID: "my-alb", Fields: map[string]string{}}
-	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0 (empty dns_name), got %d", got.Count)
-	}
-}
+// elb:r53 (checkELBR53) was removed along with its registration: it was
+// hardcoded to Count:-1 whenever Fields["dns_name"] != "" (i.e. always, for
+// any real ELB), with no AWS API path to reverse-resolve which R53 records
+// alias to the LB's DNS name from cache alone. See
+// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
+// comment for the burn-down precedent this deletion follows.
 
 // TestRelated_SFN_EbRule_ReturnsZeroOnEmptyARN verifies sfn→eb-rule reports Count=0
 // when the state machine ARN field is empty. checkSFNEbRule uses a live
@@ -346,29 +325,12 @@ func TestRelated_R53_ACM_EmptyZoneReturnsZero(t *testing.T) {
 	}
 }
 
-func TestRelated_KMS_S3_EmptyID(t *testing.T) {
-	checker := checkerByTargetUncovered(t, "kms", "s3")
-
-	// Empty ID → Count:0 (cannot search without a key ID)
-	empty := resource.Resource{ID: "", Fields: map[string]string{}}
-	got := checker(context.Background(), nil, empty, nil)
-	if got.Count != 0 {
-		t.Errorf("empty ID: expected Count=0, got %d", got.Count)
-	}
-	if got.TargetType != "s3" {
-		t.Errorf("empty ID: expected TargetType=s3, got %q", got.TargetType)
-	}
-
-	// Non-empty ID → Count:-1 (S3 resources don't expose KMS key IDs)
-	withID := resource.Resource{ID: "abc-def-1234-5678-abcd", Fields: map[string]string{}}
-	got2 := checker(context.Background(), nil, withID, nil)
-	if got2.Count != -1 {
-		t.Errorf("non-empty ID: expected Count=-1, got %d", got2.Count)
-	}
-	if got2.TargetType != "s3" {
-		t.Errorf("non-empty ID: expected TargetType=s3, got %q", got2.TargetType)
-	}
-}
+// kms:s3 (checkKMSS3) was removed along with its registration: it was
+// hardcoded to Count:-1 whenever res.ID != "" — S3 resources do not expose
+// KMS key IDs in Fields or RawStruct, so the relationship was never
+// determinable from cache alone. See qa_demo_pivot_coverage_test.go's
+// knownDisconnectedPivots terminal-state comment for the burn-down
+// precedent this deletion follows.
 
 // ---------------------------------------------------------------------------
 // STRUCT EXTRACTION CHECKERS

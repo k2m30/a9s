@@ -216,7 +216,6 @@ elb — NETWORKING. Lifecycle key: `state`.
 | sg | Security Groups | no |
 | vpc | VPC | no |
 | cfn | CloudFormation | no |
-| r53 | Route 53 Records | no |
 | acm | ACM Certificates | no |
 | cf | CloudFront | no |
 | eni | Network Interfaces | yes |

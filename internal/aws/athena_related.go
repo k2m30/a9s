@@ -64,29 +64,6 @@ func checkAthenaKMS(ctx context.Context, clients any, res resource.Resource, _ r
 	return relatedResult("kms", []string{keyID})
 }
 
-// checkAthenaGlue returns the Glue Data Catalog name attached to the workgroup
-// via its Spark execution role (for Spark workgroups). For SQL workgroups the
-// catalog is "AwsDataCatalog" (the account's default Glue catalog). When the
-// workgroup's EngineVersion indicates PySpark, we surface the reference.
-// Pattern C — one GetWorkGroup call.
-func checkAthenaGlue(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
-	if cfg == nil {
-		return resource.RelatedCheckResult{TargetType: "glue", Count: -1}
-	}
-	// Every Athena workgroup queries the Glue Data Catalog by default.
-	// We only emit a link when the workgroup actually carries an
-	// ExecutionRole (Spark workgroups) or a non-default AdditionalConfiguration
-	// that ties it explicitly to Glue. Otherwise Count: 0.
-	if cfg.EngineVersion == nil || cfg.EngineVersion.EffectiveEngineVersion == nil {
-		return resource.RelatedCheckResult{TargetType: "glue", Count: 0}
-	}
-	// No structured "glue job/catalog" field exists on the WG config. The
-	// relationship to Glue is the account-wide data catalog; resolving which
-	// specific Glue jobs share this catalog requires a catalog crawl.
-	return resource.RelatedCheckResult{TargetType: "glue", Count: 0}
-}
-
 // checkAthenaLogs calls athena:GetWorkGroup and extracts the CloudWatch log
 // group used for Spark driver logs (CustomerContentEncryptionConfiguration is
 // storage-side; the spark driver log group is carried on the EngineConfiguration).

@@ -85,73 +85,21 @@ import (
 // s3 is deliberately absent: its 9 originally-disconnected pivots were fixed
 // by a parallel fixture rebuild before this ratchet was written, and must
 // never be re-added here.
-var knownDisconnectedPivots = map[string]bool{
-	// apigw:r53, apigw:vpce, apigw:waf: each checker
-	// (internal/aws/apigw_related.go checkApigwR53/VPCE/WAF) is
-	// hardcoded to return Count:-1 whenever res.ID != "" (i.e. always, for any
-	// real fixture) — the AWS API path needed to resolve a concrete ID is
-	// documented in each function's comment as unavailable from GetApis
-	// (private-API endpoint id is v1-only, etc). Since isWitnessResult
-	// requires Count>0 for non-FetchFilter results, no fixture can ever
-	// produce a witness here.
-	//
-	// apigw:elb and apigw:role are NOT here: both checkers now call
-	// apigwListIntegrations and can resolve a real VpcLink/CredentialsArn,
-	// producing Count>0 witnesses — see TestDemoPivotCoverage burn-down.
-	"apigw:r53":  true,
-	"apigw:vpce": true, "apigw:waf": true,
-	// apigw:sfn, apigw:sns: checkApigwSFN/SNS (same file) can detect that an
-	// SFN/SNS integration exists but the target ARN lives in the per-route
-	// request template, not the integration URI — both functions explicitly
-	// return Count:-1 (found-but-unidentified) or Count:0 (not found), never
-	// Count>0. Structurally unwitnessable without request-template parsing.
-	"apigw:sfn": true, "apigw:sns": true,
-	// athena:glue: checkAthenaGlue (internal/aws/athena_related.go) is
-	// documented as structurally incapable of a non-zero result — its own
-	// comment states "No structured glue job/catalog field exists on the WG
-	// config... resolving which specific Glue jobs share this catalog
-	// requires a catalog crawl" — the function always returns Count:0 or
-	// Count:-1, never Count>0.
-	"athena:glue": true,
-	// eip:logs: checkEIPLogs (internal/aws/eip_related.go) is hardcoded to
-	// return Count:-1 whenever res.ID != "" — EIP flow logs require per-ENI
-	// DescribeFlowLogs, explicitly "outside the 1-call budget." Structurally
-	// unwitnessable; no fixture changes this.
-	"eip:logs": true,
-	// elb:r53: checkELBR53 (internal/aws/elb_related.go) is hardcoded to
-	// return Count:-1 whenever Fields["dns_name"] != "" (true for every real
-	// ELB) — reverse-resolving which R53 records alias to this LB's DNS name
-	// requires enumerating every hosted zone's record sets, outside the
-	// checker's call budget. Structurally unwitnessable.
-	"elb:r53": true,
-	// kms:s3: checkKMSS3 (internal/aws/kms_related.go) is hardcoded to return
-	// Count:-1 whenever res.ID != "" — its own comment states "S3 resources
-	// do not expose KMS key IDs in Fields or RawStruct, so the relationship
-	// cannot be determined from cache alone." Structurally unwitnessable.
-	"kms:s3": true,
-	// tg:backup, tg:dbc, tg:dbi, tg:dbi-snap, tg:logs, tg:sg, tg:subnet: each
-	// checker (internal/aws/tg_related.go checkTGBackup/DBC/DBI/DBISnap/Logs/
-	// SG/Subnet) is hardcoded to return Count:-1 whenever the TG has an ARN
-	// (or, for sg/subnet, whenever Fields["vpc_id"] != "") — every function's
-	// own comment documents the missing AWS API path: target identity
-	// (backup/dbc/dbi/dbi-snap) requires DescribeTargetHealth + matching IP
-	// addresses against instance/DB ENIs; logs requires resolving to the
-	// parent ELB's access logs; sg/subnet require DescribeTargetHealth + ENI
-	// lookup — all explicitly "outside the 1-call budget." Structurally
-	// unwitnessable; no fixture changes this.
-	"tg:backup": true, "tg:dbc": true, "tg:dbi": true,
-	"tg:dbi-snap": true, "tg:logs": true, "tg:sg": true, "tg:subnet": true,
-	// vpce:acm, vpce:cf, vpce:s3, vpce:tg, vpce:waf: each checker
-	// (internal/aws/vpce_related.go checkVPCEACM/CF/S3/TG/WAF) is
-	// hardcoded to return Count:-1 whenever res.ID != "" — every function's
-	// own comment documents the missing AWS API path (CloudFront->VPCE needs
-	// VPC Origins, not on DistributionSummary; S3 gateway access needs
-	// policy-document JSON interpretation; TG/WAF associations require
-	// DescribeTargetHealth / wafv2:ListResourcesForWebACL from the other
-	// side). Structurally unwitnessable; no fixture changes this.
-	"vpce:acm": true, "vpce:cf": true,
-	"vpce:s3": true, "vpce:tg": true, "vpce:waf": true,
-}
+//
+// TERMINAL STATE: the map is empty. Every pivot ever pinned here
+// (apigw:r53/vpce/waf/sfn/sns, athena:glue, eip:logs, elb:r53, kms:s3,
+// tg:backup/dbc/dbi/dbi-snap/logs/sg/subnet, vpce:acm/cf/s3/tg/waf) was
+// structurally unwitnessable per its own checker's documented comment — no
+// fixture graph could ever produce a witness, unlike s3's gap, which was a
+// fixable fixture problem. Rather than carry 20 permanent burn-down entries
+// that could never burn down, each checker and its RegisterRelated entry was
+// deleted outright (see internal/aws/catalog_dns_cdn.go, catalog_data.go,
+// catalog_networking.go, catalog_secrets.go). resource.GetRelated no longer
+// returns these TargetTypes for their owning types, so this loop never visits
+// their keys again — do not re-add them; a genuinely new structurally-
+// unwitnessable pivot should not be registered at all, following this
+// precedent, rather than added here.
+var knownDisconnectedPivots = map[string]bool{}
 
 // knownIssueCoverageGaps pins the exact issue-capable types that had zero
 // flagged demo fixtures at ratchet-conversion time. Same burn-down semantics
