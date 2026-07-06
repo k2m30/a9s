@@ -176,6 +176,12 @@ type Session struct {
 
 	// Session-scoped caches + stale-result guards.
 	RelatedCache *RelatedCacheLRU
+
+	// FilteredRows is the session home for server-side-filtered related-drill
+	// results (C6). Kept outside RowStore because a filtered subset stored
+	// under the type's canonical row-store key would poison that type's
+	// global row set for every other consumer.
+	FilteredRows *FilteredRowsLRU
 	RelatedGen   domain.Gen // bumped on refresh/profile/region switch
 	EnrichGen    domain.Gen // bumped on refresh/profile/region switch (detail-enrichment only)
 	EnrichResKey string     // "resourceType:resourceID" of last detail-enrichment dispatch
@@ -227,6 +233,7 @@ func New() *Session {
 		EnrichmentTruncatedIDs: make(map[string]map[string]bool),
 		RowStore:               NewRowStore(),
 		RelatedCache:           NewRelatedCacheLRU(MaxRelatedCacheEntries),
+		FilteredRows:           NewFilteredRowsLRU(MaxFilteredRowsEntries),
 		RelatedGen:             1,
 		EnrichGen:              1,
 		EnrichmentGen:          1,
@@ -358,6 +365,7 @@ func (s *Session) CurrentGenFor(a messages.Aspect) domain.Gen {
 // — this method touches only Session-owned fields.
 func (s *Session) Rotate() {
 	s.RelatedCache.Clear()
+	s.FilteredRows.Clear()
 	s.RelatedGen.Bump()
 	s.EnrichGen.Bump()
 	s.AvailabilityGen.Bump()

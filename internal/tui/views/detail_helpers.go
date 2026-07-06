@@ -95,13 +95,15 @@ func (m DetailModel) buildLiveBody() app.DetailBody {
 				continue
 			}
 			related = append(related, app.RelatedBlock{
-				Name:        row.displayName,
-				Count:       row.count,
-				Loading:     row.loading,
-				Err:         row.err != nil,
-				Approximate: row.approximate,
-				FetchFilter: row.fetchFilter,
-				TargetType:  row.targetType,
+				Name:         row.displayName,
+				Count:        row.count,
+				Loading:      row.loading,
+				Err:          row.err != nil,
+				Approximate:  row.approximate,
+				FetchFilter:  row.fetchFilter,
+				TargetType:   row.targetType,
+				Actionable:   isActionableRow(row),
+				CountDisplay: resource.FormatRelatedCount(row.count),
 			})
 		}
 	}

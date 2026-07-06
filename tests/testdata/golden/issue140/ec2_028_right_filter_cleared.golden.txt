@@ -32,4 +32,4 @@
 │     HttpTokens: required                                                            │                                │
 │     State: applied                                                                  │                                │
 │ LaunchTime:           2025-11-15 08:30                                              │                                │
-└───────────────────────────────────enter CloudWatch Alarms──tab Fields──y YAML──J JSON──t CloudTrail──ctrl+r Refresh──┘
+└────────────────────────────────────────────────────────────tab Fields──y YAML──J JSON──t CloudTrail──ctrl+r Refresh──┘

@@ -488,6 +488,23 @@ func (c *Core) RelatedCacheSet(key string, results []RelatedCacheResult) {
 // key so the next related-fanout re-runs the checkers.
 func (c *Core) RelatedCacheDelete(key string) { c.session.RelatedCache.Delete(key) }
 
+// FilteredRowsGet returns the cached rows for a server-side-filtered
+// related drill of resourceType under the given fetch filter.
+func (c *Core) FilteredRowsGet(resourceType string, filter map[string]string) (session.FilteredRowsEntry, bool) {
+	return c.session.FilteredRows.Get(session.FilteredRowsKey(resourceType, filter))
+}
+
+// FilteredRowsSet stores a filtered drill's accumulated rows + pagination
+// state under its (type + filter) key. Rows are copied — the caller's
+// slice is screen-owned and mutated in place by later field updates.
+func (c *Core) FilteredRowsSet(resourceType string, filter map[string]string, rows []resource.Resource, truncated bool, cursor string) {
+	c.session.FilteredRows.Set(session.FilteredRowsKey(resourceType, filter), session.FilteredRowsEntry{
+		Rows:      append([]resource.Resource(nil), rows...),
+		Truncated: truncated,
+		Cursor:    cursor,
+	})
+}
+
 // HasIssueEnricher reports whether a Wave-2 issue enricher is registered
 // for the given resource short name. Renderer adapters use this in place
 // of probing awsclient.Wave2EnricherFor / awsclient.IssueEnricherRegistry

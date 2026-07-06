@@ -307,6 +307,44 @@ func (c *Controller) replayRelatedCache(resourceType string, res resource.Resour
 	return true
 }
 
+// SeedFilteredListFromCache seeds the top list screen from the session
+// filtered-rows cache for (targetType, filter). On a hit the rows render
+// immediately and Refreshing is armed so the ⟳ marker shows while the
+// caller's filtered fetch verifies the seeded content (C3 cache-first,
+// C6 instant re-entry). On a miss the screen keeps its Loading state —
+// C4 permits the bare Loading only for a never-cached drill.
+func (c *Controller) SeedFilteredListFromCache(targetType string, filter map[string]string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.seedFilteredListFromCache(targetType, filter)
+}
+
+// seedFilteredListFromCache is the lock-free implementation of
+// SeedFilteredListFromCache. Callers must hold c.mu (write).
+func (c *Controller) seedFilteredListFromCache(targetType string, filter map[string]string) bool {
+	if len(filter) == 0 {
+		return false
+	}
+	canon := targetType
+	if td := resource.FindResourceType(targetType); td != nil {
+		canon = td.ShortName
+	}
+	entry, ok := c.core.FilteredRowsGet(canon, filter)
+	if !ok || len(entry.Rows) == 0 {
+		return false
+	}
+	ls := c.topListState()
+	if ls == nil {
+		return false
+	}
+	ls.Rows = append([]resource.Resource(nil), entry.Rows...)
+	ls.Loading = false
+	ls.HasPagination = entry.Truncated
+	ls.PaginationCursor = entry.Cursor
+	ls.Refreshing = true
+	return true
+}
+
 // dispatchRelatedNavigate calls HandleRelatedNavigate then applyRelatedNavResult
 // and merges the two task slices, preferring extraTasks when the same Key
 // appears in both (applyRelatedNavResult returns payload-bearing replacements
@@ -399,9 +437,12 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 			}
 			if len(res.FetchFilter) > 0 {
 				ls.FetchFilter = res.FetchFilter
+				c.seedFilteredListFromCache(res.TargetType, res.FetchFilter)
 				// HandleRelatedNavigate returns a no-payload KindFetchFiltered task
 				// (tested as-is by the QA suite). Replace it here with a payload-
 				// bearing version so the executor can invoke the filtered fetcher.
+				// The task is still returned even on a cache hit: it is the
+				// background verify-refresh that clears Refreshing when it lands.
 				return []runtime.TaskRequest{{
 					Key:     runtime.TaskKey{Kind: runtime.KindFetchFiltered, Scope: res.TargetType},
 					Cache:   runtime.CacheNone,

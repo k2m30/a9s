@@ -167,6 +167,16 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 		// syncExactTotalToMenu makes this safe to call unconditionally — a
 		// truncated or smaller result never regresses a larger known count.
 		c.syncExactTotalToMenu(s, canon)
+		// C6 — a filtered related drill's result is a session view; persisted
+		// under (type + filter) so the next entry into the same drill seeds
+		// instantly (SeedFilteredListFromCache) instead of a bare Loading.
+		// Err results are skipped — a partial page must not replay as
+		// complete. ls.Rows already holds the append-accumulated, materialized
+		// set.
+		if ls := s.State.List; ls != nil && msg.Err == nil && len(ls.FetchFilter) > 0 &&
+			!isTopLevelCanonicalList(s.ID, ls) {
+			c.core.FilteredRowsSet(canon, ls.FetchFilter, ls.Rows, ls.HasPagination, ls.PaginationCursor)
+		}
 		return
 	}
 }
@@ -426,16 +436,42 @@ func (c *Controller) handleRelatedCheckBatch(batch messages.RelatedCheckBatch) {
 // DisplayName and preserving ResourceIDs. The single merge used by every
 // related-result path (result lane, cache replay, batch, async adapter).
 func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, count int, loading bool, errMsg string, approximate bool, resourceIDs []string, fetchFilter map[string]string) {
+	targetIdx := -1
 	for i := range ds.RelatedRows {
 		if ds.RelatedRows[i].DisplayName == displayName {
-			ds.RelatedRows[i].Count = count
-			ds.RelatedRows[i].Loading = loading
-			ds.RelatedRows[i].Err = errMsg
-			ds.RelatedRows[i].Approximate = approximate
-			ds.RelatedRows[i].ResourceIDs = resourceIDs
-			ds.RelatedRows[i].FetchFilter = fetchFilter
+			targetIdx = i
+			break
+		}
+	}
+	// Tight unambiguous fallback for results without DisplayName: match by
+	// TargetType ONLY when exactly one row carries that TargetType. Refuse to
+	// bind on ambiguity rather than guess. Production always populates
+	// DefDisplayName; this branch is test-surface only.
+	if targetIdx < 0 && displayName == "" {
+		matches := 0
+		firstIdx := -1
+		for i := range ds.RelatedRows {
+			if ds.RelatedRows[i].TargetType == targetType {
+				if firstIdx < 0 {
+					firstIdx = i
+				}
+				matches++
+			}
+		}
+		if matches == 1 {
+			targetIdx = firstIdx
+		} else {
 			return
 		}
+	}
+	if targetIdx >= 0 {
+		ds.RelatedRows[targetIdx].Count = count
+		ds.RelatedRows[targetIdx].Loading = loading
+		ds.RelatedRows[targetIdx].Err = errMsg
+		ds.RelatedRows[targetIdx].Approximate = approximate
+		ds.RelatedRows[targetIdx].ResourceIDs = resourceIDs
+		ds.RelatedRows[targetIdx].FetchFilter = fetchFilter
+		return
 	}
 	ds.RelatedRows = append(ds.RelatedRows, DetailRelatedRow{
 		TargetType:  targetType,

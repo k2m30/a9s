@@ -107,6 +107,9 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			w, h := m.innerSize()
 			rs.width, rs.height = w, h
 			m.pushRS(rs)
+			// C6 replay: seed instantly from the session filtered-rows cache; the
+			// fetch below stays as the ⟳ verify-refresh.
+			m.ctrl.SeedFilteredListFromCache(msg.TargetType, result.FetchFilter)
 			return m, tea.Batch(initCmd, m.fetchResourcesFiltered(msg.TargetType, result.FetchFilter, m.core.AvailabilityGen()))
 		}
 
