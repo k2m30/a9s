@@ -2,8 +2,13 @@ package unit
 
 // qa_bug_issue_count_test.go — Tests for three bugs found in live testing:
 // 1. Main menu FrameTitle under ctrl+z should show filtered/total count
-// 2. RDS enricher must count only resources that match probed resources, not all maintenance ARNs
+// 2. dbi enricher must count only resources that match probed resources, not all maintenance ARNs
 // 3. (Consequence of #2 — correct enricher count means correct badge)
+//
+// Bug 2/3 originally pinned against the dead EnrichRDSDocDBMaintenance
+// (deleted: wired to no catalog Wave2 field). EnrichDBIMaintenance is the live
+// sibling exercising the identical maintenance-window mechanics per
+// docs/resources/dbi.md §3.2.
 
 import (
 	"context"
@@ -57,7 +62,7 @@ func TestMainMenuFrameTitle_CtrlZShowsFilteredCount(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Bug 2: RDS enricher counts all maintenance ARNs, not matching resources
+// Bug 2: dbi enricher counts all maintenance ARNs, not matching resources
 // ---------------------------------------------------------------------------
 
 // rdsMaintenanceBugFake returns 4 pending maintenance actions (2 clusters + 2 instances)
@@ -79,7 +84,7 @@ func (f *rdsMaintenanceBugFake) DescribePendingMaintenanceActions(_ context.Cont
 	}, nil
 }
 
-func TestEnrichRDSDocDBMaintenance_FindingsContainMatchingResources(t *testing.T) {
+func TestEnrichDBIMaintenance_FindingsContainMatchingResources(t *testing.T) {
 	fake := &rdsMaintenanceBugFake{}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
@@ -89,38 +94,42 @@ func TestEnrichRDSDocDBMaintenance_FindingsContainMatchingResources(t *testing.T
 		{ID: "rds-eu-west-2-dev-instance", Name: "rds-eu-west-2-dev-instance"},
 	}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources, nil)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, probeResources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// RDS enricher is account-wide: Findings may include off-page resources (clusters, etc.).
-	// Verify the probed instance IDs ARE present in Findings (the key contract).
+	// dbi enricher is account-wide: verify the probed instance IDs ARE
+	// present in Findings (the key contract) and cluster ARNs are excluded.
 	for _, r := range probeResources {
 		if _, ok := result.Findings[r.ID]; !ok {
 			t.Errorf("expected Findings to contain probed resource %q", r.ID)
 		}
 	}
+	if len(result.Findings) != len(probeResources) {
+		t.Errorf("len(Findings) = %d, want %d (cluster ARNs must be excluded by isInstanceARN)", len(result.Findings), len(probeResources))
+	}
 }
 
-func TestEnrichRDSDocDBMaintenance_UnprobedResourcesAppearsAsArnSuffix(t *testing.T) {
+func TestEnrichDBIMaintenance_UnprobedResourcesDoNotAppear(t *testing.T) {
 	fake := &rdsMaintenanceBugFake{}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
 	// Probed resources don't match any maintenance ARNs by ID.
-	// Account-wide enricher still emits findings, keyed by ARN suffix.
 	probeResources := []resource.Resource{
 		{ID: "unrelated-instance", Name: "unrelated-instance"},
 	}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources, nil)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, probeResources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Unmatched ARNs still appear in Findings keyed by their ARN suffix.
-	// Verify the unprobed resource ID is NOT in Findings (no false positive for it).
+	// Unmatched ARNs must not appear in Findings under any key.
 	if _, ok := result.Findings["unrelated-instance"]; ok {
 		t.Error("unrelated-instance must NOT appear in Findings — no matching maintenance action")
+	}
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0 (no probed resource matches any maintenance ARN)", len(result.Findings))
 	}
 }

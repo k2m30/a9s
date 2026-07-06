@@ -56,13 +56,13 @@ func colorSSM(r domain.Resource) domain.Color {
 }
 
 func colorKMS(r domain.Resource) domain.Color {
-	switch r.Fields["key_state"] {
+	switch r.Fields["status"] {
 	case "Enabled":
 		return domain.ColorHealthy
 	case "Disabled":
-		return domain.ColorDim
-	case "PendingDeletion", "PendingImport":
 		return domain.ColorWarning
+	case "PendingDeletion", "PendingImport", "PendingReplicaDeletion":
+		return domain.ColorBroken
 	case "Unavailable":
 		return domain.ColorBroken
 	}
@@ -202,7 +202,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Findings: []catalog.FindingDef{
 			{Code: CodeKMSStatePendingDeletion, Phrase: "pending deletion", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeKMSStateDisabled, Phrase: "disabled", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeKMSStateUnavailable, Phrase: "<key state>", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeKMSStateUnavailable, Phrase: "<key state>", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: kmsCodeRotationDisabled, Phrase: "key rotation disabled (CIS KMS.1)", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},

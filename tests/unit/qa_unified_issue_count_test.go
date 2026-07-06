@@ -51,7 +51,7 @@ type allEnrichersCase struct {
 // that produces severity "!" findings returns result.IssueCount == len(result.Findings)
 // when seeded with one finding. Enrichers that only produce severity "~" (informational)
 // findings are excluded because "~" findings do not contribute to IssueCount — they are
-// tested separately in TestEnrichRDSDocDBMaintenance_OnlyEmitsForProbedResources.
+// tested separately in TestEnrichDBIMaintenance_OnlyEmitsForProbedResources.
 func TestAllEnrichers_IssueCountMatchesFindings(t *testing.T) {
 	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg/abc123"
 	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:sm"

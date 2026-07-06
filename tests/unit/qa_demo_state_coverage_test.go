@@ -120,46 +120,39 @@ var knownStateCoverageGaps = map[string]bool{
 	"glue:broken": true, "glue:dim": true, "glue:warning": true,
 	"iam-group:broken": true, "iam-group:dim": true, "iam-group:warning": true,
 	"iam-user:broken": true, "iam-user:dim": true,
-	// iam-user:warning: NOT a fixture gap — colorIAMUser requires
-	// r.Fields["has_console_password"]=="true", but FetchIAMUsersPage
-	// (iam_users.go) hardcodes it to "false" at Wave 1 and EnrichIAMUserMFA
-	// (the type's only Wave-2 enricher) never writes has_console_password —
-	// it only updates "mfa" and "risk". The warning branch is unreachable
-	// under the current fetcher/enricher wiring; no fixture can bridge this.
+	// iam-user:warning: structurally unreachable through THIS harness — every
+	// raw fixture is fed straight through td.ResolveColor (no Wave-2
+	// FieldUpdates fold), and FetchIAMUsersPage (internal/aws/iam_users.go)
+	// unconditionally hardcodes Fields["has_console_password"]="false" at
+	// fetch time. colorIAMUser's only non-Healthy branch requires
+	// has_console_password=="true", so no raw fixture — regardless of its
+	// PasswordLastUsed value — can ever resolve to Warning here. The
+	// corrected classification (docs/resources/iam-user.md §3.2 console-
+	// login-without-MFA -> Broken) requires the Wave-2 field-update merge
+	// this harness intentionally omits; see TestColorIAMUser_ConsoleUserWithoutMFAClassifiesBroken
+	// in aws_classifier_fivepack_test.go for the pinned production gap.
 	"iam-user:warning": true,
 	"igw:broken":       true, "igw:dim": true,
 	"kinesis:broken": true, "kinesis:dim": true,
-	// kms:broken/dim/warning: NOT a fixture gap — colorKMS (catalog_secrets.go)
-	// reads r.Fields["key_state"], but FetchKMSKeysPage (kms.go) only ever
-	// writes r.Fields["status"]. The fixtures for Disabled/PendingDeletion/
-	// Unavailable key states already exist (kms.go fixtures) but can never
-	// reach the classifier under this field-name mismatch. Production-code
-	// fix required in internal/aws/kms.go or catalog_secrets.go, out of scope
-	// for a fixture-only pass.
-	"kms:broken": true, "kms:dim": true, "kms:warning": true,
-	// lambda:dim/healthy: NOT a fixture gap — colorLambda checks
-	// r.Fields["dlq_target_arn"]=="" (→ forces Warning) BEFORE checking
-	// state=="Inactive" (→ Dim) or falling through to Healthy, but
-	// FetchLambdaFunctionsPage (lambda.go) never writes a "dlq_target_arn"
-	// field at all. Every fixture whose last_update_status isn't "Failed",
-	// whose runtime isn't deprecated, and that carries no wave1 finding is
-	// permanently forced into Warning by the always-empty DLQ check,
-	// regardless of its actual state — both the Dim and Healthy branches
-	// downstream of that check are unreachable under the current wiring.
-	"lambda:dim": true, "lambda:healthy": true,
+	// kms:dim: colorKMS (internal/aws/catalog_secrets.go) has exactly three
+	// branches — Enabled->Healthy, Disabled->Warning, PendingDeletion/
+	// PendingImport/PendingReplicaDeletion/Unavailable->Broken — and no Dim
+	// return. docs/resources/kms.md §3.1/§3.2 document no Dim-producing
+	// signal for this type; structurally unreachable, not a fixture gap.
+	"kms:dim":     true,
 	"logs:broken": true, "logs:dim": true,
 	"msk:dim":         true,
 	"ng:dim":          true,
 	"pipeline:broken": true, "pipeline:dim": true, "pipeline:warning": true,
 	"policy:broken": true, "policy:dim": true,
 	"r53:broken": true, "r53:dim": true,
-	// redis:dim: NOT a fixture gap — colorRedis matches phrase=="deleted", but
-	// FetchRedisPage derives phrase via computeRedisFindings, whose switch has
-	// no case for a "deleted" status (only "deleting", the in-progress form;
-	// ElastiCache's real API never reports "deleted" — a torn-down replication
-	// group simply stops appearing in DescribeReplicationGroups). A fixture
-	// with a raw "deleted" status computes zero findings, so Fields["status"]
-	// resolves to "" instead of "deleted", never reaching the dim branch.
+	// redis:dim: colorRedis (internal/aws/catalog_databases.go) has no Dim
+	// branch — deleted as dead code per AWS API behavior (a torn-down
+	// ElastiCache ReplicationGroup simply stops appearing in
+	// DescribeReplicationGroups rather than reporting a "deleted" status;
+	// see docs/resources/redis.md §3.1/§3.2/§5 and the Bug 4 pin in
+	// aws_classifier_fivepack_test.go). Structurally unreachable, not a
+	// fixture gap.
 	"redis:dim":    true,
 	"redshift:dim": true,
 	"role:dim":     true, "role:warning": true,

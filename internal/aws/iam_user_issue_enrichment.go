@@ -163,9 +163,15 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		if localIssue {
 			issueCount++
 		}
+		consolePasswordVal := "false"
+		if hasConsolePassword {
+			consolePasswordVal = "true"
+		}
+
 		result.FieldUpdates[r.ID] = map[string]string{
-			"mfa":  mfaVal,
-			"risk": riskLabel,
+			"mfa":                  mfaVal,
+			"risk":                 riskLabel,
+			"has_console_password": consolePasswordVal, //nolint:gosec // not a credential, display field key
 		}
 
 		if len(rows) == 0 {

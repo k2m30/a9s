@@ -1,10 +1,18 @@
 package unit
 
 // qa_enrich_rds_finding_key_test.go — regression tests for Bug B2:
-// EnrichRDSDocDBMaintenance emits findings for cluster ARNs that do not match
-// any probed instance ID, via the arnSuffix fallback. This bloats the banner
-// count and prevents the detail view Background Check section from appearing
-// (detail lookup uses resource.ID, which never matches a cluster ARN suffix).
+// EnrichDBIMaintenance must emit findings only for probed dbi instance IDs.
+// Cluster ARNs (dbc) must never leak into Findings via an arnSuffix fallback.
+// This bloats the banner count and prevents the detail view Background Check
+// section from appearing (detail lookup uses resource.ID, which never matches
+// a cluster ARN suffix).
+//
+// Originally pinned against the dead EnrichRDSDocDBMaintenance (deleted: wired
+// to no catalog Wave2 field). EnrichDBIMaintenance is the live sibling that
+// exercises the identical maintenance-window mechanics per docs/resources/dbi.md
+// §3.2, and additionally filters cluster ARNs via isInstanceARN before any
+// ID matching — a strictly stronger guarantee than the original arnSuffix-only
+// contract this test pinned.
 
 import (
 	"context"
@@ -61,11 +69,10 @@ func (f *rdsFindingKeyFake) DescribePendingMaintenanceActions(
 	}, nil
 }
 
-// TestEnrichRDSDocDBMaintenance_OnlyEmitsForProbedResources verifies that the
+// TestEnrichDBIMaintenance_OnlyEmitsForProbedResources verifies that the
 // enricher only creates findings for resources whose ID matches a probed instance.
-// Cluster ARNs not in probeResources must not produce findings via arnSuffix fallback.
-// FAILS today: current code uses arnSuffix fallback → len(findings)==4 not 2.
-func TestEnrichRDSDocDBMaintenance_OnlyEmitsForProbedResources(t *testing.T) {
+// Cluster ARNs must not produce findings via arnSuffix fallback.
+func TestEnrichDBIMaintenance_OnlyEmitsForProbedResources(t *testing.T) {
 	fake := &rdsFindingKeyFake{}
 	clients := &awsclient.ServiceClients{RDS: fake}
 	probeResources := []resource.Resource{
@@ -73,7 +80,7 @@ func TestEnrichRDSDocDBMaintenance_OnlyEmitsForProbedResources(t *testing.T) {
 		{ID: "rds-instance-b"},
 	}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources, nil)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, probeResources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

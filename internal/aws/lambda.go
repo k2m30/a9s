@@ -102,23 +102,30 @@ func FetchLambdaFunctionsPageWithEventSources(
 			eventSourceARN, _ = firstLambdaEventSourceARN(ctx, eventSourceAPI, functionName)
 		}
 
+		dlqTargetARN := ""
+		if fn.DeadLetterConfig != nil {
+			dlqTargetARN = aws.ToString(fn.DeadLetterConfig.TargetArn)
+		}
+
 		r := resource.Resource{
 			ID:   functionName,
 			Name: functionName,
 			// Status intentionally unset — lifecycle state is emitted as a Finding.
 			Fields: map[string]string{
-				"function_name":    functionName,
-				"runtime":          runtime,
-				"state":            string(fn.State),
-				"memory":           memory,
-				"timeout":          timeout,
-				"handler":          handler,
-				"last_modified":    lastModified,
-				"code_size":        codeSize,
-				"log_group":        logGroup,
-				"package_type":     packageType,
-				"event_source_arn": eventSourceARN,
-				"arn":              aws.ToString(fn.FunctionArn),
+				"function_name":      functionName,
+				"runtime":            runtime,
+				"state":              string(fn.State),
+				"last_update_status": string(fn.LastUpdateStatus),
+				"memory":             memory,
+				"timeout":            timeout,
+				"handler":            handler,
+				"last_modified":      lastModified,
+				"code_size":          codeSize,
+				"log_group":          logGroup,
+				"package_type":       packageType,
+				"event_source_arn":   eventSourceARN,
+				"dlq_target_arn":     dlqTargetARN,
+				"arn":                aws.ToString(fn.FunctionArn),
 			},
 			RawStruct: fn,
 		}

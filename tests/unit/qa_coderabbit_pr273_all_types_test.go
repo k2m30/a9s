@@ -51,8 +51,8 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 type typeContract struct {
@@ -139,7 +139,13 @@ var typeContracts = []typeContract{
 	{shortName: "eks", apiDoc: "https://docs.aws.amazon.com/eks/latest/APIReference/API_DescribeCluster.html", statusField: "status", healthyStatuses: []string{"ACTIVE"}, warningStatuses: []string{"CREATING", "UPDATING", "DELETING"}, brokenStatuses: []string{"FAILED"}, reasoning: "EKS ClusterStatus per DescribeCluster."},
 	{shortName: "elb", apiDoc: "https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeLoadBalancers.html", statusField: "state", healthyStatuses: []string{"active"}, warningStatuses: []string{"provisioning", "active_impaired"}, brokenStatuses: []string{"failed"}, reasoning: "ELBv2 State.Code per DescribeLoadBalancers: active | provisioning | active_impaired | failed."},
 	{shortName: "eni", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeNetworkInterfaces.html", statusField: "status", healthyStatuses: []string{"in-use"}, warningStatuses: []string{"available", "attaching", "detaching"}, reasoning: "ENI Status per DescribeNetworkInterfaces: available | associated | attaching | in-use | detaching. 'available' with type != requester-managed → Warning (orphan ENI)."},
-	{shortName: "lambda", apiDoc: "https://docs.aws.amazon.com/lambda/latest/api/API_GetFunctionConfiguration.html", statusField: "state", warningStatuses: []string{"Active", "Pending", "Inactive"}, brokenStatuses: []string{"Failed"}, reasoning: "Lambda FunctionConfiguration.State per GetFunctionConfiguration: Pending | Active | Inactive | Failed. Active/Inactive/Pending all → Warning under minimal-field injection (dlq_target_arn empty → missing DLQ warning)."},
+	// "Inactive" is deliberately absent from warningStatuses: docs/resources/lambda.md
+	// §4 precedence table puts State==Inactive→Dim BEFORE the missing-DLQ Warning
+	// check (see colorLambda's switch-on-state, which returns before reaching the
+	// dlq_target_arn=="" branch). This table has no dim bucket to assert against;
+	// full Dim coverage lives in qa_lambda_color_test.go and
+	// aws_classifier_fivepack_test.go's TestColorLambda_RealFetcherReachesDimAndHealthy.
+	{shortName: "lambda", apiDoc: "https://docs.aws.amazon.com/lambda/latest/api/API_GetFunctionConfiguration.html", statusField: "state", warningStatuses: []string{"Active", "Pending"}, brokenStatuses: []string{"Failed"}, reasoning: "Lambda FunctionConfiguration.State per GetFunctionConfiguration: Pending | Active | Inactive | Failed. Active→Warning (missing-DLQ, dlq_target_arn empty under minimal-field injection); Pending→Warning per §4. Inactive→Dim per lambda.md §4 precedence (State switch returns before the DLQ check), not asserted here — see qa_lambda_color_test.go."},
 	{shortName: "nat", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeNatGateways.html", statusField: "state", healthyStatuses: []string{"available"}, warningStatuses: []string{"pending", "deleting"}, brokenStatuses: []string{"failed"}, reasoning: "NAT Gateway State per DescribeNatGateways: pending | failed | available | deleting | deleted."},
 	{shortName: "ng", apiDoc: "https://docs.aws.amazon.com/eks/latest/APIReference/API_DescribeNodegroup.html", statusField: "status", healthyStatuses: []string{"ACTIVE"}, warningStatuses: []string{"CREATING", "UPDATING", "DELETING"}, brokenStatuses: []string{"CREATE_FAILED", "DELETE_FAILED", "DEGRADED"}, reasoning: "EKS Nodegroup Status per DescribeNodegroup: CREATING | ACTIVE | UPDATING | DELETING | CREATE_FAILED | DELETE_FAILED | DEGRADED."},
 	// redis: post-migration (2026-04-23) Fields["status"] carries §4 PHRASES,

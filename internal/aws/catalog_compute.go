@@ -136,18 +136,16 @@ func colorLambda(r domain.Resource) domain.Color {
 	if c, ok := colorFromWave1(r); ok {
 		return c
 	}
-	state := r.Fields["state"]
-	switch state {
+	switch r.Fields["state"] {
 	case "Failed":
 		return domain.ColorBroken
 	case "Pending":
 		return domain.ColorWarning
+	case "Inactive":
+		return domain.ColorDim
 	}
 	if r.Fields["dlq_target_arn"] == "" {
 		return domain.ColorWarning
-	}
-	if state == "Inactive" {
-		return domain.ColorDim
 	}
 	return domain.ColorHealthy
 }
@@ -730,9 +728,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return FetchLambdaFunctionsPage(ctx, c.Lambda, continuationToken)
 		},
 		FieldKeys: []string{
-			"function_name", "runtime", "state", "memory", "timeout", "handler",
-			"last_modified", "code_size", "log_group", "package_type",
-			"event_source_arn", "arn",
+			"function_name", "runtime", "state", "last_update_status", "memory",
+			"timeout", "handler", "last_modified", "code_size", "log_group",
+			"package_type", "event_source_arn", "dlq_target_arn", "arn",
 		},
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkLambdaRole, NeedsTargetCache: true},

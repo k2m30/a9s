@@ -360,6 +360,6 @@ func kmsStateFindings(state kmstypes.KeyState, stateStr string) []domain.Finding
 	case kmstypes.KeyStateDisabled:
 		return []domain.Finding{{Code: CodeKMSStateDisabled, Phrase: "disabled", Severity: domain.SevWarn, Source: "wave1"}}
 	default:
-		return []domain.Finding{{Code: CodeKMSStateUnavailable, Phrase: stateStr, Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{{Code: CodeKMSStateUnavailable, Phrase: stateStr, Severity: domain.SevBroken, Source: "wave1"}}
 	}
 }

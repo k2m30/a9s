@@ -42,8 +42,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // =============================================================================
@@ -824,8 +824,8 @@ func TestCR273_Item3_CloudWatchAlarm_ALARM_ReturnsBroken(t *testing.T) {
 	}
 	// Use the fetcher's real field key ("state"), not the wrong resolver key ("state_value").
 	r := resource.Resource{
-		ID:     "acme-cpu-high-alarm",
-		Name:   "acme-cpu-high-alarm",
+		ID:   "acme-cpu-high-alarm",
+		Name: "acme-cpu-high-alarm",
 		Fields: map[string]string{
 			"alarm_name": "acme-cpu-high-alarm",
 			"state":      "ALARM",
@@ -848,8 +848,8 @@ func TestCR273_Item3_CloudWatchAlarm_INSUFFICIENT_DATA_ReturnsWarning(t *testing
 		t.Fatal("resource type 'alarm' not registered")
 	}
 	r := resource.Resource{
-		ID:     "acme-disk-alarm",
-		Name:   "acme-disk-alarm",
+		ID:   "acme-disk-alarm",
+		Name: "acme-disk-alarm",
 		Fields: map[string]string{
 			"alarm_name": "acme-disk-alarm",
 			"state":      "INSUFFICIENT_DATA",
@@ -1016,6 +1016,12 @@ func TestCR273_Item18_TrivialColor_MustClassify(t *testing.T) {
 		// ses phrase-based statuses (Color reads Fields["status"] derived phrase).
 		"verification failed", "verify: temp failure", "verification not started",
 		"pending verification", "sending disabled",
+		// redis phrase-based statuses (colorRedis reads Fields["status"] derived
+		// phrase, not the raw ReplicationGroup.Status enum — see docs/resources/redis.md §4).
+		"create failed — see events", "creating — new group",
+		"modifying — config change", "snapshotting — backup running",
+		"deleting — teardown", "multi-AZ without auto-failover",
+		"shard 0002 degraded",
 	}
 
 	fieldKeys := []string{

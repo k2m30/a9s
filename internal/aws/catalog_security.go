@@ -28,6 +28,11 @@ func colorPolicy(r domain.Resource) domain.Color {
 }
 
 func colorIAMUser(r domain.Resource) domain.Color {
+	for i := range r.Findings {
+		if r.Findings[i].Code == iamUserCodeNoMFA && r.Findings[i].IsWave2Sourced() {
+			return colorFromSeverity(r.Findings[i].Severity)
+		}
+	}
 	if r.Fields["has_console_password"] != "true" {
 		return domain.ColorHealthy
 	}
@@ -199,7 +204,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			"user_name", "user_id", "path", "create_date", "password_last_used",
 			"has_console_password",
 		},
-		IssueEnricherFieldKeys: []string{"mfa", "risk"},
+		IssueEnricherFieldKeys: []string{"mfa", "risk", "has_console_password"},
 		Related: []domain.RelatedDef{
 			{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkUserGroup, NeedsTargetCache: false},
 			{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkUserPolicy, NeedsTargetCache: false},

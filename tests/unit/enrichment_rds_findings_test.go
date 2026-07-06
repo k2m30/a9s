@@ -1,16 +1,22 @@
 package unit
 
-// enrichment_rds_findings_test.go — Behavioral tests for EnrichRDSDocDBMaintenance
+// enrichment_rds_findings_test.go — Behavioral tests for EnrichDBIMaintenance
 // plus the AS-140 stacked wave-1+wave-2 case for EnrichDBIMaintenance.
 //
-// Contract assertions (enricher-contract.md):
-//   - Returns EnricherResult.Findings keyed by Resource.ID (ARN-suffix match).
+// The generic-invariant tests below were originally pinned against the dead
+// EnrichRDSDocDBMaintenance (deleted: wired to no catalog Wave2 field — dbi
+// and dbc each have their own live maintenance enrichers). EnrichDBIMaintenance
+// is the drop-in sibling exercising the same maintenance-window mechanics per
+// docs/resources/dbi.md §3.2, so the contract assertions below still apply:
+//
+//   - Returns IssueEnricherResult.Findings keyed by Resource.ID (ARN-suffix match).
 //   - Severity "~" for all findings (informational, excluded from menu badge).
-//   - Summary format: "pending maintenance: <actions>".
+//   - Summary format: "maintenance scheduled" (dbi's S4 phrase, see dbi.md §4).
 //   - IssueCount always 0 (severity "~" rule).
-//   - Findings may contain entries for resources NOT in the input slice (account-wide).
 //   - Empty result → non-nil empty Findings map.
-//   - Truncated = true when Marker is non-nil.
+//   - Off-input-slice ARNs must not leak into Findings (unlike the dead
+//     enricher's account-wide arnSuffix fallback, EnrichDBIMaintenance only
+//     emits for probeIDs present in the input resources slice).
 
 import (
 	"context"
@@ -49,9 +55,9 @@ func (f *enrichRDSFake) DescribePendingMaintenanceActions(
 	}, nil
 }
 
-// TestEnrichRDSDocDBMaintenance_FindingsKeyedByResourceID verifies that the findings
+// TestEnrichDBIMaintenance_FindingsKeyedByResourceID verifies that the findings
 // map is keyed by the ARN suffix — i.e. Resource.ID form — not the full ARN.
-func TestEnrichRDSDocDBMaintenance_FindingsKeyedByResourceID(t *testing.T) {
+func TestEnrichDBIMaintenance_FindingsKeyedByResourceID(t *testing.T) {
 	fake := &enrichRDSFake{
 		actions: []rdstypes.ResourcePendingMaintenanceActions{
 			{
@@ -65,7 +71,7 @@ func TestEnrichRDSDocDBMaintenance_FindingsKeyedByResourceID(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: fake}
 	resources := []resource.Resource{{ID: "prod-db"}}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -77,8 +83,8 @@ func TestEnrichRDSDocDBMaintenance_FindingsKeyedByResourceID(t *testing.T) {
 	}
 }
 
-// TestEnrichRDSDocDBMaintenance_SeverityTilde verifies findings carry severity "~".
-func TestEnrichRDSDocDBMaintenance_SeverityTilde(t *testing.T) {
+// TestEnrichDBIMaintenance_SeverityTilde verifies findings carry severity "~".
+func TestEnrichDBIMaintenance_SeverityTilde(t *testing.T) {
 	fake := &enrichRDSFake{
 		actions: []rdstypes.ResourcePendingMaintenanceActions{
 			{
@@ -92,7 +98,7 @@ func TestEnrichRDSDocDBMaintenance_SeverityTilde(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: fake}
 	resources := []resource.Resource{{ID: "my-db"}}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -105,9 +111,10 @@ func TestEnrichRDSDocDBMaintenance_SeverityTilde(t *testing.T) {
 	}
 }
 
-// TestEnrichRDSDocDBMaintenance_SummaryFormat verifies the summary matches
-// "pending maintenance: <action>" contract.
-func TestEnrichRDSDocDBMaintenance_SummaryFormat(t *testing.T) {
+// TestEnrichDBIMaintenance_SummaryFormat verifies the summary matches the
+// dbi.md §4 S4 phrase contract: "maintenance scheduled" — Action/Description
+// live in Rows, not the summary phrase.
+func TestEnrichDBIMaintenance_SummaryFormat(t *testing.T) {
 	fake := &enrichRDSFake{
 		actions: []rdstypes.ResourcePendingMaintenanceActions{
 			{
@@ -121,26 +128,36 @@ func TestEnrichRDSDocDBMaintenance_SummaryFormat(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: fake}
 	resources := []resource.Resource{{ID: "my-db"}}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	f := result.Findings["my-db"]
-	if !strings.HasPrefix(f.Phrase, "pending maintenance") {
-		t.Errorf("summary %q does not start with %q", f.Phrase, "pending maintenance")
+	if f.Phrase != "maintenance scheduled" {
+		t.Errorf("Phrase = %q, want %q", f.Phrase, "maintenance scheduled")
 	}
-	if !strings.Contains(f.Phrase, "system-update") {
-		t.Errorf("summary %q does not contain action name %q", f.Phrase, "system-update")
+	if !strings.Contains(f.Detail, "system-update") {
+		var rowsHaveAction bool
+		if ad, ok := result.AttentionDetails["my-db"]; ok {
+			for _, row := range ad.Rows {
+				if row.Label == "Action" && row.Value == "system-update" {
+					rowsHaveAction = true
+				}
+			}
+		}
+		if !rowsHaveAction {
+			t.Errorf("action %q not found in Detail %q nor in AttentionDetails Rows", "system-update", f.Detail)
+		}
 	}
 }
 
-// TestEnrichRDSDocDBMaintenance_OffPageFindingsAreSkipped verifies that
-// findings for resources NOT in the input slice are dropped. Emitting them
-// would inflate unifiedIssueCount above the visible row count — e.g. when
-// the enricher is dispatched for dbc (clusters), instance ARNs would otherwise
-// produce findings keyed by instance IDs that don't correspond to any
-// cluster row, surfacing as "DB Clusters (2) issues:4".
-func TestEnrichRDSDocDBMaintenance_OffPageFindingsAreSkipped(t *testing.T) {
+// TestEnrichDBIMaintenance_OffInputFindingsAreSkipped verifies that findings
+// for resources NOT in the input slice are dropped. Emitting them would
+// inflate unifiedIssueCount above the visible row count — e.g. an instance ARN
+// not present in the probed dbi list must not produce a finding keyed by an
+// ID that doesn't correspond to any visible row, surfacing as
+// "DB Instances (1) issues:2".
+func TestEnrichDBIMaintenance_OffInputFindingsAreSkipped(t *testing.T) {
 	fake := &enrichRDSFake{
 		actions: []rdstypes.ResourcePendingMaintenanceActions{
 			{
@@ -160,7 +177,7 @@ func TestEnrichRDSDocDBMaintenance_OffPageFindingsAreSkipped(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: fake}
 	resources := []resource.Resource{{ID: "on-page-db"}}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources, nil)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -175,18 +192,18 @@ func TestEnrichRDSDocDBMaintenance_OffPageFindingsAreSkipped(t *testing.T) {
 	}
 }
 
-// TestEnrichRDSDocDBMaintenance_EmptyReturnsNonNilMap verifies the empty case returns
+// TestEnrichDBIMaintenance_EmptyReturnsNonNilMap verifies the empty case returns
 // a non-nil empty Findings map (MUST NOT return nil — banner logic depends on len(Findings)).
-func TestEnrichRDSDocDBMaintenance_EmptyReturnsNonNilMap(t *testing.T) {
+func TestEnrichDBIMaintenance_EmptyReturnsNonNilMap(t *testing.T) {
 	fake := &enrichRDSFake{actions: nil, marker: nil}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, nil, nil)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if result.Findings == nil {
-		t.Error("Findings must not be nil on empty result — use make(map[string]EnrichmentFinding)")
+		t.Error("Findings must not be nil on empty result — use make(map[string]domain.Finding)")
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected empty Findings, got %d entries", len(result.Findings))
@@ -196,37 +213,11 @@ func TestEnrichRDSDocDBMaintenance_EmptyReturnsNonNilMap(t *testing.T) {
 	}
 }
 
-// TestEnrichRDSDocDBMaintenance_TruncatedWhenMarkerPresent verifies Truncated=true
-// when the API response has a non-nil Marker.
-func TestEnrichRDSDocDBMaintenance_TruncatedWhenMarkerPresent(t *testing.T) {
-	fake := &enrichRDSFake{
-		actions: []rdstypes.ResourcePendingMaintenanceActions{
-			{
-				ResourceIdentifier: aws.String("arn:aws:rds:us-east-1:000000000000:db:db-1"),
-				PendingMaintenanceActionDetails: []rdstypes.PendingMaintenanceAction{
-					{Action: aws.String("system-update")},
-				},
-			},
-		},
-		marker: aws.String("next-page"),
-	}
-	clients := &awsclient.ServiceClients{RDS: fake}
-	resources := []resource.Resource{{ID: "db-1"}}
-
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when API response Marker is non-nil")
-	}
-}
-
-// TestEnrichRDSDocDBMaintenance_NilRDSClientReturnsEmptyFindings verifies nil client
+// TestEnrichDBIMaintenance_NilRDSClientReturnsEmptyFindings verifies nil client
 // returns non-nil empty Findings (not an error — degraded gracefully).
-func TestEnrichRDSDocDBMaintenance_NilRDSClientReturnsEmptyFindings(t *testing.T) {
+func TestEnrichDBIMaintenance_NilRDSClientReturnsEmptyFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: nil}
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, nil, nil)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

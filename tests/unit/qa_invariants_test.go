@@ -310,7 +310,8 @@ type enricherInvariantCase struct {
 //
 //	["dbi", "ebs", "cb", "tg", "pipeline", "sfn", "glue"]
 //
-// Note: "rds" shares EnrichRDSDocDBMaintenance with "dbi" and is covered by the dbi case.
+// Note: dbi's live maintenance enricher is EnrichDBIMaintenance (the dead
+// EnrichRDSDocDBMaintenance, wired to no catalog Wave2 field, was deleted).
 func TestEnrichmentFinding_AllKeptEnrichersPopulateRows(t *testing.T) {
 	buildDate := time.Date(2026, 4, 14, 10, 0, 0, 0, time.UTC)
 	tgARN := "arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/inv-tg/abc"
@@ -318,19 +319,19 @@ func TestEnrichmentFinding_AllKeptEnrichersPopulateRows(t *testing.T) {
 
 	cases := []enricherInvariantCase{
 		{
-			name: "dbi (EnrichRDSDocDBMaintenance)",
+			name: "dbi (EnrichDBIMaintenance)",
 			clients: &awsclient.ServiceClients{RDS: &invRDSFake{
 				actions: []rdstypes.ResourcePendingMaintenanceActions{
 					{
 						ResourceIdentifier: aws.String("arn:aws:rds:us-east-1:000000000000:db:inv-db"),
 						PendingMaintenanceActionDetails: []rdstypes.PendingMaintenanceAction{
-							{Action: aws.String("system-update")},
+							{Action: aws.String("system-update"), Description: aws.String("Engine patch")},
 						},
 					},
 				},
 			}},
 			resources: []resource.Resource{{ID: "inv-db"}},
-			enrich:    awsclient.EnrichRDSDocDBMaintenance,
+			enrich:    awsclient.EnrichDBIMaintenance,
 		},
 		{
 			name: "ebs (EnrichEBSVolumeStatus)",

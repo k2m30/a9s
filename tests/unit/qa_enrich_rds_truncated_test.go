@@ -1,10 +1,16 @@
 package unit
 
-// qa_enrich_rds_truncated_test.go — Tests that EnrichRDSDocDBMaintenance
-// correctly reports Truncated=true when the DescribePendingMaintenanceActions
-// response has a non-nil Marker (pagination continuation token).
+// qa_enrich_rds_truncated_test.go — Tests that EnrichDBIMaintenance
+// correctly reports Truncated when the DescribePendingMaintenanceActions
+// pagination walk cannot terminate before hitting EnrichmentCap.
 //
-// Updated for EnricherResult return type: result, err := EnrichRDSDocDBMaintenance(...).
+// Originally pinned against the dead EnrichRDSDocDBMaintenance (deleted:
+// wired to no catalog Wave2 field), which set Truncated straight from the
+// last page's Marker. EnrichDBIMaintenance (the live sibling per
+// docs/resources/dbi.md §3.2) uses a different mechanism: it keeps
+// paginating until Marker is nil/empty OR EnrichmentCap pages have been
+// walked — so Truncated only flips true when the API never stops handing
+// back a Marker within the cap, not merely because the last page had one.
 
 import (
 	"context"
@@ -33,7 +39,7 @@ func (f *rdsMaintenanceFake) DescribePendingMaintenanceActions(_ context.Context
 	}, nil
 }
 
-func TestEnrichRDSDocDBMaintenance_NotTruncated(t *testing.T) {
+func TestEnrichDBIMaintenance_NotTruncated(t *testing.T) {
 	fake := &rdsMaintenanceFake{
 		actions: []rdstypes.ResourcePendingMaintenanceActions{
 			{ResourceIdentifier: aws.String("arn:aws:rds:us-east-1:000000000000:db:prod-db")},
@@ -43,7 +49,7 @@ func TestEnrichRDSDocDBMaintenance_NotTruncated(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: fake}
 
 	probeResources := []resource.Resource{{ID: "prod-db"}}
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources, nil)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, probeResources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -51,32 +57,41 @@ func TestEnrichRDSDocDBMaintenance_NotTruncated(t *testing.T) {
 		t.Errorf("len(Findings) = %d, want 1", len(result.Findings))
 	}
 	if result.Truncated {
-		t.Error("Truncated = true, want false (no Marker)")
+		t.Error("Truncated = true, want false (single page, no Marker)")
 	}
 }
 
-func TestEnrichRDSDocDBMaintenance_Truncated(t *testing.T) {
-	fake := &rdsMaintenanceFake{
-		actions: []rdstypes.ResourcePendingMaintenanceActions{
-			{ResourceIdentifier: aws.String("arn:aws:rds:us-east-1:000000000000:db:prod-db-1")},
-			{ResourceIdentifier: aws.String("arn:aws:rds:us-east-1:000000000000:db:prod-db-2")},
+// rdsUnboundedMaintenanceFake always hands back a non-nil Marker, so the
+// pagination walk in EnrichDBIMaintenance never sees a natural stop and must
+// be cut off by EnrichmentCap.
+type rdsUnboundedMaintenanceFake struct {
+	awsclient.RDSAPI
+	calls int
+}
+
+func (f *rdsUnboundedMaintenanceFake) DescribePendingMaintenanceActions(_ context.Context, _ *rds.DescribePendingMaintenanceActionsInput, _ ...func(*rds.Options)) (*rds.DescribePendingMaintenanceActionsOutput, error) {
+	f.calls++
+	return &rds.DescribePendingMaintenanceActionsOutput{
+		PendingMaintenanceActions: []rdstypes.ResourcePendingMaintenanceActions{
+			{ResourceIdentifier: aws.String("arn:aws:rds:us-east-1:000000000000:db:prod-db")},
 		},
-		marker: aws.String("next-page-token"), // more pages exist
-	}
+		Marker: aws.String("next-page-token"), // never terminates on its own
+	}, nil
+}
+
+func TestEnrichDBIMaintenance_TruncatedWhenPaginationHitsCap(t *testing.T) {
+	fake := &rdsUnboundedMaintenanceFake{}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
-	probeResources := []resource.Resource{
-		{ID: "prod-db-1"},
-		{ID: "prod-db-2"},
-	}
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources, nil)
+	probeResources := []resource.Resource{{ID: "prod-db"}}
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, probeResources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result.Findings) != 2 {
-		t.Errorf("len(Findings) = %d, want 2", len(result.Findings))
-	}
 	if !result.Truncated {
-		t.Error("Truncated = false, want true (Marker is non-nil)")
+		t.Error("Truncated = false, want true (pagination never terminates, must hit EnrichmentCap)")
+	}
+	if fake.calls != awsclient.EnrichmentCap {
+		t.Errorf("DescribePendingMaintenanceActions called %d times, want exactly EnrichmentCap=%d", fake.calls, awsclient.EnrichmentCap)
 	}
 }

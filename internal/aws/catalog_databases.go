@@ -77,9 +77,6 @@ func colorRedis(r domain.Resource) domain.Color {
 		return c
 	}
 	phrase := stripFindingSuffix(r.Fields["status"])
-	if phrase == "deleted" {
-		return domain.ColorDim
-	}
 	switch phrase {
 	case "create failed — see events":
 		return domain.ColorBroken
