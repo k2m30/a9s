@@ -122,6 +122,15 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 			// feeds ObserveCount instead of Observe.
 			if len(realRows) > 0 {
 				c.ObserveRows(shortName, realRows, &resource.PaginationMeta{IsTruncated: truncated[shortName]}, session.OriginDisk, false)
+				// ObserveRows/Observe sets TotalCount=len(rows) unconditionally, which
+				// silently drops a C6a count exceeding the seeded row page (e.g. a
+				// 55-row disk count with only 50 real rows on disk) — the first list
+				// frame would then show 50+ instead of 55+. ObserveCountRows'
+				// counts-only write (C6a contract, rowstore.go's ObserveCount doc
+				// comment) restores the wider count without touching Rows.
+				if count > len(realRows) {
+					c.ObserveCountRows(shortName, count)
+				}
 			} else {
 				c.ObserveCountRows(shortName, count)
 			}

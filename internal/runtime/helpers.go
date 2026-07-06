@@ -70,15 +70,18 @@ func ApplyWave2ToRow(
 	if r == nil {
 		return
 	}
-	// Strip any existing wave2 entries; fetchers write wave1 Findings directly (W1.1+).
-	n := 0
+	// Strip any existing wave2 entries; fetchers write wave1 Findings directly
+	// (W1.1+). Builds a NEW backing array rather than compacting r.Findings in
+	// place (r.Findings[n] = f) — applyEnrichment's row copy is shallow, so an
+	// in-place compaction here would mutate the backing array still shared
+	// with prior snapshots/retained rows.
+	out := make([]domain.Finding, 0, len(r.Findings))
 	for _, f := range r.Findings {
 		if !strings.HasPrefix(f.Source, "wave2:") {
-			r.Findings[n] = f
-			n++
+			out = append(out, f)
 		}
 	}
-	r.Findings = r.Findings[:n]
+	r.Findings = out
 	r.AttentionDetails = nil
 	f, ok := findings[r.ID]
 	if !ok || f.Phrase == "" {

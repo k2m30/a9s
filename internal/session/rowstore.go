@@ -233,6 +233,12 @@ func isStaleReplaceRows(existing, incoming []resource.Resource, pagination *reso
 //     existing Fetch-origin (or Probe-origin) entry that already carries
 //     rows — a disk seed race-losing to an already-landed live result must
 //     not regress the session's live knowledge.
+//  1b. Probe-vs-Fetch (append=false only): an OriginProbe replace is
+//     rejected over an existing Fetch-origin entry that already carries
+//     rows — a (possibly smaller, truncated) availability-probe page must
+//     never regress rows a live top-level fetch already accumulated via
+//     load-more. Probe replacing Probe, or Probe replacing Disk, is still
+//     allowed; Fetch replacing Fetch is untouched by this rule.
 //  2. Stale replace (append=false only): mirrors isStaleReplace — a smaller,
 //     still-truncated, strict-ID-subset replace is rejected as an
 //     out-of-order straggler.
@@ -252,6 +258,10 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 	existing := s.types[canon]
 
 	if origin == OriginDisk && len(existing.Rows) > 0 && (existing.Origin == OriginFetch || existing.Origin == OriginProbe) {
+		return existing.Rows, existing.Gen
+	}
+
+	if !appendPage && origin == OriginProbe && len(existing.Rows) > 0 && existing.Origin == OriginFetch {
 		return existing.Rows, existing.Gen
 	}
 

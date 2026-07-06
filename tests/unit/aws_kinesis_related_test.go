@@ -169,7 +169,16 @@ func TestRelated_Kinesis_Lambda_Found(t *testing.T) {
 	}
 }
 
-func TestRelated_Kinesis_Lambda_NotFound(t *testing.T) {
+// TestRelated_Kinesis_Lambda_MappedFnNotInCache_FallsBackToARNBareName pins
+// the union contract (internal/aws/related_common.go
+// lambdaEventSourceMappingLambdaCheck): a ListEventSourceMappings-confirmed
+// FunctionArn that is NOT the one resolved in a non-truncated lambda
+// ResourceCache is not dropped — it is still counted via the bare function
+// name parsed from its own ARN. Renamed from
+// TestRelated_Kinesis_Lambda_NotFound (pre-fix behavior asserted a
+// definitive Count=0 here; the API result is authoritative regardless of
+// cache membership).
+func TestRelated_Kinesis_Lambda_MappedFnNotInCache_FallsBackToARNBareName(t *testing.T) {
 	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
 	const mappedFnArn = "arn:aws:lambda:us-east-1:123456789012:function:process-clickstream"
 	const cachedFnArn = "arn:aws:lambda:us-east-1:123456789012:function:unrelated-fn"
@@ -200,8 +209,17 @@ func TestRelated_Kinesis_Lambda_NotFound(t *testing.T) {
 
 	checker := kinesisCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, source, cache)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (mapping's function isn't the one cached — no match against lambda cache)", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (the API-confirmed mapping is authoritative even though its function isn't the one cached — union contract)", result.Count)
+	}
+	found := false
+	for _, id := range result.ResourceIDs {
+		if id == "process-clickstream" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("ResourceIDs = %v, want to contain %q (bare function name parsed from the cache-missing mapping's own ARN)", result.ResourceIDs, "process-clickstream")
 	}
 	if fake.calls != 1 {
 		t.Errorf("ListEventSourceMappings called %d times, want exactly 1", fake.calls)

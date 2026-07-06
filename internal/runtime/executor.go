@@ -257,8 +257,9 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			return nil, nil
 		}
 		cacheSnap := c.SnapshotCache()
-		mainCacheKeys := make(map[string]struct{}, len(c.ResourceCacheKeys()))
-		for _, k := range c.ResourceCacheKeys() {
+		fetchKeys := c.FetchOriginCacheKeys()
+		mainCacheKeys := make(map[string]struct{}, len(fetchKeys))
+		for _, k := range fetchKeys {
 			mainCacheKeys[k] = struct{}{}
 		}
 		gen := c.RelatedGen()

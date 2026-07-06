@@ -119,14 +119,17 @@ func relatedResult(target string, ids []string) resource.RelatedCheckResult {
 // is the Lambda event source, and lambda:ListEventSourceMappings filtered by
 // EventSourceArn (one call per open resource — budget rule 7 in
 // docs/related-resources.md) is itself the authoritative mechanism per
-// kinesis.md/msk.md §2 — its FunctionArn values are the definitive answer.
-// The already-loaded lambda cache, when present, only enriches: it resolves
-// each FunctionArn to the bare function name the lambda drill/detail view
-// navigates by (resource.Resource.ID for a Lambda function is its bare
-// FunctionName — see FetchLambdaFunctionsPageWithEventSources). When the
-// cache is absent, the bare name is instead parsed out of the FunctionArn
-// (arn:aws:lambda:region:account:function:name[:qualifier]) so cache
-// presence never changes the count.
+// kinesis.md/msk.md §2 — its FunctionArn values are the definitive answer,
+// and every FunctionArn in the response resolves to exactly one counted ID.
+// The already-loaded lambda cache, when present, only enriches: for a
+// FunctionArn the cache has, it resolves to the cached Resource.ID (the bare
+// function name the lambda drill/detail view navigates by — see
+// FetchLambdaFunctionsPageWithEventSources); for any FunctionArn the cache
+// lacks (stale/incomplete cache — a cache miss must never drop a
+// API-confirmed mapping), the bare name is instead parsed out of the
+// FunctionArn (arn:aws:lambda:region:account:function:name[:qualifier]). The
+// two resolutions are unioned per-arn, so cache presence never changes the
+// count — only which ID string represents an already-cached function.
 func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, eventSourceArn string, cache resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
@@ -156,28 +159,26 @@ func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, event
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 	}
 
-	entry, cacheOK := cache["lambda"]
-	if !cacheOK {
-		ids := make([]string, 0, len(functionArns))
-		for arn := range functionArns {
-			if name := lambdaFunctionNameFromARN(arn); name != "" {
-				ids = append(ids, name)
+	arnToID := make(map[string]string, len(functionArns))
+	if entry, cacheOK := cache["lambda"]; cacheOK {
+		for _, fn := range entry.Resources {
+			if arn := fn.Fields["arn"]; arn != "" {
+				arnToID[arn] = fn.ID
 			}
 		}
-		return relatedResult("lambda", ids)
 	}
 
-	var ids []string
-	for _, fn := range entry.Resources {
-		if _, matched := functionArns[fn.Fields["arn"]]; matched {
-			ids = append(ids, fn.ID)
+	ids := make([]string, 0, len(functionArns))
+	for arn := range functionArns {
+		if id, matched := arnToID[arn]; matched {
+			ids = append(ids, id)
+			continue
+		}
+		if name := lambdaFunctionNameFromARN(arn); name != "" {
+			ids = append(ids, name)
 		}
 	}
-	result := relatedResult("lambda", ids)
-	if len(ids) == 0 && entry.IsTruncated {
-		return resource.ApproximateZero("lambda")
-	}
-	return result
+	return relatedResult("lambda", ids)
 }
 
 // lambdaFunctionNameFromARN extracts the bare function name from a Lambda

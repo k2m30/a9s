@@ -368,6 +368,30 @@ func (c *Core) ResourceCacheKeys() []string {
 	return keys
 }
 
+// FetchOriginCacheKeys returns the set of resource short names whose cached
+// top-level list entry passes the same freshness gate as HasResourceCache
+// (Gen != 0, !Partial, Origin == OriginFetch) — i.e. a verified live
+// top-level fetch, never a Wave-1 availability probe or disk-cache seed.
+// Related-checker fan-out (relatedCheckCmd / runRelatedCheckers) uses this to
+// decide whether a NeedsTargetCache pivot can skip its own fresh target
+// fetch: a Probe/Disk-origin entry is knowledge gathered for the menu
+// counts/availability sweep, not a verified-fresh target list, so treating it
+// as "already cached" here would silently suppress the live fetch and let
+// the pivot serve stale or incomplete rows. ResourceCacheKeys (which includes
+// Probe/Disk origins) remains the correct source for the enrichment-fold
+// consumer in app_enrich_fold.go, whose membership semantics are unrelated to
+// freshness-gating and must not change.
+func (c *Core) FetchOriginCacheKeys() []string {
+	all := c.session.RowStore.SnapshotAll(false)
+	keys := make([]string, 0, len(all))
+	for k, tr := range all {
+		if tr.Gen != 0 && !tr.Partial && tr.Origin == session.OriginFetch {
+			keys = append(keys, k)
+		}
+	}
+	return keys
+}
+
 // ForEachResourceCache invokes fn for every full (non-Partial) cached
 // resource-list entry. Each entry is freshly built from the store's
 // defensive-copy SnapshotAll, so the callback's in-place mutation of

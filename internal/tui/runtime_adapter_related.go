@@ -546,7 +546,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 	cache := m.buildResourceCacheSnapshot()
 	gen := m.core.RelatedGen()
 
-	keys := m.core.ResourceCacheKeys()
+	keys := m.core.FetchOriginCacheKeys()
 	mainCacheKeys := make(map[string]struct{}, len(keys))
 	for _, k := range keys {
 		mainCacheKeys[k] = struct{}{}
