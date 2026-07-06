@@ -1,8 +1,6 @@
 package app
 
 import (
-	"maps"
-
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -237,28 +235,16 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 		ms.Truncated[canon] = newTrunc
 	}
 
+	// authoritative=false: newIssues here is derived from bare list rows, not
+	// a confirmed Wave-2 enrichment result, so a zero must not be treated as
+	// a confirmed "no issues" (Wave-2 may not have run for this list yet).
 	newIssues := c.listIssueCount(ls, canon)
-	c.syncMenuIssueCount(ms, canon, newIssues, newTrunc)
+	c.syncMenuIssueCount(ms, canon, newIssues, newTrunc, false)
 
 	// Persist the updated availability to disk, mirroring the "survives an
 	// app restart" half of Contract D. Best-effort — a write failure here
-	// must not surface as a controller error; the existing
-	// TaskKindSaveCache/probe-completion paths already treat cache writes as
-	// best-effort.
-	profile, region := c.core.Profile(), c.core.Region()
-	if profile != "" && region != "" {
-		avail := make(map[string]int, len(ms.Availability))
-		maps.Copy(avail, ms.Availability)
-		trunc := make(map[string]bool, len(ms.Truncated))
-		maps.Copy(trunc, ms.Truncated)
-		issueCounts := make(map[string]int, len(ms.IssueCounts))
-		maps.Copy(issueCounts, ms.IssueCounts)
-		issueTrunc := make(map[string]bool, len(ms.IssueTruncated))
-		maps.Copy(issueTrunc, ms.IssueTruncated)
-		issueKnown := make(map[string]bool, len(ms.IssueKnown))
-		maps.Copy(issueKnown, ms.IssueKnown)
-		_ = c.core.SaveAvailabilityCache(avail, trunc, issueCounts, issueTrunc, issueKnown)
-	}
+	// must not surface as a controller error.
+	c.persistMenuAvailabilityCache(ms)
 }
 
 // maybeSaveResourceListCache persists ls.Rows for canon's canonical

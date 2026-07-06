@@ -54,6 +54,7 @@ func newParityPair(t *testing.T, w, h int) (views.MainMenuModel, *app.Controller
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := app.New(core)
+	t.Cleanup(c.Close)
 
 	return m, c
 }

@@ -99,6 +99,7 @@ func newListController(t *testing.T, shortName string) *app.Controller {
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := app.New(core)
+	t.Cleanup(c.Close)
 	// Navigate to the list screen for this resource type.
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: shortName})
 	return c

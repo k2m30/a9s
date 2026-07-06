@@ -219,6 +219,7 @@ func TestReconcileTypeFile_Wave2SourcedObservation_ClearsCarriedData(t *testing.
 	s.Region = wave2ClearRegion
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 
 	// Seed RowStore with the CURRENT session's bare Wave-1-observed row (no
 	// findings of its own yet) — mirrors what a live availability sweep would
@@ -392,6 +393,7 @@ func TestRestartSeed_S3_Wave2FindingAndStatusVisibleOnFirstRender(t *testing.T) 
 	}
 
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 	snap := ctrl.Snapshot()
 

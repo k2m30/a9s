@@ -56,7 +56,9 @@ func newRowStorePinsTestController(t *testing.T) (*session.Session, *runtime.Cor
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	return s, core, app.New(core)
+	c := app.New(core)
+	t.Cleanup(c.Close)
+	return s, core, c
 }
 
 // =============================================================================

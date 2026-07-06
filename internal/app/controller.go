@@ -28,8 +28,8 @@ import (
 // GetMenu*, GetList*) acquire a read lock. Internal helpers called while a
 // lock is already held must NOT lock — Go mutexes are not reentrant.
 type Controller struct {
-	mu   sync.RWMutex
-	core *runtime.Core
+	mu    sync.RWMutex
+	core  *runtime.Core
 	stack []Screen
 
 	// enrichmentStore stores Wave-2 per-resource findings per resource type,
@@ -105,6 +105,30 @@ type Controller struct {
 	// stale) because the sweep-in-flight signal tracks wall-clock probe
 	// completion, not generation validity.
 	menuSweepAcked map[string]bool
+
+	// availSaveCh feeds persistMenuAvailabilityCache's snapshots to the
+	// single writer goroutine started by availSaveOnce. Buffered to exactly
+	// 1 so a burst of calls coalesces into a latest-wins queue of one pending
+	// write instead of stacking a write per call (see menu.go).
+	availSaveCh chan availabilitySavePayload
+
+	// availSaveOnce starts the persistMenuAvailabilityCache writer goroutine
+	// on the first send, so a Controller that never touches the availability
+	// badge (e.g. most unit tests) never spawns it.
+	availSaveOnce sync.Once
+
+	// availSaveStop signals runAvailabilitySaveLoop to drain and exit; closed
+	// exactly once by Close via availSaveCloseOnce.
+	availSaveStop chan struct{}
+
+	// availSaveCloseOnce guards closing availSaveStop so a Controller.Close
+	// called more than once (or concurrently) never double-closes the channel.
+	availSaveCloseOnce sync.Once
+
+	// availSaveWG is Add(1)-ed when the writer goroutine starts and Done on
+	// its return; Close.Wait()s on it so the last queued write is guaranteed
+	// to have run before Close returns.
+	availSaveWG sync.WaitGroup
 }
 
 // controllerErrorEntry is one session-error-log entry stored in Controller.
@@ -133,6 +157,8 @@ func New(core *runtime.Core) *Controller {
 				State: ScreenState{Menu: &MenuState{}},
 			},
 		},
+		availSaveCh:   make(chan availabilitySavePayload, 1),
+		availSaveStop: make(chan struct{}),
 	}
 	core.SetSaveColumns(c.resolveSaveColumns)
 	return c

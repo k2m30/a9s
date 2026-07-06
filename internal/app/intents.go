@@ -197,10 +197,15 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// defensive fallback for a hypothetical future producer that
 				// forgets to set it, not an observed case today.
 				issueCount, issueTruncated := 0, false
+				issuesAuthoritative := v.Issues != nil
 				if v.Issues != nil {
 					issueCount, issueTruncated = v.Issues.Count, v.Issues.Truncated
 				}
-				c.applyEnrichmentState(v.ResourceType, issueCount, issueTruncated, v.Enrichment.Findings, v.Enrichment.AttentionDetails)
+				// issuesAuthoritative=false when v.Issues is nil: the 0/false
+				// above is a defensive fallback standing in for "no issue-badge
+				// result carried by this intent", not a confirmed zero-issue
+				// Wave-2 result — it must not flip the menu's IssueKnown flag.
+				c.applyEnrichmentState(v.ResourceType, issueCount, issueTruncated, v.Enrichment.Findings, v.Enrichment.AttentionDetails, issuesAuthoritative)
 				// applyEnrichmentState only stores findings + the issue badge; the
 				// Wave-2 column updates (status/summary) must also reach the cached
 				// list rows or enriched columns render stale (ECR/WAF/CodeArtifact).

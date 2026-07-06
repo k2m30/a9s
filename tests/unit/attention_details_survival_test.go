@@ -58,9 +58,11 @@ type attnRawFixture struct {
 	Name string
 }
 
-func newAttnController(profile, region string) (*runtime.Core, *app.Controller) {
+func newAttnController(t *testing.T, profile, region string) (*runtime.Core, *app.Controller) {
+	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	return core, ctrl
 }
@@ -86,7 +88,7 @@ func TestControllerReapply_AttentionDetails_SurviveFreshFetchReplace(t *testing.
 	})
 	t.Cleanup(func() { resource.CleanupPaginatedForTest(attnSurvivalType) })
 
-	core, ctrl := newAttnController(attnSurvivalProfile, attnSurvivalRegion)
+	core, ctrl := newAttnController(t, attnSurvivalProfile, attnSurvivalRegion)
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: attnSurvivalType})
 

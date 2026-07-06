@@ -45,7 +45,7 @@ import (
 // invalidation directly (it is a session-cache-internal side effect with no
 // public read seam), only on the RENDERED non-destructive contract.
 func TestActionRefresh_ListWithRows_StaysNonDestructive(t *testing.T) {
-	_, ctrl := newLiveWebStyleController("", "us-east-1")
+	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	rows := []resource.Resource{
@@ -80,7 +80,7 @@ func TestActionRefresh_ListWithRows_StaysNonDestructive(t *testing.T) {
 // still show the Loading shell on ActionRefresh — there was never any
 // content for the refreshing marker to sit under.
 func TestActionRefresh_EmptyList_StillShowsLoading(t *testing.T) {
-	_, ctrl := newLiveWebStyleController("", "us-east-1")
+	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	ctrl.ApplyResourcesLoaded("ec2", []resource.Resource{}, nil, false)
@@ -138,7 +138,7 @@ func TestWarmListOpen_TruncatedDiskSeed_ShowsNPlus_BeforeRefetch(t *testing.T) {
 		t.Fatalf("seed SaveType(ec2): %v", err)
 	}
 
-	core, ctrl := newLiveWebStyleController(profile, region)
+	core, ctrl := newLiveWebStyleController(t, profile, region)
 	loadedStore := core.EnsureCacheStore()
 	if loadedStore == nil {
 		t.Fatal("EnsureCacheStore returned nil")
@@ -187,7 +187,7 @@ func TestWarmListOpen_TruncatedDiskSeed_ShowsNPlus_BeforeRefetch(t *testing.T) {
 // row carrying ANY finding at all, badge or not, even though the row's own
 // color is independently an issue.
 func TestGetListIssueCount_ColorIssueRow_OnlyNonBadgeFinding_StillCounted(t *testing.T) {
-	_, ctrl := newLiveWebStyleController("", "us-east-1")
+	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	rows := []resource.Resource{

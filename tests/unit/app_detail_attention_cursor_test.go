@@ -42,6 +42,7 @@ func newAttentionCursorController(t *testing.T, res resource.Resource, resourceT
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := app.New(core)
+	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenDetail},
 	})

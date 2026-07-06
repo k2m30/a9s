@@ -128,9 +128,29 @@ func (s *Server) ListenAndServe(ctx context.Context, readyCh chan<- struct{}) er
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutCtx)
+		s.closeAllSessions()
 		return <-errCh
 	case serveErr := <-errCh:
 		return serveErr
+	}
+}
+
+// closeAllSessions calls app.Controller.Close on every live per-browser-
+// session controller, so each session's pending menu-availability-cache
+// write (see app.Controller.Close's doc comment) is flushed before the
+// process exits. Sessions in this server are never individually evicted
+// (no idle-timeout or explicit logout removes an entry from s.sessions), so
+// this server-shutdown path is the only reachable place a web session's
+// Controller.Close is ever called.
+func (s *Server) closeAllSessions() {
+	s.sessionsMu.Lock()
+	entries := make([]*sessionEntry, 0, len(s.sessions))
+	for _, e := range s.sessions {
+		entries = append(entries, e)
+	}
+	s.sessionsMu.Unlock()
+	for _, e := range entries {
+		e.ctrl.Close()
 	}
 }
 

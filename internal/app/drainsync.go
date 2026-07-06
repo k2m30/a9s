@@ -125,9 +125,15 @@ func DrainSyncContextProgress(ctx context.Context, c *Controller, pending []runt
 // completion (bounded by maxDrainIterations, the pre-existing runaway
 // backstop) unless the PARENT itself is cancelled.
 //
-// Per-task timeouts are not silently swallowed: every task whose own
-// ExecuteTask call fails with context.DeadlineExceeded is counted, and once
-// the queue is fully drained (or the parent is cancelled) a single aggregated
+// Per-task timeouts are not silently swallowed: every task whose OWN
+// per-task budget (taskCtx, not some inner AWS-call deadline the task set up
+// on its own) is exhausted by the time ExecuteTask returns is counted — this
+// is checked via taskCtx.Err() == context.DeadlineExceeded, not
+// errors.Is(err, context.DeadlineExceeded) against the returned error, since
+// the latter also matches an unrelated inner deadline the task itself created
+// (e.g. AWS SDK per-call context) and would inflate the count during ordinary
+// throttling that has nothing to do with the per-task budget. Once the queue
+// is fully drained (or the parent is cancelled) a single aggregated
 // FlashIntent is applied via Controller.ApplyIntents when the count is
 // non-zero ("N background tasks timed out"). One aggregated flash — not one
 // per timeout — because Controller.flash is a single last-write-wins slot
@@ -180,13 +186,14 @@ func DrainSyncPerTaskTimeout(
 
 		taskCtx, cancel := context.WithTimeout(parent, perTaskTimeout)
 		ev, err := c.core.ExecuteTask(taskCtx, req)
+		budgetExpired := taskCtx.Err() == context.DeadlineExceeded
 		cancel()
 		if err != nil {
 			if errors.Is(err, runtime.ErrAdapterOnlyTask) {
 				// Renderer-only kind — irrelevant in a headless sync context.
 				continue
 			}
-			if errors.Is(err, context.DeadlineExceeded) {
+			if budgetExpired {
 				timedOut++
 			}
 			// Execution error: no event to dispatch, no follow-up tasks.

@@ -298,6 +298,7 @@ func TestLoadMore_TokenPresent_AfterColdOpen(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 
 	// Cold open via the -c/ActionCommand lane (same handler as the
 	// colon-command lane per handleActionCommand's ":s3"-equivalent switch).
@@ -341,6 +342,7 @@ func TestLoadMore_AppendDedup_Backstop(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
@@ -410,6 +412,7 @@ func TestLoadMore_PersistedPair_NeverMismatched(t *testing.T) {
 	s.Region = region
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 

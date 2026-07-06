@@ -49,6 +49,7 @@ func newLiveShapedBadgeReproController(t *testing.T, profile, region string) (*r
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	return core, ctrl
 }

@@ -68,6 +68,9 @@ func newListController(t *testing.T, typeName string) *app.Controller {
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := app.New(core)
+	// The async availability-save writer must be joined before t.TempDir
+	// cleanup removes the config folder it writes into.
+	t.Cleanup(c.Close)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: typeName})
 	return c
 }

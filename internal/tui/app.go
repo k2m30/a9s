@@ -153,6 +153,18 @@ func (m Model) Cancel() {
 	}
 }
 
+// CloseController flushes the headless controller's pending menu-availability-
+// cache write (see app.Controller.Close), so the badge's last state durably
+// lands on disk before the process exits. Separate from Cancel — Cancel only
+// signals context cancellation and must stay instantaneous, while this
+// method blocks until the pending disk write (if any) completes. Safe to
+// call on a zero-value Model.
+func (m Model) CloseController() {
+	if m.ctrl != nil {
+		m.ctrl.Close()
+	}
+}
+
 // Init implements tea.Model. Fires a command to establish the live AWS connection.
 // When pre-supplied clients are present (demo mode or tests), emits a synthetic
 // ClientsReadyMsg immediately. Otherwise initiates the live AWS connection flow.

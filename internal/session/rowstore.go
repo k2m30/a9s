@@ -247,6 +247,15 @@ func isStaleReplaceRows(existing, incoming []resource.Resource, pagination *reso
 //     dedup happens to the row set, not to the observation.
 //  4. Replace (append=false, not stale): incoming rows replace the existing
 //     rows wholesale.
+//  5. TotalCount shrink guard (applies to both append and replace): a
+//     non-exact incoming pagination (IsTruncated=true, or nil — nil is never
+//     exact per DEF-18) only ever RAISES TotalCount to at least len(newRows);
+//     it never shrinks a wider TotalCount already known (e.g. seeded by an
+//     earlier ObserveCount or a wider prior Observe), since a truncated page
+//     explicitly does not claim to be the whole list. Only an EXACT
+//     (IsTruncated=false) result is authoritative proof of the new total and
+//     is allowed to shrink it — resources can genuinely be deleted between
+//     observations.
 //
 // A non-Disk observation always clears Partial (full-beats-partial is
 // handled by ObservePartial's counterpart rule — a plain Observe is by
@@ -288,10 +297,27 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 		newRows = rows
 	}
 
+	// TotalCount shrink guard: nil pagination is never exact (DEF-18), and an
+	// IsTruncated=true page explicitly does not claim to be the whole list —
+	// neither is authoritative proof the total shrank, so both only ever
+	// raise TotalCount to at least len(newRows), never below the existing
+	// known total (e.g. one seeded by an earlier, wider ObserveCount). Only
+	// an EXACT (IsTruncated=false) result is authoritative proof of the new
+	// total and may shrink it — resources can genuinely be deleted between
+	// observations, and an exact fetch confirms that directly. Applies
+	// identically to the append path, where newRows is already the
+	// accumulated (deduped) slice.
+	totalCount := len(newRows)
+	if pagination == nil || pagination.IsTruncated {
+		if existing.TotalCount > totalCount {
+			totalCount = existing.TotalCount
+		}
+	}
+
 	next := TypeRows{
 		Rows:       newRows,
 		Pagination: pagination,
-		TotalCount: len(newRows),
+		TotalCount: totalCount,
 		Origin:     origin,
 		Partial:    false,
 		Gen:        existing.Gen + 1,

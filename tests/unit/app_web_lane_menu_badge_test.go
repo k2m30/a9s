@@ -35,7 +35,9 @@ func newWebLaneMenuBadgeController(t *testing.T) *app.Controller {
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	return app.New(core)
+	c := app.New(core)
+	t.Cleanup(c.Close)
+	return c
 }
 
 // s3PatchFindings builds n wave2-sourced findings for distinct fake S3

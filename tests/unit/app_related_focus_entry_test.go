@@ -40,6 +40,7 @@ func newRelatedFocusEntryController(t *testing.T, rows []app.DetailRelatedRow) *
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 	c := app.New(core)
+	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenDetail},
 	})

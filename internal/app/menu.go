@@ -8,6 +8,19 @@ import (
 	"github.com/k2m30/a9s/v3/internal/runtime"
 )
 
+// availabilitySavePayload is one snapshot of the menu availability/issue
+// state, queued by persistMenuAvailabilityCache for the single writer
+// goroutine (runAvailabilitySaveLoop) to persist. Fields mirror
+// Core.SaveAvailabilityCache's parameters exactly — the writer passes them
+// through unchanged.
+type availabilitySavePayload struct {
+	avail       map[string]int
+	trunc       map[string]bool
+	issueCounts map[string]int
+	issueTrunc  map[string]bool
+	issueKnown  map[string]bool
+}
+
 // topMenuState returns the MenuState of the top-of-stack screen if it is
 // ScreenMenu, or nil otherwise.
 func (c *Controller) topMenuState() *MenuState {
@@ -181,18 +194,53 @@ func (c *Controller) markMenuSweepAcked(shortName string) {
 
 // syncMenuIssueCount applies the monotonic issue-badge guard to ms for canon:
 // only raise ms.IssueCounts[canon] (never regress it), and clear a stale
-// truncated flag once an equal-count exact (untruncated) observation lands.
-// canon must already be the canonical resource short name — callers resolve
-// aliases before calling in. Mirrors the issue-count half of the availability
-// sync Contract D pins for syncExactTotalToMenu; extracted as the single
-// chokepoint both the sweep lane (handle.go's syncExactTotalToMenu) and the
-// in-list Wave-2 enrichment lane (list_filter.go's applyEnrichmentState) call,
-// so a session with no background sweep (e.g. the web/headless lane) still
-// gets the menu badge from in-list enrichment alone. Caller must hold c.mu
-// (write).
-func (c *Controller) syncMenuIssueCount(ms *MenuState, canon string, newIssues int, newTrunc bool) {
+// truncated flag once an equal-count exact (untruncated) observation lands —
+// UNLESS the existing truncation was itself set authoritatively by a prior
+// Wave-2 enrichment result and the current call is not itself authoritative
+// (see authoritative below, axis 2). canon must already be the canonical
+// resource short name — callers resolve aliases before calling in. Mirrors
+// the issue-count half of the availability sync Contract D pins for
+// syncExactTotalToMenu; extracted as the single chokepoint both the sweep
+// lane (handle.go's syncExactTotalToMenu) and the in-list Wave-2 enrichment
+// lane (list_filter.go's applyEnrichmentState) call, so a session with no
+// background sweep (e.g. the web/headless lane) still gets the menu badge
+// from in-list enrichment alone.
+//
+// authoritative distinguishes the two callers' semantics along TWO axes:
+//
+//  1. Raise-to-zero (the "authoritative && !known" arm): applyEnrichmentState
+//     passes true because newIssues IS the Wave-2 result for canon (a genuine
+//     zero-issue type must still flip IssueKnown so the menu stops showing it
+//     as unswept); syncExactTotalToMenu passes false because its newIssues is
+//     derived from bare list rows, which is not authoritative for a zero
+//     count (Wave-2 enrichment may simply not have run yet for that list).
+//     Without this distinction, a type first observed with newIssues==0 would
+//     never set IssueKnown (no arm below fires on a zero-vs-zero comparison),
+//     leaving a genuinely clean type stuck "unknown" forever — but relaxing
+//     that for the non-authoritative caller would let an un-enriched list's
+//     bare-zero falsely claim "no issues known".
+//
+//  2. Truncation-clear (the "equal-count exact" arm): a rows-derived
+//     (non-authoritative) equal-count resync must never clear a truncation
+//     flag that an authoritative Wave-2 enrichment result itself set.
+//     syncExactTotalToMenu's newTrunc is ls.HasPagination — the LIST'S OWN
+//     fetch pagination, which says nothing about whether the enrichment scan
+//     that produced curIssues covered every row (e.g. a 55-row exact list
+//     whose Wave-2 enrichment cap only scanned the first 50 rows) — the exact
+//     row-fetch proves the ROW COUNT is complete, not that the issue COUNT
+//     among those rows is. ms.IssueTruncAuthoritative[canon] records whether
+//     the CURRENT curIssueTrunc=true was set by an authoritative caller; the
+//     clear arm fires only when that is false (the flag was itself seeded
+//     non-authoritatively — e.g. by PatchMenu or a prior rows-derived sync —
+//     so a later equal-count rows-derived resync is still allowed to clear
+//     it) or when the current call IS authoritative (a fresh Wave-2 result
+//     always has standing to correct its own prior truncation claim).
+//
+// Caller must hold c.mu (write).
+func (c *Controller) syncMenuIssueCount(ms *MenuState, canon string, newIssues int, newTrunc bool, authoritative bool) {
 	curIssues := ms.IssueCounts[canon]
 	curIssueTrunc := ms.IssueTruncated[canon]
+	curIssueTruncAuthoritative := ms.IssueTruncAuthoritative[canon]
 	switch {
 	case newIssues > curIssues:
 		if ms.IssueCounts == nil {
@@ -204,15 +252,187 @@ func (c *Controller) syncMenuIssueCount(ms *MenuState, canon string, newIssues i
 		if ms.IssueTruncated == nil {
 			ms.IssueTruncated = make(map[string]bool)
 		}
+		if ms.IssueTruncAuthoritative == nil {
+			ms.IssueTruncAuthoritative = make(map[string]bool)
+		}
 		ms.IssueCounts[canon] = newIssues
 		ms.IssueKnown[canon] = true
 		ms.IssueTruncated[canon] = newTrunc
-	case newIssues == curIssues && curIssueTrunc && !newTrunc:
+		ms.IssueTruncAuthoritative[canon] = authoritative && newTrunc
+	case authoritative && !ms.IssueKnown[canon]:
+		if ms.IssueCounts == nil {
+			ms.IssueCounts = make(map[string]int)
+		}
+		if ms.IssueKnown == nil {
+			ms.IssueKnown = make(map[string]bool)
+		}
+		if ms.IssueTruncated == nil {
+			ms.IssueTruncated = make(map[string]bool)
+		}
+		if ms.IssueTruncAuthoritative == nil {
+			ms.IssueTruncAuthoritative = make(map[string]bool)
+		}
+		ms.IssueCounts[canon] = newIssues
+		ms.IssueKnown[canon] = true
+		ms.IssueTruncated[canon] = newTrunc
+		ms.IssueTruncAuthoritative[canon] = newTrunc
+	case newIssues == curIssues && curIssueTrunc && !newTrunc && (authoritative || !curIssueTruncAuthoritative):
 		if ms.IssueTruncated == nil {
 			ms.IssueTruncated = make(map[string]bool)
 		}
 		ms.IssueTruncated[canon] = false
+		if ms.IssueTruncAuthoritative == nil {
+			ms.IssueTruncAuthoritative = make(map[string]bool)
+		}
+		ms.IssueTruncAuthoritative[canon] = false
 	}
+}
+
+// persistMenuAvailabilityCache best-effort persists ms's availability/issue
+// state to disk (Contract D: the badge must survive a restart). No-op when
+// profile or region is unset (no cache file identity to write to). Shared by
+// both callers of syncMenuIssueCount — syncExactTotalToMenu (handle.go) and
+// applyEnrichmentState (list_filter.go) — which used to each carry their own
+// verbatim copy of this five-map-clone-then-save block. Caller must hold c.mu
+// (at least read, since it only reads ms and c.core's profile/region).
+//
+// The actual disk write never runs on this call stack. c.mu is the same lock
+// every key event needs (Apply/Handle take it for their whole duration), and
+// Core.SaveAvailabilityCache performs synchronous file I/O (temp file,
+// chmod, rename) under session.cacheStoreMu — running it inline here would
+// serialize user input behind disk latency on every Wave-2 result. Instead
+// the five maps are cloned (cheap, still under c.mu — this is the only part
+// that must not race the maps' own mutation) and handed to a single writer
+// goroutine via a latest-wins, buffer-1 channel: a burst of calls (e.g. the
+// startup availability sweep) collapses into whatever the newest snapshot is
+// by the time the writer gets to it, rather than queuing one disk write per
+// call. A write failure is silently dropped, mirroring the existing
+// TaskKindSaveCache/probe-completion paths that already treat cache writes
+// as best-effort.
+//
+// Close (below) is the deterministic shutdown hook: it stops the writer and
+// blocks until the last queued snapshot has been persisted, so Contract D's
+// "survives a restart" guarantee holds even though no write here ever blocks
+// a live key event. Every real Controller owner (TUI, web session) must call
+// Close on its own shutdown path — see Close's doc comment for the current
+// wiring.
+func (c *Controller) persistMenuAvailabilityCache(ms *MenuState) {
+	profile, region := c.core.Profile(), c.core.Region()
+	if profile == "" || region == "" {
+		return
+	}
+	avail := make(map[string]int, len(ms.Availability))
+	maps.Copy(avail, ms.Availability)
+	trunc := make(map[string]bool, len(ms.Truncated))
+	maps.Copy(trunc, ms.Truncated)
+	issueCounts := make(map[string]int, len(ms.IssueCounts))
+	maps.Copy(issueCounts, ms.IssueCounts)
+	issueTrunc := make(map[string]bool, len(ms.IssueTruncated))
+	maps.Copy(issueTrunc, ms.IssueTruncated)
+	issueKnown := make(map[string]bool, len(ms.IssueKnown))
+	maps.Copy(issueKnown, ms.IssueKnown)
+	c.queueAvailabilitySave(availabilitySavePayload{
+		avail:       avail,
+		trunc:       trunc,
+		issueCounts: issueCounts,
+		issueTrunc:  issueTrunc,
+		issueKnown:  issueKnown,
+	})
+}
+
+// queueAvailabilitySave hands p to the single availability-cache writer
+// goroutine, starting it on first use, and applies latest-wins coalescing: if
+// the buffer-1 channel already holds an unconsumed snapshot, that snapshot is
+// dropped in favor of p (the writer never blocks a caller by falling behind,
+// and a burst of N calls only ever produces the last one's disk write).
+// Non-blocking by construction — never runs disk I/O itself. A no-op after
+// Close has been called (send on availSaveStop-closed path is guarded by the
+// same select, so a very late call harmlessly drops its payload rather than
+// panicking on a closed channel — the writer goroutine has already exited by
+// then, and Close already flushed the last snapshot it had).
+func (c *Controller) queueAvailabilitySave(p availabilitySavePayload) {
+	select {
+	case <-c.availSaveStop:
+		// Close already ran (or is running): the writer is gone or exiting.
+		// Dropping here is safe — Close's own drain step already persisted
+		// whatever was queued at the time it was called, and no code path
+		// depends on a save queued strictly after Close for correctness
+		// (Contract D's restart guarantee only concerns the LAST save before
+		// a real shutdown, which Close itself owns).
+		return
+	default:
+	}
+	c.availSaveOnce.Do(func() {
+		c.availSaveWG.Add(1)
+		go c.runAvailabilitySaveLoop()
+	})
+	select {
+	case c.availSaveCh <- p:
+	default:
+		select {
+		case <-c.availSaveCh:
+		default:
+		}
+		select {
+		case c.availSaveCh <- p:
+		default:
+		}
+	}
+}
+
+// runAvailabilitySaveLoop is the single writer goroutine started by
+// queueAvailabilitySave. It owns every call to Core.SaveAvailabilityCache for
+// the menu-badge persistence path, so the synchronous disk write
+// (SaveAvailabilityCache -> WithCacheStore -> store.SaveType's temp
+// file+chmod+rename) never runs on a goroutine holding Controller.mu. Exits
+// once Close closes availSaveStop, after persisting any snapshot still
+// pending in availSaveCh (Close.Wait()s on availSaveWG for exactly this).
+func (c *Controller) runAvailabilitySaveLoop() {
+	defer c.availSaveWG.Done()
+	for {
+		select {
+		case p := <-c.availSaveCh:
+			_ = c.core.SaveAvailabilityCache(p.avail, p.trunc, p.issueCounts, p.issueTrunc, p.issueKnown)
+		case <-c.availSaveStop:
+			// Drain exactly one more pending snapshot (if any) so a Close
+			// racing a just-queued save still persists it, then exit.
+			select {
+			case p := <-c.availSaveCh:
+				_ = c.core.SaveAvailabilityCache(p.avail, p.trunc, p.issueCounts, p.issueTrunc, p.issueKnown)
+			default:
+			}
+			return
+		}
+	}
+}
+
+// Close deterministically shuts down the availability-cache writer: it
+// signals runAvailabilitySaveLoop to stop, and blocks until that goroutine
+// has persisted any snapshot still queued and returned — so the menu badge's
+// final state durably lands on disk (Contract D) even though no write along
+// the way ever blocked a live key event. Idempotent and safe to call on a
+// Controller that never queued a save (returns immediately without ever
+// having started the goroutine). Safe to call more than once or
+// concurrently — sync.Once guards the channel close.
+//
+// Every real Controller owner must call this on its own shutdown path:
+//   - TUI: internal/tui.Model exposes it via CloseController, called from
+//     cmd/a9s's runProgram.
+//   - Web: each per-browser-session Controller (internal/web/construct.go's
+//     newSession) is closed when the server's own context is cancelled
+//     (internal/web/server.go's ListenAndServe) — sessions are otherwise
+//     never individually evicted in this server, so process shutdown is the
+//     only reachable hook today.
+//
+// Tests that queue an availability save (directly or via Handle/Apply) and
+// then rely on t.TempDir() cleanup must call Close (e.g. t.Cleanup(c.Close))
+// before returning, or the writer goroutine can still be persisting when the
+// temp directory is removed.
+func (c *Controller) Close() {
+	c.availSaveCloseOnce.Do(func() {
+		close(c.availSaveStop)
+	})
+	c.availSaveWG.Wait()
 }
 
 // menuRefreshing reports whether a background availability sweep is still in

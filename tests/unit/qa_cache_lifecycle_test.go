@@ -100,9 +100,11 @@ const lifecycleShortName = "s3"
 // every scenario below reuses the SAME temp dir across successive "boots" to
 // simulate an app restart). Mirrors newLiveWebStyleController
 // (app_web_live_cold_boot_test.go).
-func newLifecycleController(profile, region string) (*runtime.Core, *app.Controller) {
+func newLifecycleController(t *testing.T, profile, region string) (*runtime.Core, *app.Controller) {
+	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	return core, ctrl
 }
@@ -264,7 +266,7 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 
 	registerNoopS3Fetcher(t)
 
-	_, ctrl := newLifecycleController(profile, region)
+	_, ctrl := newLifecycleController(t, profile, region)
 
 	// --- Step 1: boot seed load over an EMPTY directory ---
 	vsBoot := bootSeedFromDisk(ctrl, profile, region)
@@ -393,7 +395,7 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 	// --- First boot: seed the disk state (mirrors scenario 1 end-state) ---
 	setNoopS3Fetcher()
 	func() {
-		_, ctrl1 := newLifecycleController(profile, region)
+		_, ctrl1 := newLifecycleController(t, profile, region)
 		bootSeedFromDisk(ctrl1, profile, region)
 		openS3List(ctrl1)
 		deliverVerifyFetch(ctrl1, world, false)
@@ -406,7 +408,7 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 	// --- Second boot: SAME world, fetcher re-registered fresh ---
 	registerNoopS3Fetcher(t)
 
-	_, ctrl2 := newLifecycleController(profile, region)
+	_, ctrl2 := newLifecycleController(t, profile, region)
 
 	// Step 1: boot seed load from disk — menu counts+badges present BEFORE
 	// any probe result.
@@ -537,7 +539,7 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 	// persist it — no separate enrichment call needed. ---
 	setNoopS3Fetcher()
 	func() {
-		_, ctrl1 := newLifecycleController(profile, region)
+		_, ctrl1 := newLifecycleController(t, profile, region)
 		bootSeedFromDisk(ctrl1, profile, region)
 		openS3List(ctrl1)
 		deliverVerifyFetch(ctrl1, oldWorld, false)
@@ -555,7 +557,7 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 	// --- Third boot: mutated world ---
 	registerNoopS3Fetcher(t)
 
-	_, ctrl3 := newLifecycleController(profile, region)
+	_, ctrl3 := newLifecycleController(t, profile, region)
 	bootSeedFromDisk(ctrl3, profile, region)
 
 	// Step 1: seeded frame shows the OLD state (stale-until-verified),
@@ -697,7 +699,7 @@ func TestCacheLifecycle_Scenario4_CachePresent_ConfigChanged(t *testing.T) {
 	// --- First boot: OLD (built-in default) column config ---
 	setNoopS3Fetcher()
 	func() {
-		_, ctrl1 := newLifecycleController(profile, region)
+		_, ctrl1 := newLifecycleController(t, profile, region)
 		bootSeedFromDisk(ctrl1, profile, region)
 		openS3List(ctrl1)
 		deliverVerifyFetch(ctrl1, world, false)
@@ -740,7 +742,7 @@ detail:
 	}
 
 	// --- Second boot: apply the new config via the real SetViewConfig seam ---
-	_, ctrl2 := newLifecycleController(profile, region)
+	_, ctrl2 := newLifecycleController(t, profile, region)
 	ctrl2.SetViewConfig(vc)
 
 	registerNoopS3Fetcher(t)

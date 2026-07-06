@@ -49,7 +49,9 @@ func newStage2PinTestController(t *testing.T) (*session.Session, *runtime.Core, 
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	return s, core, app.New(core)
+	c := app.New(core)
+	t.Cleanup(c.Close)
+	return s, core, c
 }
 
 // stage2PinReadTypeFile re-reads the on-disk TypeFile for shortName under

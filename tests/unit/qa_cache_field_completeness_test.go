@@ -71,6 +71,7 @@ func fieldCompletenessPair(t *testing.T, profile, region string) *app.Controller
 	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	return ctrl
 }
@@ -447,6 +448,7 @@ func TestPoisonedExact_HealsOnContradiction(t *testing.T) {
 
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	openTopLevelList(ctrl, "s3")
 
@@ -517,6 +519,7 @@ func TestSilentSwap_NeverDropsKnownFindings(t *testing.T) {
 
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	openTopLevelList(ctrl, "s3")
 
@@ -598,6 +601,7 @@ func TestSilentSwap_Wave1FindingNotCarriedOnResolve(t *testing.T) {
 
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	openTopLevelList(ctrl, "s3")
 

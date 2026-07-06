@@ -59,6 +59,7 @@ func glyphContinuityPair(t *testing.T, profile, region string) *app.Controller {
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	return ctrl
 }

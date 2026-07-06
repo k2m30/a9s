@@ -247,6 +247,7 @@ func newPostSweepApp(t *testing.T, profile, region string) tui.Model {
 		tui.WithProfile(profile),
 		tui.WithRegion(region))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+	t.Cleanup(m.CloseController)
 	return m
 }
 

@@ -154,7 +154,9 @@ func TestScreenIDGuard_TopLevelCommandVsPushChildListScreen(t *testing.T) {
 		s.Profile = profile
 		s.Region = "us-east-1"
 		core := runtime.New(s, nil)
-		return app.New(core)
+		c := app.New(core)
+		t.Cleanup(c.Close)
+		return c
 	}
 
 	t.Run("top_level_command_open_pushes_ScreenResourceList", func(t *testing.T) {

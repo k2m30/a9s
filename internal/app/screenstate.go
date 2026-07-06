@@ -174,6 +174,15 @@ type MenuState struct {
 	IssueCounts    map[string]int  `json:"issue_counts,omitempty"`
 	IssueKnown     map[string]bool `json:"issue_known,omitempty"`
 	IssueTruncated map[string]bool `json:"issue_truncated,omitempty"`
+	// IssueTruncAuthoritative tracks, per resource type, whether the current
+	// IssueTruncated[canon]=true was set by an authoritative Wave-2
+	// enrichment result (true) as opposed to a non-authoritative rows-derived
+	// sync (false/absent) — see syncMenuIssueCount's doc comment. Only an
+	// authoritative caller may clear a truncation flag it did not itself set
+	// without authority; a rows-derived equal-count resync may still clear a
+	// flag that was itself seeded non-authoritatively (e.g. by PatchMenu or a
+	// prior rows-derived sync).
+	IssueTruncAuthoritative map[string]bool `json:"issue_trunc_authoritative,omitempty"`
 	// Origin tracks, per resource type, whether the stored availability count
 	// is disk-cache-seeded ("cache") or confirmed by a live probe this
 	// session ("verified") — DEF-6/C3.

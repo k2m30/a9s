@@ -86,12 +86,15 @@ import (
 // construction shape (tests/unit/app_controller_test.go), duplicated here
 // because that helper lives in the external unit_test package and this file
 // must stay in package unit to reuse the TUI rootApplyMsg/tuitest harness.
-func newParityHeadlessController(profile, region string) *app.Controller {
+func newParityHeadlessController(t *testing.T, profile, region string) *app.Controller {
+	t.Helper()
 	s := session.New()
 	s.Profile = profile
 	s.Region = region
 	core := runtime.New(s, nil)
-	return app.New(core)
+	c := app.New(core)
+	t.Cleanup(c.Close)
+	return c
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -102,7 +105,7 @@ func newParityHeadlessController(profile, region string) *app.Controller {
 // green at HEAD): the same well-known main-menu bindings must appear in both
 // the controller's HelpBody sections and the TUI's rendered help View().
 func TestHelpBody_ContentMatchesTUIMainMenuHelp(t *testing.T) {
-	ctrl := newParityHeadlessController("help-parity-prof", "us-east-1")
+	ctrl := newParityHeadlessController(t, "help-parity-prof", "us-east-1")
 	vs, _ := ctrl.Apply(app.Action{Kind: app.ActionOpenHelp})
 
 	if vs.Body.Kind != app.BodyKindHelp || vs.Body.Help == nil {
@@ -144,7 +147,7 @@ func TestHelpBody_ContentMatchesTUIMainMenuHelp(t *testing.T) {
 // never in mainMenuGroups (help.go L217-250) — so this assertion
 // distinguishes list-context help from main-menu-context help.
 func TestHelpBody_UnderResourceList_CarriesListContextBindings(t *testing.T) {
-	ctrl := newParityHeadlessController("help-parity-list-prof", "us-east-1")
+	ctrl := newParityHeadlessController(t, "help-parity-list-prof", "us-east-1")
 
 	ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
 		ID:      runtime.ScreenResourceList,
@@ -193,7 +196,7 @@ func TestHelpBody_ListContext_ProducedByTUIAndControllerAgree(t *testing.T) {
 		t.Fatalf("sanity check failed: views.HelpModel resourceListGroups should contain \"yaml\" — harness precondition broken, got:\n%s", tuiListHelp)
 	}
 
-	ctrl := newParityHeadlessController("help-parity-list-agree-prof", "us-east-1")
+	ctrl := newParityHeadlessController(t, "help-parity-list-agree-prof", "us-east-1")
 	ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
 		ID:      runtime.ScreenResourceList,
 		Context: runtime.ScreenContext{ResourceType: "ec2"},

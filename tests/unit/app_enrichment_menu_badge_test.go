@@ -23,7 +23,9 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/session"
 )
 
@@ -38,7 +40,9 @@ func newEnrichmentMenuBadgeController(t *testing.T) *app.Controller {
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	return app.New(core)
+	c := app.New(core)
+	t.Cleanup(c.Close)
+	return c
 }
 
 // s3EnrichmentFindings builds n wave2-sourced findings for distinct fake S3
@@ -173,5 +177,60 @@ func TestApplyEnrichmentState_MenuBadge_CanonicalizesAlias(t *testing.T) {
 	}
 	if got := c.GetMenuIssueCounts()["workgroups"]; got != 0 {
 		t.Errorf("GetMenuIssueCounts()[workgroups] = %d, want 0 — alias key must not be stored verbatim alongside the canonical key", got)
+	}
+}
+
+// TestApplyEnrichmentState_ZeroIssues_StillBecomesKnown pins the
+// authoritative-zero case: a type whose Wave-2 enrichment reports ZERO
+// issues must still flip IssueKnown to true (a genuinely clean type must not
+// stay stuck "unknown" forever just because its confirmed result happens to
+// be zero). Before the authoritative-flag fix, syncMenuIssueCount's guard
+// only fires on newIssues > curIssues, so a fresh 0-vs-0 comparison never
+// sets IssueKnown — this is RED at HEAD (Known stays false).
+func TestApplyEnrichmentState_ZeroIssues_StillBecomesKnown(t *testing.T) {
+	c := newEnrichmentMenuBadgeController(t)
+
+	c.ApplyEnrichmentState("s3", 0, false, map[string]domain.Finding{}, map[string]domain.AttentionDetail{})
+
+	if got := c.GetMenuIssueKnown()["s3"]; !got {
+		t.Errorf("GetMenuIssueKnown()[s3] = %v, want true — a confirmed Wave-2 zero-issue result must still flip Known", got)
+	}
+	if got := c.GetMenuIssueCounts()["s3"]; got != 0 {
+		t.Errorf("GetMenuIssueCounts()[s3] = %d, want 0", got)
+	}
+	entry := menuEntryFor(c.Snapshot().Body.Menu, "s3")
+	if entry == nil {
+		t.Fatal("menu has no entry for s3")
+	}
+	if entry.IssueBadge.Count != 0 {
+		t.Errorf("s3 IssueBadge.Count = %d, want 0 — a confirmed-clean type must show no badge count", entry.IssueBadge.Count)
+	}
+}
+
+// TestSyncExactTotalToMenu_RowsWithoutFindings_DoesNotSetIssueKnown pins the
+// other half of the authoritative distinction: the rows-derived lane
+// (syncExactTotalToMenu, reached via ResourcesLoaded handling) must NOT set
+// IssueKnown just because a list of rows loaded with zero enrichment
+// findings — Wave-2 may simply not have run yet for that type. Driven via
+// Controller.Handle(messages.ResourcesLoaded{Gen: 0}) (the
+// ApplyResourcesLoaded test seam bypasses this sync-back entirely).
+func TestSyncExactTotalToMenu_RowsWithoutFindings_DoesNotSetIssueKnown(t *testing.T) {
+	c := newEnrichmentMenuBadgeController(t)
+
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
+
+	rows := make([]resource.Resource, 3)
+	for i := range rows {
+		rows[i] = resource.Resource{ID: "bucket-" + itoaTest(i), Type: "s3"}
+	}
+	c.Handle(messages.ResourcesLoaded{
+		ResourceType: "s3",
+		Resources:    rows,
+		Pagination:   &resource.PaginationMeta{IsTruncated: false},
+		Gen:          0,
+	})
+
+	if got := c.GetMenuIssueKnown()["s3"]; got {
+		t.Error("GetMenuIssueKnown()[s3] = true, want false — bare list rows with no Wave-2 findings must not be treated as a confirmed issue result")
 	}
 }

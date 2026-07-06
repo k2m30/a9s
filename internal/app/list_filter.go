@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"maps"
 	"reflect"
 	"sort"
 	"strconv"
@@ -293,16 +292,23 @@ func (c *Controller) reapplyCheckerAgainst(ls *ListState, typeName string, newPa
 }
 
 // ApplyEnrichmentState stores Wave-2 enrichment results for typeName.
-// Mirrors ResourceListModel.SetEnrichmentState.
+// Mirrors ResourceListModel.SetEnrichmentState. issueCount is always treated
+// as an authoritative Wave-2 result — every caller of this exported entry
+// point (ResourceListModel, tests) passes a real observed count, never a
+// defensive placeholder.
 func (c *Controller) ApplyEnrichmentState(typeName string, issueCount int, truncated bool, findings map[string]domain.Finding, details map[string]domain.AttentionDetail) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.applyEnrichmentState(typeName, issueCount, truncated, findings, details)
+	c.applyEnrichmentState(typeName, issueCount, truncated, findings, details, true)
 }
 
 // applyEnrichmentState is the lock-free implementation of ApplyEnrichmentState.
+// authoritative marks whether issueCount is a confirmed Wave-2 result (true)
+// or a defensive fallback standing in for "no result carried" (false — used
+// by intents.go's PatchResourceList case when v.Issues is nil, so a
+// fabricated 0/false does not falsely mark the type's issue badge Known).
 // Callers must hold c.mu (write).
-func (c *Controller) applyEnrichmentState(typeName string, issueCount int, truncated bool, findings map[string]domain.Finding, details map[string]domain.AttentionDetail) {
+func (c *Controller) applyEnrichmentState(typeName string, issueCount int, truncated bool, findings map[string]domain.Finding, details map[string]domain.AttentionDetail, authoritative bool) {
 	if c.enrichmentStore == nil {
 		c.enrichmentStore = make(map[string]map[string]domain.Finding)
 	}
@@ -327,7 +333,11 @@ func (c *Controller) applyEnrichmentState(typeName string, issueCount int, trunc
 		canon = td.ShortName
 	}
 	if ms := c.rootMenuState(); ms != nil {
-		c.syncMenuIssueCount(ms, canon, issueCount, truncated)
+		// authoritative propagates the caller's own authority over issueCount:
+		// when true (issueCount IS the confirmed Wave-2 result for canon), even
+		// a genuine zero must flip IssueKnown — otherwise a clean type stays
+		// "unknown" forever.
+		c.syncMenuIssueCount(ms, canon, issueCount, truncated, authoritative)
 
 		// Persist, mirroring syncExactTotalToMenu's disk-write half (Contract
 		// D: the badge must survive a restart). Best-effort, same as the
@@ -336,20 +346,7 @@ func (c *Controller) applyEnrichmentState(typeName string, issueCount int, trunc
 		// RowStore and never reaches store.SaveType, so without this call the
 		// badge this function just raised would be lost on the next launch
 		// even though it is visible for the rest of the session.
-		profile, region := c.core.Profile(), c.core.Region()
-		if profile != "" && region != "" {
-			avail := make(map[string]int, len(ms.Availability))
-			maps.Copy(avail, ms.Availability)
-			trunc := make(map[string]bool, len(ms.Truncated))
-			maps.Copy(trunc, ms.Truncated)
-			issueCounts := make(map[string]int, len(ms.IssueCounts))
-			maps.Copy(issueCounts, ms.IssueCounts)
-			issueTrunc := make(map[string]bool, len(ms.IssueTruncated))
-			maps.Copy(issueTrunc, ms.IssueTruncated)
-			issueKnown := make(map[string]bool, len(ms.IssueKnown))
-			maps.Copy(issueKnown, ms.IssueKnown)
-			_ = c.core.SaveAvailabilityCache(avail, trunc, issueCounts, issueTrunc, issueKnown)
-		}
+		c.persistMenuAvailabilityCache(ms)
 	}
 }
 

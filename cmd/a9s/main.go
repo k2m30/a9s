@@ -361,12 +361,16 @@ func runWebServer(profile, region, command, addr string, allowReveal, demoMode, 
 }
 
 // runProgram constructs the model, starts the Bubble Tea program, and guarantees
-// the app context is cancelled on any exit path (normal return, error, panic).
-// Separated from main() so that `defer model.Cancel()` runs before os.Exit —
-// deferred functions don't fire on os.Exit, so that call must live above it.
+// the app context is cancelled and the controller's pending cache write is
+// flushed on any exit path (normal return, error, panic). Separated from
+// main() so that these defers run before os.Exit — deferred functions don't
+// fire on os.Exit, so these calls must live above it. model.CloseController
+// runs first (LIFO defer order) so the menu-availability-cache write lands
+// before model.Cancel signals in-flight goroutines to abort.
 func runProgram(profile, region string, extraOpts []tui.Option, activeTheme string) error {
 	model := tui.New(profile, region, append(extraOpts, tui.WithActiveTheme(activeTheme))...)
 	defer model.Cancel()
+	defer model.CloseController()
 
 	p := tea.NewProgram(model)
 	_, err := p.Run()

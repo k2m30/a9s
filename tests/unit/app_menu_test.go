@@ -45,7 +45,9 @@ func newMenuController(t *testing.T) *app.Controller {
 	s.Profile = "test-profile"
 	s.Region = "eu-west-1"
 	core := runtime.New(s, nil)
-	return app.New(core)
+	c := app.New(core)
+	t.Cleanup(c.Close)
+	return c
 }
 
 // requireMenuBody extracts the MenuBody from the current Snapshot, failing

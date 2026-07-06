@@ -122,7 +122,7 @@ func TestIsBackgroundFetchTask_NonFetchKind_UnaffectedByRenderability(t *testing
 // must land in the DEFERRED slice, never executed synchronously.
 func TestWebBoot_WarmListOpen_FetchTaskDeferredAsBackground(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	core, ctrl := newLiveWebStyleController("pilot-def1-prof", "us-east-1")
+	core, ctrl := newLiveWebStyleController(t, "pilot-def1-prof", "us-east-1")
 
 	// Seed a REAL on-disk per-type file for s3 so the cache-first list-open
 	// path (NavigateKindPushResourceList's RowStore/OriginDisk seed) has
@@ -206,7 +206,7 @@ func TestWebBoot_WarmListOpen_FetchTaskDeferredAsBackground(t *testing.T) {
 // availability sweep's truncated first-page result) must retain
 // Availability["s3"]==55 and Truncated["s3"]==false — not regress to 50/true.
 func TestAvailabilityChecked_TruncatedProbe_NeverDowngradesExactMenuTotal(t *testing.T) {
-	core, ctrl := newLiveWebStyleController("", "us-east-1")
+	core, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 
 	// Establish the exact baseline the pilot's step 3/4 produce ("s3(55)",
 	// exact, no "+") via the same intent PatchMenuAvailability the runtime
@@ -299,6 +299,7 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 
 	finding := domain.Finding{
 		Code:     "s3-public-read",
@@ -333,6 +334,7 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 	s2.Region = "us-east-1"
 	core2 := runtime.New(s2, resource.AllResourceTypes())
 	ctrl2 := app.New(core2)
+	t.Cleanup(ctrl2.Close)
 
 	ctrl2.Handle(messages.AvailabilityCacheLoaded{
 		Entries: map[string]int{"s3": tf.Count},
@@ -413,6 +415,7 @@ func TestProductionRefresh_OneType_LeavesSiblingTypeFilesByteIdentical(t *testin
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{
@@ -455,6 +458,7 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 
 	// A truncated 50-row refetch landing on the SAME type — mirrors the
 	// pilot's observed "truncated refetch save SHRANK rows 55->50" defect.
@@ -519,7 +523,7 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 // on screen (nothing blanks).
 func TestAPIError_OverCachedList_ClearsRefreshing_SetsErrorMarker(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	core, ctrl := newLiveWebStyleController("pilot-def5-prof", "us-east-1")
+	core, ctrl := newLiveWebStyleController(t, "pilot-def5-prof", "us-east-1")
 
 	// Seed a REAL on-disk per-type file for s3 so the cache-first list-open
 	// has genuine row data to seed from (C6a: a counts-only
@@ -604,7 +608,7 @@ func (*pilotFetchError) Error() string { return "pilot: simulated fetch failure"
 // must report Origin=="cache"; once the matching AvailabilityChecked result
 // lands for that type, Origin must flip to "verified".
 func TestMenuEntry_Origin_CacheBeforeVerification_FlipsOnAvailabilityChecked(t *testing.T) {
-	core, ctrl := newLiveWebStyleController("", "us-east-1")
+	core, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 
 	vs, _ := ctrl.Handle(messages.AvailabilityCacheLoaded{
 		Entries: map[string]int{"s3": 55},
@@ -663,6 +667,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 
 	finding := domain.Finding{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave2:s3"}
 	sweepResources := []resource.Resource{
@@ -786,6 +791,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 
 	finding := domain.Finding{
 		Code:     "s3-public-read",
@@ -852,6 +858,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	s2.Region = "us-east-1"
 	core2 := runtime.New(s2, resource.AllResourceTypes())
 	ctrl2 := app.New(core2)
+	t.Cleanup(ctrl2.Close)
 
 	ctrl2.Handle(messages.AvailabilityCacheLoaded{
 		Entries: map[string]int{"s3": tf.Count},

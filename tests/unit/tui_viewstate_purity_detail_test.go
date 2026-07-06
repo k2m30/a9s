@@ -104,6 +104,7 @@ func TestViewStatePurity_Detail_FieldListConsistencyAcrossAllTypes(t *testing.T)
 			s.Region = "us-east-1"
 			core := runtime.New(s, nil)
 			c := app.New(core)
+			t.Cleanup(c.Close)
 			c.ApplyIntents([]runtime.UIIntent{
 				runtime.PushScreen{ID: runtime.ScreenDetail},
 			})

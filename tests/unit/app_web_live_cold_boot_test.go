@@ -124,9 +124,11 @@ import (
 // internal/web/construct.go newSession does for a LIVE (non-demo) session:
 // runtime.Bootstrap + app.New + SetUIMode("web") — no pre-supplied clients,
 // no synchronous demo handshake, s.NoCache left false (the live default).
-func newLiveWebStyleController(profile, region string) (*runtime.Core, *app.Controller) {
+func newLiveWebStyleController(t *testing.T, profile, region string) (*runtime.Core, *app.Controller) {
+	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	return core, ctrl
 }
@@ -145,7 +147,7 @@ func newLiveWebStyleController(profile, region string) (*runtime.Core, *app.Cont
 // staying false throughout the sweep this same event kicks off).
 func TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	_, ctrl := newLiveWebStyleController("", "us-east-1")
+	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 
 	vs, _ := ctrl.Handle(messages.AvailabilityCacheLoaded{
 		Entries:     map[string]int{"s3": 57},
@@ -203,7 +205,7 @@ func TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu(t *testing
 // unreachable (post-C6a) placeholder-count path.
 func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	core, ctrl := newLiveWebStyleController("webboot-refreshing-prof", "us-east-1")
+	core, ctrl := newLiveWebStyleController(t, "webboot-refreshing-prof", "us-east-1")
 
 	store := core.EnsureCacheStore()
 	if store == nil {
@@ -287,7 +289,7 @@ func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testin
 // snapshot as the KindFetchResources task.
 func TestWebBoot_ColdListOpen_ControllerLevel_ReturnsLoadingShellAndFetchTask(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	_, ctrl := newLiveWebStyleController("", "us-east-1")
+	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 
 	_, tasks := ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
@@ -344,7 +346,7 @@ func TestWebBoot_ColdListOpen_ControllerLevel_ReturnsLoadingShellAndFetchTask(t 
 // which is what a genuine warm/cold-boot-with-cache scenario exercises.
 func TestWebBoot_AvailabilityCacheLoaded_CountsOnlyFallback_KeepsLoadingTrue(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	_, ctrl := newLiveWebStyleController("", "us-east-1")
+	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 
 	// Models exactly what ExecuteTask(TaskKindLoadAvailCache) would produce
 	// from a counts-only projection with no per-type disk file backing it —
@@ -537,6 +539,7 @@ func TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBeforeFetchCompl
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 
 	reloaded := cache.LoadDir("coldboot-prof", "us-east-1")
 	tf, ok := reloaded.Type("s3")
@@ -619,6 +622,7 @@ func TestChildAndFilteredLists_NeverWrittenToTypeFile(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 
 	// Push a CHILD list screen directly (ParentContext set), bypassing the
 	// normal top-level ActionCommand open, mirroring how a drill-down child
@@ -740,6 +744,7 @@ func TestLoadBeforeSave_PairSwitch_NeverSavesBeforeLoad(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 
 	// Establish pair A's directory via a real load+save round trip.
 	storeA := cache.LoadDir("pair-a", "us-east-1")
@@ -796,6 +801,7 @@ func TestNoCache_NeverLoadsPopulatedDir_NeverWritesFiles(t *testing.T) {
 	core := runtime.New(s, resource.AllResourceTypes())
 	core.SetNoCache(true)
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 
 	snap := ctrl.Snapshot()
 	if snap.Body.Menu == nil {
@@ -879,6 +885,7 @@ func TestAncientTypeFile_SeedsNormally_NoAgeDiscard(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 
 	vs, _ := ctrl.Handle(messages.AvailabilityCacheLoaded{
 		Entries: map[string]int{"s3": ancientTF.Count},

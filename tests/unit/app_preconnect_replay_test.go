@@ -92,6 +92,7 @@ func newHermeticLiveController(t *testing.T, profile, region string) (*runtime.C
 	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	ctrl := app.New(core)
+	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	return core, ctrl
 }

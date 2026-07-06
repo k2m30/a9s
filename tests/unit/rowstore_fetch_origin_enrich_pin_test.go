@@ -52,7 +52,9 @@ func newFetchOriginPinSession(t *testing.T) (*session.Session, *runtime.Core, *a
 	s.Region = "us-east-1"
 	s.Clients = &awsclient.ServiceClients{}
 	core := runtime.New(s, nil)
-	return s, core, app.New(core)
+	c := app.New(core)
+	t.Cleanup(c.Close)
+	return s, core, c
 }
 
 // TestProbeEnrichment_FetchOriginRows_ReachesRealEnricher is the primary
