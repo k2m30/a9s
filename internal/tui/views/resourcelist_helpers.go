@@ -311,26 +311,13 @@ func (m ResourceListModel) handleChildKey(keyName string, r *resource.Resource) 
 	return m, nil
 }
 
-// buildChildContext resolves ContextKeys for a ChildViewDef given the selected resource.
+// buildChildContext resolves ContextKeys for a ChildViewDef given the selected
+// resource. Delegates to resource.ResolveChildContext — the single resolver
+// shared with the auto-open-single-detail path in
+// internal/tui/runtime_adapter_resources.go, so "ID"/"Name"/"@parent." source
+// expressions resolve identically on every navigation path into a child view.
 func (m ResourceListModel) buildChildContext(child resource.ChildViewDef, r *resource.Resource) map[string]string {
-	ctx := make(map[string]string, len(child.ContextKeys))
-	pc := m.ctrl.GetListParentContext()
-	for param, source := range child.ContextKeys {
-		switch {
-		case source == "ID":
-			ctx[param] = r.ID
-		case source == "Name":
-			ctx[param] = r.Name
-		case strings.HasPrefix(source, "@parent."):
-			parentKey := strings.TrimPrefix(source, "@parent.")
-			if pc != nil {
-				ctx[param] = pc[parentKey]
-			}
-		default:
-			ctx[param] = r.Fields[source]
-		}
-	}
-	return ctx
+	return resource.ResolveChildContext(child, r, m.ctrl.GetListParentContext())
 }
 
 // ClearLoading clears the loading and load-more flags on the controller's

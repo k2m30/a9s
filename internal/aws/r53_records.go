@@ -26,6 +26,10 @@ type r53ContinuationToken struct {
 // all three Route53 pagination cursors (NextRecordName, NextRecordType,
 // NextRecordIdentifier) as a JSON string.
 func FetchR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, hostedZoneId string, continuationToken string) (resource.FetchResult, error) {
+	if hostedZoneId == "" {
+		return resource.FetchResult{}, nil
+	}
+
 	input := &route53.ListResourceRecordSetsInput{
 		HostedZoneId: &hostedZoneId,
 	}

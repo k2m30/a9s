@@ -94,10 +94,7 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 						if cv.DrillCondition != nil && !cv.DrillCondition(r) {
 							break
 						}
-						ctx := make(map[string]string)
-						for k, v := range cv.ContextKeys {
-							ctx[k] = r.Fields[v]
-						}
+						ctx := resource.ResolveChildContext(*cv, &r, m.ctrl.GetListParentContext())
 						displayName := ctx[cv.DisplayNameKey]
 						childType := cv.ChildType
 						return m, tea.Batch(coreCmd, func() tea.Msg {

@@ -1,6 +1,8 @@
 package resource
 
 import (
+	"strings"
+
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
@@ -27,6 +29,40 @@ type Column = domain.Column
 // ChildViewDef describes a child view that can be drilled into from a parent
 // resource list. Type alias of domain.ChildViewDef — zero-churn backward compat.
 type ChildViewDef = domain.ChildViewDef
+
+// ResolveChildContext resolves a ChildViewDef's ContextKeys against the
+// selected resource, producing the parentCtx map handed to the child's
+// ChildFetcher. Source expressions:
+//   - "ID"            → r.ID
+//   - "Name"           → r.Name
+//   - "@parent.<key>" → parentCtx[<key>] (the grandparent context, for
+//     multi-level drills)
+//   - anything else    → r.Fields[source]
+//
+// This is the single resolver for ContextKeys; every navigation path that
+// enters a child view (direct Enter, auto-open-single-detail) must call this
+// rather than re-deriving the map inline; a hand-rolled r.Fields[source]-only
+// copy silently drops "ID"/"Name" sources to "" for any ContextKeys entry
+// that reads from them.
+func ResolveChildContext(child ChildViewDef, r *domain.Resource, parentCtx map[string]string) map[string]string {
+	ctx := make(map[string]string, len(child.ContextKeys))
+	for param, source := range child.ContextKeys {
+		switch {
+		case source == "ID":
+			ctx[param] = r.ID
+		case source == "Name":
+			ctx[param] = r.Name
+		case strings.HasPrefix(source, "@parent."):
+			parentKey := strings.TrimPrefix(source, "@parent.")
+			if parentCtx != nil {
+				ctx[param] = parentCtx[parentKey]
+			}
+		default:
+			ctx[param] = r.Fields[source]
+		}
+	}
+	return ctx
+}
 
 // AllResourceTypes returns the definitions for all supported resource types.
 // Pure catalog passthrough.

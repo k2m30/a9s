@@ -44,6 +44,10 @@ func FetchCfnEvents(
 	stackName string,
 	continuationToken string,
 ) (resource.FetchResult, error) {
+	if stackName == "" {
+		return resource.FetchResult{}, nil
+	}
+
 	input := &cloudformation.DescribeStackEventsInput{
 		StackName: &stackName,
 	}

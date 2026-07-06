@@ -23,6 +23,10 @@ func FetchEventBridgeRuleTargets(
 	ruleName := parentCtx["rule_name"]
 	eventBus := parentCtx["event_bus"]
 
+	if ruleName == "" {
+		return resource.FetchResult{}, nil
+	}
+
 	input := &eventbridge.ListTargetsByRuleInput{
 		Rule:         &ruleName,
 		EventBusName: &eventBus,
