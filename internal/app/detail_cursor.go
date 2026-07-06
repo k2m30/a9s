@@ -164,6 +164,14 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 		// Only effective when the related panel is visible and has actionable rows.
 		if ds.RelatedVisible {
 			ds.RelatedFocus = !ds.RelatedFocus
+			if ds.RelatedFocus {
+				// Entering the related column lands on row 0 like MoveTop, then
+				// applies the same skip-unselectable stepping so a dimmed
+				// dead-end row is never the initial selection.
+				ds.RelatedCursor = 0
+				ds.RelatedScroll = 0
+				detailSkipUnselectableRelated(ds, +1)
+			}
 		}
 		return c.snapshot(), nil, true
 
