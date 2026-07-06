@@ -27,7 +27,7 @@ const (
 // (capped at EnrichmentCap) to surface console users without MFA and stale access keys.
 //
 // Findings:
-//   - GetLoginProfile succeeds AND ListMFADevices empty → "!" finding "console user without MFA (CIS IAM.5)"
+//   - GetLoginProfile succeeds AND ListMFADevices empty → "!" finding "console user without MFA"
 //   - Any active access key with CreateDate >90d → "~" finding "access key >90d (rotation)"
 //
 // Skip when clients.IAM == nil.
@@ -106,7 +106,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			if !hasMFA {
 				rows = append(rows, domain.DetailRow{
 					Label: "MFA",
-					Value: "console user without MFA (CIS IAM.5)",
+					Value: "console user without MFA",
 					Tier:  "!",
 				})
 				severity = "!"

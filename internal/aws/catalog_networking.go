@@ -361,7 +361,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Findings: []catalog.FindingDef{
 			{Code: CodeVPCStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: vpcCodeNoFlowLogs, Phrase: "no active VPC flow logs (CIS EC2.6)", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: vpcCodeNoFlowLogs, Phrase: "no active VPC flow logs", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{

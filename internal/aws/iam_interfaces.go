@@ -32,13 +32,13 @@ type IAMListGroupsAPI interface {
 }
 
 // IAMGetLoginProfileAPI defines the interface for the IAM GetLoginProfile operation.
-// Used by Wave 2 EnrichIAMUserMFA to detect console users without MFA (CIS IAM.5).
+// Used by Wave 2 EnrichIAMUserMFA to detect console users without MFA.
 type IAMGetLoginProfileAPI interface {
 	GetLoginProfile(ctx context.Context, params *iam.GetLoginProfileInput, optFns ...func(*iam.Options)) (*iam.GetLoginProfileOutput, error)
 }
 
 // IAMListMFADevicesAPI defines the interface for the IAM ListMFADevices operation.
-// Used by Wave 2 EnrichIAMUserMFA to detect console users without MFA (CIS IAM.5).
+// Used by Wave 2 EnrichIAMUserMFA to detect console users without MFA.
 type IAMListMFADevicesAPI interface {
 	ListMFADevices(ctx context.Context, params *iam.ListMFADevicesInput, optFns ...func(*iam.Options)) (*iam.ListMFADevicesOutput, error)
 }

@@ -178,7 +178,7 @@ kms — SECRETS & CONFIG. Lifecycle key: `status`.
 | kms.state.pending_deletion | pending deletion | broken | wave1 |
 | kms.state.disabled | disabled | warn | wave1 |
 | kms.state.unavailable | <key state> | broken | wave1 |
-| kms.rotation-disabled | key rotation disabled (CIS KMS.1) | warn | wave2 |
+| kms.rotation-disabled | key rotation disabled | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

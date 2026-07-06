@@ -22,7 +22,7 @@ const (
 // raises a finding when no ACTIVE flow log exists.
 //
 // Findings:
-//   - No ACTIVE flow log for the VPC → "~" finding "no active VPC flow logs (CIS EC2.6)"
+//   - No ACTIVE flow log for the VPC → "~" finding "no active VPC flow logs"
 //
 // IssueCount stays 0 (severity "~" only).
 // Skip when clients.EC2 == nil.
@@ -90,7 +90,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		flowLogsVal := "yes"
 		if !hasActive {
 			flowLogsVal = "no"
-			setWave2Finding(&result, vpcID, vpcCodeNoFlowLogs, "no active VPC flow logs (CIS EC2.6)", "~", "vpc", nil, "")
+			setWave2Finding(&result, vpcID, vpcCodeNoFlowLogs, "no active VPC flow logs", "~", "vpc", nil, "")
 		}
 		result.FieldUpdates[vpcID] = map[string]string{
 			"flow_logs": flowLogsVal,

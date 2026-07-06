@@ -176,7 +176,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		DetailEnrich: enrichPolicy,
 		Findings: []catalog.FindingDef{
 			{Code: iamPolicyCodeOrphanUnattached, Phrase: "unattached, no roles/users/groups use it", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: iamPolicyCodeAdminStar, Phrase: "admin star (CIS IAM.16)", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: iamPolicyCodeAdminStar, Phrase: "admin star (allows * on *)", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
 	{
@@ -212,7 +212,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkIAMUserCtEvents, NeedsTargetCache: false},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: iamUserCodeNoMFA, Phrase: "console user without MFA (CIS IAM.5)", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: iamUserCodeNoMFA, Phrase: "console user without MFA", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: iamUserCodeOldKey, Phrase: "key <keyID> >90d (rotation)", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},

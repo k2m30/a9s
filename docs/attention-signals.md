@@ -62,8 +62,8 @@ resource-list frame title. The frame-title rules:
 | `lambda` | Lambda Functions | `State`: `Active`→Healthy; `Pending`→Warning; `Inactive`→Dim; `Failed`→Broken. `LastUpdateStatus==Failed`→Broken — implemented as a row-color rule, no finding row (as of 2026-07-06). `Runtime` in [deprecated-runtimes list](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html) → Broken — implemented as a row-color rule, no finding row (as of 2026-07-06). `DeadLetterConfig==nil` → Warning — implemented as a row-color rule, no finding row (as of 2026-07-06) | None | CloudWatch `Errors/Invocations` ratio; `Throttles`; `Duration` p99 vs `Timeout`; `GetFunctionConcurrency` per function | [GetFunctionConfiguration](https://docs.aws.amazon.com/lambda/latest/api/API_GetFunctionConfiguration.html) |
 | `asg` | Auto Scaling Groups | `Status==""`→Healthy; `Delete in progress`→Warning. `Instances[].HealthStatus==Unhealthy` → Warning. InService count < `MinSize` → Broken. `SuspendedProcesses` containing `Launch`/`Terminate`/`HealthCheck` → Warning | `DescribeScalingActivities(MaxRecords=1)`: latest `StatusCode==Failed` → Broken (launch-failure loop) | CloudWatch `GroupDesiredCapacity` vs `GroupInServiceInstances` delta sustained | [DescribeAutoScalingGroups](https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_DescribeAutoScalingGroups.html) |
 | `eb` | Elastic Beanstalk | `Health`: `Green`→Healthy; `Yellow`/`Grey`→Warning; `Red`→Broken — implemented as a row-color rule, no finding row (as of 2026-07-06). `Status==Terminated`→Dim — implemented as a row-color rule, no finding row (as of 2026-07-06) | `DescribeEnvironmentHealth`: `Causes[]` non-empty → Warning detail | `DescribeConfigurationSettings` platform-EOL check; `DescribeEvents` severity filter | [DescribeEnvironments](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_DescribeEnvironments.html) |
-| `ebs` | EBS Volumes | `State`: `in-use`→Healthy; `creating`/`deleting`→Warning; `error`→Broken. `available` with `CreateTime` >7d → Warning (orphan). `Encrypted==false` → Warning (CIS EC2.7) | `DescribeVolumeStatus`: `VolumeStatus.Status==impaired` → Broken; `VolumeStatus.Status==warning` → Warning; `Events[]` non-empty → Warning | CloudWatch `VolumeQueueLength`; `BurstBalance` on gp2 | [DescribeVolumeStatus](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVolumeStatus.html) |
-| `ebs-snap` | EBS Snapshots | `State`: `completed`→Healthy; `pending`→Warning; `error`→Broken; `recoverable`/`recovering`→Broken — implemented as a row-color rule, no finding row (as of 2026-07-06). Age >365d with automated description → Warning (cost) — implemented as a row-color rule, no finding row (as of 2026-07-06). `Encrypted==false` → Warning (CIS EC2.1) — implemented as a row-color rule, no finding row (as of 2026-07-06). Cross-ref `ebs` — source volume deleted → Warning (orphan) — implemented as a row-color rule, no finding row (as of 2026-07-06) | None | `DescribeSnapshotAttribute(createVolumePermission)` per snapshot (public-snapshot detection) | [DescribeSnapshots](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSnapshots.html) |
+| `ebs` | EBS Volumes | `State`: `in-use`→Healthy; `creating`/`deleting`→Warning; `error`→Broken. `available` with `CreateTime` >7d → Warning (orphan). `Encrypted==false` → Warning (unencrypted at rest) | `DescribeVolumeStatus`: `VolumeStatus.Status==impaired` → Broken; `VolumeStatus.Status==warning` → Warning; `Events[]` non-empty → Warning | CloudWatch `VolumeQueueLength`; `BurstBalance` on gp2 | [DescribeVolumeStatus](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVolumeStatus.html) |
+| `ebs-snap` | EBS Snapshots | `State`: `completed`→Healthy; `pending`→Warning; `error`→Broken; `recoverable`/`recovering`→Broken — implemented as a row-color rule, no finding row (as of 2026-07-06). Age >365d with automated description → Warning (cost) — implemented as a row-color rule, no finding row (as of 2026-07-06). `Encrypted==false` → Warning (unencrypted at rest) — implemented as a row-color rule, no finding row (as of 2026-07-06). Cross-ref `ebs` — source volume deleted → Warning (orphan) — implemented as a row-color rule, no finding row (as of 2026-07-06) | None | `DescribeSnapshotAttribute(createVolumePermission)` per snapshot (public-snapshot detection) | [DescribeSnapshots](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSnapshots.html) |
 | `ami` | AMIs | `State`: `available`→Healthy; `pending`/`transient`→Warning; `failed`/`error`/`invalid`→Broken; `deregistered`/`disabled`→Dim — implemented as a row-color rule, no finding row (as of 2026-07-06). `DeprecationTime < now()` → Warning — implemented as a row-color rule, no finding row (as of 2026-07-06). Cross-ref `ebs-snap` (owner-scoped only — skip public/marketplace AMIs) — backing snapshot missing → Warning — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | None | `DescribeImageAttribute(launchPermission)` per AMI | [DescribeImages](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeImages.html) |
 
 ### Containers
@@ -79,7 +79,7 @@ resource-list frame title. The frame-title rules:
 |---|---|---|---|---|---|
 | `elb` | Load Balancers | ELBv2 only: `State.Code`: `active`→Healthy; `provisioning`/`active_impaired`→Warning; `failed`→Broken. Surface `State.Reason` as Broken detail. Classic (ELBv1) has no `State` field | None (target health lives on `tg`) | CloudWatch `HTTPCode_ELB_5XX_Count`; `DescribeLoadBalancerAttributes` per LB (deletion-protection, access-logs) | [DescribeLoadBalancers](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeLoadBalancers.html) |
 | `tg` | Target Groups | `LoadBalancerArns==[]` → Warning (orphan) | `DescribeTargetHealth` per TG: any target `State==unhealthy` → Warning; all unhealthy → Broken | CloudWatch `UnHealthyHostCount` / `HealthyHostCount` ratios | [DescribeTargetHealth](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeTargetHealth.html) |
-| `vpc` | VPCs | `State`: `available`→Healthy; `pending`→Warning. Cross-ref `subnet` — no subnets → Warning (empty VPC) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | `DescribeFlowLogs` (filter `ResourceType=VPC` client-side): no flow logs for VPC → Warning (CIS/Well-Architected SEC) | `DescribeVpcAttribute(EnableDnsSupport)` per VPC | [DescribeVpcs](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVpcs.html) |
+| `vpc` | VPCs | `State`: `available`→Healthy; `pending`→Warning. Cross-ref `subnet` — no subnets → Warning (empty VPC) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | `DescribeFlowLogs` (filter `ResourceType=VPC` client-side): no flow logs for VPC → Warning (no traffic audit trail) | `DescribeVpcAttribute(EnableDnsSupport)` per VPC | [DescribeVpcs](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVpcs.html) |
 | `subnet` | Subnets | `State`: `available`→Healthy; `pending`→Warning; `unavailable`/`failed`→Broken; `failed-insufficient-capacity`→Broken (AZ out of capacity — ENI provisioning here will fail). `AvailableIpAddressCount / CIDR size < 0.1` → Warning, `< 0.02` → Broken — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06). Cross-ref `rtb` — `MapPublicIpOnLaunch=true` without `0.0.0.0/0 → IGW` in associated RTB (including the VPC main RTB when subnet has no explicit association) → Warning (misconfigured public subnet) — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | None | None | [DescribeSubnets](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSubnets.html) |
 | `rtb` | Route Tables | `Routes[].State==blackhole` → Broken (dead target — gateway/ENI gone) — implemented as a row-color rule, no finding row (as of 2026-07-06). No `Associations[]` AND not VPC main → Warning (orphan) — implemented as a row-color rule, no finding row (as of 2026-07-06) | None | None | [DescribeRouteTables](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeRouteTables.html) |
 | `nat` | NAT Gateways | `State`: `available`→Healthy; `pending`/`deleting`→Warning; `failed`→Broken. `FailureCode` non-empty → Broken detail; surface `FailureMessage` | None | CloudWatch `ErrorPortAllocation`, `PacketsDropCount`, `BytesOutToDestination==0` cost-waste | [DescribeNatGateways](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeNatGateways.html) |
@@ -94,7 +94,7 @@ resource-list frame title. The frame-title rules:
 
 | shortName | Name | Wave 1 | Wave 2 | Wave 3 | Source |
 |---|---|---|---|---|---|
-| `dbi` | DB Instances | `DBInstanceStatus`: `available`→Healthy; transitional → Warning; `failed`/`storage-full`/`incompatible-*`/`restore-error`/`inaccessible-encryption-credentials`→Broken. `BackupRetentionPeriod==0` → Warning. `PubliclyAccessible==true` → Warning (CIS RDS.2). `StorageEncrypted==false` → Warning (CIS RDS.3). `DeletionProtection==false` → Warning | `DescribePendingMaintenanceActions` (one account-wide call): action with `ForcedApplyDate` or `AutoAppliedAfterDate` in past → Warning | CloudWatch `FreeStorageSpace`, `CPUUtilization`, `ReplicaLag`, `DatabaseConnections` | [DescribeDBInstances](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBInstances.html) |
+| `dbi` | DB Instances | `DBInstanceStatus`: `available`→Healthy; transitional → Warning; `failed`/`storage-full`/`incompatible-*`/`restore-error`/`inaccessible-encryption-credentials`→Broken. `BackupRetentionPeriod==0` → Warning. `PubliclyAccessible==true` → Warning (reachable from the internet). `StorageEncrypted==false` → Warning (unencrypted at rest). `DeletionProtection==false` → Warning | `DescribePendingMaintenanceActions` (one account-wide call): action with `ForcedApplyDate` or `AutoAppliedAfterDate` in past → Warning | CloudWatch `FreeStorageSpace`, `CPUUtilization`, `ReplicaLag`, `DatabaseConnections` | [DescribeDBInstances](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBInstances.html) |
 <!-- amended by a9s-resource-spec during dbc gen: service URL realigned to DocumentDB to match related-resources.md; name disambiguated from RDS Aurora -->
 | `dbc` | DocumentDB Clusters | `Status`: `available`→Healthy; transitional → Warning; `failed`/`inaccessible-encryption-credentials`/`incompatible-parameters`→Broken. No `DBClusterMembers[]` entry with `IsClusterWriter==true` → Broken. `DeletionProtection==false` → Warning. `StorageEncrypted==false` → Warning. `BackupRetentionPeriod==0` → Warning | Shared with `dbi`: `DescribePendingMaintenanceActions` — an overdue action emits the `maintenance overdue` finding at Broken severity (unlike `dbi`, which emits Warning) | CloudWatch `DBInstanceReplicaLag`, `DatabaseConnections` | [DescribeDBClusters](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusters.html) |
 | `redis` | ElastiCache Redis | (Replication-group-scoped; values are `ReplicationGroup.Status`.) `Status`: `available`→Healthy; `creating`/`modifying`/`deleting`/`snapshotting`→Warning; `create-failed`→Broken. `AutomaticFailover` != `enabled` on multi-AZ → Warning | None | CloudWatch `DatabaseMemoryUsagePercentage`, `Evictions`, `ReplicationLag`, `EngineCPUUtilization` | [DescribeReplicationGroups](https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_DescribeReplicationGroups.html) |
@@ -103,7 +103,7 @@ resource-list frame title. The frame-title rules:
 | `redshift` | Redshift Clusters | `ClusterStatus`: `available`→Healthy; `creating`/`modifying`/`resizing`/`rebooting`/`renaming`/`deleting`→Warning; `incompatible-hsm`/`incompatible-network`/`incompatible-parameters`/`incompatible-restore`/`hardware-failure`/`storage-full`→Broken. `ClusterAvailabilityStatus`: `Unavailable`/`Failed`→Broken, `Maintenance`/`Modifying`→Warning. `PendingModifiedValues` non-empty → Warning. `DeferredMaintenanceWindows[]` active → Warning. `PubliclyAccessible==true` → Warning. `Encrypted==false` → Warning | None | CloudWatch `PercentageDiskSpaceUsed`, `HealthStatus` | [DescribeClusters](https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeClusters.html) |
 | `efs` | EFS File Systems | `LifeCycleState`: `available`→Healthy; `creating`/`updating`/`deleting`→Warning; `error`→Broken. `NumberOfMountTargets==0` → Broken (unreachable) | `DescribeMountTargets` per FS: any mount target `LifeCycleState` != `available` → Broken | CloudWatch `PercentIOLimit`, `BurstCreditBalance` | [DescribeMountTargets](https://docs.aws.amazon.com/efs/latest/ug/API_DescribeMountTargets.html) |
 | `s3` | S3 Buckets | None — `ListBuckets` returns `Name`, `CreationDate`, `BucketRegion`, `BucketArn` only | `GetPublicAccessBlock` per bucket: `NoSuchPublicAccessBlockConfiguration` error or any flag false → Warning (public-exposure risk; account-level PAB may still override) | `GetBucketPolicyStatus`, `GetBucketEncryption`, `GetBucketVersioning`, `GetBucketLogging`, `GetBucketLifecycleConfiguration` (each is per-bucket) | [GetPublicAccessBlock](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetPublicAccessBlock.html) |
-| `dbi-snap` | DB Instance Snapshots | `Status`: `available`→Healthy; `creating`→Warning; `failed`/`incompatible-*`→Broken. `Encrypted==false` → Warning (CIS RDS.4). Cross-ref `dbi` — source DB deleted → Warning (orphan). When parent DB in the loaded list: `SnapshotCreateTime` > parent `BackupRetentionPeriod` AND `SnapshotType==automated` → Warning | None | `DescribeDBSnapshotAttributes` per snapshot (public-snapshot) | [DescribeDBSnapshots](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBSnapshots.html) |
+| `dbi-snap` | DB Instance Snapshots | `Status`: `available`→Healthy; `creating`→Warning; `failed`/`incompatible-*`→Broken. `Encrypted==false` → Warning (unencrypted at rest). Cross-ref `dbi` — source DB deleted → Warning (orphan). When parent DB in the loaded list: `SnapshotCreateTime` > parent `BackupRetentionPeriod` AND `SnapshotType==automated` → Warning | None | `DescribeDBSnapshotAttributes` per snapshot (public-snapshot) | [DescribeDBSnapshots](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBSnapshots.html) |
 | `dbc-snap` | DB Cluster Snapshots | `Status`: `available`→Healthy; `creating`→Warning; `failed`→Broken. Manual snapshot age >365d → Warning (cost). Cross-ref `dbc`: when parent cluster in loaded list, age > cluster `BackupRetentionPeriod` × 1.5 AND automated → Warning | None | `DescribeDBClusterSnapshotAttributes` per snapshot | [DescribeDBClusterSnapshots](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusterSnapshots.html) |
 
 ### Messaging
@@ -217,6 +217,8 @@ resource-list frame title. The frame-title rules:
 | asg | asg.scaling-activity-failed | latest scaling activity failed | broken | wave2 |
 | ebs | ebs.state.creating | creating | warn | wave1 |
 | ebs | ebs.state.error | error | broken | wave1 |
+| ebs | ebs.orphan-unattached | orphan: unattached Nd | warn | wave1 |
+| ebs | ebs.encryption.disabled | unencrypted | warn | wave1 |
 | ebs | ebs.volume-io-degraded | volume I/O degraded | broken | wave2 |
 | ebs-snap | ebs-snap.state.pending | pending | warn | wave1 |
 | ebs-snap | ebs-snap.state.error | error | broken | wave1 |
@@ -239,7 +241,7 @@ resource-list frame title. The frame-title rules:
 | sg | sg.ingress.wide-open | all ports open to 0.0.0.0/0 | broken | wave1 |
 | sg | sg.ingress.dangerous-ports | ports <list> open to 0.0.0.0/0 | broken | wave1 |
 | vpc | vpc.state.pending | pending | warn | wave1 |
-| vpc | vpc.no-flow-logs | no active VPC flow logs (CIS EC2.6) | warn | wave2 |
+| vpc | vpc.no-flow-logs | no active VPC flow logs | warn | wave2 |
 | subnet | subnet.state.pending | pending | warn | wave1 |
 | subnet | subnet.state.unavailable | unavailable | broken | wave1 |
 | subnet | subnet.state.failed | failed | broken | wave1 |
@@ -306,7 +308,7 @@ resource-list frame title. The frame-title rules:
 | ddb | ddb.warn.updating | updating | warn | wave1 |
 | ddb | ddb.warn.deleting | deleting | warn | wave1 |
 | ddb | ddb.warn.archiving | archiving | warn | wave1 |
-| ddb | ddb.pitr-off | PITR off | warn | wave2 |
+| ddb | ddb.pitr-off | point-in-time recovery disabled | warn | wave2 |
 | opensearch | opensearch.dim.deleting | deleting: removal in progress | dim | wave1 |
 | opensearch | opensearch.broken.isolated | isolated: quarantined by AWS | broken | wave1 |
 | opensearch | opensearch.warn.processing | processing: config change in flight | warn | wave1 |
@@ -350,7 +352,7 @@ resource-list frame title. The frame-title rules:
 | dbc-snap | dbc-snap.warn.manual_unused | manual, unused <N>d | warn | wave1 |
 | dbc-snap | dbc-snap.orphan | orphan: source cluster deleted | broken | wave2 |
 | dbc-snap | dbc-snap.past-retention | automated, <N>d past retention | broken | wave2 |
-| alarm | alarm.state.alarm | ALARM | broken | wave1 |
+| alarm | alarm.state.alarm | alarm triggered | broken | wave1 |
 | alarm | alarm.state.insufficient_data | insufficient data | warn | wave1 |
 | alarm | alarm.no_actions | no actions | warn | wave1 |
 | logs | logs.retention-never-expire | retention: never expire | warn | wave1 |
@@ -388,8 +390,8 @@ resource-list frame title. The frame-title rules:
 | ses | ses.verification.not_started | verification not started | broken | wave1 |
 | ses | ses.verification.pending | pending verification | warn | wave1 |
 | ses | ses.sending.disabled | sending disabled | warn | wave1 |
-| ses | ses.account-shutdown | account SHUTDOWN | broken | wave2 |
-| ses | ses.account-probation | account PROBATION | broken | wave2 |
+| ses | ses.account-shutdown | sending paused by AWS (shutdown) | broken | wave2 |
+| ses | ses.account-probation | account under review (probation) | broken | wave2 |
 | ses | ses.quota-high | quota 80%+ used | warn | wave2 |
 | secrets | secrets.state.deleted | deleted | broken | wave1 |
 | secrets | secrets.state.rotation_overdue | rotation overdue | warn | wave1 |
@@ -401,7 +403,7 @@ resource-list frame title. The frame-title rules:
 | kms | kms.state.pending_deletion | pending deletion | broken | wave1 |
 | kms | kms.state.disabled | disabled | warn | wave1 |
 | kms | kms.state.unavailable | <key state> | broken | wave1 |
-| kms | kms.rotation-disabled | key rotation disabled (CIS KMS.1) | warn | wave2 |
+| kms | kms.rotation-disabled | key rotation disabled | warn | wave2 |
 | r53 | r53.zone.unused | only default NS/SOA records remain | warn | wave1 |
 | r53 | r53.orphan-private-zone | private zone with no VPC associations (orphan) | warn | wave2 |
 | cf | cf.insecure-protocol | no HTTPS redirect (insecure); origin without TLS | warn | wave2 |
@@ -411,8 +413,8 @@ resource-list frame title. The frame-title rules:
 | apigw | apigw.stage-config-issues | no throttling configured (DoS risk); access logs disabled | warn | wave2 |
 | role | iam-role.dormant | dormant role (>90d) | warn | wave2 |
 | policy | iam-policy.orphan-unattached | unattached, no roles/users/groups use it | warn | wave1 |
-| policy | iam-policy.admin-star | admin star (CIS IAM.16) | broken | wave2 |
-| iam-user | iam-user.no-mfa | console user without MFA (CIS IAM.5) | broken | wave2 |
+| policy | iam-policy.admin-star | admin star (allows * on *) | broken | wave2 |
+| iam-user | iam-user.no-mfa | console user without MFA | broken | wave2 |
 | iam-user | iam-user.old-key | key <keyID> >90d (rotation) | warn | wave2 |
 | iam-group | iam-group.orphan-or-noop | group has no members (orphan) | warn | wave2 |
 | waf | waf.no-logging | no logging configuration | warn | wave2 |
@@ -423,7 +425,7 @@ resource-list frame title. The frame-title rules:
 | cfn | cfn.stack-drifted | stack drifted from template | warn | wave2 |
 | pipeline | pipeline.stage-failed | stage <stage> failed | broken | wave2 |
 | cb | cb.latest-build-failed | latest build <status> (<date>) | broken | wave2 |
-| ecr | ecr.vulnerabilities | <N> CRITICAL findings across <M> image(s) | broken | wave2 |
+| ecr | ecr.vulnerabilities | <N> critical, <M> high vulnerabilities | broken | wave2 |
 | codeartifact | codeartifact.no-permissions-policy | no permissions policy | warn | wave2 |
 | codeartifact | codeartifact.public-access-policy | public access policy | broken | wave2 |
 | glue | glue.latest-run-failed | latest run <STATUS> | broken | wave2 |

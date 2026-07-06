@@ -21,7 +21,7 @@ const (
 // (capped at EnrichmentCap) to detect wildcard-admin policies.
 //
 // Findings:
-//   - Policy document contains Statement with Effect=Allow, Action=*, Resource=* → "!" finding "admin star (CIS IAM.16)"
+//   - Policy document contains Statement with Effect=Allow, Action=*, Resource=* → "!" finding "admin star (allows * on *)"
 //
 // AWS-managed policies (ARN starts with "arn:aws:iam::aws:policy/") are skipped.
 // Skip when clients.IAM == nil.
@@ -76,7 +76,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		}
 		if isAdminStarPolicy(doc) {
 			riskVal = "ADMIN_ALL"
-			setWave2Finding(&result, r.ID, iamPolicyCodeAdminStar, "admin star (CIS IAM.16)", "!", "iam-policy", []domain.DetailRow{
+			setWave2Finding(&result, r.ID, iamPolicyCodeAdminStar, "admin star (allows * on *)", "!", "iam-policy", []domain.DetailRow{
 				{Label: "Action", Value: "*", Tier: "!"},
 				{Label: "Resource", Value: "*", Tier: "!"},
 			}, "")

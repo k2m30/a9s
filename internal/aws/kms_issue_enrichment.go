@@ -19,7 +19,7 @@ const (
 
 // EnrichKMSRotation calls GetKeyRotationStatus for each customer-managed key (cap EnrichmentCap)
 // and returns a Finding when key rotation is not enabled.
-// Severity is "~" (informational per CIS KMS.1); IssueCount counts rotation-disabled findings.
+// Severity is "~" (informational); IssueCount counts rotation-disabled findings.
 // AWS-managed keys reject GetKeyRotationStatus with AccessDeniedException — that error is
 // silently skipped without marking Truncated. Other per-key errors set Truncated=true.
 func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
@@ -64,7 +64,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			"rotation_enabled": rotationVal,
 		}
 		if !out.KeyRotationEnabled {
-			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, "key rotation disabled (CIS KMS.1)", "~", "kms", nil, "")
+			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, "key rotation disabled", "~", "kms", nil, "")
 		}
 	})
 	result.IssueCount = 0
