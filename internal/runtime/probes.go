@@ -172,20 +172,35 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 // shortName's IssueEnricherFieldKeys when the incoming row itself has no
 // Wave-2 Finding of its own. Wave-1 findings never carry (see
 // carryWave2ForRows).
-func reconcileTypeFile(existing cache.TypeFile, incoming cache.TypeFile, rowsProvided bool, rawTruncated bool, rawCount int, shortName string, wave2Authoritative bool) cache.TypeFile {
-	if existing.Exact && rawTruncated && rawCount >= existing.Count && existing.Count > 0 {
+//
+// reconcileInput groups the rule-context parameters reconcileTypeFile needs
+// beyond the two TypeFile snapshots (existing stays a separate positional
+// argument since it is the thing being reconciled AGAINST, not a rule
+// input).
+type reconcileInput struct {
+	Incoming           cache.TypeFile
+	RowsProvided       bool
+	RawTruncated       bool
+	RawCount           int
+	ShortName          string
+	Wave2Authoritative bool
+}
+
+func reconcileTypeFile(existing cache.TypeFile, in reconcileInput) cache.TypeFile {
+	incoming := in.Incoming
+	if existing.Exact && in.RawTruncated && in.RawCount >= existing.Count && existing.Count > 0 {
 		// Rule 0: the stored Exact is provably false — accept the poisoned
 		// pair's self-healing observation instead of letting it re-stick.
 		incoming.Exact = false
-		if rawCount > incoming.Count {
-			incoming.Count = rawCount
+		if in.RawCount > incoming.Count {
+			incoming.Count = in.RawCount
 		}
 	}
 
 	tf := incoming
 	tf.HasResources = incoming.Count > 0
 
-	if !rowsProvided {
+	if !in.RowsProvided {
 		// Rule 2: counts-only write. Rows are never inspected or dropped.
 		tf.Rows = existing.Rows
 		if existing.Count > 0 || len(existing.Rows) > 0 {
@@ -209,8 +224,8 @@ func reconcileTypeFile(existing cache.TypeFile, incoming cache.TypeFile, rowsPro
 		// incoming itself lacks, unless this write is itself the
 		// Wave-2-completion save (which must supersede carried data wholesale
 		// so healed/resolved issues clear).
-		if !wave2Authoritative {
-			tf.Rows = carryWave2ForRows(existing.Rows, tf.Rows, issueEnricherFieldKeysFor(shortName))
+		if !in.Wave2Authoritative {
+			tf.Rows = carryWave2ForRows(existing.Rows, tf.Rows, issueEnricherFieldKeysFor(in.ShortName))
 		}
 	}
 	return tf
@@ -296,7 +311,12 @@ func (c *Core) SaveAvailabilityCache(
 				// overrides this too when the contradiction condition holds.
 				incoming.Count = existing.Count
 			}
-			tf := reconcileTypeFile(existing, incoming, false, trunc, count, name, false)
+			tf := reconcileTypeFile(existing, reconcileInput{
+				Incoming:     incoming,
+				RawTruncated: trunc,
+				RawCount:     count,
+				ShortName:    name,
+			})
 			if issueKnown[rawName] {
 				tf.Issues = issueCounts[rawName]
 				tf.IssuesKnown = true
@@ -545,7 +565,14 @@ func (c *Core) saveResourceListCache(shortName string, rows []cache.Row, count i
 			incoming.Exact = true
 			incoming.Count = existing.Count
 		}
-		tf := reconcileTypeFile(existing, incoming, true, !exact, count, canon, wave2Authoritative)
+		tf := reconcileTypeFile(existing, reconcileInput{
+			Incoming:           incoming,
+			RowsProvided:       true,
+			RawTruncated:       !exact,
+			RawCount:           count,
+			ShortName:          canon,
+			Wave2Authoritative: wave2Authoritative,
+		})
 		if issuesKnown {
 			tf.Issues = issues
 			tf.IssuesKnown = true

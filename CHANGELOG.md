@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Persistent cache survives restarts in both UIs** — every list column,
+  status text and `!`/`~` issue glyph renders in the first frame from the
+  per-type cache files and is silently re-verified in the background; a
+  Wave-1 refresh can no longer strip previously learned findings from the
+  file or the screen (Wave-2 carry rule C6b).
+- **Machine findings registry** — every resource type declares its complete
+  finding inventory (code, phrase, severity, wave) on the catalog; the
+  findings tables in `docs/resources/*.md` and `docs/attention-signals.md`
+  are generated from it. Hand-written signal rows that the code does not
+  emit are explicitly marked `NOT IMPLEMENTED (backlog)`; row-color-only
+  rules are labeled as such.
+- **Demo mode is a full verification bench** — background checks run in
+  demo; every registered related-panel pivot has a live witness; every
+  witnessed ID resolves on drill-down; issue-carrying fixtures exist for
+  every issue-capable type; per-type color-state coverage is inventoried
+  by ratchet tests that only shrink.
+- **Filtered related drill-downs cache per session** — re-entering e.g.
+  CloudTrail Events from a key renders instantly from the session cache
+  with a background refresh instead of a bare full-screen Loading.
+
+### Changed
+
+- **One row store** — the five in-memory copies of per-type list rows
+  (probe buffer, session caches, controller mirror, screen rows) collapse
+  into a single session-scoped `RowStore`; screens adopt what the store's
+  reconciler accepts, both save lanes share one materializer with the
+  user's column config honored, and a conformance test bans new shadow
+  row maps at the source level.
+- **Related-panel contract hardened** — 24 pivots that returned zero or
+  garbage on any data now implement their documented mechanisms (five new
+  AWS API integrations); the remaining 20 zero-count pivots are annotated
+  `budget-excluded` under the new one-extra-call policy rule; checkers
+  return IDs the drill-down can actually resolve.
+
+### Fixed
+
+- KMS color states never worked (classifier read a field the fetcher never
+  wrote); console users without MFA now classify Broken as documented;
+  Lambda state precedence follows the spec (Inactive dims before the
+  missing-DLQ warning); CloudTrail emits findings for all four documented
+  conditions including stale delivery.
+- Related panel: all zero-count rows dim consistently; Tab lands on the
+  first actionable row; cursor movement skips dead ends; count badges
+  render on the legacy TUI lane; results without display names bind to
+  their row instead of appending phantom rows.
+- Sort order, filter and cursor position survive list re-entry.
+- Render tests are hermetic: one deterministic color profile for the
+  whole suite regardless of the invoking terminal.
+
 ## [3.45.0] - 2026-05-12
 
 ### Changed (BREAKING — resource type renames, no aliases)

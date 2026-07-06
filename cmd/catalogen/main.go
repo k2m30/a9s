@@ -11,7 +11,9 @@
 //
 // Output files (relative to the repo root):
 //   - docs/attention-signals.md  — findings × severity table
-//   - docs/related-resources.md  — generated from Related defs
+//   - docs/related-resources.md  — ONLY the marked related-table section;
+//     the per-type contract prose (mechanisms, citations, budget-excluded
+//     annotations) is hand-maintained and NOT generated
 //   - docs/resources/<short>.md  — per-resource markdown (section-marker mode)
 //
 // When the catalog is empty, no output files are written; the generator
