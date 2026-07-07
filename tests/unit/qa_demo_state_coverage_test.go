@@ -17,18 +17,24 @@
 //     of truth for which of the four domain.Color buckets (Healthy / Warning
 //     / Broken / Dim) a resource lands in — mirroring how the pivot test
 //     calls the type's own real RelatedDef.Checker instead of reimplementing
-//     pivot logic. "Reachable" is discovered empirically: a bucket is
-//     reachable for a type iff at least one demo fixture resource of that
-//     type actually classifies into it via td.ResolveColor. A bucket no demo
-//     fixture ever reaches is either (a) a fixture gap — the type has real
-//     resources that could be in that state but none exist in demo data, pin
-//     it in knownStateCoverageGaps — or (b) structurally unreachable for that
-//     type (e.g. a type with no lifecycle signal at all only ever resolves
-//     ColorHealthy) in which case it is never observed as a gap in the first
-//     place: this test only ever asks about buckets it saw at least one
-//     fixture claim as a candidate improvement target, so "unreachable"
-//     buckets are silently absent from both the failure set and the
-//     allowlist, never scored as N/A explicitly.
+//     pivot logic. td.ResolveColor runs against a Wave-2-folded copy of each
+//     fixture resource — runtime.ApplyWave2ToRow applied with the type's own
+//     registered Wave-2 IssueEnricher output, exactly the shape production
+//     uses before Color funcs that lead with colorFromAnyFinding ever see the
+//     row — so a bucket only reachable through a Wave-2 finding (e.g. s3's
+//     PAB-incomplete Broken) is witnessable here, not just Wave-1-only
+//     buckets. "Reachable" is discovered empirically: a bucket is reachable
+//     for a type iff at least one demo fixture resource of that type actually
+//     classifies into it via td.ResolveColor on the folded copy. A bucket no
+//     demo fixture ever reaches is either (a) a fixture gap — the type has
+//     real resources that could be in that state but none exist in demo
+//     data, pin it in knownStateCoverageGaps — or (b) structurally
+//     unreachable for that type (e.g. a type with no lifecycle signal at all
+//     only ever resolves ColorHealthy) in which case it is never observed as
+//     a gap in the first place: this test only ever asks about buckets it
+//     saw at least one fixture claim as a candidate improvement target, so
+//     "unreachable" buckets are silently absent from both the failure set and
+//     the allowlist, never scored as N/A explicitly.
 //
 //  2. Finding coverage (catalog.ResourceTypeDef.Findings — code/phrase/
 //     severity/source; this is what cmd/catalogen writes into the findings
@@ -73,6 +79,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 )
 
 // knownStateCoverageGaps pins the exact inventory of missing demo-fixture
@@ -95,82 +102,96 @@ import (
 //     regression the allowlist was never told about.
 var knownStateCoverageGaps = map[string]bool{
 	// --- bucket gaps: type never resolves to this domain.Color via td.ResolveColor ---
+	//
+	// Reason class: "healthy unreachable" — findingCodesFor now folds each
+	// type's Wave-2 IssueEnricher output onto a copy of every fixture via
+	// runtime.ApplyWave2ToRow before calling td.ResolveColor (matching
+	// production's runtime.Core.applyEnrichment exactly). For these six
+	// types every demo fixture is deliberately built in a state the
+	// enricher flags, so colorFromAnyFinding (which every affected Color
+	// func consults first) wins over the raw structural branch on every
+	// single fixture and none stays Healthy. Fixing this needs a new,
+	// deliberately-clean demo fixture per type — internal/demo/ is out of
+	// tests/unit scope, so these stay pinned as debt, not forced.
+	"apigw:healthy":        true, // internal/demo/fixtures/apigw.go: PublicAPIGWID's $default stage has zero throttling + no access logs (stage-config-issues); the other 2 APIs have no Stages map entry at all (no-deployed-stages).
+	"codeartifact:healthy": true, // internal/demo/fixtures/codeartifact.go: acme-npm's PermissionsPolicies entry has Principal:"*" (public-access-policy); acme-pypi/acme-maven have no entry at all, so GetRepositoryPermissionsPolicy returns ResourceNotFoundException (no-permissions-policy) for both — by the fixture's own doc comment, deliberate.
+	"eb-rule:healthy":      true, // no eb_rule Target in internal/demo/fixtures ever sets DeadLetterConfig, so EnrichEventBridgeRuleTargets' "no DLQ on target" ("~") check fires for every rule that has at least one target.
+	"kms:healthy":          true, // internal/demo/fakes/kms.go's GetKeyRotationStatus unconditionally returns KeyRotationEnabled:false for every key (not per-key fixture data) — EnrichKMSRotation's "key rotation disabled" finding fires for all 41 fixtures.
+	"tgw:healthy":          true, // internal/demo/fixtures/ec2.go buildTransitGateways: only 2 of 7 TGWs are state=available, and buildTGWAttachments deliberately gives both of them a bad attachment (hub: modifying, DR: failed) so EnrichTGWAttachments's worst-wins finding always fires on the only two structurally-Healthy candidates.
+	"vpc:healthy":          true, // internal/demo/fixtures/ec2.go: FlowLogsByResourceID only has an entry keyed by a vpce ID (the vpce:logs pivot witness), never by either fixture VPC ID — EnrichVPCFlowLogs' "no active VPC flow logs" finding fires for every vpc.
+
+	// Reason class: "dim unreachable: AWS stops listing the resource once
+	// deleted" — the Dim bucket models a genuine AWS terminal "deleted"
+	// lifecycle state, but the type's own List/Describe API drops the
+	// resource from its output once torn down, so no fixture — demo or
+	// real — can ever witness it without misrepresenting live AWS
+	// behavior.
+	"redis:dim": true, // colorRedis (internal/aws/catalog_databases.go) has no Dim branch — deleted as dead code per AWS API behavior (a torn-down ElastiCache ReplicationGroup simply stops appearing in DescribeReplicationGroups rather than reporting a "deleted" status; see docs/resources/redis.md §3.1/§3.2/§5 and the Bug 4 pin in aws_classifier_fivepack_test.go).
+
+	// Reason class: "color never modeled by the classifier or any
+	// FindingDef" — verified per entry against BOTH the type's Color func
+	// (internal/aws/catalog_*.go — no switch case or FieldUpdates-driven
+	// branch returns this domain.Color) AND its registered
+	// catalog.FindingDef table (internal/aws/catalog_*.go Findings: [] —
+	// no entry carries the matching Severity). With neither a structural
+	// path nor a registered Finding of that severity, no fixture of any
+	// shape could ever witness this bucket — it is not a fixture gap.
 	"alarm:dim":    true,
-	"apigw:broken": true, "apigw:dim": true, "apigw:warning": true,
+	"apigw:broken": true, "apigw:dim": true,
 	"asg:dim":       true,
 	"athena:broken": true, "athena:dim": true,
-	"backup:broken": true, "backup:dim": true, "backup:warning": true,
-	"cb:broken": true, "cb:dim": true, "cb:warning": true,
-	"cf:broken":           true,
-	"codeartifact:broken": true, "codeartifact:dim": true, "codeartifact:warning": true,
-	"ct-events:healthy": true,
-	"dbc:dim":           true,
-	"dbc-snap:dim":      true,
-	"dbi:dim":           true, "dbi-snap:dim": true,
-	"ddb:dim":        true,
-	"eb-rule:broken": true, "eb-rule:warning": true,
+	"backup:dim": true,
+	"cb:dim":     true, "cb:warning": true,
+	"cf:broken":        true,
+	"codeartifact:dim": true,
+	"dbc:dim":          true,
+	"dbc-snap:dim":     true,
+	"dbi:dim":          true, "dbi-snap:dim": true,
+	"ddb:dim": true,
 	"ebs:dim": true, "ebs-snap:dim": true,
-	"ecr:broken": true, "ecr:dim": true, "ecr:warning": true,
+	"ecr:dim": true, "ecr:warning": true,
 	"ecs:dim": true, "ecs-svc:dim": true,
 	"efs:dim":    true,
 	"eip:broken": true, "eip:dim": true,
 	"eks:dim":    true,
 	"elb:dim":    true,
 	"eni:broken": true, "eni:dim": true,
-	"glue:broken": true, "glue:dim": true, "glue:warning": true,
-	"iam-group:broken": true, "iam-group:dim": true, "iam-group:warning": true,
-	"iam-user:broken": true, "iam-user:dim": true,
-	// iam-user:warning: structurally unreachable through THIS harness — every
-	// raw fixture is fed straight through td.ResolveColor (no Wave-2
-	// FieldUpdates fold), and FetchIAMUsersPage (internal/aws/iam_users.go)
-	// unconditionally hardcodes Fields["has_console_password"]="false" at
-	// fetch time. colorIAMUser's only non-Healthy branch requires
-	// has_console_password=="true", so no raw fixture — regardless of its
-	// PasswordLastUsed value — can ever resolve to Warning here. The
-	// corrected classification (docs/resources/iam-user.md §3.2 console-
-	// login-without-MFA -> Broken) requires the Wave-2 field-update merge
-	// this harness intentionally omits; see TestColorIAMUser_ConsoleUserWithoutMFAClassifiesBroken
-	// in aws_classifier_fivepack_test.go for the pinned production gap.
-	"iam-user:warning": true,
-	"igw:broken":       true, "igw:dim": true,
+	"glue:dim": true, "glue:warning": true,
+	"iam-group:broken": true, "iam-group:dim": true,
+	"iam-user:dim": true,
+	"igw:broken":   true, "igw:dim": true,
 	"kinesis:broken": true, "kinesis:dim": true,
-	// kms:dim: colorKMS (internal/aws/catalog_secrets.go) has exactly three
-	// branches — Enabled->Healthy, Disabled->Warning, PendingDeletion/
-	// PendingImport/PendingReplicaDeletion/Unavailable->Broken — and no Dim
-	// return. docs/resources/kms.md §3.1/§3.2 document no Dim-producing
-	// signal for this type; structurally unreachable, not a fixture gap.
-	"kms:dim":     true,
+	"kms:dim":     true, // colorKMS (internal/aws/catalog_secrets.go) has exactly three branches — Enabled->Healthy, Disabled->Warning, PendingDeletion/PendingImport/PendingReplicaDeletion/Unavailable->Broken — and no Dim return; docs/resources/kms.md §3.1/§3.2 document no Dim-producing signal for this type.
 	"logs:broken": true, "logs:dim": true,
-	"msk:dim":         true,
-	"ng:dim":          true,
-	"pipeline:broken": true, "pipeline:dim": true, "pipeline:warning": true,
-	"policy:broken": true, "policy:dim": true,
+	"msk:dim":      true,
+	"ng:dim":       true,
+	"pipeline:dim": true, "pipeline:warning": true,
+	"policy:dim": true,
 	"r53:broken": true, "r53:dim": true,
-	// redis:dim: colorRedis (internal/aws/catalog_databases.go) has no Dim
-	// branch — deleted as dead code per AWS API behavior (a torn-down
-	// ElastiCache ReplicationGroup simply stops appearing in
-	// DescribeReplicationGroups rather than reporting a "deleted" status;
-	// see docs/resources/redis.md §3.1/§3.2/§5 and the Bug 4 pin in
-	// aws_classifier_fivepack_test.go). Structurally unreachable, not a
-	// fixture gap.
-	"redis:dim":    true,
 	"redshift:dim": true,
-	"role:dim":     true, "role:warning": true,
-	"rtb:dim":   true,
-	"s3:broken": true, "s3:dim": true, "s3:warning": true,
+	"role:dim":     true,
+	"rtb:dim":      true,
+	"s3:dim":       true, "s3:warning": true,
 	"secrets:dim": true,
 	"ses:dim":     true,
-	"sfn:broken":  true, "sfn:dim": true, "sfn:warning": true,
+	"sfn:dim":     true, "sfn:warning": true,
 	"sg:dim": true, "sg:warning": true,
-	"sns:broken": true, "sns:dim": true, "sns:warning": true,
+	"sns:broken": true, "sns:dim": true,
 	"sns-sub:broken": true,
-	"sqs:broken":     true, "sqs:dim": true, "sqs:warning": true,
+	"sqs:broken":     true, "sqs:dim": true,
 	"ssm:dim":    true,
 	"subnet:dim": true,
-	"tg:broken":  true, "tg:dim": true, "tg:warning": true,
+	"tg:dim":     true, "tg:warning": true,
 	"trail:dim":  true,
 	"vpc:broken": true, "vpc:dim": true,
-	"waf:broken": true, "waf:dim": true, "waf:warning": true,
+	"waf:broken": true, "waf:dim": true,
+
+	// ct-events:healthy — colorCTEvents (internal/aws/catalog_monitoring.go)
+	// has exactly two colored branches (ct-danger -> Broken, ct-attention ->
+	// Warning) and defaults every other status straight to Dim; Healthy is
+	// not a reachable return value from this classifier by design, not a
+	// fixture gap.
+	"ct-events:healthy": true,
 
 	// --- finding gaps: seeded 2026-07-06 from the machine findings registry
 	// (249 FindingDefs across all types). The 52 original entries from that
@@ -243,7 +264,15 @@ func buildDemoStateTypeCache(t *testing.T) (map[string][]resource.Resource, reso
 // the type's registered Wave-2 IssueEnricher emits into
 // IssueEnricherResult.Findings when run against those same fixtures. Also
 // returns the resolved domain.Color bucket set (via td.ResolveColor) across
-// every fixture resource.
+// every fixture resource — computed on a runtime.ApplyWave2ToRow-folded copy
+// of each resource, so a Color func that leads with colorFromAnyFinding
+// (internal/aws/catalog_color_helpers.go) can see the Wave-2 finding exactly
+// as production's runtime.Core.applyEnrichment fold does, not just the raw
+// pre-enrichment Wave-1 resource. FieldUpdates is intentionally NOT folded
+// here — a Color func whose only path to a given bucket runs through the
+// separate FieldUpdates merge (e.g. colorIAMUser's has_console_password
+// branch) would still show that bucket as unreachable through this harness,
+// even though ApplyListFieldUpdates gives production a witness.
 func findingCodesFor(
 	t *testing.T,
 	td resource.ResourceTypeDef,
@@ -255,21 +284,32 @@ func findingCodesFor(
 	codes := make(map[domain.FindingCode]bool)
 	buckets := make(map[domain.Color]bool)
 
-	for _, res := range fixtures {
-		buckets[td.ResolveColor(res)] = true
-		for _, f := range res.Findings {
-			codes[f.Code] = true
-		}
-	}
+	var wave2Findings map[string]domain.Finding
+	var wave2AttentionDetails map[string]domain.AttentionDetail
+	hasEnricher := false
 
 	if enricher, ok := awsclient.Wave2EnricherFor(td.ShortName); ok && enricher.Fn != nil {
 		result, err := enricher.Fn(context.Background(), clients, fixtures, cache)
 		if err != nil {
 			t.Fatalf("%s: Wave-2 enricher returned error: %v", td.ShortName, err)
 		}
+		hasEnricher = true
+		wave2Findings = result.Findings
+		wave2AttentionDetails = result.AttentionDetails
 		for _, f := range result.Findings {
 			codes[f.Code] = true
 		}
+	}
+
+	for _, res := range fixtures {
+		for _, f := range res.Findings {
+			codes[f.Code] = true
+		}
+		folded := res
+		if hasEnricher {
+			runtime.ApplyWave2ToRow(&folded, td, wave2Findings, wave2AttentionDetails)
+		}
+		buckets[td.ResolveColor(folded)] = true
 	}
 
 	return codes, buckets
