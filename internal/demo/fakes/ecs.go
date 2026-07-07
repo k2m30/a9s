@@ -4,6 +4,7 @@ package fakes
 
 import (
 	"context"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -94,7 +95,12 @@ func (f *ECSFake) DescribeTasks(_ context.Context, input *ecs.DescribeTasksInput
 	wanted := toSet(input.Tasks)
 	var result []ecstypes.Task
 	for _, t := range f.fix.Tasks {
-		if wanted[aws.ToString(t.TaskArn)] {
+		arn := aws.ToString(t.TaskArn)
+		id := arn
+		if idx := strings.LastIndex(arn, "/"); idx != -1 {
+			id = arn[idx+1:]
+		}
+		if wanted[arn] || wanted[id] {
 			result = append(result, t)
 		}
 	}
