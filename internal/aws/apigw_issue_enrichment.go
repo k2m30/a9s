@@ -32,7 +32,7 @@ const (
 // Skip if clients.APIGatewayV2 == nil. Per-API errors → truncated.
 func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string]domain.Finding),
+		Findings:     make(map[string][]domain.Finding),
 		FieldUpdates: make(map[string]map[string]string),
 		TruncatedIDs: make(map[string]bool),
 	}

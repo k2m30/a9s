@@ -20,9 +20,12 @@ import (
 //
 //  1. Strips any existing Wave-2 entries from r.Findings (fetchers write
 //     Wave-1 Findings directly post-W1.1; nothing else needs re-derivation).
-//  2. Appends the Wave-2 Finding from findings[r.ID] (when present).
-//  3. Writes attentionDetails[r.ID] into r.AttentionDetails under the matching
-//     FindingCode (the fold-layer re-keying from Resource.ID to FindingCode).
+//  2. Appends every Wave-2 Finding from findings[r.ID] (when present) —
+//     an enricher may emit more than one independently-evaluated condition
+//     per resource.
+//  3. Writes attentionDetails[r.ID] into r.AttentionDetails under the
+//     matching FindingCode (the fold-layer re-keying from Resource.ID to
+//     FindingCode).
 //
 // Folds Wave-2 findings into RowStore's retained rows for canon via
 // AmendRows' copy-on-write mutation (task #17 wave 1 stage 3 — the former
@@ -32,7 +35,7 @@ import (
 // Amend exists to remove — see RowStore.Amend's doc comment.
 func (c *Core) applyEnrichment(
 	resourceType string,
-	findings map[string]domain.Finding,
+	findings map[string][]domain.Finding,
 	attentionDetails map[string]domain.AttentionDetail,
 ) {
 	canon := resourceType
@@ -58,13 +61,16 @@ func (c *Core) applyEnrichment(
 }
 
 // ApplyWave2ToRow strips any existing Wave-2 entries from r.Findings, then
-// appends the per-row Wave-2 Finding (if present) and writes its AttentionDetail
-// under the Finding's Code. Nil findings/attentionDetails behaves as the clear
-// path (strip only, no Wave-2 appended).
+// appends every per-row Wave-2 Finding for r.ID (an enricher may emit more
+// than one independently-evaluated condition per resource; dedupe by Code
+// guards against an enricher accidentally emitting the same Code twice) and
+// writes their AttentionDetail under each Finding's own Code. Nil
+// findings/attentionDetails behaves as the clear path (strip only, no
+// Wave-2 appended).
 func ApplyWave2ToRow(
 	r *domain.Resource,
 	td resource.ResourceTypeDef,
-	findings map[string]domain.Finding,
+	findings map[string][]domain.Finding,
 	attentionDetails map[string]domain.AttentionDetail,
 ) {
 	if r == nil {
@@ -83,25 +89,39 @@ func ApplyWave2ToRow(
 	}
 	r.Findings = out
 	r.AttentionDetails = nil
-	f, ok := findings[r.ID]
-	if !ok || f.Phrase == "" {
+
+	fs := findings[r.ID]
+	if len(fs) == 0 {
 		return
 	}
-	// Enricher-emitted Findings already carry the canonical Code and
-	// Source. Source must be "wave2:<short>" for the existing app_enrich_fold
-	// readers (findingFromResource, findingsFromRows, stripWave2) to recognise
-	// the entry. Tolerate enrichers that forgot to set Source by stamping the
-	// canonical form here.
-	if f.Source == "" {
-		f.Source = "wave2:" + td.ShortName
-	} else if !strings.HasPrefix(f.Source, "wave2:") {
-		f.Source = "wave2:" + td.ShortName
-	}
-	r.Findings = append(r.Findings, f)
-	if ad, ok := attentionDetails[r.ID]; ok && len(ad.Rows) > 0 {
-		if r.AttentionDetails == nil {
-			r.AttentionDetails = make(map[domain.FindingCode]domain.AttentionDetail, 1)
+
+	ad, hasAD := attentionDetails[r.ID]
+	adAssigned := false
+	seen := make(map[domain.FindingCode]bool, len(fs))
+	for _, f := range fs {
+		if f.Phrase == "" || seen[f.Code] {
+			continue
 		}
-		r.AttentionDetails[f.Code] = ad
+		seen[f.Code] = true
+		// Enricher-emitted Findings already carry the canonical Code and
+		// Source. Source must be "wave2:<short>" for the existing
+		// app_enrich_fold readers (findingFromResource, findingsFromRows,
+		// stripWave2) to recognise the entry. Tolerate enrichers that forgot
+		// to set Source by stamping the canonical form here.
+		if f.Source == "" || !strings.HasPrefix(f.Source, "wave2:") {
+			f.Source = "wave2:" + td.ShortName
+		}
+		r.Findings = append(r.Findings, f)
+		// attentionDetails is keyed by Resource.ID (not by Finding.Code), so
+		// a resource with more than one Finding has only one shared rows set
+		// to distribute; it attaches to the first Finding appended for this
+		// resource rather than being duplicated onto every Finding's Code.
+		if hasAD && len(ad.Rows) > 0 && !adAssigned {
+			if r.AttentionDetails == nil {
+				r.AttentionDetails = make(map[domain.FindingCode]domain.AttentionDetail, 1)
+			}
+			r.AttentionDetails[f.Code] = ad
+			adAssigned = true
+		}
 	}
 }

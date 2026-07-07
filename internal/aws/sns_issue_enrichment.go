@@ -24,7 +24,7 @@ const (
 // Per-topic errors are treated as truncated (skip silently).
 func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string]domain.Finding),
+		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 		FieldUpdates: make(map[string]map[string]string),
 	}

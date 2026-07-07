@@ -358,6 +358,21 @@ func (c *Controller) listEnrichmentFindings(typeName string) map[string]domain.F
 	return c.enrichmentStore[typeName]
 }
 
+// listEnrichmentAllFindings returns the per-resource slice-valued finding map
+// for typeName (every independently-evaluated Wave-2 condition, not just the
+// worst-severity representative), or nil. Falls back to wrapping
+// listEnrichmentFindings' single-representative form when typeName has no
+// entry in enrichmentStoreAll (a type only ever populated via the public
+// ApplyEnrichmentState, which cannot carry the full slice).
+func (c *Controller) listEnrichmentAllFindings(typeName string) map[string][]domain.Finding {
+	if c.enrichmentStoreAll != nil {
+		if all, ok := c.enrichmentStoreAll[typeName]; ok {
+			return all
+		}
+	}
+	return wrapSingleFindingMap(c.listEnrichmentFindings(typeName))
+}
+
 // listEnrichmentDetails returns the per-resource AttentionDetail map for
 // typeName, or nil. Mirrors listEnrichmentFindings.
 func (c *Controller) listEnrichmentDetails(typeName string) map[string]domain.AttentionDetail {

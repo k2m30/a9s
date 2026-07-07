@@ -39,18 +39,51 @@ type ProbeAvailabilityResult struct {
 // enrichment probe. Adapters convert this into a platform-specific message
 // (e.g. messages.EnrichmentChecked for the Bubble Tea adapter).
 //
-// Findings and AttentionDetails are both keyed by Resource.ID. The fold layer
-// (runtime.Core.applyEnrichment) flips AttentionDetails to FindingCode against
-// the matching r.Findings entry when writing onto cached rows.
+// Findings and AttentionDetails are both keyed by Resource.ID. Findings
+// carries every independently-evaluated Wave-2 Finding per resource
+// (IssueEnricherResult.Findings, unfiltered) — the adapter derives the
+// single-representative form its own single-Finding-per-resource fields need
+// via WorstFindingPerID. The fold layer (runtime.Core.applyEnrichment) flips
+// AttentionDetails to FindingCode against the matching r.Findings entry when
+// writing onto cached rows.
 type ProbeEnrichmentResult struct {
 	ResourceType     string
 	Issues           int
 	Truncated        bool
-	Findings         map[string]domain.Finding
+	Findings         map[string][]domain.Finding
 	AttentionDetails map[string]domain.AttentionDetail
 	FieldUpdates     map[string]map[string]string
 	TruncatedIDs     map[string]bool
 	Err              error
+}
+
+// WorstFindingPerID reduces a per-resource slice-valued Wave-2 finding map to
+// a single-Finding-per-resource map, keeping only the highest-severity entry
+// for each resource ID (ties keep the first-seen entry). Adapters use this to
+// populate single-Finding-per-resource fields (messages.EnrichmentChecked.
+// Findings, and transitively PatchDetail.EnrichmentFindings/
+// ListEnrichmentPatch.Findings) from ProbeEnrichmentResult.Findings/
+// IssueEnricherResult.Findings, which may carry more than one
+// independently-evaluated condition per resource. Returns nil for a nil/empty
+// input.
+func WorstFindingPerID(findings map[string][]domain.Finding) map[string]domain.Finding {
+	if len(findings) == 0 {
+		return nil
+	}
+	out := make(map[string]domain.Finding, len(findings))
+	for id, fs := range findings {
+		if len(fs) == 0 {
+			continue
+		}
+		worst := fs[0]
+		for _, f := range fs[1:] {
+			if f.Severity > worst.Severity {
+				worst = f
+			}
+		}
+		out[id] = worst
+	}
+	return out
 }
 
 // DemoPrefetchResult carries the combined outcome of a synchronous demo

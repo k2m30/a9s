@@ -28,7 +28,7 @@ const (
 // Skip when clients.IAM == nil.
 func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string]domain.Finding),
+		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 	}
 	if clients.IAM == nil {

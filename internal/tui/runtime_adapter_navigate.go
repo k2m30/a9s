@@ -211,11 +211,15 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		// Initialise related rows from registered defs so the controller body
 		// shows loading state immediately (mirrors newRightColumn on SetSize).
 		m.ctrl.InitDetailRelatedRows(result.ResolvedType)
-		// Seed wave-2 findings into the controller immediately when the resource
-		// already carries a finding (wave-1 or pre-loaded wave-2).
-		if ef, ad := findingFromResource(*result.Resource); ef != nil {
-			m.ctrl.ApplyDetailFinding(ef, ad)
-		}
+		// No separate ApplyDetailFinding call here: EnsureDetailState above
+		// already seeds ds.Findings/ds.AttentionDetails from
+		// result.Resource.Findings/AttentionDetails verbatim (a freshly-pushed
+		// ScreenDetail always hits ensureDetailState's non-nil branch), which
+		// already carries every wave-2 finding ApplyWave2ToRow appended (#52 —
+		// a resource with more than one independently-evaluated condition).
+		// findingFromResource only ever surfaces the FIRST one; re-applying it
+		// here would strip the ones EnsureDetailState just correctly seeded
+		// down to that single entry.
 		// Create a transient detail model only to configure the controller state
 		// (SetNavProvider seeds navigable-field data into the ctrl).
 		d := views.NewDetailWithCtrl(*result.Resource, result.ResolvedType, m.viewConfig, m.keys, m.ctrl)

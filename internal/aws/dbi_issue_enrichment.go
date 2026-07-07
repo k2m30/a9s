@@ -26,7 +26,7 @@ const (
 // phraseFromFindings; this enricher only emits Findings.
 func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string]domain.Finding),
+		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 		FieldUpdates: make(map[string]map[string]string),
 	}

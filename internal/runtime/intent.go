@@ -37,6 +37,13 @@ type ListEnrichmentPatch struct {
 	AttentionDetails map[string]domain.AttentionDetail
 	TruncatedIDs     map[string]bool
 	FieldUpdates     map[string]map[string]string
+	// AllFindings carries every independently-evaluated Wave-2 Finding per
+	// Resource.ID (mirrors messages.EnrichmentChecked.AllFindings) — the
+	// adapter folds this onto cached rows so a multi-condition resource keeps
+	// every Finding, not just the single worst-severity representative in
+	// Findings above. Nil when the producer only knows about the
+	// single-representative form; adapters fall back to wrapping Findings.
+	AllFindings map[string][]domain.Finding
 }
 
 // PatchResourceList instructs the adapter to apply the contained patches

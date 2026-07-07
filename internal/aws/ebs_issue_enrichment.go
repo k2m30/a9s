@@ -21,7 +21,7 @@ const (
 // Severity is "!" (broken/degraded). Walks up to EnrichmentCap pages via NextToken.
 func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string]domain.Finding),
+		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 	}
 	if clients.EC2 == nil {

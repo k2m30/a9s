@@ -51,7 +51,7 @@ const ECRImagesPerRepo = 10
 // silently — AWS returns a nil ImageScanFindingsSummary for those.
 func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string]domain.Finding),
+		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 		FieldUpdates: make(map[string]map[string]string),
 	}
@@ -153,9 +153,12 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	sort.Strings(failures)
 
 	issueCount := 0
-	for _, f := range result.Findings {
-		if f.Severity == domain.SevBroken {
-			issueCount++
+	for _, fs := range result.Findings {
+		for _, f := range fs {
+			if f.Severity == domain.SevBroken {
+				issueCount++
+				break
+			}
 		}
 	}
 	result.IssueCount = issueCount

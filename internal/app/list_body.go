@@ -188,8 +188,11 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// findings from the enrichment store so a silent-swap refetch never leaves
 	// the controller rows (and therefore the list-open save path, DEF-8)
 	// glyph-blind until the next EnrichmentChecked. Mirrors the session-side
-	// fold, which re-applies onto Core stores after every result lands.
-	if known := c.listEnrichmentFindings(typeName); len(known) > 0 {
+	// fold, which re-applies onto Core stores after every result lands. Uses
+	// listEnrichmentAllFindings (every independently-evaluated Wave-2
+	// Finding per resource) so a multi-condition resource keeps every
+	// Finding across a silent-swap refetch, not just the worst one.
+	if known := c.listEnrichmentAllFindings(typeName); len(known) > 0 {
 		c.applyRowFindings(typeName, known, c.listEnrichmentDetails(typeName))
 	}
 }
@@ -837,6 +840,22 @@ func (c *Controller) clearRowFindings(typeName string) {
 	}
 }
 
+// wrapSingleFindingMap converts a single-representative Wave-2 finding map
+// into the one-element-per-ID slice form applyRowFindings/runtime.
+// ApplyWave2ToRow need, for callers that only have the legacy
+// single-Finding-per-resource form (e.g. ApplyEnrichmentState's public
+// signature, unchanged by #52). Returns nil for a nil input.
+func wrapSingleFindingMap(findings map[string]domain.Finding) map[string][]domain.Finding {
+	if findings == nil {
+		return nil
+	}
+	out := make(map[string][]domain.Finding, len(findings))
+	for id, f := range findings {
+		out[id] = []domain.Finding{f}
+	}
+	return out
+}
+
 // applyRowFindings is the applying-direction mirror of clearRowFindings: it
 // writes Wave-2 findings (and their attention details) onto the controller's
 // own row stores — every matching list screen's ls.Rows plus the
@@ -847,8 +866,12 @@ func (c *Controller) clearRowFindings(typeName string) {
 // reseed glyphless (S3-pilot DEF-8). Callers must hold c.mu (write); the
 // PatchResourceList intent case is the production entry point. A nil
 // findings map clears Wave-2 entries, matching runtime.ApplyWave2ToRow's
-// contract.
-func (c *Controller) applyRowFindings(typeName string, findings map[string]domain.Finding, details map[string]domain.AttentionDetail) {
+// contract. findings carries every independently-evaluated Wave-2 Finding
+// per resource ID (mirrors runtime.ApplyWave2ToRow's own contract) — callers
+// with only the single-representative form must wrap via
+// wrapSingleFindingMap first, so a multi-condition resource's second Finding
+// is never silently dropped by this write.
+func (c *Controller) applyRowFindings(typeName string, findings map[string][]domain.Finding, details map[string]domain.AttentionDetail) {
 	canon := typeName
 	var td resource.ResourceTypeDef
 	if t := resource.FindResourceType(typeName); t != nil {

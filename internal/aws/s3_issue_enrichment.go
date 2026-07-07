@@ -65,7 +65,7 @@ const s3PABIncompleteDetail = "Bucket-level public access block is missing or pa
 // IssueCount stays 0 (framework counts "!" findings directly).
 func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string]domain.Finding),
+		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 		FieldUpdates: make(map[string]map[string]string),
 	}

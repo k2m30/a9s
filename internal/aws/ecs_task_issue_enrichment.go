@@ -29,7 +29,7 @@ const (
 //   - Any container with a non-zero ExitCode → container crash detected
 func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string]domain.Finding),
+		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 	}
 	if clients.ECS == nil || len(resources) == 0 {

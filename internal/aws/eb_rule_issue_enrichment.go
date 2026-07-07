@@ -27,7 +27,7 @@ const (
 //   - Any target without DeadLetterConfig → "~" finding (no DLQ on target)
 func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string]domain.Finding),
+		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 		FieldUpdates: make(map[string]map[string]string),
 	}
@@ -150,9 +150,12 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 	})
 
 	issueCount := 0
-	for _, f := range result.Findings {
-		if f.Severity == domain.SevBroken {
-			issueCount++
+	for _, fs := range result.Findings {
+		for _, f := range fs {
+			if f.Severity == domain.SevBroken {
+				issueCount++
+				break
+			}
 		}
 	}
 	result.IssueCount = issueCount

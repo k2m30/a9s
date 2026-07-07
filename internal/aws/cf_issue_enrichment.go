@@ -36,7 +36,7 @@ const (
 // Skip if clients.CloudFront == nil. Per-distribution errors → truncated.
 func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string]domain.Finding),
+		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 	}
 	if clients.CloudFront == nil {

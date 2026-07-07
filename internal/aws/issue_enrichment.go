@@ -42,7 +42,7 @@ type IssueEnricher struct {
 // fails. Tests use it as a benign Fn fixture too.
 func InFetcherWave2Sentinel(_ context.Context, _ *ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	return IssueEnricherResult{
-		Findings:         map[string]domain.Finding{},
+		Findings:         map[string][]domain.Finding{},
 		AttentionDetails: map[string]domain.AttentionDetail{},
 		TruncatedIDs:     map[string]bool{},
 		FieldUpdates:     map[string]map[string]string{},
@@ -102,6 +102,27 @@ func formatDate(t interface{ Format(string) string }) string {
 // shortName stamps Source = "wave2:<shortName>" on the emitted Finding. It is
 // the resource short name the enricher serves (e.g. "acm", "dbi", "tg").
 //
+// Append-style: calling this a second time for the same resourceID (an
+// enricher with two independently-evaluated conditions on the same resource,
+// e.g. opensearch's update-forced + encryption-off) appends the new Finding
+// to r.Findings[resourceID] rather than overwriting it — every
+// independently-evaluated condition survives as its own Finding, with its
+// own Phrase/Detail/Code, never demoted into another finding's supporting
+// row. ApplyWave2ToRow (internal/runtime/helpers.go) folds the whole slice
+// onto domain.Resource.Findings, and colorFromAnyFinding/buildAttentionEntries/
+// listPhraseFromFindings already read the whole slice for worst-severity
+// color, one Attention entry per issue-severity finding, and the stacked
+// "<top> (+N)" list phrase respectively.
+//
+// rows, when non-empty, become this resourceID's single AttentionDetail
+// entry — the first call for a given resourceID that supplies non-empty rows
+// wins that slot; a later call with empty rows never clears it. The
+// AttentionDetail is keyed by resourceID only (not per-Code), so a second
+// independently-evaluated condition with its own rows on the same resourceID
+// is a case this helper does not disambiguate; ApplyWave2ToRow attaches
+// whatever rows were captured here to the first Finding it appends for that
+// resourceID.
+//
 // The caller is responsible for initialising r.Findings and (when emitting
 // rows) r.AttentionDetails before calling this helper. The IssueEnricherResult
 // godoc requires both reference fields be non-nil on a successful return.
@@ -115,18 +136,22 @@ func setWave2Finding(
 	rows []domain.DetailRow,
 	detail string,
 ) {
-	r.Findings[resourceID] = domain.Finding{
+	f := domain.Finding{
 		Code:     code,
 		Phrase:   phrase,
 		Detail:   detail,
 		Severity: glyphToSeverity(severityGlyph),
 		Source:   "wave2:" + shortName,
 	}
+	r.Findings[resourceID] = append(r.Findings[resourceID], f)
+
 	if len(rows) > 0 {
 		if r.AttentionDetails == nil {
 			r.AttentionDetails = make(map[string]domain.AttentionDetail)
 		}
-		r.AttentionDetails[resourceID] = domain.AttentionDetail{Rows: rows}
+		if _, ok := r.AttentionDetails[resourceID]; !ok {
+			r.AttentionDetails[resourceID] = domain.AttentionDetail{Rows: rows}
+		}
 	}
 }
 
@@ -146,16 +171,19 @@ func setWave2Finding(
 //     instead of a global banner. An ID appearing here MUST NOT also appear in
 //     Findings unless the partial data was still usable.
 //
-//   - Findings: map from Resource.ID → domain.Finding. The enricher emits ≤1
-//     Finding per Resource.ID. May contain entries for resources NOT in the
-//     input slice (account-wide enrichers). Enrichers that receive API
-//     identifiers in a different form (e.g., ARNs) MUST normalize to
-//     Resource.ID before writing to Findings.
+//   - Findings: map from Resource.ID → []domain.Finding. The enricher emits
+//     one entry per independently-evaluated Wave-2 condition for the
+//     resource (a single-condition enricher always emits a one-element
+//     slice). May contain entries for resources NOT in the input slice
+//     (account-wide enrichers). Enrichers that receive API identifiers in a
+//     different form (e.g., ARNs) MUST normalize to Resource.ID before
+//     writing to Findings.
 //
-//   - AttentionDetails: per-resource supporting rows for the Wave-2 Finding,
-//     keyed by Resource.ID. Only entries with non-empty rows are emitted; the
-//     fold layer (runtime.Core.applyEnrichment) re-keys to FindingCode against
-//     the matching Finding when writing onto r.AttentionDetails.
+//   - AttentionDetails: per-resource supporting rows for the Wave-2
+//     Finding(s), keyed by Resource.ID. Only entries with non-empty rows are
+//     emitted; the fold layer (runtime.ApplyWave2ToRow) re-keys to
+//     FindingCode against the matching Finding when writing onto
+//     r.AttentionDetails.
 //
 //   - FieldUpdates: map from Resource.ID → (fieldKey → value). Same normalization
 //     rule applies.
@@ -166,10 +194,10 @@ type IssueEnricherResult struct {
 	IssueCount   int
 	Truncated    bool
 	TruncatedIDs map[string]bool
-	Findings     map[string]domain.Finding
+	Findings     map[string][]domain.Finding
 	// AttentionDetails carries per-resource supporting rows for the Wave-2
-	// Finding emitted in Findings. Keyed by Resource.ID until the fold layer
-	// (runtime.Core.applyEnrichment) flips it to FindingCode against the
+	// Finding(s) emitted in Findings. Keyed by Resource.ID until the fold
+	// layer (runtime.ApplyWave2ToRow) flips it to FindingCode against the
 	// matching r.Findings entry. Enrichers MAY omit this when no rows accompany
 	// the finding.
 	AttentionDetails map[string]domain.AttentionDetail

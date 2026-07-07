@@ -34,7 +34,7 @@ const (
 // and stores the ARN in Fields. Each call is wrapped in RetryOnThrottle.
 func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string]domain.Finding),
+		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 	}
 	if clients.ELBv2 == nil {
@@ -99,9 +99,12 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 	})
 	sort.Strings(failures)
 	issueCount := 0
-	for _, f := range result.Findings {
-		if f.Severity == domain.SevBroken {
-			issueCount++
+	for _, fs := range result.Findings {
+		for _, f := range fs {
+			if f.Severity == domain.SevBroken {
+				issueCount++
+				break
+			}
 		}
 	}
 	result.IssueCount = issueCount

@@ -122,7 +122,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 		source := "wave2:" + cfg.ShortName
 
 		result := IssueEnricherResult{
-			Findings:         make(map[string]domain.Finding),
+			Findings:         make(map[string][]domain.Finding),
 			AttentionDetails: make(map[string]domain.AttentionDetail),
 			TruncatedIDs:     make(map[string]bool),
 		}
@@ -214,12 +214,12 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 			// Findings emits the entry for the detail-view Attention section
 			// AND drives the S4 status column at render time via
 			// phraseFromFindings(r.Findings).
-			result.Findings[res.ID] = domain.Finding{
+			result.Findings[res.ID] = []domain.Finding{{
 				Code:     code,
 				Phrase:   phrase,
 				Severity: sev,
 				Source:   source,
-			}
+			}}
 			if len(rows) > 0 {
 				result.AttentionDetails[res.ID] = domain.AttentionDetail{Rows: rows}
 			}

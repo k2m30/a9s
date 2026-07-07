@@ -31,7 +31,7 @@ const (
 // Skip if clients.MSK == nil. Per-cluster errors → Truncated.
 func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string]domain.Finding),
+		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 	}
 	if clients.MSK == nil {

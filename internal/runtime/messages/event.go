@@ -234,8 +234,21 @@ type EnrichmentChecked struct {
 	// Findings is the per-resource finding map for this type, keyed by
 	// resource.Resource.ID. Populated on success AND on partial-success (Err
 	// non-nil but partial results present). May include findings for resources
-	// off-page (account-wide enrichers). At most one Finding per Resource.ID.
+	// off-page (account-wide enrichers). At most one Finding per Resource.ID —
+	// when an enricher emits more than one independently-evaluated condition,
+	// this carries only the worst-severity one; see AllFindings for the full
+	// per-resource slice. Kept single-valued for PatchDetail.EnrichmentFindings/
+	// ListEnrichmentPatch.Findings' existing single-Finding-per-resource
+	// contract (adapter live-patch of an already-open view).
 	Findings map[string]domain.Finding
+	// AllFindings carries every independently-evaluated Wave-2 Finding per
+	// Resource.ID (IssueEnricherResult.Findings, unfiltered) — the row-level
+	// fold (applyEnrichment/ApplyWave2ToRow) uses this so a multi-condition
+	// resource retains every Finding on its cached row, and unifiedIssueCount
+	// uses this to count a resource once if ANY entry is SevBroken. Findings
+	// above is the single worst-severity representative derived from this at
+	// message-construction time — the two share the same key set.
+	AllFindings map[string][]domain.Finding
 	// AttentionDetails carries the supporting rows for each per-resource
 	// Finding. Keyed by Resource.ID at message-emission time; the fold layer
 	// (runtime.Core.applyEnrichment) flips it to FindingCode against the

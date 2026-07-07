@@ -29,7 +29,7 @@ const (
 // This surfaces hidden failures that are not reflected in the top-level StackStatus.
 func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string]domain.Finding),
+		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 	}
 	if clients.CloudFormation == nil {
@@ -135,7 +135,7 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 		combinedErr = driftErr
 	}
 
-	merged := make(map[string]domain.Finding, len(eventsResult.Findings)+len(driftResult.Findings))
+	merged := make(map[string][]domain.Finding, len(eventsResult.Findings)+len(driftResult.Findings))
 	// Drift findings go in first; stack-events findings overwrite on conflict.
 	maps.Copy(merged, driftResult.Findings)
 	maps.Copy(merged, eventsResult.Findings)
@@ -171,7 +171,7 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 // Severity "~" findings do not contribute to IssueCount.
 func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
-		Findings:     make(map[string]domain.Finding),
+		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 		FieldUpdates: make(map[string]map[string]string),
 	}

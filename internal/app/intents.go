@@ -183,6 +183,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			// resurrect its glyphs on a same-ID resource under the new pair. A
 			// frame may never mix findings from two profile/region pairs.
 			c.enrichmentStore = nil
+			c.enrichmentStoreAll = nil
 			c.enrichmentDetails = nil
 			c.enrichmentTruncated = nil
 
@@ -206,6 +207,18 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// result carried by this intent", not a confirmed zero-issue
 				// Wave-2 result — it must not flip the menu's IssueKnown flag.
 				c.applyEnrichmentState(v.ResourceType, issueCount, issueTruncated, v.Enrichment.Findings, v.Enrichment.AttentionDetails, issuesAuthoritative)
+				// allFindings carries every independently-evaluated Wave-2
+				// Finding per resource; falls back to wrapping the single
+				// representative when the producer only set Findings (a
+				// pre-#52 or hand-built ListEnrichmentPatch).
+				allFindings := v.Enrichment.AllFindings
+				if allFindings == nil {
+					allFindings = wrapSingleFindingMap(v.Enrichment.Findings)
+				}
+				if c.enrichmentStoreAll == nil {
+					c.enrichmentStoreAll = make(map[string]map[string][]domain.Finding)
+				}
+				c.enrichmentStoreAll[v.ResourceType] = allFindings
 				// applyEnrichmentState only stores findings + the issue badge; the
 				// Wave-2 column updates (status/summary) must also reach the cached
 				// list rows or enriched columns render stale (ECR/WAF/CodeArtifact).
@@ -213,8 +226,13 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// ...and the findings themselves must land on the controller's own
 				// rows (ls.Rows / the RowStore-backed type cache) — the list-open
 				// save path persists from them, so without this the on-disk cache
-				// rows carry no findings and reseed glyphless (DEF-8).
-				c.applyRowFindings(v.ResourceType, v.Enrichment.Findings, v.Enrichment.AttentionDetails)
+				// rows carry no findings and reseed glyphless (DEF-8). Uses
+				// allFindings (not the single-representative Findings) so a
+				// multi-condition resource keeps every Finding on the row —
+				// otherwise this call would strip runtime.Core.applyEnrichment's
+				// already-correct multi-Finding write (made moments earlier in
+				// the same handleEnrichmentChecked call) back down to one.
+				c.applyRowFindings(v.ResourceType, allFindings, v.Enrichment.AttentionDetails)
 			}
 
 		case runtime.SetIdentityIntent:

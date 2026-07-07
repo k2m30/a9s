@@ -447,9 +447,25 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		}
 		c.session.EnrichmentTruncatedIDs[msg.ResourceType] = msg.TruncatedIDs
 
+		// allFindings is the full per-resource slice this call folds onto rows
+		// and counts from. msg.AllFindings is nil only when a caller built
+		// EnrichmentChecked by hand without setting it (pre-#52 test
+		// construction, or any future caller that only knows about the
+		// single-representative Findings field) — in that case every
+		// resource's slice is exactly the one Finding msg.Findings already
+		// carries, so the fold/count below observes the identical result a
+		// direct AllFindings-aware caller would have produced.
+		allFindings := msg.AllFindings
+		if allFindings == nil {
+			allFindings = wrapSingleFindings(msg.Findings)
+		}
+
 		// applyEnrichment directly mutates r.Findings and r.AttentionDetails on
-		// every cached row of this type.
-		c.applyEnrichment(msg.ResourceType, msg.Findings, msg.AttentionDetails)
+		// every cached row of this type. Uses allFindings (every
+		// independently-evaluated Wave-2 condition per resource), not the
+		// single-representative Findings, so a multi-condition resource keeps
+		// every Finding on its cached row.
+		c.applyEnrichment(msg.ResourceType, allFindings, msg.AttentionDetails)
 
 		// Merge FieldUpdates into RowStore (task #17 wave 1 stage 3 — the
 		// former ResourceCache map leg is gone; a type's rows live in exactly
@@ -484,7 +500,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 			// and FieldUpdates onto, so this aggregation is over the freshest
 			// per-type row state this call produced.
 			rows, _ := c.ProbeResources(msg.ResourceType)
-			unified = unifiedIssueCount(rows, *td, msg.Findings)
+			unified = unifiedIssueCount(rows, *td, allFindings)
 		} else {
 			unified = msg.Issues
 		}
@@ -521,6 +537,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		// Emit resource-list enrichment patch (updates list badge + row markers).
 		enrichPatch := &ListEnrichmentPatch{
 			Findings:         msg.Findings,
+			AllFindings:      allFindings,
 			AttentionDetails: msg.AttentionDetails,
 			TruncatedIDs:     msg.TruncatedIDs,
 		}
@@ -679,12 +696,29 @@ func rowsFromCacheRows(shortName string, rows []cache.Row) []resource.Resource {
 	return out
 }
 
+// wrapSingleFindings converts a single-representative Wave-2 finding map
+// (messages.EnrichmentChecked.Findings) into the one-element-per-ID slice
+// form handleEnrichmentChecked's fold/count logic needs when a caller built
+// the message without setting AllFindings. Returns nil for a nil input.
+func wrapSingleFindings(findings map[string]domain.Finding) map[string][]domain.Finding {
+	if findings == nil {
+		return nil
+	}
+	out := make(map[string][]domain.Finding, len(findings))
+	for id, f := range findings {
+		out[id] = []domain.Finding{f}
+	}
+	return out
+}
+
 // unifiedIssueCount returns the distinct count of resource IDs with ≥1
 // SevBroken-equivalent issue: a Wave-1 structural/wave1-Finding color of
-// ColorBroken/ColorWarning (IsIssue()), or a Wave-2 SevBroken finding from
-// findings. Never a SevWarn Wave-2 finding — those are excluded from both
-// halves of this single per-resource decision.
-func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceTypeDef, findings map[string]domain.Finding) int {
+// ColorBroken/ColorWarning (IsIssue()), or ANY Wave-2 SevBroken finding in
+// findings[id]'s slice — a resource counts once even when it carries more
+// than one independently-evaluated Wave-2 condition. Never a SevWarn Wave-2
+// finding — those are excluded from both halves of this single per-resource
+// decision.
+func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceTypeDef, findings map[string][]domain.Finding) int {
 	if td.ExcludeFromIssueBadge {
 		return 0
 	}
@@ -698,12 +732,15 @@ func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceT
 			ids[r.ID] = struct{}{}
 		}
 	}
-	for id, finding := range findings {
-		if finding.Severity != domain.SevBroken {
+	for id, fs := range findings {
+		if _, ok := knownIDs[id]; !ok {
 			continue
 		}
-		if _, ok := knownIDs[id]; ok {
-			ids[id] = struct{}{}
+		for _, finding := range fs {
+			if finding.Severity == domain.SevBroken {
+				ids[id] = struct{}{}
+				break
+			}
 		}
 	}
 	return len(ids)

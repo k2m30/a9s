@@ -36,6 +36,17 @@ type Controller struct {
 	// keyed by canonical short name. Populated by ApplyEnrichmentState.
 	enrichmentStore map[string]map[string]domain.Finding
 
+	// enrichmentStoreAll mirrors enrichmentStore but carries every
+	// independently-evaluated Wave-2 Finding per Resource.ID (not just the
+	// single worst-severity representative in enrichmentStore). Populated
+	// only by the PatchResourceList intent path (runtime.ListEnrichmentPatch.
+	// AllFindings), which is the only producer that has the full slice —
+	// ApplyEnrichmentState's public single-Finding signature cannot carry it.
+	// listEnrichmentAllFindings falls back to wrapping enrichmentStore's
+	// single Finding per ID when a type has no entry here (e.g. a caller that
+	// only ever used ApplyEnrichmentState directly).
+	enrichmentStoreAll map[string]map[string][]domain.Finding
+
 	// enrichmentDetails stores Wave-2 per-resource AttentionDetail per
 	// resource type, keyed by canonical short name then Resource.ID. Delivered
 	// alongside enrichmentStore's findings in the same EnrichmentChecked
