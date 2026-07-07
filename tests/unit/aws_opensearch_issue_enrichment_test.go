@@ -206,67 +206,11 @@ func TestOpenSearch_Enrich_EncryptionOff_EmitsTildeFinding(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Test 3 — enricher_multi_background_top_wins_hidden_surfaces_as_row
-// UpdateAvailable (!) + EncryptionOff (~) → ! wins, ~ surfaces as Additional row
-// ---------------------------------------------------------------------------
-
-func TestOpenSearch_Enrich_MultiBackground_TopWinsHiddenSurfacesAsRow(t *testing.T) {
-	fix := fixtures.NewOpenSearchFixtures()
-
-	var multiDomain ostypes.DomainStatus
-	for _, d := range fix.Domains {
-		if d.DomainName != nil && *d.DomainName == fixtures.MultiBackgroundDomain {
-			multiDomain = d
-			break
-		}
-	}
-	if multiDomain.DomainName == nil {
-		t.Fatalf("MultiBackgroundDomain fixture not found")
-	}
-
-	resources := []resource.Resource{
-		buildOSResource(multiDomain, "software update forced soon (+1)"),
-	}
-
-	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, resources, nil)
-	if err != nil {
-		t.Fatalf("EnrichOpenSearchDomains error: %v", err)
-	}
-
-	id := fixtures.MultiBackgroundDomain
-	finding, ok := result.Findings[id]
-	if !ok {
-		t.Fatalf("no Finding for resource %q", id)
-	}
-
-	// ! beats ~
-	if finding.Severity != domain.SevBroken {
-		t.Errorf("Severity = %v, want SevBroken (! beats ~)", finding.Severity)
-	}
-	if finding.Phrase != "software update forced soon" {
-		t.Errorf("Phrase = %q, want %q", finding.Phrase, "software update forced soon")
-	}
-
-	rows3 := result.AttentionDetails[id].Rows
-	// Hidden ~ surfaces as Additional row.
-	hasAdditional := false
-	for _, row := range rows3 {
-		if row.Label == "Additional" && row.Value == "encryption at rest off" {
-			hasAdditional = true
-		}
-	}
-	if !hasAdditional {
-		t.Errorf("Rows missing {Label:\"Additional\", Value:\"encryption at rest off\"}; got: %v", rows3)
-	}
-
-	// U11 — Phrase must not contain any row value.
-	u11SummaryRowCheck(t, finding, rows3)
-
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1 (multi still counts as 1 instance)", result.IssueCount)
-	}
-}
+// Test 3 (enricher_multi_background_top_wins_hidden_surfaces_as_row) retired:
+// its "! wins, ~ hides in an Additional row" shape is superseded by
+// TestOpenSearch_Enrich_MultiBackground_BothConditionsSurfaceAsOwnFindings in
+// qa_wave2_multifinding_test.go, framework limit #52 (both conditions now
+// surface as their own Finding).
 
 // ---------------------------------------------------------------------------
 // Test 4 — enricher_hardstate_plus_background_no_field_update
