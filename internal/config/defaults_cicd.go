@@ -51,7 +51,7 @@ func cicdDefaultViews() map[string]ViewDef {
 		"ecr": {
 			List: []ListColumn{
 				{Title: "Repository", Path: "RepositoryName", Width: 36},
-				{Title: "Status", Key: "status", Width: 12},
+				{Title: "Status", Width: 12},
 				{Title: "URI", Path: "RepositoryUri", Width: 60},
 				{Title: "Tag Mutability", Path: "ImageTagMutability", Width: 16},
 				{Title: "Scan", Path: "ImageScanningConfiguration.ScanOnPush", Width: 6},
@@ -69,7 +69,7 @@ func cicdDefaultViews() map[string]ViewDef {
 		"codeartifact": {
 			List: []ListColumn{
 				{Title: "Repository", Path: "Name", Width: 28},
-				{Title: "Status", Key: "status", Width: 12},
+				{Title: "Status", Width: 12},
 				{Title: "Domain", Path: "DomainName", Width: 24},
 				{Title: "Packages", Key: "package_count", Width: 8},
 				{Title: "Description", Path: "Description", Width: 30},

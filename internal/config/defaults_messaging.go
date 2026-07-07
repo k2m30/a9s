@@ -5,7 +5,7 @@ func messagingDefaultViews() map[string]ViewDef {
 		"sqs": {
 			List: []ListColumn{
 				{Title: "Queue Name", Path: "", Key: "queue_name", Width: 36},
-				{Title: "Status", Key: "status", Width: 12},
+				{Title: "Status", Width: 12},
 				{Title: "Messages", Path: "", Key: "approx_messages", Width: 10},
 				{Title: "In Flight", Path: "", Key: "approx_not_visible", Width: 10},
 				{Title: "DLQ", Key: "dlq", Width: 5},
@@ -19,7 +19,7 @@ func messagingDefaultViews() map[string]ViewDef {
 		"sns": {
 			List: []ListColumn{
 				{Title: "Topic Name", Path: "TopicArn", Width: 40},
-				{Title: "Status", Key: "status", Width: 12},
+				{Title: "Status", Width: 12},
 				{Title: "Subs", Key: "subs_count", Width: 6},
 				{Title: "Topic ARN", Path: "TopicArn", Width: 60},
 			},
@@ -30,7 +30,7 @@ func messagingDefaultViews() map[string]ViewDef {
 		"sns-sub": {
 			List: []ListColumn{
 				{Title: "Topic ARN", Path: "TopicArn", Width: 48},
-				{Title: "Status", Key: "status", Width: 12},
+				{Title: "Status", Width: 12},
 				{Title: "Protocol", Path: "Protocol", Width: 10},
 				{Title: "Endpoint", Path: "Endpoint", Width: 48},
 				{Title: "Confirmed", Path: "SubscriptionArn", Width: 22},
@@ -99,7 +99,7 @@ func messagingDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Name", Path: "Name", Width: 36},
 				{Title: "Type", Path: "Type", Width: 10},
-				{Title: "Status", Key: "status", Width: 12},
+				{Title: "Status", Width: 12},
 				{Title: "Last Run", Key: "last_run", Width: 18},
 				{Title: "ARN", Path: "StateMachineArn", Width: 60},
 				{Title: "Created", Path: "CreationDate", Width: 22},

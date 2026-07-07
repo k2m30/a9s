@@ -3,7 +3,6 @@ list:
     key: queue_name
     width: 36
   Status:
-    key: status
     width: 12
   Messages:
     key: approx_messages
