@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -195,8 +196,20 @@ func convertReportEvent(event cwlogstypes.FilteredLogEvent) (resource.Resource, 
 			"cold_start":             coldStart,
 			"xray_trace_id":          xrayTraceID,
 		},
+		Findings:  lambdaInvocationFindings(status),
 		RawStruct: event,
 	}, true
+}
+
+// lambdaInvocationFindings returns a wave1 finding for an invocation whose
+// REPORT line status is TIMEOUT (the only non-OK status timeoutRegex
+// classifies — Lambda's runtime REPORT line carries no other structured
+// error/status signal for a successful-vs-failed invocation split).
+func lambdaInvocationFindings(status string) []domain.Finding {
+	if status == "TIMEOUT" {
+		return []domain.Finding{{Code: CodeLambdaInvocationTimeout, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1"}}
+	}
+	return nil
 }
 
 // formatDuration formats a duration string, stripping trailing ".00".

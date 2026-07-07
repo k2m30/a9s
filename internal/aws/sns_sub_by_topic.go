@@ -101,6 +101,10 @@ func convertSNSSubscription(sub snstypes.Subscription) resource.Resource {
 			"subscription_arn":    subscriptionArn,
 			"topic_arn":           topicArn,
 		},
+		// snsSubStateFindings (sns_sub.go) is reused verbatim: both fetchers
+		// observe the same AWS quirk where SubscriptionArn literally reads
+		// "PendingConfirmation"/"Deleted" in those states.
+		Findings:  snsSubStateFindings(subscriptionArn),
 		RawStruct: sub,
 	}
 }

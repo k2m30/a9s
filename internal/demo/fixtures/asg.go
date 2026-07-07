@@ -375,5 +375,19 @@ func buildActivitiesFor(asgName string) []asgtypes.Activity {
 			StartTime:            aws.Time(mustTime("2026-03-22T07:45:00Z")),
 			Progress:             aws.Int32(50),
 		},
+		// Cancelled — required for asg_activities' Findings-based coloring
+		// witness (asgActivityFindings, internal/aws/asg_activities.go): a
+		// StatusCode=Cancelled activity is the only demo witness of this
+		// branch.
+		{
+			ActivityId:           aws.String("act-demo-005"),
+			AutoScalingGroupName: aws.String(asgName),
+			StatusCode:           asgtypes.ScalingActivityStatusCodeCancelled,
+			Description:          aws.String("Terminating EC2 instance: cancelled by user"),
+			Cause:                aws.String("An operator cancelled the scale-in activity before it completed"),
+			StartTime:            aws.Time(mustTime("2026-03-22T07:00:00Z")),
+			EndTime:              aws.Time(mustTime("2026-03-22T07:01:00Z")),
+			Progress:             aws.Int32(0),
+		},
 	}
 }

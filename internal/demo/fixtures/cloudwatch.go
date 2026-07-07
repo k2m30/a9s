@@ -1032,6 +1032,12 @@ func NewCloudWatchFixtures() *CloudWatchFixtures {
 
 // minimalAlarmHistory returns a canonical 3-item state sequence
 // (OK → ALARM → OK) so the alarm_history child view has non-empty content.
+// The two StateUpdate items carry HistoryData JSON matching their
+// HistorySummary — real DescribeAlarmHistory always populates HistoryData
+// with an {"oldState":...,"newState":...} payload for StateUpdate items;
+// alarmHistoryFindings (internal/aws/alarm_history.go) parses this field to
+// classify the ALARM transition as broken, mirroring colorAlarm's live-alarm
+// classification.
 func minimalAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
 	t0 := time.Date(2026, 4, 20, 8, 0, 0, 0, time.UTC)
 	return []cwtypes.AlarmHistoryItem{
@@ -1040,12 +1046,14 @@ func minimalAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
 			Timestamp:       aws.Time(t0.Add(2 * time.Hour)),
 			HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
 			HistorySummary:  aws.String("Alarm updated from ALARM to OK"),
+			HistoryData:     aws.String(`{"version":"1.0","oldState":{"stateValue":"ALARM"},"newState":{"stateValue":"OK"}}`),
 		},
 		{
 			AlarmName:       aws.String(alarmName),
 			Timestamp:       aws.Time(t0.Add(1 * time.Hour)),
 			HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
 			HistorySummary:  aws.String("Alarm updated from OK to ALARM"),
+			HistoryData:     aws.String(`{"version":"1.0","oldState":{"stateValue":"OK"},"newState":{"stateValue":"ALARM"}}`),
 		},
 		{
 			AlarmName:       aws.String(alarmName),

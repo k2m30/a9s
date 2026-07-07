@@ -347,6 +347,7 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		ShortName: "pipeline_stages",
 		Columns:   resource.PipelineStageColumns(),
 		CopyField: "external_url",
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{
 			"stage_name", "stage_status", "action_name", "action_status",
 			"last_change_time", "external_url", "action_token",
@@ -358,6 +359,9 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
 			return FetchPipelineStages(ctx, c.CodePipeline, parentCtx, continuationToken)
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodePipelineActionFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 		},
 	},
 }

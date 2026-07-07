@@ -2,12 +2,14 @@ package aws
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -80,14 +82,52 @@ func convertAlarmHistoryItem(item cwtypes.AlarmHistoryItem) resource.Resource {
 		historySummary = strings.ReplaceAll(historySummary, "\r", " ")
 	}
 
+	historyData := ""
+	if item.HistoryData != nil {
+		historyData = *item.HistoryData
+	}
+
 	return resource.Resource{
-		ID:    id,
-		Name:  id,
+		ID:   id,
+		Name: id,
 		Fields: map[string]string{
 			"timestamp":         timestamp,
 			"history_item_type": historyItemType,
 			"history_summary":   historySummary,
 		},
+		Findings:  alarmHistoryFindings(historyItemType, historyData),
 		RawStruct: item,
 	}
+}
+
+// alarmHistoryStateData is the shape of the JSON payload CloudWatch's
+// DescribeAlarmHistory returns in AlarmHistoryItem.HistoryData for
+// StateUpdate items — {"version":"1.0","oldState":{...},"newState":{...}}.
+// Only the transitioned-to state's value is needed to classify severity.
+type alarmHistoryStateData struct {
+	NewState struct {
+		StateValue string `json:"stateValue"`
+	} `json:"newState"`
+}
+
+// alarmHistoryFindings returns a wave1 finding for a StateUpdate history item
+// whose newState.StateValue is ALARM or INSUFFICIENT_DATA — the same two
+// non-healthy states colorAlarm classifies for the live alarm resource
+// (internal/aws/catalog_monitoring.go). ConfigurationUpdate/Action items and
+// transitions to OK carry no finding (healthy/informational).
+func alarmHistoryFindings(historyItemType, historyData string) []domain.Finding {
+	if historyItemType != string(cwtypes.HistoryItemTypeStateUpdate) || historyData == "" {
+		return nil
+	}
+	var parsed alarmHistoryStateData
+	if err := json.Unmarshal([]byte(historyData), &parsed); err != nil {
+		return nil
+	}
+	switch parsed.NewState.StateValue {
+	case "ALARM":
+		return []domain.Finding{{Code: CodeAlarmHistoryStateAlarm, Phrase: "alarm", Severity: domain.SevBroken, Source: "wave1"}}
+	case "INSUFFICIENT_DATA":
+		return []domain.Finding{{Code: CodeAlarmHistoryStateInsufficientData, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1"}}
+	}
+	return nil
 }

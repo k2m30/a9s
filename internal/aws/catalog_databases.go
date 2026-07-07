@@ -953,6 +953,7 @@ var databasesChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		ShortName: "dbi_events",
 		Columns:   resource.DbiEventColumns(),
 		CopyField: "message",
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{
 			"timestamp", "event_categories", "message",
 			"source_identifier", "source_type", "source_arn",
@@ -963,6 +964,12 @@ var databasesChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
 			return FetchRDSEvents(ctx, c.RDS, parentCtx["db_identifier"], continuationToken)
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeDBIEventFailure, Phrase: "failure", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBIEventLowStorage, Phrase: "low storage", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeDBIEventFailover, Phrase: "failover", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBIEventRecovery, Phrase: "recovery", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 }

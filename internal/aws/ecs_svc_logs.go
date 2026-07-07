@@ -103,13 +103,20 @@ func FetchEcsSvcLogs(
 				name = name[:80]
 			}
 
+			// Status classification using the shared classifier from
+			// log_events.go — ecs_svc_logs pulls the same shape of raw
+			// CloudWatch log lines as log_events/lambda_invocation_logs.
+			status := classifyLogEventStatus(message)
+
 			r := resource.Resource{
-				ID:   id,
-				Name: name,
+				ID:       id,
+				Name:     name,
+				Findings: logEventFindings(status),
 				Fields: map[string]string{
 					"timestamp":    timestamp,
 					"stream_short": streamShort,
 					"message":      message,
+					"status":       status,
 				},
 				RawStruct: event,
 			}

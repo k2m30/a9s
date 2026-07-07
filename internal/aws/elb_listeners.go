@@ -8,6 +8,7 @@ import (
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -124,8 +125,25 @@ func convertListener(listener elbtypes.Listener) resource.Resource {
 			"certificate_short":     certShort,
 			"listener_display":      fmt.Sprintf(":%s %s", port, protocol),
 		},
+		Findings:  elbListenerFindings(listener),
 		RawStruct: listener,
 	}
+}
+
+// elbListenerFindings flags an HTTPS/TLS listener carrying zero certificates.
+// DescribeListeners always echoes the listener's own default certificate
+// back in Certificates for a properly configured HTTPS/TLS listener, so an
+// empty slice here means TLS termination has no certificate to serve —
+// every handshake against this listener fails. Wave-1: no extra API call,
+// the same DescribeListeners response already carries this field.
+func elbListenerFindings(listener elbtypes.Listener) []domain.Finding {
+	switch listener.Protocol {
+	case elbtypes.ProtocolEnumHttps, elbtypes.ProtocolEnumTls:
+		if len(listener.Certificates) == 0 {
+			return []domain.Finding{{Code: CodeELBListenerNoCertificate, Phrase: "no certificate configured", Severity: domain.SevBroken, Source: "wave1"}}
+		}
+	}
+	return nil
 }
 
 // extractTGName extracts the target group name from an ARN like:

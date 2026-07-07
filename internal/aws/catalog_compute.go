@@ -921,6 +921,7 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 		Name:      "Lambda Invocations",
 		ShortName: "lambda_invocations",
 		Columns:   resource.LambdaInvocationColumns(),
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{
 			"request_id", "timestamp", "status", "duration_ms",
 			"billed_duration_ms", "memory_size_mb", "memory_used_mb",
@@ -938,6 +939,9 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
 			return FetchLambdaInvocations(ctx, c.CloudWatchLogs, parentCtx["function_name"], parentCtx["log_group"], continuationToken)
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeLambdaInvocationTimeout, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1"},
 		},
 	},
 	{
@@ -959,6 +963,7 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 		Name:      "Scaling Activities",
 		ShortName: "asg_activities",
 		Columns:   resource.AsgActivityColumns(),
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{"start_time", "status_code", "description", "cause"},
 		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			c, ok := clients.(*ServiceClients)
@@ -966,6 +971,10 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
 			return FetchAsgActivities(ctx, c.AutoScaling, parentCtx, continuationToken)
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeAsgActivityFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeAsgActivityCancelled, Phrase: "cancelled", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 }

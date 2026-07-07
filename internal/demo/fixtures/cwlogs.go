@@ -442,8 +442,12 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 				IngestionTime: aws.Int64(1774253500100),
 			},
 			{
-				Timestamp:     aws.Int64(1774253400000),
-				Message:       aws.String("REPORT RequestId: ord-897 Duration: 67.42 ms Billed Duration: 68 ms Memory Size: 128 MB Max Memory Used: 72 MB"),
+				Timestamp: aws.Int64(1774253400000),
+				// Status: timeout — required for lambda_invocations' Findings-based
+				// coloring witness (lambdaInvocationFindings, internal/aws/
+				// lambda_invocations.go): a TIMEOUT REPORT line is the only demo
+				// witness of this branch.
+				Message:       aws.String("REPORT RequestId: ord-897 Duration: 67.42 ms Billed Duration: 68 ms Memory Size: 128 MB Max Memory Used: 72 MB Status: timeout"),
 				IngestionTime: aws.Int64(1774253400100),
 			},
 		},

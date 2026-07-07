@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -160,6 +161,7 @@ func convertPipelineStageAction(stageName, stageStatus string, action cptypes.Ac
 			"revision_id":          revisionID,
 			"revision_summary":     revisionSummary,
 		},
+		Findings: pipelineActionFindings(cptypes.ActionExecutionStatus(actionStatus)),
 		RawStruct: PipelineStageRow{
 			StageName:        stageName,
 			StageStatus:      stageStatus,
@@ -174,6 +176,17 @@ func convertPipelineStageAction(stageName, stageStatus string, action cptypes.Ac
 			RevisionSummary:  revisionSummary,
 		},
 	}
+}
+
+// pipelineActionFindings returns a wave1 finding for an action execution
+// status of Failed — the stage-action pair's own terminal failure signal
+// (a stage's overall LatestExecution.Status is Failed exactly when one of
+// its actions is). Succeeded/InProgress/Abandoned/unset carry no finding.
+func pipelineActionFindings(status cptypes.ActionExecutionStatus) []domain.Finding {
+	if status == cptypes.ActionExecutionStatusFailed {
+		return []domain.Finding{{Code: CodePipelineActionFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+	}
+	return nil
 }
 
 // pipelineActionStatus maps action execution status to the row coloring status.

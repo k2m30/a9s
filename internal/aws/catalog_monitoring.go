@@ -338,6 +338,7 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		Name:      "Alarm History",
 		ShortName: "alarm_history",
 		Columns:   resource.AlarmHistoryColumns(),
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{"timestamp", "history_item_type", "history_summary"},
 		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			c, ok := clients.(*ServiceClients)
@@ -345,6 +346,10 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
 			return FetchAlarmHistory(ctx, c.CloudWatch, parentCtx, continuationToken)
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeAlarmHistoryStateAlarm, Phrase: "alarm", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeAlarmHistoryStateInsufficientData, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 }

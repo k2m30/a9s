@@ -8,8 +8,25 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// sfnExecutionFindings returns wave1 findings derived from an SFN execution
+// status. FAILED/TIMED_OUT/ABORTED classify as broken (the operator-facing
+// terminal failure states); RUNNING, SUCCEEDED, and PENDING_REDRIVE return
+// nil so the row renders healthy/default.
+func sfnExecutionFindings(status sfntypes.ExecutionStatus) []domain.Finding {
+	switch status {
+	case sfntypes.ExecutionStatusFailed:
+		return []domain.Finding{{Code: CodeSFNExecutionFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+	case sfntypes.ExecutionStatusTimedOut:
+		return []domain.Finding{{Code: CodeSFNExecutionTimedOut, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1"}}
+	case sfntypes.ExecutionStatusAborted:
+		return []domain.Finding{{Code: CodeSFNExecutionAborted, Phrase: "aborted", Severity: domain.SevBroken, Source: "wave1"}}
+	}
+	return nil
+}
 
 // FetchSFNExecutions calls the SFN ListExecutions API and converts the
 // response into a FetchResult with pagination support. A single API call is
@@ -147,6 +164,7 @@ func convertSFNExecution(item sfntypes.ExecutionListItem) resource.Resource {
 			"redrive_count":             redriveCount,
 			"redrive_date":              redriveDate,
 		},
+		Findings:  sfnExecutionFindings(item.Status),
 		RawStruct: item,
 	}
 }

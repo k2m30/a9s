@@ -19,6 +19,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		ShortName: "eb_rule_targets",
 		Columns:   resource.EbRuleTargetColumns(),
 		CopyField: "target_arn",
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{"target_id", "target_arn", "role_arn", "resource_type_name", "input_summary"},
 		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			c, ok := clients.(*ServiceClients)
@@ -27,12 +28,16 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 			}
 			return FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, continuationToken)
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeEBRuleTargetNoDLQ, Phrase: "no DLQ configured", Severity: domain.SevWarn, Source: "wave1"},
+		},
 	},
 	{
 		Name:      "SFN Executions",
 		ShortName: "sfn_executions",
 		Columns:   resource.SFNExecutionColumns(),
 		CopyField: "execution_arn",
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{
 			"execution_arn", "name", "status", "start_date", "stop_date",
 			"duration", "state_machine_arn", "state_machine_alias_arn",
@@ -52,12 +57,18 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 			}
 			return FetchSFNExecutions(ctx, c.SFN, parentCtx, continuationToken)
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeSFNExecutionFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeSFNExecutionTimedOut, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeSFNExecutionAborted, Phrase: "aborted", Severity: domain.SevBroken, Source: "wave1"},
+		},
 	},
 	{
 		Name:      "SFN Execution History",
 		ShortName: "sfn_execution_history",
 		Columns:   resource.SFNExecutionHistoryColumns(),
 		CopyField: "event_detail",
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{
 			"timestamp", "event_type", "event_type_short",
 			"state_name", "event_detail", "event_id", "previous_event_id",
@@ -69,12 +80,16 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 			}
 			return FetchSFNExecutionHistory(ctx, c.SFN, parentCtx, continuationToken)
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeSFNHistoryEventFailed, Phrase: "task failed", Severity: domain.SevBroken, Source: "wave1"},
+		},
 	},
 	{
 		Name:      "SNS Subscriptions",
 		ShortName: "sns_subscriptions",
 		Columns:   resource.SnsSubscriptionColumns(),
 		CopyField: "endpoint",
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{
 			"protocol", "endpoint", "confirmation_status", "owner", "subscription_arn", "topic_arn",
 		},
@@ -84,6 +99,13 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
 			return FetchSNSTopicSubscriptions(ctx, c.SNS, parentCtx["topic_arn"], continuationToken)
+		},
+		// Same codes the sns-sub top-level type registers (sns_sub.go) — a
+		// subscription is pending/deleted regardless of whether it was
+		// listed via ListSubscriptions or ListSubscriptionsByTopic.
+		Findings: []catalog.FindingDef{
+			{Code: CodeSNSSubPendingConfirmation, Phrase: "endpoint has not confirmed the subscription", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeSNSSubDeleted, Phrase: "endpoint deleted", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},
 }

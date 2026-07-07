@@ -285,6 +285,7 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		ShortName: "ecr_images",
 		Columns:   resource.ECRImageColumns(),
 		CopyField: "image_uri",
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{
 			"image_tags", "digest_short", "pushed_at", "image_size",
 			"scan_status", "finding_counts", "image_uri", "image_digest",
@@ -296,6 +297,12 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
 			return FetchECRImages(ctx, c.ECR, parentCtx, continuationToken)
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeECRImageScanFailed, Phrase: "scan failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeECRImageCritical, Phrase: "<N> critical vulnerabilities", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeECRImageHigh, Phrase: "<N> high vulnerabilities", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeECRImageUntagged, Phrase: "untagged", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},
 	{
@@ -359,6 +366,7 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		Name:      "Service Logs",
 		ShortName: "ecs_svc_logs",
 		Columns:   resource.EcsSvcLogColumns(),
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{"timestamp", "stream_short", "message"},
 		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			c, ok := clients.(*ServiceClients)
@@ -366,6 +374,10 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
 			return FetchEcsSvcLogs(ctx, c.ECS, c.CloudWatchLogs, parentCtx["cluster"], parentCtx["service_name"], parentCtx["task_definition"], continuationToken)
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeCWLogError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeCWLogWarn, Phrase: "warning", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 }

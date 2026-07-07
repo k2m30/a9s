@@ -73,7 +73,8 @@ func colorFromAnyFinding(r domain.Resource) (domain.Color, bool) {
 // healthy when none is present. Used by child-type catalog entries whose only
 // severity signal comes from fetcher-emitted wave1 Findings (cb_builds,
 // cfn_resources, glue_runs, log_events, lambda_invocation_logs,
-// role_policies).
+// role_policies, ecr_images, ecs_svc_logs, dbi_events, eb_rule_targets,
+// sns_subscriptions, elb_listeners).
 func colorWave1OrHealthy(r domain.Resource) domain.Color {
 	if c, ok := colorFromWave1(r); ok {
 		return c

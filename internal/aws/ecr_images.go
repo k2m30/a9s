@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -163,8 +164,38 @@ func convertECRImage(img ecrtypes.ImageDetail, repositoryURI, repositoryName str
 			"image_digest":    digest,
 			"repository_name": repositoryName,
 		},
+		Findings:  ecrImageFindings(img),
 		RawStruct: img,
 	}
+}
+
+// ecrImageFindings derives Wave-1 Findings directly from the same
+// ImageScanStatus / ImageScanFindingsSummary fields computeImageStatus reads,
+// so the row's color always matches the same priority order: a failed scan
+// outranks a CRITICAL count, which outranks a HIGH count, which outranks an
+// untagged (dangling) image. Healthy/unscanned images carry no finding.
+func ecrImageFindings(img ecrtypes.ImageDetail) []domain.Finding {
+	if img.ImageScanStatus != nil && img.ImageScanStatus.Status == ecrtypes.ScanStatusFailed {
+		return []domain.Finding{{Code: CodeECRImageScanFailed, Phrase: "scan failed", Severity: domain.SevBroken, Source: "wave1"}}
+	}
+
+	if img.ImageScanFindingsSummary != nil {
+		counts := img.ImageScanFindingsSummary.FindingSeverityCounts
+		if c, ok := counts["CRITICAL"]; ok && c > 0 {
+			phrase := fmt.Sprintf("%d critical vulnerabilities", c)
+			return []domain.Finding{{Code: CodeECRImageCritical, Phrase: phrase, Severity: domain.SevBroken, Source: "wave1"}}
+		}
+		if h, ok := counts["HIGH"]; ok && h > 0 {
+			phrase := fmt.Sprintf("%d high vulnerabilities", h)
+			return []domain.Finding{{Code: CodeECRImageHigh, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"}}
+		}
+	}
+
+	if len(img.ImageTags) == 0 {
+		return []domain.Finding{{Code: CodeECRImageUntagged, Phrase: "untagged", Severity: domain.SevDim, Source: "wave1"}}
+	}
+
+	return nil
 }
 
 // computeImageStatus determines the resource status based on scan findings

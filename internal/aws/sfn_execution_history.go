@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -93,8 +94,23 @@ func ConvertHistoryEvent(event sfntypes.HistoryEvent, lastStateName *string) res
 			"event_id":          fmt.Sprintf("%d", event.Id),
 			"previous_event_id": fmt.Sprintf("%d", event.PreviousEventId),
 		},
+		Findings:  sfnHistoryEventFindings(eventType),
 		RawStruct: event,
 	}
+}
+
+// sfnHistoryEventFindings returns a wave1 finding for a history event whose
+// type classifies as "failed" (ClassifyEventStatus — the *Failed/*TimedOut/
+// ExecutionAborted suffix family). The Phrase names the specific event (e.g.
+// "task failed", "execution timed out") rather than a generic "failed" label,
+// since a single execution's history can carry several distinct failure event
+// types across its Task/Activity/Lambda/MapRun branches.
+func sfnHistoryEventFindings(eventType string) []domain.Finding {
+	if ClassifyEventStatus(eventType) != "failed" {
+		return nil
+	}
+	phrase := strings.ToLower(HumanizeEventType(eventType))
+	return []domain.Finding{{Code: CodeSFNHistoryEventFailed, Phrase: phrase, Severity: domain.SevBroken, Source: "wave1"}}
 }
 
 // resolveStateName determines the state name for a history event.

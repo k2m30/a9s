@@ -743,6 +743,7 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		Name:      "ELB Listeners",
 		ShortName: "elb_listeners",
 		Columns:   resource.ELBListenerColumns(),
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{
 			"port", "protocol", "default_action_type", "default_action_target",
 			"ssl_policy", "certificate_short", "listener_display",
@@ -759,6 +760,9 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
 			return FetchELBListeners(ctx, c.ELBv2, parentCtx, continuationToken)
+		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeELBListenerNoCertificate, Phrase: "no certificate configured", Severity: domain.SevBroken, Source: "wave1"},
 		},
 	},
 	{

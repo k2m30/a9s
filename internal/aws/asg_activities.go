@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -101,6 +102,22 @@ func convertAsgActivity(activity asgtypes.Activity) resource.Resource {
 			"description": description,
 			"cause":       cause,
 		},
+		Findings:  asgActivityFindings(activity.StatusCode),
 		RawStruct: activity,
 	}
+}
+
+// asgActivityFindings returns a wave1 finding for a scaling activity whose
+// StatusCode is Failed or Cancelled — the two non-successful terminal states
+// DescribeScalingActivities reports (the in-flight WaitingFor*/InProgress/
+// PendingSpotBidPlacement states and PreInService/Successful are normal
+// lifecycle, not findings).
+func asgActivityFindings(statusCode asgtypes.ScalingActivityStatusCode) []domain.Finding {
+	switch statusCode {
+	case asgtypes.ScalingActivityStatusCodeFailed:
+		return []domain.Finding{{Code: CodeAsgActivityFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+	case asgtypes.ScalingActivityStatusCodeCancelled:
+		return []domain.Finding{{Code: CodeAsgActivityCancelled, Phrase: "cancelled", Severity: domain.SevWarn, Source: "wave1"}}
+	}
+	return nil
 }

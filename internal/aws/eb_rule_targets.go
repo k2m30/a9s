@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -80,8 +81,21 @@ func convertEventBridgeTarget(target ebtypes.Target) resource.Resource {
 			"resource_type_name": ArnToResourceName(targetArn),
 			"input_summary":      ComputeInputSummary(target),
 		},
+		Findings:  ebRuleTargetFindings(target),
 		RawStruct: target,
 	}
+}
+
+// ebRuleTargetFindings flags a target with no DeadLetterConfig. Without a
+// DLQ, an event this target fails to process after exhausting its retry
+// policy is silently dropped — there is no queue to inspect and no way to
+// redrive it. ListTargetsByRule already returns DeadLetterConfig inline, so
+// this is a Wave-1 (no extra API call) structural check.
+func ebRuleTargetFindings(target ebtypes.Target) []domain.Finding {
+	if target.DeadLetterConfig == nil || target.DeadLetterConfig.Arn == nil || *target.DeadLetterConfig.Arn == "" {
+		return []domain.Finding{{Code: CodeEBRuleTargetNoDLQ, Phrase: "no DLQ configured", Severity: domain.SevWarn, Source: "wave1"}}
+	}
+	return nil
 }
 
 // arnServiceMap maps AWS service names from ARNs to friendly display names.
