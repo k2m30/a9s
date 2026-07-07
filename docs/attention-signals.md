@@ -185,9 +185,11 @@ resource-list frame title. The frame-title rules:
 | Type | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- | --- |
 | ec2 | ec2.state.pending | pending | warn | wave1 |
+| ec2 | ec2.state.shutting-down | shutting down | warn | wave1 |
 | ec2 | ec2.state.stopping | stopping | warn | wave1 |
 | ec2 | ec2.state.stopped | stopped | warn | wave1 |
 | ec2 | ec2.state.stopped.server | stopped | broken | wave1 |
+| ec2 | ec2.state.terminated | terminated | dim | wave1 |
 | ec2 | ec2.instance-status-impaired | impaired: system checks failing | broken | wave2 |
 | ecs-svc | ecs-svc.state.inactive | inactive | broken | wave1 |
 | ecs-svc | ecs-svc.state.draining | draining | warn | wave1 |
@@ -222,11 +224,17 @@ resource-list frame title. The frame-title rules:
 | ebs | ebs.volume-io-degraded | volume I/O degraded | broken | wave2 |
 | ebs-snap | ebs-snap.state.pending | pending | warn | wave1 |
 | ebs-snap | ebs-snap.state.error | error | broken | wave1 |
+| ebs-snap | ebs-snap.encryption.disabled | unencrypted | warn | wave1 |
+| ebs-snap | ebs-snap.aged-automated | automated, <N>d old | warn | wave1 |
+| ebs-snap | ebs-snap.orphan | orphan: source volume deleted | warn | wave2 |
 | ami | ami.state.pending | pending | warn | wave1 |
 | ami | ami.state.failed | failed | broken | wave1 |
+| ami | ami.state.dim | deregistered | dim | wave1 |
+| ami | ami.deprecated | deprecated | warn | wave1 |
 | eks | eks.state.creating | creating | warn | wave1 |
 | eks | eks.state.updating | updating | warn | wave1 |
 | eks | eks.state.failed | failed | broken | wave1 |
+| eks | eks.health-issue | issue: <Issue.Code> | warn | wave1 |
 | ng | ng.state.creating | creating | warn | wave1 |
 | ng | ng.state.updating | updating | warn | wave1 |
 | ng | ng.state.deleting | deleting | warn | wave1 |
@@ -251,8 +259,10 @@ resource-list frame title. The frame-title rules:
 | nat | nat.state.pending | pending | warn | wave1 |
 | nat | nat.state.deleting | deleting | warn | wave1 |
 | nat | nat.state.failed | failed | broken | wave1 |
+| nat | nat.state.deleted | deleted | dim | wave1 |
 | igw | igw.state.attaching | attaching | warn | wave1 |
 | igw | igw.state.detaching | detaching | warn | wave1 |
+| igw | igw.no-attachments | no VPC attachments | warn | wave1 |
 | eip | eip.unassociated | unassociated | warn | wave1 |
 | vpce | vpce.state.pending\_acceptance | pending acceptance | warn | wave1 |
 | vpce | vpce.state.pending | pending | warn | wave1 |
@@ -261,10 +271,12 @@ resource-list frame title. The frame-title rules:
 | vpce | vpce.state.rejected | rejected | broken | wave1 |
 | vpce | vpce.state.expired | expired | broken | wave1 |
 | vpce | vpce.state.partial | partial | broken | wave1 |
+| vpce | vpce.state.deleted | deleted | dim | wave1 |
 | tgw | tgw.state.pending | pending | warn | wave1 |
 | tgw | tgw.state.modifying | modifying | warn | wave1 |
 | tgw | tgw.state.deleting | deleting | warn | wave1 |
 | tgw | tgw.state.failed | failed | broken | wave1 |
+| tgw | tgw.state.deleted | deleted | dim | wave1 |
 | tgw | tgw.attachment-failed | attachment <id> failed | broken | wave2 |
 | tgw | tgw.attachment-transitional | attachment <id> <state> | warn | wave2 |
 | eni | eni.state.attaching | attaching | warn | wave1 |

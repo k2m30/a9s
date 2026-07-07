@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -113,6 +114,11 @@ func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDis
 					"price_class":          priceClass,
 					"lambda_function_arns": strings.Join(lambdaARNs, ","),
 				},
+				// emit canonical Findings for every non-healthy branch colorCF
+				// reads, mirroring colorCF's own precedence (enabled checked
+				// before status) so the Findings list and the row color never
+				// disagree.
+				Findings:  cfWave1Findings(enabled, status),
 				RawStruct: dist,
 			}
 
@@ -143,4 +149,24 @@ func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDis
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// cfWave1Findings returns the wave1 Finding for a CloudFront distribution
+// given the same fields colorCF (catalog_color_helpers.go) reads: enabled and
+// status. Mirrors colorCF's precedence (enabled checked before status) so the
+// two never disagree.
+func cfWave1Findings(enabled, status string) []domain.Finding {
+	if enabled == "false" {
+		return []domain.Finding{{
+			Code: cfCodeDisabled, Phrase: "disabled (admin-off)",
+			Severity: domain.SevDim, Source: "wave1",
+		}}
+	}
+	if status == "InProgress" {
+		return []domain.Finding{{
+			Code: cfCodeInProgress, Phrase: "deploying: config propagating",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	}
+	return nil
 }

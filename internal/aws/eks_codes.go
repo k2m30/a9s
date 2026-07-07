@@ -17,4 +17,12 @@ const (
 	// CodeEKSStateFailed — cluster is in the "FAILED" lifecycle state.
 	// Severity: SevBroken.
 	CodeEKSStateFailed domain.FindingCode = "eks.state.failed"
+
+	// CodeEKSHealthIssue — Health.Issues[] is non-empty on an otherwise-healthy
+	// (non-FAILED/CREATING/UPDATING) cluster (docs/resources/eks.md §3.2).
+	// Health is tracked independently of lifecycle state. Severity: SevWarn —
+	// colorEKSCluster (catalog_containers.go) ranks a bare health issue below
+	// the FAILED/CREATING/UPDATING lifecycle states, matching
+	// qa_eks_color_test.go's active_with_issues -> ColorWarning contract.
+	CodeEKSHealthIssue domain.FindingCode = "eks.health-issue"
 )

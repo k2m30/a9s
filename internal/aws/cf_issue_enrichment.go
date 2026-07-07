@@ -17,6 +17,13 @@ import (
 // cf canonical FindingCodes.
 const (
 	cfCodeInsecureProtocol domain.FindingCode = "cf.insecure-protocol"
+
+	// cfCodeInProgress — Status==InProgress. Distribution config change is
+	// still propagating to edge locations.
+	cfCodeInProgress domain.FindingCode = "cf.status.in-progress"
+	// cfCodeDisabled — Enabled==false. Distribution is administratively
+	// disabled and not serving traffic.
+	cfCodeDisabled domain.FindingCode = "cf.disabled"
 )
 
 // EnrichCloudFrontDistribution calls GetDistributionConfig per distribution (cap EnrichmentCap)

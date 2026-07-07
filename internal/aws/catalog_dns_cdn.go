@@ -9,7 +9,16 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
+// colorCF classifies a CloudFront distribution. Prefers colorFromAnyFinding
+// so real fetched resources (Findings populated by cfWave1Findings, cf.go,
+// Source: "wave1", and EnrichCloudFrontDistribution, Source: "wave2:cf")
+// color from their own Finding; the raw-field checks below are the
+// identical-precedence fallback for callers that construct a Resource with
+// only Fields set (e.g. qa_cf_color_test.go).
 func colorCF(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
 	if r.Fields["enabled"] == "false" {
 		return domain.ColorDim
 	}
@@ -22,7 +31,15 @@ func colorCF(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-func colorAPIGW(_ domain.Resource) domain.Color { return domain.ColorHealthy }
+// colorAPIGW classifies an API Gateway. All signals are Wave-2-only
+// (apigwCodeNoDeployedStages, apigwCodeStageConfigIssues) — no raw-field
+// structural state exists at Wave 1.
+func colorAPIGW(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
 
 var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{

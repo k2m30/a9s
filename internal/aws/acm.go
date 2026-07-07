@@ -3,11 +3,13 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -97,6 +99,11 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 				"in_use":          inUse,
 				"days_left":       daysLeft,
 			},
+			// emit canonical Findings for every non-ISSUED status branch
+			// acmColor reads, mirroring acmColor's own precedence — ISSUED
+			// certs are covered by EnrichACMCertificate's expiry/orphan Wave-2
+			// findings instead, so their status never reaches this switch.
+			Findings:  acmStatusFindings(status),
 			RawStruct: cert,
 		}
 
@@ -124,4 +131,30 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// acmStatusFindings returns the wave1 Finding for a non-ISSUED certificate
+// status, mirroring acmColor's (catalog_color_helpers.go) own precedence so
+// the Findings list and the row color never disagree. ISSUED certs return no
+// finding here — their color (and any "in use" / expiry signal) comes from
+// EnrichACMCertificate's Wave-2 findings instead.
+func acmStatusFindings(status string) []domain.Finding {
+	switch status {
+	case "PENDING_VALIDATION":
+		return []domain.Finding{{
+			Code: acmCodeStatusPendingValidation, Phrase: "pending validation",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	case "EXPIRED", "REVOKED", "FAILED", "VALIDATION_TIMED_OUT":
+		return []domain.Finding{{
+			Code: acmCodeStatusFailed, Phrase: strings.ToLower(status),
+			Severity: domain.SevBroken, Source: "wave1",
+		}}
+	case "INACTIVE":
+		return []domain.Finding{{
+			Code: acmCodeStatusInactive, Phrase: "inactive",
+			Severity: domain.SevDim, Source: "wave1",
+		}}
+	}
+	return nil
 }

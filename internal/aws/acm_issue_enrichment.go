@@ -19,6 +19,16 @@ import (
 const (
 	acmCodeExpiresSoon domain.FindingCode = "acm.expires-soon"
 	acmCodeOrphan      domain.FindingCode = "acm.orphan"
+
+	// acmCodeStatusPendingValidation — Status==PENDING_VALIDATION. The
+	// certificate is awaiting DNS/email validation before ACM can issue it.
+	acmCodeStatusPendingValidation domain.FindingCode = "acm.status.pending-validation"
+	// acmCodeStatusFailed — Status is one of EXPIRED, REVOKED, FAILED, or
+	// VALIDATION_TIMED_OUT. The certificate cannot be used for TLS.
+	acmCodeStatusFailed domain.FindingCode = "acm.status.failed"
+	// acmCodeStatusInactive — Status==INACTIVE. An imported certificate no
+	// longer attached to any resource for TLS termination.
+	acmCodeStatusInactive domain.FindingCode = "acm.status.inactive"
 )
 
 // EnrichACMCertificate calls DescribeCertificate per ACM certificate (cap EnrichmentCap)

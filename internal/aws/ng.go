@@ -136,8 +136,23 @@ func resolveNGImageID(ctx context.Context, api EC2DescribeLaunchTemplateVersions
 // second and later issue is folded into Detail as "+N more" rather than
 // widening the Phrase, keeping the Status cell short.
 func healthIssueFinding(code domain.FindingCode, fallbackPhrase string, issueCodes []string) domain.Finding {
+	return healthIssueFindingSev(code, fallbackPhrase, issueCodes, domain.SevBroken)
+}
+
+// healthIssueWarnFinding is healthIssueFinding at SevWarn instead of
+// SevBroken — for a Health.Issues[] signal that fires on an otherwise-healthy
+// lifecycle state (docs/resources/eks.md §3.2: Health is tracked
+// independently of lifecycle; colorEKSCluster's own precedence puts a bare
+// health issue below FAILED/CREATING/UPDATING). issueCodes is always non-empty
+// here (callers only invoke this when health_issues_count > 0), so there is
+// no fallbackPhrase parameter.
+func healthIssueWarnFinding(code domain.FindingCode, issueCodes []string) domain.Finding {
+	return healthIssueFindingSev(code, "health issue", issueCodes, domain.SevWarn)
+}
+
+func healthIssueFindingSev(code domain.FindingCode, fallbackPhrase string, issueCodes []string, sev domain.Severity) domain.Finding {
 	if len(issueCodes) == 0 {
-		return domain.Finding{Code: code, Phrase: fallbackPhrase, Severity: domain.SevBroken, Source: "wave1"}
+		return domain.Finding{Code: code, Phrase: fallbackPhrase, Severity: sev, Source: "wave1"}
 	}
 	detail := ""
 	if len(issueCodes) > 1 {
@@ -147,7 +162,7 @@ func healthIssueFinding(code domain.FindingCode, fallbackPhrase string, issueCod
 		Code:     code,
 		Phrase:   issueCodes[0],
 		Detail:   detail,
-		Severity: domain.SevBroken,
+		Severity: sev,
 		Source:   "wave1",
 	}
 }
