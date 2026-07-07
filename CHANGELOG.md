@@ -5,32 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Added
-
-- **Persistent cache survives restarts in both UIs** — every list column,
-  status text and `!`/`~` issue glyph renders in the first frame from the
-  per-type cache files and is silently re-verified in the background; a
-  Wave-1 refresh can no longer strip previously learned findings from the
-  file or the screen (Wave-2 carry rule C6b).
-- **Machine findings registry** — every resource type declares its complete
-  finding inventory (code, phrase, severity, wave) on the catalog; the
-  findings tables in `docs/resources/*.md` and `docs/attention-signals.md`
-  are generated from it. Hand-written signal rows that the code does not
-  emit are explicitly marked `NOT IMPLEMENTED (backlog)`; row-color-only
-  rules are labeled as such.
-- **Demo mode is a full verification bench** — background checks run in
-  demo; every registered related-panel pivot has a live witness; every
-  witnessed ID resolves on drill-down; issue-carrying fixtures exist for
-  every issue-capable type; per-type color-state coverage is inventoried
-  by ratchet tests that only shrink.
-- **Filtered related drill-downs cache per session** — re-entering e.g.
-  CloudTrail Events from a key renders instantly from the session cache
-  with a background refresh instead of a bare full-screen Loading.
+## [3.46.0] - 2026-07-07
 
 ### Changed
 
+- **One Status column everywhere** — every list view has exactly one status
+  column, titled `Status`; the duplicate `State`/`Issues`/`Risk`/`State
+  Reason`/`Logging` columns are gone. The cell renders the row's finding
+  phrase, else its humanized lifecycle state; no raw AWS enum reaches any
+  rendered cell.
+- **Row color derives from findings** — all 66 classifiers resolve color
+  from the row's findings (worst severity wins); color, status text and the
+  detail Attention block share one source, so a colored row always explains
+  itself. Enforced by an empty-allowlist conformance gate.
+- **Finding phrases are operator sentences** — cause, not severity or
+  benchmark citations ("reads sensitive data (ListSecrets)", "deletion
+  protection disabled", "access key >90d old").
 - **One row store** — the five in-memory copies of per-type list rows
   (probe buffer, session caches, controller mirror, screen rows) collapse
   into a single session-scoped `RowStore`; screens adopt what the store's
@@ -43,8 +33,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `budget-excluded` under the new one-extra-call policy rule; checkers
   return IDs the drill-down can actually resolve.
 
+### Added
+
+- Demo smoke joins `make ready-to-push`; a live readonly smoke
+  (`make smoke-live`) sweeps every non-empty type in the account for raw
+  enums and vacuous statuses.
+- Dynamic witness gate: a registered finding that never fires on a demo
+  row is a coverage failure.
+- **Persistent cache survives restarts in both UIs** — every list column,
+  status text and `!`/`~` issue glyph renders in the first frame from the
+  per-type cache files and is silently re-verified in the background; a
+  Wave-1 refresh can no longer strip previously learned findings from the
+  file or the screen (Wave-2 carry rule C6b).
+- **Machine findings registry** — every resource type declares its complete
+  finding inventory (code, phrase, severity, wave) on the catalog; the
+  findings tables in `docs/resources/*.md` and `docs/attention-signals.md`
+  are generated from it.
+- **Demo mode is a full verification bench** — background checks run in
+  demo; every registered related-panel pivot has a live witness; every
+  witnessed ID resolves on drill-down; issue-carrying fixtures exist for
+  every issue-capable type; per-type color-state coverage is inventoried
+  by ratchet tests that only shrink.
+- **Filtered related drill-downs cache per session** — re-entering e.g.
+  CloudTrail Events from a key renders instantly from the session cache
+  with a background refresh instead of a bare full-screen Loading.
+
 ### Fixed
 
+- ebs orphan/unencrypted volumes, ebs-snap and dbc-snap unencrypted/orphan/
+  aged snapshots emit findings — yellow rows carry a cause in Status and
+  Attention.
+- elb: warn-level misconfiguration no longer renders red.
+- opensearch: the epoch zero date no longer counts as a forced-update
+  deadline; encryption-at-rest has its own sentence.
+- ec2 → IAM Role related pivot resolves through `GetInstanceProfile`
+  (profile name is not role name).
+- Availability sweep waits for AWS client readiness; the menu issue badge
+  counts findings from a single source.
+- EC2 status-check glyphs restored on the Status column.
 - KMS color states never worked (classifier read a field the fetcher never
   wrote); console users without MFA now classify Broken as documented;
   Lambda state precedence follows the spec (Inactive dims before the
@@ -496,7 +522,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Pre-existing lint warning in `cmd/preview/main.go` (if-else chain → switch)
 
-[Unreleased]: https://github.com/k2m30/a9s/compare/v3.45.0...HEAD
+[3.46.0]: https://github.com/k2m30/a9s/compare/v3.45.0...v3.46.0
 [3.45.0]: https://github.com/k2m30/a9s/compare/v3.44.0...v3.45.0
 [3.44.0]: https://github.com/k2m30/a9s/compare/v3.43.0...v3.44.0
 [3.43.0]: https://github.com/k2m30/a9s/compare/v3.42.0...v3.43.0
