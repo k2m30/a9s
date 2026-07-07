@@ -194,8 +194,7 @@ func (c *Core) HandleClientsReady(ev ClientsReadyEvent) ([]UIIntent, []TaskReque
 func (c *Core) handleClientsReadyFailure(ev ClientsReadyEvent) ([]UIIntent, []TaskRequest) {
 	s := c.session
 	if s.HasPrevState {
-		s.Profile = s.PrevProfile
-		s.Region = s.PrevRegion
+		s.SetProfileRegion(s.PrevProfile, s.PrevRegion)
 	}
 	s.HasPrevState = false
 	s.PrevProfile = ""
@@ -309,16 +308,21 @@ func (c *Core) handleClientsReadySuccess(ev ClientsReadyEvent) ([]UIIntent, []Ta
 	pendingCommand := s.Command
 	s.Command = ""
 
-	if s.Profile == "" {
-		s.Profile = "default"
-	}
-	if s.Region == "" {
-		if ev.Region != "" {
-			s.Region = ev.Region
-		} else {
-			configPath := awsclient.DefaultConfigPath()
-			s.Region = awsclient.GetDefaultRegion(configPath, s.Profile)
+	if s.Profile == "" || s.Region == "" {
+		profile := s.Profile
+		if profile == "" {
+			profile = "default"
 		}
+		region := s.Region
+		if region == "" {
+			if ev.Region != "" {
+				region = ev.Region
+			} else {
+				configPath := awsclient.DefaultConfigPath()
+				region = awsclient.GetDefaultRegion(configPath, profile)
+			}
+		}
+		s.SetProfileRegion(profile, region)
 	}
 
 	// Demo / no-cache: synchronous prefetch instead of the async probe
@@ -415,8 +419,7 @@ func (c *Core) HandleProfileSelected(ev ProfileSelectedEvent) ([]UIIntent, []Tas
 	s.HasPrevState = hadPrev
 	s.PrevProfile = prevProf
 	s.PrevRegion = prevReg
-	s.Profile = ev.Profile
-	s.Region = ""
+	s.SetProfileRegion(ev.Profile, "")
 	s.PendingRefresh = true
 
 	intents := []UIIntent{
@@ -638,7 +641,7 @@ func (c *Core) HandleRegionSelected(ev RegionSelectedEvent) ([]UIIntent, []TaskR
 	s.HasPrevState = hadPrev
 	s.PrevProfile = prevProf
 	s.PrevRegion = prevReg
-	s.Region = ev.Region
+	s.SetProfileRegion(s.Profile, ev.Region)
 	s.PendingRefresh = true
 
 	intents := []UIIntent{
