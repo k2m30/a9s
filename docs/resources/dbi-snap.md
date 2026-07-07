@@ -196,7 +196,7 @@ dbi-snap — DATABASES & STORAGE. Lifecycle key: `status`.
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
 | dbi-snap.broken.failed | failed | broken | wave1 |
-| dbi-snap.broken.incompatible | <incompatible-* status> | broken | wave1 |
+| dbi-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 |
 | dbi-snap.warn.creating | creating: <pct>% | warn | wave1 |
 | dbi-snap.warn.unencrypted | unencrypted | warn | wave1 |
 | dbi-snap.orphan | orphan: source DB deleted | broken | wave2 |

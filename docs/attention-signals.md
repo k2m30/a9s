@@ -234,9 +234,9 @@ resource-list frame title. The frame-title rules:
 | ng | ng.state.delete-failed | delete failed | broken | wave1 |
 | ng | ng.state.degraded | degraded | broken | wave1 |
 | elb | elb.state.provisioning | provisioning | warn | wave1 |
-| elb | elb.state.active_impaired | active impaired | warn | wave1 |
+| elb | elb.state.active\_impaired | active impaired | warn | wave1 |
 | elb | elb.state.failed | failed | broken | wave1 |
-| elb | elb.misconfigured | Deletion Protection: disabled | warn | wave2 |
+| elb | elb.misconfigured | deletion protection disabled | warn | wave2 |
 | tg | tg.unhealthy-targets | unhealthy targets: <N>/<M> | broken | wave2 |
 | sg | sg.ingress.wide-open | all ports open to 0.0.0.0/0 | broken | wave1 |
 | sg | sg.ingress.dangerous-ports | ports <list> open to 0.0.0.0/0 | broken | wave1 |
@@ -254,7 +254,7 @@ resource-list frame title. The frame-title rules:
 | igw | igw.state.attaching | attaching | warn | wave1 |
 | igw | igw.state.detaching | detaching | warn | wave1 |
 | eip | eip.unassociated | unassociated | warn | wave1 |
-| vpce | vpce.state.pending_acceptance | pending acceptance | warn | wave1 |
+| vpce | vpce.state.pending\_acceptance | pending acceptance | warn | wave1 |
 | vpce | vpce.state.pending | pending | warn | wave1 |
 | vpce | vpce.state.deleting | deleting | warn | wave1 |
 | vpce | vpce.state.failed | failed | broken | wave1 |
@@ -271,39 +271,39 @@ resource-list frame title. The frame-title rules:
 | eni | eni.state.detaching | detaching | warn | wave1 |
 | eni | eni.state.available | available | warn | wave1 |
 | dbi | dbi.broken.failed | failed | broken | wave1 |
-| dbi | dbi.broken.storage_full | storage-full | broken | wave1 |
-| dbi | dbi.broken.incompatible_network | incompatible-network | broken | wave1 |
-| dbi | dbi.broken.incompatible_option_group | incompatible-option-group | broken | wave1 |
-| dbi | dbi.broken.incompatible_parameters | incompatible-parameters | broken | wave1 |
-| dbi | dbi.broken.incompatible_restore | incompatible-restore | broken | wave1 |
-| dbi | dbi.broken.restore_error | restore-error | broken | wave1 |
-| dbi | dbi.broken.encryption_key_unavailable | encryption key unavailable | broken | wave1 |
+| dbi | dbi.broken.storage\_full | storage-full | broken | wave1 |
+| dbi | dbi.broken.incompatible\_network | incompatible-network | broken | wave1 |
+| dbi | dbi.broken.incompatible\_option\_group | incompatible-option-group | broken | wave1 |
+| dbi | dbi.broken.incompatible\_parameters | incompatible-parameters | broken | wave1 |
+| dbi | dbi.broken.incompatible\_restore | incompatible-restore | broken | wave1 |
+| dbi | dbi.broken.restore\_error | restore-error | broken | wave1 |
+| dbi | dbi.broken.encryption\_key\_unavailable | encryption key unavailable | broken | wave1 |
 | dbi | dbi.broken.stopped | stopped | broken | wave1 |
 | dbi | dbi.warn.transitional | <status>: <pending field> | warn | wave1 |
-| dbi | dbi.warn.no_automated_backups | no automated backups | warn | wave1 |
-| dbi | dbi.warn.publicly_accessible | publicly accessible | warn | wave1 |
-| dbi | dbi.warn.unencrypted_storage | unencrypted storage | warn | wave1 |
-| dbi | dbi.warn.deletion_protection_off | deletion protection off | warn | wave1 |
+| dbi | dbi.warn.no\_automated\_backups | no automated backups | warn | wave1 |
+| dbi | dbi.warn.publicly\_accessible | publicly accessible | warn | wave1 |
+| dbi | dbi.warn.unencrypted\_storage | unencrypted storage | warn | wave1 |
+| dbi | dbi.warn.deletion\_protection\_off | deletion protection off | warn | wave1 |
 | dbi | dbi.pending-maintenance | maintenance scheduled | warn | wave2 |
 | s3 | s3.public-access-block-incomplete | public access block incomplete | broken | wave2 |
-| redis | redis.broken.create_failed | create failed — see events | broken | wave1 |
+| redis | redis.broken.create\_failed | create failed — see events | broken | wave1 |
 | redis | redis.warn.creating | creating — new group | warn | wave1 |
 | redis | redis.warn.deleting | deleting — teardown | warn | wave1 |
 | redis | redis.warn.modifying | modifying — config change | warn | wave1 |
 | redis | redis.warn.snapshotting | snapshotting — backup running | warn | wave1 |
-| redis | redis.warn.shard_issue | shard <NodeGroupId>: <status> | warn | wave1 |
-| redis | redis.warn.multiaz_without_auto_failover | multi-AZ without auto-failover | warn | wave1 |
+| redis | redis.warn.shard\_issue | shard <NodeGroupId>: <status> | warn | wave1 |
+| redis | redis.warn.multiaz\_without\_auto\_failover | multi-AZ without auto-failover | warn | wave1 |
 | dbc | dbc.broken.failed | failed: cluster operation | broken | wave1 |
-| dbc | dbc.broken.encryption_key_unreachable | encryption key unreachable | broken | wave1 |
-| dbc | dbc.broken.incompatible_parameters | parameter group incompatible | broken | wave1 |
-| dbc | dbc.broken.no_writer | no writer: reads only | broken | wave1 |
+| dbc | dbc.broken.encryption\_key\_unreachable | encryption key unreachable | broken | wave1 |
+| dbc | dbc.broken.incompatible\_parameters | parameter group incompatible | broken | wave1 |
+| dbc | dbc.broken.no\_writer | no writer: reads only | broken | wave1 |
 | dbc | dbc.warn.transitional | <status>: in progress | warn | wave1 |
-| dbc | dbc.warn.deletion_protection_off | delete-protection off | warn | wave1 |
-| dbc | dbc.warn.not_encrypted_at_rest | not encrypted at rest | warn | wave1 |
-| dbc | dbc.warn.no_automated_backups | no automated backups | warn | wave1 |
+| dbc | dbc.warn.deletion\_protection\_off | delete-protection off | warn | wave1 |
+| dbc | dbc.warn.not\_encrypted\_at\_rest | not encrypted at rest | warn | wave1 |
+| dbc | dbc.warn.no\_automated\_backups | no automated backups | warn | wave1 |
 | dbc | dbc.maintenance-overdue | maintenance overdue | broken | wave2 |
-| ddb | ddb.broken.kms_key_inaccessible | kms key inaccessible | broken | wave1 |
-| ddb | ddb.broken.archived_kms_lost | archived: kms key lost | broken | wave1 |
+| ddb | ddb.broken.kms\_key\_inaccessible | kms key inaccessible | broken | wave1 |
+| ddb | ddb.broken.archived\_kms\_lost | archived: kms key lost | broken | wave1 |
 | ddb | ddb.warn.creating | creating | warn | wave1 |
 | ddb | ddb.warn.updating | updating | warn | wave1 |
 | ddb | ddb.warn.deleting | deleting | warn | wave1 |
@@ -314,12 +314,12 @@ resource-list frame title. The frame-title rules:
 | opensearch | opensearch.warn.processing | processing: config change in flight | warn | wave1 |
 | opensearch | opensearch.update-forced | software update forced soon | broken | wave2 |
 | opensearch | opensearch.encryption-off | encryption at rest off | warn | wave2 |
-| redshift | redshift.broken.incompatible_hsm | incompatible-hsm | broken | wave1 |
-| redshift | redshift.broken.incompatible_network | incompatible-network | broken | wave1 |
-| redshift | redshift.broken.incompatible_parameters | incompatible-parameters | broken | wave1 |
-| redshift | redshift.broken.incompatible_restore | incompatible-restore | broken | wave1 |
-| redshift | redshift.broken.hardware_failure | hardware-failure | broken | wave1 |
-| redshift | redshift.broken.storage_full | storage-full | broken | wave1 |
+| redshift | redshift.broken.incompatible\_hsm | incompatible-hsm | broken | wave1 |
+| redshift | redshift.broken.incompatible\_network | incompatible-network | broken | wave1 |
+| redshift | redshift.broken.incompatible\_parameters | incompatible-parameters | broken | wave1 |
+| redshift | redshift.broken.incompatible\_restore | incompatible-restore | broken | wave1 |
+| redshift | redshift.broken.hardware\_failure | hardware-failure | broken | wave1 |
+| redshift | redshift.broken.storage\_full | storage-full | broken | wave1 |
 | redshift | redshift.broken.unavailable | unavailable | broken | wave1 |
 | redshift | redshift.broken.failed | failed | broken | wave1 |
 | redshift | redshift.warn.creating | creating | warn | wave1 |
@@ -329,32 +329,33 @@ resource-list frame title. The frame-title rules:
 | redshift | redshift.warn.renaming | renaming | warn | wave1 |
 | redshift | redshift.warn.deleting | deleting | warn | wave1 |
 | redshift | redshift.warn.maintenance | maintenance | warn | wave1 |
-| redshift | redshift.warn.availability_modifying | modifying | warn | wave1 |
-| redshift | redshift.warn.pending_change | pending change queued | warn | wave1 |
-| redshift | redshift.warn.maintenance_deferred | maintenance deferred | warn | wave1 |
-| redshift | redshift.warn.publicly_accessible | publicly accessible | warn | wave1 |
-| redshift | redshift.warn.unencrypted_at_rest | unencrypted at rest | warn | wave1 |
+| redshift | redshift.warn.availability\_modifying | modifying | warn | wave1 |
+| redshift | redshift.warn.pending\_change | pending change queued | warn | wave1 |
+| redshift | redshift.warn.maintenance\_deferred | maintenance deferred | warn | wave1 |
+| redshift | redshift.warn.publicly\_accessible | publicly accessible | warn | wave1 |
+| redshift | redshift.warn.unencrypted\_at\_rest | unencrypted at rest | warn | wave1 |
 | efs | efs.broken.error | error | broken | wave1 |
-| efs | efs.broken.no_mount_targets | no mount targets | broken | wave1 |
+| efs | efs.broken.no\_mount\_targets | no mount targets | broken | wave1 |
 | efs | efs.warn.creating | creating | warn | wave1 |
 | efs | efs.warn.updating | updating | warn | wave1 |
 | efs | efs.warn.deleting | deleting | warn | wave1 |
 | efs | efs.mount-target-down | mount target down | broken | wave2 |
 | dbi-snap | dbi-snap.broken.failed | failed | broken | wave1 |
-| dbi-snap | dbi-snap.broken.incompatible | <incompatible-* status> | broken | wave1 |
+| dbi-snap | dbi-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 |
 | dbi-snap | dbi-snap.warn.creating | creating: <pct>% | warn | wave1 |
 | dbi-snap | dbi-snap.warn.unencrypted | unencrypted | warn | wave1 |
 | dbi-snap | dbi-snap.orphan | orphan: source DB deleted | broken | wave2 |
 | dbi-snap | dbi-snap.past-retention | automated, <N>d past retention | broken | wave2 |
 | dbc-snap | dbc-snap.broken.failed | failed | broken | wave1 |
-| dbc-snap | dbc-snap.broken.incompatible | <incompatible-* status> | broken | wave1 |
+| dbc-snap | dbc-snap.broken.incompatible | <incompatible-\* status> | broken | wave1 |
 | dbc-snap | dbc-snap.warn.creating | creating | warn | wave1 |
-| dbc-snap | dbc-snap.warn.manual_unused | manual, unused <N>d | warn | wave1 |
+| dbc-snap | dbc-snap.warn.manual\_unused | manual, unused <N>d | warn | wave1 |
+| dbc-snap | dbc-snap.warn.unencrypted | unencrypted | warn | wave1 |
 | dbc-snap | dbc-snap.orphan | orphan: source cluster deleted | broken | wave2 |
 | dbc-snap | dbc-snap.past-retention | automated, <N>d past retention | broken | wave2 |
 | alarm | alarm.state.alarm | alarm triggered | broken | wave1 |
-| alarm | alarm.state.insufficient_data | insufficient data | warn | wave1 |
-| alarm | alarm.no_actions | no actions | warn | wave1 |
+| alarm | alarm.state.insufficient\_data | insufficient data | warn | wave1 |
+| alarm | alarm.no\_actions | no actions | warn | wave1 |
 | logs | logs.retention-never-expire | retention: never expire | warn | wave1 |
 | logs | logs.stale-empty | empty, created over 90 days ago | warn | wave1 |
 | logs | logs.missing-metric-filters | audit log group missing metric filters | warn | wave2 |
@@ -362,9 +363,9 @@ resource-list frame title. The frame-title rules:
 | trail | trail.not-logging | not logging | broken | wave2 |
 | trail | trail.delivery-error | delivery error: <LatestDeliveryError> | broken | wave2 |
 | trail | trail.delivery-stale | delivery stale since <LatestDeliveryTime> | broken | wave2 |
-| ct-events | ct_event.severity.danger | destructive call | broken | wave1 |
-| ct-events | ct_event.severity.attention | root account activity | warn | wave1 |
-| ct-events | ct_event.severity.info | routine event | dim | wave1 |
+| ct-events | ct\_event.severity.danger | destructive call | broken | wave1 |
+| ct-events | ct\_event.severity.attention | root account activity | warn | wave1 |
+| ct-events | ct\_event.severity.info | routine event | dim | wave1 |
 | sqs | sqs.missing-dlq | no DLQ configured | warn | wave2 |
 | sns | sns.no-subscribers | topic has no subscribers | warn | wave2 |
 | sns | sns.all-pending-confirmation | all pending confirmation | warn | wave2 |
@@ -378,7 +379,7 @@ resource-list frame title. The frame-title rules:
 | msk | msk.warn.creating | creating | warn | wave1 |
 | msk | msk.warn.updating | updating | warn | wave1 |
 | msk | msk.warn.maintenance | maintenance | warn | wave1 |
-| msk | msk.warn.rebooting_broker | rebooting broker | warn | wave1 |
+| msk | msk.warn.rebooting\_broker | rebooting broker | warn | wave1 |
 | msk | msk.warn.healing | healing | warn | wave1 |
 | msk | msk.warn.deleting | deleting | warn | wave1 |
 | msk | msk.broken.failed | failed | broken | wave1 |
@@ -386,21 +387,21 @@ resource-list frame title. The frame-title rules:
 | msk | msk.encryption-not-tls | encryption in transit not enforced | warn | wave2 |
 | sfn | sfn.latest-execution-failed | latest execution <STATUS> | broken | wave2 |
 | ses | ses.verification.failed | verification failed | broken | wave1 |
-| ses | ses.verification.temp_failure | verify: temp failure | broken | wave1 |
-| ses | ses.verification.not_started | verification not started | broken | wave1 |
+| ses | ses.verification.temp\_failure | verify: temp failure | broken | wave1 |
+| ses | ses.verification.not\_started | verification not started | broken | wave1 |
 | ses | ses.verification.pending | pending verification | warn | wave1 |
 | ses | ses.sending.disabled | sending disabled | warn | wave1 |
 | ses | ses.account-shutdown | sending paused by AWS (shutdown) | broken | wave2 |
 | ses | ses.account-probation | account under review (probation) | broken | wave2 |
 | ses | ses.quota-high | quota 80%+ used | warn | wave2 |
 | secrets | secrets.state.deleted | deleted | broken | wave1 |
-| secrets | secrets.state.rotation_overdue | rotation overdue | warn | wave1 |
+| secrets | secrets.state.rotation\_overdue | rotation overdue | warn | wave1 |
 | secrets | secrets.state.dormant | dormant | warn | wave1 |
 | secrets | secrets.rotation.disabled | rotation not enabled | warn | wave1 |
 | secrets | secrets.value.stale | value unchanged in over 365 days | warn | wave1 |
 | ssm | ssm.value.plaintext-sensitive | plaintext value looks like a credential | broken | wave1 |
 | ssm | ssm.value.stale | not modified in over 365 days | warn | wave1 |
-| kms | kms.state.pending_deletion | pending deletion | broken | wave1 |
+| kms | kms.state.pending\_deletion | pending deletion | broken | wave1 |
 | kms | kms.state.disabled | disabled | warn | wave1 |
 | kms | kms.state.unavailable | <key state> | broken | wave1 |
 | kms | kms.rotation-disabled | key rotation disabled | warn | wave2 |
@@ -413,14 +414,14 @@ resource-list frame title. The frame-title rules:
 | apigw | apigw.stage-config-issues | no throttling configured (DoS risk); access logs disabled | warn | wave2 |
 | role | iam-role.dormant | dormant role (>90d) | warn | wave2 |
 | policy | iam-policy.orphan-unattached | unattached, no roles/users/groups use it | warn | wave1 |
-| policy | iam-policy.admin-star | admin star (allows * on *) | broken | wave2 |
+| policy | iam-policy.admin-star | admin star (allows \* on \*) | broken | wave2 |
 | iam-user | iam-user.no-mfa | console user without MFA | broken | wave2 |
 | iam-user | iam-user.old-key | key <keyID> >90d (rotation) | warn | wave2 |
 | iam-group | iam-group.orphan-or-noop | group has no members (orphan) | warn | wave2 |
 | waf | waf.no-logging | no logging configuration | warn | wave2 |
 | cfn | cfn.stack.failed | <status, lowercased> | broken | wave1 |
 | cfn | cfn.stack.rollback | <status, lowercased> | broken | wave1 |
-| cfn | cfn.stack.in_progress | <status, lowercased> | warn | wave1 |
+| cfn | cfn.stack.in\_progress | <status, lowercased> | warn | wave1 |
 | cfn | cfn.recent-resource-failure | recent resource failure: <ResourceType/LogicalResourceId> | broken | wave2 |
 | cfn | cfn.stack-drifted | stack drifted from template | warn | wave2 |
 | pipeline | pipeline.stage-failed | stage <stage> failed | broken | wave2 |

@@ -203,9 +203,9 @@ elb — NETWORKING. Lifecycle key: `state`.
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
 | elb.state.provisioning | provisioning | warn | wave1 |
-| elb.state.active_impaired | active impaired | warn | wave1 |
+| elb.state.active\_impaired | active impaired | warn | wave1 |
 | elb.state.failed | failed | broken | wave1 |
-| elb.misconfigured | Deletion Protection: disabled | warn | wave2 |
+| elb.misconfigured | deletion protection disabled | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
