@@ -11,7 +11,7 @@ import (
 )
 
 func colorDBI(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	status := r.Fields["status"]
@@ -95,7 +95,7 @@ func colorRedis(r domain.Resource) domain.Color {
 }
 
 func colorDBC(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	phrase := stripFindingSuffix(r.Fields["status"])
@@ -121,7 +121,7 @@ func colorDBC(r domain.Resource) domain.Color {
 }
 
 func colorDDB(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	phrase := stripFindingSuffix(r.Fields["status"])
@@ -142,7 +142,7 @@ func colorOpenSearch(r domain.Resource) domain.Color {
 	if r.Fields["deleted"] == "true" {
 		return domain.ColorDim
 	}
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	stripped := stripFindingSuffix(r.Fields["status"])
@@ -213,7 +213,7 @@ func colorRedshift(r domain.Resource) domain.Color {
 }
 
 func colorEFS(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	phrase := stripFindingSuffix(r.Fields["status"])
@@ -230,7 +230,7 @@ func colorEFS(r domain.Resource) domain.Color {
 }
 
 func colorDBISnap(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	phrase := stripFindingSuffix(r.Fields["status"])
@@ -250,13 +250,15 @@ func colorDBISnap(r domain.Resource) domain.Color {
 }
 
 // colorDBCSnap classifies a dbc-snap row. Every Warning/Broken bucket here is
-// backed by a wave1 domain.Finding emitted by computeDBCSnapFindings /
-// computeRDSDBClusterSnapshotFindings (failed, incompatible-*, creating,
-// manual age > 365d, unencrypted) — colorFromWave1 always resolves first, so
-// the phrase-parsing fallback below only classifies rows whose RawStruct
-// predates a Findings-carrying fetch (e.g. cache replay of an older schema).
+// backed by a domain.Finding — wave1 (failed, incompatible-*, creating,
+// manual age > 365d, unencrypted) emitted by computeDBCSnapFindings /
+// computeRDSDBClusterSnapshotFindings, or wave2 (orphan, past-retention)
+// emitted by enrichDBCSnapCrossRef — colorFromAnyFinding always resolves
+// first, so the phrase-parsing fallback below only classifies rows whose
+// RawStruct predates a Findings-carrying fetch (e.g. cache replay of an
+// older schema).
 func colorDBCSnap(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	phrase := stripFindingSuffix(r.Fields["status"])

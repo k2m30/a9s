@@ -11,8 +11,21 @@ import (
 
 // opensearch canonical FindingCodes.
 const (
-	opensearchCodeUpdateForced   domain.FindingCode = "opensearch.update-forced"
-	opensearchCodeEncryptionOff  domain.FindingCode = "opensearch.encryption-off"
+	opensearchCodeUpdateForced  domain.FindingCode = "opensearch.update-forced"
+	opensearchCodeEncryptionOff domain.FindingCode = "opensearch.encryption-off"
+)
+
+// opensearchUpdateForcedDetail and opensearchEncryptionOffDetail are the S5
+// "concrete operator sentence" texts stamped onto Finding.Detail. Each names
+// its own condition only — neither references the other — so the two
+// problems read as independent facts even in the both-active case, where
+// only one can be the resource's single Wave-2 Finding
+// (IssueEnricherResult.Findings is map[string]domain.Finding, one entry per
+// resource) and the other is surfaced as a DetailRow instead of a second
+// Finding.
+const (
+	opensearchUpdateForcedDetail  = "AWS will apply this update automatically once the scheduled date passes; upgrade on your own schedule before then to control the maintenance window."
+	opensearchEncryptionOffDetail = "Data at rest is stored unencrypted. Enabling encryption at rest requires creating a new domain and migrating data — it cannot be turned on in place."
 )
 
 // EnrichOpenSearchDomains emits Findings for background-check signals
@@ -21,8 +34,15 @@ const (
 //   - service_software_update_available == "true"  → Severity "!", Summary "software update forced soon"
 //   - encryption_at_rest_enabled == "false"        → Severity "~", Summary "encryption at rest off"
 //
-// When both signals are active, the "!" branch is emitted (! beats ~) with an
-// additional row {Label:"Additional", Value:"encryption at rest off", Tier:"~"}.
+// Each condition names its own FindingCode and Detail sentence and is
+// evaluated independently of the other. When both are active on the same
+// resource, only one Finding can attach (the map is keyed by Resource.ID) —
+// the "!" branch wins (! beats ~) and the encryption fact is still surfaced,
+// as an {Label:"Additional", Value:"encryption at rest off", Tier:"~"} row,
+// so it is never silently dropped. The two conditions never share a Detail
+// sentence or a Phrase — each keeps its own wording (opensearchUpdateForcedDetail
+// vs opensearchEncryptionOffDetail) so an operator reading either surface sees
+// two distinct problems, not one problem with an appendix.
 //
 // IssueCount counts resources with update_available ("!" severity); "~"-only
 // instances never bump.
@@ -59,8 +79,7 @@ func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []r
 		}
 
 		if updateAvailable {
-			// "!" branch — update forced soon. Include enc-off as additional row
-			// when both signals are active so the "~" finding is not lost.
+			// "!" branch — update forced soon, its own independent condition.
 			var rows []domain.DetailRow
 			if updateDate := r.Fields["automated_update_date"]; updateDate != "" {
 				rows = append(rows, domain.DetailRow{Label: "Automated Update", Value: updateDate, Tier: "!"})
@@ -72,15 +91,19 @@ func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []r
 				rows = append(rows, domain.DetailRow{Label: "New Version", Value: nv})
 			}
 			if encOff {
-				// Surface the hidden ~ finding as an additional row (U11 contract:
-				// its value must not appear in Summary).
+				// The encryption-off condition is independent of update-forced —
+				// only one Wave-2 Finding can attach per resource
+				// (IssueEnricherResult.Findings is map[string]domain.Finding), so
+				// the hidden "~" finding surfaces as its own row here rather than
+				// being silently dropped. U11 contract: Phrase must not contain
+				// any row value.
 				rows = append(rows, domain.DetailRow{Label: "Additional", Value: "encryption at rest off", Tier: "~"})
 			}
-			setWave2Finding(&result, r.ID, opensearchCodeUpdateForced, "software update forced soon", "!", "opensearch", rows, "")
+			setWave2Finding(&result, r.ID, opensearchCodeUpdateForced, "software update forced soon", "!", "opensearch", rows, opensearchUpdateForcedDetail)
 			bangCount++
 		} else {
-			// Only enc-off — "~" finding, no rows needed.
-			setWave2Finding(&result, r.ID, opensearchCodeEncryptionOff, "encryption at rest off", "~", "opensearch", nil, "")
+			// Only enc-off — "~" finding, its own Detail sentence, no rows needed.
+			setWave2Finding(&result, r.ID, opensearchCodeEncryptionOff, "encryption at rest off", "~", "opensearch", nil, opensearchEncryptionOffDetail)
 			// "~" never bumps bangCount.
 		}
 	}
