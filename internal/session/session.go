@@ -143,6 +143,21 @@ type Session struct {
 	AvailChecked    int        // number probed so far in current gen
 	AvailTotal      int        // total types to probe in current gen
 
+	// AvailSweepPending latches that handleAvailabilityCacheLoaded built
+	// AvailQueue (menu/RowStore already seeded from disk) but held back the
+	// first probe-dispatch batch because Clients was still nil at that
+	// instant — the disk-cache load races ahead of the AWS connect on
+	// startup (Init fires both concurrently via tea.Batch for instant-paint,
+	// C1), so dispatching probes here would run them against a nil
+	// transport and fail every one with "AWS clients not initialized"
+	// instead of actually probing. Consumed by the next successful
+	// HandleClientsReady, which drains AvailQueue's first batch now that a
+	// real transport exists. Not cleared by Rotate for the same reason
+	// AvailQueue itself is reset there instead of surviving — a pair switch
+	// always restarts the sweep from HandleClientsReady's own dispatch, so a
+	// stale pending flag from the old pair is moot once AvailQueue is nil.
+	AvailSweepPending bool
+
 	// Wave 2 issue-enrichment dispatch.
 	//
 	// ProbeResources/ProbeTruncated DIED in task #17 wave 1 stage 2 (row-store
@@ -401,6 +416,7 @@ func (s *Session) Rotate() {
 	s.AvailQueue = nil
 	s.AvailChecked = 0
 	s.AvailTotal = 0
+	s.AvailSweepPending = false
 	s.EnrichChecked = 0
 	s.EnrichTotal = 0
 	s.RowStore.Clear()

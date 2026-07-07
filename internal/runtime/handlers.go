@@ -240,6 +240,14 @@ func (c *Core) handleClientsReadyFailure(ev ClientsReadyEvent) ([]UIIntent, []Ta
 				Payload: LoadAvailCachePayload{},
 			})
 		}
+		// Retained transport is a real, working connection (rollback to the
+		// prior stable pair) — drain any probe batch a pre-rollback disk-cache
+		// load latched but could not dispatch while Clients briefly looked
+		// unset to a racing handleAvailabilityCacheLoaded call.
+		if s.AvailSweepPending {
+			s.AvailSweepPending = false
+			tasks = append(tasks, c.fireNextAvailabilityProbes(4)...)
+		}
 	}
 	return intents, tasks
 }
@@ -354,6 +362,16 @@ func (c *Core) handleClientsReadySuccess(ev ClientsReadyEvent) ([]UIIntent, []Ta
 		Key:     TaskKey{Kind: TaskKindLoadAvailCache},
 		Payload: LoadAvailCachePayload{},
 	})
+
+	// The disk-cache load fired at startup (Init's seedCmd) commonly wins
+	// the race against this very connect and already built AvailQueue
+	// before s.Clients existed — handleAvailabilityCacheLoaded latched
+	// AvailSweepPending instead of dispatching probes against a nil
+	// transport. Clients now exist, so drain the held-back first batch.
+	if s.AvailSweepPending {
+		s.AvailSweepPending = false
+		tasks = append(tasks, c.fireNextAvailabilityProbes(4)...)
+	}
 
 	intents, refreshTasks := c.maybeRefreshIntents(ev)
 	tasks = append(tasks, refreshTasks...)
