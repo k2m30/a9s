@@ -145,9 +145,14 @@ func TestScenario_BackupVisual(t *testing.T) {
 
 	// Attention primary entry: glyph + capitalized phrase.
 	scenario.ExpectViewContains(backupDetailBroken2Capitalize)
-	// Per-job State rows — FAILED and EXPIRED both surface from Rows.
-	scenario.ExpectViewContains("FAILED")
-	scenario.ExpectViewContains("EXPIRED")
+	// Per-job State rows — the operator-phrase architecture humanizes the raw
+	// AWS enum before it reaches the rendered surface (State: failed / State:
+	// expired), never the bare SDK constant. Assert the new phrase, forbid
+	// the old raw whole-word enum from ever reappearing.
+	scenario.ExpectViewContains("State: failed")
+	scenario.ExpectViewContains("State: expired")
+	scenario.ExpectViewNotContains("FAILED")
+	scenario.ExpectViewNotContains("EXPIRED")
 	// Most-recent timestamp row should also appear — asserted loosely as
 	// a presence of the "Most recent" label (the concrete timestamp is
 	// relative and not pinned here).
