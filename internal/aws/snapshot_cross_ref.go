@@ -123,7 +123,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 
 		result := IssueEnricherResult{
 			Findings:         make(map[string][]domain.Finding),
-			AttentionDetails: make(map[string]domain.AttentionDetail),
+			AttentionDetails: make(map[string]map[domain.FindingCode]domain.AttentionDetail),
 			TruncatedIDs:     make(map[string]bool),
 		}
 
@@ -221,7 +221,9 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				Source:   source,
 			}}
 			if len(rows) > 0 {
-				result.AttentionDetails[res.ID] = domain.AttentionDetail{Rows: rows}
+				result.AttentionDetails[res.ID] = map[domain.FindingCode]domain.AttentionDetail{
+					code: {Rows: rows},
+				}
 			}
 		}
 

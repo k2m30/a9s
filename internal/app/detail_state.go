@@ -115,7 +115,31 @@ func (c *Controller) ApplyDetailFinding(f *domain.Finding, ad *domain.AttentionD
 	if ds == nil {
 		return
 	}
-	c.applyFindingToState(ds, f, ad)
+	c.applyFindingToState(ds, singleFindingSlice(f), singleAttentionDetailMap(f, ad))
+}
+
+// singleFindingSlice converts a single *domain.Finding into the
+// []domain.Finding slice applyFindingToState's plural contract needs, for
+// callers (ApplyDetailFinding, applyDetailFindingForResource,
+// ApplyDetailEnrichmentForResource) that still carry only one finding at a
+// time. Returns nil (clear-only) for a nil finding or an empty Phrase —
+// mirrors applyFindingToState's own former f != nil && f.Phrase != "" guard.
+func singleFindingSlice(f *domain.Finding) []domain.Finding {
+	if f == nil || f.Phrase == "" {
+		return nil
+	}
+	return []domain.Finding{*f}
+}
+
+// singleAttentionDetailMap converts a single *domain.AttentionDetail paired
+// with its owning finding's Code into the per-Code map applyFindingToState's
+// plural contract needs. Returns nil when there is no finding, no
+// AttentionDetail, or no rows to carry.
+func singleAttentionDetailMap(f *domain.Finding, ad *domain.AttentionDetail) map[domain.FindingCode]domain.AttentionDetail {
+	if f == nil || ad == nil || len(ad.Rows) == 0 {
+		return nil
+	}
+	return map[domain.FindingCode]domain.AttentionDetail{f.Code: *ad}
 }
 
 // ApplyDetailFindingForResource applies a wave-2 finding to the detail screen in
@@ -132,6 +156,17 @@ func (c *Controller) ApplyDetailFindingForResource(resourceType, resourceID stri
 // applyDetailFindingForResource is the lock-free implementation of
 // ApplyDetailFindingForResource. Callers must hold c.mu (write).
 func (c *Controller) applyDetailFindingForResource(resourceType, resourceID string, f *domain.Finding, ad *domain.AttentionDetail) {
+	c.applyDetailFindingsForResource(resourceType, resourceID, singleFindingSlice(f), singleAttentionDetailMap(f, ad))
+}
+
+// applyDetailFindingsForResource applies EVERY finding in findings (each
+// looking up its own AttentionDetail in attentionDetails by its Code) to the
+// detail screen(s) in the stack matching (resourceType, resourceID) — the
+// plural counterpart of applyDetailFindingForResource. Used by the PatchDetail
+// intent case so an already-open detail's Attention block shows every
+// independently-evaluated Wave-2 finding, not just a single worst-severity
+// representative. No-op when no stacked detail matches.
+func (c *Controller) applyDetailFindingsForResource(resourceType, resourceID string, findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail) {
 	for i := range c.stack {
 		if c.stack[i].ID != runtime.ScreenDetail {
 			continue
@@ -140,7 +175,7 @@ func (c *Controller) applyDetailFindingForResource(resourceType, resourceID stri
 		if ds == nil || ds.Resource.ID != resourceID || ds.ResourceType != resourceType {
 			continue
 		}
-		c.applyFindingToState(ds, f, ad)
+		c.applyFindingToState(ds, findings, attentionDetails)
 	}
 }
 
@@ -187,14 +222,19 @@ func (c *Controller) ApplyDetailEnrichmentForResource(resourceType, resourceID s
 			continue
 		}
 		ds.Resource = enriched
-		c.applyFindingToState(ds, f, ad)
+		c.applyFindingToState(ds, singleFindingSlice(f), singleAttentionDetailMap(f, ad))
 	}
 }
 
-// applyFindingToState merges (or clears, when f is nil) a wave-2 enrichment
-// finding on the given DetailState, adjusting FieldCursor for the change in the
-// attention-prepend size. Callers must hold c.mu (write).
-func (c *Controller) applyFindingToState(ds *DetailState, f *domain.Finding, ad *domain.AttentionDetail) {
+// applyFindingToState merges (or clears, when findings is empty) wave-2
+// enrichment findings on the given DetailState, adjusting FieldCursor for the
+// change in the attention-prepend size. Strips every prior wave-2 finding
+// FIRST, then appends the ENTIRE findings slice — a multi-condition resource's
+// Attention block must show every independently-evaluated finding, not just
+// one, so callers pass the full per-resource slice rather than looping this
+// method once per finding (which would strip the previous iteration's
+// just-appended entry). Callers must hold c.mu (write).
+func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail) {
 	// Capture old prepend size before stripping, so the cursor delta can be computed.
 	oldPrepend := attentionPrependCount(ds.Findings, ds.AttentionDetails)
 
@@ -213,17 +253,20 @@ func (c *Controller) applyFindingToState(ds *DetailState, f *domain.Finding, ad 
 		ds.Findings = kept
 	}
 
-	if f != nil && f.Phrase != "" {
-		finding := *f
+	for _, f := range findings {
+		if f.Phrase == "" {
+			continue
+		}
+		finding := f
 		if !strings.HasPrefix(string(finding.Source), "wave2:") {
 			finding.Source = "wave2:controller"
 		}
 		ds.Findings = append(ds.Findings, finding)
-		if ad != nil && len(ad.Rows) > 0 {
+		if ad, ok := attentionDetails[finding.Code]; ok && len(ad.Rows) > 0 {
 			if ds.AttentionDetails == nil {
 				ds.AttentionDetails = make(map[domain.FindingCode]domain.AttentionDetail, 1)
 			}
-			ds.AttentionDetails[finding.Code] = *ad
+			ds.AttentionDetails[finding.Code] = ad
 		}
 	}
 

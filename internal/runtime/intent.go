@@ -44,6 +44,15 @@ type ListEnrichmentPatch struct {
 	// Findings above. Nil when the producer only knows about the
 	// single-representative form; adapters fall back to wrapping Findings.
 	AllFindings map[string][]domain.Finding
+	// AttentionDetailsAll mirrors AllFindings for AttentionDetails: keyed by
+	// Resource.ID then by the owning Finding's Code (mirrors
+	// messages.EnrichmentChecked.AttentionDetails), so a multi-condition
+	// resource's row fold (applyRowFindings/runtime.ApplyWave2ToRow) can
+	// attach each independently-evaluated finding its OWN AttentionDetail
+	// instead of the single shared entry in AttentionDetails above. Nil when
+	// the producer only knows about the single-representative form; adapters
+	// fall back to wrapping AttentionDetails against Findings' Codes.
+	AttentionDetailsAll map[string]map[domain.FindingCode]domain.AttentionDetail
 }
 
 // PatchResourceList instructs the adapter to apply the contained patches
@@ -66,14 +75,21 @@ type PatchDetail struct {
 	Findings     []domain.Finding
 	Attention    map[domain.FindingCode]domain.AttentionDetail
 	FieldUpdates map[string]string
-	// EnrichmentFindings carries the Wave-2 per-resource finding map used by
-	// the adapter to look up the finding for a specific detail view's resource.
-	// Keyed by resource.Resource.ID; nil means clear enrichment.
-	EnrichmentFindings map[string]domain.Finding
+	// EnrichmentFindings carries EVERY independently-evaluated Wave-2 Finding
+	// per resource used by the adapter to look up the findings for a specific
+	// detail view's resource. Keyed by resource.Resource.ID; nil/empty means
+	// clear enrichment. An already-open detail must show every
+	// independently-evaluated condition, not just the worst-severity one, so
+	// this carries the full per-resource slice (mirrors
+	// messages.EnrichmentChecked.AllFindings) rather than a single
+	// representative.
+	EnrichmentFindings map[string][]domain.Finding
 	// EnrichmentAttentionDetails carries the supporting rows for each per-
-	// resource Wave-2 finding, keyed by Resource.ID at the message-emission
-	// boundary. Paired with EnrichmentFindings (same Resource.ID set).
-	EnrichmentAttentionDetails map[string]domain.AttentionDetail
+	// resource Wave-2 finding, keyed by Resource.ID then by the owning
+	// Finding's Code at the message-emission boundary. Paired with
+	// EnrichmentFindings (same Resource.ID set) — each finding in that slice
+	// looks up its own AttentionDetail here by its Code.
+	EnrichmentAttentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail
 }
 
 func (PatchDetail) isIntent() {}

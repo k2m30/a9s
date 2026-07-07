@@ -39,19 +39,20 @@ type ProbeAvailabilityResult struct {
 // enrichment probe. Adapters convert this into a platform-specific message
 // (e.g. messages.EnrichmentChecked for the Bubble Tea adapter).
 //
-// Findings and AttentionDetails are both keyed by Resource.ID. Findings
-// carries every independently-evaluated Wave-2 Finding per resource
-// (IssueEnricherResult.Findings, unfiltered) — the adapter derives the
-// single-representative form its own single-Finding-per-resource fields need
-// via WorstFindingPerID. The fold layer (runtime.Core.applyEnrichment) flips
-// AttentionDetails to FindingCode against the matching r.Findings entry when
-// writing onto cached rows.
+// Findings is keyed by Resource.ID and carries every independently-evaluated
+// Wave-2 Finding per resource (IssueEnricherResult.Findings, unfiltered) —
+// the adapter derives the single-representative form its own
+// single-Finding-per-resource fields need via WorstFindingPerID.
+// AttentionDetails is keyed by Resource.ID then by the owning Finding's Code
+// (IssueEnricherResult.AttentionDetails, unfiltered) — the fold layer
+// (runtime.Core.applyEnrichment) reads it directly against the matching
+// r.Findings entry when writing onto cached rows.
 type ProbeEnrichmentResult struct {
 	ResourceType     string
 	Issues           int
 	Truncated        bool
 	Findings         map[string][]domain.Finding
-	AttentionDetails map[string]domain.AttentionDetail
+	AttentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail
 	FieldUpdates     map[string]map[string]string
 	TruncatedIDs     map[string]bool
 	Err              error

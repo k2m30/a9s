@@ -81,13 +81,13 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 				setWave2Finding(&result, r.ID, mskCodeBrokerOutdated, "broker software outdated", "~", "msk", nil, "")
 			}
 		}
-		// Check encryption in transit (only set finding if not already set).
-		if _, alreadyFound := result.Findings[r.ID]; !alreadyFound {
-			if prov.EncryptionInfo != nil &&
-				prov.EncryptionInfo.EncryptionInTransit != nil &&
-				prov.EncryptionInfo.EncryptionInTransit.ClientBroker != kafkatypes.ClientBrokerTls {
-				setWave2Finding(&result, r.ID, mskCodeEncryptionNotTLS, "encryption in transit not enforced", "~", "msk", nil, "")
-			}
+		// Check encryption in transit — independently evaluated from the broker
+		// version check above; setWave2Finding is append-style, so both
+		// conditions surface as separate findings when both hold.
+		if prov.EncryptionInfo != nil &&
+			prov.EncryptionInfo.EncryptionInTransit != nil &&
+			prov.EncryptionInfo.EncryptionInTransit.ClientBroker != kafkatypes.ClientBrokerTls {
+			setWave2Finding(&result, r.ID, mskCodeEncryptionNotTLS, "encryption in transit not enforced", "~", "msk", nil, "")
 		}
 	})
 	sort.Strings(failures)

@@ -55,6 +55,16 @@ type Controller struct {
 	// the paired AttentionDetail without re-deriving it.
 	enrichmentDetails map[string]map[string]domain.AttentionDetail
 
+	// enrichmentDetailsAll mirrors enrichmentDetails but carries the
+	// per-Code nested AttentionDetails for every independently-evaluated
+	// Wave-2 Finding (not just the single-representative form in
+	// enrichmentDetails), keyed by canonical short name then Resource.ID then
+	// FindingCode. Populated only by the PatchResourceList intent path
+	// (runtime.ListEnrichmentPatch.AttentionDetailsAll), which is the only
+	// producer that has the full nested shape — ApplyEnrichmentState's public
+	// single-AttentionDetail signature cannot carry it.
+	enrichmentDetailsAll map[string]map[string]map[domain.FindingCode]domain.AttentionDetail
+
 	// enrichmentTruncated stores the truncation flag per resource type from
 	// ApplyEnrichmentState, parallel to enrichmentStore.
 	enrichmentTruncated map[string]bool

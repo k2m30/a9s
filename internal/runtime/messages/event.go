@@ -237,9 +237,10 @@ type EnrichmentChecked struct {
 	// off-page (account-wide enrichers). At most one Finding per Resource.ID —
 	// when an enricher emits more than one independently-evaluated condition,
 	// this carries only the worst-severity one; see AllFindings for the full
-	// per-resource slice. Kept single-valued for PatchDetail.EnrichmentFindings/
-	// ListEnrichmentPatch.Findings' existing single-Finding-per-resource
-	// contract (adapter live-patch of an already-open view).
+	// per-resource slice. Kept single-valued for ListEnrichmentPatch.Findings'
+	// and ApplyEnrichmentState's legacy single-Finding-per-resource contract;
+	// PatchDetail.EnrichmentFindings is built from AllFindings, not this field
+	// (every independently-evaluated finding must reach an already-open detail).
 	Findings map[string]domain.Finding
 	// AllFindings carries every independently-evaluated Wave-2 Finding per
 	// Resource.ID (IssueEnricherResult.Findings, unfiltered) — the row-level
@@ -250,10 +251,12 @@ type EnrichmentChecked struct {
 	// message-construction time — the two share the same key set.
 	AllFindings map[string][]domain.Finding
 	// AttentionDetails carries the supporting rows for each per-resource
-	// Finding. Keyed by Resource.ID at message-emission time; the fold layer
-	// (runtime.Core.applyEnrichment) flips it to FindingCode against the
-	// matching r.Findings entry when writing onto cached rows.
-	AttentionDetails map[string]domain.AttentionDetail
+	// Finding, keyed by Resource.ID then by the owning Finding's Code
+	// (IssueEnricherResult.AttentionDetails, unfiltered) — every
+	// independently-evaluated condition on a resource keeps its own rows. The
+	// row-level fold (runtime.Core.applyEnrichment) reads it directly against
+	// the matching r.Findings entry when writing onto cached rows.
+	AttentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail
 	// FieldUpdates carries per-resource Fields[] mutations to merge into
 	// cached rows. Keyed by resource ID then by field key. Populated on success
 	// AND on partial-success (Err non-nil but partial results present).

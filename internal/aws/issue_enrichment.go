@@ -43,7 +43,7 @@ type IssueEnricher struct {
 func InFetcherWave2Sentinel(_ context.Context, _ *ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	return IssueEnricherResult{
 		Findings:         map[string][]domain.Finding{},
-		AttentionDetails: map[string]domain.AttentionDetail{},
+		AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{},
 		TruncatedIDs:     map[string]bool{},
 		FieldUpdates:     map[string]map[string]string{},
 		IssueCount:       0,
@@ -114,14 +114,12 @@ func formatDate(t interface{ Format(string) string }) string {
 // color, one Attention entry per issue-severity finding, and the stacked
 // "<top> (+N)" list phrase respectively.
 //
-// rows, when non-empty, become this resourceID's single AttentionDetail
-// entry — the first call for a given resourceID that supplies non-empty rows
-// wins that slot; a later call with empty rows never clears it. The
-// AttentionDetail is keyed by resourceID only (not per-Code), so a second
-// independently-evaluated condition with its own rows on the same resourceID
-// is a case this helper does not disambiguate; ApplyWave2ToRow attaches
-// whatever rows were captured here to the first Finding it appends for that
-// resourceID.
+// rows, when non-empty, become this (resourceID, code) pair's AttentionDetail
+// entry — keyed by the Finding's own Code, so a second independently-evaluated
+// condition on the same resourceID (its own Code) records its own rows
+// without disturbing the first condition's entry. ApplyWave2ToRow looks up
+// each appended Finding's AttentionDetail by (resourceID, Code), so every
+// independently-evaluated condition keeps its own supporting rows.
 //
 // The caller is responsible for initialising r.Findings and (when emitting
 // rows) r.AttentionDetails before calling this helper. The IssueEnricherResult
@@ -147,11 +145,12 @@ func setWave2Finding(
 
 	if len(rows) > 0 {
 		if r.AttentionDetails == nil {
-			r.AttentionDetails = make(map[string]domain.AttentionDetail)
+			r.AttentionDetails = make(map[string]map[domain.FindingCode]domain.AttentionDetail)
 		}
-		if _, ok := r.AttentionDetails[resourceID]; !ok {
-			r.AttentionDetails[resourceID] = domain.AttentionDetail{Rows: rows}
+		if r.AttentionDetails[resourceID] == nil {
+			r.AttentionDetails[resourceID] = make(map[domain.FindingCode]domain.AttentionDetail, 1)
 		}
+		r.AttentionDetails[resourceID][code] = domain.AttentionDetail{Rows: rows}
 	}
 }
 
@@ -179,11 +178,12 @@ func setWave2Finding(
 //     different form (e.g., ARNs) MUST normalize to Resource.ID before
 //     writing to Findings.
 //
-//   - AttentionDetails: per-resource supporting rows for the Wave-2
-//     Finding(s), keyed by Resource.ID. Only entries with non-empty rows are
-//     emitted; the fold layer (runtime.ApplyWave2ToRow) re-keys to
-//     FindingCode against the matching Finding when writing onto
-//     r.AttentionDetails.
+//   - AttentionDetails: per-resource, per-Code supporting rows for the Wave-2
+//     Finding(s), keyed by Resource.ID then by the owning Finding's Code.
+//     Only entries with non-empty rows are emitted. Keying by Code (rather
+//     than Resource.ID alone) lets each independently-evaluated condition on
+//     the same resource carry its own supporting rows without one condition's
+//     rows crowding out another's.
 //
 //   - FieldUpdates: map from Resource.ID → (fieldKey → value). Same normalization
 //     rule applies.
@@ -195,12 +195,13 @@ type IssueEnricherResult struct {
 	Truncated    bool
 	TruncatedIDs map[string]bool
 	Findings     map[string][]domain.Finding
-	// AttentionDetails carries per-resource supporting rows for the Wave-2
-	// Finding(s) emitted in Findings. Keyed by Resource.ID until the fold
-	// layer (runtime.ApplyWave2ToRow) flips it to FindingCode against the
-	// matching r.Findings entry. Enrichers MAY omit this when no rows accompany
-	// the finding.
-	AttentionDetails map[string]domain.AttentionDetail
+	// AttentionDetails carries per-resource, per-Code supporting rows for the
+	// Wave-2 Finding(s) emitted in Findings. Keyed by Resource.ID then by the
+	// owning Finding's Code — the target shape domain.Resource.AttentionDetails
+	// already uses one layer down, threaded up through this result so every
+	// independently-evaluated condition on a resource keeps its own rows.
+	// Enrichers MAY omit an entry when no rows accompany a given finding.
+	AttentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail
 	// FieldUpdates carries per-resource Fields[] mutations the enricher wants
 	// merged into the cached row. Keyed by resource ID, then by field key.
 	// Used by list columns and Color funcs that need access to Wave-2-derived

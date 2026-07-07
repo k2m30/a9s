@@ -535,11 +535,17 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		})
 
 		// Emit resource-list enrichment patch (updates list badge + row markers).
+		// AttentionDetails is the legacy single-representative reduction (feeds
+		// ApplyEnrichmentState's single-Finding contract); AttentionDetailsAll
+		// carries every independently-evaluated condition's own rows (feeds
+		// applyRowFindings/ApplyWave2ToRow so a multi-condition resource's row
+		// fold keeps every finding's own AttentionDetail).
 		enrichPatch := &ListEnrichmentPatch{
-			Findings:         msg.Findings,
-			AllFindings:      allFindings,
-			AttentionDetails: msg.AttentionDetails,
-			TruncatedIDs:     msg.TruncatedIDs,
+			Findings:            msg.Findings,
+			AllFindings:         allFindings,
+			AttentionDetails:    singleAttentionDetailFor(msg.Findings, msg.AttentionDetails),
+			AttentionDetailsAll: msg.AttentionDetails,
+			TruncatedIDs:        msg.TruncatedIDs,
 		}
 		if len(msg.FieldUpdates) > 0 {
 			enrichPatch.FieldUpdates = msg.FieldUpdates
@@ -552,10 +558,14 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 
 		// Emit detail-view patch for any open detail views of this type.
 		// ResourceID empty = all detail views of this type; the adapter looks up
-		// the finding for each view's specific resource ID from EnrichmentFindings.
+		// the findings for each view's specific resource ID from
+		// EnrichmentFindings. Uses allFindings (every independently-evaluated
+		// Wave-2 condition per resource), not the single-representative
+		// msg.Findings, so an already-open detail's Attention block shows every
+		// condition, not just the worst-severity one.
 		intents = append(intents, PatchDetail{
 			ResourceType:               msg.ResourceType,
-			EnrichmentFindings:         msg.Findings,
+			EnrichmentFindings:         allFindings,
 			EnrichmentAttentionDetails: msg.AttentionDetails,
 		})
 	}
@@ -707,6 +717,36 @@ func wrapSingleFindings(findings map[string]domain.Finding) map[string][]domain.
 	out := make(map[string][]domain.Finding, len(findings))
 	for id, f := range findings {
 		out[id] = []domain.Finding{f}
+	}
+	return out
+}
+
+// singleAttentionDetailFor reduces the per-Code nested AttentionDetails map
+// (messages.EnrichmentChecked.AttentionDetails) to the legacy
+// single-AttentionDetail-per-resource form ListEnrichmentPatch.AttentionDetails
+// still carries for ApplyEnrichmentState's single-Finding-per-resource
+// contract. Selects each resource's entry via findings' matching
+// single-representative Finding.Code, mirroring WorstFindingPerID's own
+// single-representative selection for Findings. Returns nil when nested is
+// empty or no entry matches a Code in findings.
+func singleAttentionDetailFor(findings map[string]domain.Finding, nested map[string]map[domain.FindingCode]domain.AttentionDetail) map[string]domain.AttentionDetail {
+	if len(nested) == 0 {
+		return nil
+	}
+	var out map[string]domain.AttentionDetail
+	for id, f := range findings {
+		byCode, ok := nested[id]
+		if !ok {
+			continue
+		}
+		ad, ok := byCode[f.Code]
+		if !ok {
+			continue
+		}
+		if out == nil {
+			out = make(map[string]domain.AttentionDetail, len(nested))
+		}
+		out[id] = ad
 	}
 	return out
 }

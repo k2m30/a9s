@@ -36,7 +36,7 @@ import (
 func (c *Core) applyEnrichment(
 	resourceType string,
 	findings map[string][]domain.Finding,
-	attentionDetails map[string]domain.AttentionDetail,
+	attentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail,
 ) {
 	canon := resourceType
 	var td resource.ResourceTypeDef
@@ -64,14 +64,14 @@ func (c *Core) applyEnrichment(
 // appends every per-row Wave-2 Finding for r.ID (an enricher may emit more
 // than one independently-evaluated condition per resource; dedupe by Code
 // guards against an enricher accidentally emitting the same Code twice) and
-// writes their AttentionDetail under each Finding's own Code. Nil
-// findings/attentionDetails behaves as the clear path (strip only, no
-// Wave-2 appended).
+// writes each Finding's OWN AttentionDetail, looked up by (r.ID, Finding.Code)
+// in attentionDetails. Nil findings/attentionDetails behaves as the clear
+// path (strip only, no Wave-2 appended).
 func ApplyWave2ToRow(
 	r *domain.Resource,
 	td resource.ResourceTypeDef,
 	findings map[string][]domain.Finding,
-	attentionDetails map[string]domain.AttentionDetail,
+	attentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail,
 ) {
 	if r == nil {
 		return
@@ -95,8 +95,7 @@ func ApplyWave2ToRow(
 		return
 	}
 
-	ad, hasAD := attentionDetails[r.ID]
-	adAssigned := false
+	adByCode := attentionDetails[r.ID]
 	seen := make(map[domain.FindingCode]bool, len(fs))
 	for _, f := range fs {
 		if f.Phrase == "" || seen[f.Code] {
@@ -112,16 +111,14 @@ func ApplyWave2ToRow(
 			f.Source = "wave2:" + td.ShortName
 		}
 		r.Findings = append(r.Findings, f)
-		// attentionDetails is keyed by Resource.ID (not by Finding.Code), so
-		// a resource with more than one Finding has only one shared rows set
-		// to distribute; it attaches to the first Finding appended for this
-		// resource rather than being duplicated onto every Finding's Code.
-		if hasAD && len(ad.Rows) > 0 && !adAssigned {
+		// Each Finding gets its OWN AttentionDetail by its Code — a resource
+		// with more than one independently-evaluated condition keeps every
+		// condition's own supporting rows, none crowded out by another.
+		if ad, ok := adByCode[f.Code]; ok && len(ad.Rows) > 0 {
 			if r.AttentionDetails == nil {
 				r.AttentionDetails = make(map[domain.FindingCode]domain.AttentionDetail, 1)
 			}
 			r.AttentionDetails[f.Code] = ad
-			adAssigned = true
 		}
 	}
 }

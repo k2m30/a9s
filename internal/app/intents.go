@@ -185,6 +185,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			c.enrichmentStore = nil
 			c.enrichmentStoreAll = nil
 			c.enrichmentDetails = nil
+			c.enrichmentDetailsAll = nil
 			c.enrichmentTruncated = nil
 
 		case runtime.PatchResourceList:
@@ -219,6 +220,19 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 					c.enrichmentStoreAll = make(map[string]map[string][]domain.Finding)
 				}
 				c.enrichmentStoreAll[v.ResourceType] = allFindings
+				// allDetails mirrors allFindings for AttentionDetails: every
+				// independently-evaluated finding's own rows, keyed by Code;
+				// falls back to wrapping the single-representative AttentionDetails
+				// against Findings' Codes when the producer only set the legacy
+				// single-value field (a hand-built ListEnrichmentPatch).
+				allDetails := v.Enrichment.AttentionDetailsAll
+				if allDetails == nil {
+					allDetails = wrapSingleAttentionDetailMap(v.Enrichment.Findings, v.Enrichment.AttentionDetails)
+				}
+				if c.enrichmentDetailsAll == nil {
+					c.enrichmentDetailsAll = make(map[string]map[string]map[domain.FindingCode]domain.AttentionDetail)
+				}
+				c.enrichmentDetailsAll[v.ResourceType] = allDetails
 				// applyEnrichmentState only stores findings + the issue badge; the
 				// Wave-2 column updates (status/summary) must also reach the cached
 				// list rows or enriched columns render stale (ECR/WAF/CodeArtifact).
@@ -227,12 +241,13 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// rows (ls.Rows / the RowStore-backed type cache) — the list-open
 				// save path persists from them, so without this the on-disk cache
 				// rows carry no findings and reseed glyphless (DEF-8). Uses
-				// allFindings (not the single-representative Findings) so a
-				// multi-condition resource keeps every Finding on the row —
-				// otherwise this call would strip runtime.Core.applyEnrichment's
+				// allFindings/allDetails (not the single-representative
+				// Findings/AttentionDetails) so a multi-condition resource keeps
+				// every Finding — and every finding's own AttentionDetail — on the
+				// row — otherwise this call would strip runtime.Core.applyEnrichment's
 				// already-correct multi-Finding write (made moments earlier in
 				// the same handleEnrichmentChecked call) back down to one.
-				c.applyRowFindings(v.ResourceType, allFindings, v.Enrichment.AttentionDetails)
+				c.applyRowFindings(v.ResourceType, allFindings, allDetails)
 			}
 
 		case runtime.SetIdentityIntent:
@@ -314,17 +329,15 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// Clear stale findings from every stacked detail of this type first,
 				// so a resource that recovered (absent from the new map) loses its
 				// Attention; then re-apply for resources still reporting findings.
-				// applyDetailFindingForResource searches all stacked screens by
+				// applyDetailFindingsForResource searches all stacked screens by
 				// (type, id), so a stacked-but-not-active detail is still updated.
+				// Every finding in EnrichmentFindings[resourceID] is applied — not
+				// just a single worst-severity representative — so a
+				// multi-condition resource's Attention block shows every
+				// independently-evaluated finding on an already-open detail.
 				c.clearDetailFindingsForType(v.ResourceType)
-				for resourceID, f := range v.EnrichmentFindings {
-					finding := f
-					var ad *domain.AttentionDetail
-					if got, hasAD := v.EnrichmentAttentionDetails[resourceID]; hasAD && len(got.Rows) > 0 {
-						adVal := got
-						ad = &adVal
-					}
-					c.applyDetailFindingForResource(v.ResourceType, resourceID, &finding, ad)
+				for resourceID, fs := range v.EnrichmentFindings {
+					c.applyDetailFindingsForResource(v.ResourceType, resourceID, fs, v.EnrichmentAttentionDetails[resourceID])
 				}
 			}
 

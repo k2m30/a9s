@@ -15,7 +15,27 @@ func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskReques
 	// (clear filter/search before popping) are handled in the per-screen
 	// Update methods in the TUI adapter.
 	c.applyIntents([]runtime.UIIntent{runtime.PopScreen{}})
-	return c.snapshot(), nil
+
+	// Owner decision #38 (2026-07-06): when the pop reveals a detail screen
+	// with registered related defs, re-dispatch its related-resource checks —
+	// a pivot left at the transient "(?)" state (Count==-1, no FetchFilter)
+	// must resolve to its real count once the user drills into the target
+	// type and returns, without a manual Ctrl+R. Mirrors the shape
+	// HandleRelatedCheckStarted (internal/runtime/related.go) and
+	// openRelatedDetail (internal/app/navigate.go) already produce, so this
+	// is renderer-agnostic — both TUI and web/headless callers get the
+	// recompute from this single ActionBack effect.
+	var tasks []runtime.TaskRequest
+	if ds := c.topDetailState(); ds != nil {
+		if len(resource.GetRelated(ds.ResourceType)) > 0 {
+			tasks = append(tasks, runtime.TaskRequest{
+				Key:     runtime.TaskKey{Kind: runtime.KindRelatedCheck, Scope: ds.ResourceType + "/" + ds.Resource.ID},
+				Cache:   runtime.CacheNone,
+				Payload: runtime.RelatedCheckPayload{ResourceType: ds.ResourceType, Resource: ds.Resource},
+			})
+		}
+	}
+	return c.snapshot(), tasks
 }
 
 // handleActionMoveUp handles ActionMoveUp.

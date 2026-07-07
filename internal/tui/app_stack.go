@@ -16,6 +16,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -39,7 +40,8 @@ func (m *Model) pushRS(rs *rendererState) {
 // web renderer get it, and it fires as soon as a fetch or load-more result
 // lands rather than only when the user pops back to the menu.
 func (m *Model) popRS() bool {
-	return m.popRSWithCtrlPop(true)
+	popped, _ := m.popRSWithCtrlPop(true)
+	return popped
 }
 
 // popRSOnly removes the top rendererState WITHOUT popping the controller's
@@ -48,7 +50,8 @@ func (m *Model) popRS() bool {
 // controller's own PopScreen case, so calling popRS() here would pop the
 // controller stack a second time for one logical "go back".
 func (m *Model) popRSOnly() bool {
-	return m.popRSWithCtrlPop(false)
+	popped, _ := m.popRSWithCtrlPop(false)
+	return popped
 }
 
 // popRSWithCtrlPop is the shared implementation. When ctrlPop is true and the
@@ -56,9 +59,19 @@ func (m *Model) popRSOnly() bool {
 // ActionBack — the path every non-applyIntents caller of popRS() still
 // relies on. When ctrlPop is false, the controller stack is left untouched
 // because the caller already popped it (or intends to leave it alone).
-func (m *Model) popRSWithCtrlPop(ctrlPop bool) bool {
+//
+// The returned tea.Cmd surfaces the TaskRequests ActionBack itself returns
+// (today, only ever a KindRelatedCheck re-dispatch — owner decision #38, see
+// handleActionBack in internal/app/actions_nav.go) translated into the TUI's
+// native trigger via relatedCheckStartedCmdFromTasks. The controller is the
+// single source of truth for "does revealing this screen need a
+// related-check recompute" — the TUI no longer independently re-derives that
+// decision (the former TUI-only recomputeRelatedOnReveal is deleted; its
+// logic is now owned by handleActionBack so web/headless callers get the
+// same recompute).
+func (m *Model) popRSWithCtrlPop(ctrlPop bool) (bool, tea.Cmd) {
 	if len(m.stack) <= 1 {
-		return false
+		return false, nil
 	}
 	// Persist sort/cursor/scroll state to session cache before popping a list.
 	// Must run before ActionBack so the controller still holds the list state.
@@ -68,40 +81,40 @@ func (m *Model) popRSWithCtrlPop(ctrlPop bool) bool {
 	// Keep the headless controller stack in sync: pop controller screen when the
 	// rs being removed was ctrl-backed (i.e. a PushScreen was issued when it was
 	// pushed). Help, identity-overlay, and error-log overlay are NOT ctrl-backed.
+	var cmd tea.Cmd
 	if ctrlPop && m.activeRS().ctrlBacked {
-		m.ctrl.Apply(app.Action{Kind: app.ActionBack})
+		_, tasks := m.ctrl.Apply(app.Action{Kind: app.ActionBack})
+		cmd = relatedCheckStartedCmdFromTasks(tasks)
 	}
 	m.stack = m.stack[:len(m.stack)-1]
-	return true
+	return true, cmd
 }
 
-// recomputeRelatedOnReveal re-dispatches the related-resource checks for the
-// detail screen revealed by a pop, when the pop landed back on a detail
-// screen. Owner decision #38 (2026-07-06): a related-panel pivot that was
-// left at the transient "(?)" state (count==-1, no FetchFilter — see
-// resource.IsRelatedActionable) must resolve to its real count once the
-// user drills into the target type and returns, without a manual Ctrl+R.
-// Esc-popping a list otherwise has no hook into the related-check machinery
-// (contrast with the Detail Ctrl+R handler, which explicitly re-dispatches
-// messages.RelatedCheckStarted) — this is the generic fix, applied to every
-// pop that reveals a detail screen, not just the list pushed by a related
-// drill.
-func (m *Model) recomputeRelatedOnReveal() tea.Cmd {
-	rs := m.activeRS()
-	if rs.kind != rsKindDetail {
-		return nil
-	}
-	rt := rs.resourceType
-	if len(resource.GetRelated(rt)) == 0 {
-		return nil
-	}
-	srcRes := m.ctrl.GetDetailResource()
-	return func() tea.Msg {
-		return messages.RelatedCheckStarted{
-			ResourceType:   rt,
-			SourceResource: srcRes,
+// relatedCheckStartedCmdFromTasks translates a KindRelatedCheck TaskRequest
+// (as emitted by handleActionBack when a pop reveals a detail screen with
+// registered related defs, owner decision #38) into the TUI's own
+// messages.RelatedCheckStarted trigger, so the existing concurrent per-def
+// fan-out (relatedCheckCmd, wired from handleRelatedCheckStarted) runs
+// exactly as it does for any other related-check dispatch — no separate,
+// independently-derived TUI decision is needed. Returns nil when tasks
+// carries no KindRelatedCheck entry.
+func relatedCheckStartedCmdFromTasks(tasks []runtime.TaskRequest) tea.Cmd {
+	for _, t := range tasks {
+		if t.Key.Kind != runtime.KindRelatedCheck {
+			continue
+		}
+		p, ok := t.Payload.(runtime.RelatedCheckPayload)
+		if !ok {
+			continue
+		}
+		return func() tea.Msg {
+			return messages.RelatedCheckStarted{
+				ResourceType:   p.ResourceType,
+				SourceResource: p.Resource,
+			}
 		}
 	}
+	return nil
 }
 
 // innerSize returns the content area dimensions inside the frame.

@@ -373,6 +373,21 @@ func (c *Controller) listEnrichmentAllFindings(typeName string) map[string][]dom
 	return wrapSingleFindingMap(c.listEnrichmentFindings(typeName))
 }
 
+// listEnrichmentDetailsAll returns the per-resource, per-FindingCode nested
+// AttentionDetail map for typeName, or nil. Mirrors listEnrichmentAllFindings:
+// falls back to wrapping listEnrichmentDetails' single AttentionDetail per ID
+// (keyed against listEnrichmentFindings' matching Finding.Code) when typeName
+// has no entry in enrichmentDetailsAll (e.g. a caller that only ever used
+// ApplyEnrichmentState directly).
+func (c *Controller) listEnrichmentDetailsAll(typeName string) map[string]map[domain.FindingCode]domain.AttentionDetail {
+	if c.enrichmentDetailsAll != nil {
+		if all, ok := c.enrichmentDetailsAll[typeName]; ok {
+			return all
+		}
+	}
+	return wrapSingleAttentionDetailMap(c.listEnrichmentFindings(typeName), c.listEnrichmentDetails(typeName))
+}
+
 // listEnrichmentDetails returns the per-resource AttentionDetail map for
 // typeName, or nil. Mirrors listEnrichmentFindings.
 func (c *Controller) listEnrichmentDetails(typeName string) map[string]domain.AttentionDetail {

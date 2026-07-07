@@ -193,7 +193,7 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// Finding per resource) so a multi-condition resource keeps every
 	// Finding across a silent-swap refetch, not just the worst one.
 	if known := c.listEnrichmentAllFindings(typeName); len(known) > 0 {
-		c.applyRowFindings(typeName, known, c.listEnrichmentDetails(typeName))
+		c.applyRowFindings(typeName, known, c.listEnrichmentDetailsAll(typeName))
 	}
 }
 
@@ -856,6 +856,32 @@ func wrapSingleFindingMap(findings map[string]domain.Finding) map[string][]domai
 	return out
 }
 
+// wrapSingleAttentionDetailMap converts a single-representative Wave-2
+// AttentionDetail map into the per-FindingCode nested form
+// applyRowFindings/runtime.ApplyWave2ToRow need, for callers that only have
+// the legacy single-AttentionDetail-per-resource form (e.g.
+// ApplyEnrichmentState's public signature). Each entry is keyed by its
+// paired Finding's Code (from findings) so the nested per-Code lookup
+// ApplyWave2ToRow performs still resolves. Returns nil when details is
+// empty or no entry matches a Code in findings.
+func wrapSingleAttentionDetailMap(findings map[string]domain.Finding, details map[string]domain.AttentionDetail) map[string]map[domain.FindingCode]domain.AttentionDetail {
+	if len(details) == 0 {
+		return nil
+	}
+	var out map[string]map[domain.FindingCode]domain.AttentionDetail
+	for id, ad := range details {
+		f, ok := findings[id]
+		if !ok {
+			continue
+		}
+		if out == nil {
+			out = make(map[string]map[domain.FindingCode]domain.AttentionDetail, len(details))
+		}
+		out[id] = map[domain.FindingCode]domain.AttentionDetail{f.Code: ad}
+	}
+	return out
+}
+
 // applyRowFindings is the applying-direction mirror of clearRowFindings: it
 // writes Wave-2 findings (and their attention details) onto the controller's
 // own row stores — every matching list screen's ls.Rows plus the
@@ -871,7 +897,7 @@ func wrapSingleFindingMap(findings map[string]domain.Finding) map[string][]domai
 // with only the single-representative form must wrap via
 // wrapSingleFindingMap first, so a multi-condition resource's second Finding
 // is never silently dropped by this write.
-func (c *Controller) applyRowFindings(typeName string, findings map[string][]domain.Finding, details map[string]domain.AttentionDetail) {
+func (c *Controller) applyRowFindings(typeName string, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail) {
 	canon := typeName
 	var td resource.ResourceTypeDef
 	if t := resource.FindResourceType(typeName); t != nil {
