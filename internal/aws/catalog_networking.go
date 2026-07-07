@@ -778,10 +778,12 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		},
 	},
 	{
-		Name:      "Target Health",
-		ShortName: "tg_health",
-		Columns:   resource.TargetHealthColumns(),
-		FieldKeys: []string{"target_id", "port", "az", "health", "reason", "description"},
+		Name:         "Target Health",
+		ShortName:    "tg_health",
+		Columns:      resource.TargetHealthColumns(),
+		Color:        colorWave1OrHealthy,
+		LifecycleKey: "health",
+		FieldKeys:    []string{"target_id", "port", "az", "health", "reason", "reason_human", "description"},
 		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			c, ok := clients.(*ServiceClients)
 			if !ok || c == nil {

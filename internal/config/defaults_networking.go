@@ -225,7 +225,7 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "Port", Key: "port", Width: 8},
 				{Title: "AZ", Key: "az", Width: 14},
 				{Title: "Health", Key: "health", Width: 14},
-				{Title: "Reason", Key: "reason", Width: 28},
+				{Title: "Reason", Key: "reason_human", Width: 28},
 				{Title: "Description", Key: "description", Width: 36},
 			},
 			Detail: []DetailField{

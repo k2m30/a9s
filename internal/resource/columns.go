@@ -49,7 +49,7 @@ func TargetHealthColumns() []Column {
 		{Key: "port", Title: "Port", Width: 8, Sortable: true},
 		{Key: "az", Title: "AZ", Width: 14, Sortable: true},
 		{Key: "health", Title: "Health", Width: 14, Sortable: true},
-		{Key: "reason", Title: "Reason", Width: 28, Sortable: true},
+		{Key: "reason_human", Title: "Reason", Width: 28, Sortable: true},
 		{Key: "description", Title: "Description", Width: 36, Sortable: true},
 	}
 }

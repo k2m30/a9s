@@ -556,7 +556,7 @@ func TestFetchTargetHealth_RawStruct(t *testing.T) {
 func TestTargetHealthColumns(t *testing.T) {
 	cols := resource.TargetHealthColumns()
 
-	expectedKeys := []string{"target_id", "port", "az", "health", "reason", "description"}
+	expectedKeys := []string{"target_id", "port", "az", "health", "reason_human", "description"}
 
 	t.Run("column_count", func(t *testing.T) {
 		if len(cols) != 6 {

@@ -12,7 +12,7 @@ list:
     key: health
     width: 14
   Reason:
-    key: reason
+    key: reason_human
     width: 28
   Description:
     key: description

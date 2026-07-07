@@ -112,7 +112,7 @@ func colorLambda(r domain.Resource) domain.Color {
 }
 
 func colorASG(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	status := r.Fields["status"]
@@ -178,7 +178,7 @@ func colorEB(r domain.Resource) domain.Color {
 }
 
 func colorEBS(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	var base domain.Color

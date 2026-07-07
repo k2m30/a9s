@@ -29,6 +29,9 @@ func colorAlarm(r domain.Resource) domain.Color {
 }
 
 func colorLogs(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
 	if r.Fields["retention_days"] == "" {
 		return domain.ColorWarning
 	}

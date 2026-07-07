@@ -3,10 +3,12 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -66,19 +68,69 @@ func convertTargetHealth(thd elbv2types.TargetHealthDescription) resource.Resour
 			description = *thd.TargetHealth.Description
 		}
 	}
+	reasonHuman := humanizeTargetHealthReason(reason)
 
 	return resource.Resource{
 		ID:   targetID,
 		Name: targetID,
 		Fields: map[string]string{
-			"target_id":   targetID,
-			"port":        port,
-			"az":          az,
-			"status":      health,
-			"health":      health,
-			"reason":      reason,
-			"description": description,
+			"target_id":    targetID,
+			"port":         port,
+			"az":           az,
+			"status":       health,
+			"health":       health,
+			"reason":       reason,
+			"reason_human": reasonHuman,
+			"description":  description,
 		},
+		Findings:  targetHealthFindings(health, reasonHuman),
 		RawStruct: thd,
+	}
+}
+
+// humanizeTargetHealthReason converts a raw elbv2types.TargetHealthReasonEnum
+// (e.g. "Target.FailedHealthChecks") into an operator-readable phrase (e.g.
+// "failed health checks"). The enum's leading "Target."/"Elb." namespace
+// prefix carries no operator-facing meaning, so it is stripped before the
+// remaining CamelCase segment is run through domain.HumanizeStatusPhrase.
+func humanizeTargetHealthReason(rawReason string) string {
+	if rawReason == "" {
+		return ""
+	}
+	_, rest, found := strings.Cut(rawReason, ".")
+	if !found {
+		return domain.HumanizeStatusPhrase(rawReason)
+	}
+	return domain.HumanizeStatusPhrase(rest)
+}
+
+// targetHealthFindings maps a TargetHealthStateEnum value to the Wave-1
+// Finding(s) that communicate its cause. healthy/unused targets carry no
+// finding — the row renders with the default healthy color.
+func targetHealthFindings(health, humanizedReason string) []domain.Finding {
+	phrase := humanizedReason
+	switch health {
+	case string(elbv2types.TargetHealthStateEnumUnhealthy), string(elbv2types.TargetHealthStateEnumUnhealthyDraining):
+		if phrase == "" {
+			phrase = "unhealthy"
+		}
+		return []domain.Finding{{Code: CodeTGHealthUnhealthy, Phrase: phrase, Severity: domain.SevBroken, Source: "wave1"}}
+	case string(elbv2types.TargetHealthStateEnumUnavailable):
+		if phrase == "" {
+			phrase = "target unavailable"
+		}
+		return []domain.Finding{{Code: CodeTGHealthUnavailable, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"}}
+	case string(elbv2types.TargetHealthStateEnumDraining):
+		if phrase == "" {
+			phrase = "draining"
+		}
+		return []domain.Finding{{Code: CodeTGHealthDraining, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"}}
+	case string(elbv2types.TargetHealthStateEnumInitial):
+		if phrase == "" {
+			phrase = "initial health check pending"
+		}
+		return []domain.Finding{{Code: CodeTGHealthInitial, Phrase: phrase, Severity: domain.SevDim, Source: "wave1"}}
+	default:
+		return nil
 	}
 }
