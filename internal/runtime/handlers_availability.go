@@ -154,12 +154,22 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 
 	intents = append(intents, PatchMenuCheckProgress{Checked: 0, Total: c.session.AvailTotal})
 
-	// Fire first batch of concurrent probes (up to 4).
+	// The disk-cache load races ahead of the AWS connect on startup by
+	// design (Init fires both concurrently via tea.Batch for instant-paint,
+	// C1) — it routinely wins, since local disk I/O finishes long before a
+	// network connect settles. Dispatching probe tasks while Clients is
+	// still nil would run every one of them against a nil transport and
+	// fail hard ("AWS clients not initialized"), permanently losing that
+	// probe for the session instead of actually checking availability (the
+	// four resource types first in resource.AllShortNames() were observed
+	// failing this way). Latch AvailSweepPending instead; the next
+	// successful HandleClientsReady drains the first batch once a real
+	// transport exists.
 	var tasks []TaskRequest
-	for i := 0; i < 4 && len(c.session.AvailQueue) > 0; i++ {
-		shortName := c.session.AvailQueue[0]
-		c.session.AvailQueue = c.session.AvailQueue[1:]
-		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindProbeAvailability, Scope: shortName}})
+	if c.session.Clients != nil {
+		tasks = append(tasks, c.fireNextAvailabilityProbes(4)...)
+	} else {
+		c.session.AvailSweepPending = true
 	}
 
 	// DEF-14/D11: consume the one-shot -c navigation armed by
@@ -180,6 +190,23 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 	}
 
 	return intents, tasks
+}
+
+// fireNextAvailabilityProbes pops up to n resource types off AvailQueue and
+// returns one TaskKindProbeAvailability TaskRequest per type. Callers MUST
+// hold c.session.Clients != nil before calling — this only shrinks the
+// queue and builds tasks, it does not itself check readiness (see
+// handleAvailabilityCacheLoaded's AvailSweepPending gate and
+// handleClientsReadySuccess's drain for the two call sites and their
+// respective readiness checks).
+func (c *Core) fireNextAvailabilityProbes(n int) []TaskRequest {
+	var tasks []TaskRequest
+	for i := 0; i < n && len(c.session.AvailQueue) > 0; i++ {
+		shortName := c.session.AvailQueue[0]
+		c.session.AvailQueue = c.session.AvailQueue[1:]
+		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindProbeAvailability, Scope: shortName}})
+	}
+	return tasks
 }
 
 // handleAvailabilityPrefetched applies synchronously-prefetched counts to the
@@ -651,7 +678,6 @@ func rowsFromCacheRows(shortName string, rows []cache.Row) []resource.Resource {
 	}
 	return out
 }
-
 
 // unifiedIssueCount returns the distinct count of resource IDs with ≥1 issue
 // across both Wave-1 (IsIssue() status color) and Wave-2 (enrichment findings).
