@@ -40,8 +40,15 @@ const (
 	ddbPhraseArchiving     = "archiving"
 	ddbPhraseKMSLost       = "kms key inaccessible"
 	ddbPhraseArchived      = "archived: kms key lost"
-	ddbPhrasePITROff       = "PITR off"
+	ddbPhrasePITROff       = "point-in-time recovery disabled"
 	ddbPhraseArchivedPlus1 = "archived: kms key lost (+1)"
+
+	// ddbDetailPITROffCapitalize is the Attention-section rendering of
+	// ddbPhrasePITROff — injectAttentionSection capitalizes the first
+	// letter of every finding phrase (capitalizeFirst), so the Status
+	// column's lowercase phrase and the detail view's capitalized phrase
+	// are two different literal strings for the same finding.
+	ddbDetailPITROffCapitalize = "Point-in-time recovery disabled"
 )
 
 func TestScenario_DDBVisual(t *testing.T) {
@@ -76,12 +83,13 @@ func TestScenario_DDBVisual(t *testing.T) {
 	// the Status column per §4.
 	//
 	// Note: `"PITR"` on its own is NOT in this deny-list because the
-	// valid §4 phrase `"PITR off"` legitimately renders in the Status
-	// column for `audit-pitr-off`. The deleted column was width-6 with
-	// title `PITR` and values like `false`/`true`; the absence of the
-	// column is asserted by the positive ExpectRowStatusEquals check
-	// on `audit-pitr-off` further down — if the jargon column were
-	// still in the view, the Status column would miss its §4 phrase.
+	// operator-phrase Status value for `audit-pitr-off` is
+	// "point-in-time recovery disabled". The deleted column was
+	// width-6 with title `PITR` and values like `false`/`true`; the
+	// absence of the column is asserted by the positive
+	// ExpectRowStatusEquals check on `audit-pitr-off` further down —
+	// if the jargon column were still in the view, the Status column
+	// would miss its §4 phrase.
 	// ---------------------------------------------------------------
 	for _, jargon := range []string{
 		"CIS", " Flags", "Policy ", " Issues ",
@@ -104,7 +112,9 @@ func TestScenario_DDBVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(demofixtures.LegacyKMSLostID, ddbPhraseKMSLost)
 
 	// `audit-pitr-off` — Healthy + Wave-2 `~` finding. Status phrase
-	// is "PITR off" (enricher-set on a Healthy row, no suffix).
+	// is "point-in-time recovery disabled" (enricher-set on a Healthy
+	// row, no suffix) — the operator-phrase architecture humanizes the
+	// raw PITR flag instead of rendering the old "PITR off" jargon.
 	scenario.ExpectRowStatusEquals(demofixtures.AuditPITROffID, ddbPhrasePITROff)
 
 	// `legacy-archived` — ARCHIVED + PITR disabled → multi-W2 stacking
@@ -165,8 +175,9 @@ func TestScenario_DDBVisual(t *testing.T) {
 	// ---------------------------------------------------------------
 	// Rule 7 U7c — S5 Attention section on `legacy-archived` shows
 	// BOTH the fetcher-side Wave-2 phrase (`archived: kms key lost`)
-	// AND the Wave-2 PITR finding (`PITR off`). No finding silently
-	// disappears when the Status cell shows the worst-severity phrase.
+	// AND the Wave-2 PITR finding (`point-in-time recovery disabled`).
+	// No finding silently disappears when the Status cell shows the
+	// worst-severity phrase.
 	// ---------------------------------------------------------------
 	scenario.Back()
 	stacked := selectDDBByID(t, scenario, demofixtures.LegacyArchivedID)
@@ -178,15 +189,17 @@ func TestScenario_DDBVisual(t *testing.T) {
 	// Attention entry for the Wave-2-from-fetcher phrase, capitalized
 	// at render time by injectAttentionSection → capitalizeFirst.
 	scenario.ExpectViewContains("Archived: kms key lost")
-	// Attention entry for the Wave-2 PITR finding.
-	scenario.ExpectViewContains("PITR off")
+	// Attention entry for the Wave-2 PITR finding — the operator phrase,
+	// capitalized at render time, never the retired "PITR off" jargon.
+	scenario.ExpectViewContains(ddbDetailPITROffCapitalize)
+	scenario.ExpectViewNotContains("PITR off")
 
 	// U11 regression guard — the PITR enricher's Summary must be the
 	// stable short phrase. If Summary leaked any Row text, we'd see
-	// embedded colons or parens after "PITR off"; assert that shape
+	// embedded colons or parens after the phrase; assert that shape
 	// does not appear.
-	scenario.ExpectViewNotContains("PITR off:")
-	scenario.ExpectViewNotContains("PITR off (")
+	scenario.ExpectViewNotContains(ddbDetailPITROffCapitalize + ":")
+	scenario.ExpectViewNotContains(ddbDetailPITROffCapitalize + " (")
 
 	// ---------------------------------------------------------------
 	// Rule 7 U7c cross-check — Healthy + ~ fixture also surfaces the
@@ -196,7 +209,7 @@ func TestScenario_DDBVisual(t *testing.T) {
 	pitr := selectDDBByID(t, scenario, demofixtures.AuditPITROffID)
 	scenario.OpenDetailResource("ddb", pitr)
 	scenario.ExpectNoAPIError()
-	scenario.ExpectViewContains("PITR off")
+	scenario.ExpectViewContains(ddbDetailPITROffCapitalize)
 }
 
 // selectDDBByID looks up a concrete ddb resource from the demo clients so the
