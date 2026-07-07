@@ -22,8 +22,19 @@ func (f *MSKFake) ListClustersV2(_ context.Context, _ *kafka.ListClustersV2Input
 	return &kafka.ListClustersV2Output{ClusterInfoList: f.fix.Clusters}, nil
 }
 
-// DescribeClusterV2 is a no-op stub — the demo transport does not exercise Wave 2 enrichment.
-func (f *MSKFake) DescribeClusterV2(_ context.Context, _ *kafka.DescribeClusterV2Input, _ ...func(*kafka.Options)) (*kafka.DescribeClusterV2Output, error) {
+// DescribeClusterV2 returns the fixture-registered cluster matching the
+// requested ClusterArn, backing EnrichMSKCluster's broker-version and
+// encryption-in-transit checks (msk.broker-outdated / msk.encryption-not-tls).
+func (f *MSKFake) DescribeClusterV2(_ context.Context, input *kafka.DescribeClusterV2Input, _ ...func(*kafka.Options)) (*kafka.DescribeClusterV2Output, error) {
+	if input == nil || input.ClusterArn == nil {
+		return &kafka.DescribeClusterV2Output{}, nil
+	}
+	for _, cluster := range f.fix.Clusters {
+		if cluster.ClusterArn != nil && *cluster.ClusterArn == *input.ClusterArn {
+			c := cluster
+			return &kafka.DescribeClusterV2Output{ClusterInfo: &c}, nil
+		}
+	}
 	return &kafka.DescribeClusterV2Output{}, nil
 }
 

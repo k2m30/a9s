@@ -22,11 +22,14 @@ func (f *APIGWFake) GetApis(_ context.Context, _ *apigatewayv2.GetApisInput, _ .
 	return &apigatewayv2.GetApisOutput{Items: f.fix.APIs}, nil
 }
 
-// GetStages returns an empty stage list for demo mode.
-// Wave 2 enrichment uses this to check throttling and access-log settings;
-// returning no stages produces no findings in demo mode.
-func (f *APIGWFake) GetStages(_ context.Context, _ *apigatewayv2.GetStagesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error) {
-	return &apigatewayv2.GetStagesOutput{}, nil
+// GetStages returns the fixture-registered stages for the requested API,
+// backing EnrichAPIGatewayStage's throttling and access-log checks
+// (apigw.stage-config-issues / apigw.no-deployed-stages).
+func (f *APIGWFake) GetStages(_ context.Context, input *apigatewayv2.GetStagesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error) {
+	if input == nil || input.ApiId == nil {
+		return &apigatewayv2.GetStagesOutput{}, nil
+	}
+	return &apigatewayv2.GetStagesOutput{Items: f.fix.Stages[*input.ApiId]}, nil
 }
 
 // GetDomainNames returns the fixture-registered custom domain names.

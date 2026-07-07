@@ -27,6 +27,10 @@ type APIGWFixtures struct {
 	// Authorizers maps ApiId -> authorizers, served by GetAuthorizers.
 	// Required for the apigw:role related-panel pivot (checkApigwRole).
 	Authorizers map[string][]apigwtypes.Authorizer
+	// Stages maps ApiId -> deployed stages, served by GetStages. Required for
+	// the apigw.stage-config-issues / apigw.no-deployed-stages Wave 2 findings
+	// (EnrichAPIGatewayStage).
+	Stages map[string][]apigwtypes.Stage
 }
 
 const (
@@ -149,6 +153,23 @@ var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
 		ApiMappings: map[string][]apigwtypes.ApiMapping{
 			PublicAPIGWDomainName: {
 				{ApiId: aws.String(PublicAPIGWID), Stage: aws.String("$default")},
+			},
+		},
+		// Stages — the $default stage on PublicAPIGWID has no throttling
+		// configured and no access logs, witnessing apigw.stage-config-issues
+		// (EnrichAPIGatewayStage: DefaultRouteSettings.Throttling{Burst,Rate}Limit
+		// == 0 OR AccessLogSettings == nil).
+		Stages: map[string][]apigwtypes.Stage{
+			PublicAPIGWID: {
+				{
+					StageName:   aws.String("$default"),
+					CreatedDate: aws.Time(time.Date(2025, 3, 10, 9, 5, 0, 0, time.UTC)),
+					DefaultRouteSettings: &apigwtypes.RouteSettings{
+						ThrottlingBurstLimit: aws.Int32(0),
+						ThrottlingRateLimit:  aws.Float64(0),
+					},
+					AccessLogSettings: nil,
+				},
 			},
 		},
 	}

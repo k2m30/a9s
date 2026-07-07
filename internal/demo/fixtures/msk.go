@@ -96,7 +96,9 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 				CurrentVersion: aws.String("K1INITIAL"),
 				CreationTime:   aws.Time(mustParseMSKTime("2026-03-20T16:00:00+00:00")),
 			},
-			// Issue: State=FAILED → Broken (cluster in unrecoverable failure state)
+			// Issue: State=FAILED → Broken (cluster in unrecoverable failure state).
+			// EncryptionInTransit.ClientBroker=TLS_PLAINTEXT witnesses
+			// msk.encryption-not-tls (EnrichMSKCluster: ClientBroker != TLS).
 			{
 				ClusterName:    aws.String("msk-failed"),
 				ClusterArn:     aws.String("arn:aws:kafka:us-east-1:123456789012:cluster/msk-failed/d1e2f3a4"),
@@ -110,12 +112,19 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 						InstanceType:  aws.String("kafka.m5.large"),
 					},
 					NumberOfBrokerNodes: aws.Int32(3),
+					EncryptionInfo: &kafkatypes.EncryptionInfo{
+						EncryptionInTransit: &kafkatypes.EncryptionInTransit{
+							ClientBroker: kafkatypes.ClientBrokerTlsPlaintext,
+						},
+					},
 				},
 				Tags: map[string]string{
 					"Environment": "prod",
 				},
 			},
-			// Issue: State=REBOOTING_BROKER → Warning (broker maintenance in progress)
+			// Issue: State=REBOOTING_BROKER → Warning (broker maintenance in progress).
+			// CurrentBrokerSoftwareInfo.KafkaVersion=2.6.2 witnesses
+			// msk.broker-outdated (EnrichMSKCluster: version below 2.8 cutoff).
 			{
 				ClusterName:    aws.String("msk-rebooting"),
 				ClusterArn:     aws.String("arn:aws:kafka:us-east-1:123456789012:cluster/msk-rebooting/b5c6d7e8"),
@@ -129,6 +138,9 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 						InstanceType:  aws.String("kafka.m5.large"),
 					},
 					NumberOfBrokerNodes: aws.Int32(3),
+					CurrentBrokerSoftwareInfo: &kafkatypes.BrokerSoftwareInfo{
+						KafkaVersion: aws.String("2.6.2"),
+					},
 				},
 				Tags: map[string]string{
 					"Environment": "prod",
