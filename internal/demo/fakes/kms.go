@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 )
@@ -34,6 +35,13 @@ func (f *KMSFake) ListKeys(_ context.Context, _ *kms.ListKeysInput, _ ...func(*k
 func (f *KMSFake) DescribeKey(_ context.Context, input *kms.DescribeKeyInput, _ ...func(*kms.Options)) (*kms.DescribeKeyOutput, error) {
 	if input.KeyId == nil {
 		return nil, fmt.Errorf("DescribeKey: KeyId is required")
+	}
+	if *input.KeyId == fixtures.KMSAccessDeniedKeyID {
+		return nil, &smithy.GenericAPIError{
+			Code:    "AccessDeniedException",
+			Message: "User is not authorized to perform kms:DescribeKey",
+			Fault:   smithy.FaultClient,
+		}
 	}
 	meta, ok := f.fix.Keys[*input.KeyId]
 	if !ok {

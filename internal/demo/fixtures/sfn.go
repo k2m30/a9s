@@ -34,6 +34,7 @@ type SFNFixtures struct {
 var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 	const smARNOrderFulfillment = "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"
 	const smARNPaymentValidation = "arn:aws:states:us-east-1:123456789012:stateMachine:payment-validation"
+	const smARNUserOnboarding = "arn:aws:states:us-east-1:123456789012:stateMachine:user-onboarding-flow"
 
 	redriveCount := int32(1)
 	redriveDate := time.Date(2026, 3, 21, 19, 0, 0, 0, time.UTC)
@@ -74,7 +75,7 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 			},
 			{
 				Name:            aws.String("user-onboarding-flow"),
-				StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:user-onboarding-flow"),
+				StateMachineArn: aws.String(smARNUserOnboarding),
 				Type:            sfntypes.StateMachineTypeStandard,
 				CreationDate:    aws.Time(time.Date(2026, 1, 8, 16, 30, 0, 0, time.UTC)),
 			},
@@ -149,6 +150,22 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 					StartDate:       aws.Time(time.Date(2026, 3, 22, 4, 0, 0, 0, time.UTC)),
 					StopDate:        aws.Time(time.Date(2026, 3, 22, 4, 0, 8, 0, time.UTC)),
 					StateMachineArn: aws.String(smARNPaymentValidation),
+					Status:          sfntypes.ExecutionStatusFailed,
+				},
+			},
+			// user-onboarding-flow's single (and therefore latest) execution
+			// failed on a STANDARD-type state machine — required to keep
+			// sfn.latest-execution-failed witnessed by a fixture ListExecutions
+			// is actually called against (payment-validation is EXPRESS, which
+			// EnrichStepFunctionsStatus now skips pre-call since AWS rejects
+			// ListExecutions for that type with StateMachineTypeNotSupported).
+			smARNUserOnboarding: {
+				{
+					ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:user-onboarding-flow:exec-2026-0322-0500-c2d3e4f5"),
+					Name:            aws.String("exec-2026-0322-0500-c2d3e4f5"),
+					StartDate:       aws.Time(time.Date(2026, 3, 22, 5, 0, 0, 0, time.UTC)),
+					StopDate:        aws.Time(time.Date(2026, 3, 22, 5, 0, 4, 0, time.UTC)),
+					StateMachineArn: aws.String(smARNUserOnboarding),
 					Status:          sfntypes.ExecutionStatusFailed,
 				},
 			},

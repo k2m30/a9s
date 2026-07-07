@@ -426,6 +426,7 @@ resource-list frame title. The frame-title rules:
 | kms | kms.state.pending\_deletion | pending deletion | broken | wave1 |
 | kms | kms.state.disabled | disabled | warn | wave1 |
 | kms | kms.state.unavailable | <key state> | broken | wave1 |
+| kms | kms.access-denied | access denied (kms:DescribeKey) | broken | wave1 |
 | kms | kms.rotation-disabled | key rotation disabled | warn | wave2 |
 | r53 | r53.zone.unused | only default NS/SOA records remain | warn | wave1 |
 | r53 | r53.orphan-private-zone | private zone with no VPC associations (orphan) | warn | wave2 |

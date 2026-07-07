@@ -84,6 +84,10 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 			})
 		})
 		if descErr != nil {
+			if accessDeniedErr(descErr) {
+				resources = append(resources, kmsAccessDeniedResource(*key.KeyId))
+				continue
+			}
 			failures = append(failures, fmt.Sprintf("%s: %v", *key.KeyId, descErr))
 			continue
 		}
@@ -195,6 +199,10 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 			return c.KMS.DescribeKey(ctx, &kms.DescribeKeyInput{KeyId: aws.String(id)})
 		})
 		if err != nil {
+			if accessDeniedErr(err) {
+				resources = append(resources, kmsAccessDeniedResource(id))
+				continue
+			}
 			failures = append(failures, fmt.Sprintf("%s: %v", id, err))
 			continue
 		}
@@ -345,6 +353,30 @@ func FetchKMSKeys(
 	}
 
 	return resources, nil
+}
+
+// accessDeniedErr reports whether err is an AWS AccessDenied(Exception) API
+// error, via ClassifyAWSError's smithy.APIError code check.
+func accessDeniedErr(err error) bool {
+	code, _, _ := ClassifyAWSError(err)
+	return code == "AccessDenied" || code == "AccessDeniedException"
+}
+
+// kmsAccessDeniedResource synthesizes a row for a key whose DescribeKey call
+// was denied: the real key state is unknowable, but the key's existence
+// (from ListKeys) is not in question, so it stays visible with a finding
+// distinguishing it from the generic "unavailable" bucket in kmsStateFindings.
+func kmsAccessDeniedResource(keyID string) resource.Resource {
+	return resource.Resource{
+		ID: keyID,
+		Findings: []domain.Finding{
+			{Code: CodeKMSAccessDenied, Phrase: "access denied (kms:DescribeKey)", Severity: domain.SevBroken, Source: "wave1"},
+		},
+		Fields: map[string]string{
+			"key_id": keyID,
+			"status": "AccessDenied",
+		},
+	}
 }
 
 // kmsStateFindings maps a KMS key state to the canonical Finding slice.

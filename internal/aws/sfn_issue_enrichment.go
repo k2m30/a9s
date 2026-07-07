@@ -50,6 +50,12 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		if smARN == "" {
 			return
 		}
+		// EXPRESS state machines reject ListExecutions outright
+		// (StateMachineTypeNotSupported) — skip the call entirely rather than
+		// reacting to the guaranteed error.
+		if r.Fields["type"] == "EXPRESS" {
+			return
+		}
 		mu.Lock()
 		total++
 		mu.Unlock()
@@ -62,6 +68,13 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
+			// Defense in depth: if an EXPRESS machine still reaches here
+			// (e.g. Fields["type"] was unset/stale), AWS rejects the call with
+			// StateMachineTypeNotSupported — that is a benign, expected skip,
+			// not a real failure.
+			if code, _, _ := ClassifyAWSError(err); code == "StateMachineTypeNotSupported" {
+				return
+			}
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true

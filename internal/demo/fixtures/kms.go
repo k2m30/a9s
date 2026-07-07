@@ -19,6 +19,12 @@ type KMSFixtures struct {
 	KeyPolicies map[string]string
 }
 
+// KMSAccessDeniedKeyID names the ListKeys entry whose DescribeKey call the
+// KMSFake denies with AccessDeniedException — witnesses
+// FetchKMSKeysPage's kms.access-denied finding (real key state unreadable,
+// key still shown).
+const KMSAccessDeniedKeyID = "b8c9d0e1-f2a3-5678-90bc-eeffaabbccdd"
+
 // NewKMSFixtures constructs KMSFixtures from the canonical demo data.
 var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 	keyMetadata := []*kmstypes.KeyMetadata{
@@ -111,6 +117,14 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
 			CreationDate: aws.Time(time.Date(2024, 9, 5, 6, 0, 0, 0, time.UTC)),
 			Enabled:      false,
+		},
+		// Access-denied key — DescribeKey is denied for this ID (see
+		// KMSFake.DescribeKey), witnessing kms.access-denied. Real key state
+		// is unreadable; the row is synthesized from ListKeys alone.
+		{
+			KeyId:      aws.String(KMSAccessDeniedKeyID),
+			Arn:        aws.String("arn:aws:kms:us-east-1:123456789012:key/" + KMSAccessDeniedKeyID),
+			KeyManager: kmstypes.KeyManagerTypeCustomer,
 		},
 		// Backup prod-vault encryption key (checkBackupKMS pivot).
 		// DescribeBackupVault("acme-prod-vault").EncryptionKeyArn points here.

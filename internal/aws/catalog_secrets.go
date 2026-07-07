@@ -215,6 +215,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeKMSStatePendingDeletion, Phrase: "pending deletion", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeKMSStateDisabled, Phrase: "disabled", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeKMSStateUnavailable, Phrase: "<key state>", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeKMSAccessDenied, Phrase: "access denied (kms:DescribeKey)", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: kmsCodeRotationDisabled, Phrase: "key rotation disabled", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
