@@ -260,7 +260,7 @@ func TestRelated_EIP_ASG_NilCacheNoClients(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // checkEIPECS / checkEIPECSSvc / checkEIPECSTask
-// Each returns Count:-1 for a non-empty ID (outside 1-call budget) and
+// Each returns State: RelatedUnknown for a non-empty ID (outside 1-call budget) and
 // Count:0 for an empty ID (no EIP → no association possible).
 //
 // checkEIPLogs (same shape) was removed along with its eip:logs

@@ -124,7 +124,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		rl.SetSize(m.innerSize())
 		issueCount := m.ctrl.GetMenuIssueCounts()[canon]
 		issueTrunc := m.ctrl.GetMenuIssueTruncated()[canon]
-		rl.SetEnrichmentState(issueCount, issueTrunc, primaryWave2FindingByID(entry.Resources), primaryWave2DetailByID(entry.Resources))
+		rl.SetEnrichmentState(issueCount, issueTrunc, wave2FindingsByID(entry.Resources), wave2DetailsByID(entry.Resources))
 		rl.SetTruncatedIDs(m.core.EnrichmentTruncatedIDs(canon))
 		rs := newListRS(canon)
 		w, h := m.innerSize()

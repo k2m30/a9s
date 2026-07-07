@@ -431,7 +431,7 @@ func TestRelated_Subnet_ASG_SubnetsFieldFallback(t *testing.T) {
 }
 
 // --- EKS checker tests ---
-// checkSubnetEFS is a genuine stub (unconditionally Count:-1 for non-empty ID);
+// checkSubnetEFS is a genuine stub (unconditionally State: RelatedUnknown for non-empty ID);
 // it is intentionally not tested.
 
 // TestRelated_Subnet_EKS_Match: an EKS cluster whose "subnets" field contains

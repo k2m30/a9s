@@ -594,7 +594,7 @@ func TestPipeline_Related_EbRule_ResolvesViaRealFetcherOutput(t *testing.T) {
 // GetQueueAttributes with AttributeNameAll, which returns KmsMasterKeyId in
 // the attrs map — but the fetcher (internal/aws/sqs.go:93-100) never copies
 // that value into Fields["kms_key_id"]. checkSQSKMS reads that missing key
-// and permanently returns Count:-1/0. This test drives the real fetch path
+// and permanently returns State: RelatedUnknown / Count:0. This test drives the real fetch path
 // with a fake GetQueueAttributes response carrying KmsMasterKeyId and proves
 // the field must reach Fields, then the kms cross-ref resolves.
 // ---------------------------------------------------------------------------
@@ -904,7 +904,7 @@ func TestGlue_Related_CFN_ResolvesRegionWithoutEnvVar(t *testing.T) {
 	result := checker(context.Background(), clients, jobRes, cache)
 
 	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1 (region must be resolved from clients/config, not AWS_REGION env var — got Count:-1 via regionFromEnv())", result.Count)
+		t.Fatalf("Count = %d, want 1 (region must be resolved from clients/config, not AWS_REGION env var — got State: RelatedUnknown via regionFromEnv())", result.Count)
 	}
 	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "data-pipeline-stack" {
 		t.Fatalf("ResourceIDs = %v, want [data-pipeline-stack]", result.ResourceIDs)
@@ -1059,7 +1059,7 @@ var _ = wafv2.ListWebACLsInput{}
 // 12. checkEIPECS / checkEIPECSSvc — zero-call ENI cross-ref.
 //
 // checkEIPECS/ECSSvc/ECSTask (internal/aws/eip_related.go:196-220) are all
-// hardcoded to return Count:-1 whenever res.ID != "" — each function's own
+// hardcoded to return State: RelatedUnknown whenever res.ID != "" — each function's own
 // comment claims resolving requires per-cluster DescribeTasks, "outside the
 // 1-call budget." But the EIP's NetworkInterfaceId (already on
 // ec2types.Address, used by checkEIPENI) can be cross-referenced against the
@@ -1139,7 +1139,7 @@ func TestEIP_Related_ECS_MatchesViaTaskClusterArn(t *testing.T) {
 // 13. checkR53Logs — ListQueryLoggingConfigs cross-ref.
 //
 // checkR53Logs (internal/aws/r53_related.go:314-319) is hardcoded to return
-// Count:-1 whenever res.ID != "" — its own comment states
+// State: RelatedUnknown whenever res.ID != "" — its own comment states
 // route53:ListQueryLoggingConfigs "is not in Route53API yet." The correct
 // mechanism issues one ListQueryLoggingConfigs call per open zone and
 // matches CloudWatchLogsLogGroupArn against the logs cache.
@@ -1196,7 +1196,7 @@ func TestR53_Related_Logs_ResolvesViaListQueryLoggingConfigs(t *testing.T) {
 // 14. checkVPCER53 — ListHostedZonesByVPC cross-ref.
 //
 // checkVPCER53 (internal/aws/vpce_related.go:197-202) is hardcoded to
-// return Count:-1 whenever res.ID != "" — its own comment states the
+// return State: RelatedUnknown whenever res.ID != "" — its own comment states the
 // associated-zones list lives on route53:ListHostedZonesByVPC, "not in the
 // r53 hosted-zone cache." The correct mechanism issues one
 // ListHostedZonesByVPC call per open endpoint and matches the returned
@@ -1254,7 +1254,7 @@ func TestVPCE_Related_R53_ResolvesViaListHostedZonesByVPC(t *testing.T) {
 // 15. checkSubnetEFS — zero-call ENI cross-ref (reverse of checkEFSSubnet).
 //
 // checkSubnetEFS (internal/aws/subnet_related.go:258-263) is hardcoded to
-// return Count:-1 whenever res.ID != "" — its own comment claims mount
+// return State: RelatedUnknown whenever res.ID != "" — its own comment claims mount
 // targets require per-file-system DescribeMountTargets, "outside the 1-call
 // budget." But checkEFSSubnet (internal/aws/efs_related.go:141-177) already
 // solves the exact same relationship in reverse with zero extra calls: scan

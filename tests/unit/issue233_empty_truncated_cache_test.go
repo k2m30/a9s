@@ -105,7 +105,7 @@ func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model, sourceResourc
 	// Execute the batch. tea.Batch returns a cmd that, when called, returns tea.BatchMsg.
 	rawMsg := batchCmd()
 	if rawMsg == nil {
-		return resource.RelatedCheckResult{Count: -1}, false
+		return resource.UnknownRelated("tg"), false
 	}
 
 	batchMsg, ok := rawMsg.(tea.BatchMsg)
@@ -114,7 +114,7 @@ func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model, sourceResourc
 		if r, ok2 := rawMsg.(messages.RelatedCheckResult); ok2 && r.Result.TargetType == "tg" {
 			return r.Result, true
 		}
-		return resource.RelatedCheckResult{Count: -1}, false
+		return resource.UnknownRelated("tg"), false
 	}
 
 	for _, cmd := range batchMsg {
@@ -129,7 +129,7 @@ func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model, sourceResourc
 			return r.Result, true
 		}
 	}
-	return resource.RelatedCheckResult{Count: -1}, false
+	return resource.UnknownRelated("tg"), false
 }
 
 // TestContract_EmptyTruncatedPage_PreservesIsTruncated is the core bug test for issue #233.

@@ -158,7 +158,7 @@ func TestRelated_SQS_SQS_RedrivePolicy_InvalidJSON(t *testing.T) {
 }
 
 // TestRelated_SQS_SQS_RedrivePolicy_EmptyCache verifies that an empty cache
-// returns Count:-1 (unknown, can't determine relationship).
+// returns State: RelatedUnknown (can't determine relationship).
 func TestRelated_SQS_SQS_RedrivePolicy_EmptyCache(t *testing.T) {
 	thisRes := sqsDLQRes(
 		"my-queue",

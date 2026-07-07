@@ -554,8 +554,8 @@ func TestS3_Related_Athena_NoMatch(t *testing.T) {
 	}
 	checker := s3CheckerByTarget(t, "athena")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
-	if result.Count < 0 && result.Count != -1 {
-		t.Errorf("Count = %d, want ≥0 or -1 for athena pivot with no match", result.Count)
+	if result.Count < 0 {
+		t.Errorf("Count = %d, want ≥0 for athena pivot with no match", result.Count)
 	}
 }
 

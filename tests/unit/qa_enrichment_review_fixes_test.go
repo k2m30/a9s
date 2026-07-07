@@ -62,8 +62,8 @@ func TestRowMarker_HiddenWhenIdentityColumnScrolledOff(t *testing.T) {
 	}
 	m, _ = m.Update(messages.ResourcesLoaded{ResourceType: "test", Resources: resources})
 
-	findings := map[string]domain.Finding{
-		"r-1": {Code: "ec2.system.status.impaired", Phrase: "broken", Severity: domain.SevBroken, Source: "wave2:ec2"},
+	findings := map[string][]domain.Finding{
+		"r-1": {{Code: "ec2.system.status.impaired", Phrase: "broken", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 	}
 	m.SetEnrichmentState(len(findings), false, findings, nil)
 

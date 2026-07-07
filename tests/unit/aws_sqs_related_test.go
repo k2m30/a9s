@@ -196,7 +196,7 @@ func TestRelated_SQS_EmptyCache(t *testing.T) {
 // --- Lambda checker nil-clients test ---
 
 // TestRelated_SQS_Lambda_NilClients verifies that the lambda checker returns
-// Count:-1 when clients are nil (API call cannot proceed).
+// State: RelatedUnknown when clients are nil (API call cannot proceed).
 func TestRelated_SQS_Lambda_NilClients(t *testing.T) {
 	res := sqsPaymentRes()
 	checker := sqsCheckerByTarget(t, "lambda")

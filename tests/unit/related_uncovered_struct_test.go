@@ -236,7 +236,7 @@ func TestRelated_Lambda_EbRule_UnknownWithoutClients(t *testing.T) {
 }
 
 // elb:r53 (checkELBR53) was removed along with its registration: it was
-// hardcoded to Count:-1 whenever Fields["dns_name"] != "" (i.e. always, for
+// hardcoded to State: RelatedUnknown whenever Fields["dns_name"] != "" (i.e. always, for
 // any real ELB), with no AWS API path to reverse-resolve which R53 records
 // alias to the LB's DNS name from cache alone. See
 // qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
@@ -327,7 +327,7 @@ func TestRelated_R53_ACM_EmptyZoneReturnsZero(t *testing.T) {
 }
 
 // kms:s3 (checkKMSS3) was removed along with its registration: it was
-// hardcoded to Count:-1 whenever res.ID != "" — S3 resources do not expose
+// hardcoded to State: RelatedUnknown whenever res.ID != "" — S3 resources do not expose
 // KMS key IDs in Fields or RawStruct, so the relationship was never
 // determinable from cache alone. See qa_demo_pivot_coverage_test.go's
 // knownDisconnectedPivots terminal-state comment for the burn-down

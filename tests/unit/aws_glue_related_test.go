@@ -251,11 +251,11 @@ func TestRelated_Glue_Alarms_CacheMissNoClients(t *testing.T) {
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown", result.State)
 	}
 }
 
-// --- glue→cfn: undeterminable without GetTags, returns Count: -1 ---
+// --- glue→cfn: undeterminable without GetTags, returns State: RelatedUnknown ---
 
 func TestRelated_Glue_CFN_Unknown(t *testing.T) {
 	source := resource.Resource{

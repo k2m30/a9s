@@ -161,7 +161,7 @@ func scopeNGToEBSOnly(t *testing.T) resource.RelatedDef {
 // transientUnknownSetup builds a demo root model, opens the ng resource's
 // DETAIL view via a real Navigate message, and feeds a single
 // messages.RelatedCheckResult reproducing checkNGEBS's real cold-cache
-// output (Count: -1, no FetchFilter, no RelatedIDs) for the ng->ebs row —
+// output (State: RelatedUnknown, no FetchFilter, no RelatedIDs) for the ng->ebs row —
 // exactly what production's fan-out delivers when the "ec2" RowStore entry
 // is cold. Deliberately does NOT load "ec2" resources, so the transient
 // "(?)" state is genuine, not simulated past the checker boundary.

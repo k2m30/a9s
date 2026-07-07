@@ -215,7 +215,7 @@ func TestRelated_Alarm_ASG_NoDimension(t *testing.T) {
 
 func TestRelated_Alarm_ASG_NilCache(t *testing.T) {
 	// Empty cache
-	// → Count: -1
+	// → State: RelatedUnknown
 	raw := cwtypes.MetricAlarm{
 		Dimensions: []cwtypes.Dimension{
 			{

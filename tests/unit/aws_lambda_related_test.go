@@ -312,12 +312,12 @@ func TestRelated_Lambda_ECR_NoClientReturnsUnknown(t *testing.T) {
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (no live Lambda client to call GetFunction)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown (no live Lambda client to call GetFunction)", result.State)
 	}
 }
 
 // TestRelated_Lambda_ECR_ImageTypeNoURI: GetFunction succeeds but Code.ImageUri
-// is empty/absent (e.g. an inconsistent Image-package function) → Count: -1.
+// is empty/absent (e.g. an inconsistent Image-package function) → State: RelatedUnknown.
 func TestRelated_Lambda_ECR_ImageTypeNoURI(t *testing.T) {
 	src := resource.Resource{
 		ID:     "my-image-function",

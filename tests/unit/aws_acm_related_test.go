@@ -67,8 +67,8 @@ func TestRelated_ACM_Registered(t *testing.T) {
 
 // --- acm→elb: requires DescribeListeners per ELB (outside cache budget) ---
 
-// TestRelated_ACM_ELB_NilClients: real cert RawStruct → Count: -1 when clients
-// are nil (API call is the only way to resolve).
+// TestRelated_ACM_ELB_NilClients: real cert RawStruct → State: RelatedUnknown
+// when clients are nil (API call is the only way to resolve).
 func TestRelated_ACM_ELB_NilClients(t *testing.T) {
 	source := resource.Resource{
 		ID:   "example.com",
@@ -211,8 +211,8 @@ func TestRelated_ACM_CF_EmptyCertARN(t *testing.T) {
 
 // --- acm→apigw: requires GetDomainNames (outside cache budget) ---
 
-// TestRelated_ACM_APIGW_NilClients: real cert RawStruct → Count: -1 when
-// clients are nil (acm:DescribeCertificate is the source of truth).
+// TestRelated_ACM_APIGW_NilClients: real cert RawStruct → State: RelatedUnknown
+// when clients are nil (acm:DescribeCertificate is the source of truth).
 // TestRelated_ACM_APIGW_EmptyInput: empty cert identity → Count: 0.
 func TestRelated_ACM_APIGW_EmptyInput(t *testing.T) {
 	source := resource.Resource{ID: "", Name: ""}
@@ -225,8 +225,8 @@ func TestRelated_ACM_APIGW_EmptyInput(t *testing.T) {
 
 // --- acm→r53: requires per-zone ListResourceRecordSets (outside cache budget) ---
 
-// TestRelated_ACM_R53_NilClients: real cert RawStruct → Count: -1 when
-// clients are nil (acm:DescribeCertificate is the source of truth).
+// TestRelated_ACM_R53_NilClients: real cert RawStruct → State: RelatedUnknown
+// when clients are nil (acm:DescribeCertificate is the source of truth).
 // TestRelated_ACM_R53_EmptyInput: empty cert identity → Count: 0.
 func TestRelated_ACM_R53_EmptyInput(t *testing.T) {
 	source := resource.Resource{ID: "", Name: ""}

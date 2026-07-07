@@ -156,9 +156,9 @@ func TestFrameTitleIssueSuffixTruncated(t *testing.T) {
 		"running", "running", "running", "running", "running",
 	)
 	m := newListFromCache(ec2TypeDef(), resources, nil, "", false)
-	findings := map[string]domain.Finding{
-		"i-0000": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
-		"i-0001": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+	findings := map[string][]domain.Finding{
+		"i-0000": {{Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
+		"i-0001": {{Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 	}
 	m.SetEnrichmentState(2, true, findings, nil)
 	got := m.FrameTitle()

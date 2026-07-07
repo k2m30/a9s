@@ -5,7 +5,7 @@
 //   - cache["role"] fast path: if a role in cache matches the profile-derived
 //     name, return it with zero API calls.
 //   - otherwise one iam:GetInstanceProfile call resolving Roles[].RoleName.
-//   - API error -> Count:-1, Err set, no panic.
+//   - API error -> State: RelatedError, Err set, no panic.
 //   - zero roles on the profile -> Count:0.
 // ---------------------------------------------------------------------------
 package unit_test
@@ -132,7 +132,7 @@ func TestEC2Role_FastPath_CacheHit_ZeroAPICalls(t *testing.T) {
 	}
 }
 
-// 3. iam:GetInstanceProfile API error -> Count:-1 with Err set, no panic.
+// 3. iam:GetInstanceProfile API error -> State: RelatedError with Err set, no panic.
 func TestEC2Role_GetInstanceProfileError_ReturnsNegativeOneWithErr(t *testing.T) {
 	res := ec2InstanceWithProfileARN("arn:aws:iam::123456789012:instance-profile/eks-test-dev_1234567890123456789")
 
@@ -146,7 +146,7 @@ func TestEC2Role_GetInstanceProfileError_ReturnsNegativeOneWithErr(t *testing.T)
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
 	if result.State != domain.RelatedError {
-		t.Fatalf("Count = %d, want -1", result.Count)
+		t.Fatalf("State = %v, want RelatedError", result.State)
 	}
 	if result.Err == nil {
 		t.Fatal("Err = nil, want non-nil API error")

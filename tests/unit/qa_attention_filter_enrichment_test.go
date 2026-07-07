@@ -59,8 +59,8 @@ func TestAttentionFilter_SetEnrichmentState_ReappliesFilter(t *testing.T) {
 	// SetEnrichmentState → applySortAndFilter re-run, the row must become
 	// visible immediately — without the user toggling ctrl+z or editing the
 	// filter text.
-	findings := map[string]domain.Finding{
-		"b-0": {Code: "s3.public.access.enabled", Phrase: "public access enabled", Severity: domain.SevBroken, Source: "wave2:s3"},
+	findings := map[string][]domain.Finding{
+		"b-0": {{Code: "s3.public.access.enabled", Phrase: "public access enabled", Severity: domain.SevBroken, Source: "wave2:s3"}},
 	}
 	m.SetEnrichmentState(1, false, findings, nil)
 

@@ -9,7 +9,7 @@
 //   - regionFromEnv: unexported. Covered indirectly by exercising a checker
 //     that calls it. The AWS_REGION / AWS_DEFAULT_REGION env-var branches are
 //     tested by inspecting the behaviour of checkEBSBackup when the env is
-//     unset vs. set (observable via Count:-1 when region is the bottleneck).
+//     unset vs. set (observable via State: RelatedUnknown when region is the bottleneck).
 //
 // Direct white-box tests for these functions require a test file inside the
 // internal/aws package itself (internal/aws/identity_cache_test.go), which is
@@ -36,14 +36,14 @@ import (
 // checkEBSBackup calls:
 //   region  := regionFromEnv()
 //   account := accountIDFromClients(ctx, c)
-//   if region == "" || account == "" { return Count:-1 }
+//   if region == "" || account == "" { return UnknownRelated(targetType) }
 //
 // When AWS_REGION is unset AND AWS_DEFAULT_REGION is unset, regionFromEnv()
-// returns "" → the checker returns Count:-1 regardless of the STS client.
+// returns "" → the checker returns State: RelatedUnknown regardless of the STS client.
 // ---------------------------------------------------------------------------
 
 // TestIdentityCache_RegionFromEnv_EmptyWhenEnvUnset verifies that a checker
-// that needs the region returns Count:-1 when neither AWS_REGION nor
+// that needs the region returns State: RelatedUnknown when neither AWS_REGION nor
 // AWS_DEFAULT_REGION is set.  This exercises the regionFromEnv() "" branch.
 func TestIdentityCache_RegionFromEnv_EmptyWhenEnvUnset(t *testing.T) {
 	// Ensure both region env vars are absent for this test.
@@ -77,9 +77,9 @@ func TestIdentityCache_RegionFromEnv_EmptyWhenEnvUnset(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "backup")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	// With no AWS_REGION and no STS client, Count must be -1.
+	// With no AWS_REGION and no STS client, State must be RelatedUnknown.
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (region unresolvable, no STS)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown (region unresolvable, no STS)", result.State)
 	}
 	if result.TargetType != "backup" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "backup")
@@ -88,7 +88,7 @@ func TestIdentityCache_RegionFromEnv_EmptyWhenEnvUnset(t *testing.T) {
 
 // TestIdentityCache_RegionFromEnv_FallbackToAWSDefaultRegion verifies that
 // when AWS_REGION is unset but AWS_DEFAULT_REGION is set, the checker still
-// returns Count:-1 because the STS client (accountIDFromClients) is nil —
+// returns State: RelatedUnknown because the STS client (accountIDFromClients) is nil —
 // but it exercises the AWS_DEFAULT_REGION branch of regionFromEnv().
 func TestIdentityCache_RegionFromEnv_FallbackToAWSDefaultRegion(t *testing.T) {
 	orig1, has1 := os.LookupEnv("AWS_REGION")
@@ -113,8 +113,9 @@ func TestIdentityCache_RegionFromEnv_FallbackToAWSDefaultRegion(t *testing.T) {
 	})
 
 	// region is now non-empty (eu-west-1) but STS is nil → accountIDFromClients
-	// returns "" → checker still returns Count:-1. The test verifies the code
-	// path executes without panic, which covers the regionFromEnv fallback branch.
+	// returns "" → checker still returns State: RelatedUnknown. The test verifies
+	// the code path executes without panic, which covers the regionFromEnv
+	// fallback branch.
 	clients := &awsclient.ServiceClients{
 		Backup: newFakeBackupWithRecoveryPoints(nil),
 	}
@@ -127,12 +128,12 @@ func TestIdentityCache_RegionFromEnv_FallbackToAWSDefaultRegion(t *testing.T) {
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (no STS client to resolve account)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown (no STS client to resolve account)", result.State)
 	}
 }
 
 // TestIdentityCache_NilClients_ReturnsMinusOne verifies that a nil clients
-// argument to a checker that needs identity returns Count:-1 without panicking.
+// argument to a checker that needs identity returns State: RelatedUnknown without panicking.
 func TestIdentityCache_NilClients_ReturnsMinusOne(t *testing.T) {
 	src := resource.Resource{
 		ID:     "vol-0a1b2c3d4e5f67890",
@@ -143,7 +144,7 @@ func TestIdentityCache_NilClients_ReturnsMinusOne(t *testing.T) {
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown (nil clients)", result.State)
 	}
 }
 

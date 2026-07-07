@@ -4,8 +4,8 @@
 // checkApigwELB, checkApigwRole.
 //
 // checkApigwR53, checkApigwSFN, checkApigwSNS, checkApigwVPCE were removed
-// along with their registrations: each was hardcoded to Count:-1/0, never a
-// witnessable Count>0, with no AWS API path to resolve a concrete match from
+// along with their registrations: each was hardcoded to State: RelatedUnknown
+// (or a resolved 0), never a witnessable Count>0, with no AWS API path to resolve a concrete match from
 // GetApis/GetIntegrations alone (R53/VPCE: private-API endpoint id and
 // alias-record resolution are outside GetApis; SFN/SNS: the target ARN lives
 // in the per-route request template, not the integration URI). See
@@ -30,7 +30,7 @@ import (
 
 // ---------------------------------------------------------------------------
 // checkApigwACM — resolves ACM certs via GetDomainNames + GetApiMappings.
-// With a nil client we exercise the client-missing guard → Count:-1.
+// With a nil client we exercise the client-missing guard → State: RelatedUnknown.
 // ---------------------------------------------------------------------------
 
 func TestRelated_APIGW_ACM_Unknown(t *testing.T) {
@@ -136,7 +136,7 @@ func TestRelated_APIGW_Alarm_NoMatch(t *testing.T) {
 }
 
 func TestRelated_APIGW_Alarm_CacheNotLoaded(t *testing.T) {
-	// Empty cache + nil clients → Count:-1 (unknown).
+	// Empty cache + nil clients → State: RelatedUnknown.
 	checker := apigwCheckerByTarget(t, "alarm")
 	res := resource.Resource{ID: "api-xyz987", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
@@ -274,7 +274,7 @@ func TestRelated_APIGW_CF_EmptyID(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkApigwELB — stub: returns Count:-1 for non-empty API ID.
+// checkApigwELB — stub: returns State: RelatedUnknown for non-empty API ID.
 // ---------------------------------------------------------------------------
 
 func TestRelated_APIGW_ELB_Unknown(t *testing.T) {
@@ -286,7 +286,7 @@ func TestRelated_APIGW_ELB_Unknown(t *testing.T) {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "elb")
 	}
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (ELB links via VPC link require GetVpcLinks, not in budget)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown (ELB links via VPC link require GetVpcLinks, not in budget)", result.State)
 	}
 }
 
@@ -301,7 +301,7 @@ func TestRelated_APIGW_ELB_EmptyID(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkApigwRole — stub: returns Count:-1 for non-empty API ID.
+// checkApigwRole — stub: returns State: RelatedUnknown for non-empty API ID.
 // ---------------------------------------------------------------------------
 
 func TestRelated_APIGW_Role_Unknown(t *testing.T) {

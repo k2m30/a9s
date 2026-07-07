@@ -6,7 +6,7 @@ package unit_test
 //   checkACMR53 (zone-suffix match from cache, no-match from cache)
 //
 // checkEIPECS / checkEIPECSSvc / checkEIPECSTask are genuine stubs that
-// unconditionally return Count:-1 for non-empty IDs; they are intentionally
+// unconditionally return State: RelatedUnknown for non-empty IDs; they are intentionally
 // not tested here. (checkEIPLogs, the same shape, was removed along with its
 // eip:logs registration — see qa_demo_pivot_coverage_test.go's
 // knownDisconnectedPivots terminal-state comment.)

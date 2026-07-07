@@ -59,7 +59,7 @@ func athenaCheckerByTarget(t *testing.T, target string) resource.RelatedChecker 
 
 // ---------------------------------------------------------------------------
 // checkAthenaS3 tests — reads Fields["result_output_location"] populated by
-// GetWorkGroup enrichment. Without enrichment, Count: -1 (unknown).
+// GetWorkGroup enrichment. Without enrichment, State: RelatedUnknown.
 // ---------------------------------------------------------------------------
 
 func TestRelated_Athena_S3_Unknown(t *testing.T) {

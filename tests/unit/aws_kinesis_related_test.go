@@ -233,11 +233,11 @@ func TestRelated_Kinesis_Lambda_CacheMissNoClients(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown (cache miss, no clients)", result.State)
 	}
 }
 
-// --- kinesis→cfn: undeterminable without ListTagsForStream, returns Count: -1 ---
+// --- kinesis→cfn: undeterminable without ListTagsForStream, returns State: RelatedUnknown ---
 
 func TestRelated_Kinesis_CFN_Unknown(t *testing.T) {
 	source := resource.Resource{

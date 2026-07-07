@@ -330,8 +330,8 @@ func TestRelated_NG_EBS_CacheJoin_MatchedInstanceNoBlockDeviceMappings(t *testin
 			NodegroupName: aws.String(ngName),
 			// Non-empty Resources.AutoScalingGroups so the OLD two-call
 			// implementation proceeds past its early Count:0 guard and
-			// instead falls through to its nil-clients Count:-1 branch —
-			// making this a true RED pin against current HEAD rather than
+			// instead falls through to its nil-clients State: RelatedUnknown
+			// branch — making this a true RED pin against current HEAD rather than
 			// an accidental match on the old short-circuit path. The new
 			// cache-join contract must ignore this field entirely.
 			Resources: &ekstypes.NodegroupResources{

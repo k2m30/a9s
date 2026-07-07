@@ -1,13 +1,15 @@
 // aws_false_zero_cache_miss_test.go pins the contract that a missing
-// required cache entry is UNKNOWN (Count:-1, renders "?"), never a
-// definitive 0. Five checkers currently return the zero-value
+// required cache entry is UNKNOWN (State: RelatedUnknown via
+// resource.UnknownRelated, renders "?"), never a definitive 0. Five
+// checkers currently return the zero-value
 // resource.RelatedCheckResult{TargetType: ...} on a cache-miss branch,
 // which is a false zero: a missing cache is not an authoritative answer.
 //
 // Established contract (this branch, e.g. the kinesis/msk lambda fix):
-// missing required cache -> Count:-1. A PRESENT-but-empty cache entry
-// (entry exists, zero resources) must still return a definitive 0 — the
-// fix must not turn legitimate zeros into -1.
+// missing required cache -> State: RelatedUnknown (resource.UnknownRelated).
+// A PRESENT-but-empty cache entry (entry exists, zero resources) must still
+// return a definitive 0 — the fix must not turn legitimate zeros into
+// RelatedUnknown.
 //
 // These pins are RED against the current cache-miss branches:
 //   - checkCbPipeline        (internal/aws/codebuild_related.go:36)
@@ -37,8 +39,9 @@ import (
 // --- 1. cb -> pipeline (checkCbPipeline, internal/aws/codebuild_related.go:36) ---
 
 // TestRelated_Cb_Pipeline_CacheMiss_ReturnsUnknown verifies that when the
-// "pipeline" cache key is entirely absent, checkCbPipeline returns Count:-1
-// (unknown), not the false zero the zero-value struct currently produces.
+// "pipeline" cache key is entirely absent, checkCbPipeline returns
+// State: RelatedUnknown (resource.UnknownRelated), not the false zero the
+// zero-value struct currently produces.
 // No AWS client is needed to reach this branch: the miss check runs before
 // the CodePipeline-client guard, so nil clients still isolate the cache-miss
 // behavior specifically.
@@ -75,7 +78,7 @@ func TestRelated_Cb_Pipeline_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.
 
 // TestRelated_ECR_Pipeline_CacheMiss_ReturnsUnknown verifies that when the
 // "pipeline" cache key is entirely absent, checkECRPipeline returns
-// Count:-1 (unknown), not a false zero.
+// State: RelatedUnknown (resource.UnknownRelated), not a false zero.
 func TestRelated_ECR_Pipeline_CacheMiss_ReturnsUnknown(t *testing.T) {
 	source := resource.Resource{
 		ID:   "acme/api-service",
@@ -128,10 +131,11 @@ func TestRelated_ECR_Pipeline_PresentEmptyCache_ReturnsDefinitiveZero(t *testing
 // --- 3. secrets -> eb (checkSecretsEB, internal/aws/secrets_related_extra.go:88) ---
 
 // TestRelated_Secrets_EB_CacheMiss_ReturnsUnknown verifies that when the
-// "eb" cache key is entirely absent, checkSecretsEB returns Count:-1
-// (unknown), not a false zero. The cache-miss check (line 88) runs before
-// the ServiceClients-nil guard (line 93), so nil clients still isolate the
-// cache-miss behavior specifically.
+// "eb" cache key is entirely absent, checkSecretsEB returns
+// State: RelatedUnknown (resource.UnknownRelated), not a false zero. The
+// cache-miss check (line 88) runs before the ServiceClients-nil guard
+// (line 93), so nil clients still isolate the cache-miss behavior
+// specifically.
 func TestRelated_Secrets_EB_CacheMiss_ReturnsUnknown(t *testing.T) {
 	source := secretsSourceWithARN(
 		"arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password",
@@ -174,13 +178,14 @@ func TestRelated_Secrets_EB_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.T
 // --- 4. kinesis -> ddb (checkKinesisDDB, internal/aws/kinesis_related.go:179) ---
 
 // TestRelated_Kinesis_DDB_CacheMiss_ReturnsUnknown verifies that when the
-// "ddb" cache key is entirely absent, checkKinesisDDB returns Count:-1
-// (unknown), not a false zero. Unlike the other four checkers in this file,
-// checkKinesisDDB checks the DynamoDB client BEFORE the cache-presence
-// check, so a non-nil ServiceClients with a DynamoDB client satisfying
-// DynamoDBDescribeKinesisStreamingDestinationAPI is required to reach the
-// cache-miss branch at all — nil clients would short-circuit to -1 for an
-// unrelated reason (no client), not the cache-miss bug this test isolates.
+// "ddb" cache key is entirely absent, checkKinesisDDB returns
+// State: RelatedUnknown (resource.UnknownRelated), not a false zero. Unlike
+// the other four checkers in this file, checkKinesisDDB checks the DynamoDB
+// client BEFORE the cache-presence check, so a non-nil ServiceClients with a
+// DynamoDB client satisfying DynamoDBDescribeKinesisStreamingDestinationAPI
+// is required to reach the cache-miss branch at all — nil clients would
+// short-circuit to State: RelatedUnknown for an unrelated reason (no
+// client), not the cache-miss bug this test isolates.
 func TestRelated_Kinesis_DDB_CacheMiss_ReturnsUnknown(t *testing.T) {
 	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
 	fakeDDB := &fakeDynamoDBBatch4{}
@@ -219,10 +224,10 @@ func TestRelated_Kinesis_DDB_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.
 // --- 5. ecs-svc -> sfn (checkECSSvcSFN, internal/aws/ecs_svc_related_extra.go:397) ---
 
 // TestRelated_ECSSvc_SFN_CacheMiss_ReturnsUnknown verifies that when the
-// "sfn" cache key is entirely absent, checkECSSvcSFN returns Count:-1
-// (unknown), not a false zero. No client-nil guard sits in front of the
-// cache-presence check, so nil clients isolate the cache-miss behavior
-// specifically.
+// "sfn" cache key is entirely absent, checkECSSvcSFN returns
+// State: RelatedUnknown (resource.UnknownRelated), not a false zero. No
+// client-nil guard sits in front of the cache-presence check, so nil
+// clients isolate the cache-miss behavior specifically.
 func TestRelated_ECSSvc_SFN_CacheMiss_ReturnsUnknown(t *testing.T) {
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
 
@@ -258,9 +263,9 @@ func TestRelated_ECSSvc_SFN_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.T
 
 // TestRelated_Secrets_ECSTask_CacheMiss_ReturnsUnknown verifies that when the
 // "ecs-task" cache key is entirely absent, checkSecretsECSTask returns
-// Count:-1 (unknown), not a false zero. The cache-miss check runs before the
-// ServiceClients-nil guard, so nil clients still isolate the cache-miss
-// behavior specifically.
+// State: RelatedUnknown (resource.UnknownRelated), not a false zero. The
+// cache-miss check runs before the ServiceClients-nil guard, so nil clients
+// still isolate the cache-miss behavior specifically.
 func TestRelated_Secrets_ECSTask_CacheMiss_ReturnsUnknown(t *testing.T) {
 	source := secretsSourceWithARN(
 		"arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/db-password",
@@ -320,10 +325,10 @@ func ecrEbRuleSourceResource(repoName string) resource.Resource {
 }
 
 // TestRelated_ECR_EbRule_CacheMiss_ReturnsUnknown verifies that when the
-// "eb-rule" cache key is entirely absent, checkECREbRule returns Count:-1
-// (unknown), not a false zero. No client-nil guard sits in front of the
-// cache-presence check, so nil clients isolate the cache-miss behavior
-// specifically.
+// "eb-rule" cache key is entirely absent, checkECREbRule returns
+// State: RelatedUnknown (resource.UnknownRelated), not a false zero. No
+// client-nil guard sits in front of the cache-presence check, so nil
+// clients isolate the cache-miss behavior specifically.
 func TestRelated_ECR_EbRule_CacheMiss_ReturnsUnknown(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, ecrEbRuleSourceResource("acme/api-service"), resource.ResourceCache{})
@@ -355,10 +360,10 @@ func TestRelated_ECR_EbRule_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.T
 // --- 8. ecs-svc -> eb-rule (checkECSSvcEbRule, internal/aws/ecs_svc_related_extra.go:157) ---
 
 // TestRelated_ECSSvc_EbRule_CacheMiss_ReturnsUnknown verifies that when the
-// "eb-rule" cache key is entirely absent, checkECSSvcEbRule returns Count:-1
-// (unknown), not a false zero. No client-nil guard sits in front of the
-// cache-presence check, so nil clients isolate the cache-miss behavior
-// specifically.
+// "eb-rule" cache key is entirely absent, checkECSSvcEbRule returns
+// State: RelatedUnknown (resource.UnknownRelated), not a false zero. No
+// client-nil guard sits in front of the cache-presence check, so nil
+// clients isolate the cache-miss behavior specifically.
 func TestRelated_ECSSvc_EbRule_CacheMiss_ReturnsUnknown(t *testing.T) {
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
 

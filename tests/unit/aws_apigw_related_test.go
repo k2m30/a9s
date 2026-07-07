@@ -13,7 +13,7 @@ import (
 
 // TestRelated_APIGW_Registered verifies all related defs are registered with correct checker presence.
 // waf was removed along with its registration (checkApigwWAF was hardcoded
-// to Count:-1 for any real fixture); see
+// to State: RelatedUnknown for any real fixture); see
 // qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
 // comment for the burn-down precedent this deletion follows.
 func TestRelated_APIGW_Registered(t *testing.T) {
@@ -171,7 +171,7 @@ func TestRelated_APIGW_Logs_NilCache(t *testing.T) {
 // checkApigwLambda tests (requires GetIntegrations per API — outside budget)
 // ---------------------------------------------------------------------------
 
-// TestRelated_APIGW_Lambda_Unknown: valid API → Count: -1 (integrations via GetIntegrations).
+// TestRelated_APIGW_Lambda_Unknown: valid API → State: RelatedUnknown (integrations via GetIntegrations).
 func TestRelated_APIGW_Lambda_Unknown(t *testing.T) {
 	res := resource.Resource{
 		ID:     "api-abc123",
@@ -182,7 +182,7 @@ func TestRelated_APIGW_Lambda_Unknown(t *testing.T) {
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown: integration targets via GetIntegrations)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown (integration targets via GetIntegrations)", result.State)
 	}
 	if result.TargetType != "lambda" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
@@ -200,7 +200,7 @@ func TestRelated_APIGW_Lambda_EmptyInput(t *testing.T) {
 }
 
 // apigw:waf (checkApigwWAF) was removed along with its registration: it was
-// hardcoded to Count:-1 whenever res.ID != "" (i.e. always, for any real
+// hardcoded to State: RelatedUnknown whenever res.ID != "" (i.e. always, for any real
 // fixture) — Web ACL associations are only resolvable from the WAF side via
 // ListResourcesForWebACL, outside this checker's call budget. See
 // qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state

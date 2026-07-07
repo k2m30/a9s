@@ -249,13 +249,13 @@ func TestRelated_VPCE_VPC_EmptyVPCID(t *testing.T) {
 }
 
 // vpce:acm, vpce:cf (checkVPCEACM/CF) were removed along with their
-// registrations: both were hardcoded to Count:-1 whenever res.ID != "" (i.e.
+// registrations: both were hardcoded to State: RelatedUnknown whenever res.ID != "" (i.e.
 // always, for any real fixture), with no AWS API path to resolve a concrete
 // match from a VPC endpoint listing alone. See
 // qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
 // comment for the burn-down precedent this deletion follows.
 
-// --- R53 checker (Pattern stub — empty ID → 0, non-empty → -1) ---
+// --- R53 checker (Pattern stub — empty ID → 0, non-empty → RelatedUnknown) ---
 
 // TestRelated_VPCE_R53_EmptyID verifies Count=0 for empty endpoint ID.
 func TestRelated_VPCE_R53_EmptyID(t *testing.T) {
@@ -267,18 +267,18 @@ func TestRelated_VPCE_R53_EmptyID(t *testing.T) {
 	}
 }
 
-// TestRelated_VPCE_R53_NonEmptyID verifies Count=-1 for a real endpoint ID.
+// TestRelated_VPCE_R53_NonEmptyID verifies State=RelatedUnknown for a real endpoint ID.
 func TestRelated_VPCE_R53_NonEmptyID(t *testing.T) {
 	res := vpceSrcInterfaceResource()
 	checker := vpceCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (private zones via ListHostedZonesByVPC not in list response)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown (private zones via ListHostedZonesByVPC not in list response)", result.State)
 	}
 }
 
 // vpce:s3, vpce:tg, vpce:waf (checkVPCES3/TG/WAF) were removed along with
-// their registrations: each was hardcoded to Count:-1 whenever res.ID != ""
+// their registrations: each was hardcoded to State: RelatedUnknown whenever res.ID != ""
 // (i.e. always, for any real fixture) — S3 gateway access needs
 // policy-document JSON interpretation, TG/WAF associations require
 // DescribeTargetHealth / wafv2:ListResourcesForWebACL from the other side,

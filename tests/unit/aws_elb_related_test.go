@@ -278,13 +278,13 @@ func TestRelated_ELB_Alarms_CacheMissNoClients(t *testing.T) {
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown", result.State)
 	}
 }
 
 // --- elb→cfn: requires DescribeTags per ELB (outside cache budget) ---
 
-// TestRelated_ELB_CFN_Unknown: valid ELB → Count: -1 (tags not in DescribeLoadBalancers).
+// TestRelated_ELB_CFN_Unknown: valid ELB → State: RelatedUnknown (tags not in DescribeLoadBalancers).
 func TestRelated_ELB_CFN_Unknown(t *testing.T) {
 	source := resource.Resource{
 		ID:   "acme-prod-web",
@@ -296,7 +296,7 @@ func TestRelated_ELB_CFN_Unknown(t *testing.T) {
 	checker := elbCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown: tags via DescribeTags per ELB)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown (unknown: tags via DescribeTags per ELB)", result.State)
 	}
 	if result.TargetType != "cfn" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "cfn")
@@ -314,7 +314,7 @@ func TestRelated_ELB_CFN_EmptyInput(t *testing.T) {
 }
 
 // elb:r53 (checkELBR53) was removed along with its registration: it was
-// hardcoded to Count:-1 whenever Fields["dns_name"] != "" (i.e. always, for
+// hardcoded to State: RelatedUnknown whenever Fields["dns_name"] != "" (i.e. always, for
 // any real ELB), with no AWS API path to resolve which R53 records alias to
 // the LB's DNS name from cache alone. See qa_demo_pivot_coverage_test.go's
 // knownDisconnectedPivots terminal-state comment for the burn-down

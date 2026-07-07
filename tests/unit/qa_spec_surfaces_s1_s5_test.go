@@ -106,9 +106,9 @@ func TestSpec_NoBanner_WhenFindingsOffViewport(t *testing.T) {
 	)
 	m.SetSize(120, 5) // tiny viewport — forces hidden findings
 	// Attach findings to rows that would be off-viewport after sort/filter.
-	findings := map[string]domain.Finding{
-		"i-001": {Code: "ec2.system.status.impaired", Phrase: "some finding", Severity: domain.SevBroken, Source: "wave2:ec2"},
-		"i-002": {Code: "ec2.system.status.impaired", Phrase: "some finding", Severity: domain.SevBroken, Source: "wave2:ec2"},
+	findings := map[string][]domain.Finding{
+		"i-001": {{Code: "ec2.system.status.impaired", Phrase: "some finding", Severity: domain.SevBroken, Source: "wave2:ec2"}},
+		"i-002": {{Code: "ec2.system.status.impaired", Phrase: "some finding", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 	}
 	m.SetEnrichmentState(2, false, findings, nil)
 	view := stripANSISpec(m.View())

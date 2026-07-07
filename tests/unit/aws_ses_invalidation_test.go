@@ -358,7 +358,7 @@ func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Pre-fix: two concurrent callers both observe a cache miss and both invoke
 // DescribeActiveReceiptRuleSet. When one succeeds and the sibling transiently
-// fails (throttle / 5xx), the failing checker returns Count:-1 even though the
+// fails (throttle / 5xx), the failing checker returns State: RelatedError even though the
 // cache now holds the successful result.
 //
 // Post-fix: singleflight ensures exactly one upstream call is issued; all

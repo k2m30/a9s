@@ -175,7 +175,7 @@ func TestAllEnrichers_IssueCountMatchesFindings(t *testing.T) {
 
 // buildUnifiedModel builds a ResourceListModel loaded with the given resources and
 // enrichment state, returning the FrameTitle for count inspection.
-func buildUnifiedModel(t *testing.T, resources []resource.Resource, enrichIC int, findings map[string]domain.Finding) string {
+func buildUnifiedModel(t *testing.T, resources []resource.Resource, enrichIC int, findings map[string][]domain.Finding) string {
 	t.Helper()
 	td := resource.ResourceTypeDef{
 		ShortName: "ec2",
@@ -209,8 +209,8 @@ func TestUnifiedIssueCount_DedupesAcrossWaves(t *testing.T) {
 			{ID: "i-bbb", Name: "running-server",
 				Fields: map[string]string{"name": "running-server", "state": "running"}},
 		}
-		findings := map[string]domain.Finding{
-			"i-bbb": {Code: "ec2.system.status.impaired", Phrase: "status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+		findings := map[string][]domain.Finding{
+			"i-bbb": {{Code: "ec2.system.status.impaired", Phrase: "status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		}
 		// enrichIC=1 reflects the correct distinct count from unifiedIssueCount on the production side.
 		title := buildUnifiedModel(t, resources, 1, findings)
@@ -224,8 +224,8 @@ func TestUnifiedIssueCount_DedupesAcrossWaves(t *testing.T) {
 			{ID: "i-aaa", Name: "stopped-server",
 				Fields: map[string]string{"name": "stopped-server", "state": "stopped"}},
 		}
-		findings := map[string]domain.Finding{
-			"i-aaa": {Code: "ec2.system.status.impaired", Phrase: "status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+		findings := map[string][]domain.Finding{
+			"i-aaa": {{Code: "ec2.system.status.impaired", Phrase: "status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		}
 		// unifiedIssueCount({i-aaa(stopped)}, findings{i-aaa}) = 1, not 2.
 		title := buildUnifiedModel(t, resources, 1, findings)
@@ -244,10 +244,10 @@ func TestUnifiedIssueCount_DedupesAcrossWaves(t *testing.T) {
 			{ID: "i-bbb", Name: "s2", Fields: map[string]string{"name": "s2"}},
 			{ID: "i-ccc", Name: "s3", Fields: map[string]string{"name": "s3"}},
 		}
-		findings := map[string]domain.Finding{
-			"i-aaa": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
-			"i-bbb": {Code: "rds.pending-maintenance", Phrase: "maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"},
-			"i-ccc": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+		findings := map[string][]domain.Finding{
+			"i-aaa": {{Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
+			"i-bbb": {{Code: "rds.pending-maintenance", Phrase: "maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"}},
+			"i-ccc": {{Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		}
 		title := buildUnifiedModel(t, resources, 3, findings)
 		if !strings.Contains(title, "3") {
@@ -259,7 +259,7 @@ func TestUnifiedIssueCount_DedupesAcrossWaves(t *testing.T) {
 		resources := []resource.Resource{
 			{ID: "i-aaa", Name: "server", Fields: map[string]string{"name": "server"}},
 		}
-		title := buildUnifiedModel(t, resources, 0, map[string]domain.Finding{})
+		title := buildUnifiedModel(t, resources, 0, map[string][]domain.Finding{})
 		if strings.Contains(title, "[!]") {
 			t.Errorf("FrameTitle() = %q; no issue badge expected when enrichIC=0 and no findings", title)
 		}

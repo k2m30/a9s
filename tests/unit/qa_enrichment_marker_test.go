@@ -60,7 +60,7 @@ func markerResources() []resource.Resource {
 }
 
 // buildMarkerModel constructs a fully-loaded ResourceListModel for marker tests.
-func buildMarkerModel(t *testing.T, findings map[string]domain.Finding) views.ResourceListModel {
+func buildMarkerModel(t *testing.T, findings map[string][]domain.Finding) views.ResourceListModel {
 	t.Helper()
 	tuitest.NoColor(t)
 
@@ -91,7 +91,7 @@ func countFindingPrefixes(rendered string) int {
 // TestRowMarker_Absent_WhenNoFinding verifies that when findingsByID is empty,
 // no "! " or "~ " prefix marker appears in the rendered list output.
 func TestRowMarker_Absent_WhenNoFinding(t *testing.T) {
-	m := buildMarkerModel(t, map[string]domain.Finding{})
+	m := buildMarkerModel(t, map[string][]domain.Finding{})
 	rendered := m.View()
 	plain := stripANSI(rendered)
 	if strings.Contains(plain, "! ") || strings.Contains(plain, "~ ") {
@@ -106,8 +106,8 @@ func TestRowMarker_Absent_WhenNoFinding(t *testing.T) {
 // TestRowMarker_PresentForFinding_SeverityBang verifies that a resource with
 // severity "!" has a "! " prefix marker in the rendered output.
 func TestRowMarker_PresentForFinding_SeverityBang(t *testing.T) {
-	findings := map[string]domain.Finding{
-		"i-1": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+	findings := map[string][]domain.Finding{
+		"i-1": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 	}
 	m := buildMarkerModel(t, findings)
 	rendered := m.View()
@@ -138,8 +138,8 @@ func TestRowMarker_PresentForFinding_SeverityBang(t *testing.T) {
 // TestRowMarker_PresentForFinding_SeverityTilde verifies that a resource with
 // severity "~" has a "~ " prefix marker in the rendered output.
 func TestRowMarker_PresentForFinding_SeverityTilde(t *testing.T) {
-	findings := map[string]domain.Finding{
-		"i-1": {Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update", Severity: domain.SevWarn, Source: "wave2:rds"},
+	findings := map[string][]domain.Finding{
+		"i-1": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update", Severity: domain.SevWarn, Source: "wave2:rds"}},
 	}
 	m := buildMarkerModel(t, findings)
 	rendered := m.View()
@@ -165,8 +165,8 @@ func TestRowMarker_PresentForFinding_SeverityTilde(t *testing.T) {
 // marker appears at most once per row (not duplicated across multiple columns).
 // This indirectly verifies it is attached to the identity column only.
 func TestRowMarker_PrefixedToIdentityColumn_NotOthers(t *testing.T) {
-	findings := map[string]domain.Finding{
-		"i-1": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+	findings := map[string][]domain.Finding{
+		"i-1": {{Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 	}
 	m := buildMarkerModel(t, findings)
 	rendered := m.View()
@@ -193,8 +193,8 @@ func TestRowMarker_PrefixedToIdentityColumn_NotOthers(t *testing.T) {
 // resources has a finding, exactly one prefix marker appears in the full
 // rendered output.
 func TestRowMarker_OnlyOnAffectedRows(t *testing.T) {
-	findings := map[string]domain.Finding{
-		"i-1": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+	findings := map[string][]domain.Finding{
+		"i-1": {{Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 	}
 	m := buildMarkerModel(t, findings)
 	rendered := m.View()
@@ -208,9 +208,9 @@ func TestRowMarker_OnlyOnAffectedRows(t *testing.T) {
 // TestRowMarker_OnlyOnAffectedRows_Multiple verifies prefix marker count when
 // multiple resources have findings.
 func TestRowMarker_OnlyOnAffectedRows_Multiple(t *testing.T) {
-	findings := map[string]domain.Finding{
-		"i-1": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
-		"i-3": {Code: "rds.pending-maintenance", Phrase: "maintenance pending", Severity: domain.SevWarn, Source: "wave2:rds"},
+	findings := map[string][]domain.Finding{
+		"i-1": {{Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
+		"i-3": {{Code: "rds.pending-maintenance", Phrase: "maintenance pending", Severity: domain.SevWarn, Source: "wave2:rds"}},
 	}
 	m := buildMarkerModel(t, findings)
 	rendered := m.View()
@@ -231,8 +231,8 @@ func TestRowMarker_OnlyOnAffectedRows_Multiple(t *testing.T) {
 func TestRowMarker_NoColorMode_StillVisible(t *testing.T) {
 	tuitest.NoColor(t)
 
-	findings := map[string]domain.Finding{
-		"i-2": {Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:rds"},
+	findings := map[string][]domain.Finding{
+		"i-2": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:rds"}},
 	}
 
 	td := markerTypeDef()
@@ -266,8 +266,8 @@ func TestRowMarker_AllResourceTypes(t *testing.T) {
 		t.Fatal("AllResourceTypes returned empty — registry is broken")
 	}
 
-	finding := map[string]domain.Finding{
-		"test-id-1": {Code: "ec2.system.status.impaired", Phrase: "test finding", Severity: domain.SevBroken, Source: "wave2:ec2"},
+	finding := map[string][]domain.Finding{
+		"test-id-1": {{Code: "ec2.system.status.impaired", Phrase: "test finding", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 	}
 
 	for _, td := range allTypes {

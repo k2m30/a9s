@@ -93,7 +93,7 @@ func execRelatedCheckerResult(t *testing.T, m tui.Model, resourceType string, so
 
 	rawMsg := batchCmd()
 	if rawMsg == nil {
-		return resource.RelatedCheckResult{Count: -1}, false
+		return resource.UnknownRelated(targetType), false
 	}
 
 	batchMsg, ok := rawMsg.(tea.BatchMsg)
@@ -101,7 +101,7 @@ func execRelatedCheckerResult(t *testing.T, m tui.Model, resourceType string, so
 		if r, ok2 := rawMsg.(messages.RelatedCheckResult); ok2 && r.Result.TargetType == targetType {
 			return r.Result, true
 		}
-		return resource.RelatedCheckResult{Count: -1}, false
+		return resource.UnknownRelated(targetType), false
 	}
 
 	for _, cmd := range batchMsg {
@@ -116,7 +116,7 @@ func execRelatedCheckerResult(t *testing.T, m tui.Model, resourceType string, so
 			return r.Result, true
 		}
 	}
-	return resource.RelatedCheckResult{Count: -1}, false
+	return resource.UnknownRelated(targetType), false
 }
 
 // setupLiveModeEFSDetail creates a live-mode root model navigated to an EFS

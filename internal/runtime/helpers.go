@@ -104,7 +104,7 @@ func ApplyWave2ToRow(
 		seen[f.Code] = true
 		// Enricher-emitted Findings already carry the canonical Code and
 		// Source. Source must be "wave2:<short>" for the existing
-		// app_enrich_fold readers (primaryWave2Finding, primaryWave2FindingByID,
+		// app_enrich_fold readers (primaryWave2Finding, wave2FindingsByID,
 		// stripWave2) to recognise the entry. Tolerate enrichers that forgot
 		// to set Source by stamping the canonical form here.
 		if f.Source == "" || !strings.HasPrefix(f.Source, "wave2:") {

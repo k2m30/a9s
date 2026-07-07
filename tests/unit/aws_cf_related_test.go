@@ -535,7 +535,7 @@ func TestRelated_CF_R53_MatchByFieldsFallback(t *testing.T) {
 	}
 }
 
-// TestRelated_CF_R53_NilCacheWithAliases: aliases present but nil zone cache → Count: -1.
+// TestRelated_CF_R53_NilCacheWithAliases: aliases present but nil zone cache → State: RelatedUnknown.
 func TestRelated_CF_R53_NilCacheWithAliases(t *testing.T) {
 	res := resource.Resource{
 		ID:     "E1A2B3C4D5E6F7",
@@ -692,7 +692,7 @@ func TestRelated_CF_Alarm_EmptyDistID(t *testing.T) {
 	}
 }
 
-// TestRelated_CF_Alarm_NilCache: alarm cache miss → Count: -1.
+// TestRelated_CF_Alarm_NilCache: alarm cache miss → State: RelatedUnknown.
 func TestRelated_CF_Alarm_NilCache(t *testing.T) {
 	res := resource.Resource{ID: "E1TESTDISTID", Fields: map[string]string{}}
 	checker := cfAlarmCheckerByTarget(t)
@@ -755,7 +755,7 @@ func TestRelated_CF_Alarm_AlarmWithNoRawStruct(t *testing.T) {
 
 // --- checkCfLambda: nil client path ---
 
-// TestRelated_CF_Lambda_NilClients: no CloudFront client → Count: -1.
+// TestRelated_CF_Lambda_NilClients: no CloudFront client → State: RelatedUnknown.
 func TestRelated_CF_Lambda_NilClients(t *testing.T) {
 	res := resource.Resource{ID: "E1A2B3C4D5E6F7", Fields: map[string]string{}}
 	checker := cfCheckerByTarget(t, "lambda")
@@ -856,7 +856,7 @@ func TestRelated_CF_S3_RegionalOriginFormat(t *testing.T) {
 	}
 }
 
-// TestRelated_CF_S3_WrongRawStruct: non-DistributionSummary RawStruct → Count: -1.
+// TestRelated_CF_S3_WrongRawStruct: non-DistributionSummary RawStruct → State: RelatedUnknown.
 func TestRelated_CF_S3_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "EWRONGRAW",
@@ -1067,7 +1067,7 @@ func TestRelated_CF_Lambda_NilDistributionConfig(t *testing.T) {
 }
 
 // TestRelated_CF_Lambda_APIError: GetDistributionConfig returns an error
-// → Count: -1, Err set.
+// → State: RelatedError, Err set.
 func TestRelated_CF_Lambda_APIError(t *testing.T) {
 	clients := fakeCFServiceClients(&fakeCFClient{
 		getErr: errors.New("cloudfront: GetDistributionConfig throttled"),
@@ -1078,7 +1078,7 @@ func TestRelated_CF_Lambda_APIError(t *testing.T) {
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
 	if result.State != domain.RelatedError {
-		t.Errorf("Count = %d, want -1 (API error)", result.Count)
+		t.Errorf("State = %v, want RelatedError (API error)", result.State)
 	}
 	if result.Err == nil {
 		t.Error("Err = nil, want non-nil on API error")
@@ -1154,7 +1154,7 @@ func TestRelated_CF_Logs_NilLoggingConfig(t *testing.T) {
 	}
 }
 
-// TestRelated_CF_Logs_NilClientPath: nil clients → Count: -1.
+// TestRelated_CF_Logs_NilClientPath: nil clients → State: RelatedUnknown.
 func TestRelated_CF_Logs_NilClientPath(t *testing.T) {
 	res := resource.Resource{ID: "E1NILCLIENT", Fields: map[string]string{}}
 	checker := cfCheckerByTarget(t, "logs")

@@ -224,9 +224,10 @@ func TestIsActionableRow_ApproxZero_NoFilter(t *testing.T) {
 
 // TestIsActionableRow_ApproxZero_WithFilter — count=0, approximate=true, fetchFilter={"x":"y"}
 // Expected: NOT actionable. NEW contract: count==0 is never actionable even
-// with a fetchFilter set, because FetchFilter pivots always carry Count:-1
-// (never 0) in production — a resolved Count:0 with a fetchFilter is still a
-// definite empty result and must not be navigable.
+// with a fetchFilter set, because FetchFilter pivots always carry
+// State: RelatedDeferred (never a resolved Count) in production — a
+// resolved Count:0 with a fetchFilter is still a definite empty result and
+// must not be navigable.
 func TestIsActionableRow_ApproxZero_WithFilter(t *testing.T) {
 	ensureNoColor(t)
 	d, cleanup := buildApproxDetail(t)

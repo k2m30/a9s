@@ -100,7 +100,7 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"sg", "sg"}:  "Referencing SGs",
 
 		// elb (r53 removed along with its registration: checkELBR53 was
-		// hardcoded to Count:-1 for any real ELB with a dns_name)
+		// hardcoded to State: RelatedUnknown for any real ELB with a dns_name)
 		{"elb", "tg"}:    "Target Groups",
 		{"elb", "alarm"}: "CW Alarms",
 		{"elb", "cfn"}:   "CloudFormation",
@@ -148,7 +148,7 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"asg", "ng"}:     "EKS Node Groups",
 
 		// kms (s3 removed along with its registration: checkKMSS3 was
-		// hardcoded to Count:-1 for any real fixture — S3 does not expose
+		// hardcoded to State: RelatedUnknown for any real fixture — S3 does not expose
 		// KMS key IDs in Fields or RawStruct)
 		{"kms", "ebs"}:     "EBS Volumes",
 		{"kms", "dbi"}:     "RDS Instances",
@@ -242,7 +242,7 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"acm", "r53"}:   "Route 53 Zones",
 
 		// apigw (waf removed along with its registration: checkApigwWAF was
-		// hardcoded to Count:-1 for any real fixture)
+		// hardcoded to State: RelatedUnknown for any real fixture)
 		{"apigw", "lambda"}: "Lambda Functions",
 		{"apigw", "logs"}:   "Log Groups",
 

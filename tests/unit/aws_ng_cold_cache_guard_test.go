@@ -5,16 +5,16 @@
 //
 // Two scenarios, one per checker (4 tests total):
 //
-//   - No "ec2" cache entry at all: the checker must return Count:-1
-//     (unknown) and must NEVER call EC2:DescribeInstances — a cold/missing
-//     cache entry is not a live-fetch trigger. Wired via a recording fake
-//     EC2 client inside a real *aws.ServiceClients so any call fails the
-//     test immediately.
+//   - No "ec2" cache entry at all: the checker must return
+//     State: RelatedUnknown (resource.UnknownRelated) and must NEVER call
+//     EC2:DescribeInstances — a cold/missing cache entry is not a live-fetch
+//     trigger. Wired via a recording fake EC2 client inside a real
+//     *aws.ServiceClients so any call fails the test immediately.
 //   - An "ec2" cache entry present but holding disk-seeded rows (Fields
 //     only, no RawStruct — the on-disk cache shape after a restart) must
-//     also return Count:-1 (unknown), not Count:0 — a struct-less row set
-//     cannot be tag-matched, so treating it as an exact zero would be a
-//     false negative in the RELATED panel.
+//     also return State: RelatedUnknown, not a resolved Count:0 — a
+//     struct-less row set cannot be tag-matched, so treating it as an exact
+//     zero would be a false negative in the RELATED panel.
 //
 // RED today (HEAD): checkNGEC2 and checkNGEBS both call ngRelatedResources,
 // which falls through to FetchRelatedTarget's live-fetch-on-cache-miss path

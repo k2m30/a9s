@@ -13,7 +13,7 @@ package unit_test
 //
 // Contract pinned here (post-AS-378):
 //   actual = -1, FetchFilter present       → "DisplayName"            (no parens, navigable)
-//   actual = -1, FetchFilter absent        → "DisplayName"            (no parens, dim)
+//   actual = -1, FetchFilter absent        → "DisplayName (?)"        (transient-unknown, navigable)
 //   actual = 0,  approximate = false       → "DisplayName (0)"        (dim, confirmed zero)
 //   actual = 0,  approximate = true        → "DisplayName (0)"        (normal, lower bound)
 //   actual = N>0, approximate = false      → "DisplayName (N)"        (normal)
@@ -29,8 +29,8 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -61,14 +61,27 @@ func buildSuffixDetail(t *testing.T, displayName, targetType string) (views.Deta
 // injectSuffixResult delivers a RelatedCheckResultMsg for the named target
 // and waits for the model to apply it.
 func injectSuffixResult(d views.DetailModel, targetType string, count int, approximate bool, fetchFilter map[string]string) views.DetailModel {
-	msg := messages.RelatedCheckResult{
-		ResourceType: "suffix-test",
-		Result: resource.RelatedCheckResult{
+	// Build the result the way a real checker does — via the state
+	// constructors — so a negative "count" produces the correct
+	// RelatedRowState instead of the retired {Count:-1, State:Resolved}
+	// sentinel: a filtered pivot defers, an unfiltered miss is unknown.
+	var result resource.RelatedCheckResult
+	switch {
+	case count < 0 && len(fetchFilter) > 0:
+		result = resource.DeferredRelated(targetType, fetchFilter)
+	case count < 0:
+		result = resource.UnknownRelated(targetType)
+	default:
+		result = resource.RelatedCheckResult{
 			TargetType:  targetType,
 			Count:       count,
 			Approximate: approximate,
 			FetchFilter: fetchFilter,
-		},
+		}
+	}
+	msg := messages.RelatedCheckResult{
+		ResourceType: "suffix-test",
+		Result:       result,
 	}
 	updated, _ := d.Update(msg)
 	return updated
@@ -193,7 +206,8 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 			mustNotContain: []string{"Glue Jobs (0+)"},
 		},
 		// Network Interfaces — lambda's ENI pivot with actual=-1 (cache
-		// miss, no fetch fallback). Renderer emits the bare displayName.
+		// miss, no fetch fallback) → RelatedUnknown; renderer emits the
+		// "(?)" marker (never a "(0)"/"(0+)" count).
 		{
 			name:           "Network_Interfaces_minus_one",
 			displayName:    "Network Interfaces",

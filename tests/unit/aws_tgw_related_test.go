@@ -113,14 +113,14 @@ func TestRelated_TGW_NilClients(t *testing.T) {
 
 // --- VPC checker nil-clients test ---
 
-// TestRelated_TGW_VPC_NilClients verifies that the vpc checker returns Count:-1
-// when clients are nil (DescribeTransitGatewayVpcAttachments cannot be called).
+// TestRelated_TGW_VPC_NilClients verifies that the vpc checker returns
+// State: RelatedUnknown when clients are nil (DescribeTransitGatewayVpcAttachments cannot be called).
 func TestRelated_TGW_VPC_NilClients(t *testing.T) {
 	res := tgwSrcResource()
 	checker := tgwCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, nil)
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown (nil clients)", result.State)
 	}
 }
 

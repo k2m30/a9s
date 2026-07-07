@@ -4,15 +4,16 @@ package unit_test
 // checkers that issue a per-bucket S3 API call (checkS3CFN → GetBucketTagging,
 // checkS3KMS → GetBucketEncryption, checkS3Logs → GetBucketLogging,
 // checkS3Role → GetBucketPolicy) must NOT bubble PermanentRedirect (301) or
-// IllegalLocationConstraintException (400) up as Count:-1 errors. Both codes
-// indicate the configured S3 client's region differs from the target bucket's
-// region — a legitimate environmental condition on multi-region accounts, not a
-// bug. The checkers must soft-truncate to ApproximateZero ("0+"), preserving
-// the existing -1 contract for genuine failures (e.g. AccessDenied).
+// IllegalLocationConstraintException (400) up as a State: RelatedError result.
+// Both codes indicate the configured S3 client's region differs from the target
+// bucket's region — a legitimate environmental condition on multi-region
+// accounts, not a bug. The checkers must soft-truncate to ApproximateZero
+// ("0+"), preserving the existing RelatedError (resource.ErrorRelated) contract
+// for genuine failures (e.g. AccessDenied).
 //
 // Discovery: `TestLiveFullIntegration_AllResourcesBaseline/s3` failed on a live
 // account containing buckets in eu-west-2 + ap-south-1; opening any related-pivot
-// on the out-of-region bucket emitted Count:-1 and the related panel showed no
+// on the out-of-region bucket emitted State: RelatedError and the related panel showed no
 // count for the affected pivot.
 //
 // Pattern A precedent: see s3_issue_enrichment.go EnrichS3PublicAccessBlock,

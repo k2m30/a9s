@@ -7,7 +7,7 @@ package unit_test
 //     deleted upstream (InvalidLaunchTemplateId.NotFound) instead of hard
 //     failing the whole AMI panel.
 //  2. checkNGAMI must return Count:0 (a true zero) when the launch template
-//     has been deleted upstream, not Count:-1 with the API error.
+//     has been deleted upstream, not State: RelatedError with the API error.
 //  3. checkELBWAF must skip the wafv2:GetWebACLForResource call for non-ALB
 //     load balancers (NLB / GWLB), because AWS WAFv2 only supports ALBs and
 //     would return WAFInvalidParameterException.
@@ -44,7 +44,7 @@ import (
 // TestCheckEKSAMI_SkipsDeletedLaunchTemplate verifies that when one node group
 // references a launch template that has been deleted upstream, the AMI panel
 // still surfaces the AMIs from the other node groups (rather than hard-failing
-// with Count:-1). The deleted-LT NG is recorded as a partial failure entry in
+// with State: RelatedError). The deleted-LT NG is recorded as a partial failure entry in
 // the aggregated error per the existing AggregateFailures format.
 func TestCheckEKSAMI_SkipsDeletedLaunchTemplate(t *testing.T) {
 	const (
@@ -165,8 +165,8 @@ func TestCheckEKSAMI_HardFailsOnOtherErrors(t *testing.T) {
 
 // TestCheckNGAMI_SkipsDeletedLaunchTemplate verifies that when the node group's
 // launch template has been deleted upstream, the AMI checker returns
-// Count:0 / Err:nil instead of Count:-1 with the API error — the LT is gone,
-// so there is no AMI to relate to.
+// Count:0 / Err:nil instead of State: RelatedError with the API error — the
+// LT is gone, so there is no AMI to relate to.
 func TestCheckNGAMI_SkipsDeletedLaunchTemplate(t *testing.T) {
 	const ltDeleted = "lt-deleted999"
 

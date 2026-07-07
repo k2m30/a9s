@@ -237,7 +237,7 @@ func TestRelated_APIGW_Registered(t *testing.T) {
 	}
 
 	// waf/r53/sfn/sns/vpce were removed: their checkers (checkApigwWAF/R53/
-	// SFN/SNS/VPCE) were structurally unwitnessable (hardcoded Count:-1/0, no
+	// SFN/SNS/VPCE) were structurally unwitnessable (hardcoded to State: RelatedUnknown / 0, no
 	// AWS API path to resolve a concrete match) and were deleted along with
 	// the registration rather than carried as permanent demo-coverage debt.
 	expected := []string{"lambda", "logs"}

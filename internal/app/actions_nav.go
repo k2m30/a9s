@@ -18,7 +18,7 @@ func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskReques
 
 	// Owner decision #38 (2026-07-06): when the pop reveals a detail screen
 	// with registered related defs, re-dispatch its related-resource checks —
-	// a pivot left at the transient "(?)" state (Count==-1, no FetchFilter)
+	// a pivot left at the transient "(?)" state (domain.RelatedUnknown, no FetchFilter)
 	// must resolve to its real count once the user drills into the target
 	// type and returns, without a manual Ctrl+R. Mirrors the shape
 	// HandleRelatedCheckStarted (internal/runtime/related.go) and
@@ -400,8 +400,9 @@ func (c *Controller) handleActionRelatedSelect(a Action) (ViewState, []runtime.T
 	// buildDetailRelatedBlocks / detailRelatedVisibleCount / cursor stepping).
 	targetRow := visibleRelatedRowAt(ds, clickIdx)
 	if targetRow == nil || !isActionableDetailRow(*targetRow) {
-		// Dead-end row: loading, error, count==-1 without FetchFilter, or
-		// confirmed zero without FetchFilter/Approximate. No navigation.
+		// Dead-end row: loading, error, unknown (RelatedUnknown) without
+		// FetchFilter, or confirmed zero without FetchFilter/Approximate. No
+		// navigation.
 		return c.snapshot(), nil
 	}
 	// Sync cursor state so the selection highlight is consistent with the

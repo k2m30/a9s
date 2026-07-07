@@ -142,7 +142,7 @@ func TestRelated_SG_EC2_NotFound(t *testing.T) {
 }
 
 // TestRelated_SG_EC2_CacheMissNoClients verifies that an empty cache with nil
-// clients returns Count:-1 (unknown).
+// clients returns State: RelatedUnknown (resource.UnknownRelated).
 func TestRelated_SG_EC2_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{ID: "sg-test"}
 	cache := resource.ResourceCache{}
@@ -239,7 +239,7 @@ func TestRelated_SG_ENI_NotFound(t *testing.T) {
 }
 
 // TestRelated_SG_ENI_CacheMissNoClients verifies that an empty cache with nil
-// clients returns Count:-1 (unknown).
+// clients returns State: RelatedUnknown (resource.UnknownRelated).
 func TestRelated_SG_ENI_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{ID: "sg-test"}
 	cache := resource.ResourceCache{}
@@ -306,7 +306,7 @@ func TestRelated_SG_ELB_NotFound(t *testing.T) {
 }
 
 // TestRelated_SG_ELB_CacheMissNoClients verifies that an empty cache with nil
-// clients returns Count:-1 (unknown).
+// clients returns State: RelatedUnknown (resource.UnknownRelated).
 func TestRelated_SG_ELB_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{ID: "sg-test"}
 	cache := resource.ResourceCache{}
@@ -494,7 +494,7 @@ func TestRelated_SG_SG_NotFound(t *testing.T) {
 }
 
 // TestRelated_SG_SG_CacheMissNoClients verifies that an empty cache with nil
-// clients returns Count:-1 (cache miss).
+// clients returns State: RelatedUnknown (resource.UnknownRelated; cache miss).
 func TestRelated_SG_SG_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{ID: "sg-source"}
 	cache := resource.ResourceCache{}

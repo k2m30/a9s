@@ -121,13 +121,13 @@ func TestWave2_ListStatusColumn_ShowsConcretePhrase_ForIssueFinding(t *testing.T
 		},
 	})
 
-	findings := map[string]domain.Finding{
-		"i-flagged-1": {
+	findings := map[string][]domain.Finding{
+		"i-flagged-1": {{
 			Code:     "dbi.no-backups",
 			Phrase:   "no automated backups",
 			Severity: domain.SevWarn,
 			Source:   "wave2:dbi",
-		},
+		}},
 	}
 	m.SetEnrichmentState(0, false, findings, nil)
 

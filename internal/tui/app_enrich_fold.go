@@ -6,12 +6,14 @@ package tui
 // The Wave-2 fold itself lives on runtime.Core.applyEnrichment (internal/
 // runtime/helpers.go); Model.applyEnrichment here is CLEAR-only, stripping
 // wave2 findings from one type's cached rows ahead of a rerun.
-// primaryWave2Finding, primaryWave2FindingByID, and primaryWave2DetailByID
-// rebuild detail/list view input from the authoritative r.Findings +
+// primaryWave2Finding, wave2FindingsByID, and wave2DetailsByID rebuild
+// detail/list view input from the authoritative r.Findings +
 // r.AttentionDetails state on each cached row — a row may carry several
-// independently-evaluated wave2 findings; each of these three reduces to the
-// single WORST-severity one for its render-boundary consumer (an on-demand
-// detail-enrich Attention pair, or a row's one-character glyph).
+// independently-evaluated wave2 findings. primaryWave2Finding reduces to the
+// single WORST-severity one for its narrow on-demand detail-enrich consumer
+// (see its own doc comment for why); wave2FindingsByID and wave2DetailsByID
+// carry every one of them through unreduced into
+// Controller.ApplyEnrichmentState's plural storage layer.
 
 import (
 	"strings"
@@ -88,19 +90,22 @@ func primaryWave2Finding(r resource.Resource) (*domain.Finding, *domain.Attentio
 	return &finding, ad
 }
 
-// primaryWave2FindingByID rebuilds a per-resource domain.Finding map from
-// wave2 entries in the supplied resource slice (emitting domain.Finding to
-// match the runtime→adapter PatchResourceList contract). Used by cache-hit
-// navigation sites that populate views.ResourceListModel.SetEnrichmentState
-// (row marker glyphs) from the authoritative r.Findings on each cached row.
+// wave2FindingsByID rebuilds a per-resource, slice-valued domain.Finding map
+// from wave2 entries in the supplied resource slice (emitting the
+// map[string][]domain.Finding shape the runtime→adapter PatchResourceList
+// contract and Controller.ApplyEnrichmentState's plural storage layer both
+// use). Used by cache-hit navigation sites that populate
+// views.ResourceListModel.SetEnrichmentState from the authoritative
+// r.Findings on each cached row.
 //
-// A row may carry more than one independently-evaluated wave2 Finding; this
-// reduces to the single WORST-severity one via domain.WorstSeverityFinding —
-// a row's glyph is one character, so this is a named render-boundary
-// derivation, not a compat shim. Returns nil when no wave2 findings are
-// present.
-func primaryWave2FindingByID(rows []resource.Resource) map[string]domain.Finding {
-	var out map[string]domain.Finding
+// A row may carry more than one independently-evaluated wave2 Finding; every
+// one of them is carried through unreduced — the plural store is the
+// canonical, single source of truth for a resource's full finding set, and
+// nothing downstream of it (row glyph, detail Attention panel, menu badge)
+// should be starved of a condition another consumer needs. Returns nil when
+// no wave2 findings are present.
+func wave2FindingsByID(rows []resource.Resource) map[string][]domain.Finding {
+	var out map[string][]domain.Finding
 	for _, r := range rows {
 		var wave2 []domain.Finding
 		for _, f := range r.Findings {
@@ -112,21 +117,26 @@ func primaryWave2FindingByID(rows []resource.Resource) map[string]domain.Finding
 			continue
 		}
 		if out == nil {
-			out = make(map[string]domain.Finding)
+			out = make(map[string][]domain.Finding)
 		}
-		out[r.ID] = domain.WorstSeverityFinding(wave2)
+		out[r.ID] = wave2
 	}
 	return out
 }
 
-// primaryWave2DetailByID mirrors primaryWave2FindingByID: it rebuilds a
-// per-resource domain.AttentionDetail map from each row's WORST-severity
-// wave2-sourced finding's companion AttentionDetail, keyed by Resource.ID to
-// match the runtime→adapter PatchResourceList contract (ListEnrichmentPatch.
-// AttentionDetails). Only entries with at least one DetailRow are included.
+// wave2DetailsByID mirrors wave2FindingsByID: it rebuilds a per-resource,
+// per-FindingCode domain.AttentionDetail map from every row's wave2-sourced
+// findings, keyed first by Resource.ID and then by Finding.Code — the same
+// nested shape setWave2Finding (internal/aws/issue_enrichment.go) and
+// runtime.ApplyWave2ToRow (internal/runtime/helpers.go) produce, and the
+// shape the runtime→adapter PatchResourceList contract
+// (ListEnrichmentPatch.AttentionDetails) and Controller.ApplyEnrichmentState's
+// plural storage layer both require. A row with more than one
+// independently-evaluated wave2 Finding contributes one entry per Code, not
+// just its worst one. Only entries with at least one DetailRow are included.
 // Returns nil when no row has a non-empty companion AttentionDetail.
-func primaryWave2DetailByID(rows []resource.Resource) map[string]domain.AttentionDetail {
-	var out map[string]domain.AttentionDetail
+func wave2DetailsByID(rows []resource.Resource) map[string]map[domain.FindingCode]domain.AttentionDetail {
+	var out map[string]map[domain.FindingCode]domain.AttentionDetail
 	for _, r := range rows {
 		var wave2 []domain.Finding
 		for _, f := range r.Findings {
@@ -137,12 +147,18 @@ func primaryWave2DetailByID(rows []resource.Resource) map[string]domain.Attentio
 		if len(wave2) == 0 {
 			continue
 		}
-		worst := domain.WorstSeverityFinding(wave2)
-		if ad, ok := r.AttentionDetails[worst.Code]; ok && len(ad.Rows) > 0 {
-			if out == nil {
-				out = make(map[string]domain.AttentionDetail)
+		for _, f := range wave2 {
+			ad, ok := r.AttentionDetails[f.Code]
+			if !ok || len(ad.Rows) == 0 {
+				continue
 			}
-			out[r.ID] = ad
+			if out == nil {
+				out = make(map[string]map[domain.FindingCode]domain.AttentionDetail)
+			}
+			if out[r.ID] == nil {
+				out[r.ID] = make(map[domain.FindingCode]domain.AttentionDetail, 1)
+			}
+			out[r.ID][f.Code] = ad
 		}
 	}
 	return out
@@ -168,7 +184,7 @@ func stripWave2(findings []domain.Finding) []domain.Finding {
 // clearAllWave2 strips wave2 findings from every row RowStore retains for
 // every type this session has touched. Used by main-menu Ctrl+R to ensure
 // the next list-open doesn't rehydrate stale wave2 attention state via
-// primaryWave2FindingByID.
+// wave2FindingsByID.
 //
 // Every retained type's rows live in exactly one RowStore entry (task #17
 // wave 1 stage 3 — the former ResourceCache/LazyResourceCache/ProbeResources

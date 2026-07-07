@@ -241,7 +241,7 @@ func TestRelated_R53_APIGW_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_R53_APIGW_NilClients verifies that nil clients → Count:-1.
+// TestRelated_R53_APIGW_NilClients verifies that nil clients → State: RelatedUnknown.
 func TestRelated_R53_APIGW_NilClients(t *testing.T) {
 	checker := r53CheckerByTarget(t, "apigw")
 	source := resource.Resource{ID: "Z4NILCLIENTS", Fields: map[string]string{}}
@@ -424,14 +424,14 @@ func TestRelated_R53_S3_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_R53_S3_NilClients verifies that nil clients → Count:-1.
+// TestRelated_R53_S3_NilClients verifies that nil clients → State: RelatedUnknown.
 func TestRelated_R53_S3_NilClients(t *testing.T) {
 	checker := r53CheckerByTarget(t, "s3")
 	source := resource.Resource{ID: "Z9NILS3", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown (nil clients → errClientMissing)", result.State)
 	}
 }
 
@@ -449,8 +449,8 @@ func TestRelated_R53_S3_EmptyID(t *testing.T) {
 // checkR53Logs tests
 // ---------------------------------------------------------------------------
 
-// TestRelated_R53_Logs_Unknown verifies that checkR53Logs always returns Count:-1
-// for a non-empty zone ID (ListQueryLoggingConfigs not yet wired).
+// TestRelated_R53_Logs_Unknown verifies that checkR53Logs always returns
+// State: RelatedUnknown for a non-empty zone ID (ListQueryLoggingConfigs not yet wired).
 func TestRelated_R53_Logs_Unknown(t *testing.T) {
 	checker := r53CheckerByTarget(t, "logs")
 	source := resource.Resource{ID: "ZALOGS123", Fields: map[string]string{}}
@@ -548,7 +548,7 @@ func TestRelated_R53_VPC_PublicZone_ReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_R53_VPC_PrivateZone_NilClients verifies Count:-1 when clients are nil.
+// TestRelated_R53_VPC_PrivateZone_NilClients verifies State: RelatedUnknown when clients are nil.
 func TestRelated_R53_VPC_PrivateZone_NilClients(t *testing.T) {
 	source := resource.Resource{
 		ID:     "ZPRIVATE002",
@@ -777,7 +777,7 @@ func TestRelated_R53_ELB_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_R53_ELB_NilClients verifies that nil clients → Count:-1.
+// TestRelated_R53_ELB_NilClients verifies that nil clients → State: RelatedUnknown.
 func TestRelated_R53_ELB_NilClients(t *testing.T) {
 	checker := r53CheckerByTarget(t, "elb")
 	source := resource.Resource{ID: "ZELB004", Fields: map[string]string{}}
@@ -875,7 +875,7 @@ func TestRelated_R53_CF_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_R53_CF_NilClients verifies that nil clients → Count:-1.
+// TestRelated_R53_CF_NilClients verifies that nil clients → State: RelatedUnknown.
 func TestRelated_R53_CF_NilClients(t *testing.T) {
 	checker := r53CheckerByTarget(t, "cf")
 	source := resource.Resource{ID: "ZCF003", Fields: map[string]string{}}
@@ -1007,7 +1007,7 @@ func TestRelated_R53_ACM_NonACMCNAMEIgnored(t *testing.T) {
 	}
 }
 
-// TestRelated_R53_ACM_NilClients verifies that nil clients → Count:-1.
+// TestRelated_R53_ACM_NilClients verifies that nil clients → State: RelatedUnknown.
 func TestRelated_R53_ACM_NilClients(t *testing.T) {
 	checker := r53CheckerByTarget(t, "acm")
 	source := resource.Resource{ID: "ZACM004", Fields: map[string]string{}}

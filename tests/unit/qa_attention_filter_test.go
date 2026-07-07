@@ -101,8 +101,8 @@ func TestAttentionFilter_IncludesResourcesWithFindings(t *testing.T) {
 	})
 
 	// Wave 2 finding only for res-0.
-	findings := map[string]domain.Finding{
-		"res-0": {Code: "s3.public.access.enabled", Phrase: "public access enabled", Severity: domain.SevWarn, Source: "wave2:s3"},
+	findings := map[string][]domain.Finding{
+		"res-0": {{Code: "s3.public.access.enabled", Phrase: "public access enabled", Severity: domain.SevWarn, Source: "wave2:s3"}},
 	}
 	m.SetEnrichmentState(1, false, findings, nil)
 

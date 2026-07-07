@@ -223,7 +223,7 @@ func TestLambda_Related_TG_InstanceTargetTypeSkipsDescribeTargetHealth(t *testin
 //
 // At HEAD the checker reads res.Fields["image_uri"], which is never
 // populated by the lambda fetcher (ListFunctions does not carry ImageUri),
-// so this pivot is permanently Count:-1 for every real Image-package
+// so this pivot is permanently State: RelatedUnknown for every real Image-package
 // function. The correct mechanism calls GetFunction for this one function.
 // ---------------------------------------------------------------------------
 

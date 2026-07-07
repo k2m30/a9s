@@ -118,27 +118,27 @@ func wafSrcResource() resource.Resource {
 
 // --- ELB checker nil-clients test ---
 
-// TestRelated_WAF_ELB_NilClients verifies that the elb checker returns Count:-1
-// when clients are nil (ListResourcesForWebACL cannot be called).
+// TestRelated_WAF_ELB_NilClients verifies that the elb checker returns
+// State: RelatedUnknown when clients are nil (ListResourcesForWebACL cannot be called).
 func TestRelated_WAF_ELB_NilClients(t *testing.T) {
 	res := wafSrcResource()
 	checker := wafCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, nil)
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown (nil clients)", result.State)
 	}
 }
 
 // --- APIGW checker nil-clients test ---
 
-// TestRelated_WAF_APIGW_NilClients verifies that the apigw checker returns Count:-1
-// when clients are nil (ListResourcesForWebACL cannot be called).
+// TestRelated_WAF_APIGW_NilClients verifies that the apigw checker returns
+// State: RelatedUnknown when clients are nil (ListResourcesForWebACL cannot be called).
 func TestRelated_WAF_APIGW_NilClients(t *testing.T) {
 	res := wafSrcResource()
 	checker := wafCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, res, nil)
 	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+		t.Errorf("State = %v, want RelatedUnknown (nil clients)", result.State)
 	}
 }
 
@@ -158,7 +158,7 @@ func TestRelated_WAF_CF_RegionalReturnsZero(t *testing.T) {
 }
 
 // TestRelated_WAF_CF_CloudfrontScopeUnknown: CLOUDFRONT scope with a resolvable
-// WebACL ARN but no CloudFront client available → Count: -1 (would need
+// WebACL ARN but no CloudFront client available → State: RelatedUnknown (would need
 // cloudfront:ListDistributionsByWebACLId) — docs/resources/waf.md §2 `cf`.
 // Fields["arn"] must be set: checkWAFCF reads Fields["arn"], not Fields["id"].
 func TestRelated_WAF_CF_CloudfrontScopeUnknown(t *testing.T) {

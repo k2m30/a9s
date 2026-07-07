@@ -209,12 +209,7 @@ func TestRightColumn_ErrorShowsDash(t *testing.T) {
 	d = showRelatedPanel(d)
 	d = sendRelatedResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
-		Result: resource.RelatedCheckResult{
-			TargetType:  "tg",
-			Count:       -1,
-			ResourceIDs: nil,
-			Err:         errors.New("permission denied"),
-		},
+		Result:       resource.ErrorRelated("tg", errors.New("permission denied")),
 	})
 
 	view := d.View()

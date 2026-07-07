@@ -3,7 +3,7 @@
 //
 // checkTGBackup, checkTGDBC, checkTGDBI, checkTGLogs, checkTGDBISnap, checkTGSG,
 // checkTGSubnet were removed along with their registrations: each was
-// hardcoded to Count:-1 whenever the TG had an ARN (or, for sg/subnet,
+// hardcoded to State: RelatedUnknown whenever the TG had an ARN (or, for sg/subnet,
 // whenever Fields["vpc_id"] != ""), with no AWS API path to resolve target
 // identity from cache alone (DescribeTargetHealth + matching IP addresses
 // against instance/DB ENIs, or resolving to the parent ELB's access logs —

@@ -188,7 +188,7 @@ func poisonedTargetCache(sourceShortName string, sourceID string) resource.Resou
 // COVERAGE BOUNDARY (honest disclosure): clients=nil is hermetic — every
 // AWS-calling checker in internal/aws guards with
 // `c, ok := clients.(*ServiceClients); if !ok || c == nil`, so with nil
-// clients those checkers short-circuit to Count:-1/0 BEFORE reaching their
+// clients those checkers short-circuit to State: RelatedUnknown (or a resolved 0) BEFORE reaching their
 // vulnerable ID-extraction logic, regardless of the cache. Of the 605
 // registered defs at time of writing, only ~5 pure cache-scan checkers
 // (e.g. checkS3Backup/Athena/Glue/EBRule/R53-shaped defs) actually run their

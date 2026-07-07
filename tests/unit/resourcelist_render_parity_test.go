@@ -172,10 +172,9 @@ func listParityFindings(resources []resource.Resource) map[string]domain.Finding
 }
 
 // wrapFindingsForApply converts a listParityFindings single-value map into
-// the one-element-slice-per-ID shape Controller.ApplyEnrichmentState requires,
-// preserving the exact same finding set listParityFindings built for the
-// SetEnrichmentState (single-value, render-boundary-reduced) side of the same
-// parity comparison.
+// the one-element-slice-per-ID shape both ResourceListModel.SetEnrichmentState
+// and Controller.ApplyEnrichmentState require, so the TUI and Controller sides
+// of the same parity comparison are fed the identical plural finding set.
 func wrapFindingsForApply(findings map[string]domain.Finding) map[string][]domain.Finding {
 	if findings == nil {
 		return nil
@@ -504,7 +503,7 @@ func TestResourceListRenderParity(t *testing.T) {
 					Resources:    resources10,
 					ResourceType: td.ShortName,
 				})
-				m.SetEnrichmentState(len(findings), false, findings, nil)
+				m.SetEnrichmentState(len(findings), false, wrapFindingsForApply(findings), nil)
 
 				c := newListController(t, td.ShortName)
 				c.ApplyResourcesLoaded(td.ShortName, resources10, nil, false)
@@ -524,7 +523,7 @@ func TestResourceListRenderParity(t *testing.T) {
 					0, 0, true, // attentionOnly=true
 				)
 				m.SetSize(stdW, stdH)
-				m.SetEnrichmentState(len(findings), false, findings, nil)
+				m.SetEnrichmentState(len(findings), false, wrapFindingsForApply(findings), nil)
 
 				c := newListController(t, td.ShortName)
 				c.ApplyResourcesLoaded(td.ShortName, resources10, nil, false)
@@ -551,7 +550,7 @@ func TestResourceListRenderParity(t *testing.T) {
 					0, 1, false, // hScrollOffset=1
 				)
 				m.SetSize(stdW, stdH)
-				m.SetEnrichmentState(len(findings), false, findings, nil)
+				m.SetEnrichmentState(len(findings), false, wrapFindingsForApply(findings), nil)
 
 				c := newListController(t, td.ShortName)
 				c.ApplyResourcesLoaded(td.ShortName, resources10, nil, false)

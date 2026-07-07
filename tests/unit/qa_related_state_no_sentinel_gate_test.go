@@ -2,13 +2,21 @@
 //
 // The `Count == -1` sentinel on related-resource results/rows is being
 // replaced by an explicit RelatedRowState enum. This gate pins the purge: no
-// production composite literal of a related result/row type may set its Count
-// (RelatedCheckResult / DetailRelatedRow / RelatedBlock) or count
-// (rightColumnRow) field to a NEGATIVE integer literal. RED today (the
-// checkers hand-roll `Count: -1`); GREEN once every producer routes through a
-// state constructor (UnknownRelated / ErrorRelated / DeferredRelated /
-// LoadingRelated) that sets the enum and leaves Count at its resolved zero
-// value.
+// composite literal of a related result/row type — production OR test, under
+// internal/ or tests/ — may set its Count (RelatedCheckResult /
+// DetailRelatedRow / RelatedBlock) or count (rightColumnRow) field to a
+// NEGATIVE integer literal. RED today (the checkers hand-roll `Count: -1`);
+// GREEN once every producer routes through a state constructor
+// (UnknownRelated / ErrorRelated / DeferredRelated / LoadingRelated) that
+// sets the enum and leaves Count at its resolved zero value.
+//
+// Scope (Batch 2, task #58 follow-up): the scan walks BOTH internal/ (every
+// .go file, including internal/**_test.go white-box tests) and tests/ (every
+// .go file under tests/unit, tests/integration, tests/stories, tests/testdata
+// — tests/e2e has no .go files). Test-side stub checkers and fake results are
+// exactly as bound by this gate as production checkers: a test fixture that
+// hand-rolls `RelatedCheckResult{Count: -1}` to simulate "unknown" reintroduces
+// the retired sentinel encoding just as surely as a production checker would.
 //
 // DESIGN CHOICE (mirrors qa_multifinding_no_legacy_gate_test.go): no
 // allowlist. A fresh AST scan every run, an unconditional t.Errorf listing
@@ -26,6 +34,12 @@
 // negative int literal (*ast.UnaryExpr Op=SUB wrapping an INT *ast.BasicLit).
 // A comparison like `r.Count == -1` or `PaginationMeta.TotalHint == -1` is a
 // BinaryExpr, never a CompositeLit element, so it can never false-positive.
+// A prose mention inside a `//` comment or a string literal (e.g. an Errorf
+// format string) is never part of the AST's CompositeLit walk either, so this
+// file's own historical/documentation references to the retired sentinel
+// cannot self-trip the gate — go/parser does not evaluate `//go:build` tags,
+// so build-tag-gated files under tests/integration are parsed (and scanned)
+// unconditionally too.
 package unit_test
 
 import (
@@ -158,41 +172,52 @@ func rsnsScanFile(fset *token.FileSet, path, rel string) ([]rsnsViolation, error
 	return violations, nil
 }
 
+// rsnsScanRoots are the two trees the gate walks: ALL of internal/ (including
+// internal/**_test.go white-box tests — no "_test.go" exclusion, unlike the
+// original production-only scan) and ALL of tests/ (unit, integration,
+// stories, testdata; tests/e2e has no .go files to match). See this file's
+// header for the Batch 2 scope rationale.
+var rsnsScanRoots = []string{"../../internal", "../../tests"}
+
 // TestRelatedStateNoSentinel_NoNegativeCountLiteralInRelatedTypes is the
-// task #58 gate: no non-test .go file under internal/ may construct a related
-// result/row literal with a negative Count sentinel. See this file's header
-// for the exact AST shape matched and the no-allowlist rationale.
+// task #58 gate: no .go file under internal/ or tests/ — production or test —
+// may construct a related result/row literal with a negative Count sentinel.
+// See this file's header for the exact AST shape matched and the
+// no-allowlist rationale.
 func TestRelatedStateNoSentinel_NoNegativeCountLiteralInRelatedTypes(t *testing.T) {
-	root, err := filepath.Abs("../../internal")
-	if err != nil {
-		t.Fatalf("filepath.Abs: %v", err)
-	}
 	fset := token.NewFileSet()
 	var violations []rsnsViolation
-	walkErr := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	for _, r := range rsnsScanRoots {
+		root, err := filepath.Abs(r)
 		if err != nil {
-			return err
+			t.Fatalf("filepath.Abs(%q): %v", r, err)
 		}
-		if info.IsDir() {
+		rootLabel := filepath.Base(root)
+		walkErr := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+			if !strings.HasSuffix(path, ".go") {
+				return nil
+			}
+			rel, rerr := filepath.Rel(root, path)
+			if rerr != nil {
+				return rerr
+			}
+			rel = filepath.ToSlash(filepath.Join(rootLabel, rel))
+			found, serr := rsnsScanFile(fset, path, rel)
+			if serr != nil {
+				return serr
+			}
+			violations = append(violations, found...)
 			return nil
+		})
+		if walkErr != nil {
+			t.Fatalf("walk %s failed: %v", r, walkErr)
 		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		rel, rerr := filepath.Rel(root, path)
-		if rerr != nil {
-			return rerr
-		}
-		rel = filepath.ToSlash(rel)
-		found, serr := rsnsScanFile(fset, path, rel)
-		if serr != nil {
-			return serr
-		}
-		violations = append(violations, found...)
-		return nil
-	})
-	if walkErr != nil {
-		t.Fatalf("walk internal/ failed: %v", walkErr)
 	}
 	if len(violations) == 0 {
 		return
