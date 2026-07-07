@@ -44,15 +44,18 @@ func (c *Core) CurrentGenFor(a messages.Aspect) domain.Gen {
 func (c *Core) Profile() string { return c.session.Profile }
 
 // SetProfile sets the active session profile. Used by the WithProfile
-// constructor option only.
-func (c *Core) SetProfile(p string) { c.session.Profile = p }
+// constructor option only, before any goroutine other than the caller's own
+// can observe the session — goes through SetProfileRegion regardless, so a
+// later WithProfile/WithRegion combination (both constructor options run
+// during the same single-threaded construction) never risks a torn pair.
+func (c *Core) SetProfile(p string) { c.session.SetProfileRegion(p, c.session.Region) }
 
 // Region returns the active session region.
 func (c *Core) Region() string { return c.session.Region }
 
 // SetRegion sets the active session region. Used by the WithRegion
-// constructor option only.
-func (c *Core) SetRegion(r string) { c.session.Region = r }
+// constructor option only. See SetProfile's doc comment.
+func (c *Core) SetRegion(r string) { c.session.SetProfileRegion(c.session.Profile, r) }
 
 // NoCache reports whether the --no-cache / --demo CLI flags disabled
 // on-disk availability caching and background probes.
@@ -74,38 +77,44 @@ func (c *Core) CacheStore() *cache.Store { return c.EnsureCacheStore() }
 // covers both the first call since the last Rotate (C9) or process start,
 // and a pair switch that lands between two calls without an intervening
 // Rotate observation. NoCache=true always returns nil without ever calling
-// LoadDir (C7b: --no-cache disables persisted load entirely). session == ""
-// Profile or Region (pair not yet resolved) returns nil WITHOUT memoizing,
-// so a pre-connect call never pins the store to the wrong "<profile>--"
-// directory. All access serializes on session.cacheStoreMu.
+// LoadDir (C7b: --no-cache disables persisted load entirely). An unresolved
+// Profile or Region (pair not yet resolved) returns nil WITHOUT memoizing, so
+// a pre-connect call never pins the store to the wrong "<profile>--"
+// directory. Session.EnsureCacheStore reads the pair itself under
+// session.pairMu — this method no longer reads session.Profile/Region at all,
+// closing the cross-goroutine race a profile/region switch (which writes
+// those fields via SetProfileRegion, also under pairMu) used to have against
+// a concurrent caller here (CI run 28839454135).
 func (c *Core) EnsureCacheStore() *cache.Store {
 	if c.session.NoCache {
 		return nil
 	}
-	return c.session.EnsureCacheStore(c.session.Profile, c.session.Region)
+	return c.session.EnsureCacheStore()
 }
 
 // WithCacheStore runs fn against the current pair's *cache.Store with
-// session.cacheStoreMu held for fn's entire duration, so a caller's own
+// session.pairMu held for fn's entire duration, so a caller's own
 // store.Type/Put/SaveType read-modify-write sequence for one type file can
-// never interleave with another such sequence running concurrently (DEF-17).
-// No-op (fn not called) when NoCache is set, mirroring EnsureCacheStore.
+// never interleave with another such sequence running concurrently (DEF-17),
+// and so the Profile/Region pair itself cannot be read torn or racing a
+// concurrent profile/region switch. No-op (fn not called) when NoCache is
+// set, mirroring EnsureCacheStore.
 func (c *Core) WithCacheStore(fn func(store *cache.Store) error) error {
 	if c.session.NoCache {
 		return nil
 	}
-	return c.session.WithCacheStore(c.session.Profile, c.session.Region, fn)
+	return c.session.WithCacheStore(fn)
 }
 
 // ReadCacheStore runs fn against the current pair's *cache.Store with
-// session.cacheStoreMu held, for read-only callers (store.Type/store.Types).
-// See Session.ReadCacheStore for why a read call site must not bypass this
-// lock even though it never mutates the store itself.
+// session.pairMu held, for read-only callers (store.Type/store.Types). See
+// Session.ReadCacheStore for why a read call site must not bypass this lock
+// even though it never mutates the store itself.
 func (c *Core) ReadCacheStore(fn func(store *cache.Store) error) error {
 	if c.session.NoCache {
 		return nil
 	}
-	return c.session.ReadCacheStore(c.session.Profile, c.session.Region, fn)
+	return c.session.ReadCacheStore(fn)
 }
 
 // Command returns the one-shot resource short name to navigate to on the

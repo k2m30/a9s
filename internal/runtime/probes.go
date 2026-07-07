@@ -79,18 +79,24 @@ type DemoPrefetchResult struct {
 // does not have to wait on a live connection (C1: cached data renders
 // before any AWS activity). This mirrors the resolution
 // handleClientsReadySuccess performs post-connect. The resolved region is
-// passed directly to Session.EnsureCacheStore and is NOT written back to
-// c.session.Region — connect owns that field, and if it resolves a
+// passed directly to Session.EnsureCacheStoreForRegion and is NOT written
+// back to c.session.Region — connect owns that field, and if it resolves a
 // different region the pair-stamped Store self-corrects on the next call.
+//
+// This method is itself dispatched as a tea.Cmd (background goroutine), so
+// its own Profile/Region read goes through the pairMu-guarded
+// EnsureCacheStoreForRegion rather than reading c.session.Region/Profile
+// directly — the same cross-goroutine hazard EnsureCacheStore/WithCacheStore/
+// ReadCacheStore close (see Session.pairMu's doc comment).
 func (c *Core) LoadAvailabilityCache() *cache.Store {
 	if c.session.NoCache {
 		return nil
 	}
-	region := c.session.Region
+	profile, region := c.session.CurrentPair()
 	if region == "" {
-		region = awsclient.GetDefaultRegion(awsclient.DefaultConfigPath(), c.session.Profile)
+		region = awsclient.GetDefaultRegion(awsclient.DefaultConfigPath(), profile)
 	}
-	return c.session.EnsureCacheStore(c.session.Profile, region)
+	return c.session.EnsureCacheStoreForRegion(region)
 }
 
 // reconcileTypeFile is the SINGLE chokepoint every type-file write goes

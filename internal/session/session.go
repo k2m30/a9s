@@ -41,7 +41,15 @@ import (
 // Session owns the in-memory orchestration state for the active
 // profile/region session.
 type Session struct {
-	// Session identity — set by the caller (tui.New / handler) before/after Rotate.
+	// Session identity — set by the caller (tui.New / handler) before/after
+	// Rotate. Writers on the Bubble Tea update goroutine (profile/region
+	// switch handlers, connect success/failure handlers in
+	// internal/runtime/handlers.go) MUST write both fields together via
+	// SetProfileRegion rather than direct field assignment — see pairMu's
+	// doc comment for the cross-goroutine race this guards against.
+	// Same-goroutine reads on the update path (e.g. Core.Profile()/Region())
+	// may still read the fields directly; only the cross-goroutine
+	// cache-store accessors and the writers need the lock.
 	Profile string
 	Region  string
 
@@ -110,12 +118,32 @@ type Session struct {
 	// static policy, not session state.
 	NoCache bool
 
-	// cacheStoreMu guards CacheStore and the cacheStore{Profile,Region} stamp
-	// below. TUI tea.Cmd goroutines and concurrent web drains both reach
-	// EnsureCacheStore/CacheStore, and Rotate clears the field from the
-	// event-handling goroutine on a profile/region switch — all three must
+	// pairMu guards two related things that must be observed together
+	// atomically across goroutines: the live Profile/Region pair, and
+	// CacheStore + its cacheStore{Profile,Region} load-stamp below.
+	//
+	// Profile/Region are written on the Bubble Tea update goroutine by the
+	// profile/region-switch handlers (HandleProfileSelected/
+	// HandleRegionSelected/handleClientsReadyFailure/
+	// handleClientsReadySuccess in internal/runtime/handlers.go) — all via
+	// SetProfileRegion, never by direct field assignment. They are read
+	// cross-goroutine by EnsureCacheStore/WithCacheStore/ReadCacheStore's own
+	// callers, which historically read c.session.Profile/Region at the Core
+	// accessor call site BEFORE entering this lock — that pre-lock read was
+	// the actual data race (a profile switch's field write interleaving with
+	// the detached availability-cache-save writer goroutine's read, caught by
+	// -race on CI run 28839454135: Core.HandleProfileSelected's write at
+	// handlers.go:418 against Core.WithCacheStore's read at accessors.go:97,
+	// reached via the single-writer goroutine runAvailabilitySaveLoop spawns
+	// in internal/app/menu.go). EnsureCacheStore/WithCacheStore/ReadCacheStore
+	// now read the pair via CurrentPair while already holding pairMu, closing
+	// that gap for every caller in one place rather than one at a time.
+	//
+	// TUI tea.Cmd goroutines and concurrent web drains both reach
+	// EnsureCacheStore/CacheStore, and Rotate clears CacheStore from the
+	// event-handling goroutine on a profile/region switch — all must
 	// serialize on this lock (Codex P1 / CodeRabbit race).
-	cacheStoreMu sync.Mutex
+	pairMu sync.Mutex
 
 	// CacheStore is the loaded per-type disk cache (C7) for the pair recorded
 	// in cacheStoreProfile/cacheStoreRegion. nil until LoadDir has run for a
@@ -126,7 +154,7 @@ type Session struct {
 	// load. Cleared (set to nil) by Rotate so a pair switch never lets writes
 	// for the OLD pair's Store race a save for the NEW pair (C9). Access only
 	// through EnsureCacheStore — never read/write this field directly
-	// outside cacheStoreMu.
+	// outside pairMu.
 	CacheStore *cache.Store
 
 	// cacheStoreProfile/cacheStoreRegion are the pair CacheStore was loaded
@@ -260,22 +288,70 @@ func New() *Session {
 	}
 }
 
-// EnsureCacheStore returns the *cache.Store for the given profile/region
-// pair, loading (or reloading) it via cache.LoadDir when no store is
-// memoized yet or the memoized store was loaded for a different pair.
-// profile/region == "" means the pair has not resolved yet (pre-connect or
-// cold boot before the first ClientsReady/Rotate settles Profile/Region);
-// the empty pair is never memoized so a later call with the real pair always
-// reloads instead of forever returning a store keyed by "<profile>--".
-//
-// All CacheStore reads/writes are serialized on cacheStoreMu so concurrent
-// TUI tea.Cmd goroutines, concurrent web drains, and a same-moment Rotate
-// (profile/region switch) can never interleave a check-then-write on the
-// field or observe a store loaded for the wrong pair.
-func (s *Session) EnsureCacheStore(profile, region string) *cache.Store {
-	s.cacheStoreMu.Lock()
-	defer s.cacheStoreMu.Unlock()
+// CurrentPair returns the live Profile/Region pair while holding pairMu, so a
+// caller on any goroutine observes a consistent snapshot rather than reading
+// the two fields separately (which could race a concurrent SetProfileRegion
+// writing one and not yet the other). Callers needing the pair together with
+// a CacheStore decision (EnsureCacheStore/WithCacheStore/ReadCacheStore) read
+// it from inside their own pairMu-held critical section instead of calling
+// this method, to avoid a lock-release-then-reacquire window between the
+// pair read and the store decision.
+func (s *Session) CurrentPair() (profile, region string) {
+	s.pairMu.Lock()
+	defer s.pairMu.Unlock()
+	return s.Profile, s.Region
+}
 
+// SetProfileRegion sets the live Profile/Region pair while holding pairMu.
+// Every write to Session.Profile/Session.Region MUST go through this method
+// (never a direct field assignment) so a concurrent EnsureCacheStore/
+// WithCacheStore/ReadCacheStore call on another goroutine can never observe a
+// torn or half-written pair, and never races the write itself (see pairMu's
+// doc comment for the CI-caught race this closes).
+func (s *Session) SetProfileRegion(profile, region string) {
+	s.pairMu.Lock()
+	defer s.pairMu.Unlock()
+	s.Profile = profile
+	s.Region = region
+}
+
+// EnsureCacheStore returns the *cache.Store for the current Profile/Region
+// pair, loading (or reloading) it via cache.LoadDir when no store is
+// memoized yet or the memoized store was loaded for a different pair. An
+// unresolved pair ("" profile or region — pre-connect or cold boot before
+// the first ClientsReady/Rotate settles Profile/Region) returns nil without
+// memoizing, so a later call with the real pair always reloads instead of
+// forever returning a store keyed by "<profile>--".
+//
+// The pair is read AND the CacheStore decision made inside the same pairMu
+// critical section, so concurrent TUI tea.Cmd goroutines, concurrent web
+// drains, and a same-moment profile/region switch (SetProfileRegion/Rotate)
+// can never interleave a check-then-write on the field, observe a store
+// loaded for the wrong pair, or race the Profile/Region read itself.
+func (s *Session) EnsureCacheStore() *cache.Store {
+	s.pairMu.Lock()
+	defer s.pairMu.Unlock()
+	return s.ensureCacheStoreLocked(s.Profile, s.Region)
+}
+
+// EnsureCacheStoreForRegion is EnsureCacheStore's counterpart for a caller
+// (LoadAvailabilityCache) that needs to substitute a locally-resolved default
+// region for an unresolved Session.Region without writing that resolution
+// back onto the session (connect still owns Session.Region — see
+// LoadAvailabilityCache's doc comment for why). Reads Session.Profile under
+// pairMu just like EnsureCacheStore; region is the caller-supplied override
+// rather than Session.Region.
+func (s *Session) EnsureCacheStoreForRegion(region string) *cache.Store {
+	s.pairMu.Lock()
+	defer s.pairMu.Unlock()
+	return s.ensureCacheStoreLocked(s.Profile, region)
+}
+
+// ensureCacheStoreLocked is EnsureCacheStore/EnsureCacheStoreForRegion's
+// shared body, factored out so WithCacheStore/ReadCacheStore can also reuse
+// it inside their own already-held pairMu critical section without a
+// reentrant Lock call (sync.Mutex is not reentrant).
+func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
 	if profile == "" || region == "" {
 		return nil
 	}
@@ -288,8 +364,9 @@ func (s *Session) EnsureCacheStore(profile, region string) *cache.Store {
 	return s.CacheStore
 }
 
-// WithCacheStore runs fn against the current pair's *cache.Store while
-// holding cacheStoreMu for the entire call, then returns fn's error.
+// WithCacheStore runs fn against the current Profile/Region pair's
+// *cache.Store while holding pairMu for the entire call (both the pair read
+// and the store decision, then fn itself), then returns fn's error.
 //
 // DEF-17: SaveResourceListCache and SaveAvailabilityCache each perform their
 // own store.Type (read) / mutate / store.Put+SaveType (write) sequence for
@@ -307,47 +384,32 @@ func (s *Session) EnsureCacheStore(profile, region string) *cache.Store {
 // goroutines writing s.types[shortName] concurrently is a data race on the
 // map, independent of the logical inconsistency above.
 //
-// fn must not call back into WithCacheStore/EnsureCacheStore (Session's mutex
-// is not reentrant) and should do no blocking I/O beyond store.SaveType.
-// Returns nil without calling fn when NoCache is set or profile/region has
-// not resolved yet — matching EnsureCacheStore's nil-store contract.
-func (s *Session) WithCacheStore(profile, region string, fn func(store *cache.Store) error) error {
-	s.cacheStoreMu.Lock()
-	defer s.cacheStoreMu.Unlock()
-
-	if profile == "" || region == "" {
-		return nil
-	}
-	if s.CacheStore == nil || s.cacheStoreProfile != profile || s.cacheStoreRegion != region {
-		s.CacheStore = cache.LoadDir(profile, region)
-		s.cacheStoreProfile = profile
-		s.cacheStoreRegion = region
-	}
-	return fn(s.CacheStore)
+// fn must not call back into WithCacheStore/EnsureCacheStore/CurrentPair/
+// SetProfileRegion (Session's mutex is not reentrant) and should do no
+// blocking I/O beyond store.SaveType. Always calls fn (never skips it) —
+// when profile/region has not resolved yet, fn receives a nil store, matching
+// EnsureCacheStore's nil-store contract; callers already check for a nil
+// store inside fn (see SaveAvailabilityCache). The NoCache short-circuit
+// lives one layer up, in Core.WithCacheStore/Core.ReadCacheStore, which never
+// call down into this method at all when NoCache is set.
+func (s *Session) WithCacheStore(fn func(store *cache.Store) error) error {
+	s.pairMu.Lock()
+	defer s.pairMu.Unlock()
+	return fn(s.ensureCacheStoreLocked(s.Profile, s.Region))
 }
 
-// ReadCacheStore runs fn against the current pair's *cache.Store while
-// holding cacheStoreMu, for callers that only read (store.Type/store.Types)
-// and never Put/SaveType. Pairs with WithCacheStore (DEF-17): a reader that
-// bypassed the lock (the shape every read call site had before DEF-17) could
-// observe cache.Store's internal map mid-write from a concurrent
-// WithCacheStore call — a data race on the map itself, independent of the
-// logical Count/Rows consistency WithCacheStore's callers already guard.
-// Same nil-fn contract as WithCacheStore: NoCache or unresolved profile/
-// region skips fn and returns nil.
-func (s *Session) ReadCacheStore(profile, region string, fn func(store *cache.Store) error) error {
-	s.cacheStoreMu.Lock()
-	defer s.cacheStoreMu.Unlock()
-
-	if profile == "" || region == "" {
-		return nil
-	}
-	if s.CacheStore == nil || s.cacheStoreProfile != profile || s.cacheStoreRegion != region {
-		s.CacheStore = cache.LoadDir(profile, region)
-		s.cacheStoreProfile = profile
-		s.cacheStoreRegion = region
-	}
-	return fn(s.CacheStore)
+// ReadCacheStore runs fn against the current Profile/Region pair's
+// *cache.Store while holding pairMu, for callers that only read
+// (store.Type/store.Types) and never Put/SaveType. Pairs with WithCacheStore
+// (DEF-17): a reader that bypassed the lock (the shape every read call site
+// had before DEF-17) could observe cache.Store's internal map mid-write from
+// a concurrent WithCacheStore call — a data race on the map itself,
+// independent of the logical Count/Rows consistency WithCacheStore's callers
+// already guard. Same nil-store-to-fn contract as WithCacheStore.
+func (s *Session) ReadCacheStore(fn func(store *cache.Store) error) error {
+	s.pairMu.Lock()
+	defer s.pairMu.Unlock()
+	return fn(s.ensureCacheStoreLocked(s.Profile, s.Region))
 }
 
 // CurrentGenFor implements messages.GenSource. It maps an Aspect to the
@@ -399,11 +461,11 @@ func (s *Session) Rotate() {
 	// vice versa). The new pair's Store is re-obtained via a fresh
 	// cache.LoadDir call dispatched by the pair-switch handler
 	// (TaskKindLoadAvailCache), never carried over from the old pair.
-	s.cacheStoreMu.Lock()
+	s.pairMu.Lock()
 	s.CacheStore = nil
 	s.cacheStoreProfile = ""
 	s.cacheStoreRegion = ""
-	s.cacheStoreMu.Unlock()
+	s.pairMu.Unlock()
 
 	s.Identity = nil
 	s.IdentityFetching = false
