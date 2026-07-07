@@ -145,6 +145,7 @@ igw — NETWORKING. Lifecycle key: `state`.
 | --- | --- | --- | --- |
 | igw.state.attaching | attaching | warn | wave1 |
 | igw.state.detaching | detaching | warn | wave1 |
+| igw.no-attachments | no VPC attachments | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

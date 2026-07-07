@@ -20,10 +20,13 @@ const (
 )
 
 // EnrichELBAttributes calls DescribeLoadBalancerAttributes for each load
-// balancer (1 per LB, cap 50) and returns an informational "~" finding for
-// each LB missing deletion protection or access logging.
-// The worst finding per LB is promoted to "!" if both attributes are missing;
-// otherwise "~" is used. IssueCount counts findings with Severity "!".
+// balancer (1 per LB, cap 50) and returns a "~" (SevWarn) finding for each LB
+// missing deletion protection or access logging — matching the single
+// elbCodeMisconfigured FindingDef declared at SevWarn in
+// catalog_networking.go. Both flags missing at once is the AWS
+// create-load-balancer default and must not escalate to SevBroken; doing so
+// previously painted every freshly-created, unhardened LB red. IssueCount
+// counts findings with Severity SevBroken, which this enricher never emits.
 //
 // Per-LB API failures aggregate into a composite error returned alongside
 // the partial findings (E1–E6 contract). LoadBalancerArn is read from
@@ -92,13 +95,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		if len(rows) == 0 {
 			return
 		}
-		// Severity is "~" for each individual finding; promote to "!" only
-		// when both misconfiguration flags are present simultaneously.
-		severity := "~"
-		if len(rows) >= 2 {
-			severity = "!"
-		}
-		setWave2Finding(&result, r.ID, elbCodeMisconfigured, phrases[0], severity, "elb", rows, "")
+		setWave2Finding(&result, r.ID, elbCodeMisconfigured, phrases[0], "~", "elb", rows, "")
 	})
 	sort.Strings(failures)
 	issueCount := 0

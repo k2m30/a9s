@@ -7,4 +7,5 @@ const (
 	CodeTGWStateModifying domain.FindingCode = "tgw.state.modifying"
 	CodeTGWStateDeleting  domain.FindingCode = "tgw.state.deleting"
 	CodeTGWStateFailed    domain.FindingCode = "tgw.state.failed"
+	CodeTGWStateDeleted   domain.FindingCode = "tgw.state.deleted"
 )

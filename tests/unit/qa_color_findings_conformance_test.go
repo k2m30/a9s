@@ -180,7 +180,6 @@ var knownColorDivergence = map[string]bool{
 	"iam-group:empty-group":                                              true,
 	"iam-group:readonly":                                                 true,
 	"iam-user:bob.smith":                                                 true,
-	"igw:igw-0unattached111111c":                                         true,
 	"kms:11111111-1111-1111-1111-111111111111":                           true,
 	"kms:2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b":                           true,
 	"kms:a1b2c3d4-5678-90ab-cdef-111111111111":                           true,
@@ -194,7 +193,6 @@ var knownColorDivergence = map[string]bool{
 	"kms:kms-redshift-1":                                                 true,
 	"kms:kms-redshift-2":                                                 true,
 	"kms:orders-prod-cmk-0001":                                           true,
-	"nat:nat-0deleted11111111f":                                          true,
 	"opensearch:acme-metrics":                                            true,
 	"opensearch:acme-product-search":                                     true,
 	"opensearch:acme-search-alpha":                                       true,
@@ -257,9 +255,6 @@ var knownColorDivergence = map[string]bool{
 	"sqs:data-pipeline-dlq":                                        true,
 	"sqs:email-notification-queue":                                 true,
 	"sqs:webhook-ingest-queue.fifo":                                true,
-	"tg:acme-web-tg":                                               true,
-	"tgw:tgw-0deleted11111111e":                                    true,
-	"vpce:vpce-0deleted111111111f":                                 true,
 	"waf:a1b2c3d4-5678-90ab-cdef-333333333333":                     true,
 }
 

@@ -85,6 +85,8 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 			findings = []domain.Finding{{Code: CodeTGWStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
 		case "failed":
 			findings = []domain.Finding{{Code: CodeTGWStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		case "deleted":
+			findings = []domain.Finding{{Code: CodeTGWStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"}}
 		}
 
 		r := resource.Resource{

@@ -270,6 +270,7 @@ vpce — NETWORKING. Lifecycle key: `state`.
 | vpce.state.rejected | rejected | broken | wave1 |
 | vpce.state.expired | expired | broken | wave1 |
 | vpce.state.partial | partial | broken | wave1 |
+| vpce.state.deleted | deleted | dim | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

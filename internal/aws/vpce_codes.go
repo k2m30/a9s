@@ -10,4 +10,5 @@ const (
 	CodeVPCEStateRejected          domain.FindingCode = "vpce.state.rejected"
 	CodeVPCEStateExpired           domain.FindingCode = "vpce.state.expired"
 	CodeVPCEStatePartial           domain.FindingCode = "vpce.state.partial"
+	CodeVPCEStateDeleted           domain.FindingCode = "vpce.state.deleted"
 )

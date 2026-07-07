@@ -6,4 +6,5 @@ const (
 	CodeNATStatePending  domain.FindingCode = "nat.state.pending"
 	CodeNATStateDeleting domain.FindingCode = "nat.state.deleting"
 	CodeNATStateFailed   domain.FindingCode = "nat.state.failed"
+	CodeNATStateDeleted  domain.FindingCode = "nat.state.deleted"
 )

@@ -25,7 +25,12 @@ func colorELB(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-func colorTG(_ domain.Resource) domain.Color { return domain.ColorHealthy }
+func colorTG(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
 
 func colorSG(r domain.Resource) domain.Color {
 	if r.Fields["wide_open"] == "true" {
@@ -502,6 +507,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeNATStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeNATStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeNATStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeNATStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},
 	{
@@ -536,6 +542,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Findings: []catalog.FindingDef{
 			{Code: CodeIGWStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeIGWStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeIGWNoAttachments, Phrase: "no VPC attachments", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -636,6 +643,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeVPCEStateRejected, Phrase: "rejected", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeVPCEStateExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeVPCEStatePartial, Phrase: "partial", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeVPCEStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},
 	{
@@ -674,6 +682,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeTGWStateModifying, Phrase: "modifying", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeTGWStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeTGWStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeTGWStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
 			{Code: tgwCodeAttachmentFailed, Phrase: "attachment <id> failed", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: tgwCodeAttachmentTransitional, Phrase: "attachment <id> <state>", Severity: domain.SevWarn, Source: "wave2"},
 		},

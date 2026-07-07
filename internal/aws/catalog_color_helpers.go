@@ -17,35 +17,6 @@ import (
 // The intrinsic ResolveColor fallback used by
 // catalog.ResourceTypeDef.ResolveColor stays in internal/catalog.
 
-// colorFallback classifies a resource status string when no per-type Color func
-// is set. Matches the helper of the same name in internal/catalog that
-// ResolveColor uses — kept in sync because catalog_compute.go's colorEC2 and
-// other per-type classifiers call it directly.
-func colorFallback(status string) domain.Color {
-	switch status {
-	case "running", "available", "active", "ACTIVE", "AVAILABLE", "RUNNING",
-		"in-service", "healthy":
-		return domain.ColorHealthy
-	case "stopped", "failed", "error", "impaired", "FAILED", "ERROR",
-		"STOPPED":
-		return domain.ColorBroken
-	case "terminated", "TERMINATED", "shutting-down", "deleted", "DELETED",
-		"deregistered", "inactive", "INACTIVE":
-		return domain.ColorDim
-	}
-	lower := strings.ToLower(status)
-	switch {
-	case strings.HasSuffix(lower, "_failed") || strings.HasSuffix(lower, "-failed"):
-		return domain.ColorBroken
-	case strings.HasSuffix(lower, "_in_progress") || strings.HasSuffix(lower, "_progress") ||
-		strings.HasSuffix(lower, "-in-progress") || status == "pending" ||
-		status == "creating" || status == "modifying" || status == "updating" ||
-		status == "initializing":
-		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
-}
-
 // colorFromSeverity maps a domain.Severity to the corresponding display Color.
 func colorFromSeverity(sev domain.Severity) domain.Color {
 	switch sev {
@@ -139,8 +110,16 @@ func cfnStackColor(status string) domain.Color {
 	return domain.ColorHealthy
 }
 
-// acmColor classifies an ACM certificate resource.
+// acmColor classifies an ACM certificate resource. Prefers colorFromAnyFinding
+// so real fetched resources (Findings populated by acmStatusFindings, Source:
+// "wave1", and EnrichACMCertificate, Source: "wave2:acm") color from their own
+// Finding; the raw-field switch below is the identical-precedence fallback
+// for callers that construct a Resource with only Fields set (e.g.
+// qa_acm_color_test.go, qa_acm_validation_timed_out_test.go).
 func acmColor(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
 	switch r.Fields["status"] {
 	case "ISSUED":
 		dl := r.Fields["days_left"]
@@ -172,8 +151,16 @@ func acmColor(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-// r53Color classifies a Route53 hosted zone resource.
+// r53Color classifies a Route53 hosted zone resource. Prefers
+// colorFromAnyFinding so real fetched resources (Findings populated by
+// r53CodeUnusedZone, Source: "wave1", and r53CodeOrphanPrivateZone, Source:
+// "wave2:r53") color from their own Finding; the raw-field check below is the
+// identical-precedence fallback for callers that construct a Resource with
+// only Fields set (e.g. qa_r53_color_test.go).
 func r53Color(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
 	s := r.Fields["record_count"]
 	if s != "" {
 		if n, err := strconv.ParseInt(s, 10, 64); err == nil && n <= 2 {
