@@ -74,7 +74,11 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 			if t.TargetHealth != nil && t.TargetHealth.State != elbtypes.TargetHealthStateEnumHealthy {
 				unhealthy++
 				if firstReason == "" && t.TargetHealth.Reason != "" {
-					firstReason = domain.HumanizeStatusPhrase(string(t.TargetHealth.Reason))
+					// humanizeTargetHealthReason (tg_health.go) strips the
+					// Target./Elb. namespace prefix before humanizing — plain
+					// domain.HumanizeStatusPhrase would emit "target. failed
+					// health checks" for "Target.FailedHealthChecks".
+					firstReason = humanizeTargetHealthReason(string(t.TargetHealth.Reason))
 				}
 			}
 		}

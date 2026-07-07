@@ -166,6 +166,24 @@
     return !!(body.querySelector(".detail-layout") || body.querySelector(".text-body"));
   }
 
+  // footerHasEnterChildHint reports whether the current screen is a resource
+  // list (top-level or child) whose footer advertises an "enter"-triggered
+  // child view. The footer is rendered by main.html as one
+  // <span class="key-hint"><span class="k">{key}</span>…</span> per
+  // KeyHint — "enter" only appears there for a registered enter-child
+  // (buildListFooterHints) or a detail-screen navigable field/related row
+  // (buildDetailFooterHints); scoping to ".list-table" excludes the latter,
+  // since detail screens never render that table.
+  function footerHasEnterChildHint() {
+    var body = document.getElementById("body");
+    if (!body || !body.querySelector(".list-table")) return false;
+    var hintKeys = document.querySelectorAll("#footer .key-hint .k");
+    for (var i = 0; i < hintKeys.length; i++) {
+      if (hintKeys[i].textContent === "enter") return true;
+    }
+    return false;
+  }
+
   function setFilter(val) {
     sendAction("set-filter", val);
   }
@@ -362,6 +380,19 @@
     var childKeys = { "e": "e", "L": "L", "s": "s" };
     if (childKeys[e.key] && !e.ctrlKey) {
       sendAction("child-view", e.key);
+      e.preventDefault();
+      return;
+    }
+
+    // "enter"-registered child views (tg_health, s3 objects, lambda
+    // invocations, …) advertise themselves via a footer hint with key
+    // "enter" (internal/app's buildListFooterHints), the same footer the e/L/s
+    // hints above come from. Mirror the TUI's precedence (resourcelist.go:
+    // handleChildKey("enter", …) is tried before the row opens its detail):
+    // on a list screen with a registered enter-child hint, Enter opens it;
+    // everywhere else (menu, detail) Enter keeps its existing behavior below.
+    if (e.key === "Enter" && !e.ctrlKey && footerHasEnterChildHint()) {
+      sendAction("child-view", "enter");
       e.preventDefault();
       return;
     }

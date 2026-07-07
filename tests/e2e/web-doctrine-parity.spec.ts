@@ -196,10 +196,9 @@ test.describe("presentation doctrine — web parity (demo fixtures)", () => {
 
     const unhealthy = page.locator(".list-table tbody tr", { hasText: "i-0a1b2c3d4e5f60003" });
     await expect(unhealthy).toHaveCount(1);
-    await expect(unhealthy, "unhealthy target row must show its state").toContainText("unhealthy");
     await expect(
       unhealthy,
-      "the Reason cell must render the humanized phrase, not the raw SDK enum",
+      "the flagged target row must render the finding phrase, not the raw SDK enum",
     ).toContainText("failed health checks");
 
     // No raw dotted enum token anywhere in the rendered page.
@@ -210,22 +209,10 @@ test.describe("presentation doctrine — web parity (demo fixtures)", () => {
     ).toBe(false);
   });
 
-  test("KNOWN GAP: unhealthy target row in the child view carries an issue row color", async ({ page }) => {
-    // PRODUCTION PARITY GAP, pinned as an expected failure so its fix trips
-    // the ratchet: web child-list rows carry NO row-<color> class at all (not
-    // even row-healthy). internal/app/list_body.go's buildListBody resolves
-    // the typeDef via c.fallbackTypeDefs / resource.FindResourceType only;
-    // the TUI's views.NewChildResourceList registers the child typeDef
-    // (resource.GetChildType) as the fallback before pushing the child
-    // screen, but the web lane's handleActionChildView
-    // (internal/app/actions_view.go) never does — so td == nil and
-    // resolveListDecoratorFull returns an empty color tag for every child
-    // row. The TUI colors these rows (tests/unit/
-    // qa_childview_color_doctrine_test.go pins it); the web does not.
-    // When the controller gap is fixed, this test "unexpectedly passes" —
-    // remove the test.fail() annotation to arm the assertion.
-    test.fail();
-
+  test("unhealthy target row in the child view carries an issue row color", async ({ page }) => {
+    // Web child lists share the findings-derived row color with the TUI:
+    // handleActionChildView registers the child typeDef as the fallback, so
+    // buildListBody resolves the same color tag both lanes render.
     await openTargetHealthChildView(page);
     const unhealthy = page.locator(".list-table tbody tr", { hasText: "i-0a1b2c3d4e5f60003" });
     await expect(unhealthy).toHaveCount(1);

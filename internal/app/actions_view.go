@@ -232,6 +232,15 @@ func (c *Controller) handleActionChildView(a Action) (ViewState, []runtime.TaskR
 	if matchedChild == nil {
 		return c.snapshot(), nil
 	}
+	// Mirror views.NewChildResourceList (TUI lane): register the child type's
+	// own ResourceTypeDef as a fallback so buildListBody resolves a non-nil td
+	// for child types absent from the top-level catalog (e.g. tg_health) —
+	// without this, list rows render with no Color classifier and no row-<tag>
+	// class. Uses the lock-free registerFallbackTypeDefLocked: this method
+	// runs under applyLocked, which already holds c.mu for writing.
+	if childTD := resource.GetChildType(matchedChild.ChildType); childTD != nil {
+		c.registerFallbackTypeDefLocked(*childTD)
+	}
 	// Build the parent context from ContextKeys.
 	ctx := make(map[string]string, len(matchedChild.ContextKeys))
 	for param, source := range matchedChild.ContextKeys {

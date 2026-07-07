@@ -243,6 +243,16 @@ func (c *Controller) UIMode() string {
 func (c *Controller) RegisterFallbackTypeDef(td resource.ResourceTypeDef) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.registerFallbackTypeDefLocked(td)
+}
+
+// registerFallbackTypeDefLocked is the lock-free core of RegisterFallbackTypeDef.
+// Callers must already hold c.mu (write) — e.g. applyLocked and everything it
+// calls (handleActionChildView registers the web lane's child typeDef fallback
+// this way; calling the locking RegisterFallbackTypeDef from there would
+// self-deadlock on the already-held write lock, the same hazard documented on
+// resolveSaveColumns above).
+func (c *Controller) registerFallbackTypeDefLocked(td resource.ResourceTypeDef) {
 	if c.fallbackTypeDefs == nil {
 		c.fallbackTypeDefs = make(map[string]resource.ResourceTypeDef, 1)
 	}
