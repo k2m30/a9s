@@ -69,18 +69,20 @@ func TestScenario_DBIVisual(t *testing.T) {
 	// Rule 7 — W1 + W2 stack: Warning phrase + (+1) for the hidden Wave-2 finding.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiPublicMaintID, "publicly accessible (+1)")
 
-	// Rule 3 — Wave 2 on Healthy row: S4 = "maintenance scheduled"
+	// Rule 3 — Wave 2 finding: S4 = "maintenance scheduled"
 	// (docs/resources/dbi.md §4 signal row "Pending maintenance overdue").
+	// The finding's Severity: SevWarn now also promotes the row itself to
+	// Warning color via colorFromAnyFinding (see glyph rules below).
 	scenario.ExpectRowStatusEquals(demofixtures.MaintDbiScheduledID, "maintenance scheduled")
 
 	// -----------------------------------------------------------------
 	// Glyph rules.
 	// -----------------------------------------------------------------
-	// Rule 3 — `~` glyph on Healthy + ~ finding.
-	scenario.ExpectRowNamePrefix(demofixtures.MaintDbiScheduledID, "~ ")
-
-	// Rule 3 — non-green rows must NOT carry a glyph regardless of finding.
-	// `warn-dbi-public-maint` has a Wave-2 finding but is Warning-colored.
+	// colorDBI (catalog_databases.go) resolves color via colorFromAnyFinding
+	// first. dbiCodePendingMaintenance is declared Severity: SevWarn, so
+	// MaintDbiScheduledID now renders Warning row color directly — it no
+	// longer stays Healthy-with-`~`-glyph the way it did before the
+	// findings-only color contract landed.
 	for _, id := range []string{
 		demofixtures.StagingDbiModifyingID,
 		demofixtures.StagingDbiRebootingID,
@@ -92,6 +94,7 @@ func TestScenario_DBIVisual(t *testing.T) {
 		demofixtures.WarnDbiUnprotectedID,
 		demofixtures.WarnDbiMultiID,
 		demofixtures.WarnDbiPublicMaintID,
+		demofixtures.MaintDbiScheduledID,
 		// Plain Healthy rows with no finding also have no glyph.
 		demofixtures.ProdDbiID,
 		demofixtures.ProdDbiAuroraID,

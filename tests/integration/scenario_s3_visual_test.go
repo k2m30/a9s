@@ -7,10 +7,12 @@ package integration
 // Verifies the rendered TUI output (not fetcher return values) matches the
 // universal UI rules and the §4 contract in docs/resources/s3.md.
 //
-// s3 has zero Wave-1 signals and one Wave-2 signal (`!` severity on Healthy
-// rows via GetPublicAccessBlock). The rule-7 multi-finding cases (U7a/U7b/
-// U7c/U7d/U7e/U7f) are therefore N/A for this resource and skipped with
-// a per-item justification below.
+// s3 has zero Wave-1 signals and one Wave-2 signal (`!` severity via
+// GetPublicAccessBlock). colorS3 (catalog_databases.go) resolves color via
+// colorFromAnyFinding, so a PAB finding now renders its bucket row Broken
+// directly — no Healthy-with-glyph rows for this resource. The rule-7
+// multi-finding cases (U7a/U7b/U7c/U7d/U7e/U7f) are therefore N/A for this
+// resource and skipped with a per-item justification below.
 
 import (
 	"testing"
@@ -74,11 +76,11 @@ func TestScenario_S3Visual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(s3MultiFailPABID, s3S4Phrase)
 	scenario.ExpectRowStatusEquals(s3NilCfgPABID, s3S4Phrase)
 
-	// Rule 3 — `!` glyph prefixes a Healthy (green) row with a `!` finding.
-	// All 4 PAB-finding buckets stay Healthy (s3 has no Wave-1 color bucket
-	// signal; the finding is a background-check annotation).
+	// Rule 3 — glyph rules. colorS3 resolves color via colorFromAnyFinding,
+	// so every PAB-finding bucket renders Broken row color directly instead
+	// of staying Healthy-with-`!`-glyph.
 	for _, id := range []string{s3NoPABBucketID, s3PartialPABID, s3MultiFailPABID, s3NilCfgPABID} {
-		scenario.ExpectRowNamePrefix(id, "! ")
+		scenario.ExpectRowNoGlyphPrefix(id)
 	}
 
 	// The healthy baseline must NOT carry a glyph.

@@ -67,17 +67,20 @@ func TestScenario_DBCVisual(t *testing.T) {
 	// Rule 7 U7b — W1 + W2 stack: Warning phrase + (+1) for the hidden Wave-2 finding.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDbcNoBkpMaintID, "no automated backups (+1)")
 
-	// Rule 3 — Wave 2 `!` on Healthy row: S4 = "maintenance overdue", row stays Healthy-green.
+	// dbcCodeMaintenanceOverdue is Severity: SevBroken (catalog_databases.go),
+	// so colorFromAnyFinding resolves the row color to Broken directly — the
+	// row is no longer Healthy-green-with-glyph, it renders Broken like any
+	// other `!` row. The Status phrase text is unaffected.
 	scenario.ExpectRowStatusEquals(demofixtures.MaintDbcOverdueID, "maintenance overdue")
 
 	// -----------------------------------------------------------------
 	// Glyph rules.
 	// -----------------------------------------------------------------
-	// Rule 3 — `!` glyph on Healthy + `!` finding (dbc's only Wave-2 severity is `!`).
-	scenario.ExpectRowNamePrefix(demofixtures.MaintDbcOverdueID, "! ")
-
 	// Rule 3 — non-green rows must NOT carry a glyph regardless of finding.
-	// `warn-dbc-no-bkp-plus-maint` has a Wave-2 finding but is Warning-colored.
+	// Every dbc Wave-2/Wave-1 finding here now resolves a non-Healthy row
+	// color via colorFromAnyFinding, so none of these rows carry a glyph —
+	// including MaintDbcOverdueID, which used to be the one Healthy+glyph
+	// exception before its finding severity promoted the row to Broken.
 	for _, id := range []string{
 		"warn-dbc-modifying",
 		"broken-dbc-failed",
@@ -89,6 +92,7 @@ func TestScenario_DBCVisual(t *testing.T) {
 		"warn-dbc-no-bkp",
 		"warn-dbc-multi",
 		demofixtures.WarnDbcNoBkpMaintID,
+		demofixtures.MaintDbcOverdueID,
 		// Plain Healthy rows with no finding also have no glyph.
 		demofixtures.ProdDbcID,
 	} {

@@ -125,16 +125,12 @@ func TestScenario_DDBVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(demofixtures.LegacyArchivedID, ddbPhraseArchivedPlus1)
 
 	// ---------------------------------------------------------------
-	// Rule 3 — `~` glyph prefixes a Healthy (green) row with a `~`
-	// finding. `audit-pitr-off` is the only such fixture.
-	// ---------------------------------------------------------------
-	scenario.ExpectRowNamePrefix(demofixtures.AuditPITROffID, "~ ")
-
-	// ---------------------------------------------------------------
-	// Rule 3 — every NON-green row renders WITHOUT a glyph regardless
-	// of finding presence. Color is the signal. Includes the multi-W2
-	// `legacy-archived` row (red) which carries a Wave-2 `~` finding
-	// but must not glyph.
+	// Rule 3 — every row renders WITHOUT a glyph. colorDDB
+	// (catalog_databases.go) resolves color via colorFromAnyFinding first,
+	// and ddbCodePITROff is declared Severity: SevWarn, so `audit-pitr-off`
+	// now renders Warning row color directly instead of staying
+	// Healthy-with-`~`-glyph — the glyph is retired once the row itself
+	// carries the finding's color.
 	// ---------------------------------------------------------------
 	for _, id := range []string{
 		demofixtures.SessionsCreatingID,
@@ -143,6 +139,7 @@ func TestScenario_DDBVisual(t *testing.T) {
 		demofixtures.LegacyArchivingID,
 		demofixtures.LegacyKMSLostID,
 		demofixtures.LegacyArchivedID,
+		demofixtures.AuditPITROffID,
 	} {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}

@@ -85,11 +85,15 @@ func TestScenario_DBISnapVisual(t *testing.T) {
 	// -----------------------------------------------------------------
 	// Glyph rules.
 	// -----------------------------------------------------------------
-	// After AS-140 the Wave-2 enricher emits Findings only (no
-	// FieldUpdates), so the orphan-snapshot fixture keeps its underlying
-	// status="available" → ColorHealthy and renders a `!` glyph for the
-	// `!`-severity orphan finding. The remaining rows are either truly
-	// healthy (no finding) or non-green (glyph suppressed by U5).
+	// colorDBISnap (catalog_databases.go) resolves color via
+	// colorFromAnyFinding first. dbiSnapOrphanCode and
+	// dbiSnapPastRetentionCode are both declared Severity: SevBroken, so the
+	// cross-ref enricher's findings now promote those rows straight to
+	// Broken row color — they no longer stay Healthy-with-glyph the way they
+	// did when the enricher emitted Findings without a severity color read.
+	// Every row here resolves a non-Healthy color via a finding (or a plain
+	// structural fallback for the truly healthy rows), so none carry a
+	// glyph.
 	for _, id := range []string{
 		demofixtures.ProdDBISnapID,
 		demofixtures.BackupCoveredDBISnapID,
@@ -99,14 +103,11 @@ func TestScenario_DBISnapVisual(t *testing.T) {
 		demofixtures.SeverityBrokenWarnDBISnapID,
 		demofixtures.WarnDBISnapUnencryptedID,
 		demofixtures.MultiW1DBISnapID,
+		demofixtures.WarnDBISnapOrphanID,
+		demofixtures.WarnDBISnapPastRetentionID,
 	} {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}
-	// Healthy+! rows — `!`-severity Wave-2 finding on rows whose underlying
-	// status stayed ColorHealthy post-AS-140 (orphan and past-retention both
-	// have status="available" + encrypted=true → ColorHealthy).
-	scenario.ExpectRowNamePrefix(demofixtures.WarnDBISnapOrphanID, "! ")
-	scenario.ExpectRowNamePrefix(demofixtures.WarnDBISnapPastRetentionID, "! ")
 
 	// -----------------------------------------------------------------
 	// Related panel — graph-root = ProdDBISnapID. Per impl-plan §9.3
