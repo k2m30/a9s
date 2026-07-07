@@ -42,8 +42,6 @@ func monitoringDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Trail Name", Path: "Name", Width: 28},
 				{Title: "Status", Width: 12},
-				{Title: "Logging", Key: "is_logging", Width: 10},
-				{Title: "Last Error", Key: "latest_delivery_error", Width: 32},
 				{Title: "S3 Bucket", Path: "S3BucketName", Width: 28},
 				{Title: "Home Region", Path: "HomeRegion", Width: 16},
 				{Title: "Multi-Region", Path: "IsMultiRegionTrail", Width: 14},

@@ -9,7 +9,15 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func colorBackup(_ domain.Resource) domain.Color { return domain.ColorHealthy }
+// colorBackup classifies a Backup plan. All signals come from
+// EnrichBackupJobs (backup_issue_enrichment.go, Source: "wave2:backup") —
+// spec §3.1 has zero Wave 1 signals for this resource.
+func colorBackup(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
 
 var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{

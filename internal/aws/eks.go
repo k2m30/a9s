@@ -127,22 +127,27 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource 
 		RawStruct: cluster,
 	}
 
-	// emit canonical Findings for non-healthy lifecycle states.
-	// ACTIVE is healthy — no Finding. DELETING is terminal — no Finding.
-	// CREATING and UPDATING are transitional → SevWarn. FAILED → SevBroken.
-	switch cluster.Status {
-	case ekstypes.ClusterStatusCreating:
+	// emit canonical Findings for non-healthy lifecycle states, mirroring
+	// colorEKSCluster's own precedence (catalog_containers.go): FAILED wins
+	// outright (SevBroken, folding in Health.Issues detail if present),
+	// then CREATING/UPDATING (SevWarn), then a bare Health.Issues[] on an
+	// otherwise-healthy cluster (SevWarn — health is tracked independently
+	// of lifecycle state, docs/resources/eks.md §3.2).
+	switch {
+	case cluster.Status == ekstypes.ClusterStatusFailed:
+		r.Findings = []domain.Finding{healthIssueFinding(CodeEKSStateFailed, "failed", issueCodes)}
+	case cluster.Status == ekstypes.ClusterStatusCreating:
 		r.Findings = []domain.Finding{{
 			Code: CodeEKSStateCreating, Phrase: "creating",
 			Severity: domain.SevWarn, Source: "wave1",
 		}}
-	case ekstypes.ClusterStatusUpdating:
+	case cluster.Status == ekstypes.ClusterStatusUpdating:
 		r.Findings = []domain.Finding{{
 			Code: CodeEKSStateUpdating, Phrase: "updating",
 			Severity: domain.SevWarn, Source: "wave1",
 		}}
-	case ekstypes.ClusterStatusFailed:
-		r.Findings = []domain.Finding{healthIssueFinding(CodeEKSStateFailed, "failed", issueCodes)}
+	case healthIssuesCount > 0:
+		r.Findings = []domain.Finding{healthIssueWarnFinding(CodeEKSHealthIssue, issueCodes)}
 	}
 
 	return r
