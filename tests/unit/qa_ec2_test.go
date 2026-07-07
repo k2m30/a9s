@@ -36,6 +36,7 @@ func newEC2ListModel(t *testing.T) tui.Model {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -778,6 +779,7 @@ func newEC2DetailModel(t *testing.T, r resource.Resource) tui.Model {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
@@ -925,6 +927,7 @@ func newEC2YAMLModel(t *testing.T, r resource.Resource) tui.Model {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,

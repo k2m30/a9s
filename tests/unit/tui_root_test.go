@@ -31,6 +31,12 @@ import (
 // own t.Setenv.
 var lastAutoIsolatedConfigFolder string
 
+// lastAutoIsolatedModel is the tui.Model (if any) newRootSizedModel handed
+// back on its previous call. Retained solely so this function can flush that
+// model's headless controller (CloseController, nil-safe) before abandoning
+// its auto-isolated directory below — see the Close call's comment for why.
+var lastAutoIsolatedModel *tui.Model
+
 // helper: create a model with a size set so View() actually renders.
 //
 // #17 wave 2 isolation fix: every one of this helper's ~575 call sites shares
@@ -53,7 +59,37 @@ var lastAutoIsolatedConfigFolder string
 // package runs sequentially (no t.Parallel() call site here also invokes
 // this helper — see tui_stack_sync_test.go), so a later call's Setenv safely
 // lands before that caller's own I/O runs.
+//
+// Task #41: any caller that delivers messages.ResourcesLoaded (or otherwise
+// reaches Controller.persistMenuAvailabilityCache) through the returned
+// Model queues an async availability-cache write on that Model's own
+// headless controller. None of these ~575 call sites ever closed it, so the
+// writer goroutine outlived its test — and, because cache.Dir reads
+// A9S_CONFIG_FOLDER live at write time (not at goroutine-launch time), a
+// still-running writer from an EARLIER call here can land its write inside
+// whatever directory A9S_CONFIG_FOLDER points to by the time the OS
+// scheduler gets to it, including an unrelated LATER test's own
+// t.TempDir() — surfacing there as "TempDir RemoveAll cleanup: ... directory
+// not empty" (see app_availsave_tempdir_cleanup_race_test.go for the traced
+// mechanism and canary). Closing the previous call's controller before
+// abandoning its directory below — the same point this function already
+// treats as "this dir is no longer live" — closes that leak for every
+// caller without threading *testing.T through any of them.
+//
+// The Close call below runs on EVERY invocation (not only the directory-
+// rotation branch above): the residual gap — a test that calls this once,
+// then independently reassigns A9S_CONFIG_FOLDER itself (its own t.Setenv)
+// without ever calling this helper again — cannot be closed from here
+// (there is no hook back into that test's cleanup), but draining the
+// previous call's writer as early as the very next invocation, anywhere in
+// the ~575-call-site suite, shrinks that window from "for the rest of the
+// binary" to "until this helper is next called" — which in this suite is
+// almost always within the same or next test.
 func newRootSizedModel() tui.Model {
+	if lastAutoIsolatedModel != nil {
+		lastAutoIsolatedModel.CloseController()
+		lastAutoIsolatedModel = nil
+	}
 	current := os.Getenv("A9S_CONFIG_FOLDER")
 	if lastAutoIsolatedConfigFolder == "" || current == lastAutoIsolatedConfigFolder {
 		if dir, err := os.MkdirTemp("", "a9s-roottest-config-*"); err == nil {
@@ -61,7 +97,9 @@ func newRootSizedModel() tui.Model {
 			lastAutoIsolatedConfigFolder = dir
 		}
 	}
-	return tuitest.Sized("testprofile", "us-east-1")
+	m := tuitest.Sized("testprofile", "us-east-1")
+	lastAutoIsolatedModel = &m
+	return m
 }
 
 // helper: send a message through Update and return the updated model

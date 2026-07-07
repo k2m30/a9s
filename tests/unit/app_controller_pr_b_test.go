@@ -72,7 +72,7 @@ import (
 // view-stack mutation" half of the old no-op contract; only the "zero tasks"
 // half changes.
 func TestController_Handle_PRB_ResourcesLoaded_DispatchesProbeEnrichForIssueCapableType(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	ev := messages.ResourcesLoaded{
 		ResourceType: "ec2",
@@ -120,7 +120,7 @@ func TestController_Handle_PRB_ResourcesLoaded_DispatchesProbeEnrichForIssueCapa
 // Deferred to post-PR-C: RelatedCheckResult dispatch is blocked on relocating
 // TUI-shim pre-processing (see plan PR-B note).
 func TestController_Handle_PRB_RelatedCheckResult_IsNoOpPassThrough(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	ev := messages.RelatedCheckResult{
 		ResourceType:     "ec2",
@@ -160,7 +160,7 @@ func TestController_Handle_PRB_RelatedCheckResult_IsNoOpPassThrough(t *testing.T
 // Deferred to post-PR-C: EnrichDetailResult dispatch is blocked on relocating
 // TUI-shim pre-processing (see plan PR-B note).
 func TestController_Handle_PRB_EnrichDetailResult_IsNoOpPassThrough(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	ev := messages.EnrichDetailResult{
 		ResourceType: "rds",
@@ -199,7 +199,7 @@ func TestController_Handle_PRB_EnrichDetailResult_IsNoOpPassThrough(t *testing.T
 // Deferred to post-PR-C: ValueRevealed dispatch is blocked on relocating
 // TUI-shim pre-processing (see plan PR-B note).
 func TestController_Handle_PRB_ValueRevealed_Success_IsNoOpPassThrough(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	ev := messages.ValueRevealed{
 		ResourceType: "secrets",
@@ -238,7 +238,7 @@ func TestController_Handle_PRB_ValueRevealed_Success_IsNoOpPassThrough(t *testin
 // Deferred to post-PR-C: ValueRevealed dispatch is blocked on relocating
 // TUI-shim pre-processing (see plan PR-B note).
 func TestController_Handle_PRB_ValueRevealed_Error_IsNoOpPassThrough(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	ev := messages.ValueRevealed{
 		ResourceType: "ssm",
@@ -279,7 +279,7 @@ func TestController_Handle_PRB_ValueRevealed_Error_IsNoOpPassThrough(t *testing.
 // active screen kind (a menu-only stack stays on the menu — ClientsReady
 // never itself navigates).
 func TestController_Handle_PRB_ClientsReady_Success_DispatchesToCore(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	ev := messages.ClientsReady{
 		Clients: nil, // no pre-supplied clients on this controller — HandleClientsReady still dispatches identity/avail-cache tasks
@@ -332,7 +332,7 @@ func TestController_Handle_PRB_ClientsReady_Success_DispatchesToCore(t *testing.
 // Deferred to post-PR-C: ClientsReady dispatch is blocked on relocating
 // TUI-shim pre-processing (see plan PR-B note).
 func TestController_Handle_PRB_ClientsReady_Error_IsNoOpPassThrough(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	ev := messages.ClientsReady{
 		Clients: nil,
@@ -371,7 +371,7 @@ func TestController_Handle_PRB_ClientsReady_Error_IsNoOpPassThrough(t *testing.T
 // Deferred to post-PR-C: ClearFlash dispatch is blocked on relocating
 // TUI-shim pre-processing (see plan PR-B note).
 func TestController_Handle_PRB_ClearFlash_IsNoOpPassThrough(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// ClearFlash is NOT a GenStamped event; the staleness guard skips it.
 	ev := messages.ClearFlash{Gen: 0}
@@ -406,7 +406,7 @@ func TestController_Handle_PRB_ClearFlash_IsNoOpPassThrough(t *testing.T) {
 // Deferred to post-PR-C: APIError dispatch is blocked on relocating
 // TUI-shim pre-processing (see plan PR-B note).
 func TestController_Handle_PRB_APIError_IsNoOpPassThrough(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	ev := messages.APIError{
 		ResourceType: "lambda",
@@ -442,7 +442,7 @@ func TestController_Handle_PRB_APIError_IsNoOpPassThrough(t *testing.T) {
 // AvailabilityGen is silently discarded (staleness guard) without panicking.
 // The returned ViewState must still equal Snapshot().
 func TestController_Handle_PRB_StaleResourcesLoaded_DroppedNoPanic(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// Gen=999 will not match the session's AvailabilityGen (which starts at 1 per
 	// session.New); AcceptZeroGen=true so zero passes, but 999 does not.
@@ -474,7 +474,7 @@ func TestController_Handle_PRB_StaleResourcesLoaded_DroppedNoPanic(t *testing.T)
 // ActionSelectProfile returns a non-empty []TaskRequest containing a connect
 // task. PR-B wires HandleProfileSelected which schedules TaskKindConnect.
 func TestController_Apply_PRB_SelectProfile_ReturnsConnectTask(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	vs, tasks := c.Apply(app.Action{Kind: app.ActionSelectProfile, Arg: "staging-fake"})
 
@@ -501,7 +501,7 @@ func TestController_Apply_PRB_SelectProfile_ReturnsConnectTask(t *testing.T) {
 // of the stack (PopSelectorIntent was applied by HandleProfileSelected).
 // Precondition: push a ScreenProfileSelector so the pop has something to remove.
 func TestController_Apply_PRB_SelectProfile_PopsSelectorIntent(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// Push a profile selector onto the stack so PopSelectorIntent can pop it.
 	c.ApplyIntents([]runtime.UIIntent{
@@ -544,7 +544,7 @@ func TestController_Apply_PRB_SelectProfile_PopsSelectorIntent(t *testing.T) {
 // ActionSelectRegion returns a non-empty []TaskRequest containing a connect
 // task. PR-B wires HandleRegionSelected which schedules TaskKindConnect.
 func TestController_Apply_PRB_SelectRegion_ReturnsConnectTask(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	vs, tasks := c.Apply(app.Action{Kind: app.ActionSelectRegion, Arg: "us-west-2"})
 
@@ -570,7 +570,7 @@ func TestController_Apply_PRB_SelectRegion_ReturnsConnectTask(t *testing.T) {
 // after ActionSelectRegion the region-selector screen is gone from the top of
 // the stack (PopSelectorIntent applied by HandleRegionSelected).
 func TestController_Apply_PRB_SelectRegion_PopsSelectorIntent(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// Push a region selector so PopSelectorIntent has something to remove.
 	c.ApplyIntents([]runtime.UIIntent{
@@ -614,7 +614,7 @@ func TestController_Apply_PRB_SelectRegion_PopsSelectorIntent(t *testing.T) {
 // TaskKindReadThemeFile task. Uses "default" as the theme name because it is
 // always present in the embedded theme catalog regardless of disk state.
 func TestController_Apply_PRB_SelectTheme_ReturnsReadThemeTask(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	vs, tasks := c.Apply(app.Action{Kind: app.ActionSelectTheme, Arg: "default"})
 
@@ -641,7 +641,7 @@ func TestController_Apply_PRB_SelectTheme_ReturnsReadThemeTask(t *testing.T) {
 // reflect BodyKindHelp. PR-B wires ActionOpenHelp → HandleNavigate(TargetHelp)
 // → NavigateKindPushHelp → PushScreen{ScreenHelp}.
 func TestController_Apply_PRB_OpenHelp_PushesHelpScreen(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	vs, tasks := c.Apply(app.Action{Kind: app.ActionOpenHelp})
 
@@ -658,7 +658,7 @@ func TestController_Apply_PRB_OpenHelp_PushesHelpScreen(t *testing.T) {
 // the root menu screen remains is a no-op: no panic, stack stays at depth 1,
 // and Snapshot reports BodyKindMenu (the root is never popped).
 func TestController_Apply_PRB_Back_RootIsNoOp(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// Fresh controller starts at depth-1 (root menu). Back must not pop it.
 	var vs app.ViewState
@@ -684,7 +684,7 @@ func TestController_Apply_PRB_Back_RootIsNoOp(t *testing.T) {
 // ActionBack is a single pop (PopScreen), not a full collapse (that is the
 // "root" Command). This replaces the old PopAll assertion.
 func TestController_Apply_PRB_Back_TwoDeepStack_SinglePop(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// Push two screens: lower=ScreenChildList, upper=ScreenProfileSelector.
 	c.ApplyIntents([]runtime.UIIntent{
@@ -730,7 +730,7 @@ func TestController_Apply_PRB_Back_TwoDeepStack_SinglePop(t *testing.T) {
 // [ScreenMenu]. Pushing ScreenHelp yields [ScreenMenu, ScreenHelp].
 // ActionBack pops ScreenHelp, leaving [ScreenMenu] → BodyKindMenu.
 func TestController_Apply_PRB_Back_OneDeepStack_ReturnsToMenu(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenHelp, Context: runtime.ScreenContext{}},
@@ -768,7 +768,7 @@ func TestController_Apply_PRB_Back_OneDeepStack_ReturnsToMenu(t *testing.T) {
 // PR-B pushes ScreenIdentity directly (no NavigateTargetIdentity in the runtime)
 // and enqueues the fetch task so the adapter can call STS GetCallerIdentity.
 func TestController_Apply_PRB_OpenIdentity_PushesIdentityScreenAndReturnsFetchTask(t *testing.T) {
-	core, c := newTestControllerWithCore()
+	core, c := newTestControllerWithCore(t)
 
 	vs, tasks := c.Apply(app.Action{Kind: app.ActionOpenIdentity})
 
@@ -809,7 +809,7 @@ func TestController_Apply_PRB_OpenIdentity_PushesIdentityScreenAndReturnsFetchTa
 // ActionCommand{Arg:"help"} pushes the help screen, making Snapshot report
 // BodyKindHelp. Mirrors the "help" colon-command token in the TUI.
 func TestController_Apply_PRB_Command_Help_PushesHelpScreen(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	vs, _ := c.Apply(app.Action{Kind: app.ActionCommand, Arg: "help"})
 
@@ -826,7 +826,7 @@ func TestController_Apply_PRB_Command_Help_PushesHelpScreen(t *testing.T) {
 // BodyKindSelector. The theme selector uses ScreenTheme → bodyKindForScreen
 // maps it to BodyKindSelector.
 func TestController_Apply_PRB_Command_Theme_PushesThemeSelector(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	vs, _ := c.Apply(app.Action{Kind: app.ActionCommand, Arg: "theme"})
 
@@ -843,7 +843,7 @@ func TestController_Apply_PRB_Command_Theme_PushesThemeSelector(t *testing.T) {
 // report BodyKindSelector. The region selector uses ScreenRegion → bodyKindForScreen
 // maps it to BodyKindSelector.
 func TestController_Apply_PRB_Command_Region_PushesRegionSelector(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	vs, _ := c.Apply(app.Action{Kind: app.ActionCommand, Arg: "region"})
 
@@ -860,7 +860,7 @@ func TestController_Apply_PRB_Command_Region_PushesRegionSelector(t *testing.T) 
 // leaving exactly the root menu screen. Snapshot reports BodyKindMenu at
 // depth 1 — the root is never popped.
 func TestController_Apply_PRB_Command_Root_CollapsesStack(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// Push two screens on top of the root menu → depth 3.
 	c.ApplyIntents([]runtime.UIIntent{
@@ -891,7 +891,7 @@ func TestController_Apply_PRB_Command_Root_CollapsesStack(t *testing.T) {
 // fetch task yields an APIError and rows stay empty — which is correct and
 // separately asserted in headless integration tests that use demo clients.
 func TestController_Apply_PRB_Command_ResourceShortName_PushesListScreen(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	vs, tasks := c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 
@@ -924,7 +924,7 @@ func TestController_Apply_PRB_NavigateResourceList_PushesListScreen(t *testing.T
 	for _, shortName := range resourceShortNames {
 		shortName := shortName
 		t.Run(shortName, func(t *testing.T) {
-			c := newTestController()
+			c := newTestController(t)
 
 			vs, _ := c.Apply(app.Action{Kind: app.ActionCommand, Arg: shortName})
 
@@ -942,7 +942,7 @@ func TestController_Apply_PRB_NavigateResourceList_PushesListScreen(t *testing.T
 // unrecognised command token ("zzz-not-a-resource") is silently dropped:
 // no panic, no stack change, Snapshot unchanged.
 func TestController_Apply_PRB_Command_UnknownToken_IsNoPanic(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	snapBefore := c.Snapshot()
 
@@ -989,7 +989,7 @@ func TestController_Apply_PRB_PRCBlockedActions_NoPanicReturnSnapshot(t *testing
 	for i := range prcBlockedActions {
 		a := prcBlockedActions[i]
 		t.Run(string(a.Kind), func(t *testing.T) {
-			c := newTestController()
+			c := newTestController(t)
 			var vs app.ViewState
 			var tasks []runtime.TaskRequest
 			func() {
@@ -1017,7 +1017,7 @@ func TestController_Apply_PRB_PRCBlockedActions_NoPanicReturnSnapshot(t *testing
 // after a sequence of Handle calls with different event types. Guards against
 // state corruption between events.
 func TestController_Handle_PRB_ResultLane_ConsistencyAfterMultipleEvents(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	events := []runtime.Event{
 		messages.ResourcesLoaded{ResourceType: "lambda", Gen: 0},
@@ -1046,12 +1046,20 @@ func TestController_Handle_PRB_ResultLane_ConsistencyAfterMultipleEvents(t *test
 // newTestControllerWithCore builds a Controller backed by a fresh runtime.Core
 // and returns both so tests can assert on Core state (e.g. IdentityFetching).
 // Mirrors newTestController but exposes the Core for latch/getter assertions.
-func newTestControllerWithCore() (*runtime.Core, *app.Controller) {
+// Redirects A9S_CONFIG_FOLDER to a fresh t.TempDir() and registers
+// t.Cleanup(c.Close) — in that order (see newTestController in
+// app_controller_test.go, and app_availsave_tempdir_cleanup_race_test.go
+// for the traced race this ordering closes).
+func newTestControllerWithCore(t *testing.T) (*runtime.Core, *app.Controller) {
+	t.Helper()
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	s := session.New()
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	return core, app.New(core)
+	c := app.New(core)
+	t.Cleanup(c.Close)
+	return core, c
 }
 
 // taskKindStrings returns the TaskKind strings from a slice of TaskRequests,

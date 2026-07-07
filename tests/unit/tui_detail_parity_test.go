@@ -49,13 +49,24 @@ import (
 // exactly like newIntentParityHeadlessController (tui_intent_parity_test.go)
 // and newTestController (app_controller_test.go): a fresh in-memory session,
 // no disk-cache interaction, hermetic.
+//
+// Redirects A9S_CONFIG_FOLDER to a fresh t.TempDir() and registers
+// t.Cleanup(c.Close) — in that order. This file's Handle(EnrichmentChecked)
+// calls reach Controller.applyEnrichmentState, which calls
+// persistMenuAvailabilityCache and so can queue an async availability-cache
+// save; without this ordering the writer goroutine can still be running
+// when t.TempDir()'s RemoveAll fires (see
+// app_availsave_tempdir_cleanup_race_test.go for the traced race).
 func newDetailParityHeadlessController(t *testing.T) (*app.Controller, *runtime.Core) {
 	t.Helper()
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	s := session.New()
 	s.Profile = "detail-parity-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	return app.New(core), core
+	c := app.New(core)
+	t.Cleanup(c.Close)
+	return c, core
 }
 
 // newDetailParityTUIModel builds a sized, demo-independent tui.Model exactly

@@ -64,6 +64,7 @@ func TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk(t *testing.T) {
 	const profile, region = "toplevel-persist-prof", "us-east-1"
 
 	m := tuitest.Sized(profile, region)
+	t.Cleanup(func() { m.CloseController() })
 
 	// Open the s3 list (top-level, menu-driven — the exact ":command open"
 	// shape, since messages.Navigate{TargetResourceList} is what both the
@@ -222,6 +223,7 @@ func TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch(t *testin
 	// cache-miss fallback (no ProbeResources observed yet) reads the just-seeded
 	// disk pair (internal/runtime/handlers_navigate.go's ReadCacheStore branch).
 	m := tuitest.Sized(profile, region)
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = tuitest.Step(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
@@ -280,6 +282,7 @@ func TestCacheMissSeed_RefreshingMarkerOnFirstFrame(t *testing.T) {
 	const profile, region = "refresh-marker-prof", "us-east-1"
 
 	m := tuitest.Sized(profile, region)
+	t.Cleanup(func() { m.CloseController() })
 
 	// Seed session.RowStore for ec2 BEFORE navigating, exactly as a
 	// prior availability probe would have — this is the CachedEntry seed

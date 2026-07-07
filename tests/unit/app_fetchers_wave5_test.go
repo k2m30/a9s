@@ -97,6 +97,7 @@ func TestLoadAvailabilityCache_PopulatedCacheReturnsEntries(t *testing.T) {
 		tui.WithClients(clients),
 		tui.WithNoCache(false),
 	)
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Trigger handleClientsReady which calls loadAvailabilityCache.
@@ -153,6 +154,7 @@ func TestLoadAvailabilityCache_IssueFieldsMapped(t *testing.T) {
 		tui.WithClients(clients),
 		tui.WithNoCache(false),
 	)
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	_, cmd := rootApplyMsg(m, messages.ClientsReady{

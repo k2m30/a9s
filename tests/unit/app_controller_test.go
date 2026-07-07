@@ -38,12 +38,28 @@ import (
 // with recognisable profile/region values. No AWS clients are attached;
 // all test scenarios either exercise the empty-stack path or inject intents
 // directly via ApplyIntents.
-func newTestController() *app.Controller {
+//
+// Redirects A9S_CONFIG_FOLDER to a fresh t.TempDir() and registers
+// t.Cleanup(c.Close) — in that order, so t.TempDir()'s own RemoveAll
+// cleanup (registered by the FIRST TempDir() call in a test, per Go's
+// testing package) runs AFTER Close via t.Cleanup's LIFO ordering. Any test
+// in this file that drives a ResourcesLoaded/AvailabilityChecked event
+// through the returned Controller can queue an async availability-cache
+// save (queueAvailabilitySave); without this ordering the writer goroutine
+// can still be running cache.Store.SaveType when RemoveAll fires, which is
+// task #41's flaky "TempDir RemoveAll cleanup: ... directory not empty"
+// failure (see app_availsave_tempdir_cleanup_race_test.go for the traced
+// mechanism and canary).
+func newTestController(t *testing.T) *app.Controller {
+	t.Helper()
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	s := session.New()
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	return app.New(core)
+	c := app.New(core)
+	t.Cleanup(c.Close)
+	return c
 }
 
 // =============================================================================
@@ -459,7 +475,7 @@ func TestViewState_JSONRoundTrip_IdentityBodyAllFieldsSurvive(t *testing.T) {
 // PR-C contract: New(core) starts with ScreenMenu as the root screen, so a
 // fresh controller's Snapshot() returns BodyKindMenu, not BodyKindUnknown.
 func TestController_Snapshot_FreshControllerNoPanic(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	var vs app.ViewState
 	func() {
@@ -481,7 +497,7 @@ func TestController_Snapshot_FreshControllerNoPanic(t *testing.T) {
 // The root screen (menu) is preserved — PopScreen at depth 1 is a no-op, so
 // the stack never empties and BodyKindUnknown is never returned.
 func TestController_Snapshot_EmptyStackAfterPopNoPanic(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// Attempt to pop the root menu — must be a no-op (root is preserved).
 	var vs app.ViewState
@@ -504,7 +520,7 @@ func TestController_Snapshot_EmptyStackAfterPopNoPanic(t *testing.T) {
 // TestController_Snapshot_EmptyStackCarriesProfileAndRegion verifies that the
 // Header fields from runtime.Core are present even with an empty stack.
 func TestController_Snapshot_EmptyStackCarriesProfileAndRegion(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 	vs := c.Snapshot()
 
 	if vs.Header.Profile != "demo" {
@@ -530,7 +546,7 @@ func TestController_Snapshot_EmptyStackCarriesProfileAndRegion(t *testing.T) {
 // PR-C: a fresh controller starts on ScreenMenu (BodyKindMenu). After pushing
 // ScreenProfileSelector, the top becomes BodyKindSelector.
 func TestController_Stack_PushGrowsStackAndSetsBodyKind(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	before := c.Snapshot()
 	if before.Body.Kind != app.BodyKindMenu {
@@ -557,7 +573,7 @@ func TestController_Stack_PushGrowsStackAndSetsBodyKind(t *testing.T) {
 // TestController_Stack_PushChildListBodyKindList verifies that
 // ScreenChildList maps to BodyKindList (not BodyKindUnknown or another kind).
 func TestController_Stack_PushChildListBodyKindList(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
@@ -575,7 +591,7 @@ func TestController_Stack_PushChildListBodyKindList(t *testing.T) {
 // TestController_Stack_PushRevealBodyKindDetail verifies that
 // ScreenReveal maps to BodyKindDetail.
 func TestController_Stack_PushRevealBodyKindDetail(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
@@ -597,7 +613,7 @@ func TestController_Stack_PushRevealBodyKindDetail(t *testing.T) {
 // ScreenProfileSelector and then popping, the stack returns to the menu root
 // (BodyKindMenu), not BodyKindUnknown.
 func TestController_Stack_PopShrinksStack(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// Push a selector on top of the menu root.
 	c.ApplyIntents([]runtime.UIIntent{
@@ -623,7 +639,7 @@ func TestController_Stack_PopShrinksStack(t *testing.T) {
 // the root menu remains is a no-op: it does not panic and the stack stays at
 // depth 1 with BodyKindMenu. The root screen is never popped.
 func TestController_Stack_PopOnEmptyStackNoPanic(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// Fresh controller starts at depth 1 (root menu).
 	// PopScreen at the root must be a no-op.
@@ -666,7 +682,7 @@ func TestController_Stack_PopOnEmptyStackNoPanic(t *testing.T) {
 // Replace swaps the ChildList entry with ProfileSelector (still depth-2).
 // Pop reveals the menu root → BodyKindMenu.
 func TestController_Stack_ReplaceSwapsTopWithoutChangingDepth(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// Push a ChildList on top of the menu root → depth-2.
 	c.ApplyIntents([]runtime.UIIntent{
@@ -711,7 +727,7 @@ func TestController_Stack_ReplaceSwapsTopWithoutChangingDepth(t *testing.T) {
 // The old "drain root to empty then replace" path is gone because PopScreen at
 // depth 1 is a no-op — the root is never popped.
 func TestController_Stack_ReplaceOnRootSwapsScreen(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// Precondition: root menu at depth 1.
 	if c.Snapshot().Body.Kind != app.BodyKindMenu {
@@ -757,7 +773,7 @@ func TestController_Stack_ReplaceOnRootSwapsScreen(t *testing.T) {
 //   - Pop 3:  depth 1 (BodyKindMenu — root)
 //   - Pop 4:  depth 1 (BodyKindMenu — root preserved, no-op)
 func TestController_Stack_MultiPushPreservesDepth(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	pushes := []runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenChildList, Context: runtime.ScreenContext{ResourceType: "ec2"}},
@@ -801,7 +817,7 @@ func TestController_Stack_MultiPushPreservesDepth(t *testing.T) {
 // that the ViewState returned by ApplyIntents equals the Snapshot taken
 // immediately afterward — they must be consistent.
 func TestController_Stack_ApplyIntentsReturnedViewStateMatchesSnapshot(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	returned := c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
@@ -823,7 +839,7 @@ func TestController_Stack_ApplyIntentsReturnedViewStateMatchesSnapshot(t *testin
 // goroutine so the test harness can time it out; in practice it must complete
 // before the goroutine switch even happens.
 func TestDrainSync_EmptyPendingReturnsImmediately(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	done := make(chan struct{}, 1)
 	go func() {
@@ -842,7 +858,7 @@ func TestDrainSync_EmptyPendingReturnsImmediately(t *testing.T) {
 // subsequent Apply returns a shape-correct (non-panicking) result. PR-A leaves
 // task execution stubbed so deeper side-effect assertions are deferred.
 func TestDrainSync_AfterSeededPendingApplyIsShapeCorrect(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// Obtain a pending task list from the lane return value — the authoritative
 	// source under the new contract. In PR-A Apply returns nil tasks for the
@@ -864,7 +880,7 @@ func TestDrainSync_AfterSeededPendingApplyIsShapeCorrect(t *testing.T) {
 // TestDrainSync_NoPanicOnRepeatedCalls verifies that calling DrainSync
 // multiple times in succession never panics (idempotent on nil pending).
 func TestDrainSync_NoPanicOnRepeatedCalls(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	func() {
 		defer func() {
@@ -885,7 +901,7 @@ func TestDrainSync_NoPanicOnRepeatedCalls(t *testing.T) {
 // TestController_Apply_MoveDownNoPanic verifies that Apply(MoveDown) does not
 // panic and returns a ViewState equal to the subsequent Snapshot().
 func TestController_Apply_MoveDownNoPanic(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	var vs app.ViewState
 	var tasks []runtime.TaskRequest
@@ -910,7 +926,7 @@ func TestController_Apply_MoveDownNoPanic(t *testing.T) {
 // TestController_Apply_BackNoPanic verifies that Apply(Back) does not panic
 // and returns a ViewState equal to Snapshot() post-apply.
 func TestController_Apply_BackNoPanic(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	var vs app.ViewState
 	func() {
@@ -969,7 +985,7 @@ func TestController_Apply_AllSkeletonActionsNoPanic(t *testing.T) {
 	for _, a := range verbs {
 		a := a
 		t.Run(string(a.Kind), func(t *testing.T) {
-			c := newTestController() // fresh controller per verb — independent
+			c := newTestController(t) // fresh controller per verb — independent
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
@@ -986,7 +1002,7 @@ func TestController_Apply_AllSkeletonActionsNoPanic(t *testing.T) {
 // verifies the core contract "Apply returns ViewState == Snapshot() post-apply"
 // when the stack is non-empty (so FrameTitle is meaningful).
 func TestController_Apply_ReturnedViewStateEqualsSnapshotWithNonEmptyStack(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
@@ -1013,7 +1029,7 @@ func TestController_Apply_ReturnedViewStateEqualsSnapshotWithNonEmptyStack(t *te
 // In PR-A the handler body is a no-op; this guards against any panic
 // introduced while wiring the handler in future PRs.
 func TestController_Handle_IdentityErrorNoPanic(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	var vs app.ViewState
 	var tasks []runtime.TaskRequest
@@ -1042,7 +1058,7 @@ func TestController_Handle_IdentityErrorNoPanic(t *testing.T) {
 // short-circuits to nil, nil — which is the correct safe fallback and is
 // still a legitimate exercise of the dispatch path.
 func TestController_Handle_AvailabilityCheckedNoPanic(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	var vs app.ViewState
 	func() {
@@ -1063,7 +1079,7 @@ func TestController_Handle_AvailabilityCheckedNoPanic(t *testing.T) {
 // after the call. Uses messages.IdentityError (GenStamped, AcceptZeroGen=true)
 // so the event reaches the dispatch switch rather than being dropped.
 func TestController_Handle_ReturnedViewStateEqualsSnapshot(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	vs, _ := c.Handle(messages.IdentityError{Err: "ec2 loaded", Gen: 0})
 	snap := c.Snapshot()
@@ -1076,7 +1092,7 @@ func TestController_Handle_ReturnedViewStateEqualsSnapshot(t *testing.T) {
 // Snapshot().Body.Identity.ARN once ScreenIdentity is on the stack.
 // Gen=0 is accepted (AcceptZeroGen=true).
 func TestController_Handle_IdentityLoadedNoPanic(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// nil Identity must not panic.
 	func() {

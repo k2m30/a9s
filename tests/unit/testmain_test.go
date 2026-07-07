@@ -45,6 +45,15 @@ func TestMain(m *testing.M) {
 		resource.WireProjection()
 	}
 	code := m.Run()
+	// newRootSizedModel (tui_root_test.go) closes the PREVIOUS call's
+	// controller on every new call, but the very LAST model it ever built in
+	// this run has no later call to trigger that drain — flush it here,
+	// before cleanupDir (which its own auto-isolated directory may still be,
+	// or may itself be a still-live A9S_CONFIG_FOLDER target) is removed.
+	if lastAutoIsolatedModel != nil {
+		lastAutoIsolatedModel.CloseController()
+		lastAutoIsolatedModel = nil
+	}
 	if cleanupDir != "" {
 		os.RemoveAll(cleanupDir) //nolint:errcheck // best-effort cleanup, process is exiting regardless
 	}

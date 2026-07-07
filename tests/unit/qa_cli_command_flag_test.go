@@ -199,6 +199,7 @@ func TestQA_CLICommand_LivePath_ClientsReady_ArmsButDoesNotEmitNavigateYet(t *te
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithCommand("ec2"),
 	)
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	_, cmd := rootApplyMsg(m, messages.ClientsReady{
@@ -226,6 +227,7 @@ func TestQA_CLICommand_LivePath_AvailabilityCacheLoaded_EmitsNavigateMsg(t *test
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithCommand("ec2"),
 	)
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	m, _ = rootApplyMsg(m, messages.ClientsReady{

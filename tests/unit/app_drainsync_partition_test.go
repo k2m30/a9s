@@ -63,7 +63,7 @@ func alwaysBlocking(runtime.TaskKind) bool { return false }
 // TaskKindEmitNavigate) executes the blocking task and returns the
 // background tasks unexecuted, in the original relative order.
 func TestDrainSyncPartition_MixedBatch_BlockingExecuted_BackgroundReturned(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// ActionOpenIdentity pushes ScreenIdentity so Snapshot().Body.Identity is
 	// populated once FetchIdentity completes (snapshot() only fills
@@ -149,7 +149,7 @@ func TestDrainSyncPartition_BlockingFollowUp_IsBackground_ReturnedNotExecuted(t 
 // the entire batch exactly like DrainSyncContextProgress (nothing deferred)
 // and produces the same observable end state.
 func TestDrainSyncPartition_AllBlocking_BehavesLikeDrainSyncContextProgress(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// ActionOpenIdentity pushes ScreenIdentity so Snapshot().Body.Identity is
 	// populated once FetchIdentity completes (snapshot() only fills
@@ -177,7 +177,7 @@ func TestDrainSyncPartition_AllBlocking_BehavesLikeDrainSyncContextProgress(t *t
 // touching controller state, matching DrainSyncContextProgress's immediate
 // return on an empty queue.
 func TestDrainSyncPartition_EmptyPending_ReturnsNil(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	deferred := app.DrainSyncPartition(context.Background(), c, nil, alwaysBlocking, nil)
 
@@ -191,7 +191,7 @@ func TestDrainSyncPartition_EmptyPending_ReturnsNil(t *testing.T) {
 // DrainSyncProgress semantics, and is NOT invoked for tasks that were
 // deferred as background without executing.
 func TestDrainSyncPartition_OnEventCalledOnlyForExecutedTasks(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	flashTick := runtime.TaskRequest{Key: runtime.TaskKey{Kind: runtime.TaskKindFlashTick}}
 	fetchIdentity := runtime.TaskRequest{Key: runtime.TaskKey{Kind: runtime.TaskKindFetchIdentity}}

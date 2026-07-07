@@ -24,7 +24,7 @@
 //     by design. DrainSync terminates after the initial batch without growing pending.
 //
 // All tests are hermetic: no AWS credentials, no disk I/O, no goroutines.
-// newTestController() uses runtime.New(session, nil) — no demo clients —
+// newTestController(t) uses runtime.New(session, nil) — no demo clients —
 // which is sufficient because TaskKindFetchIdentity handles nil clients
 // gracefully (returns IdentityError, not a panic).
 package unit_test
@@ -45,7 +45,7 @@ import (
 // After DrainSync, Handle(IdentityError) has been called internally and the
 // identity error state is reflected in Snapshot().Body.Identity.ErrorMsg.
 func TestDrainSync_RealExecutableTask_TerminatesWithoutHanging(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// ActionOpenIdentity pushes ScreenIdentity and returns a TaskKindFetchIdentity
 	// task request.
@@ -95,7 +95,7 @@ func TestDrainSync_RealExecutableTask_TerminatesWithoutHanging(t *testing.T) {
 // Adapter-only kinds tested: TaskKindFlashTick, TaskKindEmitNavigate.
 // Real executable kind: TaskKindFetchIdentity (nil STS → IdentityError, no panic).
 func TestDrainSync_AdapterOnlyTasksSkipped_NoPanic(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	adapterOnlyFlash := runtime.TaskRequest{
 		Key: runtime.TaskKey{Kind: runtime.TaskKindFlashTick, Scope: ""},
@@ -127,7 +127,7 @@ func TestDrainSync_AdapterOnlyTasksSkipped_NoPanic(t *testing.T) {
 // (context-aware AWS calls) or completes synchronously (in-memory demo path).
 // Either way the loop must exit at or before the maxDrainIterations cap.
 func TestDrainSyncContext_CancelledContext_ReturnsPromptly(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionOpenIdentity})
 	if len(tasks) == 0 {
@@ -151,7 +151,7 @@ func TestDrainSyncContext_CancelledContext_ReturnsPromptly(t *testing.T) {
 // drains completely without panic. Guards against an off-by-one in the pending
 // slice append logic that could leave tasks undrained.
 func TestDrainSync_MixedBatch_RealAndAdapterOnly_AllDrain(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	adapterOnly := func(kind runtime.TaskKind) runtime.TaskRequest {
 		return runtime.TaskRequest{Key: runtime.TaskKey{Kind: kind}}
@@ -189,7 +189,7 @@ func TestDrainSync_MixedBatch_RealAndAdapterOnly_AllDrain(t *testing.T) {
 // observable post-DrainSync assertion is structural: Snapshot must be valid
 // (non-empty BodyKind, no panic) regardless of the connect outcome.
 func TestDrainSync_SelectProfile_ConnectTask_TerminatesWithoutHanging(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	// ActionSelectProfile returns a TaskKindConnect task.
 	_, tasks := c.Apply(app.Action{Kind: app.ActionSelectProfile, Arg: "fake-profile-000000000000"})
@@ -234,7 +234,7 @@ func TestDrainSync_SelectProfile_ConnectTask_TerminatesWithoutHanging(t *testing
 // IdentityError IS wired through Handle (sets identityErrMsg) but produces no
 // follow-up task requests, so the initial batch of 1 is the only drain cycle.
 func TestDrainSync_NilFollowUpTasks_DoesNotGrow(t *testing.T) {
-	c := newTestController()
+	c := newTestController(t)
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionOpenIdentity})
 	if len(tasks) == 0 {

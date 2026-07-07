@@ -106,6 +106,7 @@ func TestTUIInit_SeedsMenuFromDisk_BeforeClientsReady(t *testing.T) {
 	m := tui.New(profile, region,
 		tui.WithProfile(profile),
 		tui.WithRegion(region))
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	initCmd := m.Init()
@@ -215,6 +216,7 @@ func TestTUIInit_EmptyRegion_ResolvesConfigDefaultForSeed(t *testing.T) {
 	seedTypeFile(t, profile, configDefaultRegion, "ec2", 3)
 
 	m := tui.New(profile, "", tui.WithProfile(profile), tui.WithRegion(""))
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	initCmd := m.Init()

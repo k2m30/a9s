@@ -61,6 +61,7 @@ func newSaveCacheApp(t *testing.T, profile, region string) tui.Model {
 		tui.WithIsDemo(true),
 		tui.WithProfile(profile),
 		tui.WithRegion(region))
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	return m
 }

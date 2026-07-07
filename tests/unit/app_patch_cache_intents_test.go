@@ -53,7 +53,7 @@ import (
 //
 // Status: RED (behavior). intents.go's default case discards this intent.
 func TestApplyIntents_PatchResourceCache_WritesSessionResourceCache(t *testing.T) {
-	c, core := newTestControllerAndCore()
+	c, core := newTestControllerAndCore(t)
 
 	entry := &domain.ListViewCacheEntry{
 		Resources: []resource.Resource{{ID: "i-cache0001", Type: "ec2"}},
@@ -77,7 +77,7 @@ func TestApplyIntents_PatchResourceCache_WritesSessionResourceCache(t *testing.T
 //
 // Status: RED (behavior). intents.go's default case discards this intent.
 func TestApplyIntents_PatchLazyResourceCache_WritesSessionLazyCache(t *testing.T) {
-	c, core := newTestControllerAndCore()
+	c, core := newTestControllerAndCore(t)
 
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PatchLazyResourceCache{
@@ -105,7 +105,7 @@ func TestApplyIntents_PatchLazyResourceCache_WritesSessionLazyCache(t *testing.T
 // this is the direct cause of the reported bug: headless RelatedCache never
 // fills, so reopening a detail always misses and re-runs the full fan-out.
 func TestApplyIntents_PatchRelatedCache_WritesSessionRelatedCache(t *testing.T) {
-	c, core := newTestControllerAndCore()
+	c, core := newTestControllerAndCore(t)
 
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PatchRelatedCache{
@@ -158,7 +158,7 @@ func TestOpenSelectedListDetail_SecondOpen_CacheHit_NoRelatedCheckTask(t *testin
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: noopChecker},
 	})
 
-	c := newTestController()
+	c := newTestController(t)
 
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	c.ApplyResourcesLoaded("ec2", []resource.Resource{
@@ -218,7 +218,7 @@ func TestOpenSelectedListDetail_TypeWithDetailEnricher_DispatchesEnrichDetailTas
 	})
 	t.Cleanup(func() { resource.CleanupDetailEnricherForTest("ec2") })
 
-	c := newTestController()
+	c := newTestController(t)
 
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	c.ApplyResourcesLoaded("ec2", []resource.Resource{
@@ -251,7 +251,7 @@ func TestOpenSelectedListDetail_TypeWithoutDetailEnricher_NoEnrichDetailTask(t *
 		t.Skip("s3 unexpectedly has a registered detail enricher in this test binary — assumption broken")
 	}
 
-	c := newTestController()
+	c := newTestController(t)
 
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 	c.ApplyResourcesLoaded("s3", []resource.Resource{
@@ -286,7 +286,7 @@ func TestHandle_RelatedCheckBatch_AfterDetailPopped_NoPanic_TopScreenUnchanged(t
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: noopChecker},
 	})
 
-	c := newTestController()
+	c := newTestController(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	c.ApplyResourcesLoaded("ec2", []resource.Resource{
 		{ID: "i-popped0001", Type: "ec2", Name: "popped-test-instance"},
@@ -346,7 +346,7 @@ func TestHandle_RelatedCheckBatch_StaleGeneration_Dropped(t *testing.T) {
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: noopChecker},
 	})
 
-	c, core := newTestControllerAndCore()
+	c, core := newTestControllerAndCore(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	c.ApplyResourcesLoaded("ec2", []resource.Resource{
 		{ID: "i-stale0001", Type: "ec2", Name: "stale-gen-test-instance"},
@@ -388,12 +388,21 @@ func TestHandle_RelatedCheckBatch_StaleGeneration_Dropped(t *testing.T) {
 // backing *runtime.Core so tests can assert on session-owned cache state via
 // Core's public accessors (ResourceCache / LazyResourceCache / RelatedCacheGet
 // / BumpRelatedGen) without the Controller exposing its unexported core field.
-func newTestControllerAndCore() (*app.Controller, *runtime.Core) {
+//
+// Redirects A9S_CONFIG_FOLDER to a fresh t.TempDir() and registers
+// t.Cleanup(c.Close) — in that order (see newTestController in
+// app_controller_test.go, and app_availsave_tempdir_cleanup_race_test.go
+// for the traced race this ordering closes).
+func newTestControllerAndCore(t *testing.T) (*app.Controller, *runtime.Core) {
+	t.Helper()
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	s := session.New()
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	return app.New(core), core
+	c := app.New(core)
+	t.Cleanup(c.Close)
+	return c, core
 }
 
 // hasTaskKind reports whether tasks contains at least one TaskRequest of the
