@@ -67,69 +67,21 @@ import (
 //   - present + now witnessed           -> FAIL ("prune from allowlist").
 //   - a code NOT present here           -> FAIL unconditionally, a new
 //     regression the allowlist was never told about.
+//
+// All 52 original entries from the seeding census (apigw, asg, cfn, dbi,
+// ebs, ecs, ecs-task, eks, eni, igw, kinesis, logs, msk, ng, redshift,
+// secrets, sns, subnet, tgw, vpce) have since been pruned — each now fires
+// dynamically against its demo fixtures. Only the three ses codes remain:
+// SES exposes exactly one GetAccount-shaped Wave-2 signal per account (no
+// per-resource dimension to vary), and the canonical demo account is
+// intentionally modeled healthy so the rest of the demo fleet has a
+// non-degraded sending identity to reference. The distress shapes for
+// account-shutdown / account-probation / quota-high are constructed inline
+// in QA tests instead (see internal/demo/fixtures/ses.go's own doc comment).
 var knownUnwitnessedFindings = map[string]bool{
-	"apigw:apigw.stage-config-issues": true,
-	"asg:asg.scaling-activity-failed": true,
-	"cfn:cfn.stack.failed":            true,
-	"cfn:cfn.stack-drifted":           true,
-	// dbi.broken.incompatible_*: a parallel coder was actively wiring
-	// dbi-snap witnesses as of this census — confirmed still failing
-	// dynamically (not yet green) at seeding time. dbc-snap.warn.manual_unused
-	// and elb.misconfigured (the sibling entries from the same census) have
-	// since been pruned: both now fire dynamically per the coder's fixture/fake
-	// fix (elb's DescribeLoadBalancerAttributes demo fake landed, and the
-	// dbc-snap witness resolves).
-	"dbi:dbi.broken.incompatible_network":              true,
-	"dbi:dbi.broken.incompatible_option_group":         true,
-	"dbi:dbi.broken.incompatible_restore":              true,
-	"ebs:ebs.volume-io-degraded":                       true,
-	"ecs:ecs.state.deprovisioning":                     true,
-	"ecs:ecs.state.inactive":                           true,
-	"ecs-task:ecs-task.state.provisioning":             true,
-	"ecs-task:ecs-task.state.activating":               true,
-	"ecs-task:ecs-task.state.deactivating":             true,
-	"ecs-task:ecs-task.state.stopping":                 true,
-	"ecs-task:ecs-task.state.deprovisioning":           true,
-	"ecs-task:ecs-task.task-failed":                    true,
-	"eks:eks.state.updating":                           true,
-	"eni:eni.state.attaching":                          true,
-	"eni:eni.state.detaching":                          true,
-	"igw:igw.state.attaching":                          true,
-	"igw:igw.state.detaching":                          true,
-	"kinesis:kinesis.warn.updating":                    true,
-	"logs:logs.missing-metric-filters":                 true,
-	"msk:msk.warn.updating":                            true,
-	"msk:msk.warn.maintenance":                         true,
-	"msk:msk.warn.healing":                             true,
-	"msk:msk.warn.deleting":                            true,
-	"msk:msk.broker-outdated":                          true,
-	"msk:msk.encryption-not-tls":                       true,
-	"ng:ng.state.creating":                             true,
-	"ng:ng.state.deleting":                             true,
-	"ng:ng.state.delete-failed":                        true,
-	"redshift:redshift.broken.incompatible_hsm":        true,
-	"redshift:redshift.broken.incompatible_parameters": true,
-	"redshift:redshift.broken.incompatible_restore":    true,
-	"redshift:redshift.warn.creating":                  true,
-	"redshift:redshift.warn.modifying":                 true,
-	"redshift:redshift.warn.renaming":                  true,
-	"redshift:redshift.warn.deleting":                  true,
-	"secrets:secrets.state.rotation_overdue":           true,
-	"ses:ses.account-shutdown":                         true,
-	"ses:ses.account-probation":                        true,
-	"ses:ses.quota-high":                               true,
-	"sns:sns.all-pending-confirmation":                 true,
-	"subnet:subnet.state.failed":                       true,
-	"subnet:subnet.state.failed-insufficient-capacity": true,
-	"tgw:tgw.state.pending":                            true,
-	"tgw:tgw.state.modifying":                          true,
-	"tgw:tgw.attachment-failed":                        true,
-	"tgw:tgw.attachment-transitional":                  true,
-	"vpce:vpce.state.pending_acceptance":               true,
-	"vpce:vpce.state.deleting":                         true,
-	"vpce:vpce.state.rejected":                         true,
-	"vpce:vpce.state.expired":                          true,
-	"vpce:vpce.state.partial":                          true,
+	"ses:ses.account-shutdown":  true,
+	"ses:ses.account-probation": true,
+	"ses:ses.quota-high":        true,
 }
 
 // TestFindingDynamicWitness_EveryRegisteredCodeFiresOnDemoFixtures is the

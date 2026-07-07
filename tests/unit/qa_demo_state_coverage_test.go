@@ -159,8 +159,8 @@ var knownStateCoverageGaps = map[string]bool{
 	"rtb:dim":   true,
 	"s3:broken": true, "s3:dim": true, "s3:warning": true,
 	"secrets:dim": true,
-	"ses:dim":    true,
-	"sfn:broken": true, "sfn:dim": true, "sfn:warning": true,
+	"ses:dim":     true,
+	"sfn:broken":  true, "sfn:dim": true, "sfn:warning": true,
 	"sg:dim": true, "sg:warning": true,
 	"sns:broken": true, "sns:dim": true, "sns:warning": true,
 	"sns-sub:broken": true,
@@ -173,73 +173,26 @@ var knownStateCoverageGaps = map[string]bool{
 	"waf:broken": true, "waf:dim": true, "waf:warning": true,
 
 	// --- finding gaps: seeded 2026-07-06 from the machine findings registry
-	// (249 FindingDefs across all types). This is the burn-down inventory
-	// captured the moment the registry went from empty to populated: for
-	// each key below, no demo fixture resource of that type yet produces a
-	// domain.Finding carrying that Code (neither via Wave-1 res.Findings nor
-	// the type's registered Wave-2 IssueEnricher). Fix the fixtures (or the
-	// enricher wiring) and remove the entry in the same PR — see the
-	// BURN-DOWN branch above. s3 is deliberately absent and MUST stay
-	// absent: its per-resource Wave-1/Wave-2 "public access block
-	// incomplete" signal (EnrichS3PublicAccessBlock / GetPublicAccessBlockOutput
-	// fixtures) already flows into
-	// TestDemoIssueCoverage_EveryIssueCapableTypeHasAFlaggedFixture in
-	// qa_demo_pivot_coverage_test.go, which is unaffected by this ratchet.
-	"apigw:apigw.stage-config-issues":                  true,
-	"asg:asg.scaling-activity-failed":                  true,
-	"cfn:cfn.stack.failed":                             true,
-	"cfn:cfn.stack-drifted":                            true,
-	"dbi:dbi.broken.incompatible_network":              true,
-	"dbi:dbi.broken.incompatible_option_group":         true,
-	"dbi:dbi.broken.incompatible_restore":              true,
-	"ebs:ebs.volume-io-degraded":                       true,
-	"ecs:ecs.state.deprovisioning":                     true,
-	"ecs:ecs.state.inactive":                           true,
-	"ecs-task:ecs-task.state.provisioning":             true,
-	"ecs-task:ecs-task.state.activating":               true,
-	"ecs-task:ecs-task.state.deactivating":             true,
-	"ecs-task:ecs-task.state.stopping":                 true,
-	"ecs-task:ecs-task.state.deprovisioning":           true,
-	"ecs-task:ecs-task.task-failed":                    true,
-	"eks:eks.state.updating":                           true,
-	"eni:eni.state.attaching":                          true,
-	"eni:eni.state.detaching":                          true,
-	"igw:igw.state.attaching":                          true,
-	"igw:igw.state.detaching":                          true,
-	"kinesis:kinesis.warn.updating":                    true,
-	"logs:logs.missing-metric-filters":                 true,
-	"msk:msk.warn.updating":                            true,
-	"msk:msk.warn.maintenance":                         true,
-	"msk:msk.warn.healing":                             true,
-	"msk:msk.warn.deleting":                            true,
-	"msk:msk.broker-outdated":                          true,
-	"msk:msk.encryption-not-tls":                       true,
-	"ng:ng.state.creating":                             true,
-	"ng:ng.state.deleting":                             true,
-	"ng:ng.state.delete-failed":                        true,
-	"redshift:redshift.broken.incompatible_hsm":        true,
-	"redshift:redshift.broken.incompatible_parameters": true,
-	"redshift:redshift.broken.incompatible_restore":    true,
-	"redshift:redshift.warn.creating":                  true,
-	"redshift:redshift.warn.modifying":                 true,
-	"redshift:redshift.warn.renaming":                  true,
-	"redshift:redshift.warn.deleting":                  true,
-	"secrets:secrets.state.rotation_overdue":           true,
-	"ses:ses.account-shutdown":                         true,
-	"ses:ses.account-probation":                        true,
-	"ses:ses.quota-high":                               true,
-	"sns:sns.all-pending-confirmation":                 true,
-	"subnet:subnet.state.failed":                       true,
-	"subnet:subnet.state.failed-insufficient-capacity": true,
-	"tgw:tgw.state.pending":                            true,
-	"tgw:tgw.state.modifying":                          true,
-	"tgw:tgw.attachment-failed":                        true,
-	"tgw:tgw.attachment-transitional":                  true,
-	"vpce:vpce.state.pending_acceptance":               true,
-	"vpce:vpce.state.deleting":                         true,
-	"vpce:vpce.state.rejected":                         true,
-	"vpce:vpce.state.expired":                          true,
-	"vpce:vpce.state.partial":                          true,
+	// (249 FindingDefs across all types). The 52 original entries from that
+	// census (apigw, asg, cfn, dbi, ebs, ecs, ecs-task, eks, eni, igw,
+	// kinesis, logs, msk, ng, redshift, secrets, sns, subnet, tgw, vpce)
+	// have since been burned down — each now has a demo fixture producing
+	// the finding. s3 is deliberately absent and MUST stay absent: its
+	// per-resource Wave-1/Wave-2 "public access block incomplete" signal
+	// (EnrichS3PublicAccessBlock / GetPublicAccessBlockOutput fixtures)
+	// already flows into TestDemoIssueCoverage_EveryIssueCapableTypeHasAFlaggedFixture
+	// in qa_demo_pivot_coverage_test.go, which is unaffected by this ratchet.
+	//
+	// Only the three ses codes remain: SES exposes exactly one
+	// GetAccount-shaped Wave-2 signal per account (no per-resource dimension
+	// to vary), and the canonical demo account is intentionally modeled
+	// healthy so the rest of the demo fleet has a non-degraded sending
+	// identity to reference. The distress shapes for account-shutdown /
+	// account-probation / quota-high are constructed inline in QA tests
+	// instead (see internal/demo/fixtures/ses.go's own doc comment).
+	"ses:ses.account-shutdown":  true,
+	"ses:ses.account-probation": true,
+	"ses:ses.quota-high":        true,
 }
 
 // bucketName maps a domain.Color to the lowercase token used in
