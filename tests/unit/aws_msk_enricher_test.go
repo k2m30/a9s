@@ -259,6 +259,52 @@ func TestEnrichMSKCluster_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	}
 }
 
+// TestEnrichMSKCluster_OutdatedVersionAndPlaintextEncryption_ProducesBothFindings
+// is a RED regression pin for a P2 bug found by Codex in the v3.47.0 #52 landing:
+// EnrichMSKCluster's encryption-in-transit check is gated by
+// `if _, alreadyFound := result.Findings[r.ID]; !alreadyFound` (msk_issue_enrichment.go),
+// a pre-#52 "only one finding per resource" short-circuit that setWave2Finding's
+// append-style contract (#52) obsoletes. When cluster-1 is BOTH broker-outdated
+// (KafkaVersion 2.6.0) AND not using TLS (ClientBroker=PLAINTEXT), the broker check
+// runs first and its setWave2Finding call populates result.Findings[r.ID], so the
+// encryption check's alreadyFound guard trips and the second, independently-evaluated
+// condition is silently dropped — the cluster shows only "broker software outdated",
+// never "encryption in transit not enforced", even though both are true.
+func TestEnrichMSKCluster_OutdatedVersionAndPlaintextEncryption_ProducesBothFindings(t *testing.T) {
+	fake := &mskDescribeClusterV2Fake{
+		results: map[string]*kafkatypes.Cluster{
+			mskARN1: provisionedCluster(mskARN1, "2.6.0", kafkatypes.ClientBrokerPlaintext),
+		},
+	}
+	clients := &awsclient.ServiceClients{MSK: fake}
+	resources := mskClusterResources(mskARN1)
+
+	result, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fs, ok := result.Findings[mskName1]
+	if !ok {
+		t.Fatalf("expected findings keyed by bare cluster name %q, got Findings=%+v", mskName1, result.Findings)
+	}
+
+	var haveBrokerOutdated, haveEncryptionNotTLS bool
+	for _, f := range fs {
+		switch f.Code {
+		case domain.FindingCode("msk.broker-outdated"):
+			haveBrokerOutdated = true
+		case domain.FindingCode("msk.encryption-not-tls"):
+			haveEncryptionNotTLS = true
+		}
+	}
+	if !haveBrokerOutdated {
+		t.Errorf("result.Findings[%q] missing Code \"msk.broker-outdated\" — test fixture assumption broken; got %+v", mskName1, fs)
+	}
+	if !haveEncryptionNotTLS {
+		t.Errorf(`BUG: result.Findings[%q] missing Code "msk.encryption-not-tls" (%d entries, want 2) — EnrichMSKCluster's encryption-in-transit check is gated behind "if _, alreadyFound := result.Findings[r.ID]; !alreadyFound" (internal/aws/msk_issue_enrichment.go), so once the broker-outdated check appends its finding first, the encryption check short-circuits and never runs, even though setWave2Finding is append-style (#52) and both conditions independently hold. Got %+v`, mskName1, len(fs), fs)
+	}
+}
+
 // TestEnrichMSKCluster_APIErrorSetsTruncatedAndSurfacesError verifies that when the
 // API call for cluster-1 returns an error, the enricher sets Truncated=true, produces
 // 0 findings for that cluster, and returns a composite error containing the enricher
