@@ -132,6 +132,7 @@ This target is the canonical gate. It MUST pass locally with zero edits before a
 7. `make snapshot` — golden-file render checks.
 8. `make mdlint` — markdown lint across `docs/`, `CLAUDE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`.
 9. `make smoke` — tmux-driven demo smoke over the compiled binary (`scripts/smoke-demo.sh`): rendered menu counts, humanized statuses, per-row issue causes, the reference bucket's related panel. Requires tmux. When demo fixtures legitimately change, update the script's assertions in the same PR.
+10. `make smoke-related` — tmux-driven demo smoke dedicated to the RELATED panel (`scripts/smoke-related-demo.sh`): exact fixture witness badges, the zero-count-row cursor skip, a count-1 drill landing on the target detail, a circular drill re-showing cached counts, and the ec2 IAM Role pivot. Requires tmux.
 
 For changes that touch `internal/aws/` real-account behavior, additionally run the live integration test against a real AWS profile (this is also the entry to Stage 6.5):
 
@@ -150,8 +151,8 @@ For pure docs changes (`*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICEN
 ### Stage 6.5 — Post-merge real-AWS validation
 
 - **Trigger**: a merge to `main` touches `internal/aws/`, fetchers, child views, related-resource pivots, or fixtures. Skipped for pure-docs and pure-tooling changes. For a multi-PR refactor program, also run a batch pass at each phase boundary (≥ 3 PRs merged since the last real-AWS sign-off), since mocks cannot fully cover large refactor surfaces.
-- **Tools**: the integration test binaries under `tests/integration/`; `make smoke-live PROFILE=<profile>-readonly [REGION=...]` — a data-independent TUI sweep over every non-empty resource type in the account (raw-enum and vacuous-status forbids, related-panel settle checks). Live smoke runs only on `*readonly` profiles by construction.
-- **Action**: run the integration suite against a real AWS profile (`A9S_CT_PROFILE=<profile>`), run `make smoke-live`, exercise the changed surface (list → detail → child view → related view) across ≥ 4 distinct resource types for a phase-boundary pass, and capture pass/fail per scenario.
+- **Tools**: the integration test binaries under `tests/integration/`; `make smoke-live PROFILE=<profile>-readonly [REGION=...]` — a data-independent TUI sweep over every non-empty resource type in the account (raw-enum and vacuous-status forbids, related-panel settle checks); `make smoke-related-live PROFILE=<profile>-readonly [REGION=...]` — the RELATED-panel-dedicated companion (settled counted badge, drill-and-return, a surviving "(?)" row staying actionable). Live smoke runs only on `*readonly` profiles by construction.
+- **Action**: run the integration suite against a real AWS profile (`A9S_CT_PROFILE=<profile>`), run `make smoke-live` and `make smoke-related-live`, exercise the changed surface (list → detail → child view → related view) across ≥ 4 distinct resource types for a phase-boundary pass, and capture pass/fail per scenario.
 - **Exit**: all real-AWS scenarios green, or a scoped regression note with a follow-up fix.
 - **Anti-pattern**: treating Stage 6 (`make ready-to-push`) as sufficient for changes that depend on real AWS API behavior.
 

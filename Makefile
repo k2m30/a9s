@@ -171,9 +171,26 @@ smoke:
 smoke-live:
 	PROFILE="$(PROFILE)" REGION="$(REGION)" ./scripts/smoke-readonly.sh
 
+# smoke-related drives the RELATED panel end to end over the demo fixtures:
+# exact fixture witness badges, the zero-count-row cursor skip, count-1
+# drills landing on the target detail, a circular drill re-showing cached
+# counts with the depth badge intact, and the ec2 IAM Role pivot. ~30s.
+# Requires tmux. Part of ready-to-push alongside `make smoke`.
+smoke-related:
+	./scripts/smoke-related-demo.sh
+
+# smoke-related-live drives the same RELATED-panel walk against a real
+# *readonly* AWS profile with data-independent assertions (a settled counted
+# badge, a count-1/N drill landing on a detail or list frame, a surviving
+# "(?)" row staying actionable with no dead end). Companion to the Stage 6
+# live sub-rule; not part of ready-to-push (needs credentials).
+# Usage: make smoke-related-live [PROFILE=acme-dev-readonly] [REGION=eu-west-2]
+smoke-related-live:
+	PROFILE="$(PROFILE)" REGION="$(REGION)" ./scripts/smoke-related-readonly.sh
+
 # Stage 6 — Pre-push gate. The single command every PR must pass before push.
 # See docs/development-process.md.
-ready-to-push: test-race lint security gofix verify-readonly verify-zero-init check-readme snapshot mdlint smoke
+ready-to-push: test-race lint security gofix verify-readonly verify-zero-init check-readme snapshot mdlint smoke smoke-related
 	@echo "PASS: ready-to-push gate green"
 
 # Stage 7 — Pre-release gate. Run before tagging a release. Subsumes ready-to-push

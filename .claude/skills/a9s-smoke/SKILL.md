@@ -34,6 +34,19 @@ YAML view, circular drill re-showing cached badges, version+depth header.
 When demo fixtures legitimately change, update the script's assertions in
 the same PR.
 
+Related panel, demo (deterministic, asserted, part of `make ready-to-push`):
+
+```
+make smoke-related        # scripts/smoke-related-demo.sh, ~30s
+```
+
+Dedicated RELATED-panel edge cases: exact fixture witness badges (CloudTrail
+Trails, KMS Key), the bare CloudTrail Events pivot, the zero-count-row
+cursor skip, a count-1 drill landing on the target detail (not a list), a
+circular drill (bucket -> trail -> bucket) re-showing cached counts with the
+depth badge intact, Esc unwinding back to the same detail, and the ec2 IAM
+Role pivot.
+
 Live (data-independent patterns, credentials required, not in the gate):
 
 ```
@@ -44,6 +57,18 @@ Sweep reaches issue badges in-session, no whole-cell raw enums anywhere,
 issue-titled lists carry cause phrases, an ec2 detail's related checks
 settle to counts and its drills produce no fetch errors. Refuses non-readonly
 profiles.
+
+Related panel, live (data-independent, credentials required, not in the gate):
+
+```
+make smoke-related-live PROFILE=acme-dev-readonly REGION=eu-west-2
+```
+
+Pattern-based RELATED-panel checks against a real account: the first
+candidate type (ec2, lambda, s3, sg) that settles a counted badge, a drill
+of the first actionable pivot landing on a detail or list frame with Esc
+returning to the same title, and — if a "(?)" row is visible — Enter
+navigates and the row never dead-ends. Refuses non-readonly profiles.
 
 ## Session checks — compose them every run
 
