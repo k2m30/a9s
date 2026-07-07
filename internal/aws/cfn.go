@@ -113,6 +113,8 @@ func cfnStackFindings(status string) []domain.Finding {
 		"UPDATE_ROLLBACK_COMPLETE", "UPDATE_ROLLBACK_FAILED",
 		"IMPORT_ROLLBACK_COMPLETE", "IMPORT_ROLLBACK_FAILED":
 		return []domain.Finding{{Code: CodeCFNStackRollback, Phrase: strings.ToLower(status), Severity: domain.SevBroken, Source: "wave1"}}
+	case "DELETE_COMPLETE":
+		return []domain.Finding{{Code: CodeCFNStackDeleted, Phrase: strings.ToLower(status), Severity: domain.SevDim, Source: "wave1"}}
 	}
 	if strings.HasSuffix(status, "_FAILED") {
 		return []domain.Finding{{Code: CodeCFNStackFailed, Phrase: strings.ToLower(status), Severity: domain.SevBroken, Source: "wave1"}}

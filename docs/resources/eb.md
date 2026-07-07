@@ -213,6 +213,12 @@ eb — MESSAGING. Lifecycle key: `status`.
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
+| eb.health.red | health: red | broken | wave1 |
+| eb.health.yellow | health: yellow | warn | wave1 |
+| eb.health.grey | health: grey | warn | wave1 |
+| eb.status.terminated | terminated | dim | wave1 |
+| eb.status.launching | launching | warn | wave1 |
+| eb.status.terminating | terminating | dim | wave1 |
 | eb.environment-causes | EB causes: <first cause> | warn | wave2 |
 <!-- END GENERATED: findings -->
 

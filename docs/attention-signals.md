@@ -205,6 +205,9 @@ resource-list frame title. The frame-title rules:
 | ecs-task | ecs-task.state.deactivating | deactivating | warn | wave1 |
 | ecs-task | ecs-task.state.stopping | stopping | warn | wave1 |
 | ecs-task | ecs-task.state.deprovisioning | deprovisioning | warn | wave1 |
+| ecs-task | ecs-task.state.stopped | stopped | dim | wave1 |
+| ecs-task | ecs-task.stop-code.failed | stopped: <stop code> | broken | wave1 |
+| ecs-task | ecs-task.health.unhealthy | unhealthy | broken | wave1 |
 | ecs-task | ecs-task.task-failed | <stop code or container> failed | broken | wave2 |
 | lambda | lambda.last-update.failed | last update failed to apply | broken | wave1 |
 | lambda | lambda.runtime.deprecated | runtime is end-of-life | broken | wave1 |
@@ -383,7 +386,14 @@ resource-list frame title. The frame-title rules:
 | sns | sns.all-pending-confirmation | all pending confirmation | warn | wave2 |
 | sns-sub | sns-sub.state.pending-confirmation | endpoint has not confirmed the subscription | warn | wave1 |
 | sns-sub | sns-sub.state.deleted | endpoint deleted | dim | wave1 |
+| eb | eb.health.red | health: red | broken | wave1 |
+| eb | eb.health.yellow | health: yellow | warn | wave1 |
+| eb | eb.health.grey | health: grey | warn | wave1 |
+| eb | eb.status.terminated | terminated | dim | wave1 |
+| eb | eb.status.launching | launching | warn | wave1 |
+| eb | eb.status.terminating | terminating | dim | wave1 |
 | eb | eb.environment-causes | EB causes: <first cause> | warn | wave2 |
+| eb-rule | eb-rule.state.disabled | disabled | dim | wave1 |
 | eb-rule | eb-rule.target-issue | enabled rule has no targets (rule matches but goes nowhere) | broken | wave2 |
 | kinesis | kinesis.warn.creating | creating | warn | wave1 |
 | kinesis | kinesis.warn.updating | updating | warn | wave1 |
@@ -434,6 +444,7 @@ resource-list frame title. The frame-title rules:
 | cfn | cfn.stack.failed | <status, lowercased> | broken | wave1 |
 | cfn | cfn.stack.rollback | <status, lowercased> | broken | wave1 |
 | cfn | cfn.stack.in\_progress | <status, lowercased> | warn | wave1 |
+| cfn | cfn.stack.deleted | delete\_complete | dim | wave1 |
 | cfn | cfn.recent-resource-failure | recent resource failure: <ResourceType/LogicalResourceId> | broken | wave2 |
 | cfn | cfn.stack-drifted | stack drifted from template | warn | wave2 |
 | pipeline | pipeline.stage-failed | stage <stage> failed | broken | wave2 |

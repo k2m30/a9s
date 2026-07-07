@@ -359,6 +359,12 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("eb")},
 		},
 		Findings: []catalog.FindingDef{
+			{Code: CodeEBHealthRed, Phrase: "health: red", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeEBHealthYellow, Phrase: "health: yellow", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEBHealthGrey, Phrase: "health: grey", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEBTerminated, Phrase: "terminated", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeEBLaunching, Phrase: "launching", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEBTerminating, Phrase: "terminating", Severity: domain.SevDim, Source: "wave1"},
 			{Code: ebCodeEnvironmentCauses, Phrase: "EB causes: <first cause>", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
@@ -406,6 +412,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{FieldPath: "RoleArn", TargetType: "role"},
 		},
 		Findings: []catalog.FindingDef{
+			{Code: CodeEBRuleDisabled, Phrase: "disabled", Severity: domain.SevDim, Source: "wave1"},
 			{Code: ebRuleCodeTargetIssue, Phrase: "enabled rule has no targets (rule matches but goes nowhere)", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},

@@ -181,6 +181,7 @@ cfn — CI/CD. Lifecycle key: `status`.
 | cfn.stack.failed | <status, lowercased> | broken | wave1 |
 | cfn.stack.rollback | <status, lowercased> | broken | wave1 |
 | cfn.stack.in\_progress | <status, lowercased> | warn | wave1 |
+| cfn.stack.deleted | delete\_complete | dim | wave1 |
 | cfn.recent-resource-failure | recent resource failure: <ResourceType/LogicalResourceId> | broken | wave2 |
 | cfn.stack-drifted | stack drifted from template | warn | wave2 |
 <!-- END GENERATED: findings -->

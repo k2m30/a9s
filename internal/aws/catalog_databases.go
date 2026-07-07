@@ -69,7 +69,12 @@ func colorDBI(r domain.Resource) domain.Color {
 	return base
 }
 
-func colorS3(_ domain.Resource) domain.Color { return domain.ColorHealthy }
+func colorS3(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
 
 func colorRedis(r domain.Resource) domain.Color {
 	if c, ok := colorFromWave1(r); ok {

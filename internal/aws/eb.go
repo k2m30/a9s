@@ -97,7 +97,6 @@ func FetchEBEnvironmentsPage(ctx context.Context, api EBDescribeEnvironmentsAPI,
 		r := resource.Resource{
 			ID:   envID,
 			Name: envName,
-			// Status intentionally unset — lifecycle state is emitted as a Finding.
 			Fields: map[string]string{
 				"environment_name": envName,
 				"environment_id":   envID,
@@ -111,12 +110,9 @@ func FetchEBEnvironmentsPage(ctx context.Context, api EBDescribeEnvironmentsAPI,
 				"date_created":     dateCreated,
 				"environment_arn":  envArn,
 			},
+			Findings:  ebEnvironmentFindings(status, health),
 			RawStruct: env,
 		}
-
-		// Health is a structural dimension, not a wave1 lifecycle event.
-		// Fields["health"] carries the raw value; the Color func reads it directly.
-		// No wave1 Finding is emitted for health — doing so hijacks the Status column.
 
 		resources = append(resources, r)
 	}

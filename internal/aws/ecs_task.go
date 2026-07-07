@@ -154,9 +154,10 @@ func fetchECSTasksPageWithJoin(
 				fields["task_def_join_error"] = "true"
 			}
 
-			// emit wave1 Findings for non-healthy transitional states.
-			// RUNNING and STOPPED → no Finding (lifecycle; stop_code handled structurally).
-			findings := ecsTaskWave1Findings(status)
+			// emit wave1 Findings for non-healthy transitional states, plus
+			// the STOPPED/health-status structural signals colorECSTask used
+			// to read directly from Fields.
+			findings := ecsTaskStructuralFindings(status, stopCode, healthStatus)
 
 			r := resource.Resource{
 				ID:        taskID,

@@ -233,6 +233,9 @@ ecs-task — COMPUTE. Lifecycle key: `status`.
 | ecs-task.state.deactivating | deactivating | warn | wave1 |
 | ecs-task.state.stopping | stopping | warn | wave1 |
 | ecs-task.state.deprovisioning | deprovisioning | warn | wave1 |
+| ecs-task.state.stopped | stopped | dim | wave1 |
+| ecs-task.stop-code.failed | stopped: <stop code> | broken | wave1 |
+| ecs-task.health.unhealthy | unhealthy | broken | wave1 |
 | ecs-task.task-failed | <stop code or container> failed | broken | wave2 |
 <!-- END GENERATED: findings -->
 
