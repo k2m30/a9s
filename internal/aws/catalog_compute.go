@@ -44,34 +44,10 @@ func isDeprecatedLambdaRuntime(runtime string) bool {
 }
 
 func colorEC2(r domain.Resource) domain.Color {
-	for i := range r.Findings {
-		if r.Findings[i].Source == "wave1" {
-			return colorFromSeverity(r.Findings[i].Severity)
-		}
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
 	}
-	sys := r.Fields["system_status"]
-	inst := r.Fields["instance_status"]
-	if sys == "impaired" || inst == "impaired" {
-		return domain.ColorBroken
-	}
-	if sys == "initializing" || inst == "initializing" {
-		return domain.ColorWarning
-	}
-	state := r.Fields["state"]
-	switch state {
-	case "running", "":
-		return domain.ColorHealthy
-	case "pending", "shutting-down", "stopping":
-		return domain.ColorWarning
-	case "stopped":
-		if strings.HasPrefix(r.Fields["state_reason_code"], "Server.") {
-			return domain.ColorBroken
-		}
-		return domain.ColorWarning
-	case "terminated":
-		return domain.ColorDim
-	}
-	return colorFallback(state)
+	return domain.ColorHealthy
 }
 
 func colorECSSvc(r domain.Resource) domain.Color {
@@ -135,25 +111,8 @@ func colorECSTask(r domain.Resource) domain.Color {
 }
 
 func colorLambda(r domain.Resource) domain.Color {
-	if r.Fields["last_update_status"] == "Failed" {
-		return domain.ColorBroken
-	}
-	if _, ok := deprecatedLambdaRuntimes[r.Fields["runtime"]]; ok {
-		return domain.ColorBroken
-	}
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
-	}
-	switch r.Fields["state"] {
-	case "Failed":
-		return domain.ColorBroken
-	case "Pending":
-		return domain.ColorWarning
-	case "Inactive":
-		return domain.ColorDim
-	}
-	if r.Fields["dlq_target_arn"] == "" {
-		return domain.ColorWarning
 	}
 	return domain.ColorHealthy
 }
@@ -258,71 +217,17 @@ func colorEBS(r domain.Resource) domain.Color {
 }
 
 func colorEBSSnap(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	var base domain.Color
-	switch r.Fields["state"] {
-	case "completed":
-		base = domain.ColorHealthy
-	case "pending":
-		base = domain.ColorWarning
-	case "error", "recoverable", "recovering":
-		base = domain.ColorBroken
-	default:
-		base = domain.ColorHealthy
-	}
-	if base == domain.ColorBroken {
-		return base
-	}
-	if r.Fields["encrypted"] == "false" {
-		return domain.ColorWarning
-	}
-	if started, err := time.Parse(time.RFC3339, r.Fields["started"]); err == nil {
-		if time.Since(started) > 365*24*time.Hour {
-			desc := r.Fields["description"]
-			if strings.HasPrefix(desc, "Created by CreateImage") ||
-				strings.Contains(strings.ToLower(desc), "automated") {
-				return domain.ColorWarning
-			}
-		}
-	}
-	if strings.HasPrefix(r.Fields["volume_id"], "vol-") && r.Fields["volume_orphan"] == "true" {
-		return domain.ColorWarning
-	}
-	return base
+	return domain.ColorHealthy
 }
 
 func colorAMI(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	var stateColor domain.Color
-	switch r.Fields["state"] {
-	case "available":
-		stateColor = domain.ColorHealthy
-	case "pending", "transient":
-		stateColor = domain.ColorWarning
-	case "failed", "error", "invalid":
-		stateColor = domain.ColorBroken
-	case "deregistered", "disabled":
-		stateColor = domain.ColorDim
-	default:
-		stateColor = domain.ColorHealthy
-	}
-	if stateColor == domain.ColorBroken {
-		return domain.ColorBroken
-	}
-	if depStr := r.Fields["deprecation_time"]; depStr != "" {
-		if depTime, err := time.Parse(time.RFC3339, depStr); err == nil {
-			if time.Now().After(depTime) {
-				if stateColor != domain.ColorDim {
-					return domain.ColorWarning
-				}
-			}
-		}
-	}
-	return stateColor
+	return domain.ColorHealthy
 }
 
 // augmentEC2StatusChecks injects a Status Checks section after the State block.
@@ -515,9 +420,11 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		Findings: []catalog.FindingDef{
 			{Code: CodeEC2StatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEC2StateShuttingDown, Phrase: "shutting down", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeEC2StateStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeEC2StateStopped, Phrase: "stopped", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeEC2StateStoppedServer, Phrase: "stopped", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeEC2StateTerminated, Phrase: "terminated", Severity: domain.SevDim, Source: "wave1"},
 			{Code: ec2CodeInstanceStatusImpaired, Phrase: "impaired: system checks failing", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},
@@ -915,6 +822,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			}
 			return FetchEBSSnapshotsPage(ctx, c.EC2, continuationToken)
 		},
+		Wave2:     IssueEnricher{Fn: enrichEBSSnapCrossRef, Priority: 100},
 		FieldKeys: []string{"snapshot_id", "name", "state", "volume_id", "size", "encrypted", "description", "started", "progress"},
 		FetchByIDs: func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
 			c, ok := clients.(*ServiceClients)
@@ -938,6 +846,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Findings: []catalog.FindingDef{
 			{Code: CodeEBSSnapStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeEBSSnapStateError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeEBSSnapUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEBSSnapAgedAutomated, Phrase: "automated, <N>d old", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEBSSnapOrphan, Phrase: "orphan: source volume deleted", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -1002,6 +913,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Findings: []catalog.FindingDef{
 			{Code: CodeAMIStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeAMIStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeAMIStateDim, Phrase: "deregistered", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeAMIDeprecated, Phrase: "deprecated", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 }

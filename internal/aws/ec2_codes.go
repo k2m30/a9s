@@ -22,4 +22,12 @@ const (
 	// code (AWS-initiated, e.g. capacity, spot interruption).
 	// Severity: SevBroken.
 	CodeEC2StateStoppedServer domain.FindingCode = "ec2.state.stopped.server"
+
+	// CodeEC2StateShuttingDown — instance is in the "shutting-down" lifecycle
+	// state (transitional, en route to terminated). Severity: SevWarn.
+	CodeEC2StateShuttingDown domain.FindingCode = "ec2.state.shutting-down"
+
+	// CodeEC2StateTerminated — instance is in the "terminated" lifecycle
+	// state (permanent, no further action possible). Severity: SevDim.
+	CodeEC2StateTerminated domain.FindingCode = "ec2.state.terminated"
 )

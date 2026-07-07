@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -362,7 +363,57 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 		}}
 	}
 
+	if len(r.Findings) == 0 {
+		r.Findings = ebsSnapStructuralFindings(snap)
+	}
+
 	return r
+}
+
+// ebsSnapAge is the automated-snapshot age threshold past which a completed
+// snapshot is flagged as a cost concern (no retention policy pruning it).
+const ebsSnapAge = 365 * 24 * time.Hour
+
+// ebsSnapStructuralFindings mirrors colorEBSSnap's own precedence
+// (unencrypted, then aged-automated) for the "completed" branch, which
+// carries no state-derived Finding, so the list Status cell / detail
+// Attention block always explain the Warning color. Only called when
+// len(r.Findings)==0 (state is "completed", the only state with no Finding
+// from the switch above). The orphan (source volume deleted) rule is a
+// cross-ref check requiring the sibling ebs cache and is registered
+// separately as this type's Wave2 IssueEnricher (enrichEBSSnapCrossRef in
+// ebs_snap_issue_enrichment.go), since it needs the full ResourceCache this
+// per-item helper does not have access to.
+func ebsSnapStructuralFindings(snap ec2types.Snapshot) []domain.Finding {
+	if snap.Encrypted == nil || !*snap.Encrypted {
+		return []domain.Finding{{
+			Code: CodeEBSSnapUnencrypted, Phrase: "unencrypted",
+			Detail: "Snapshot is not encrypted at rest — " +
+				"re-create from an encrypted volume.",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	}
+	if snap.StartTime != nil {
+		if age := time.Since(*snap.StartTime); age > ebsSnapAge {
+			desc := ""
+			if snap.Description != nil {
+				desc = *snap.Description
+			}
+			isAutomated := strings.HasPrefix(desc, "Created by CreateImage") ||
+				strings.Contains(strings.ToLower(desc), "automated")
+			if isAutomated {
+				days := int(age.Hours() / 24)
+				return []domain.Finding{{
+					Code:   CodeEBSSnapAgedAutomated,
+					Phrase: "automated, " + strconv.Itoa(days) + "d old",
+					Detail: "Automated snapshot is " + strconv.Itoa(days) +
+						" days old with no retention policy pruning it — billed indefinitely.",
+					Severity: domain.SevWarn, Source: "wave1",
+				}}
+			}
+		}
+	}
+	return nil
 }
 
 // ebsStructuralFindings mirrors colorEBS's own precedence (orphan check,

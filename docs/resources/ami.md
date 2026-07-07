@@ -171,6 +171,8 @@ ami — COMPUTE. Lifecycle key: `state`.
 | --- | --- | --- | --- |
 | ami.state.pending | pending | warn | wave1 |
 | ami.state.failed | failed | broken | wave1 |
+| ami.state.dim | deregistered | dim | wave1 |
+| ami.deprecated | deprecated | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

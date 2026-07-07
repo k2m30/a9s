@@ -402,11 +402,19 @@ func makeInstance(
 		)
 	}
 	// aws:ecs:cluster-name tag — required for ecs→ec2 related-panel pivot.
-	// acme-services is a real ECS cluster fixture (ecs.go).
+	// acme-services is a real ECS cluster fixture (ecs.go). StateReason.Code
+	// with a "Server." prefix is also this suite's only witness for the
+	// broken (AWS-initiated stop) bucket of colorEC2/CodeEC2StateStoppedServer
+	// — this instance is stopped + spot lifecycle, a natural fit for a
+	// spot-interruption AWS-initiated stop.
 	if instanceID == "i-0a1b2c3d4e5f60004" {
 		inst.Tags = append(inst.Tags,
 			ec2types.Tag{Key: aws.String("aws:ecs:cluster-name"), Value: aws.String("acme-services")},
 		)
+		inst.StateReason = &ec2types.StateReason{
+			Code:    aws.String("Server.SpotInstanceShutdown"),
+			Message: aws.String("Server.SpotInstanceShutdown: The instance was stopped because the Spot Instance was interrupted."),
+		}
 	}
 	if publicIP != "" {
 		inst.PublicIpAddress = aws.String(publicIP)
@@ -2567,12 +2575,14 @@ func buildSnapshots() []ec2types.Snapshot {
 				{Key: aws.String("aws:backup:source-resource"), Value: aws.String("arn:aws:ec2:us-east-1:123456789012:volume/vol-0a1b2c3d4e5f60001")},
 			},
 		},
-		// Old automated snapshot (400+ days) → stale / attention signal
+		// Old automated snapshot (>365d) → aged-automated cost finding.
+		// Fixed 2025-01-01 anchor keeps the age deterministically past the
+		// 365-day threshold regardless of when the test suite runs.
 		{
 			SnapshotId: aws.String("snap-completed-old00a"), State: ec2types.SnapshotStateCompleted,
 			VolumeId: aws.String("vol-0a1b2c3d4e5f60001"), VolumeSize: aws.Int32(50),
-			Encrypted: aws.Bool(true), Description: aws.String("Created automatically by data lifecycle manager"),
-			StartTime: aws.Time(time.Now().AddDate(-1, -1, -5)), // ~400 days ago
+			Encrypted: aws.Bool(true), Description: aws.String("Automated snapshot created by data lifecycle manager"),
+			StartTime: aws.Time(time.Date(2025, 1, 1, 3, 0, 0, 0, time.UTC)),
 			Progress:  aws.String("100%"), OwnerId: aws.String("123456789012"),
 			KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("dlm-auto-old-snap")}},
@@ -2582,19 +2592,33 @@ func buildSnapshots() []ec2types.Snapshot {
 			SnapshotId: aws.String("snap-error000000000b"), State: ec2types.SnapshotStateError,
 			VolumeId: aws.String("vol-0a1b2c3d4e5f60003"), VolumeSize: aws.Int32(100),
 			Encrypted: aws.Bool(false), Description: aws.String("Failed backup — disk I/O error during snapshot"),
-			StartTime: aws.Time(time.Now().AddDate(0, 0, -3)),
+			StartTime: aws.Time(time.Date(2026, 3, 25, 4, 0, 0, 0, time.UTC)),
 			Progress:  aws.String("0%"), OwnerId: aws.String("123456789012"),
 			Tags: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("failed-backup-snap")}},
 		},
-		// Orphan snap: references a deleted volume
+		// Orphan snap: references a deleted volume (vol-deleted-original does
+		// not appear in buildVolumes) — required witness for the ebs-snap
+		// cross-ref orphan Finding (enrichEBSSnapCrossRef).
 		{
 			SnapshotId: aws.String("snap-orphan00000000c"), State: ec2types.SnapshotStateCompleted,
 			VolumeId: aws.String("vol-deleted-original"), VolumeSize: aws.Int32(200),
 			Encrypted: aws.Bool(true), Description: aws.String("Snapshot of deleted volume — orphaned"),
-			StartTime: aws.Time(time.Now().AddDate(0, -2, 0)),
+			StartTime: aws.Time(time.Date(2026, 1, 28, 5, 0, 0, 0, time.UTC)),
 			Progress:  aws.String("100%"), OwnerId: aws.String("123456789012"),
 			KmsKeyId: aws.String("b2c3d4e5-6789-01ab-cdef-222222222222"),
 			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("orphan-snap")}},
+		},
+		// Completed + unencrypted → CIS EC2.1 violation witness (distinct
+		// from snap-error000000000b, which is Error-state and never reaches
+		// the unencrypted structural check since Error already carries its
+		// own state Finding).
+		{
+			SnapshotId: aws.String("snap-unencrypted00d"), State: ec2types.SnapshotStateCompleted,
+			VolumeId: aws.String("vol-0a1b2c3d4e5f60004"), VolumeSize: aws.Int32(80),
+			Encrypted: aws.Bool(false), Description: aws.String("Manual snapshot before decommission"),
+			StartTime: aws.Time(time.Date(2026, 5, 10, 6, 0, 0, 0, time.UTC)),
+			Progress:  aws.String("100%"), OwnerId: aws.String("123456789012"),
+			Tags: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("legacy-worker-unencrypted-snap")}},
 		},
 	}
 }
@@ -2683,7 +2707,7 @@ func buildImages() []ec2types.Image {
 			RootDeviceName: aws.String("/dev/sda1"), Hypervisor: ec2types.HypervisorTypeXen,
 			VirtualizationType: ec2types.VirtualizationTypeHvm, ImageType: ec2types.ImageTypeValuesMachine,
 			CreationDate:    aws.String("2023-01-15T09:00:00.000Z"),
-			DeprecationTime: aws.String(time.Now().AddDate(0, -3, 0).UTC().Format("2006-01-02T15:04:05.000Z")),
+			DeprecationTime: aws.String("2026-01-15T09:00:00.000Z"),
 			Public:          aws.Bool(false),
 			OwnerId:         aws.String("123456789012"),
 			Description:     aws.String("Ubuntu 20.04 LTS — deprecated in favour of 22.04"),

@@ -132,13 +132,17 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, contin
 				RawStruct: inst,
 			}
 
-			// emit canonical Findings for non-healthy lifecycle states.
-			// Healthy ("running") and terminal ("terminated", "shutting-down") lifecycle
-			// states have no Finding — rendered via Fields[LifecycleKey] fallback.
+			// emit canonical Findings for every non-healthy lifecycle state.
+			// Healthy ("running") has no Finding.
 			switch state {
 			case "pending":
 				r.Findings = []domain.Finding{{
 					Code: CodeEC2StatePending, Phrase: "pending",
+					Severity: domain.SevWarn, Source: "wave1",
+				}}
+			case "shutting-down":
+				r.Findings = []domain.Finding{{
+					Code: CodeEC2StateShuttingDown, Phrase: "shutting down",
 					Severity: domain.SevWarn, Source: "wave1",
 				}}
 			case "stopping":
@@ -158,6 +162,11 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, contin
 						Severity: domain.SevWarn, Source: "wave1",
 					}}
 				}
+			case "terminated":
+				r.Findings = []domain.Finding{{
+					Code: CodeEC2StateTerminated, Phrase: "terminated",
+					Severity: domain.SevDim, Source: "wave1",
+				}}
 			}
 
 			resources = append(resources, r)
