@@ -29,4 +29,17 @@ const (
 	// CodeEBSSnapStateError — EBS snapshot is in the "error", "recoverable", or
 	// "recovering" state. Severity: SevBroken.
 	CodeEBSSnapStateError domain.FindingCode = "ebs-snap.state.error"
+
+	// CodeEBSSnapUnencrypted — snapshot is not encrypted at rest, violating
+	// CIS EC2.1. Severity: SevWarn.
+	CodeEBSSnapUnencrypted domain.FindingCode = "ebs-snap.encryption.disabled"
+
+	// CodeEBSSnapAgedAutomated — automated snapshot older than 365 days —
+	// billed indefinitely with no retention policy pruning it.
+	// Severity: SevWarn.
+	CodeEBSSnapAgedAutomated domain.FindingCode = "ebs-snap.aged-automated"
+
+	// CodeEBSSnapOrphan — snapshot's source volume is no longer present in
+	// the loaded ebs cache. Severity: SevWarn.
+	CodeEBSSnapOrphan domain.FindingCode = "ebs-snap.orphan"
 )

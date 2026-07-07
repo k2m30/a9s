@@ -218,9 +218,10 @@ func imageResource(img ec2types.Image) resource.Resource {
 		RawStruct: img,
 	}
 
-	// emit canonical Findings for non-healthy AMI states.
-	// available → healthy (no Finding). deregistered / disabled → terminal (no Finding).
-	// pending / transient → SevWarn. failed / error / invalid → SevBroken.
+	// emit canonical Findings for every non-healthy AMI state or condition,
+	// mirroring colorAMI's own precedence: broken state wins outright; a
+	// dim (deregistered/disabled) state stays dim even when also deprecated;
+	// otherwise a passed DeprecationTime bumps an available AMI to warning.
 	switch img.State {
 	case ec2types.ImageStatePending, ec2types.ImageStateTransient:
 		r.Findings = []domain.Finding{{
@@ -232,6 +233,26 @@ func imageResource(img ec2types.Image) resource.Resource {
 			Code: CodeAMIStateFailed, Phrase: "failed",
 			Severity: domain.SevBroken, Source: "wave1",
 		}}
+	case ec2types.ImageStateDeregistered:
+		r.Findings = []domain.Finding{{
+			Code: CodeAMIStateDim, Phrase: "deregistered",
+			Severity: domain.SevDim, Source: "wave1",
+		}}
+	case ec2types.ImageStateDisabled:
+		r.Findings = []domain.Finding{{
+			Code: CodeAMIStateDim, Phrase: "disabled",
+			Severity: domain.SevDim, Source: "wave1",
+		}}
+	default:
+		if img.DeprecationTime != nil && *img.DeprecationTime != "" {
+			if t, err := time.Parse(time.RFC3339, *img.DeprecationTime); err == nil && time.Now().After(t) {
+				r.Findings = []domain.Finding{{
+					Code: CodeAMIDeprecated, Phrase: "deprecated",
+					Detail:   "DeprecationTime has passed — AWS no longer recommends this AMI for new launches.",
+					Severity: domain.SevWarn, Source: "wave1",
+				}}
+			}
+		}
 	}
 
 	return r
