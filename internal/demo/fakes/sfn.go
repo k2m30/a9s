@@ -35,8 +35,18 @@ func (f *SFNFake) ListExecutions(_ context.Context, input *sfn.ListExecutionsInp
 	return &sfn.ListExecutionsOutput{Executions: f.fix.Executions[smARN]}, nil
 }
 
-func (f *SFNFake) GetExecutionHistory(_ context.Context, _ *sfn.GetExecutionHistoryInput, _ ...func(*sfn.Options)) (*sfn.GetExecutionHistoryOutput, error) {
-	return &sfn.GetExecutionHistoryOutput{}, nil
+// GetExecutionHistory returns the fixture's history events for the given
+// execution ARN (see SFNFixtures.History), when modeled. Falls back to an
+// empty event list for executions without modeled history.
+func (f *SFNFake) GetExecutionHistory(_ context.Context, input *sfn.GetExecutionHistoryInput, _ ...func(*sfn.Options)) (*sfn.GetExecutionHistoryOutput, error) {
+	var executionArn string
+	if input != nil && input.ExecutionArn != nil {
+		if err := validateSFNArn(*input.ExecutionArn); err != nil {
+			return nil, err
+		}
+		executionArn = *input.ExecutionArn
+	}
+	return &sfn.GetExecutionHistoryOutput{Events: f.fix.History[executionArn]}, nil
 }
 
 // DescribeStateMachine returns the fixture's ASL definition, execution role,

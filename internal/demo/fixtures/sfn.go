@@ -28,6 +28,12 @@ type SFNFixtures struct {
 	// DescribeStateMachine. Required for the sfn:kms related-panel pivot
 	// witness (checkSFNKMS). Shared prod KMS key used across fixtures.
 	EncryptionKeyIDs map[string]string
+	// History maps execution ARN -> GetExecutionHistory events, served by
+	// SFNFake.GetExecutionHistory. Required for the sfn_execution_history
+	// child view and its sfn-execution-history.broken.event_failed finding
+	// witness (ClassifyEventStatus classifies *Failed/*TimedOut/
+	// ExecutionAborted event types as "failed").
+	History map[string][]sfntypes.HistoryEvent
 }
 
 // NewSFNFixtures constructs SFNFixtures from the canonical demo data.
@@ -35,6 +41,7 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 	const smARNOrderFulfillment = "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"
 	const smARNPaymentValidation = "arn:aws:states:us-east-1:123456789012:stateMachine:payment-validation"
 	const smARNUserOnboarding = "arn:aws:states:us-east-1:123456789012:stateMachine:user-onboarding-flow"
+	const execArnOrderFulfillmentFailed = "arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0322-0200-b2c3d4e5"
 
 	redriveCount := int32(1)
 	redriveDate := time.Date(2026, 3, 21, 19, 0, 0, 0, time.UTC)
@@ -91,7 +98,7 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 					Status:          sfntypes.ExecutionStatusSucceeded,
 				},
 				{
-					ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:order-fulfillment-workflow:exec-2026-0322-0200-b2c3d4e5"),
+					ExecutionArn:    aws.String(execArnOrderFulfillmentFailed),
 					Name:            aws.String("exec-2026-0322-0200-b2c3d4e5"),
 					StartDate:       &start2,
 					StopDate:        &stop2,
@@ -208,6 +215,78 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 		// order-fulfillment-workflow encryption key — required for sfn:kms.
 		EncryptionKeyIDs: map[string]string{
 			smARNOrderFulfillment: "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111",
+		},
+		// exec-2026-0322-0200-b2c3d4e5's history: RunFulfillmentTask's ECS
+		// task fails to pull its container image, which fails the .sync
+		// task integration and, with no Catch, the execution itself —
+		// required for the sfn_execution_history.broken.event_failed
+		// witness (both TaskFailed and ExecutionFailed classify "failed").
+		History: map[string][]sfntypes.HistoryEvent{
+			execArnOrderFulfillmentFailed: {
+				{
+					Id:        1,
+					Timestamp: &start2,
+					Type:      sfntypes.HistoryEventTypeExecutionStarted,
+					ExecutionStartedEventDetails: &sfntypes.ExecutionStartedEventDetails{
+						Input:   aws.String(`{"orderId":"ORD-88213","warehouseId":"WH-4"}`),
+						RoleArn: aws.String(fixtIAMProdLambdaRoleARN),
+					},
+				},
+				{
+					Id:              2,
+					PreviousEventId: 1,
+					Timestamp:       &start2,
+					Type:            sfntypes.HistoryEventTypeTaskStateEntered,
+					StateEnteredEventDetails: &sfntypes.StateEnteredEventDetails{
+						Name:  aws.String("RunFulfillmentTask"),
+						Input: aws.String(`{"orderId":"ORD-88213","warehouseId":"WH-4"}`),
+					},
+				},
+				{
+					Id:              3,
+					PreviousEventId: 2,
+					Timestamp:       aws.Time(time.Date(2026, 3, 22, 2, 0, 1, 0, time.UTC)),
+					Type:            sfntypes.HistoryEventTypeTaskScheduled,
+					TaskScheduledEventDetails: &sfntypes.TaskScheduledEventDetails{
+						Resource:     aws.String("ecs:runTask.sync"),
+						ResourceType: aws.String("ecs"),
+						Region:       aws.String("us-east-1"),
+						Parameters:   aws.String(`{"Cluster":"` + ecsClusterArnServices + `","TaskDefinition":"api-gateway"}`),
+					},
+				},
+				{
+					Id:              4,
+					PreviousEventId: 3,
+					Timestamp:       aws.Time(time.Date(2026, 3, 22, 2, 0, 2, 0, time.UTC)),
+					Type:            sfntypes.HistoryEventTypeTaskStarted,
+					TaskStartedEventDetails: &sfntypes.TaskStartedEventDetails{
+						Resource:     aws.String("ecs:runTask.sync"),
+						ResourceType: aws.String("ecs"),
+					},
+				},
+				{
+					Id:              5,
+					PreviousEventId: 4,
+					Timestamp:       &stop2,
+					Type:            sfntypes.HistoryEventTypeTaskFailed,
+					TaskFailedEventDetails: &sfntypes.TaskFailedEventDetails{
+						Resource:     aws.String("ecs:runTask.sync"),
+						ResourceType: aws.String("ecs"),
+						Error:        aws.String("ECS.AmazonECSException"),
+						Cause:        aws.String("CannotPullContainerError: pull image manifest has been retried 5 time(s): failed to resolve ref docker.io/acme/fulfillment-worker:2026.03.21: not found"),
+					},
+				},
+				{
+					Id:              6,
+					PreviousEventId: 5,
+					Timestamp:       &stop2,
+					Type:            sfntypes.HistoryEventTypeExecutionFailed,
+					ExecutionFailedEventDetails: &sfntypes.ExecutionFailedEventDetails{
+						Error: aws.String("ECS.AmazonECSException"),
+						Cause: aws.String("CannotPullContainerError: pull image manifest has been retried 5 time(s): failed to resolve ref docker.io/acme/fulfillment-worker:2026.03.21: not found"),
+					},
+				},
+			},
 		},
 	}
 })
