@@ -90,7 +90,7 @@ func TestEnrichStepFunctionsStatus_SummaryContainsFAILED(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := result.Findings[smName].Phrase
+	summary := result.Findings[smName][0].Phrase
 	wantSummary := "latest execution failed"
 	if summary != wantSummary {
 		t.Errorf("summary = %q, want %q", summary, wantSummary)
@@ -115,7 +115,7 @@ func TestEnrichStepFunctionsStatus_SummaryTimedOut(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := result.Findings[smName].Phrase
+	summary := result.Findings[smName][0].Phrase
 	wantSummary := "latest execution timed out"
 	if summary != wantSummary {
 		t.Errorf("summary = %q, want %q", summary, wantSummary)
@@ -138,7 +138,7 @@ func TestEnrichStepFunctionsStatus_SummaryAborted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := result.Findings[smName].Phrase
+	summary := result.Findings[smName][0].Phrase
 	wantSummary := "latest execution aborted"
 	if summary != wantSummary {
 		t.Errorf("summary = %q, want %q", summary, wantSummary)

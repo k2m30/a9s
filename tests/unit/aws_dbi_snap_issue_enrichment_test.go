@@ -156,10 +156,11 @@ func TestDBISnap_Enricher_Orphan_DbiMissingFromCache(t *testing.T) {
 	}
 
 	snapID := fixtures.WarnDBISnapOrphanID
-	finding, hasFinding := result.Findings[snapID]
+	findings, hasFinding := result.Findings[snapID]
 	if !hasFinding {
 		t.Fatalf("Findings[%q] missing, want a finding with Summary matching the §4 phrase", snapID)
 	}
+	finding := findings[0]
 	if finding.Phrase != "orphan: source DB deleted" {
 		t.Errorf("Findings[%q].Phrase = %q, want %q", snapID, finding.Phrase, "orphan: source DB deleted")
 	}
@@ -206,10 +207,11 @@ func TestDBISnap_Enricher_AutomatedPastRetention_BasicCase(t *testing.T) {
 	}
 
 	snapID := fixtures.WarnDBISnapPastRetentionID
-	finding, hasFinding := result.Findings[snapID]
+	findings, hasFinding := result.Findings[snapID]
 	if !hasFinding {
 		t.Fatalf("Findings[%q] missing, want past-retention finding", snapID)
 	}
+	finding := findings[0]
 	if !strings.Contains(finding.Phrase, "automated") || !strings.Contains(finding.Phrase, "past retention") {
 		t.Errorf("Findings[%q].Phrase = %q, want a phrase matching \"automated, <N>d past retention\"", snapID, finding.Phrase)
 	}
@@ -285,11 +287,12 @@ func TestDBISnap_Enricher_SkipPastRetention_WhenParentNotInCache(t *testing.T) {
 		t.Fatalf("enricher returned unexpected error: %v", err)
 	}
 
-	finding, hasFinding := result.Findings["snap-automated-missing-parent"]
+	findings, hasFinding := result.Findings["snap-automated-missing-parent"]
 	// Orphan rule should fire (parent not found in loaded dbi cache).
 	if !hasFinding {
 		t.Fatalf("Findings[snap-automated-missing-parent] missing, want orphan finding")
 	}
+	finding := findings[0]
 	if finding.Phrase != "orphan: source DB deleted" {
 		t.Errorf("Findings[snap-automated-missing-parent].Phrase = %q, want \"orphan: source DB deleted\"", finding.Phrase)
 	}
@@ -332,10 +335,11 @@ func TestDBISnap_Enricher_MultiW1_UnencryptedPlusOrphan_Suffix(t *testing.T) {
 	}
 
 	snapID := fixtures.MultiW1DBISnapID
-	finding, hasFinding := result.Findings[snapID]
+	findings, hasFinding := result.Findings[snapID]
 	if !hasFinding {
 		t.Fatalf("Findings[%q] missing, want orphan finding", snapID)
 	}
+	finding := findings[0]
 	if finding.Phrase != "orphan: source DB deleted" {
 		t.Errorf("Findings[%q].Phrase = %q, want \"orphan: source DB deleted\"", snapID, finding.Phrase)
 	}
@@ -425,10 +429,11 @@ func TestDBISnap_Enricher_FindingMirrorsIssueAppend(t *testing.T) {
 		t.Fatalf("enricher returned unexpected error: %v", err)
 	}
 
-	finding, ok := result.Findings["snap-orphan-check"]
+	findings, ok := result.Findings["snap-orphan-check"]
 	if !ok {
 		t.Fatalf("Findings missing entry for snap-orphan-check; want a Finding with orphan Summary")
 	}
+	finding := findings[0]
 	if finding.Phrase != "orphan: source DB deleted" {
 		t.Errorf("Finding.Phrase = %q, want %q", finding.Phrase, "orphan: source DB deleted")
 	}
@@ -508,36 +513,37 @@ func TestDBISnap_Enricher_FullFixtures_OrphanAndRetentionFound(t *testing.T) {
 	// WarnDBISnapOrphanID ("orphan-deleted-db-snap") has parent "deleted-legacy-db"
 	// which is NOT in the dbi fixtures → orphan finding expected.
 	orphanID := fixtures.WarnDBISnapOrphanID
-	orphanFinding, hasOrphan := result.Findings[orphanID]
+	orphanFindings, hasOrphan := result.Findings[orphanID]
 	if !hasOrphan {
 		t.Errorf("WarnDBISnapOrphanID: Findings[%q] missing, want orphan finding", orphanID)
-	} else if orphanFinding.Phrase != "orphan: source DB deleted" {
+	} else if orphanFinding := orphanFindings[0]; orphanFinding.Phrase != "orphan: source DB deleted" {
 		t.Errorf("WarnDBISnapOrphanID: Findings[%q].Phrase = %q, want \"orphan: source DB deleted\"", orphanID, orphanFinding.Phrase)
 	}
 
 	// MultiW1DBISnapID also has "deleted-legacy-db" as parent → orphan.
 	multiID := fixtures.MultiW1DBISnapID
-	multiFinding, hasMulti := result.Findings[multiID]
+	multiFindings, hasMulti := result.Findings[multiID]
 	if !hasMulti {
 		t.Errorf("MultiW1DBISnapID: Findings[%q] missing, want orphan finding", multiID)
-	} else if multiFinding.Phrase != "orphan: source DB deleted" {
+	} else if multiFinding := multiFindings[0]; multiFinding.Phrase != "orphan: source DB deleted" {
 		t.Errorf("MultiW1DBISnapID: Findings[%q].Phrase = %q, want \"orphan: source DB deleted\"", multiID, multiFinding.Phrase)
 	}
 
 	// WarnDBISnapPastRetentionID has parent WarnDbiPastRetentionParentID (in dbi cache)
 	// with BackupRetentionPeriod=7 and SnapshotCreateTime=now-30d → past-retention expected.
 	retentionID := fixtures.WarnDBISnapPastRetentionID
-	retFinding, hasRetention := result.Findings[retentionID]
+	retFindings, hasRetention := result.Findings[retentionID]
 	if !hasRetention {
 		t.Errorf("WarnDBISnapPastRetentionID: Findings[%q] missing, want past-retention finding", retentionID)
-	} else if !strings.Contains(retFinding.Phrase, "automated") || !strings.Contains(retFinding.Phrase, "past retention") {
+	} else if retFinding := retFindings[0]; !strings.Contains(retFinding.Phrase, "automated") || !strings.Contains(retFinding.Phrase, "past retention") {
 		t.Errorf("WarnDBISnapPastRetentionID: Findings[%q].Phrase = %q, want \"automated, Nd past retention\"", retentionID, retFinding.Phrase)
 	}
 
 	// Healthy fixtures (ProdDBISnapID) with parent in dbi cache
 	// must produce no orphan or retention findings.
 	for _, id := range []string{fixtures.ProdDBISnapID} {
-		if f, has := result.Findings[id]; has {
+		if fs, has := result.Findings[id]; has {
+			f := fs[0]
 			if strings.Contains(f.Phrase, "orphan") || strings.Contains(f.Phrase, "past retention") {
 				t.Errorf("healthy snap %q: unexpected finding %q", id, f.Phrase)
 			}

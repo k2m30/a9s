@@ -79,10 +79,11 @@ func TestEnrichEC2InstanceStatus_InstanceStatusImpairedProducesFindingSevBang(t 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["i-0aaaa1111bbbbb222"]
+	fs, ok := result.Findings["i-0aaaa1111bbbbb222"]
 	if !ok {
 		t.Fatalf("expected finding keyed by instance ID %q", "i-0aaaa1111bbbbb222")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
@@ -115,10 +116,11 @@ func TestEnrichEC2InstanceStatus_SystemStatusImpairedProducesFindingSevBang(t *t
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["i-0bbbb2222ccccc333"]
+	fs, ok := result.Findings["i-0bbbb2222ccccc333"]
 	if !ok {
 		t.Fatalf("expected finding keyed by instance ID %q for impaired system status", "i-0bbbb2222ccccc333")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
@@ -155,10 +157,11 @@ func TestEnrichEC2InstanceStatus_ScheduledEventSoonProducesFindingSevTilde(t *te
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["i-0cccc3333ddddd444"]
+	fs, ok := result.Findings["i-0cccc3333ddddd444"]
 	if !ok {
 		t.Fatalf("expected finding keyed by instance ID %q for imminent scheduled event", "i-0cccc3333ddddd444")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -248,10 +251,11 @@ func TestEnrichEC2InstanceStatus_SystemStatusInitializingIsWarningNotImpaired(t 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["i-0eeee5555fffff666"]
+	fs, ok := result.Findings["i-0eeee5555fffff666"]
 	if !ok {
 		t.Fatalf("expected finding keyed by instance ID %q for initializing system status", "i-0eeee5555fffff666")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v (ec2.md line 226: initializing -> Warning, not Broken)", f.Severity, domain.SevWarn)
 	}
@@ -296,10 +300,11 @@ func TestEnrichEC2InstanceStatus_InstanceStatusInsufficientDataIsWarningNotImpai
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["i-0ffff6666aaaaa777"]
+	fs, ok := result.Findings["i-0ffff6666aaaaa777"]
 	if !ok {
 		t.Fatalf("expected finding keyed by instance ID %q for insufficient-data instance status", "i-0ffff6666aaaaa777")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v (ec2.md line 227: insufficient-data -> Warning, not Broken)", f.Severity, domain.SevWarn)
 	}

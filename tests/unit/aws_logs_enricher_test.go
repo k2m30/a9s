@@ -121,10 +121,11 @@ func TestEnrichLogsMetricFilters_AuditNoFiltersProducesFindingSevTilde(t *testin
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[auditGroup]
+	fs, ok := result.Findings[auditGroup]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no metric filters)", auditGroup)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}

@@ -211,7 +211,13 @@ func TestFold_TwoWave2FindingsSameResource_DetailAttentionListsBothPhrases(t *te
 			attentionText = append(attentionText, f.Value)
 		}
 	}
-	joined := strings.Join(attentionText, " | ")
+	// Case-insensitive: buildAttentionEntries renders through
+	// capitalizeFirstDetail (internal/app/detail_body.go), which upper-cases
+	// the first letter for display ("deployment failed" -> "Deployment
+	// failed"). The contract this pins is that BOTH findings' phrases survive
+	// the fold and each surfaces as its own Attention entry — not the exact
+	// casing of a display convention.
+	joined := strings.ToLower(strings.Join(attentionText, " | "))
 	if !strings.Contains(joined, multiFindingBang.Phrase) {
 		t.Errorf("detail Attention block missing bang phrase %q — buildAttentionEntries (internal/app/detail_body.go) builds one entry per issue-severity r.Findings element with its OWN Phrase/Detail; this fails only if ApplyWave2ToRow still drops a finding during the fold (#52); got Attention rows: %v", multiFindingBang.Phrase, attentionText)
 	}

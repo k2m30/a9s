@@ -140,8 +140,8 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 		TruncatedIDs: map[string]bool{
 			"res-pe-002": true,
 		},
-		Findings: map[string]domain.Finding{
-			"res-pe-001": {Code: "rds.pending-maintenance", Phrase: "maintenance window overdue", Severity: domain.SevBroken, Source: "wave2:test-pe-partial"},
+		Findings: map[string][]domain.Finding{
+			"res-pe-001": {{Code: "rds.pending-maintenance", Phrase: "maintenance window overdue", Severity: domain.SevBroken, Source: "wave2:test-pe-partial"}},
 		},
 		FieldUpdates: map[string]map[string]string{
 			"res-pe-001": {"maintenance_window": "overdue"},

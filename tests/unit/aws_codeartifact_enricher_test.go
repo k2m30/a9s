@@ -156,10 +156,11 @@ func TestEnrichCodeArtifactRepository_NoPolicyProducesFindingSevTilde(t *testing
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[caRepo1]
+	fs, ok := result.Findings[caRepo1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no policy)", caRepo1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -192,10 +193,11 @@ func TestEnrichCodeArtifactRepository_PublicPolicyProducesFindingSevBang(t *test
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[caRepo1]
+	fs, ok := result.Findings[caRepo1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (public access)", caRepo1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}

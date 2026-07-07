@@ -119,10 +119,11 @@ func TestOpenSearch_Enrich_UpdateAvailable_EmitsBangFinding(t *testing.T) {
 	}
 
 	id := fixtures.UpdateAvailableDomain
-	finding, ok := result.Findings[id]
+	findings, ok := result.Findings[id]
 	if !ok {
 		t.Fatalf("no Finding for resource %q", id)
 	}
+	finding := findings[0]
 
 	if finding.Severity != domain.SevBroken {
 		t.Errorf("Severity = %v, want SevBroken", finding.Severity)
@@ -186,10 +187,11 @@ func TestOpenSearch_Enrich_EncryptionOff_EmitsTildeFinding(t *testing.T) {
 	}
 
 	id := fixtures.EncryptionOffDomain
-	finding, ok := result.Findings[id]
+	findings, ok := result.Findings[id]
 	if !ok {
 		t.Fatalf("no Finding for resource %q", id)
 	}
+	finding := findings[0]
 
 	if finding.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
@@ -242,10 +244,11 @@ func TestOpenSearch_Enrich_HardStatePlusBackground_NoFieldUpdate(t *testing.T) {
 	}
 
 	id := fixtures.ProcessingPlusUpdateDomain
-	finding, ok := result.Findings[id]
+	findings, ok := result.Findings[id]
 	if !ok {
 		t.Fatalf("no Finding for resource %q", id)
 	}
+	finding := findings[0]
 
 	if finding.Severity != domain.SevBroken {
 		t.Errorf("Severity = %v, want SevBroken", finding.Severity)

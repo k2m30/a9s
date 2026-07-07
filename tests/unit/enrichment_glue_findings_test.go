@@ -88,7 +88,7 @@ func TestEnrichGlueJobStatus_SummaryContainsFAILED(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := result.Findings["fail-job"].Phrase
+	summary := result.Findings["fail-job"][0].Phrase
 	wantSummary := "latest run failed"
 	if summary != wantSummary {
 		t.Errorf("summary = %q, want %q", summary, wantSummary)
@@ -113,7 +113,7 @@ func TestEnrichGlueJobStatus_SummaryContainsERROR(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := result.Findings["err-job"].Phrase
+	summary := result.Findings["err-job"][0].Phrase
 	wantSummary := "latest run error"
 	if summary != wantSummary {
 		t.Errorf("summary = %q, want %q", summary, wantSummary)
@@ -142,7 +142,7 @@ func TestEnrichGlueJobStatus_SummaryContainsTIMEOUT(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := result.Findings["timeout-job"].Phrase
+	summary := result.Findings["timeout-job"][0].Phrase
 	wantSummary := "latest run timeout"
 	if summary != wantSummary {
 		t.Errorf("summary = %q, want %q", summary, wantSummary)

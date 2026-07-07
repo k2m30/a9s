@@ -279,6 +279,20 @@ func TestConformance_NoParallelPerTypeRowStore_OutsideRowStore(t *testing.T) {
 	}
 }
 
+var (
+	goLineCommentPattern  = regexp.MustCompile(`//[^\n]*`)
+	goBlockCommentPattern = regexp.MustCompile(`(?s)/\*.*?\*/`)
+)
+
+// stripGoComments removes // line and /* */ block comments so a source
+// scanner matches real code, not a function name referenced in prose. A "//"
+// inside a string literal is not handled — no such case exists for the scans
+// that use this.
+func stripGoComments(src []byte) []byte {
+	src = goBlockCommentPattern.ReplaceAll(src, []byte(" "))
+	return goLineCommentPattern.ReplaceAll(src, []byte(""))
+}
+
 // rowStoreMutationSeamFiles lists the known production call sites of
 // ApplyWave2ToRow/applyWave2ToRow — the two enrich-fold mutators task #17's
 // RowStore.Amend/Core.AmendRows exist to make copy-on-write-safe (see
@@ -332,10 +346,15 @@ func TestConformance_Wave2RowMutators_HaveNoUnvettedCallSites(t *testing.T) {
 		}
 		rel = filepath.ToSlash(rel)
 
-		data, rerr := os.ReadFile(path)
+		raw, rerr := os.ReadFile(path)
 		if rerr != nil {
 			return rerr
 		}
+		// Strip comments before matching: a doc comment mentioning
+		// ApplyWave2ToRow(...) is not a call site, and the scanner must not
+		// flag it (the regex's `\s*\(` otherwise matches "ApplyWave2ToRow
+		// (internal/runtime/helpers.go)" inside prose).
+		data := stripGoComments(raw)
 		if !callPattern.Match(data) {
 			return nil
 		}

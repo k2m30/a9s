@@ -96,11 +96,12 @@ func TestEnrichKMSRotation_DisabledProducesFindings(t *testing.T) {
 		t.Errorf("findings = %d, want 3", len(result.Findings))
 	}
 	for _, id := range []string{"key-aaa", "key-bbb", "key-ccc"} {
-		f, ok := result.Findings[id]
+		fs, ok := result.Findings[id]
 		if !ok {
 			t.Errorf("expected finding for key %q", id)
 			continue
 		}
+		f := fs[0]
 		if f.Severity != domain.SevWarn {
 			t.Errorf("key %q severity = %v, want SevWarn", id, f.Severity)
 		}
@@ -205,10 +206,10 @@ func TestEnrichKMSRotation_MixedDisabledEnabledError(t *testing.T) {
 	if len(result.Findings) != 1 {
 		t.Errorf("findings = %d, want 1", len(result.Findings))
 	}
-	f, ok := result.Findings["key-disabled"]
+	fs, ok := result.Findings["key-disabled"]
 	if !ok {
 		t.Error("expected finding for key-disabled")
-	} else if f.Severity != domain.SevWarn {
+	} else if f := fs[0]; f.Severity != domain.SevWarn {
 		t.Errorf("key-disabled severity = %v, want %v", f.Severity, "~")
 	}
 	if _, ok := result.Findings["key-enabled"]; ok {

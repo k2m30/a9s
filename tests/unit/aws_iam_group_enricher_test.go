@@ -167,10 +167,11 @@ func TestEnrichIAMGroup_NoMembersProducesFindingSevTilde(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["dev-team"]
+	fs, ok := result.Findings["dev-team"]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (empty group)", "dev-team")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -206,10 +207,11 @@ func TestEnrichIAMGroup_NoPoliciesProducesFindingSevTilde(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["dev-team"]
+	fs, ok := result.Findings["dev-team"]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no policies)", "dev-team")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}

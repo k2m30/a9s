@@ -114,7 +114,7 @@ func TestEnrichTargetGroupHealth_SummaryUnhealthyXofY(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f := result.Findings[tgName]
+	f := result.Findings[tgName][0]
 	// Summary must be "unhealthy targets: 2/3"
 	if !strings.HasPrefix(f.Phrase, "unhealthy targets:") {
 		t.Errorf("summary %q must start with %q", f.Phrase, "unhealthy targets:")

@@ -167,8 +167,9 @@ func TestBackup_Enricher_OneFailed_ShowsBrokenPhrase(t *testing.T) {
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
-	finding, ok := result.Findings[planID]
+	findings, ok := result.Findings[planID]
 	require.True(t, ok, "expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
+	finding := findings[0]
 
 	// Severity must be Broken.
 	require.Equal(t, domain.SevBroken, finding.Severity, "Severity mismatch — FAILED must map to '!'")
@@ -237,8 +238,9 @@ func TestBackup_Enricher_TwoFailed_CountsCorrectly(t *testing.T) {
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
-	finding, ok := result.Findings[planID]
+	findings, ok := result.Findings[planID]
 	require.True(t, ok, "expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
+	finding := findings[0]
 
 	require.Equal(t, domain.SevBroken, finding.Severity, "Severity mismatch — 2 failed jobs must map to '!'")
 	require.Equal(t, "2 jobs failed in last 24h", finding.Phrase,
@@ -289,8 +291,9 @@ func TestBackup_Enricher_OneAborted_IsAlsoBroken(t *testing.T) {
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
-	finding, ok := result.Findings[planID]
+	findings, ok := result.Findings[planID]
 	require.True(t, ok, "expected finding for plan %s; ABORTED must map to '!' bucket", planID)
+	finding := findings[0]
 
 	require.Equal(t, domain.SevBroken, finding.Severity,
 		"ABORTED must map to Severity '!' per spec §3.2")
@@ -329,8 +332,9 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
-	finding, ok := result.Findings[planID]
+	findings, ok := result.Findings[planID]
 	require.True(t, ok, "expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
+	finding := findings[0]
 
 	require.Equal(t, domain.SevWarn, finding.Severity,
 		"PARTIAL-only must produce Severity '~' (Warning, not Broken)")
@@ -346,9 +350,11 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 	// S1: IssueCount must NOT bump (spec §4: "~ findings do not bump").
 	// We check by counting only "!" findings in the result.
 	bangCount := 0
-	for _, f := range result.Findings {
-		if f.Severity == domain.SevBroken {
-			bangCount++
+	for _, fs := range result.Findings {
+		for _, f := range fs {
+			if f.Severity == domain.SevBroken {
+				bangCount++
+			}
 		}
 	}
 	require.Equal(t, 0, bangCount,
@@ -411,8 +417,9 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
-	finding, ok := result.Findings[planID]
+	findings, ok := result.Findings[planID]
 	require.True(t, ok, "expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
+	finding := findings[0]
 
 	// U7d: Broken beats Warning.
 	require.Equal(t, domain.SevBroken, finding.Severity,
@@ -429,9 +436,11 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 
 	// S1: IssueCount bumps.
 	bangCount := 0
-	for _, f := range result.Findings {
-		if f.Severity == domain.SevBroken {
-			bangCount++
+	for _, fs := range result.Findings {
+		for _, f := range fs {
+			if f.Severity == domain.SevBroken {
+				bangCount++
+			}
 		}
 	}
 	require.GreaterOrEqual(t, bangCount, 1,
@@ -543,8 +552,9 @@ func TestBackup_Enricher_BannedWords_NeverAppear(t *testing.T) {
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
-	finding, ok := result.Findings[planID]
+	findings, ok := result.Findings[planID]
 	require.Truef(t, ok, "expected finding for planID %q, got none", planID)
+	finding := findings[0]
 
 	bannedWords := []string{
 		"Wave 1", "Wave 2", "Wave 3",
@@ -738,9 +748,10 @@ func TestBackup_Enricher_FailedBucket_AllStatesMapToBang(t *testing.T) {
 			result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 			require.NoError(t, err)
 
-			finding, ok := result.Findings[tc.planID]
+			findings, ok := result.Findings[tc.planID]
 			require.True(t, ok,
 				"state %s must produce a finding; got keys %v", tc.state, findingKeys(result.Findings))
+			finding := findings[0]
 
 			require.Equal(t, domain.SevBroken, finding.Severity,
 				"state %s must map to Severity '!'", tc.state)
@@ -819,21 +830,23 @@ func TestBackup_Enricher_U11_SummaryNeverContainsRowValues(t *testing.T) {
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
-	for planID, finding := range result.Findings {
-		for _, row := range result.AttentionDetails[planID].Rows {
-			if row.Value == "" || row.Value == "failed" {
-				continue
+	for planID, findings := range result.Findings {
+		for _, finding := range findings {
+			for _, row := range result.AttentionDetails[planID].Rows {
+				if row.Value == "" || row.Value == "failed" {
+					continue
+				}
+				// Skip pure-integer count values — they naturally appear in count phrases
+				// like "1 job failed in last 24h" and are not a U11 violation. The
+				// "failed" skip above covers the FAILED-state Row.Value, which now
+				// legitimately overlaps the humanized Phrase's "failed" word.
+				if _, isNum := strconv.Atoi(row.Value); isNum == nil {
+					continue
+				}
+				require.NotContains(t, finding.Phrase, row.Value,
+					"U11 violation for plan %s: Phrase %q contains Row value %q — Phrase and Rows must be disjoint",
+					planID, finding.Phrase, row.Value)
 			}
-			// Skip pure-integer count values — they naturally appear in count phrases
-			// like "1 job failed in last 24h" and are not a U11 violation. The
-			// "failed" skip above covers the FAILED-state Row.Value, which now
-			// legitimately overlaps the humanized Phrase's "failed" word.
-			if _, isNum := strconv.Atoi(row.Value); isNum == nil {
-				continue
-			}
-			require.NotContains(t, finding.Phrase, row.Value,
-				"U11 violation for plan %s: Phrase %q contains Row value %q — Phrase and Rows must be disjoint",
-				planID, finding.Phrase, row.Value)
 		}
 	}
 }

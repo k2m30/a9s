@@ -227,10 +227,11 @@ func TestSnapshotCrossRef_OrphanFinding(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	finding, found := result.Findings["snap-1"]
+	findings, found := result.Findings["snap-1"]
 	if !found {
 		t.Fatal("expected orphan finding for snap-1, got none")
 	}
+	finding := findings[0]
 
 	if finding.Severity != domain.SevBroken {
 		t.Errorf("expected Severity=SevBroken, got %v", finding.Severity)
@@ -284,10 +285,11 @@ func TestSnapshotCrossRef_PastRetention_Automated(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	finding, found := result.Findings["snap-1"]
+	findings, found := result.Findings["snap-1"]
 	if !found {
 		t.Fatal("expected past-retention finding for snap-1, got none")
 	}
+	finding := findings[0]
 	if finding.Severity != domain.SevBroken {
 		t.Errorf("expected Severity=SevBroken, got %v", finding.Severity)
 	}
@@ -609,14 +611,15 @@ func crossRefContains(s, sub string) bool {
 func assertResultsIdentical(t *testing.T, id string, r1, r2 awsclient.IssueEnricherResult) {
 	t.Helper()
 
-	f1, ok1 := r1.Findings[id]
-	f2, ok2 := r2.Findings[id]
+	fs1, ok1 := r1.Findings[id]
+	fs2, ok2 := r2.Findings[id]
 
 	if ok1 != ok2 {
 		t.Errorf("idempotency: run1 finding present=%v, run2 finding present=%v for %q", ok1, ok2, id)
 		return
 	}
 	if ok1 {
+		f1, f2 := fs1[0], fs2[0]
 		if f1.Severity != f2.Severity {
 			t.Errorf("idempotency: Severity run1=%v run2=%v for %q", f1.Severity, f2.Severity, id)
 		}

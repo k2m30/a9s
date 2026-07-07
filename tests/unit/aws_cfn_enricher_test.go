@@ -136,10 +136,11 @@ func TestEnrichCFNDrift_DriftedStackProducesFindingSevTilde(t *testing.T) {
 	if result.Findings == nil {
 		t.Fatal("Findings must not be nil")
 	}
-	f, ok := result.Findings[cfnDriftStack1]
+	fs, ok := result.Findings[cfnDriftStack1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (drifted stack)", cfnDriftStack1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}

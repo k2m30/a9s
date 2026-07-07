@@ -140,11 +140,12 @@ func TestEnrichVPCFlowLogs_NoLogsProducesFindingSevTilde(t *testing.T) {
 		t.Errorf("expected 2 findings, got %d", len(result.Findings))
 	}
 	for _, id := range []string{"vpc-00000001", "vpc-00000002"} {
-		f, ok := result.Findings[id]
+		fs, ok := result.Findings[id]
 		if !ok {
 			t.Errorf("expected finding for %q", id)
 			continue
 		}
+		f := fs[0]
 		if f.Severity != domain.SevWarn {
 			t.Errorf("%s: severity = %v, want SevWarn", id, f.Severity)
 		}
@@ -168,10 +169,11 @@ func TestEnrichVPCFlowLogs_InactiveOnlyProducesFindingForAffectedVPC(t *testing.
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["vpc-00000001"]
+	fs, ok := result.Findings["vpc-00000001"]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q", "vpc-00000001")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -229,10 +231,11 @@ func TestEnrichVPCFlowLogs_APIErrorSetsTruncatedFindsOtherVPC(t *testing.T) {
 	if _, ok := result.Findings["vpc-00000001"]; ok {
 		t.Error("vpc-00000001 must NOT appear in Findings on API error")
 	}
-	f, ok := result.Findings["vpc-00000002"]
+	fs, ok := result.Findings["vpc-00000002"]
 	if !ok {
 		t.Fatalf("expected finding for vpc-00000002 (no active flow logs)")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("vpc-00000002 severity = %v, want %v", f.Severity, "~")
 	}

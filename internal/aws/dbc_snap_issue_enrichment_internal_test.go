@@ -72,10 +72,11 @@ func TestEnrichDBCSnapCrossRef_FailedPlusOrphan(t *testing.T) {
 	}
 
 	// The orphan finding must be present with the dbc-snap-specific phrase.
-	finding, hasFinding := result.Findings["snap-failed"]
+	findings, hasFinding := result.Findings["snap-failed"]
 	if !hasFinding {
 		t.Fatal("Findings[\"snap-failed\"] missing; want orphan finding from cross-ref enricher")
 	}
+	finding := findings[0]
 	if finding.Phrase != "orphan: source cluster deleted" {
 		t.Errorf("Findings[\"snap-failed\"].Summary = %q, want %q",
 			finding.Phrase, "orphan: source cluster deleted")
@@ -170,10 +171,11 @@ func TestEnrichDBCSnapCrossRef_RDSShape_OrphanAndPastRetention(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		finding, ok := result.Findings["aurora-orphan"]
+		findings, ok := result.Findings["aurora-orphan"]
 		if !ok {
 			t.Fatal("expected orphan finding for rdstypes.DBClusterSnapshot, got none")
 		}
+		finding := findings[0]
 		if finding.Phrase != "orphan: source cluster deleted" {
 			t.Errorf("Summary = %q, want %q", finding.Phrase, "orphan: source cluster deleted")
 		}
@@ -216,10 +218,11 @@ func TestEnrichDBCSnapCrossRef_RDSShape_OrphanAndPastRetention(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		finding, ok := result.Findings["aurora-stale"]
+		findings, ok := result.Findings["aurora-stale"]
 		if !ok {
 			t.Fatal("expected past-retention finding for rdstypes automated snapshot")
 		}
+		finding := findings[0]
 		if !strings.Contains(finding.Phrase, "automated") || !strings.Contains(finding.Phrase, "past retention") {
 			t.Errorf("Summary = %q; want automated + past retention", finding.Phrase)
 		}

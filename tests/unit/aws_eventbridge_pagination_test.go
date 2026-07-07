@@ -364,10 +364,11 @@ func TestEnrichEventBridgeRule_EnabledWithZeroTargetsAcrossPages(t *testing.T) {
 	}
 
 	// Finding "enabled rule has no targets" must be emitted with severity "!"
-	f, ok := result.Findings[ruleName]
+	fs, ok := result.Findings[ruleName]
 	if !ok {
 		t.Fatalf("expected finding for %q (enabled rule with no targets), none produced", ruleName)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("finding severity = %v, want SevBroken", f.Severity)
 	}

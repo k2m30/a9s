@@ -73,10 +73,11 @@ func TestEnrichEFSMountTargets_OneUnavailableMTProducesFindingSevBang(t *testing
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["fs-00000001"]
+	fs, ok := result.Findings["fs-00000001"]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q", "fs-00000001")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}

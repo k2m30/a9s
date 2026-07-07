@@ -76,10 +76,11 @@ func TestDBCSnap_Orphan_DocDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	finding, ok := result.Findings["orphan-dbc-snap"]
+	findings, ok := result.Findings["orphan-dbc-snap"]
 	if !ok {
 		t.Fatal("expected orphan finding, got none")
 	}
+	finding := findings[0]
 	if finding.Severity != domain.SevBroken {
 		t.Errorf("Severity = %v, want SevBroken", finding.Severity)
 	}
@@ -133,9 +134,9 @@ func TestDBCSnap_Orphan_Aurora(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if finding, ok := result.Findings["orphan-aurora-snap"]; !ok {
+	if findings, ok := result.Findings["orphan-aurora-snap"]; !ok {
 		t.Fatal("expected orphan finding for Aurora snapshot (rdstypes.DBClusterSnapshot), got none")
-	} else if finding.Phrase != "orphan: source cluster deleted" {
+	} else if finding := findings[0]; finding.Phrase != "orphan: source cluster deleted" {
 		t.Errorf("Phrase = %q, want %q", finding.Phrase, "orphan: source cluster deleted")
 	}
 	// AS-140: FieldUpdates must be empty — the merged display phrase is
@@ -181,10 +182,11 @@ func TestDBCSnap_PastRetention_DocDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	finding, ok := result.Findings["stale-dbc-snap"]
+	findings, ok := result.Findings["stale-dbc-snap"]
 	if !ok {
 		t.Fatal("expected past-retention finding, got none")
 	}
+	finding := findings[0]
 	if !strings.Contains(finding.Phrase, "automated") || !strings.Contains(finding.Phrase, "past retention") {
 		t.Errorf("Phrase = %q, want \"automated, Nd past retention\"", finding.Phrase)
 	}

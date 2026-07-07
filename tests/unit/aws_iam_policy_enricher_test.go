@@ -210,10 +210,11 @@ func TestEnrichIAMPolicy_AdminStarProducesFindingSevBang(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[iamPolicyARN2]
+	fs, ok := result.Findings[iamPolicyARN2]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (admin star policy)", iamPolicyARN2)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}

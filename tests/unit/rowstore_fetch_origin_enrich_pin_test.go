@@ -95,13 +95,13 @@ func TestProbeEnrichment_FetchOriginRows_ReachesRealEnricher(t *testing.T) {
 		seenRows = rows
 		return awsclient.IssueEnricherResult{
 			IssueCount: 1,
-			Findings: map[string]domain.Finding{
-				fetchRow.ID: {
+			Findings: map[string][]domain.Finding{
+				fetchRow.ID: {{
 					Code:     "fetch-origin-pin-finding",
 					Phrase:   "fetch-origin pin finding",
 					Severity: domain.SevWarn,
 					Source:   "wave2:" + sentinelType,
-				},
+				}},
 			},
 		}, nil
 	}
@@ -125,10 +125,11 @@ func TestProbeEnrichment_FetchOriginRows_ReachesRealEnricher(t *testing.T) {
 	if result.Issues != 1 {
 		t.Errorf("ProbeEnrichmentResult.Issues = %d, want 1 — the enricher DID run and DID emit a finding once it received the fetch-origin row", result.Issues)
 	}
-	finding, ok := result.Findings[fetchRow.ID]
+	findings, ok := result.Findings[fetchRow.ID]
 	if !ok {
 		t.Fatalf("ProbeEnrichmentResult.Findings missing entry for %q", fetchRow.ID)
 	}
+	finding := findings[0]
 	if finding.Code != "fetch-origin-pin-finding" {
 		t.Errorf("Findings[%q].Code = %q, want %q", fetchRow.ID, finding.Code, "fetch-origin-pin-finding")
 	}
@@ -166,13 +167,13 @@ func TestEnrichmentChecked_FetchOriginFindings_SurviveToCompletionSavePayload(t 
 		seenRows = rows
 		return awsclient.IssueEnricherResult{
 			IssueCount: 1,
-			Findings: map[string]domain.Finding{
-				fetchRow.ID: {
+			Findings: map[string][]domain.Finding{
+				fetchRow.ID: {{
 					Code:     "fetch-origin-completion-finding",
 					Phrase:   "fetch-origin completion pin finding",
 					Severity: domain.SevWarn,
 					Source:   "wave2:" + sentinelType,
-				},
+				}},
 			},
 		}, nil
 	}
@@ -202,7 +203,8 @@ func TestEnrichmentChecked_FetchOriginFindings_SurviveToCompletionSavePayload(t 
 	_, tasks := ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType:     sentinelType,
 		Issues:           result.Issues,
-		Findings:         result.Findings,
+		Findings:         runtime.WorstFindingPerID(result.Findings),
+		AllFindings:      result.Findings,
 		AttentionDetails: result.AttentionDetails,
 		FieldUpdates:     result.FieldUpdates,
 		TruncatedIDs:     result.TruncatedIDs,

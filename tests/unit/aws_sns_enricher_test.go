@@ -156,10 +156,11 @@ func TestEnrichSNSSubscriptions_OrphanTopicProducesFindingSevTilde(t *testing.T)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[topic1]
+	fs, ok := result.Findings[topic1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q", topic1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -196,10 +197,11 @@ func TestEnrichSNSSubscriptions_AllPendingProducesFindingSevTilde(t *testing.T) 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[topic1]
+	fs, ok := result.Findings[topic1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q", topic1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}

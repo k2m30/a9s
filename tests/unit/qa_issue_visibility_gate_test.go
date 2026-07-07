@@ -181,24 +181,26 @@ func mergeWave2Findings(
 	}
 
 	for i := range merged {
-		f, ok := result.Findings[merged[i].ID]
+		fs, ok := result.Findings[merged[i].ID]
 		if !ok {
 			continue
 		}
-		already := false
-		for _, existing := range merged[i].Findings {
-			if existing.Code == f.Code {
-				already = true
-				break
+		for _, f := range fs {
+			already := false
+			for _, existing := range merged[i].Findings {
+				if existing.Code == f.Code {
+					already = true
+					break
+				}
 			}
+			if already {
+				continue
+			}
+			findingsCopy := make([]domain.Finding, len(merged[i].Findings), len(merged[i].Findings)+1)
+			copy(findingsCopy, merged[i].Findings)
+			findingsCopy = append(findingsCopy, f)
+			merged[i].Findings = findingsCopy
 		}
-		if already {
-			continue
-		}
-		findingsCopy := make([]domain.Finding, len(merged[i].Findings), len(merged[i].Findings)+1)
-		copy(findingsCopy, merged[i].Findings)
-		findingsCopy = append(findingsCopy, f)
-		merged[i].Findings = findingsCopy
 	}
 	return merged
 }

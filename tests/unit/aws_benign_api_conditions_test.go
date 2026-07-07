@@ -177,13 +177,15 @@ func TestEnrichStepFunctionsStatus_StateMachineTypeNotSupportedIsBenignSkip(t *t
 // fdump renders enough of the result to grep for leaked raw AWS error text.
 func fdump(r awsclient.IssueEnricherResult) string {
 	var sb strings.Builder
-	for id, f := range r.Findings {
-		sb.WriteString(id)
-		sb.WriteString(":")
-		sb.WriteString(f.Phrase)
-		sb.WriteString(" ")
-		sb.WriteString(f.Detail)
-		sb.WriteString(";")
+	for id, fs := range r.Findings {
+		for _, f := range fs {
+			sb.WriteString(id)
+			sb.WriteString(":")
+			sb.WriteString(f.Phrase)
+			sb.WriteString(" ")
+			sb.WriteString(f.Detail)
+			sb.WriteString(";")
+		}
 	}
 	return sb.String()
 }

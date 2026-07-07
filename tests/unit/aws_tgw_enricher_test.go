@@ -133,10 +133,11 @@ func TestEnrichTGWAttachments_FailedAttachmentProducesFindingSevBang(t *testing.
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["tgw-00000001"]
+	fs, ok := result.Findings["tgw-00000001"]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q", "tgw-00000001")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
@@ -165,10 +166,11 @@ func TestEnrichTGWAttachments_ModifyingAttachmentProducesFindingSevTilde(t *test
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["tgw-00000001"]
+	fs, ok := result.Findings["tgw-00000001"]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q for modifying attachment", "tgw-00000001")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}

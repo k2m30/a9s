@@ -169,10 +169,11 @@ func TestEnrichRoute53Zone_PrivateOrphanZoneProducesFindingSevTilde(t *testing.T
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[r53ZoneID1]
+	fs, ok := result.Findings[r53ZoneID1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (private orphan zone)", r53ZoneID1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}

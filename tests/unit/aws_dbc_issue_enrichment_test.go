@@ -128,7 +128,7 @@ func futureDate() *time.Time {
 }
 
 // dbcFindingKeys returns all keys in the findings map (for error reporting).
-func dbcFindingKeys(m map[string]domain.Finding) []string {
+func dbcFindingKeys(m map[string][]domain.Finding) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
@@ -156,10 +156,11 @@ func TestDBC_Enrich_MaintenanceOverdue_HealthyRow(t *testing.T) {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}
 
-	finding, ok := result.Findings[fixtures.MaintDbcOverdueID]
+	findings, ok := result.Findings[fixtures.MaintDbcOverdueID]
 	if !ok {
 		t.Fatalf("expected finding for %q; Findings keys = %v", fixtures.MaintDbcOverdueID, dbcFindingKeys(result.Findings))
 	}
+	finding := findings[0]
 
 	// Severity SevBroken — DBC maintenance is S1-badge-bumping (unlike DBI's "~").
 	if finding.Severity != domain.SevBroken {
@@ -319,10 +320,11 @@ func TestDBC_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 	}
 
 	// Finding present with SevBroken severity.
-	finding, ok := result.Findings[clusterID]
+	findings, ok := result.Findings[clusterID]
 	if !ok {
 		t.Fatalf("expected finding for %q; Findings = %v", clusterID, dbcFindingKeys(result.Findings))
 	}
+	finding := findings[0]
 	if finding.Severity != domain.SevBroken {
 		t.Errorf("Severity = %v, want SevBroken", finding.Severity)
 	}

@@ -102,10 +102,11 @@ func TestEnrichDBIMaintenance_SeverityTilde(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["my-db"]
+	fs, ok := result.Findings["my-db"]
 	if !ok {
 		t.Fatal("expected finding for my-db")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -132,7 +133,7 @@ func TestEnrichDBIMaintenance_SummaryFormat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f := result.Findings["my-db"]
+	f := result.Findings["my-db"][0]
 	if f.Phrase != "maintenance scheduled" {
 		t.Errorf("Phrase = %q, want %q", f.Phrase, "maintenance scheduled")
 	}
@@ -307,10 +308,11 @@ func TestEnrichDBI_Wave1StoppedPlusWave2_StackedFindings_AS140(t *testing.T) {
 	// The enricher must emit exactly one Finding for this resource (the wave-2
 	// maintenance signal). The wave-1 "stopped" finding belongs on the input
 	// resource and stays out of result.Findings.
-	wave2, ok := result.Findings[resourceID]
+	wave2s, ok := result.Findings[resourceID]
 	if !ok {
 		t.Fatalf("expected wave-2 Finding for %q; result.Findings keys = %v", resourceID, findingKeys(result.Findings))
 	}
+	wave2 := wave2s[0]
 	// docs/resources/dbi.md §4 row "Pending maintenance overdue": List text (S4).
 	if wave2.Phrase != "maintenance scheduled" {
 		t.Errorf("wave-2 Phrase = %q, want %q", wave2.Phrase, "maintenance scheduled")

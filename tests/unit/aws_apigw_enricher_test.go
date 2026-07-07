@@ -154,10 +154,11 @@ func TestEnrichAPIGatewayStage_NoThrottlingProducesFindingSevTilde(t *testing.T)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[apigwAPIID1]
+	fs, ok := result.Findings[apigwAPIID1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no throttling)", apigwAPIID1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -198,10 +199,11 @@ func TestEnrichAPIGatewayStage_NoAccessLogsProducesFindingSevTilde(t *testing.T)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[apigwAPIID1]
+	fs, ok := result.Findings[apigwAPIID1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no access logs)", apigwAPIID1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -264,7 +266,7 @@ func TestEnrichAPIGatewayStage_ZeroStagesEmitsWarning(t *testing.T) {
 	}
 
 	// A finding must be emitted for the API with 0 stages.
-	f, ok := result.Findings[emptyAPIID]
+	fs, ok := result.Findings[emptyAPIID]
 	if !ok {
 		t.Fatalf(
 			"expected a finding keyed by %q when 0 stages, got none — "+
@@ -272,6 +274,7 @@ func TestEnrichAPIGatewayStage_ZeroStagesEmitsWarning(t *testing.T) {
 			emptyAPIID,
 		)
 	}
+	f := fs[0]
 
 	if f.Severity != domain.SevWarn {
 		t.Errorf("finding Severity = %v, want SevWarn", f.Severity)

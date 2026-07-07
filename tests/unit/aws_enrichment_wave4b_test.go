@@ -296,8 +296,8 @@ func TestEnrichIAMPolicy_NoRawStructARNFallbackFromID(t *testing.T) {
 	if _, ok := result.Findings[iamPolicyARN1]; !ok {
 		t.Errorf("expected admin-star finding via ARN fallback from r.ID, got %d findings", len(result.Findings))
 	}
-	if result.Findings[iamPolicyARN1].Severity != domain.SevBroken {
-		t.Errorf("severity = %v, want SevBroken", result.Findings[iamPolicyARN1].Severity)
+	if result.Findings[iamPolicyARN1][0].Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want SevBroken", result.Findings[iamPolicyARN1][0].Severity)
 	}
 }
 
@@ -514,10 +514,11 @@ func TestEnrichASGScalingActivities_FailedWithStatusMessageSummarized(t *testing
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["capacity-asg"]
+	fs, ok := result.Findings["capacity-asg"]
 	if !ok {
 		t.Fatalf("expected finding for capacity-asg, got none")
 	}
+	f := fs[0]
 	// Summary must contain the status message.
 	if !strings.Contains(f.Phrase, statusMsg) {
 		t.Errorf("summary %q must contain status message %q", f.Phrase, statusMsg)
@@ -579,10 +580,11 @@ func TestEnrichASGScalingActivities_FailedWithoutStatusMessagePlainSummary(t *te
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["silent-fail-asg"]
+	fs, ok := result.Findings["silent-fail-asg"]
 	if !ok {
 		t.Fatalf("expected finding for silent-fail-asg")
 	}
+	f := fs[0]
 	if f.Phrase != "latest scaling activity failed" {
 		t.Errorf("summary = %q, want %q", f.Phrase, "latest scaling activity failed")
 	}
@@ -817,7 +819,11 @@ func TestEnrichMSKCluster_VersionBoundaries(t *testing.T) {
 			}
 
 			// Findings are keyed by r.ID = bare cluster name, not the ARN.
-			f, hasFinding := result.Findings[mskNameForVersionTests]
+			fs, hasFinding := result.Findings[mskNameForVersionTests]
+			var f domain.Finding
+			if hasFinding {
+				f = fs[0]
+			}
 			isOutdatedFinding := hasFinding && f.Phrase == "broker software outdated"
 
 			if tc.wantOutdated && !isOutdatedFinding {

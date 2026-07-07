@@ -154,10 +154,11 @@ func TestEnrichAthenaWorkGroup_NotEnforcedProducesFindingSevTilde(t *testing.T) 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[athenaWG1]
+	fs, ok := result.Findings[athenaWG1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (not enforced)", athenaWG1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -191,10 +192,11 @@ func TestEnrichAthenaWorkGroup_NoEncryptionProducesFindingSevTilde(t *testing.T)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[athenaWG1]
+	fs, ok := result.Findings[athenaWG1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no encryption)", athenaWG1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}

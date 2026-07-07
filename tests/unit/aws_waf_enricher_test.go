@@ -183,10 +183,11 @@ func TestEnrichWAFLogging_NoLoggingProducesFindingSevTilde(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[wafACLARN1]
+	fs, ok := result.Findings[wafACLARN1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no logging)", wafACLARN1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -223,10 +224,11 @@ func TestEnrichWAFLogging_OrphanACLProducesFindingSevTilde(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[wafACLARN1]
+	fs, ok := result.Findings[wafACLARN1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (orphan ACL)", wafACLARN1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}

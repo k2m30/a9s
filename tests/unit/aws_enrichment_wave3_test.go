@@ -143,10 +143,11 @@ func TestEnrichECSServices_StuckServiceEmitsBangFinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[svcName]
+	fs, ok := result.Findings[svcName]
 	if !ok {
 		t.Fatalf("expected finding for service %q; findings: %v", svcName, result.Findings)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
@@ -199,10 +200,11 @@ func TestEnrichECSServices_DeploymentRolloutFailedEmitsFinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[svcName]
+	fs, ok := result.Findings[svcName]
 	if !ok {
 		t.Fatalf("expected finding for service %q; findings: %v", svcName, result.Findings)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
@@ -362,10 +364,11 @@ func TestEnrichECSClusters_PendingTasksEmitsFinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[clusterName]
+	fs, ok := result.Findings[clusterName]
 	if !ok {
 		t.Fatalf("expected finding for cluster %q; findings: %v", clusterName, result.Findings)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -510,10 +513,11 @@ func TestEnrichECSTasks_TaskFailedToStartEmitsFinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[taskID]
+	fs, ok := result.Findings[taskID]
 	if !ok {
 		t.Fatalf("expected finding for task %q; findings: %v", taskID, result.Findings)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
@@ -715,10 +719,11 @@ func TestEnrichCFNStackEvents_FailedEventEmitsBangFinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[stackID]
+	fs, ok := result.Findings[stackID]
 	if !ok {
 		t.Fatalf("expected finding for stack %q; findings: %v", stackID, result.Findings)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
@@ -864,10 +869,11 @@ func TestEnrichELBAttributes_BothMisconfigurations_TildeFinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[lbName]
+	fs, ok := result.Findings[lbName]
 	if !ok {
 		t.Fatalf("expected finding for LB %q; findings: %v", lbName, result.Findings)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %q (both misconfigured must NOT promote to broken)", f.Severity, "~")
 	}
@@ -896,10 +902,11 @@ func TestEnrichELBAttributes_OnlyDeletionProtectionMissing_TildeFinding(t *testi
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[lbName]
+	fs, ok := result.Findings[lbName]
 	if !ok {
 		t.Fatalf("expected finding for LB %q; findings: %v", lbName, result.Findings)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %q (single misconfiguration → ~)", f.Severity, "~")
 	}
@@ -1015,10 +1022,11 @@ func TestEnrichEBEnvironmentHealth_CausesEmitsTildeFinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[envID]
+	fs, ok := result.Findings[envID]
 	if !ok {
 		t.Fatalf("expected finding keyed by env ID %q; findings: %v", envID, result.Findings)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -1145,7 +1153,8 @@ func TestEnrichCFNCombined_EventsAndDriftMerged(t *testing.T) {
 		t.Errorf("IssueCount = %d, want > 0 (event failure should count)", result.IssueCount)
 	}
 	// Events win on ID conflict: the stackID finding must be "!".
-	if f, ok := result.Findings[stackID]; ok {
+	if fs, ok := result.Findings[stackID]; ok {
+		f := fs[0]
 		if f.Severity != domain.SevBroken {
 			t.Errorf("expected events finding (severity !) to win over drift finding; got severity %v", f.Severity)
 		}

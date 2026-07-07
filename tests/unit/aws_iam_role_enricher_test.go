@@ -158,10 +158,11 @@ func TestEnrichIAMRoleLastUsed_DormantProducesFindingSevTilde(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["role-1"]
+	fs, ok := result.Findings["role-1"]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (dormant role)", "role-1")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -195,10 +196,11 @@ func TestEnrichIAMRoleLastUsed_NeverUsedProducesFindingSevTilde(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["role-1"]
+	fs, ok := result.Findings["role-1"]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (never-used role)", "role-1")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}

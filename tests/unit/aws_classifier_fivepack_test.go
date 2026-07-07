@@ -245,11 +245,12 @@ func TestColorIAMUser_ConsoleUserWithoutMFAClassifiesBroken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("iam-user Wave-2 enricher returned error: %v", err)
 	}
-	finding, hasFinding := enrichResult.Findings[alice.ID]
-	if !hasFinding || finding.Severity != domain.SevBroken {
+	findings, hasFinding := enrichResult.Findings[alice.ID]
+	if !hasFinding || len(findings) == 0 || findings[0].Severity != domain.SevBroken {
 		t.Fatalf("expected alice.johnson to carry a Broken wave2 finding (console user without MFA, "+
-			"CIS IAM.5) from EnrichIAMUserMFA, got finding=%+v hasFinding=%v", finding, hasFinding)
+			"CIS IAM.5) from EnrichIAMUserMFA, got finding=%+v hasFinding=%v", findings, hasFinding)
 	}
+	finding := findings[0]
 	alice.Findings = append(alice.Findings, finding)
 
 	// Mirror production's field-update application (Controller.ApplyListFieldUpdates

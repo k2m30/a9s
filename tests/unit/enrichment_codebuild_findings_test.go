@@ -95,10 +95,11 @@ func TestEnrichCodeBuildStatus_FailedBuildFindingKeyedByProjectName(t *testing.T
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["my-project"]
+	fs, ok := result.Findings["my-project"]
 	if !ok {
 		t.Fatalf("expected finding keyed by project name %q", "my-project")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
@@ -126,7 +127,7 @@ func TestEnrichCodeBuildStatus_SummaryContainsDateAndStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := result.Findings["proj-a"].Phrase
+	summary := result.Findings["proj-a"][0].Phrase
 	wantSummary := "latest build failed (2026-04-14)"
 	if summary != wantSummary {
 		t.Errorf("summary = %q, want %q", summary, wantSummary)

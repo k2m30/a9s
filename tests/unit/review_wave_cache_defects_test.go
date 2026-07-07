@@ -268,7 +268,7 @@ func TestApplyWave2ToRow_DoesNotMutateSharedFindingsBackingArray(t *testing.T) {
 
 	td := resource.ResourceTypeDef{ShortName: "ec2"}
 	newWave2 := domain.Finding{Code: "wave2.updated", Phrase: "updated wave2 phrase", Severity: domain.SevBroken, Source: "wave2:ec2"}
-	runtime.ApplyWave2ToRow(&live, td, map[string]domain.Finding{"i-shared-1": newWave2}, nil)
+	runtime.ApplyWave2ToRow(&live, td, map[string][]domain.Finding{"i-shared-1": {newWave2}}, nil)
 
 	if len(snapshot.Findings) != 2 {
 		t.Fatalf("snapshot.Findings = %+v, want len 2 unchanged — ApplyWave2ToRow must never mutate a shared Findings backing array (aliasing bug)", snapshot.Findings)

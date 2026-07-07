@@ -171,10 +171,11 @@ func TestEnrichIAMUserMFA_NoMFAProducesFindingSevBang(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["alice"]
+	fs, ok := result.Findings["alice"]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no MFA)", "alice")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
@@ -238,10 +239,11 @@ func TestEnrichIAMUserMFA_OldAccessKeyProducesFindingSevTilde(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["alice"]
+	fs, ok := result.Findings["alice"]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (old access key)", "alice")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}

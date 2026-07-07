@@ -780,10 +780,11 @@ func TestEnrichEBSVolumeStatus_WarningStatusProducesFinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["vol-warn"]
+	fs, ok := result.Findings["vol-warn"]
 	if !ok {
 		t.Fatalf("expected finding for volume with status 'warning'")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}

@@ -84,7 +84,7 @@ func TestEnrichCodePipelineStatus_FailedStageKeyedByResourceID(t *testing.T) {
 	if _, ok := result.Findings["my-pipeline"]; ok {
 		t.Error("finding must not be keyed by r.Name")
 	}
-	if got := result.Findings["pipe-id"].Severity; got != domain.SevBroken {
+	if got := result.Findings["pipe-id"][0].Severity; got != domain.SevBroken {
 		t.Errorf("Findings[%q].Severity = %v, want SevBroken", "pipe-id", got)
 	}
 }
@@ -107,7 +107,7 @@ func TestEnrichCodePipelineStatus_SummaryContainsStageName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	finding := result.Findings["summary-pipeline"]
+	finding := result.Findings["summary-pipeline"][0]
 	summary := finding.Phrase
 	if !strings.Contains(summary, "Integration-Test") {
 		t.Errorf("summary %q must contain stage name %q", summary, "Integration-Test")

@@ -167,10 +167,11 @@ func TestDDB_Enrich_PITRDisabled_HealthyRow(t *testing.T) {
 		t.Fatalf("EnrichDynamoDBPITR error: %v", err)
 	}
 
-	finding, ok := result.Findings[fixtures.AuditPITROffID]
+	findings, ok := result.Findings[fixtures.AuditPITROffID]
 	if !ok {
 		t.Fatalf("expected finding for %q (PITR disabled); Findings keys = %v", fixtures.AuditPITROffID, findingKeysDDB(result.Findings))
 	}
+	finding := findings[0]
 	if finding.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
@@ -211,10 +212,11 @@ func TestDDB_Enrich_PITRDisabled_NonHealthyRow(t *testing.T) {
 		t.Fatalf("EnrichDynamoDBPITR error: %v", err)
 	}
 
-	finding, ok := result.Findings[fixtures.LegacyArchivedID]
+	findings, ok := result.Findings[fixtures.LegacyArchivedID]
 	if !ok {
 		t.Fatalf("expected finding for %q (ARCHIVED + PITR off); Findings keys = %v", fixtures.LegacyArchivedID, findingKeysDDB(result.Findings))
 	}
+	finding := findings[0]
 	if finding.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
@@ -252,10 +254,11 @@ func TestDDB_Enrich_SummaryNotRows_Contract(t *testing.T) {
 		t.Fatalf("EnrichDynamoDBPITR error: %v", err)
 	}
 
-	finding, ok := result.Findings[fixtures.AuditPITROffID]
+	findings, ok := result.Findings[fixtures.AuditPITROffID]
 	if !ok {
 		t.Fatalf("expected finding for %q", fixtures.AuditPITROffID)
 	}
+	finding := findings[0]
 
 	if finding.Phrase != "point-in-time recovery disabled" {
 		t.Errorf("Phrase = %q, want exactly %q", finding.Phrase, "point-in-time recovery disabled")
@@ -355,7 +358,7 @@ func TestDDB_Enrich_NilDynamoDBClient(t *testing.T) {
 // internal helpers
 // ---------------------------------------------------------------------------
 
-func findingKeysDDB(m map[string]domain.Finding) []string {
+func findingKeysDDB(m map[string][]domain.Finding) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)

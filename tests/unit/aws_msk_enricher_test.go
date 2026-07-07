@@ -165,10 +165,11 @@ func TestEnrichMSKCluster_OutdatedVersionProducesFindingSevTilde(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[mskName1]
+	fs, ok := result.Findings[mskName1]
 	if !ok {
 		t.Fatalf("expected finding keyed by bare cluster name %q", mskName1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -198,10 +199,11 @@ func TestEnrichMSKCluster_PlaintextEncryptionProducesFindingSevTilde(t *testing.
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[mskName1]
+	fs, ok := result.Findings[mskName1]
 	if !ok {
 		t.Fatalf("expected finding keyed by bare cluster name %q", mskName1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}

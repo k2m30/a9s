@@ -262,10 +262,11 @@ func TestEnrichAPIGatewayStage_ZeroStagesAcrossPages(t *testing.T) {
 	}
 
 	// A "no deployed stages" finding must be emitted per docs/attention-signals.md Wave 2.
-	f, ok := result.Findings[apiID]
+	fs, ok := result.Findings[apiID]
 	if !ok {
 		t.Errorf("expected 1 finding for 0 stages (no deployed stages), got 0")
 	} else {
+		f := fs[0]
 		if f.Severity != domain.SevWarn {
 			t.Errorf("finding Severity = %v, want SevWarn", f.Severity)
 		}

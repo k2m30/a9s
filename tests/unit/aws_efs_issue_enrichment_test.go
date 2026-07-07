@@ -63,10 +63,11 @@ func TestEnrichEFSMountTargets_HealthyRowWithDown(t *testing.T) {
 	}
 
 	// Must have exactly one finding keyed by fsID.
-	finding, ok := result.Findings[fsID]
+	findings, ok := result.Findings[fsID]
 	if !ok {
 		t.Fatalf("expected finding for %q, got none; all findings: %v", fsID, result.Findings)
 	}
+	finding := findings[0]
 
 	// Severity must be Broken.
 	if finding.Severity != domain.SevBroken {
@@ -170,7 +171,7 @@ func TestEnrichEFSMountTargets_W1WarningPlusW2Bumps(t *testing.T) {
 	}
 
 	// The finding's Phrase is still "mount target down" (the bare W2 phrase).
-	finding := result.Findings[fsID]
+	finding := result.Findings[fsID][0]
 	if finding.Phrase != "mount target down" {
 		t.Errorf("Phrase = %q, want %q", finding.Phrase, "mount target down")
 	}
@@ -242,11 +243,12 @@ func TestEnrichEFSMountTargets_SummaryDoesNotContainRowValues(t *testing.T) {
 	}
 
 	for _, fsID := range findingFSIDs {
-		finding, ok := result.Findings[fsID]
+		findings, ok := result.Findings[fsID]
 		if !ok {
 			t.Errorf("expected finding for %q, got none", fsID)
 			continue
 		}
+		finding := findings[0]
 		for _, row := range result.AttentionDetails[fsID].Rows {
 			if row.Value == "" {
 				continue

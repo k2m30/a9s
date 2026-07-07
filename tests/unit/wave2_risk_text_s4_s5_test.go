@@ -374,10 +374,11 @@ func TestWave2_S3_PABIncomplete_PinsS4S5Strings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
 	}
-	finding, ok := result.Findings["bucket-no-pab"]
+	findings, ok := result.Findings["bucket-no-pab"]
 	if !ok {
 		t.Fatalf("expected finding for bucket-no-pab")
 	}
+	finding := findings[0]
 	if finding.Phrase != "public access block incomplete" {
 		t.Errorf("s3 PAB Phrase (S4) = %q, want %q", finding.Phrase, "public access block incomplete")
 	}
@@ -439,10 +440,11 @@ func TestWave2_EC2_SystemStatusImpaired_PinsS4S5Strings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichEC2InstanceStatus error: %v", err)
 	}
-	finding, ok := result.Findings["i-impaired-pin-1"]
+	findings, ok := result.Findings["i-impaired-pin-1"]
 	if !ok {
 		t.Fatalf("expected finding for i-impaired-pin-1")
 	}
+	finding := findings[0]
 	if finding.Phrase != "impaired: system checks failing" {
 		t.Errorf("ec2 impaired Phrase (S4) = %q, want %q (docs/resources/ec2.md §4)", finding.Phrase, "impaired: system checks failing")
 	}
@@ -518,10 +520,11 @@ func TestWave2_DBI_PendingMaintenanceOverdue_PinsS4S5Strings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
-	finding, ok := result.Findings[resourceID]
+	findings, ok := result.Findings[resourceID]
 	if !ok {
 		t.Fatalf("expected finding for %q", resourceID)
 	}
+	finding := findings[0]
 	if finding.Phrase != "maintenance scheduled" {
 		t.Errorf("dbi pending-maintenance Phrase (S4) = %q, want %q (docs/resources/dbi.md §4 — currently a buzzword bug)", finding.Phrase, "maintenance scheduled")
 	}

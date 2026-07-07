@@ -180,10 +180,11 @@ func TestEnrichCloudFrontDistribution_AllowAllViewerProtocolProducesFindingSevTi
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[cfDistroID1]
+	fs, ok := result.Findings[cfDistroID1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no HTTPS redirect)", cfDistroID1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
@@ -238,10 +239,11 @@ func TestEnrichCloudFrontDistribution_HTTPOnlyOriginProducesFindingSevTilde(t *t
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[cfDistroID1]
+	fs, ok := result.Findings[cfDistroID1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (http-only origin)", cfDistroID1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}

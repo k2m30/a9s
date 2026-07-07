@@ -137,10 +137,11 @@ func TestEnrichASGScalingActivities_OneFailedProducesFindingSevBang(t *testing.T
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["my-failing-asg"]
+	fs, ok := result.Findings["my-failing-asg"]
 	if !ok {
 		t.Fatalf("expected finding keyed by ASG name %q for failed activity", "my-failing-asg")
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}

@@ -155,7 +155,7 @@ func TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired(t *testing.T)
 		t.Fatalf("EnrichEC2InstanceStatus returned unexpected error: %v", enrichErr)
 	}
 	if f, ok := enrichResult.Findings[id]; ok {
-		r.Findings = append(r.Findings, f)
+		r.Findings = append(r.Findings, f...)
 	}
 
 	// Color func derives from the merged Wave-2 Finding → ColorBroken → IsIssue=true.
@@ -226,7 +226,7 @@ func TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired(t *testing.
 		t.Fatalf("EnrichEC2InstanceStatus returned unexpected error: %v", enrichErr)
 	}
 	if f, ok := enrichResult.Findings[id]; ok {
-		r.Findings = append(r.Findings, f)
+		r.Findings = append(r.Findings, f...)
 	}
 
 	// Color func derives from the merged Wave-2 Finding → ColorBroken.
@@ -291,7 +291,7 @@ func TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing(t *
 		t.Fatalf("EnrichEC2InstanceStatus returned unexpected error: %v", enrichErr)
 	}
 	if f, ok := enrichResult.Findings[id]; ok {
-		r.Findings = append(r.Findings, f)
+		r.Findings = append(r.Findings, f...)
 	}
 
 	// Color func derives from the merged Wave-2 Finding → ColorWarning → IsIssue=true.

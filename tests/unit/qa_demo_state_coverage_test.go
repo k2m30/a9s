@@ -103,22 +103,6 @@ import (
 var knownStateCoverageGaps = map[string]bool{
 	// --- bucket gaps: type never resolves to this domain.Color via td.ResolveColor ---
 	//
-	// Reason class: "healthy unreachable" — findingCodesFor now folds each
-	// type's Wave-2 IssueEnricher output onto a copy of every fixture via
-	// runtime.ApplyWave2ToRow before calling td.ResolveColor (matching
-	// production's runtime.Core.applyEnrichment exactly). For these six
-	// types every demo fixture is deliberately built in a state the
-	// enricher flags, so colorFromAnyFinding (which every affected Color
-	// func consults first) wins over the raw structural branch on every
-	// single fixture and none stays Healthy. Fixing this needs a new,
-	// deliberately-clean demo fixture per type — internal/demo/ is out of
-	// tests/unit scope, so these stay pinned as debt, not forced.
-	"apigw:healthy":        true, // internal/demo/fixtures/apigw.go: PublicAPIGWID's $default stage has zero throttling + no access logs (stage-config-issues); the other 2 APIs have no Stages map entry at all (no-deployed-stages).
-	"codeartifact:healthy": true, // internal/demo/fixtures/codeartifact.go: acme-npm's PermissionsPolicies entry has Principal:"*" (public-access-policy); acme-pypi/acme-maven have no entry at all, so GetRepositoryPermissionsPolicy returns ResourceNotFoundException (no-permissions-policy) for both — by the fixture's own doc comment, deliberate.
-	"eb-rule:healthy":      true, // no eb_rule Target in internal/demo/fixtures ever sets DeadLetterConfig, so EnrichEventBridgeRuleTargets' "no DLQ on target" ("~") check fires for every rule that has at least one target.
-	"kms:healthy":          true, // internal/demo/fakes/kms.go's GetKeyRotationStatus unconditionally returns KeyRotationEnabled:false for every key (not per-key fixture data) — EnrichKMSRotation's "key rotation disabled" finding fires for all 41 fixtures.
-	"tgw:healthy":          true, // internal/demo/fixtures/ec2.go buildTransitGateways: only 2 of 7 TGWs are state=available, and buildTGWAttachments deliberately gives both of them a bad attachment (hub: modifying, DR: failed) so EnrichTGWAttachments's worst-wins finding always fires on the only two structurally-Healthy candidates.
-	"vpc:healthy":          true, // internal/demo/fixtures/ec2.go: FlowLogsByResourceID only has an entry keyed by a vpce ID (the vpce:logs pivot witness), never by either fixture VPC ID — EnrichVPCFlowLogs' "no active VPC flow logs" finding fires for every vpc.
 
 	// Reason class: "dim unreachable: AWS stops listing the resource once
 	// deleted" — the Dim bucket models a genuine AWS terminal "deleted"
@@ -284,7 +268,7 @@ func findingCodesFor(
 	codes := make(map[domain.FindingCode]bool)
 	buckets := make(map[domain.Color]bool)
 
-	var wave2Findings map[string]domain.Finding
+	var wave2Findings map[string][]domain.Finding
 	var wave2AttentionDetails map[string]domain.AttentionDetail
 	hasEnricher := false
 
@@ -296,8 +280,10 @@ func findingCodesFor(
 		hasEnricher = true
 		wave2Findings = result.Findings
 		wave2AttentionDetails = result.AttentionDetails
-		for _, f := range result.Findings {
-			codes[f.Code] = true
+		for _, fs := range result.Findings {
+			for _, f := range fs {
+				codes[f.Code] = true
+			}
 		}
 	}
 

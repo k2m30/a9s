@@ -116,12 +116,13 @@ func pabResource(name string) resource.Resource {
 // assertFindingShape is a shared assertion helper for the stable finding contract.
 // It fails the test if the finding at key does not have the expected severity
 // and the verbatim stable Phrase.
-func assertFindingShape(t *testing.T, findings map[string]domain.Finding, key string) domain.Finding {
+func assertFindingShape(t *testing.T, findings map[string][]domain.Finding, key string) domain.Finding {
 	t.Helper()
-	f, ok := findings[key]
+	fs, ok := findings[key]
 	if !ok {
 		t.Fatalf("expected finding for %q; Findings keys = %v", key, findingKeys(findings))
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("[%s] Severity = %v, want SevBroken", key, f.Severity)
 	}
@@ -464,9 +465,11 @@ func TestS3_Enrich_IssueCount_FourBuckets(t *testing.T) {
 
 	// Count SevBroken findings manually to decouple from IssueCount field name choices.
 	bangCount := 0
-	for _, f := range result.Findings {
-		if f.Severity == domain.SevBroken {
-			bangCount++
+	for _, fs := range result.Findings {
+		for _, f := range fs {
+			if f.Severity == domain.SevBroken {
+				bangCount++
+			}
 		}
 	}
 	if bangCount != 4 {
@@ -521,11 +524,13 @@ func TestS3_Enrich_U11_SummaryStable_NeverContainsRowValues(t *testing.T) {
 		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
 	}
 
-	for id, finding := range result.Findings {
-		for _, row := range result.AttentionDetails[id].Rows {
-			if row.Value != "" && strings.Contains(finding.Phrase, row.Value) {
-				t.Errorf("[%s] Phrase %q must not contain Row value %q (U11 Phrase≠Rows separation)",
-					id, finding.Phrase, row.Value)
+	for id, findings := range result.Findings {
+		for _, finding := range findings {
+			for _, row := range result.AttentionDetails[id].Rows {
+				if row.Value != "" && strings.Contains(finding.Phrase, row.Value) {
+					t.Errorf("[%s] Phrase %q must not contain Row value %q (U11 Phrase≠Rows separation)",
+						id, finding.Phrase, row.Value)
+				}
 			}
 		}
 	}

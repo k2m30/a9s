@@ -112,10 +112,11 @@ func TestDBI_Enrich_MaintenancePending_HealthyRow(t *testing.T) {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
 
-	finding, ok := result.Findings[fixtures.MaintDbiScheduledID]
+	findings, ok := result.Findings[fixtures.MaintDbiScheduledID]
 	if !ok {
 		t.Fatalf("expected finding for %q; Findings keys = %v", fixtures.MaintDbiScheduledID, findingKeys(result.Findings))
 	}
+	finding := findings[0]
 	if finding.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
@@ -192,10 +193,11 @@ func TestDBI_Enrich_MaintenancePending_NilDescription(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
-	finding, ok := result.Findings[resourceID]
+	findings, ok := result.Findings[resourceID]
 	if !ok {
 		t.Fatalf("expected finding for %q", resourceID)
 	}
+	finding := findings[0]
 	if finding.Phrase != "maintenance scheduled" {
 		t.Errorf("Phrase = %q, want %q", finding.Phrase, "maintenance scheduled")
 	}
@@ -398,10 +400,11 @@ func TestDBI_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 	}
 
 	// Finding must be present with SevWarn severity.
-	finding, ok := result.Findings[resourceID]
+	findings, ok := result.Findings[resourceID]
 	if !ok {
 		t.Fatalf("expected finding for %q; Findings keys = %v", resourceID, findingKeys(result.Findings))
 	}
+	finding := findings[0]
 	if finding.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
@@ -610,7 +613,7 @@ func TestDBI_Enrich_VariousExistingStatuses_NoFieldUpdates(t *testing.T) {
 // internal helpers
 // ---------------------------------------------------------------------------
 
-func findingKeys(m map[string]domain.Finding) []string {
+func findingKeys(m map[string][]domain.Finding) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)

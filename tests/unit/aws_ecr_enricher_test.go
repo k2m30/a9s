@@ -185,10 +185,11 @@ func TestEnrichECRRepository_CriticalFindingsProduceSevBang(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[ecrRepo1]
+	fs, ok := result.Findings[ecrRepo1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q", ecrRepo1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
@@ -224,10 +225,11 @@ func TestEnrichECRRepository_HighFindingsProduceSevTilde(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[ecrRepo1]
+	fs, ok := result.Findings[ecrRepo1]
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (high vulns)", ecrRepo1)
 	}
+	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}

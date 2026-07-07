@@ -27,7 +27,7 @@ func TestIssueEnricherFuncSignatureReturnsResult(t *testing.T) {
 		return awsclient.IssueEnricherResult{
 			IssueCount: 3,
 			Truncated:  true,
-			Findings:   make(map[string]domain.Finding),
+			Findings:   make(map[string][]domain.Finding),
 		}, nil
 	})
 
@@ -58,7 +58,7 @@ func TestIssueEnricherFuncSignatureReturnsFalseWhenNotTruncated(t *testing.T) {
 		return awsclient.IssueEnricherResult{
 			IssueCount: 0,
 			Truncated:  false,
-			Findings:   make(map[string]domain.Finding),
+			Findings:   make(map[string][]domain.Finding),
 		}, nil
 	})
 
@@ -95,7 +95,7 @@ func TestEnrichmentCapTruncation(t *testing.T) {
 		return awsclient.IssueEnricherResult{
 			IssueCount: 0,
 			Truncated:  len(resources) > awsclient.EnrichmentCap,
-			Findings:   make(map[string]domain.Finding),
+			Findings:   make(map[string][]domain.Finding),
 		}, nil
 	})
 
