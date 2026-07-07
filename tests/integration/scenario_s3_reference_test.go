@@ -82,7 +82,10 @@ func TestScenario_S3ReferenceSurfaces(t *testing.T) {
 
 	t.Run("issues", func(t *testing.T) {
 		scenario.ExpectRowStatusEquals(s3NoPABBucketID, s3S4Phrase)
-		scenario.ExpectRowNamePrefix(s3NoPABBucketID, "! ")
+		// colorS3 resolves color via colorFromAnyFinding (catalog_databases.go);
+		// the PAB finding is Severity: SevBroken, so this row renders Broken
+		// row color directly instead of staying Healthy-with-`!`-glyph.
+		scenario.ExpectRowNoGlyphPrefix(s3NoPABBucketID)
 	})
 
 	t.Run("detail_related", func(t *testing.T) {

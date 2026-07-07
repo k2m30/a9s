@@ -7,12 +7,14 @@ package integration
 // the universal UI rules and the §4 contract in docs/resources/opensearch.md.
 //
 // opensearch has NO Wave-1 signals (ListDomainNames returns only names +
-// engine). All five §4 signals are Wave-2:
+// engine). All five §4 signals are Wave-2, and colorOpenSearch resolves
+// color via colorFromAnyFinding for every one of them — no signal here
+// leaves its row Healthy, so there is no name-glyph on this resource type:
 //   - Deleted         → Dim, "deleting: removal in progress"
 //   - Isolated        → Broken, "isolated: quarantined by AWS"
 //   - Processing      → Warning, "processing: config change in flight"
-//   - UpdateAvailable → Healthy + `!`, "software update forced soon"
-//   - EncryptionOff   → Healthy + `~`, "encryption at rest off"
+//   - UpdateAvailable → Broken, "software update forced soon"
+//   - EncryptionOff   → Warning, "encryption at rest off"
 //
 // Because the Wave-2 enricher reads signal flags the fetcher already wrote
 // from DescribeDomains, both waves fire in the same demo startup pass —
@@ -108,20 +110,21 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	// -----------------------------------------------------------------
 	// Glyph rules.
 	// -----------------------------------------------------------------
-	// Rule 3 (U3/U4) — `!` / `~` glyph ONLY on Healthy + Wave-2 rows.
-	scenario.ExpectRowNamePrefix(demofixtures.UpdateAvailableDomain, "! ")
-	scenario.ExpectRowNamePrefix(demofixtures.EncryptionOffDomain, "~ ")
-	// U7d — `!` beats `~` when both present on same Healthy row.
-	scenario.ExpectRowNamePrefix(demofixtures.MultiBackgroundDomain, "! ")
-
-	// Rule 3 — non-green rows carry no glyph regardless of any background
-	// finding attached. ProcessingPlusUpdate has a Wave-2 finding but the
-	// Warning color is the signal; glyph suppressed.
+	// colorOpenSearch (catalog_databases.go) resolves color via
+	// colorFromAnyFinding first. opensearchCodeUpdateForced (Severity:
+	// SevBroken) and opensearchCodeEncryptionOff (Severity: SevWarn) both
+	// now promote their row's color directly — UpdateAvailableDomain and
+	// MultiBackgroundDomain render Broken, EncryptionOffDomain renders
+	// Warning. None of them stay Healthy-with-glyph anymore; the glyph is
+	// retired in favor of the row color itself carrying the signal.
 	for _, id := range []string{
 		demofixtures.DeletingDomain,
 		demofixtures.IsolatedDomain,
 		demofixtures.ProcessingDomain,
 		demofixtures.ProcessingPlusUpdateDomain,
+		demofixtures.UpdateAvailableDomain,
+		demofixtures.EncryptionOffDomain,
+		demofixtures.MultiBackgroundDomain,
 	} {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}

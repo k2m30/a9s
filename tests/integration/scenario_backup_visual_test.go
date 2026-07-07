@@ -8,11 +8,15 @@ package integration
 // universal UI rules and the §4 contract in docs/resources/backup.md.
 //
 // backup has NO Wave-1 signals (§3.1) and two Wave-2 signals (§3.2):
-//   • FAILED/EXPIRED/ABORTED jobs in last 24h → `!` Broken.
-//   • PARTIAL jobs in last 24h  → `~` Warning.
+//   • FAILED/EXPIRED/ABORTED jobs in last 24h → Broken row color.
+//   • PARTIAL jobs in last 24h  → Warning row color.
 // Rule-7 (+N) suffix arithmetic (U7a/U7b/U7e/U7f) is N/A — the suffix only
 // activates when Wave-1 warnings coexist. U7d (! beats ~ on one row) is
 // covered by the plan-broken-mixed fixture.
+// colorBackup (catalog_backup.go) resolves color via colorFromAnyFinding, so
+// every plan with a finding renders its Broken/Warning row color directly —
+// no `!`/`~` name-glyph on backup rows (the glyph is reserved for findings
+// that land on an otherwise-Healthy row).
 
 import (
 	"testing"
@@ -36,14 +40,14 @@ const (
 	// Plan names — ExpectRowNamePrefix asserts `"<glyph> <NAME>"` because the
 	// glyph renders adjacent to the name column, and backup plan names
 	// differ from plan IDs (name = "acme-prod-critical", id = UUID).
-	backupNameProdCritical   = "acme-prod-critical"
-	backupNameProdDatabase   = "acme-prod-database"
-	backupNameStagingHourly  = "acme-staging-hourly"
-	backupNameComplianceMix  = "acme-compliance-mixed"
-	backupNameAppData        = "acme-app-data"
-	backupNameHealthyDaily   = "acme-daily-backup"
-	backupNameNeverRan       = "acme-newly-created"
-	backupNameDevSporadic    = "acme-dev-sporadic"
+	backupNameProdCritical  = "acme-prod-critical"
+	backupNameProdDatabase  = "acme-prod-database"
+	backupNameStagingHourly = "acme-staging-hourly"
+	backupNameComplianceMix = "acme-compliance-mixed"
+	backupNameAppData       = "acme-app-data"
+	backupNameHealthyDaily  = "acme-daily-backup"
+	backupNameNeverRan      = "acme-newly-created"
+	backupNameDevSporadic   = "acme-dev-sporadic"
 )
 
 func TestScenario_BackupVisual(t *testing.T) {
@@ -103,19 +107,24 @@ func TestScenario_BackupVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(demofixtures.ComplianceMixedPlanID, backupS4Broken1)
 
 	// ---------------------------------------------------------------
-	// Rule 3 — `!` / `~` glyphs. All backup findings land on Healthy
-	// (green) rows because there are no Wave-1 signals; therefore
-	// every Wave-2 finding gets a glyph.
+	// Rule 3 — glyph rules. colorBackup (catalog_backup.go) resolves color
+	// via colorFromAnyFinding first, so every plan carrying a Wave-2 finding
+	// now renders Broken/Warning row color directly instead of staying
+	// Healthy-green-with-glyph — the glyph is retired for this resource, the
+	// row color itself carries the severity signal.
 	// ---------------------------------------------------------------
 	for _, name := range []string{
 		backupNameProdCritical,
 		backupNameProdDatabase,
 		backupNameStagingHourly,
 		backupNameComplianceMix, // U7d: ! beats ~
+		backupNameAppData,
+		backupNameHealthyDaily,
+		backupNameNeverRan,
+		backupNameDevSporadic,
 	} {
-		scenario.ExpectRowNamePrefix(name, "! ")
+		scenario.ExpectRowNoGlyphPrefix(name)
 	}
-	scenario.ExpectRowNamePrefix(backupNameAppData, "~ ")
 
 	// ---------------------------------------------------------------
 	// Related panel — graph-root is plan-broken-2failed (prod vault
