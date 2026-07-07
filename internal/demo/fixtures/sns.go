@@ -40,6 +40,10 @@ var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 		// EnrichSNSSubscriptions's Wave-2 issue check. Deliberately has no
 		// SubscriptionsByTopic entry so ListSubscriptionsByTopic returns empty.
 		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:staging-deploy-alerts")},
+		// Issue: every subscriber is SubscriptionArn=="PendingConfirmation" → "~"
+		// (sns.all-pending-confirmation). Required for EnrichSNSSubscriptions's
+		// Wave-2 all-pending check.
+		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:webhook-integration-pending")},
 	}
 
 	subscriptions := []snstypes.Subscription{
@@ -94,6 +98,16 @@ var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 		"arn:aws:sns:us-east-1:123456789012:alarm-notifications":  subscriptions[:2],
 		"arn:aws:sns:us-east-1:123456789012:order-events":         subscriptions[2:4],
 		"arn:aws:sns:us-east-1:123456789012:deploy-notifications": subscriptions[4:],
+		// webhook-integration-pending — 100% of subscribers PendingConfirmation.
+		"arn:aws:sns:us-east-1:123456789012:webhook-integration-pending": {
+			{
+				TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:webhook-integration-pending"),
+				Protocol:        aws.String("https"),
+				Endpoint:        aws.String("https://partner-webhooks.example.com/sns-callback"),
+				SubscriptionArn: aws.String("PendingConfirmation"),
+				Owner:           aws.String("123456789012"),
+			},
+		},
 		// Every graph-root-reachable topic must have at least one subscription
 		// so sns→sns_subscriptions drill lands on non-empty content.
 		"arn:aws:sns:us-east-1:123456789012:" + S3EventsTopicName: minimalSubscriptions("arn:aws:sns:us-east-1:123456789012:"+S3EventsTopicName, "sqs", "arn:aws:sqs:us-east-1:123456789012:s3-events-queue"),

@@ -76,6 +76,17 @@ var sharedKinesisFixtures = sync.OnceValue(func() *KinesisFixtures {
 					StreamMode: kinesistypes.StreamModeProvisioned,
 				},
 			},
+			// Issue: StreamStatus=UPDATING → wave1 finding (CodeKinesisUpdating,
+			// SevWarn) → Warning (shard split/merge or mode change in progress).
+			{
+				StreamName:              aws.String("payments-ledger-stream"),
+				StreamARN:               aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/payments-ledger-stream"),
+				StreamStatus:            kinesistypes.StreamStatusUpdating,
+				StreamCreationTimestamp: aws.Time(mustParseKinesisTime("2025-09-05T11:00:00+00:00")),
+				StreamModeDetails: &kinesistypes.StreamModeDetails{
+					StreamMode: kinesistypes.StreamModeProvisioned,
+				},
+			},
 		},
 		// TagsByStream — required for the kinesis:cfn related-panel pivot
 		// (checkKinesisCFN → kinesis:ListTagsForStream). Points at

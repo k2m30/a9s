@@ -267,6 +267,21 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(180)},
 			CreatedDate:      aws.Time(time.Date(2023, 11, 1, 9, 0, 0, 0, time.UTC)),
 		},
+		// Issue: RotationEnabled=true, NextRotationDate in the past → wave1
+		// finding (CodeSecretStateRotationOverdue, SevWarn) → Warning
+		// (secrets.state.rotation_overdue).
+		{
+			Name:             aws.String("prod/payments/stripe-webhook-secret"),
+			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/payments/stripe-webhook-secret-NpQrSt"),
+			Description:      aws.String("Stripe webhook signing secret — automatic rotation is past due"),
+			LastAccessedDate: aws.Time(time.Date(2026, 4, 28, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:  aws.Time(time.Date(2025, 10, 1, 0, 0, 0, 0, time.UTC)),
+			RotationEnabled:  aws.Bool(true),
+			NextRotationDate: aws.Time(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)),
+			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(90)},
+			CreatedDate:      aws.Time(time.Date(2025, 4, 1, 9, 0, 0, 0, time.UTC)),
+			Tags:             []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
+		},
 	}
 
 	for i := range 18 {

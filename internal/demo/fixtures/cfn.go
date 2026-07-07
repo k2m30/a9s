@@ -292,6 +292,20 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 			StackId:           aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-decommissioned-poc/dddd6666-eeee-7777-ffff-888888888888"),
 			RoleARN:           aws.String(prodCIDeployRoleARN),
 		},
+		// StackStatus=CREATE_FAILED → wave1 finding (CodeCFNStackFailed, SevBroken) → Broken.
+		{
+			StackName:         aws.String("acme-experimental-queue"),
+			StackStatus:       cfntypes.StackStatusCreateFailed,
+			StackStatusReason: aws.String("The following resource(s) failed to create: [QueuePolicy]. Insufficient permissions."),
+			CreationTime:      aws.Time(mustParseCFNTime("2026-04-26T09:00:00+00:00")),
+			LastUpdatedTime:   aws.Time(mustParseCFNTime("2026-04-26T09:12:00+00:00")),
+			Description:       aws.String("Experimental SQS queue stack — initial create failed"),
+			StackId:           aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-experimental-queue/eeee7777-ffff-8888-9999-aaaaaaaaaaaa"),
+			RoleARN:           aws.String(prodCIDeployRoleARN),
+			Tags: []cfntypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("dev")},
+			},
+		},
 	}
 
 	stackEvents := map[string][]cfntypes.StackEvent{

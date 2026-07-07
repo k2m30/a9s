@@ -304,6 +304,19 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(14),
 			CreationTime:    aws.Int64(1750700000000),
 		},
+		// security-audit-trail's own per-trail delivery log group — a
+		// sub-path under /aws/cloudtrail/ (unlike the shared "/aws/cloudtrail"
+		// group above). EnrichLogsMetricFilters only inspects groups matching
+		// the "/aws/cloudtrail/" prefix; CWLogsFake.DescribeMetricFilters
+		// always returns an empty list, so this group fires
+		// logs.missing-metric-filters.
+		{
+			LogGroupName:    aws.String("/aws/cloudtrail/security-audit-trail"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail/security-audit-trail:*"),
+			StoredBytes:     aws.Int64(52428800),
+			RetentionInDays: aws.Int32(90),
+			CreationTime:    aws.Int64(1750800000000),
+		},
 	}
 
 	logStreams := map[string][]cwlogstypes.LogStream{

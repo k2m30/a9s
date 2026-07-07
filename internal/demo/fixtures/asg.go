@@ -250,6 +250,29 @@ func buildASGGroups() []asgtypes.AutoScalingGroup {
 				{Key: aws.String("Service"), Value: aws.String("web-worker")},
 			},
 		},
+		// Issue: latest scaling activity (MaxRecords=1, newest-first) has
+		// StatusCode=Failed → EnrichASGScalingActivities fires
+		// asg.scaling-activity-failed. In-service count meets MinSize, so
+		// this fixture demonstrates the scaling-activity-failed branch alone.
+		{
+			AutoScalingGroupName:   aws.String("asg-scaling-failed"),
+			AutoScalingGroupARN:    aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:99999999-9999-9999-9999-999999999999:autoScalingGroupName/asg-scaling-failed"),
+			MinSize:                aws.Int32(2),
+			MaxSize:                aws.Int32(8),
+			DesiredCapacity:        aws.Int32(2),
+			HealthCheckType:        aws.String("EC2"),
+			HealthCheckGracePeriod: aws.Int32(120),
+			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
+			CreatedTime:            aws.Time(mustTime("2025-07-01T08:00:00Z")),
+			Instances: []asgtypes.Instance{
+				{InstanceId: aws.String("i-0bbb888888888888b"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+				{InstanceId: aws.String("i-0ccc999999999999c"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+			},
+			Tags: []asgtypes.TagDescription{
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("Service"), Value: aws.String("payments-worker")},
+			},
+		},
 	}
 }
 
@@ -261,9 +284,35 @@ func buildASGActivities() map[string][]asgtypes.Activity {
 		"awseb-e-acmeprodapi-asg",
 		"eks-acme-prod-ng-general",
 	}
-	result := make(map[string][]asgtypes.Activity, len(asgNames))
+	result := make(map[string][]asgtypes.Activity, len(asgNames)+1)
 	for _, name := range asgNames {
 		result[name] = buildActivitiesFor(name)
+	}
+	// asg-scaling-failed's most-recent activity (index 0 — DescribeScalingActivities
+	// returns newest-first) is itself Failed, unlike buildActivitiesFor's groups
+	// where the newest activity is always Successful. Pins
+	// EnrichASGScalingActivities's asg.scaling-activity-failed finding.
+	result["asg-scaling-failed"] = []asgtypes.Activity{
+		{
+			ActivityId:           aws.String("act-demo-101"),
+			AutoScalingGroupName: aws.String("asg-scaling-failed"),
+			StatusCode:           asgtypes.ScalingActivityStatusCodeFailed,
+			StatusMessage:        aws.String("Instance became unhealthy while waiting for instance to be in InService state"),
+			Description:          aws.String("Launching a new EC2 instance: insufficient capacity"),
+			Cause:                aws.String("At 2026-03-22T11:00:00Z an instance was launched in response to a difference between desired and actual capacity, but it failed to reach a healthy state"),
+			StartTime:            aws.Time(mustTime("2026-03-22T11:00:00Z")),
+			EndTime:              aws.Time(mustTime("2026-03-22T11:03:00Z")),
+			Progress:             aws.Int32(0),
+		},
+		{
+			ActivityId:           aws.String("act-demo-102"),
+			AutoScalingGroupName: aws.String("asg-scaling-failed"),
+			StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
+			Description:          aws.String("Launching a new EC2 instance"),
+			StartTime:            aws.Time(mustTime("2026-03-22T10:30:00Z")),
+			EndTime:              aws.Time(mustTime("2026-03-22T10:35:00Z")),
+			Progress:             aws.Int32(100),
+		},
 	}
 	return result
 }

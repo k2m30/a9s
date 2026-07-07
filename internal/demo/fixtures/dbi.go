@@ -76,6 +76,18 @@ const (
 	ProdDbiRetentionParentID  = "prod-dbi-retention-parent"
 	ProdDbiRetentionParentARN = "arn:aws:rds:us-east-1:123456789012:db:prod-dbi-retention-parent"
 
+	// broken-dbi-incompatible-network — Broken (DBInstanceStatus=incompatible-network)
+	BrokenDbiIncompatibleNetworkID  = "broken-dbi-incompatible-network"
+	BrokenDbiIncompatibleNetworkARN = "arn:aws:rds:us-east-1:123456789012:db:broken-dbi-incompatible-network"
+
+	// broken-dbi-incompatible-option-group — Broken (DBInstanceStatus=incompatible-option-group)
+	BrokenDbiIncompatibleOptionGroupID  = "broken-dbi-incompatible-option-group"
+	BrokenDbiIncompatibleOptionGroupARN = "arn:aws:rds:us-east-1:123456789012:db:broken-dbi-incompatible-option-group"
+
+	// broken-dbi-incompatible-restore — Broken (DBInstanceStatus=incompatible-restore)
+	BrokenDbiIncompatibleRestoreID  = "broken-dbi-incompatible-restore"
+	BrokenDbiIncompatibleRestoreARN = "arn:aws:rds:us-east-1:123456789012:db:broken-dbi-incompatible-restore"
+
 	// Shared fixture constants
 	dbiKMSKeyID       = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 	dbiDeadbeefKeyARN = "arn:aws:kms:us-east-1:123456789012:key/deadbeef-0000-0000-0000-000000000000"
@@ -260,6 +272,18 @@ func buildDBIInstances() []rdstypes.DBInstance {
 	retentionParent := dbiBaselineHealthy(ProdDbiRetentionParentID, ProdDbiRetentionParentARN)
 	retentionParent.BackupRetentionPeriod = aws.Int32(7)
 
+	// 15. broken-dbi-incompatible-network — Broken (DBInstanceStatus=incompatible-network)
+	incompatNetwork := dbiBaselineHealthy(BrokenDbiIncompatibleNetworkID, BrokenDbiIncompatibleNetworkARN)
+	incompatNetwork.DBInstanceStatus = aws.String("incompatible-network")
+
+	// 16. broken-dbi-incompatible-option-group — Broken (DBInstanceStatus=incompatible-option-group)
+	incompatOptionGroup := dbiBaselineHealthy(BrokenDbiIncompatibleOptionGroupID, BrokenDbiIncompatibleOptionGroupARN)
+	incompatOptionGroup.DBInstanceStatus = aws.String("incompatible-option-group")
+
+	// 17. broken-dbi-incompatible-restore — Broken (DBInstanceStatus=incompatible-restore)
+	incompatRestore := dbiBaselineHealthy(BrokenDbiIncompatibleRestoreID, BrokenDbiIncompatibleRestoreARN)
+	incompatRestore.DBInstanceStatus = aws.String("incompatible-restore")
+
 	return []rdstypes.DBInstance{
 		prodDbi1,
 		auroraBase,
@@ -275,6 +299,9 @@ func buildDBIInstances() []rdstypes.DBInstance {
 		warnMulti,
 		warnPublicMaint,
 		retentionParent,
+		incompatNetwork,
+		incompatOptionGroup,
+		incompatRestore,
 	}
 }
 

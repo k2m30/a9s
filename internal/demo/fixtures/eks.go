@@ -170,6 +170,22 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				"Team":        "platform",
 			},
 		},
+		// Status=UPDATING → wave1 finding (CodeEKSStateUpdating, SevWarn) → Warning.
+		{
+			Name:    aws.String("acme-prod-updating"),
+			Arn:     aws.String("arn:aws:eks:us-east-1:123456789012:cluster/acme-prod-updating"),
+			Version: aws.String("1.30"),
+			Status:  ekstypes.ClusterStatusUpdating,
+			RoleArn: aws.String(eksClusterRoleARN),
+			ResourcesVpcConfig: &ekstypes.VpcConfigResponse{
+				VpcId:     aws.String(eksVPCID),
+				SubnetIds: []string{eksSubnetA, eksSubnetB},
+			},
+			CreatedAt: aws.Time(mustTime("2025-08-01T10:00:00Z")),
+			Tags: map[string]string{
+				"Environment": "prod",
+			},
+		},
 	}
 }
 
@@ -321,6 +337,75 @@ func buildEKSNodegroups() map[string][]ekstypes.Nodegroup {
 					},
 				},
 				CreatedAt:      aws.Time(mustTime("2026-04-10T08:00:00Z")),
+				ReleaseVersion: aws.String("1.29.3-20240322"),
+				Version:        aws.String("1.29"),
+				Tags: map[string]string{
+					"Environment": "prod",
+				},
+			},
+			// Status=CREATING → wave1 finding (CodeNGStateCreating, SevWarn) → Warning.
+			{
+				NodegroupName: aws.String("acme-prod-creating-pool"),
+				NodegroupArn:  aws.String("arn:aws:eks:us-east-1:123456789012:nodegroup/acme-prod/acme-prod-creating-pool/ccc33333"),
+				ClusterName:   aws.String("acme-prod"),
+				Status:        ekstypes.NodegroupStatusCreating,
+				NodeRole:      aws.String(eksNodeRoleARN),
+				AmiType:       ekstypes.AMITypesAl2X8664,
+				DiskSize:      aws.Int32(50),
+				InstanceTypes: []string{"m5.xlarge"},
+				Subnets:       []string{eksSubnetA, eksSubnetB},
+				ScalingConfig: &ekstypes.NodegroupScalingConfig{
+					MinSize:     aws.Int32(2),
+					MaxSize:     aws.Int32(6),
+					DesiredSize: aws.Int32(2),
+				},
+				CreatedAt:      aws.Time(mustTime("2026-04-25T09:00:00Z")),
+				ReleaseVersion: aws.String("1.29.3-20240322"),
+				Version:        aws.String("1.29"),
+				Tags: map[string]string{
+					"Environment": "prod",
+				},
+			},
+			// Status=DELETING → wave1 finding (CodeNGStateDeleting, SevWarn) → Warning.
+			{
+				NodegroupName: aws.String("acme-prod-deleting-pool"),
+				NodegroupArn:  aws.String("arn:aws:eks:us-east-1:123456789012:nodegroup/acme-prod/acme-prod-deleting-pool/ddd44444"),
+				ClusterName:   aws.String("acme-prod"),
+				Status:        ekstypes.NodegroupStatusDeleting,
+				NodeRole:      aws.String(eksNodeRoleARN),
+				AmiType:       ekstypes.AMITypesAl2X8664,
+				DiskSize:      aws.Int32(50),
+				InstanceTypes: []string{"m5.xlarge"},
+				Subnets:       []string{eksSubnetA, eksSubnetB},
+				ScalingConfig: &ekstypes.NodegroupScalingConfig{
+					MinSize:     aws.Int32(0),
+					MaxSize:     aws.Int32(4),
+					DesiredSize: aws.Int32(0),
+				},
+				CreatedAt:      aws.Time(mustTime("2025-05-01T09:00:00Z")),
+				ReleaseVersion: aws.String("1.29.3-20240322"),
+				Version:        aws.String("1.29"),
+				Tags: map[string]string{
+					"Environment": "prod",
+				},
+			},
+			// Status=DELETE_FAILED → wave1 finding (CodeNGStateDeleteFailed, SevBroken) → Broken.
+			{
+				NodegroupName: aws.String("acme-prod-delete-failed-pool"),
+				NodegroupArn:  aws.String("arn:aws:eks:us-east-1:123456789012:nodegroup/acme-prod/acme-prod-delete-failed-pool/eee55555"),
+				ClusterName:   aws.String("acme-prod"),
+				Status:        ekstypes.NodegroupStatusDeleteFailed,
+				NodeRole:      aws.String(eksNodeRoleARN),
+				AmiType:       ekstypes.AMITypesAl2X8664,
+				DiskSize:      aws.Int32(50),
+				InstanceTypes: []string{"m5.xlarge"},
+				Subnets:       []string{eksSubnetA, eksSubnetB},
+				ScalingConfig: &ekstypes.NodegroupScalingConfig{
+					MinSize:     aws.Int32(1),
+					MaxSize:     aws.Int32(4),
+					DesiredSize: aws.Int32(1),
+				},
+				CreatedAt:      aws.Time(mustTime("2025-06-10T09:00:00Z")),
 				ReleaseVersion: aws.String("1.29.3-20240322"),
 				Version:        aws.String("1.29"),
 				Tags: map[string]string{

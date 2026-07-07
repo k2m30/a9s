@@ -28,6 +28,7 @@ type EC2Fixtures struct {
 	VpcEndpoints      []ec2types.VpcEndpoint
 	NetworkInterfaces []ec2types.NetworkInterface
 	Volumes           []ec2types.Volume
+	VolumeStatuses    []ec2types.VolumeStatusItem
 	Snapshots         []ec2types.Snapshot
 	Images            []ec2types.Image
 	// TGWVpcAttachmentSubnets maps a TransitGatewayAttachmentId to the
@@ -104,6 +105,7 @@ var sharedEC2Fixtures = sync.OnceValue(func() *EC2Fixtures {
 	f.VpcEndpoints = buildVpcEndpoints()
 	f.NetworkInterfaces = buildNetworkInterfaces()
 	f.Volumes = buildVolumes()
+	f.VolumeStatuses = buildVolumeStatuses()
 	f.Snapshots = buildSnapshots()
 	f.Images = buildImages()
 	// TGWVpcAttachmentSubnets — the hub TGW's prod-VPC attachment spans the
@@ -1504,6 +1506,39 @@ func buildSubnets() []ec2types.Subnet {
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
 			},
 		},
+		// State=failed → wave1 finding (CodeSubnetStateFailed, SevBroken) → Broken.
+		ec2types.Subnet{
+			SubnetId:                aws.String("subnet-0failed111111c"),
+			VpcId:                   aws.String(fixtProdVPCID),
+			CidrBlock:               aws.String("10.0.22.0/24"),
+			AvailabilityZone:        aws.String("us-east-1c"),
+			State:                   ec2types.SubnetState("failed"),
+			AvailableIpAddressCount: aws.Int32(0),
+			MapPublicIpOnLaunch:     aws.Bool(false),
+			DefaultForAz:            aws.Bool(false),
+			OwnerId:                 aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("prod-failed-subnet")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+		// State=failed-insufficient-capacity → wave1 finding
+		// (CodeSubnetStateFailedInsufficientCapacity, SevBroken) → Broken.
+		ec2types.Subnet{
+			SubnetId:                aws.String("subnet-0failedcap1111d"),
+			VpcId:                   aws.String(fixtStagingVPCID),
+			CidrBlock:               aws.String("10.1.22.0/24"),
+			AvailabilityZone:        aws.String("us-east-1c"),
+			State:                   ec2types.SubnetStateFailedInsufficientCapacity,
+			AvailableIpAddressCount: aws.Int32(0),
+			MapPublicIpOnLaunch:     aws.Bool(false),
+			DefaultForAz:            aws.Bool(false),
+			OwnerId:                 aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("staging-failed-insufficient-capacity-subnet")},
+				{Key: aws.String("Environment"), Value: aws.String("staging")},
+			},
+		},
 	)
 
 	vpcPool := []string{fixtProdVPCID, fixtProdVPCID, fixtStagingVPCID}
@@ -1796,6 +1831,30 @@ func buildInternetGateways() []ec2types.InternetGateway {
 				{Key: aws.String("Environment"), Value: aws.String("dev")},
 			},
 		},
+		// Attachment state=attaching → wave1 finding (CodeIGWStateAttaching, SevWarn) → Warning.
+		{
+			InternetGatewayId: aws.String("igw-0attaching111111d"),
+			OwnerId:           aws.String("123456789012"),
+			Attachments: []ec2types.InternetGatewayAttachment{
+				{VpcId: aws.String("vpc-0pending111111111"), State: ec2types.AttachmentStatusAttaching},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("new-region-igw-attaching")},
+				{Key: aws.String("Environment"), Value: aws.String("dev")},
+			},
+		},
+		// Attachment state=detaching → wave1 finding (CodeIGWStateDetaching, SevWarn) → Warning.
+		{
+			InternetGatewayId: aws.String("igw-0detaching111111e"),
+			OwnerId:           aws.String("123456789012"),
+			Attachments: []ec2types.InternetGatewayAttachment{
+				{VpcId: aws.String(fixtStagingVPCID), State: ec2types.AttachmentStatusDetaching},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("staging-igw-detaching")},
+				{Key: aws.String("Environment"), Value: aws.String("staging")},
+			},
+		},
 	}
 }
 
@@ -1939,6 +1998,32 @@ func buildTransitGateways() []ec2types.TransitGateway {
 				{Key: aws.String("Environment"), Value: aws.String("dev")},
 			},
 		},
+		// State=pending → wave1 finding (CodeTGWStatePending, SevWarn) → Warning.
+		{
+			TransitGatewayId:  aws.String("tgw-0pending111111111f"),
+			TransitGatewayArn: aws.String("arn:aws:ec2:us-east-1:123456789012:transit-gateway/tgw-0pending111111111f"),
+			State:             ec2types.TransitGatewayState("pending"),
+			OwnerId:           aws.String("123456789012"),
+			Description:       aws.String("New region transit gateway — provisioning"),
+			CreationTime:      aws.Time(time.Date(2026, 4, 22, 9, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-new-region-tgw")},
+				{Key: aws.String("Environment"), Value: aws.String("dev")},
+			},
+		},
+		// State=modifying → wave1 finding (CodeTGWStateModifying, SevWarn) → Warning.
+		{
+			TransitGatewayId:  aws.String("tgw-0modifying111111g"),
+			TransitGatewayArn: aws.String("arn:aws:ec2:us-east-1:123456789012:transit-gateway/tgw-0modifying111111g"),
+			State:             ec2types.TransitGatewayStateModifying,
+			OwnerId:           aws.String("123456789012"),
+			Description:       aws.String("Disaster recovery transit gateway — ASN change in progress"),
+			CreationTime:      aws.Time(time.Date(2025, 9, 15, 14, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-dr-tgw-modifying")},
+				{Key: aws.String("Environment"), Value: aws.String("dr")},
+			},
+		},
 	}
 }
 
@@ -2008,6 +2093,38 @@ func buildTGWAttachments() []ec2types.TransitGatewayAttachment {
 			CreationTime:               t4,
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("dr-tgw-staging-vpc")},
+			},
+		},
+		// DR TGW → attachment State=failed → EnrichTGWAttachments emits
+		// tgw.attachment-failed ("!") on tgw-0bbb222222222222b.
+		{
+			TransitGatewayAttachmentId: aws.String("tgw-attach-0eee555555555555e"),
+			TransitGatewayId:           aws.String("tgw-0bbb222222222222b"),
+			ResourceType:               ec2types.TransitGatewayAttachmentResourceTypeVpn,
+			ResourceId:                 aws.String("vpn-0dr0000000000001e"),
+			State:                      ec2types.TransitGatewayAttachmentStateFailed,
+			TransitGatewayOwnerId:      aws.String("123456789012"),
+			ResourceOwnerId:            aws.String("123456789012"),
+			CreationTime:               aws.Time(time.Date(2026, 3, 1, 10, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("dr-tgw-vpn-failed")},
+			},
+		},
+		// Hub TGW → attachment State=modifying → EnrichTGWAttachments emits
+		// tgw.attachment-transitional ("~") on tgw-0aaa111111111111a. Kept off
+		// the DR TGW so the "!" attachment-failed witness there does not mask
+		// this "~" finding under EnrichTGWAttachments's worst-wins precedence.
+		{
+			TransitGatewayAttachmentId: aws.String("tgw-attach-0fff666666666666f"),
+			TransitGatewayId:           aws.String("tgw-0aaa111111111111a"),
+			ResourceType:               ec2types.TransitGatewayAttachmentResourceTypeVpn,
+			ResourceId:                 aws.String("vpn-0hub0000000000002f"),
+			State:                      ec2types.TransitGatewayAttachmentStateModifying,
+			TransitGatewayOwnerId:      aws.String("123456789012"),
+			ResourceOwnerId:            aws.String("123456789012"),
+			CreationTime:               aws.Time(time.Date(2026, 4, 5, 11, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("hub-tgw-vpn-modifying")},
 			},
 		},
 	}
@@ -2112,6 +2229,81 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 			CreationTimestamp: aws.Time(time.Date(2025, 1, 10, 8, 0, 0, 0, time.UTC)),
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("staging-sns-endpoint-deleted")},
+			},
+		},
+		// State=PendingAcceptance → wave1 finding (CodeVPCEStatePendingAcceptance, SevWarn) → Warning.
+		{
+			VpcEndpointId:     aws.String("vpce-0pendingaccept001g"),
+			ServiceName:       aws.String("com.amazonaws.us-east-1.execute-api"),
+			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
+			State:             ec2types.StatePendingAcceptance,
+			VpcId:             aws.String(fixtProdVPCID),
+			SubnetIds:         []string{fixtProdPrivateSubnetA},
+			PrivateDnsEnabled: aws.Bool(false),
+			OwnerId:           aws.String("123456789012"),
+			CreationTimestamp: aws.Time(time.Date(2026, 4, 22, 9, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("prod-execute-api-endpoint-pending-accept")},
+			},
+		},
+		// State=Deleting → wave1 finding (CodeVPCEStateDeleting, SevWarn) → Warning.
+		{
+			VpcEndpointId:     aws.String("vpce-0deleting0000001h"),
+			ServiceName:       aws.String("com.amazonaws.us-east-1.ecr.api"),
+			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
+			State:             ec2types.StateDeleting,
+			VpcId:             aws.String(fixtStagingVPCID),
+			SubnetIds:         []string{fixtStagingSubnetA},
+			PrivateDnsEnabled: aws.Bool(true),
+			OwnerId:           aws.String("123456789012"),
+			CreationTimestamp: aws.Time(time.Date(2025, 11, 1, 10, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("staging-ecr-api-endpoint-deleting")},
+			},
+		},
+		// State=Rejected → wave1 finding (CodeVPCEStateRejected, SevBroken) → Broken.
+		{
+			VpcEndpointId:     aws.String("vpce-0rejected0000001i"),
+			ServiceName:       aws.String("com.amazonaws.us-east-1.kinesis-streams"),
+			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
+			State:             ec2types.StateRejected,
+			VpcId:             aws.String(fixtProdVPCID),
+			SubnetIds:         []string{fixtProdPrivateSubnetB},
+			PrivateDnsEnabled: aws.Bool(false),
+			OwnerId:           aws.String("123456789012"),
+			CreationTimestamp: aws.Time(time.Date(2026, 3, 5, 9, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("prod-kinesis-endpoint-rejected")},
+			},
+		},
+		// State=Expired → wave1 finding (CodeVPCEStateExpired, SevBroken) → Broken.
+		{
+			VpcEndpointId:     aws.String("vpce-0expired0000001j"),
+			ServiceName:       aws.String("com.amazonaws.us-east-1.sqs"),
+			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
+			State:             ec2types.StateExpired,
+			VpcId:             aws.String(fixtStagingVPCID),
+			SubnetIds:         []string{fixtStagingSubnetB},
+			PrivateDnsEnabled: aws.Bool(false),
+			OwnerId:           aws.String("123456789012"),
+			CreationTimestamp: aws.Time(time.Date(2026, 1, 15, 9, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("staging-sqs-endpoint-expired")},
+			},
+		},
+		// State=Partial → wave1 finding (CodeVPCEStatePartial, SevBroken) → Broken.
+		{
+			VpcEndpointId:     aws.String("vpce-0partial00000001k"),
+			ServiceName:       aws.String("com.amazonaws.us-east-1.logs"),
+			VpcEndpointType:   ec2types.VpcEndpointTypeInterface,
+			State:             ec2types.StatePartial,
+			VpcId:             aws.String(fixtProdVPCID),
+			SubnetIds:         []string{fixtProdPrivateSubnetA, fixtProdPrivateSubnetB},
+			PrivateDnsEnabled: aws.Bool(true),
+			OwnerId:           aws.String("123456789012"),
+			CreationTimestamp: aws.Time(time.Date(2026, 4, 1, 9, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("prod-logs-endpoint-partial")},
 			},
 		},
 	}
@@ -2417,6 +2609,46 @@ func buildNetworkInterfaces() []ec2types.NetworkInterface {
 				{Key: aws.String("Name"), Value: aws.String("lambda-api-gateway-authorizer-eni")},
 			},
 		},
+		// Status=attaching → wave1 finding (CodeENIStateAttaching, SevWarn) → Warning.
+		{
+			NetworkInterfaceId: aws.String("eni-0attaching0000001a"),
+			Status:             ec2types.NetworkInterfaceStatusAttaching,
+			InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
+			VpcId:              aws.String(fixtProdVPCID),
+			SubnetId:           aws.String(fixtProdPrivateSubnetA),
+			AvailabilityZone:   aws.String("us-east-1a"),
+			PrivateIpAddress:   aws.String("10.0.3.201"),
+			PrivateDnsName:     aws.String("ip-10-0-3-201.ec2.internal"),
+			MacAddress:         aws.String("0a:1b:2c:3d:4e:a1"),
+			Description:        aws.String("Secondary interface for worker-batch-03, attach in progress"),
+			OwnerId:            aws.String("123456789012"),
+			RequesterManaged:   aws.Bool(false),
+			SourceDestCheck:    aws.Bool(true),
+			Groups: []ec2types.GroupIdentifier{
+				{GroupId: aws.String(fixtProdRDSSGID), GroupName: aws.String("acme-worker-sg")},
+			},
+			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("worker-batch-03-eni-attaching")}},
+		},
+		// Status=detaching → wave1 finding (CodeENIStateDetaching, SevWarn) → Warning.
+		{
+			NetworkInterfaceId: aws.String("eni-0detaching0000001b"),
+			Status:             ec2types.NetworkInterfaceStatusDetaching,
+			InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
+			VpcId:              aws.String(fixtProdVPCID),
+			SubnetId:           aws.String(fixtProdPrivateSubnetB),
+			AvailabilityZone:   aws.String("us-east-1b"),
+			PrivateIpAddress:   aws.String("10.0.4.202"),
+			PrivateDnsName:     aws.String("ip-10-0-4-202.ec2.internal"),
+			MacAddress:         aws.String("0a:1b:2c:3d:4e:a2"),
+			Description:        aws.String("Secondary interface for db-proxy-01, detach in progress"),
+			OwnerId:            aws.String("123456789012"),
+			RequesterManaged:   aws.Bool(false),
+			SourceDestCheck:    aws.Bool(true),
+			Groups: []ec2types.GroupIdentifier{
+				{GroupId: aws.String(fixtProdDBProxySGID), GroupName: aws.String("acme-db-proxy-sg")},
+			},
+			TagSet: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("db-proxy-01-eni-detaching")}},
+		},
 	}
 }
 
@@ -2505,6 +2737,31 @@ func buildVolumes() []ec2types.Volume {
 			CreateTime:  aws.Time(time.Date(2025, 9, 15, 8, 0, 0, 0, time.UTC)),
 			Attachments: []ec2types.VolumeAttachment{{InstanceId: aws.String("i-0a1b2c3d4e5f60002")}},
 			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("legacy-unencrypted-vol")}},
+		},
+	}
+}
+
+// buildVolumeStatuses backs EC2:DescribeVolumeStatus for the Wave 2
+// ebs.volume-io-degraded enrichment (EnrichEBSVolumeStatus). Only
+// vol-0a1b2c3d4e5f60002 (api-staging-data, in-use) carries a non-ok status —
+// every other volume above is intentionally left off this list so the
+// enrichment's "skip on ok/absent" path also has fixture coverage.
+func buildVolumeStatuses() []ec2types.VolumeStatusItem {
+	return []ec2types.VolumeStatusItem{
+		{
+			VolumeId: aws.String("vol-0a1b2c3d4e5f60002"),
+			VolumeStatus: &ec2types.VolumeStatusInfo{
+				Status: ec2types.VolumeStatusInfoStatusImpaired,
+			},
+			Events: []ec2types.VolumeStatusEvent{
+				{
+					EventType:   aws.String("io-performance"),
+					Description: aws.String("Degraded IOPS on volume vol-0a1b2c3d4e5f60002"),
+				},
+			},
+			Actions: []ec2types.VolumeStatusAction{
+				{Code: aws.String("enable-volume-io")},
+			},
 		},
 	}
 }

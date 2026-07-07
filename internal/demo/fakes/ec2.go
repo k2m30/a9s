@@ -149,9 +149,27 @@ func (f *EC2Fake) DescribeImages(_ context.Context, input *ec2.DescribeImagesInp
 	return &ec2.DescribeImagesOutput{Images: out}, nil
 }
 
-// DescribeVolumeStatus is a stub for the Wave 2 enrichment interface.
-func (f *EC2Fake) DescribeVolumeStatus(_ context.Context, _ *ec2.DescribeVolumeStatusInput, _ ...func(*ec2.Options)) (*ec2.DescribeVolumeStatusOutput, error) {
-	return &ec2.DescribeVolumeStatusOutput{}, nil
+// DescribeVolumeStatus backs the Wave 2 EnrichEBSVolumeStatus enrichment
+// (ebs.volume-io-degraded). Filters fixture statuses by VolumeIds when given,
+// matching DescribeInstanceStatus's filter-or-all-on-empty convention.
+func (f *EC2Fake) DescribeVolumeStatus(_ context.Context, input *ec2.DescribeVolumeStatusInput, _ ...func(*ec2.Options)) (*ec2.DescribeVolumeStatusOutput, error) {
+	if input == nil || len(input.VolumeIds) == 0 {
+		return &ec2.DescribeVolumeStatusOutput{VolumeStatuses: f.fix.VolumeStatuses}, nil
+	}
+	want := make(map[string]struct{}, len(input.VolumeIds))
+	for _, id := range input.VolumeIds {
+		want[id] = struct{}{}
+	}
+	var out []ec2types.VolumeStatusItem
+	for _, s := range f.fix.VolumeStatuses {
+		if s.VolumeId == nil {
+			continue
+		}
+		if _, ok := want[*s.VolumeId]; ok {
+			out = append(out, s)
+		}
+	}
+	return &ec2.DescribeVolumeStatusOutput{VolumeStatuses: out}, nil
 }
 
 // DescribeFlowLogs filters the fixture-registered FlowLogsByResourceID map by

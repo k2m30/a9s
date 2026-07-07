@@ -149,6 +149,33 @@ func buildECSClusters() []ecstypes.Cluster {
 				{Key: aws.String("Environment"), Value: aws.String("dev")},
 			},
 		},
+		// Status=DEPROVISIONING → wave1 finding (CodeECSStateDeprovisioning, SevWarn) → Warning.
+		{
+			ClusterName:                       aws.String("acme-cluster-deprovisioning"),
+			ClusterArn:                        aws.String("arn:aws:ecs:us-east-1:123456789012:cluster/acme-cluster-deprovisioning"),
+			Status:                            aws.String("DEPROVISIONING"),
+			RunningTasksCount:                 0,
+			PendingTasksCount:                 0,
+			ActiveServicesCount:               0,
+			RegisteredContainerInstancesCount: 0,
+			CapacityProviders:                 []string{"FARGATE"},
+			Tags: []ecstypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("dev")},
+			},
+		},
+		// Status=INACTIVE → wave1 finding (CodeECSStateInactive, SevBroken) → Broken.
+		{
+			ClusterName:                       aws.String("acme-cluster-inactive"),
+			ClusterArn:                        aws.String("arn:aws:ecs:us-east-1:123456789012:cluster/acme-cluster-inactive"),
+			Status:                            aws.String("INACTIVE"),
+			RunningTasksCount:                 0,
+			PendingTasksCount:                 0,
+			ActiveServicesCount:               0,
+			RegisteredContainerInstancesCount: 0,
+			Tags: []ecstypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("dev")},
+			},
+		},
 	}
 }
 
@@ -486,6 +513,57 @@ func buildECSTasks() []ecstypes.Task {
 			Connectivity:      ecstypes.ConnectivityConnected,
 			PlatformVersion:   aws.String("1.4.0"),
 			PlatformFamily:    aws.String("Linux"),
+			AvailabilityZone:  aws.String("us-east-1c"),
+		},
+		// LastStatus=ACTIVATING → wave1 finding (CodeECSTaskStateActivating, SevWarn) → Warning.
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-services/b8c9d0e1f2a7b8c9d0e1f2a8"),
+			ClusterArn:        aws.String(ecsClusterArnServices),
+			LastStatus:        aws.String("ACTIVATING"),
+			DesiredStatus:     aws.String("RUNNING"),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/web-frontend:8"),
+			LaunchType:        ecstypes.LaunchTypeFargate,
+			Cpu:               aws.String("256"),
+			Memory:            aws.String("512"),
+			Group:             aws.String("service:web-frontend"),
+			CreatedAt:         aws.Time(mustTime("2026-04-27T10:00:00Z")),
+			HealthStatus:      ecstypes.HealthStatusUnknown,
+			PlatformVersion:   aws.String("1.4.0"),
+			PlatformFamily:    aws.String("Linux"),
+			AvailabilityZone:  aws.String("us-east-1a"),
+		},
+		// LastStatus=DEACTIVATING → wave1 finding (CodeECSTaskStateDeactivating, SevWarn) → Warning.
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-services/c9d0e1f2a7b8c9d0e1f2a8b9"),
+			ClusterArn:        aws.String(ecsClusterArnServices),
+			LastStatus:        aws.String("DEACTIVATING"),
+			DesiredStatus:     aws.String("STOPPED"),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/order-worker:5"),
+			LaunchType:        ecstypes.LaunchTypeFargate,
+			Cpu:               aws.String("1024"),
+			Memory:            aws.String("2048"),
+			Group:             aws.String("service:order-worker"),
+			StartedAt:         aws.Time(mustTime("2026-04-27T08:00:00Z")),
+			HealthStatus:      ecstypes.HealthStatusHealthy,
+			Connectivity:      ecstypes.ConnectivityConnected,
+			PlatformVersion:   aws.String("1.4.0"),
+			PlatformFamily:    aws.String("Linux"),
+			AvailabilityZone:  aws.String("us-east-1a"),
+		},
+		// LastStatus=STOPPING → wave1 finding (CodeECSTaskStateStopping, SevWarn) → Warning.
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-batch/d0e1f2a7b8c9d0e1f2a8b9c0"),
+			ClusterArn:        aws.String(ecsClusterArnBatch),
+			LastStatus:        aws.String("STOPPING"),
+			DesiredStatus:     aws.String("STOPPED"),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/batch-etl-runner:3"),
+			LaunchType:        ecstypes.LaunchTypeEc2,
+			Cpu:               aws.String("2048"),
+			Memory:            aws.String("4096"),
+			Group:             aws.String("service:batch-etl-runner"),
+			StartedAt:         aws.Time(mustTime("2026-04-27T02:00:00Z")),
+			HealthStatus:      ecstypes.HealthStatusHealthy,
+			Connectivity:      ecstypes.ConnectivityConnected,
 			AvailabilityZone:  aws.String("us-east-1c"),
 		},
 	}
