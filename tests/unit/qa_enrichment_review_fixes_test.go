@@ -112,6 +112,24 @@ func TestRowMarker_HiddenWhenIdentityColumnScrolledOff(t *testing.T) {
 //
 // Uses the test helpers defined in qa_enrichment_rerun_overlap_test.go:
 // newRootSizedModel, rootApplyMsg, navigateToEC2List, ctrlRKeyMsg.
+// isVisibleUnderCtrlZ toggles the ctrl+z attention filter on m, checks
+// whether needle is visible, then toggles it back off (returning the
+// original model so callers can keep making assertions without ctrl+z
+// bleeding into later checks). Since the color-findings-conformance wave,
+// colorEC2 is colorFromAnyFinding-only (internal/aws/catalog_compute.go) —
+// once a SevBroken/SevWarn Finding is applied, resolveListDecoratorFull's
+// "! "/"~ " glyph prefix branch is skipped entirely (it only fires when
+// ResolveColor()==ColorHealthy; see internal/app/list_columns.go and
+// .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
+// The renderer-agnostic, stronger check for "is this row an applied issue"
+// is ctrl+z survival, not the literal glyph text.
+func isVisibleUnderCtrlZ(m tui.Model, needle string) (tui.Model, bool) {
+	m, _ = rootApplyMsg(m, ctrlZ())
+	visible := strings.Contains(stripANSI(m.View().Content), needle)
+	m, _ = rootApplyMsg(m, ctrlZ())
+	return m, visible
+}
+
 func TestCtrlR_ClearsActiveListFindingsImmediately(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
@@ -128,25 +146,27 @@ func TestCtrlR_ClearsActiveListFindingsImmediately(t *testing.T) {
 	// active list via the handler's live-update path.
 	m, _ = rootApplyMsg(m, enrichmentCheckedWithFindings(0, 0))
 
-	// Sanity: the "! " prefix marker is visible in the rendered output.
-	before := m.View().Content
-	if !strings.Contains(before, "! ") {
-		t.Fatalf("pre-condition failed: expected '! ' prefix marker in render before Ctrl+R; output:\n%s", before)
+	// Sanity: the impaired instance survives the ctrl+z attention filter
+	// (it is now an applied issue row).
+	var visible bool
+	m, visible = isVisibleUnderCtrlZ(m, "web-server-1")
+	if !visible {
+		t.Fatal("pre-condition failed: expected web-server-1 to survive ctrl+z (finding applied) before Ctrl+R")
 	}
 
 	// Dispatch Ctrl+R via the real key path.
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
-	// Assertion (corrected): the marker must still be present immediately
+	// Assertion (corrected): the finding must still be applied immediately
 	// after Ctrl+R — no fetch/enrichment response has landed yet, so the old
 	// finding is still the best-known truth (stale-until-replaced).
-	afterKeypress := m.View().Content
-	if !strings.Contains(afterKeypress, "! ") {
-		t.Errorf("Ctrl+R must NOT blank the active list's findings before the fresh result lands; '! ' prefix marker missing immediately after keypress:\n%s", afterKeypress)
+	m, visible = isVisibleUnderCtrlZ(m, "web-server-1")
+	if !visible {
+		t.Error("Ctrl+R must NOT blank the active list's findings before the fresh result lands; web-server-1 no longer survives ctrl+z immediately after keypress")
 	}
 
 	// Once a fresh EnrichmentCheckedMsg lands and genuinely omits the
-	// finding (resource recovered), the marker MUST be removed — this test
+	// finding (resource recovered), the finding MUST be removed — this test
 	// still confirms removal works, just not before the result lands.
 	recovered := messages.EnrichmentChecked{
 		ResourceType: "ec2",
@@ -158,8 +178,8 @@ func TestCtrlR_ClearsActiveListFindingsImmediately(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, recovered)
 
-	afterFreshResult := m.View().Content
-	if strings.Contains(afterFreshResult, "! ") {
-		t.Errorf("a finding absent from the fresh enrichment result must be removed once that result lands; '! ' prefix marker still present:\n%s", afterFreshResult)
+	_, visible = isVisibleUnderCtrlZ(m, "web-server-1")
+	if visible {
+		t.Error("a finding absent from the fresh enrichment result must be removed once that result lands; web-server-1 still survives ctrl+z")
 	}
 }

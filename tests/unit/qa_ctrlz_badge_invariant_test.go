@@ -24,12 +24,35 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
+
+// ec2StateFinding returns the realistic Wave-1 Finding the real EC2 fetcher
+// (internal/aws/ec2.go) attaches for a given non-healthy lifecycle state —
+// since the color-findings-conformance wave, colorEC2 is
+// colorFromAnyFinding-only (no raw-field fallback), so any synthetic EC2
+// fixture testing Color/IsIssue must carry this Finding to be meaningful.
+func ec2StateFinding(state string) []domain.Finding {
+	switch state {
+	case "pending":
+		return []domain.Finding{{Code: "ec2.state.pending", Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+	case "stopping":
+		return []domain.Finding{{Code: "ec2.state.stopping", Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"}}
+	case "shutting-down":
+		return []domain.Finding{{Code: "ec2.state.shutting-down", Phrase: "shutting down", Severity: domain.SevWarn, Source: "wave1"}}
+	case "stopped":
+		return []domain.Finding{{Code: "ec2.state.stopped", Phrase: "stopped", Severity: domain.SevWarn, Source: "wave1"}}
+	case "terminated":
+		return []domain.Finding{{Code: "ec2.state.terminated", Phrase: "terminated", Severity: domain.SevDim, Source: "wave1"}}
+	default:
+		return nil
+	}
+}
 
 // ctrlZ constructs the ctrl+z key press message understood by bubbles/v2 key.Matches.
 // Equivalent to key.NewBinding(key.WithKeys("ctrl+z")).
@@ -210,9 +233,10 @@ func TestCtrlZ_EC2_27Rows11Issues(t *testing.T) {
 	var resources []resource.Resource
 	for i, s := range issueStatuses {
 		resources = append(resources, resource.Resource{
-			ID:     "i-issue-" + string(rune('a'+i)),
-			Name:   "issue-node-" + string(rune('a'+i)),
-			Fields: map[string]string{"state": s},
+			ID:       "i-issue-" + string(rune('a'+i)),
+			Name:     "issue-node-" + string(rune('a'+i)),
+			Fields:   map[string]string{"state": s},
+			Findings: ec2StateFinding(s),
 		})
 	}
 	for i := 0; i < 14; i++ {
@@ -224,7 +248,7 @@ func TestCtrlZ_EC2_27Rows11Issues(t *testing.T) {
 	}
 	resources = append(resources,
 		resource.Resource{ID: "i-term-1", Name: "legacy-app",
-			Fields: map[string]string{"state": "terminated"}},
+			Fields: map[string]string{"state": "terminated"}, Findings: ec2StateFinding("terminated")},
 	)
 	if got := len(resources); got != 27 {
 		t.Fatalf("test setup error: want 27 resources, got %d", got)
@@ -426,9 +450,9 @@ func TestCtrlZ_EC2_ShowsOnlyIssueRows(t *testing.T) {
 		{ID: "i-0001", Name: "web-prod",
 			Fields: map[string]string{"state": "running"}},
 		{ID: "i-0002", Name: "batch-job",
-			Fields: map[string]string{"state": "stopped"}},
+			Fields: map[string]string{"state": "stopped"}, Findings: ec2StateFinding("stopped")},
 		{ID: "i-0003", Name: "old-build",
-			Fields: map[string]string{"state": "terminated"}},
+			Fields: map[string]string{"state": "terminated"}, Findings: ec2StateFinding("terminated")},
 		{ID: "i-0004", Name: "api-prod",
 			Fields: map[string]string{"state": "running"}},
 	}
@@ -447,9 +471,9 @@ func TestCtrlZ_EC2_ShowsOnlyIssueRows(t *testing.T) {
 		t.Errorf("running row 'api-prod' must be HIDDEN after ctrl+z (running is not an issue)\n  view:\n%s", view)
 	}
 
-	// stopped must be visible (ColorBroken — is an issue).
+	// stopped must be visible (ColorWarning — is an issue).
 	if !strings.Contains(view, "batch-job") {
-		t.Errorf("stopped row 'batch-job' must be visible after ctrl+z (ColorBroken.IsIssue=true)\n  view:\n%s", view)
+		t.Errorf("stopped row 'batch-job' must be visible after ctrl+z (ColorWarning.IsIssue=true)\n  view:\n%s", view)
 	}
 
 	// terminated must be hidden (ColorDim — not an issue).

@@ -444,15 +444,22 @@ func TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane(t *testing.T) 
 	}
 	ctrl.ApplyResourcesLoaded(stage4PinType, seeded, nil, false)
 
+	// Since the color-findings-conformance wave, colorS3 is
+	// colorFromAnyFinding-only (internal/aws/catalog_databases.go) — a
+	// SevBroken Finding resolves the row's whole-row color to "broken"
+	// directly (resolveListDecoratorFull's DecoratorError glyph branch only
+	// fires when ResolveColor()==ColorHealthy; see internal/app/list_columns.go
+	// and .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
+	// ListRow.Color=="broken" is the stronger, correct check throughout this test.
 	preSwap := ctrl.Snapshot()
 	foundBefore := false
 	for _, r := range preSwap.Body.List.Rows {
-		if r.ResourceID == "bucket-carry-top" && r.Decorator == app.DecoratorError {
+		if r.ResourceID == "bucket-carry-top" && r.Color == "broken" {
 			foundBefore = true
 		}
 	}
 	if !foundBefore {
-		t.Fatal("fixture assumption broken — seeded bucket-carry-top does not show an error decorator before the swap")
+		t.Fatal("fixture assumption broken — seeded bucket-carry-top does not render as a broken row before the swap")
 	}
 
 	// Silent swap on the TOP-LEVEL screen: same ID, no findings, enrichment
@@ -464,12 +471,12 @@ func TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane(t *testing.T) 
 	postSwap := ctrl.Snapshot()
 	postFound := false
 	for _, r := range postSwap.Body.List.Rows {
-		if r.ResourceID == "bucket-carry-top" && r.Decorator == app.DecoratorError {
+		if r.ResourceID == "bucket-carry-top" && r.Color == "broken" {
 			postFound = true
 		}
 	}
 	if !postFound {
-		t.Error("bucket-carry-top's error decorator vanished after the silent swap — the row's previously-known WAVE-2 finding must be inherited, not silently dropped")
+		t.Error("bucket-carry-top's broken row color vanished after the silent swap — the row's previously-known WAVE-2 finding must be inherited, not silently dropped")
 	}
 
 	// Push a SECOND, independent s3 screen (stacked related-filtered list)
@@ -494,7 +501,7 @@ func TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane(t *testing.T) 
 	stackedFound := false
 	stackedRowCount := len(stackedPostSwap.Body.List.Rows)
 	for _, r := range stackedPostSwap.Body.List.Rows {
-		if r.ResourceID == "bucket-carry-stacked" && r.Decorator == app.DecoratorError {
+		if r.ResourceID == "bucket-carry-stacked" && r.Color == "broken" {
 			stackedFound = true
 		}
 		if r.ResourceID == "bucket-carry-top" {
@@ -505,7 +512,7 @@ func TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane(t *testing.T) 
 		t.Fatalf("stacked screen after its own silent swap has %d rows, want 1 (bucket-carry-stacked only)", stackedRowCount)
 	}
 	if !stackedFound {
-		t.Error("bucket-carry-stacked's error decorator vanished after ITS OWN silent swap on the stacked screen — per-screen findings carry must work independently on every screen, not just the top-level one")
+		t.Error("bucket-carry-stacked's broken row color vanished after ITS OWN silent swap on the stacked screen — per-screen findings carry must work independently on every screen, not just the top-level one")
 	}
 
 	// Pop back to the top-level screen: its own carried finding (from the
@@ -517,7 +524,7 @@ func TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane(t *testing.T) 
 	finalTopSnap := ctrl.Snapshot()
 	finalTopFound := false
 	for _, r := range finalTopSnap.Body.List.Rows {
-		if r.ResourceID == "bucket-carry-top" && r.Decorator == app.DecoratorError {
+		if r.ResourceID == "bucket-carry-top" && r.Color == "broken" {
 			finalTopFound = true
 		}
 	}

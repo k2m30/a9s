@@ -632,12 +632,20 @@ func TestPR03c_ECSTaskFetcher_RunningEmitsNoFinding(t *testing.T) {
 	}
 }
 
-// TestPR03c_ECSTaskFetcher_StoppedEmitsNoFinding asserts that a STOPPED ECS task
-// emits no Finding (lifecycle-terminal; structural Color reads stop_code directly).
+// TestPR03c_ECSTaskFetcher_StoppedUserInitiatedEmitsDimFinding pins the
+// CURRENT (correct) contract: a STOPPED ECS task with a normal
+// (UserInitiated) stop code emits exactly one SevDim Finding
+// (CodeECSTaskStateStopped), because colorECSTask is now
+// colorFromAnyFinding-first (internal/aws/catalog_compute.go) — it needs a
+// Finding to color from, not a bare stop_code Fields read.
 //
-// This is the same pattern as Lambda Inactive and EC2 shutting-down:
-// lifecycle-terminal states are NOT promoted to wave1 Findings.
-func TestPR03c_ECSTaskFetcher_StoppedEmitsNoFinding(t *testing.T) {
+// RETIRED the old "STOPPED emits no Finding" invariant this test used to pin
+// (TestPR03c_ECSTaskFetcher_StoppedEmitsNoFinding): that was the
+// pre-color-findings-conformance contract. ecsTaskStructuralFindings
+// (internal/aws/ecs_task_codes.go) now emits the Dim Finding for this
+// branch. See qa_color_findings_conformance_test.go for the standing
+// architectural gate.
+func TestPR03c_ECSTaskFetcher_StoppedUserInitiatedEmitsDimFinding(t *testing.T) {
 	taskARN := "arn:aws:ecs:us-east-1:000000000000:task/prod-cluster/b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5"
 	clusterARN := "arn:aws:ecs:us-east-1:000000000000:cluster/prod-cluster"
 	taskDefARN := "arn:aws:ecs:us-east-1:000000000000:task-definition/api:5"
@@ -668,9 +676,14 @@ func TestPR03c_ECSTaskFetcher_StoppedEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	// STOPPED is lifecycle-terminal — no wave1 Finding (stop_code handled structurally).
-	if len(r.Findings) != 0 {
-		t.Errorf("Findings: got %d, want 0 for STOPPED task (lifecycle-terminal; stop_code is structural)", len(r.Findings))
+	if len(r.Findings) != 1 {
+		t.Fatalf("Findings: got %d, want 1 for STOPPED/UserInitiated task (colorECSTask needs its own Finding to color from)", len(r.Findings))
+	}
+	if r.Findings[0].Code != "ecs-task.state.stopped" {
+		t.Errorf("Findings[0].Code = %q, want %q", r.Findings[0].Code, "ecs-task.state.stopped")
+	}
+	if r.Findings[0].Severity != domain.SevDim {
+		t.Errorf("Findings[0].Severity = %v, want domain.SevDim", r.Findings[0].Severity)
 	}
 }
 

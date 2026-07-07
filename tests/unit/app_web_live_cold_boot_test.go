@@ -231,6 +231,17 @@ func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testin
 	if vs.Body.Menu == nil {
 		t.Fatal("Handle(AvailabilityCacheLoaded) returned nil Body.Menu")
 	}
+
+	// Since commit 89f0f69d ("availability sweep waits for client
+	// readiness"), a disk-cache load against nil clients (this controller's
+	// state — newLiveWebStyleController never sets Clients) dispatches NO
+	// probe tasks; it only latches Session.AvailSweepPending. ClientsReady is
+	// what drains the first batch (fireNextAvailabilityProbes(4)) — mirror
+	// that real sequence here so the sweep this test's Refreshing assertion
+	// depends on is actually queued.
+	vs, readyTasks := ctrl.Handle(messages.ClientsReady{})
+	tasks = append(tasks, readyTasks...)
+
 	hasProbeTask := false
 	for _, tk := range tasks {
 		if tk.Key.Kind == runtime.TaskKindProbeAvailability {
@@ -239,7 +250,7 @@ func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testin
 		}
 	}
 	if !hasProbeTask {
-		t.Fatal("Handle(AvailabilityCacheLoaded) returned no TaskKindProbeAvailability tasks — the background sweep this test's Refreshing assertion depends on was never queued; test assumption broken")
+		t.Fatal("Handle(AvailabilityCacheLoaded)+Handle(ClientsReady) returned no TaskKindProbeAvailability tasks — the background sweep this test's Refreshing assertion depends on was never queued; test assumption broken")
 	}
 
 	if !vs.Body.Menu.Refreshing {

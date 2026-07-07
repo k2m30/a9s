@@ -439,50 +439,35 @@ func TestFetchRevealValue_NoRevealFetcher(t *testing.T) {
 // probeResourceAvailability — nil clients
 // ────────────────────────────────────────────────────────────────────────────
 
-// TestProbeResourceAvailability_NilClients verifies that with nil clients the
-// probe returns AvailabilityCheckedMsg{Err: non-nil}.
+// TestProbeResourceAvailability_NilClients pins the CURRENT (correct)
+// contract from commit 89f0f69d ("availability sweep waits for client
+// readiness — no probes against a nil transport"): with nil clients, an
+// AvailabilityCacheLoadedMsg{Expired:true} must NOT dispatch any probe
+// cmds at all — dispatching them would run every probe against a nil
+// transport and fail hard, permanently losing that probe for the session.
+// Instead, Session.AvailSweepPending is latched, and the next successful
+// ClientsReady drains the first batch (fireNextAvailabilityProbes(4)) once a
+// real transport exists.
+//
+// RETIRED the old "dispatches probe cmds, each erroring for nil clients"
+// invariant this test used to pin: that was the pre-89f0f69d contract, which
+// this same test's own race this commit fixes (the four resource types first
+// in resource.AllShortNames() were observed permanently losing their first
+// probe this way).
 func TestProbeResourceAvailability_NilClients(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel() // clients == nil
 
-	// Trigger probeResourceAvailability by sending AvailabilityCacheLoadedMsg{Expired: true}.
-	// The handler calls probeResourceAvailability for each resource type.
-	// We send it and execute the returned batch.
 	_, cmd := rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
 		Expired: true,
 	})
-	if cmd == nil {
-		t.Fatal("AvailabilityCacheLoadedMsg{Expired:true} should dispatch probe cmds")
+	if cmd != nil {
+		t.Errorf("AvailabilityCacheLoadedMsg{Expired:true} with nil clients must NOT dispatch probe cmds (would run against a nil transport); got non-nil cmd")
 	}
-	// Execute the batch — it should yield AvailabilityCheckedMsg{Err:...} for
-	// each type (nil clients guard).
-	msg := cmd()
-	switch v := msg.(type) {
-	case messages.AvailabilityChecked:
-		if v.Err == nil {
-			t.Error("AvailabilityCheckedMsg.Err should be non-nil for nil clients")
-		}
-	case tea.BatchMsg:
-		// Large batch of probes; at least one should be AvailabilityCheckedMsg.
-		found := false
-		for _, subCmd := range v {
-			if subCmd == nil {
-				continue
-			}
-			if sm, ok := subCmd().(messages.AvailabilityChecked); ok {
-				if sm.Err != nil {
-					found = true
-					break
-				}
-			}
-		}
-		if !found {
-			t.Log("batch probe: no AvailabilityCheckedMsg with Err found — may be zero registered types or all nil cmds")
-		}
-	default:
-		// Acceptable in environment where no resource types are registered.
-		t.Logf("probeResourceAvailability returned %T — acceptable", msg)
+
+	if !m.Core().Session().AvailSweepPending {
+		t.Error("Session.AvailSweepPending must be latched true so ClientsReady can drain the sweep once a real transport exists")
 	}
 }
 

@@ -324,8 +324,15 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 	if !ok {
 		t.Fatal("ListBody.Rows missing bucket-s1-1 after the fetch landed")
 	}
-	if row1.Decorator != app.DecoratorError {
-		t.Errorf("bucket-s1-1 Decorator = %q, want %q (error glyph for its finding)", row1.Decorator, app.DecoratorError)
+	// Since the color-findings-conformance wave, colorS3 is
+	// colorFromAnyFinding-only (internal/aws/catalog_databases.go) — a
+	// SevBroken Finding resolves the row's whole-row color to "broken"
+	// directly (resolveListDecoratorFull's DecoratorError glyph branch only
+	// fires when ResolveColor()==ColorHealthy; see internal/app/list_columns.go
+	// and .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
+	// ListRow.Color=="broken" is the stronger, correct check.
+	if row1.Color != "broken" {
+		t.Errorf("bucket-s1-1 Color = %q, want %q (broken row for its finding)", row1.Color, "broken")
 	}
 
 	// --- Step 4: apply wave-2 enrichment state (glyph-render seam;
@@ -446,8 +453,10 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 	if !ok {
 		t.Fatal("seeded ListBody.Rows missing bucket-s2-1")
 	}
-	if seededRow1.Decorator != app.DecoratorError {
-		t.Errorf("seeded bucket-s2-1 Decorator = %q, want %q — the persisted finding's glyph must show on the seeded (pre-verify) frame", seededRow1.Decorator, app.DecoratorError)
+	// colorS3 is colorFromAnyFinding-only (see the Scenario 1 comment above) —
+	// ListRow.Color=="broken" is the correct check, not the DecoratorError glyph.
+	if seededRow1.Color != "broken" {
+		t.Errorf("seeded bucket-s2-1 Color = %q, want %q — the persisted finding's row color must show on the seeded (pre-verify) frame", seededRow1.Color, "broken")
 	}
 
 	// Step 3: deliver the verify fetch with the SAME world.
@@ -466,8 +475,8 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 	if !ok {
 		t.Fatal("post-verify ListBody.Rows missing bucket-s2-1")
 	}
-	if row1.Decorator != app.DecoratorError {
-		t.Errorf("post-verify bucket-s2-1 Decorator = %q, want %q — glyph must never go absent across the swap", row1.Decorator, app.DecoratorError)
+	if row1.Color != "broken" {
+		t.Errorf("post-verify bucket-s2-1 Color = %q, want %q — the broken row color must never go absent across the swap", row1.Color, "broken")
 	}
 	if _, ok := findListRow(lbLoaded.Rows, "bucket-s2-2"); !ok {
 		t.Error("post-verify ListBody.Rows missing bucket-s2-2")
@@ -580,8 +589,10 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 	if !ok {
 		t.Fatal("seeded ListBody.Rows missing bucket-s3-resolved")
 	}
-	if resolvedSeeded.Decorator != app.DecoratorError {
-		t.Errorf("seeded (pre-verify) bucket-s3-resolved Decorator = %q, want %q — the OLD (still-broken) glyph must show before verification", resolvedSeeded.Decorator, app.DecoratorError)
+	// colorS3 is colorFromAnyFinding-only (see the Scenario 1 comment above) —
+	// ListRow.Color=="broken" is the correct check, not the DecoratorError glyph.
+	if resolvedSeeded.Color != "broken" {
+		t.Errorf("seeded (pre-verify) bucket-s3-resolved Color = %q, want %q — the OLD (still-broken) row color must show before verification", resolvedSeeded.Color, "broken")
 	}
 	if _, addedSeeded := findListRow(lb.Rows, "bucket-s3-added"); addedSeeded {
 		t.Error("seeded (pre-verify) ListBody.Rows contains bucket-s3-added — the NEW resource must not appear before the verify fetch lands")
@@ -616,15 +627,15 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 	if !ok {
 		t.Fatal("post-verify ListBody.Rows missing bucket-s3-resolved")
 	}
-	if resolvedAfter.Decorator == app.DecoratorError {
-		t.Error("post-verify bucket-s3-resolved Decorator is still an error glyph, want it gone — the finding was resolved")
+	if resolvedAfter.Color == "broken" {
+		t.Error("post-verify bucket-s3-resolved Color is still \"broken\", want it gone — the finding was resolved")
 	}
 	stableAfter, ok := findListRow(lbLoaded.Rows, "bucket-s3-stable")
 	if !ok {
 		t.Fatal("post-verify ListBody.Rows missing bucket-s3-stable")
 	}
-	if stableAfter.Decorator != app.DecoratorError {
-		t.Errorf("post-verify bucket-s3-stable Decorator = %q, want %q — the newly-broken finding's glyph must show", stableAfter.Decorator, app.DecoratorError)
+	if stableAfter.Color != "broken" {
+		t.Errorf("post-verify bucket-s3-stable Color = %q, want %q — the newly-broken finding's row color must show", stableAfter.Color, "broken")
 	}
 
 	// Step 4: menu count/issue badge reflect the new truth. Read via the

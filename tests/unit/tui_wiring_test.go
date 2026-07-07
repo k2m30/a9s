@@ -354,6 +354,23 @@ func TestWiring_ClientsReady_DemoMode_NoCache_SkipsAvailability(t *testing.T) {
 // AvailabilityCheckedMsg for every resource type. After the last one, verify
 // flash is cleared.
 
+// TestWiring_AvailabilityComplete_ClearsFlash walks the full probe cycle
+// after ClientsReady (commit 89f0f69d "availability sweep waits for client
+// readiness"): a disk-cache load with nil clients no longer dequeues ANY
+// probes upfront — it latches Session.AvailSweepPending instead, and
+// HandleClientsReady's drain (fireNextAvailabilityProbes(4)) is what
+// dequeues the first batch. Without a ClientsReady in between, the queue
+// starts at len(AllShortNames()) undiminished, so exactly
+// len(AllShortNames()) AvailabilityCheckedMsg only reaches AvailChecked==
+// AvailTotal with the queue NOT yet empty (each message that finds
+// len(AvailQueue)>0 dequeues one more and returns before reaching the
+// ClearFlash branch — see handleAvailabilityChecked's queue-then-total
+// check order in internal/runtime/handlers_availability.go) — one message
+// short of ever emitting ClearFlash. Sending ClientsReady first (dequeuing
+// 4) restores the real production sequence: the cache-loaded handler
+// dispatches nothing, ClientsReady dequeues 4, and exactly
+// len(AllShortNames()) AvailabilityCheckedMsg then drains the remaining
+// len(AllShortNames())-4 queue entries plus reaches the terminal branch.
 func TestWiring_AvailabilityComplete_ClearsFlash(t *testing.T) {
 	m := newRootSizedModel()
 
@@ -366,15 +383,22 @@ func TestWiring_AvailabilityComplete_ClearsFlash(t *testing.T) {
 		t.Fatal("flash should be visible before availability cycle")
 	}
 
-	// Send AvailabilityCacheLoadedMsg to build the queue and fire first 3 probes
+	// Send AvailabilityCacheLoadedMsg to build the queue. With nil clients
+	// (this model's state), no probes are dispatched yet — AvailSweepPending
+	// is latched instead.
 	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
 		Expired: true,
 	})
 
-	// Now drain the queue by sending AvailabilityCheckedMsg for all resource types.
-	// The queue was built from AllShortNames(). First 3 were dequeued by the cache
-	// loaded handler. Each AvailabilityCheckedMsg dequeues one more. So we need to
+	// ClientsReady drains the latched sweep's first batch of 4 — mirroring
+	// the real boot sequence where the disk-cache load races ahead of the
+	// AWS connect.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{})
+
+	// Now drain the queue by sending AvailabilityCheckedMsg for all resource
+	// types. The queue was built from AllShortNames() minus the 4 ClientsReady
+	// dequeued. Each AvailabilityCheckedMsg dequeues one more. So we need to
 	// send len(AllShortNames()) messages total to drain everything.
 	allNames := resource.AllShortNames()
 	var lastCmd tea.Cmd

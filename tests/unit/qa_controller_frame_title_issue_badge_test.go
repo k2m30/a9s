@@ -25,6 +25,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -33,17 +34,17 @@ import (
 // the same lifecycle-bucket convention proven in qa_frame_title_issues_test.go)
 // and the rest are "running" (healthy, not an issue).
 //
-// Both colorEC2 and colorEBS (internal/aws/catalog_compute.go) classify off
-// Fields["state"] — the ResourceTypeDef.LifecycleKey default (internal/catalog/
-// types.go ResolveColor) — NOT Fields["status"], so the fixture must key off
-// "state" to actually land in the Warning/Broken bucket that produces an issue
-// count. colorEC2's "stopped" case returns ColorWarning (or ColorBroken when
-// state_reason_code has a "Server." prefix, which this fixture leaves unset),
-// and colorEBS has no "stopped" case, falling through to its default branch
-// (ColorHealthy) — so "stopped" only works as the issue-state for ec2. The
-// TestController_ListFrameTitle_IssueBadge_ChildList_Unconditional test below
-// exercises an "ebs" child list, so it must use an ebs-specific issue state
-// ("error", which colorEBS maps to ColorBroken).
+// colorEBS (internal/aws/catalog_compute.go) still classifies off
+// Fields["state"] via a raw-field fallback. colorEC2, since the
+// color-findings-conformance wave, is colorFromAnyFinding-only (no raw-field
+// fallback at all) — so the ec2 "stopped" issue rows here also carry the
+// wave1 Finding the real fetcher (internal/aws/ec2.go) attaches for a
+// user-initiated stop (CodeEC2StateStopped, SevWarn), matching colorEC2's
+// current mechanism. colorEBS has no "stopped" case, falling through to its
+// default branch (ColorHealthy) — so "stopped" only works as the issue-state
+// for ec2. The TestController_ListFrameTitle_IssueBadge_ChildList_Unconditional
+// test below exercises an "ebs" child list, so it must use an ebs-specific
+// issue state ("error", which colorEBS maps to ColorBroken via Fields).
 func controllerIssueResources(n, wantIssues int) []resource.Resource {
 	return controllerIssueResourcesWithState(n, wantIssues, "running", "stopped")
 }
@@ -51,18 +52,28 @@ func controllerIssueResources(n, wantIssues int) []resource.Resource {
 // controllerIssueResourcesWithState is like controllerIssueResources but lets
 // the caller supply the type-specific healthy/issue lifecycle-state values,
 // since the Warning/Broken state vocabulary differs per resource type's Color
-// func (see colorEC2 vs colorEBS in internal/aws/catalog_compute.go).
+// func (see colorEC2 vs colorEBS in internal/aws/catalog_compute.go). When
+// issueState is ec2's "stopped" value, the matching wave1 Finding
+// (CodeEC2StateStopped, SevWarn) is attached too, since colorEC2 no longer
+// reads Fields["state"] directly.
 func controllerIssueResourcesWithState(n, wantIssues int, healthyState, issueState string) []resource.Resource {
 	res := make([]resource.Resource, n)
 	for i := range n {
 		state := healthyState
+		var findings []domain.Finding
 		if i < wantIssues {
 			state = issueState
+			if issueState == "stopped" {
+				findings = []domain.Finding{
+					{Code: "ec2.state.stopped", Phrase: "stopped", Severity: domain.SevWarn, Source: "wave1"},
+				}
+			}
 		}
 		res[i] = resource.Resource{
-			ID:     "i-" + itoaPad(i),
-			Name:   "controller-badge-" + itoaPad(i),
-			Fields: map[string]string{"state": state},
+			ID:       "i-" + itoaPad(i),
+			Name:     "controller-badge-" + itoaPad(i),
+			Fields:   map[string]string{"state": state},
+			Findings: findings,
 		}
 	}
 	return res

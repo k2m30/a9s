@@ -540,11 +540,14 @@ func TestStage2Pin_DEF15_ObservedEmptyProbe_BeatsStaleDiskRows(t *testing.T) {
 // -----------------------------------------------------------------------
 
 // handCountDistinctIssueRows returns the count of rows carrying at least one
-// finding — the same "distinct resource IDs with >=1 issue" definition
-// unifiedIssueCount documents (handlers_availability.go:685), computed here
-// independently over a caller-supplied row set rather than by calling
-// unifiedIssueCount itself, so this test does not just re-assert the
-// production function against its own output.
+// finding — a faithful hand-count only when every finding in the row set is
+// domain.SevBroken. unifiedIssueCount's wave2 contribution
+// (handlers_availability.go:701-708) counts a finding toward the badge ONLY
+// at SevBroken; a SevWarn-only row set would make this helper overcount
+// relative to the production aggregation (see TestUnifiedIssueCount_
+// IgnoresTildeSeverityFindings). Callers must seed SevBroken findings for
+// this helper's count to remain a real cross-check rather than diverging
+// from the enforced contract.
 func handCountDistinctIssueRows(rows []resource.Resource) int {
 	n := 0
 	for _, r := range rows {
@@ -578,6 +581,11 @@ func handCountDistinctIssueRows(rows []resource.Resource) int {
 func TestStage2Pin_IssueCountParity_MenuBadgeMatchesStoreRowAggregation(t *testing.T) {
 	s, _, c := newStage2PinTestController(t)
 
+	// Fields carry state "stopped"/"running" for realism only — colorEC2
+	// derives entirely from r.Findings (colorFromAnyFinding), never
+	// r.Fields["state"], so wave1 alone contributes zero issue-colored rows
+	// here; the whole badge count below comes from the wave2 SevBroken
+	// findings seeded further down.
 	seed := []resource.Resource{
 		{ID: "i-0issuerow0001", Name: "issue-row-1", Type: stage2PinType, Fields: map[string]string{"state": "stopped"}},
 		{ID: "i-0issuerow0002", Name: "issue-row-2", Type: stage2PinType, Fields: map[string]string{"state": "stopped"}},
@@ -595,8 +603,8 @@ func TestStage2Pin_IssueCountParity_MenuBadgeMatchesStoreRowAggregation(t *testi
 	}
 
 	findings := map[string]domain.Finding{
-		"i-0issuerow0001": {Code: "ec2-stopped-has-eip", Phrase: "stopped, has EIP", Severity: domain.SevWarn, Source: "wave2:ec2"},
-		"i-0issuerow0002": {Code: "ec2-stopped-has-eip", Phrase: "stopped, has EIP", Severity: domain.SevWarn, Source: "wave2:ec2"},
+		"i-0issuerow0001": {Code: "ec2-stopped-has-eip", Phrase: "stopped, has EIP", Severity: domain.SevBroken, Source: "wave2:ec2"},
+		"i-0issuerow0002": {Code: "ec2-stopped-has-eip", Phrase: "stopped, has EIP", Severity: domain.SevBroken, Source: "wave2:ec2"},
 	}
 	_, _ = c.Handle(messages.EnrichmentChecked{
 		ResourceType: stage2PinType,

@@ -856,19 +856,20 @@ func TestViews_ListColor_ECSInactiveIsBroken(t *testing.T) {
 // (CR finding #3)
 // ---------------------------------------------------------------------------
 
-// TestViews_IssueCount_FallbackUsesTypeResolveColor pins that the empty-Findings
-// fallback in IssueCount uses td.ResolveColor(r) (which reads full Fields), not
-// the coarser FallbackColor(r.Fields["status"]).
+// TestViews_IssueCount_UsesTypeResolveColor pins that IssueCount() derives
+// from td.ResolveColor(r), not the coarser FallbackColor(r.Fields["status"]).
 //
-// Setup: EC2 type def; resource has Status="" (FallbackColor → ColorHealthy) but
-// Fields["state"]="stopped" and Fields["state_reason_code"]="Server.InternalError"
-// (AWS forced stop). td.ResolveColor reads Fields and returns ColorBroken.
-//
-// Pre-fix: IssueCount fallback calls FallbackColor("") → ColorHealthy →
-// IsIssue()=false → count=0 → FAIL.
-// Post-fix: IssueCount fallback calls td.ResolveColor(r) → reads Fields →
-// ColorBroken → IsIssue()=true → count=1 → PASS.
-func TestViews_IssueCount_FallbackUsesTypeResolveColor(t *testing.T) {
+// RETIRED the old "empty-Findings fallback" framing this test used to pin
+// (TestViews_IssueCount_FallbackUsesTypeResolveColor): since the
+// color-findings-conformance wave, colorEC2 is colorFromAnyFinding-only
+// (internal/aws/catalog_compute.go, no raw-field fallback at all), so
+// Findings=nil no longer "forces a Fields-reading fallback path" — it simply
+// yields ColorHealthy. The resource here instead carries the Finding the
+// real fetcher (internal/aws/ec2.go) attaches for a Server.*-forced stop
+// (CodeEC2StateStoppedServer, SevBroken), which is what td.ResolveColor
+// actually reads now. See qa_color_findings_conformance_test.go for the
+// standing architectural gate.
+func TestViews_IssueCount_UsesTypeResolveColor(t *testing.T) {
 	ensureNoColor(t)
 
 	td := resource.FindResourceType("ec2")
@@ -876,39 +877,41 @@ func TestViews_IssueCount_FallbackUsesTypeResolveColor(t *testing.T) {
 		t.Fatal("ec2 type def not registered — update short name if it changed")
 	}
 
+	stoppedServerFinding := []domain.Finding{
+		{Code: "ec2.state.stopped.server", Phrase: "stopped", Severity: domain.SevBroken, Source: "wave1"},
+	}
+
 	// Confirm the invariant: ec2 Color func must return ColorBroken for a stopped
-	// instance with a Server.* state_reason_code.
+	// instance carrying the Server.*-forced-stop Finding.
 	brokenProbe := resource.Resource{
-		ID:     "i-probe",
-		Name:   "probe",
+		ID:   "i-probe",
+		Name: "probe",
 		Fields: map[string]string{
 			"state":             "stopped",
 			"state_reason_code": "Server.InternalError",
 		},
+		Findings: stoppedServerFinding,
 	}
 	if got := td.ResolveColor(brokenProbe); got != resource.ColorBroken {
 		t.Fatalf("precondition: ec2.ResolveColor for stopped/Server.InternalError = %v, want ColorBroken; "+
-			"update Fields if the type def changed", got)
+			"update Findings if the type def changed", got)
 	}
 
 	r := resource.Resource{
 		ID:   "i-server-stopped",
 		Name: "server-stopped-instance",
-		// Status is deliberately empty so FallbackColor("") → ColorHealthy.
-		// td.ResolveColor reads Fields["state"]="stopped" + Server.* reason → ColorBroken.
 		Fields: map[string]string{
 			"state":             "stopped",
 			"state_reason_code": "Server.InternalError",
 		},
-		// Findings=nil forces the fallback path: IssueCount must use td.ResolveColor.
-		Findings: nil,
+		Findings: stoppedServerFinding,
 	}
 
 	m := loadList(*td, []resource.Resource{r})
 	got := m.IssueCount()
 
 	if got != 1 {
-		t.Errorf("IssueCount() = %d, want 1 (td.ResolveColor reads Fields and returns ColorBroken for "+
-			"stopped/Server.InternalError; pre-fix value is 0 because FallbackColor(\"\") = ColorHealthy)", got)
+		t.Errorf("IssueCount() = %d, want 1 (td.ResolveColor derives ColorBroken from the "+
+			"Server.*-forced-stop Finding)", got)
 	}
 }

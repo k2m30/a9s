@@ -992,6 +992,17 @@ func (m *pr03bEBSSnapMock) DescribeSnapshots(
 //
 // Pre-fix: Color returns ColorWarning (wave1 SevWarn early-return).
 // Post-fix: Color evaluates structural broken overrides BEFORE wave1.
+// TestPR03b_LambdaColor_BrokenOverridesWave1 pins that a higher-precedence
+// Broken signal wins over a lower-precedence Warn one.
+//
+// Since the color-findings-conformance wave, colorLambda is
+// colorFromAnyFinding-only (no raw-field fallback) — the real fetcher
+// (internal/aws/lambda.go) enforces precedence itself via a single switch
+// that emits exactly ONE Finding (last-update-failed > deprecated-runtime >
+// lifecycle state > no-DLQ), so "deprecated runtime overrides wave1 SevWarn"
+// is now pinned by attaching the CodeLambdaDeprecatedRuntime /
+// CodeLambdaLastUpdateFailed Finding the real fetcher would have chosen,
+// not by a bare Fields read.
 func TestPR03b_LambdaColor_BrokenOverridesWave1(t *testing.T) {
 	td := resource.FindResourceType("lambda")
 	if td == nil {
@@ -1001,8 +1012,10 @@ func TestPR03b_LambdaColor_BrokenOverridesWave1(t *testing.T) {
 	// Inactive function with deprecated runtime → must be Broken (deprecated wins).
 	r := resource.Resource{
 		Type: "lambda",
-		Findings: []domain.Finding{{Code: awsclient.CodeLambdaStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}},
-		Fields:   map[string]string{"state": "Inactive", "runtime": "python3.7"},
+		Findings: []domain.Finding{
+			{Code: awsclient.CodeLambdaDeprecatedRuntime, Phrase: "runtime is end-of-life", Severity: domain.SevBroken, Source: "wave1"},
+		},
+		Fields: map[string]string{"state": "Inactive", "runtime": "python3.7"},
 	}
 	if got := td.Color(r); got != resource.ColorBroken {
 		t.Errorf("inactive + deprecated runtime: Color = %v, want ColorBroken (deprecated runtime overrides wave1 SevWarn)", got)
@@ -1011,8 +1024,10 @@ func TestPR03b_LambdaColor_BrokenOverridesWave1(t *testing.T) {
 	// Pending function with last_update_status=Failed → must be Broken.
 	r2 := resource.Resource{
 		Type: "lambda",
-		Findings: []domain.Finding{{Code: awsclient.CodeLambdaStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}},
-		Fields:   map[string]string{"state": "Pending", "last_update_status": "Failed"},
+		Findings: []domain.Finding{
+			{Code: awsclient.CodeLambdaLastUpdateFailed, Phrase: "last update failed to apply", Severity: domain.SevBroken, Source: "wave1"},
+		},
+		Fields: map[string]string{"state": "Pending", "last_update_status": "Failed"},
 	}
 	if got := td.Color(r2); got != resource.ColorBroken {
 		t.Errorf("pending + last_update_status=Failed: Color = %v, want ColorBroken", got)
@@ -1102,22 +1117,30 @@ func TestPR03b_ENIFetcher_AvailableNonRequesterEmitsFinding(t *testing.T) {
 	}
 }
 
-// TestPR03b_EBFetcher_DoesNotEmitHealthAsWave1Finding asserts that the EB fetcher
-// does NOT emit wave1 Findings for health values (Yellow, Red, Grey). Health
-// classification stays structural via the Color func reading Fields["health"].
+// TestPR03b_EBFetcher_EmitsHealthAsWave1Finding pins the CURRENT (correct)
+// contract: the EB fetcher DOES emit a wave1 Finding for Yellow/Red/Grey
+// health, because colorEB is now colorFromAnyFinding-first
+// (internal/aws/catalog_compute.go) — it needs a Finding to color from, not
+// a bare Fields["health"] read.
 //
-// Pre-fix: FetchEBEnvironmentsPage emits wave1 Findings for Yellow/Red/Grey health,
-// causing the status column to show "health degraded" instead of the operational status.
-// Post-fix: r.Findings is empty; r.Fields["health"] carries the raw health value.
-func TestPR03b_EBFetcher_DoesNotEmitHealthAsWave1Finding(t *testing.T) {
+// RETIRED the old "must not emit health as wave1 Finding" invariant this
+// test used to pin (TestPR03b_EBFetcher_DoesNotEmitHealthAsWave1Finding):
+// that was the pre-color-findings-conformance contract (structural-only
+// Color classification). Since ebEnvironmentFindings (internal/aws/eb_codes.go)
+// was added to mirror colorEB's own precedence, emitting the health Finding
+// is the correct, current behavior — see
+// qa_color_findings_conformance_test.go for the standing architectural gate.
+func TestPR03b_EBFetcher_EmitsHealthAsWave1Finding(t *testing.T) {
 	cases := []struct {
-		name   string
-		health ebtypes.EnvironmentHealth
-		status ebtypes.EnvironmentStatus
+		name         string
+		health       ebtypes.EnvironmentHealth
+		status       ebtypes.EnvironmentStatus
+		wantCode     domain.FindingCode
+		wantSeverity domain.Severity
 	}{
-		{"Yellow", ebtypes.EnvironmentHealthYellow, ebtypes.EnvironmentStatusReady},
-		{"Red", ebtypes.EnvironmentHealthRed, ebtypes.EnvironmentStatusReady},
-		{"Grey", ebtypes.EnvironmentHealthGrey, ebtypes.EnvironmentStatusUpdating},
+		{"Yellow", ebtypes.EnvironmentHealthYellow, ebtypes.EnvironmentStatusReady, awsclient.CodeEBHealthYellow, domain.SevWarn},
+		{"Red", ebtypes.EnvironmentHealthRed, ebtypes.EnvironmentStatusReady, awsclient.CodeEBHealthRed, domain.SevBroken},
+		{"Grey", ebtypes.EnvironmentHealthGrey, ebtypes.EnvironmentStatusUpdating, awsclient.CodeEBHealthGrey, domain.SevWarn},
 	}
 
 	for _, tc := range cases {
@@ -1144,12 +1167,20 @@ func TestPR03b_EBFetcher_DoesNotEmitHealthAsWave1Finding(t *testing.T) {
 			}
 			r := result.Resources[0]
 
-			// Health is structural, not wave1 — fetcher must not emit Findings for health.
-			if len(r.Findings) != 0 {
-				t.Errorf("health=%s: Findings: got %d, want 0 (health must not be emitted as wave1 Finding)", tc.name, len(r.Findings))
+			if len(r.Findings) != 1 {
+				t.Fatalf("health=%s: Findings: got %d, want 1 (colorEB needs its own Finding to color from)", tc.name, len(r.Findings))
 			}
-			// Fetcher must not write Status.
-			// Fields["health"] must carry the raw health value for structural Color classification.
+			if r.Findings[0].Code != tc.wantCode {
+				t.Errorf("health=%s: Findings[0].Code = %q, want %q", tc.name, r.Findings[0].Code, tc.wantCode)
+			}
+			if r.Findings[0].Severity != tc.wantSeverity {
+				t.Errorf("health=%s: Findings[0].Severity = %v, want %v", tc.name, r.Findings[0].Severity, tc.wantSeverity)
+			}
+			if r.Findings[0].Source != "wave1" {
+				t.Errorf("health=%s: Findings[0].Source = %q, want wave1", tc.name, r.Findings[0].Source)
+			}
+			// Fields["health"] must still carry the raw health value (kept for
+			// realism/detail rendering; Color no longer reads it directly).
 			if r.Fields["health"] != tc.name {
 				t.Errorf("health=%s: Fields[\"health\"]: got %q, want %q", tc.name, r.Fields["health"], tc.name)
 			}

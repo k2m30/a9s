@@ -683,3 +683,211 @@ func checkCellStyleGate(
 		)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// EXTENSION: no vacuous severity-word phrase.
+//
+// A cause text that is ITSELF just the bare word "error", "warning", or
+// "issue" tells the operator nothing they didn't already know from the row's
+// color — the whole point of a cause text (S4 phrase / status cell /
+// Attention row) is to say WHY, not to restate THAT something is wrong.
+// "error: volume unusable" passes (it says why); a bare "error" does not.
+// This is a WHOLE-STRING exact-match check (case-insensitive), not a
+// substring scan — a phrase merely containing one of these words as part of
+// a real sentence is not a violation.
+// ---------------------------------------------------------------------------
+
+// vacuousPhraseWords are whole cause-text values that carry no information
+// beyond "something is wrong" — the row's color already says that. Matched
+// exact (case-insensitive, whitespace-trimmed), never as a substring.
+var vacuousPhraseWords = map[string]bool{ //nolint:gochecknoglobals // static exact-match set, mirrors this file's other allowlist style
+	"attention": true, "danger": true, "warning": true, "warn": true,
+	"error": true, "issue": true, "problem": true, "critical": true,
+	"alert": true, "bad": true, "unhealthy": true,
+}
+
+// isVacuousPhrase reports whether text, trimmed and lowercased, exactly
+// equals one of vacuousPhraseWords — never a substring/prefix match, so
+// "error: volume unusable" and "critical alarm silenced" both pass.
+func isVacuousPhrase(text string) bool {
+	return vacuousPhraseWords[strings.ToLower(strings.TrimSpace(text))]
+}
+
+// vacuousPhraseAllowlist pins today's known vacuous-phrase violations — same
+// burn-down contract as styleGateAllowlist/knownVisibilityGaps: present +
+// still violating today -> skip (pre-existing debt); present + no longer
+// violating -> FAIL ("remove from allowlist"); a violation NOT present here
+// -> FAIL unconditionally (a new regression the allowlist was never told
+// about).
+//
+// Key shape for the catalog sweep: "phrase:<shortName>:<FindingCode>".
+// Key shape for the rendered sweep: "rendered:<shortName>:<resourceID>:<surface>"
+// where surface is "list-status" or "detail-attention[N]".
+//
+// Target: EMPTY. ct-events phrases (ct-danger/ct-attention/ct-info status
+// values) were already fixed by the same wave that landed
+// domain.HumanizeStatusPhrase and are NOT bare vacuous words (they carry the
+// "ct-" event-classification prefix, not a standalone severity word) — this
+// gate is expected green against them without needing an entry here.
+//
+// SEEDED 2026-07-07 (this gate's first run): four catalog FindingDef.Phrase
+// literals are the bare word "error"/"unhealthy" with no cause text at all —
+// all four are production-owned classifier literals
+// (internal/aws/ebs.go/ebs_snap state-error branches, ecs_task_codes.go's
+// health-unhealthy branch, efs.go's error branch), not test fixtures, so
+// fixing them is out of QA's write scope. Three of the four also surface on
+// the rendered list-status column via a real demo fixture (efs's "error"
+// finding never becomes the sole/first Finding on any current efs fixture,
+// so it produces no rendered hit today).
+var vacuousPhraseAllowlist = map[string]string{ //nolint:gochecknoglobals // burn-down allowlist, see doc comment
+	"phrase:ebs:ebs.state.error":                             "colorEBS's state=error branch (internal/aws/ebs.go) sets Phrase: \"error\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix (e.g. \"error: volume unusable\").",
+	"phrase:ebs-snap:ebs-snap.state.error":                   "colorEBSSnap's state=error branch (internal/aws/ebs.go) sets Phrase: \"error\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix.",
+	"phrase:ecs-task:ecs-task.health.unhealthy":              "ecsTaskStructuralFindings' health-check branch (internal/aws/ecs_task_codes.go) sets Phrase: \"unhealthy\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix (e.g. \"unhealthy: container health check failing\").",
+	"phrase:efs:efs.broken.error":                            "EFS's error branch (internal/aws/efs.go) sets Phrase: \"error\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix.",
+	"rendered:ebs:vol-0error00000000b2:list-status":          "same production gap as phrase:ebs:ebs.state.error — the demo fixture's rendered list-status cell shows the bare literal verbatim; fixing the FindingDef.Phrase fixes this row too.",
+	"rendered:ebs-snap:snap-error000000000b:list-status":     "same production gap as phrase:ebs-snap:ebs-snap.state.error — the demo fixture's rendered list-status cell shows the bare literal verbatim; fixing the FindingDef.Phrase fixes this row too.",
+	"rendered:ecs-task:a7b8c9d0e1f2a7b8c9d0e1f2:list-status": "same production gap as phrase:ecs-task:ecs-task.health.unhealthy — the demo fixture's rendered list-status cell shows the bare literal verbatim; fixing the FindingDef.Phrase fixes this row too.",
+}
+
+// TestIssueTextStyleGate_CatalogPhrasesNeverVacuous sweeps every registered
+// FindingDef.Phrase and asserts it is never itself just a bare severity word
+// (isVacuousPhrase) — the declarative-literal half of the vacuous-phrase
+// rule, mirroring TestIssueTextStyleGate_CatalogPhrasesNeverRawEnum's
+// structure exactly.
+func TestIssueTextStyleGate_CatalogPhrasesNeverVacuous(t *testing.T) {
+	types := resource.AllResourceTypes()
+	sort.Slice(types, func(i, j int) bool { return types[i].ShortName < types[j].ShortName })
+
+	var newlyRegressed []string
+	var readyForBurnDown []string
+	var stillGapped []string
+
+	for _, td := range types {
+		for _, fd := range td.Findings {
+			key := fmt.Sprintf("phrase:%s:%s", td.ShortName, fd.Code)
+			testName := fmt.Sprintf("%s/%s", td.ShortName, fd.Code)
+
+			t.Run(testName, func(t *testing.T) {
+				violating := isVacuousPhrase(fd.Phrase)
+				reason, allowlisted := vacuousPhraseAllowlist[key]
+
+				switch {
+				case !violating && allowlisted:
+					readyForBurnDown = append(readyForBurnDown, key)
+					t.Errorf("BURN-DOWN: %s now conforms (Phrase %q is no longer vacuous) but is still allowlisted (%s) — remove %q from vacuousPhraseAllowlist", key, fd.Phrase, reason, key)
+				case violating && allowlisted:
+					stillGapped = append(stillGapped, key)
+					t.Skipf("KNOWN GAP (allowlisted): %s Phrase %q: %s", key, fd.Phrase, reason)
+				case violating:
+					newlyRegressed = append(newlyRegressed, key)
+					t.Errorf(
+						"NEW VIOLATION (not allowlisted): %s: FindingDef.Phrase %q is a bare vacuous severity word — "+
+							"it must say WHY, not just restate that something is wrong (the row's color already does "+
+							"that). If this is pre-existing debt, add %q to vacuousPhraseAllowlist naming the exact "+
+							"reason it cannot be fixed in this wave.",
+						key, fd.Phrase, key,
+					)
+				}
+			})
+		}
+	}
+
+	if len(newlyRegressed) > 0 {
+		t.Logf("NEW VIOLATION INVENTORY (%d): %v", len(newlyRegressed), newlyRegressed)
+	}
+	if len(readyForBurnDown) > 0 {
+		t.Logf("READY-FOR-BURN-DOWN INVENTORY (%d): %v", len(readyForBurnDown), readyForBurnDown)
+	}
+	if len(stillGapped) > 0 {
+		t.Logf("STILL-GAPPED (allowlisted, skipped) INVENTORY (%d): %v", len(stillGapped), stillGapped)
+	}
+}
+
+// TestIssueTextStyleGate_RenderedSurfacesNeverVacuous drives the same
+// demo-fixture-drain-plus-real-Controller harness as
+// TestIssueTextStyleGate_RenderedSurfacesNeverRawEnum and asserts that
+// neither the list Status cell nor any detail Attention row value is ever
+// itself just a bare vacuous severity word — the render-pipeline half of the
+// vacuous-phrase rule.
+func TestIssueTextStyleGate_RenderedSurfacesNeverVacuous(t *testing.T) {
+	byType, cache := buildVisibilityTypeCache(t)
+	demoClients := demo.NewServiceClients()
+
+	types := resource.AllResourceTypes()
+	sort.Slice(types, func(i, j int) bool { return types[i].ShortName < types[j].ShortName })
+
+	var newlyRegressed []string
+	var readyForBurnDown []string
+	var stillGapped []string
+
+	for _, td := range types {
+		fixtures := byType[td.ShortName]
+		if len(fixtures) == 0 {
+			continue
+		}
+
+		merged := mergeWave2Findings(t, td, fixtures, cache, demoClients)
+
+		for _, res := range merged {
+			testName := fmt.Sprintf("%s/%s", td.ShortName, res.ID)
+
+			t.Run(testName, func(t *testing.T) {
+				statusCell, _ := listStatusCellFor(t, td, merged, res.ID)
+				checkVacuousPhraseSurface(t, td.ShortName, res.ID, "list-status", statusCell,
+					isVacuousPhrase(statusCell), &newlyRegressed, &readyForBurnDown, &stillGapped)
+
+				attentionValues := detailAttentionValuesFor(t, res, td.ShortName)
+				for i, v := range attentionValues {
+					if !isVacuousPhrase(v) {
+						continue
+					}
+					surface := fmt.Sprintf("detail-attention[%d]", i)
+					checkVacuousPhraseSurface(t, td.ShortName, res.ID, surface, v,
+						true, &newlyRegressed, &readyForBurnDown, &stillGapped)
+				}
+			})
+		}
+	}
+
+	if len(newlyRegressed) > 0 {
+		t.Logf("NEW VIOLATION INVENTORY (%d): %v", len(newlyRegressed), newlyRegressed)
+	}
+	if len(readyForBurnDown) > 0 {
+		t.Logf("READY-FOR-BURN-DOWN INVENTORY (%d): %v", len(readyForBurnDown), readyForBurnDown)
+	}
+	if len(stillGapped) > 0 {
+		t.Logf("STILL-GAPPED (allowlisted, skipped) INVENTORY (%d): %v", len(stillGapped), stillGapped)
+	}
+}
+
+// checkVacuousPhraseSurface applies the shared ratchet decision (identical
+// contract to checkStyleGateSurface) for one (shortName, resourceID, surface)
+// triple already known to be a bare vacuous severity word.
+func checkVacuousPhraseSurface(
+	t *testing.T,
+	shortName, resourceID, surface, text string,
+	violating bool,
+	newlyRegressed, readyForBurnDown, stillGapped *[]string,
+) {
+	t.Helper()
+	key := fmt.Sprintf("rendered:%s:%s:%s", shortName, resourceID, surface)
+	reason, allowlisted := vacuousPhraseAllowlist[key]
+
+	switch {
+	case !violating && allowlisted:
+		*readyForBurnDown = append(*readyForBurnDown, key)
+		t.Errorf("BURN-DOWN: %s now conforms (%s=%q is no longer vacuous) but is still allowlisted (%s) — remove %q from vacuousPhraseAllowlist", key, surface, text, reason, key)
+	case violating && allowlisted:
+		*stillGapped = append(*stillGapped, key)
+		t.Skipf("KNOWN GAP (allowlisted): %s %s=%q: %s", key, surface, text, reason)
+	case violating:
+		*newlyRegressed = append(*newlyRegressed, key)
+		t.Errorf(
+			"NEW VIOLATION (not allowlisted): %s: %s=%q for resource %q (type=%s) is a bare vacuous severity word — "+
+				"it must say WHY, not just restate that something is wrong (the row's color already does that). "+
+				"If this is pre-existing debt, add %q to vacuousPhraseAllowlist naming the exact reason it cannot "+
+				"be fixed in this wave.",
+			key, surface, text, resourceID, shortName, key,
+		)
+	}
+}
