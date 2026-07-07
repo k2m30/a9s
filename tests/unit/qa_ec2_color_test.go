@@ -10,6 +10,15 @@ package unit
 // real Wave-2 enricher (internal/aws/ec2_issue_enrichment.go, Source
 // "wave2:ec2") would produce. Fields are kept for realism/context only —
 // they are no longer read by Color.
+//
+// colorEC2 is a bare `colorFromAnyFinding(r) or ColorHealthy` — it does not
+// branch on finding Code, only on Severity and Source-prefix ("wave1" or
+// "wave2:"). One representative case per severity tier (plus the no-finding
+// Healthy anchor) exercises every branch colorEC2 can take, and one wave2:ec2
+// case pins the Source-prefix acceptance (a bug class where a finding with
+// the wrong Source string is silently dropped from color resolution).
+// Per-state wave1-emission mapping (which AWS state produces which code) is
+// pinned at the fetcher layer, not here.
 
 import (
 	"testing"
@@ -42,34 +51,6 @@ func TestEc2Color(t *testing.T) {
 			fields: map[string]string{"state": "pending"},
 			findings: []domain.Finding{
 				{Code: "ec2.state.pending", Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
-			},
-			want: resource.ColorWarning,
-		},
-		{
-			// Stopping instance — transitional, not broken.
-			name:   "stopping",
-			fields: map[string]string{"state": "stopping"},
-			findings: []domain.Finding{
-				{Code: "ec2.state.stopping", Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"},
-			},
-			want: resource.ColorWarning,
-		},
-		{
-			// Shutting-down instance — transitional, not terminal.
-			name:   "shutting_down",
-			fields: map[string]string{"state": "shutting-down"},
-			findings: []domain.Finding{
-				{Code: "ec2.state.shutting-down", Phrase: "shutting down", Severity: domain.SevWarn, Source: "wave1"},
-			},
-			want: resource.ColorWarning,
-		},
-		{
-			// Stopped instance — user-initiated stop. Warning, not Broken
-			// (intentional shutdown should not fire an alert).
-			name:   "stopped_intentional",
-			fields: map[string]string{"state": "stopped"},
-			findings: []domain.Finding{
-				{Code: "ec2.state.stopped", Phrase: "stopped", Severity: domain.SevWarn, Source: "wave1"},
 			},
 			want: resource.ColorWarning,
 		},
@@ -113,47 +94,6 @@ func TestEc2Color(t *testing.T) {
 				},
 			},
 			want: resource.ColorBroken,
-		},
-		{
-			// Running instance with impaired system status check (Wave 2
-			// enricher, Source "wave2:ec2"). Must override the healthy state color.
-			name: "system_impaired",
-			fields: map[string]string{
-				"state":           "running",
-				"system_status":   "impaired",
-				"instance_status": "ok",
-			},
-			findings: []domain.Finding{
-				{
-					Code: "ec2.instance-status-impaired", Phrase: "impaired: system checks failing",
-					Severity: domain.SevBroken, Source: "wave2:ec2",
-				},
-			},
-			want: resource.ColorBroken,
-		},
-		{
-			// Running instance with initializing status checks — transitional,
-			// not broken; Wave 2 enricher emits SevWarn for "initializing".
-			name: "initializing_status",
-			fields: map[string]string{
-				"state":           "running",
-				"system_status":   "initializing",
-				"instance_status": "initializing",
-			},
-			findings: []domain.Finding{
-				{
-					Code: "ec2.instance-status-impaired", Phrase: "initializing: checks in progress",
-					Severity: domain.SevWarn, Source: "wave2:ec2",
-				},
-			},
-			want: resource.ColorWarning,
-		},
-		{
-			// Empty state field, no Findings — falls through to Healthy (the only
-			// fallback colorEC2 has left).
-			name:   "empty_state",
-			fields: map[string]string{"state": ""},
-			want:   resource.ColorHealthy,
 		},
 	}
 

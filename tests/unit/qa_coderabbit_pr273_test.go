@@ -2,30 +2,34 @@ package unit
 
 // qa_coderabbit_pr273_test.go — regression pins for CodeRabbit PR #273 review findings.
 //
-// Each test currently FAILS against HEAD (pins a real bug, not a verified fix).
-// Do NOT modify production code to make these pass — production fixes belong in
-// separate commits that also delete or update the failing test here.
+// Covered items still pinned here (skipped items were already fixed in prior
+// commits, and Items 1/2/3/4/5/14's dedicated pins were retired once the
+// per-type qa_<type>_color_test.go files and the qa_coderabbit_pr273_all_types_test.go
+// typeContracts table converged on the same coverage):
 //
-// Covered items (skipped items were already fixed in prior commits):
-//
-//   Item 1:  EKS Node Groups (ng) — AlwaysHealthy=true suppresses real lifecycle states
-//            (CREATING/UPDATING/DELETING → Warning; CREATE_FAILED/DEGRADED → Broken).
-//   Item 4:  VPC Endpoints (vpce) and Transit Gateways (tgw) — AlwaysHealthy=true is
-//            wrong for types with stateful lifecycle (pending/failed/deleting).
 //   Item 6:  Missing Gen==0 bypass in handleEnrichmentChecked — Gen=0 test-injection
 //            messages are dropped when enrichmentGen>0 after a profile/region switch.
 //   Item 12/13: CodeBuild STOPPED state generates an unwanted finding — intentionally
 //            cancelled builds should not be flagged as issues.
-//   Item 14: Staging EC2 instances (i-0a1b2c3d4e5f60030, i-0a1b2c3d4e5f60031) fall
-//            through defaultExtras() and inherit the prod web-ALB security group
-//            (sg-0aaa111111111111a) instead of a staging SG.
+//   Item 18: Main-menu ctrl+z false-positive/false-negative coverage, and the
+//            TrivialColor gate below.
 //
 // Skipped items (already fixed in prior commits):
-//   Items 2/3:   RDS/DynamoDB — fixed in 35a54d4
-//   Item 5:      CloudWatch alarms Color — already correct
+//   Items 1/4:   ng/vpce/tgw stateful-lifecycle Color coverage — now pinned by
+//                qa_ng_color_test.go, TestColorRefactor_AllTypes_NonNilColorFunc
+//                (qa_resource_color_test.go), and the typeContracts table.
+//   Items 2/3:   RDS/DocDB/DynamoDB/CloudWatch alarm Color — fixed in 35a54d4,
+//                now pinned by qa_dbi_color_test.go, qa_dbc_color_test.go,
+//                qa_alarm_color_test.go, and the typeContracts table (dbi/dbc/ddb/alarm rows).
+//   Item 5:      CloudFormation IMPORT_ROLLBACK_COMPLETE — now pinned by the
+//                typeContracts table's cfn row (both IMPORT_COMPLETE and
+//                IMPORT_ROLLBACK_COMPLETE cases).
 //   Items 7/8:   handleRegionSelected / handleProfileSelected — fixed in 2f9a808, aae6860
 //   Items 9/10:  isVisibleUnderIssueFilter truncation guard — fixed in aae6860..2e831e1
 //   Item 11:     AlwaysHealthy invariant test — already exists in qa_ctrlz_truncated_zero_health_state_test.go
+//   Item 14:     Staging EC2 instance SG fixture-data check — retired as a fixture
+//                lint concern now covered by the demo-graph gates
+//                (qa_demo_pivot_coverage_test.go, qa_demo_related_ids_resolve_test.go).
 
 import (
 	"context"
@@ -39,7 +43,6 @@ import (
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -356,164 +359,6 @@ func TestCR273_Item18_MenuCtrlZ_NoFalseNegatives_AllRegisteredTypes(t *testing.T
 }
 
 // =============================================================================
-// Item 1: EKS Node Groups (ng) — AlwaysHealthy=true suppresses lifecycle states
-// =============================================================================
-
-// TestCR273_Item1_NGHasColor asserts that EKS Node Groups have a non-nil Color
-// func. Node groups have stateful lifecycle (CREATING/UPDATING/DELETING/
-// CREATE_FAILED/DEGRADED); classification must happen.
-// (Pre-AH-purge this asserted AlwaysHealthy==false; the field has since been
-// removed, so we assert the Color func itself exists.)
-func TestCR273_Item1_NGHasColor(t *testing.T) {
-	td := resource.FindResourceType("ng")
-	if td == nil {
-		t.Fatal("resource type 'ng' not registered")
-	}
-	if td.Color == nil {
-		t.Error("ng.Color is nil: node groups have stateful lifecycle and must classify via Color")
-	}
-}
-
-// TestCR273_Item1_NG_CREATING_ReturnsWarning asserts that a node group in
-// CREATING state is classified as ColorWarning (transitioning/degrading).
-// Currently FAILS: Color func hardcodes `return ColorHealthy`.
-func TestCR273_Item1_NG_CREATING_ReturnsWarning(t *testing.T) {
-	td := resource.FindResourceType("ng")
-	if td == nil {
-		t.Fatal("resource type 'ng' not registered")
-	}
-	r := resource.Resource{
-		ID:     "ng-test-1",
-		Name:   "acme-node-group-01",
-		Fields: map[string]string{"status": "CREATING"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorWarning {
-		t.Errorf("ng Color(CREATING) = %v, want ColorWarning (%v): transitioning state must be yellow/warning", got, resource.ColorWarning)
-	}
-}
-
-// TestCR273_Item1_NG_UPDATING_ReturnsWarning asserts that UPDATING → ColorWarning.
-// Currently FAILS: Color func hardcodes `return ColorHealthy`.
-func TestCR273_Item1_NG_UPDATING_ReturnsWarning(t *testing.T) {
-	td := resource.FindResourceType("ng")
-	if td == nil {
-		t.Fatal("resource type 'ng' not registered")
-	}
-	r := resource.Resource{
-		ID:     "ng-test-2",
-		Name:   "acme-node-group-02",
-		Fields: map[string]string{"status": "UPDATING"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorWarning {
-		t.Errorf("ng Color(UPDATING) = %v, want ColorWarning (%v)", got, resource.ColorWarning)
-	}
-}
-
-// TestCR273_Item1_NG_DELETING_ReturnsWarning asserts that DELETING → ColorWarning.
-// Currently FAILS: Color func hardcodes `return ColorHealthy`.
-func TestCR273_Item1_NG_DELETING_ReturnsWarning(t *testing.T) {
-	td := resource.FindResourceType("ng")
-	if td == nil {
-		t.Fatal("resource type 'ng' not registered")
-	}
-	r := resource.Resource{
-		ID:     "ng-test-3",
-		Name:   "acme-node-group-03",
-		Fields: map[string]string{"status": "DELETING"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorWarning {
-		t.Errorf("ng Color(DELETING) = %v, want ColorWarning (%v)", got, resource.ColorWarning)
-	}
-}
-
-// TestCR273_Item1_NG_CREATE_FAILED_ReturnsBroken asserts that CREATE_FAILED → ColorBroken.
-// Currently FAILS: Color func hardcodes `return ColorHealthy`.
-func TestCR273_Item1_NG_CREATE_FAILED_ReturnsBroken(t *testing.T) {
-	td := resource.FindResourceType("ng")
-	if td == nil {
-		t.Fatal("resource type 'ng' not registered")
-	}
-	r := resource.Resource{
-		ID:     "ng-test-4",
-		Name:   "acme-node-group-04",
-		Fields: map[string]string{"status": "CREATE_FAILED"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorBroken {
-		t.Errorf("ng Color(CREATE_FAILED) = %v, want ColorBroken (%v): failed creation is a hard error", got, resource.ColorBroken)
-	}
-}
-
-// TestCR273_Item1_NG_DEGRADED_ReturnsBroken asserts that DEGRADED → ColorBroken.
-// Currently FAILS: Color func hardcodes `return ColorHealthy`.
-func TestCR273_Item1_NG_DEGRADED_ReturnsBroken(t *testing.T) {
-	td := resource.FindResourceType("ng")
-	if td == nil {
-		t.Fatal("resource type 'ng' not registered")
-	}
-	r := resource.Resource{
-		ID:     "ng-test-5",
-		Name:   "acme-node-group-05",
-		Fields: map[string]string{"status": "DEGRADED"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorBroken {
-		t.Errorf("ng Color(DEGRADED) = %v, want ColorBroken (%v): degraded node group is a broken/impaired state", got, resource.ColorBroken)
-	}
-}
-
-// TestCR273_Item1_NG_ACTIVE_ReturnsHealthy asserts that the nominal ACTIVE state
-// remains ColorHealthy after the fix.
-func TestCR273_Item1_NG_ACTIVE_ReturnsHealthy(t *testing.T) {
-	td := resource.FindResourceType("ng")
-	if td == nil {
-		t.Fatal("resource type 'ng' not registered")
-	}
-	r := resource.Resource{
-		ID:     "ng-test-6",
-		Name:   "acme-node-group-06",
-		Fields: map[string]string{"status": "ACTIVE"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorHealthy {
-		t.Errorf("ng Color(ACTIVE) = %v, want ColorHealthy (%v): nominal state must not trigger issues", got, resource.ColorHealthy)
-	}
-}
-
-// =============================================================================
-// Item 4: VPCE and TGW — AlwaysHealthy=true wrong for stateful lifecycle types
-// =============================================================================
-
-// TestCR273_Item4_VPCEHasColor asserts VPC Endpoints classify via Color.
-// VPCEs have a stateful lifecycle (pending/failed/deleting) that must not
-// be suppressed. (Pre-AH-purge this asserted AlwaysHealthy==false.)
-func TestCR273_Item4_VPCEHasColor(t *testing.T) {
-	td := resource.FindResourceType("vpce")
-	if td == nil {
-		t.Fatal("resource type 'vpce' not registered")
-	}
-	if td.Color == nil {
-		t.Error("vpce.Color is nil: VPC endpoints have stateful lifecycle and must classify via Color")
-	}
-}
-
-// TestCR273_Item4_TGWHasColor asserts Transit Gateways classify via Color.
-// TGWs have a stateful lifecycle (pending/modifying/deleting/deleted).
-// (Pre-AH-purge this asserted AlwaysHealthy==false.)
-func TestCR273_Item4_TGWHasColor(t *testing.T) {
-	td := resource.FindResourceType("tgw")
-	if td == nil {
-		t.Fatal("resource type 'tgw' not registered")
-	}
-	if td.Color == nil {
-		t.Error("tgw.Color is nil: Transit Gateways have stateful lifecycle and must classify via Color")
-	}
-}
-
-// =============================================================================
 // Item 6: Missing Gen==0 bypass in handleEnrichmentChecked
 // =============================================================================
 
@@ -533,7 +378,8 @@ func TestCR273_Item4_TGWHasColor(t *testing.T) {
 //  5. Assert that the issue marker "! " appears in the rendered list view —
 //     meaning the message was ACCEPTED, not dropped.
 //
-// Currently FAILS: line 637 in app_handlers_navigate.go drops Gen=0 when enrichmentGen=1.
+// Regression pin (fixed): app_handlers_navigate.go must accept Gen=0 as the
+// test-injection sentinel even when enrichmentGen>0.
 func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel() // fresh model: enrichmentGen starts at 0
@@ -599,8 +445,8 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 // manual abort). It is not a failure — treating it as one generates noise and
 // inflates the issue badge count.
 //
-// Currently FAILS: the switch in EnrichCodeBuildBuilds only skips SUCCEEDED and
-// IN_PROGRESS; STOPPED falls through and produces a finding with severity "!".
+// Regression pin (fixed): the switch in EnrichCodeBuildBuilds must skip
+// STOPPED alongside SUCCEEDED and IN_PROGRESS.
 func TestCR273_Item12_CodeBuild_STOPPED_ExcludedFromFindings(t *testing.T) {
 	endTime := time.Date(2026, 4, 14, 10, 0, 0, 0, time.UTC)
 	fake := &codeBuildEnrichFake{
@@ -635,7 +481,7 @@ func TestCR273_Item12_CodeBuild_STOPPED_ExcludedFromFindings(t *testing.T) {
 // when there are both STOPPED and FAILED builds for different projects, only
 // the FAILED project appears in Findings, and IssueCount = 1 (not 2).
 //
-// Currently FAILS: STOPPED falls through and is counted alongside FAILED.
+// Regression pin (fixed): STOPPED must not be counted alongside FAILED.
 func TestCR273_Item13_CodeBuild_STOPPED_WithFailed_OnlyFailedCounted(t *testing.T) {
 	endTime := time.Date(2026, 4, 14, 11, 0, 0, 0, time.UTC)
 	fake := &codeBuildEnrichFake{
@@ -674,265 +520,6 @@ func TestCR273_Item13_CodeBuild_STOPPED_WithFailed_OnlyFailedCounted(t *testing.
 	}
 	if result.IssueCount != 1 {
 		t.Errorf("IssueCount = %d, want 1 (only the FAILED build); STOPPED builds inflate the count", result.IssueCount)
-	}
-}
-
-// =============================================================================
-// Item 14: Staging EC2 instances inherit prod security group in demo fixtures
-// =============================================================================
-
-// TestCR273_Item14_StagingInstances_NoProdWebALBSG asserts that EC2 instances
-// in the staging VPC (vpc-0def456789abc123d) do not have the prod web-ALB
-// security group (sg-0aaa111111111111a) in their SecurityGroups list.
-//
-// The two staging instances (i-0a1b2c3d4e5f60030, i-0a1b2c3d4e5f60031) are
-// absent from namedExtras, so defaultExtras() assigns fixtProdWebALBSGID —
-// the prod web-ALB SG — to them. This is a fixture data bug: prod SGs in a
-// staging VPC makes no architectural sense.
-//
-// Currently FAILS: defaultExtras() always assigns fixtProdWebALBSGID as the
-// fallback SG regardless of which VPC the instance belongs to.
-func TestCR273_Item14_StagingInstances_NoProdWebALBSG(t *testing.T) {
-	const (
-		fixtStagingVPCID   = "vpc-0def456789abc123d"
-		fixtProdWebALBSGID = "sg-0aaa111111111111a"
-	)
-
-	fix := fixtures.NewEC2Fixtures()
-	if len(fix.Reservations) == 0 {
-		t.Fatal("demo EC2 fixtures missing")
-	}
-
-	// Scan all reservations for instances in the staging VPC.
-	// Security group assignment is on the raw ec2types.Instance struct.
-	stagingViolations := 0
-	for _, res := range fix.Reservations {
-		for _, inst := range res.Instances {
-			vpcID := aws.ToString(inst.VpcId)
-			if vpcID != fixtStagingVPCID {
-				continue
-			}
-			instanceID := aws.ToString(inst.InstanceId)
-			// This instance is in the staging VPC — verify no prod web-ALB SG.
-			for _, sg := range inst.SecurityGroups {
-				if aws.ToString(sg.GroupId) == fixtProdWebALBSGID {
-					stagingViolations++
-					t.Errorf("instance %q (VPC %s) has prod web-ALB SG %q — staging instances must not inherit production security groups (fix: add named extras for staging instance IDs in internal/demo/fixtures/ec2.go)",
-						instanceID, fixtStagingVPCID, fixtProdWebALBSGID)
-				}
-			}
-		}
-	}
-	if stagingViolations > 0 {
-		t.Logf("staging instances with prod SG: %d — affected IDs: i-0a1b2c3d4e5f60030, i-0a1b2c3d4e5f60031", stagingViolations)
-	}
-}
-
-// =============================================================================
-// Item 2a: DB Instances / DB Clusters — rdsInstanceColor missing "failed" case
-// =============================================================================
-//
-// The color resolver at types_databases.go:44 was fixed to read Fields["status"]
-// (the same key the list column renders) instead of "db_instance_status". However
-// rdsInstanceColor still has no case for "failed" — a status that can be set
-// by the AWS API in certain cluster-level failure scenarios. A resource whose
-// status column displays "failed" is incorrectly classified as ColorHealthy,
-// hiding it from issue badges and ctrl+z filtering.
-//
-// Note: the task specification says the bug is the key mismatch ("reads
-// db_instance_status"). The key mismatch was fixed in commit 35a54d4. The
-// remaining failure is that rdsInstanceColor has no case for "failed", so
-// Color(Resource{Fields:{"status":"failed"}}) returns ColorHealthy.
-//
-// Item 2a for ddb (INACCESSIBLE_ENCRYPTION_CREDENTIALS) is already fixed and
-// passes today — pinning is not possible without a different status value.
-// DocDB clusters use the same rdsInstanceColor function as dbi, so the same
-// "failed" gap applies to "dbc" too (Item 2a DocDB).
-
-// TestCR273_Item2_RDS_ColorReadsStatusKey asserts that a DB instance with
-// Fields["status"]="failed" (the key the list column renders) is classified
-// as ColorBroken.
-//
-// Currently FAILS: rdsInstanceColor has no case for "failed" — returns ColorHealthy.
-func TestCR273_Item2_RDS_ColorReadsStatusKey(t *testing.T) {
-	td := resource.FindResourceType("dbi")
-	if td == nil {
-		t.Fatal("resource type 'dbi' not registered")
-	}
-	r := resource.Resource{
-		ID:     "db-test-1",
-		Name:   "acme-prod-db",
-		Fields: map[string]string{"status": "failed"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorBroken {
-		t.Errorf("dbi Color(status=failed) = %v, want ColorBroken (%v): a resource whose list column shows 'failed' must be classified as broken, not healthy — missing case in rdsInstanceColor",
-			got, resource.ColorBroken)
-	}
-}
-
-// TestCR273_Item2_DocDB_ColorReadsStatusKey asserts that a DB cluster (DocDB)
-// in Status=failed renders broken. Post-refactor, Fields["status"] carries the
-// §4 phrase ("failed: cluster operation"), not the raw AWS keyword.
-func TestCR273_Item2_DocDB_ColorReadsStatusKey(t *testing.T) {
-	td := resource.FindResourceType("dbc")
-	if td == nil {
-		t.Fatal("resource type 'dbc' not registered")
-	}
-	r := resource.Resource{
-		ID:     "cluster-test-1",
-		Name:   "acme-docdb-cluster",
-		Fields: map[string]string{"status": "failed: cluster operation"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorBroken {
-		t.Errorf("dbc Color(status=%q) = %v, want ColorBroken (%v): cluster-level failure state must not appear healthy in issue badges or ctrl+z filtering",
-			r.Fields["status"], got, resource.ColorBroken)
-	}
-}
-
-// TestCR273_Item2_DDB_ColorReadsStatusKey pins the post-spec-rewrite contract:
-// Fields["status"] carries the §4 phrase (e.g. "kms key inaccessible"), not the
-// raw AWS enum. Color must classify the phrase as Broken. Spec: docs/resources/ddb.md §4.
-func TestCR273_Item2_DDB_ColorReadsStatusKey(t *testing.T) {
-	td := resource.FindResourceType("ddb")
-	if td == nil {
-		t.Fatal("resource type 'ddb' not registered")
-	}
-	r := resource.Resource{
-		ID:     "table-test-1",
-		Name:   "acme-events-table",
-		Fields: map[string]string{"status": "kms key inaccessible"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorBroken {
-		t.Errorf("ddb Color(status=%q) = %v, want ColorBroken (%v): §4 phrase for INACCESSIBLE_ENCRYPTION_CREDENTIALS must classify as Broken",
-			r.Fields["status"], got, resource.ColorBroken)
-	}
-}
-
-// =============================================================================
-// Item 3: CloudWatch Alarms — Color reads wrong field key ("state_value" vs "state")
-// =============================================================================
-//
-// The fetcher at internal/aws/alarm.go populates Fields["state"] (stateValue).
-// The color resolver at types_monitoring.go:20 reads Fields["state_value"].
-// A resource built from real fetcher output has "state" populated but not
-// "state_value", so the switch never matches and the alarm defaults to ColorHealthy
-// regardless of its actual alarm state.
-
-// TestCR273_Item3_CloudWatchAlarm_ALARM_ReturnsBroken asserts that an alarm
-// resource with Fields["state"]="ALARM" (as populated by the fetcher) is
-// classified as ColorBroken.
-//
-// Currently FAILS: Color reads Fields["state_value"] instead of Fields["state"],
-// so the switch never matches "ALARM" and returns ColorHealthy.
-func TestCR273_Item3_CloudWatchAlarm_ALARM_ReturnsBroken(t *testing.T) {
-	td := resource.FindResourceType("alarm")
-	if td == nil {
-		t.Fatal("resource type 'alarm' not registered")
-	}
-	// Use the fetcher's real field key ("state"), not the wrong resolver key ("state_value").
-	r := resource.Resource{
-		ID:   "acme-cpu-high-alarm",
-		Name: "acme-cpu-high-alarm",
-		Fields: map[string]string{
-			"alarm_name": "acme-cpu-high-alarm",
-			"state":      "ALARM",
-		},
-	}
-	got := td.Color(r)
-	if got != resource.ColorBroken {
-		t.Errorf("alarm Color(Fields[\"state\"]=\"ALARM\") = %v, want ColorBroken (%v): Color reads Fields[\"state_value\"] but fetcher populates Fields[\"state\"] — alarm is hidden from issue badges and ctrl+z filtering",
-			got, resource.ColorBroken)
-	}
-}
-
-// TestCR273_Item3_CloudWatchAlarm_INSUFFICIENT_DATA_ReturnsWarning asserts that
-// Fields["state"]="INSUFFICIENT_DATA" is classified as ColorWarning.
-//
-// Currently FAILS: same key mismatch as above — defaults to ColorHealthy.
-func TestCR273_Item3_CloudWatchAlarm_INSUFFICIENT_DATA_ReturnsWarning(t *testing.T) {
-	td := resource.FindResourceType("alarm")
-	if td == nil {
-		t.Fatal("resource type 'alarm' not registered")
-	}
-	r := resource.Resource{
-		ID:   "acme-disk-alarm",
-		Name: "acme-disk-alarm",
-		Fields: map[string]string{
-			"alarm_name": "acme-disk-alarm",
-			"state":      "INSUFFICIENT_DATA",
-		},
-	}
-	got := td.Color(r)
-	if got != resource.ColorWarning {
-		t.Errorf("alarm Color(Fields[\"state\"]=\"INSUFFICIENT_DATA\") = %v, want ColorWarning (%v): Color reads wrong key \"state_value\" instead of \"state\"",
-			got, resource.ColorWarning)
-	}
-}
-
-// =============================================================================
-// Item 5: CloudFormation — IMPORT_ROLLBACK_COMPLETE falls through to ColorHealthy
-// =============================================================================
-//
-// cfnStackColor at types_cicd.go:14 explicitly handles ROLLBACK_COMPLETE and
-// UPDATE_ROLLBACK_COMPLETE as ColorBroken. IMPORT_ROLLBACK_COMPLETE (a terminal
-// AWS status for a failed import that rolled back) is not listed and does not
-// match the _FAILED suffix check, so it falls through to ColorHealthy. A stack
-// that failed an import and rolled back appears healthy in issue badges and
-// ctrl+z filtering.
-
-// TestCR273_Item5_CFN_IMPORT_ROLLBACK_COMPLETE_ReturnsBroken asserts that a
-// CloudFormation stack with status IMPORT_ROLLBACK_COMPLETE is classified as
-// ColorBroken.
-//
-// Currently FAILS: cfnStackColor has no case for IMPORT_ROLLBACK_COMPLETE —
-// it does not end in _FAILED and is not in the explicit case list, so it
-// falls through to ColorHealthy.
-func TestCR273_Item5_CFN_IMPORT_ROLLBACK_COMPLETE_ReturnsBroken(t *testing.T) {
-	td := resource.FindResourceType("cfn")
-	if td == nil {
-		t.Fatal("resource type 'cfn' not registered")
-	}
-	r := resource.Resource{
-		ID:     "acme-import-stack",
-		Name:   "acme-import-stack",
-		Fields: map[string]string{"status": "IMPORT_ROLLBACK_COMPLETE"},
-	}
-	got := td.Color(r)
-	if got != resource.ColorBroken {
-		t.Errorf("cfn Color(status=IMPORT_ROLLBACK_COMPLETE) = %v, want ColorBroken (%v): a rolled-back import is a terminal failure — stack must not appear healthy; add IMPORT_ROLLBACK_COMPLETE to the ColorBroken case in cfnStackColor",
-			got, resource.ColorBroken)
-	}
-}
-
-// TestCR273_Item5_CFN_IMPORT_ROLLBACK_COMPLETE_ExplicitCase_NotSuffix confirms
-// that the fix must be an explicit case, not a suffix trick. The status ends in
-// _COMPLETE which would incorrectly match a hypothetical _COMPLETE=healthy rule.
-// This guard ensures the fix adds IMPORT_ROLLBACK_COMPLETE to the Broken cases.
-func TestCR273_Item5_CFN_IMPORT_ROLLBACK_COMPLETE_ExplicitCase_NotSuffix(t *testing.T) {
-	td := resource.FindResourceType("cfn")
-	if td == nil {
-		t.Fatal("resource type 'cfn' not registered")
-	}
-	// IMPORT_COMPLETE (successful import) must stay ColorHealthy.
-	// IMPORT_ROLLBACK_COMPLETE (failed import rolled back) must be ColorBroken.
-	// These two statuses have the same suffix (_COMPLETE) but opposite colors,
-	// so the fix cannot rely on suffix matching alone.
-	healthy := resource.Resource{
-		Fields: map[string]string{"status": "IMPORT_COMPLETE"},
-	}
-	broken := resource.Resource{
-		Fields: map[string]string{"status": "IMPORT_ROLLBACK_COMPLETE"},
-	}
-	gotHealthy := td.Color(healthy)
-	gotBroken := td.Color(broken)
-	if gotHealthy != resource.ColorHealthy {
-		t.Errorf("cfn Color(IMPORT_COMPLETE) = %v, want ColorHealthy (%v): successful import must remain healthy", gotHealthy, resource.ColorHealthy)
-	}
-	if gotBroken != resource.ColorBroken {
-		t.Errorf("cfn Color(IMPORT_ROLLBACK_COMPLETE) = %v, want ColorBroken (%v): rolled-back import is broken — must be distinguishable from IMPORT_COMPLETE", gotBroken, resource.ColorBroken)
 	}
 }
 

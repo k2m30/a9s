@@ -61,14 +61,6 @@ import (
 // LAMBDA
 // =============================================================================
 
-// TestPR03b_LambdaCodes_ConstantsExist verifies that lambda_codes.go declares
-// the Wave 1 finding constants. Fails to compile until the file is created.
-func TestPR03b_LambdaCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeLambdaStatePending
-	var _ domain.FindingCode = awsclient.CodeLambdaStateFailed
-}
-
 // TestPR03b_LambdaFetcher_ActiveEmitsNoFinding asserts that an Active lambda
 // function with a configured DLQ emits no Finding and no Status after
 // migration — Active state and deprecated-runtime are both healthy here, so
@@ -201,15 +193,6 @@ func (m *pr03bLambdaMock) ListFunctions(
 // EKS
 // =============================================================================
 
-// TestPR03b_EKSCodes_ConstantsExist verifies that eks_codes.go declares
-// Wave 1 finding constants. Fails to compile until the file is created.
-func TestPR03b_EKSCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeEKSStateFailed
-	var _ domain.FindingCode = awsclient.CodeEKSStateCreating
-	var _ domain.FindingCode = awsclient.CodeEKSStateUpdating
-}
-
 // TestPR03b_EKSFetcher_ActiveEmitsNoFinding asserts that an ACTIVE EKS cluster
 // emits no Finding and no Status after migration.
 func TestPR03b_EKSFetcher_ActiveEmitsNoFinding(t *testing.T) {
@@ -311,13 +294,6 @@ func (m *pr03bEKSDescribeMock) DescribeCluster(
 // =============================================================================
 // ASG
 // =============================================================================
-
-// TestPR03b_ASGCodes_ConstantsExist verifies that asg_codes.go declares
-// Wave 1 finding constants. Fails to compile until the file is created.
-func TestPR03b_ASGCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeASGStateDeleting
-}
 
 // TestPR03b_ASGFetcher_HealthyEmitsNoFinding asserts that an ASG with empty
 // status emits no Finding and no Status after migration.
@@ -471,14 +447,6 @@ func (m *pr03bEBMock) DescribeEnvironments(
 // EBS Volumes
 // =============================================================================
 
-// TestPR03b_EBSCodes_ConstantsExist verifies that ebs_codes.go declares
-// Wave 1 volume finding constants. Fails to compile until the file is created.
-func TestPR03b_EBSCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeEBSStateCreating
-	var _ domain.FindingCode = awsclient.CodeEBSStateError
-}
-
 // TestPR03b_EBSFetcher_InUseEmitsNoFinding asserts that an in-use EBS volume
 // emits no Finding and no Status after migration.
 func TestPR03b_EBSFetcher_InUseEmitsNoFinding(t *testing.T) {
@@ -569,14 +537,6 @@ func (m *pr03bEBSVolMock) DescribeVolumes(
 // =============================================================================
 // AMI
 // =============================================================================
-
-// TestPR03b_AMICodes_ConstantsExist verifies that ami_codes.go declares
-// Wave 1 finding constants. Fails to compile until the file is created.
-func TestPR03b_AMICodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeAMIStatePending
-	var _ domain.FindingCode = awsclient.CodeAMIStateFailed
-}
 
 // TestPR03b_AMIFetcher_AvailableEmitsNoFinding asserts that an available AMI
 // emits no Finding and no Status after migration.
@@ -670,16 +630,6 @@ func (m *pr03bAMIMock) DescribeImages(
 // =============================================================================
 // EIP (Elastic IPs)
 // =============================================================================
-
-// TestPR03b_EIPCodes_ConstantsExist verifies that eip_codes.go declares
-// the Wave 1 finding constant. Fails to compile until the file is created.
-//
-// EIP has no "broken" lifecycle state — the actionable issue is cost waste
-// (allocated but unassociated). SevWarn is the highest severity for EIP.
-func TestPR03b_EIPCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeEIPUnassociated
-}
 
 // TestPR03b_EIPFetcher_AssociatedEmitsNoFinding asserts that an EIP that is
 // associated with an instance emits no Finding and no Status after migration.
@@ -776,19 +726,6 @@ func (m *pr03bEIPMock) DescribeAddresses(
 // ENI (Network Interfaces)
 // =============================================================================
 
-// TestPR03b_ENICodes_ConstantsExist verifies that eni_codes.go declares
-// Wave 1 finding constants. Fails to compile until the file is created.
-//
-// NOTE: ENI "available" state maps to SevWarn for non-requester-managed
-// interfaces (idle/unused ENI, potential cost waste). No SevBroken state exists
-// at the fetcher lifecycle level for ENI.
-func TestPR03b_ENICodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeENIStateAttaching
-	var _ domain.FindingCode = awsclient.CodeENIStateDetaching
-	var _ domain.FindingCode = awsclient.CodeENIStateAvailable
-}
-
 // TestPR03b_ENIFetcher_InUseEmitsNoFinding asserts that an in-use ENI
 // emits no Finding and no Status after migration.
 func TestPR03b_ENIFetcher_InUseEmitsNoFinding(t *testing.T) {
@@ -879,18 +816,6 @@ func (m *pr03bENIMock) DescribeNetworkInterfaces(
 // =============================================================================
 // EBS Snapshots
 // =============================================================================
-
-// TestPR03b_EBSSnapCodes_ConstantsExist verifies that ebs_snap_codes.go (or
-// ebs_codes.go) declares Wave 1 snapshot finding constants. Fails to compile
-// until the constants are created.
-//
-// NOTE: Snapshot constants may live in the same ebs_codes.go as volume
-// constants, or in a separate ebs_snap_codes.go — the coder decides.
-func TestPR03b_EBSSnapCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeEBSSnapStatePending
-	var _ domain.FindingCode = awsclient.CodeEBSSnapStateError
-}
 
 // TestPR03b_EBSSnapFetcher_CompletedEmitsNoFinding asserts that a completed
 // EBS snapshot emits no Finding and no Status after migration.

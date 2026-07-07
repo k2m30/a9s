@@ -10,10 +10,19 @@ package unit
 // enricher (internal/aws/ebs_snap_issue_enrichment.go, Source
 // "wave2:ebs-snap"). Fields are kept for realism/context only — they are no
 // longer read by Color.
+//
+// colorEBSSnap is a bare `colorFromAnyFinding(r) or ColorHealthy` — it does
+// not branch on finding Code, only on Severity, Source-prefix ("wave1" or
+// "wave2:"), and worst-severity-wins across multiple Findings. Coverage below
+// pins: the no-finding Healthy anchor, one wave1 case per severity tier, the
+// wave2:ebs-snap Source-prefix acceptance (a bug class where a finding with
+// the wrong Source string is silently dropped from color resolution), and
+// the multi-finding worst-severity-wins reduction. Per-state wave1-emission
+// mapping (which AWS state produces which code) is pinned at the fetcher
+// layer, not here.
 
 import (
 	"testing"
-	"time"
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -51,73 +60,6 @@ func TestEbsSnapColor(t *testing.T) {
 				{Code: "ebs-snap.state.error", Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
 			},
 			want: resource.ColorBroken,
-		},
-		{
-			name:   "state_recoverable",
-			fields: map[string]string{"state": "recoverable"},
-			findings: []domain.Finding{
-				{Code: "ebs-snap.state.error", Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
-			},
-			want: resource.ColorBroken,
-		},
-		{
-			name:   "state_recovering",
-			fields: map[string]string{"state": "recovering"},
-			findings: []domain.Finding{
-				{Code: "ebs-snap.state.error", Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
-			},
-			want: resource.ColorBroken,
-		},
-		{
-			name:   "encrypted_false",
-			fields: map[string]string{"state": "completed", "encrypted": "false"},
-			findings: []domain.Finding{
-				{
-					Code: "ebs-snap.encryption.disabled", Phrase: "unencrypted",
-					Detail:   "Snapshot is not encrypted at rest — re-create from an encrypted volume.",
-					Severity: domain.SevWarn, Source: "wave1",
-				},
-			},
-			want: resource.ColorWarning,
-		},
-		{
-			name:   "encrypted_true",
-			fields: map[string]string{"state": "completed", "encrypted": "true"},
-			want:   resource.ColorHealthy,
-		},
-		{
-			name: "automated_old",
-			fields: map[string]string{
-				"state":       "completed",
-				"description": "Created by CreateImage(i-abc)",
-				"started":     time.Now().AddDate(-2, 0, 0).Format(time.RFC3339),
-			},
-			findings: []domain.Finding{
-				{
-					Code: "ebs-snap.aged-automated", Phrase: "automated, 730d old",
-					Detail:   "Automated snapshot is 730 days old with no retention policy pruning it — billed indefinitely.",
-					Severity: domain.SevWarn, Source: "wave1",
-				},
-			},
-			want: resource.ColorWarning,
-		},
-		{
-			name: "automated_recent",
-			fields: map[string]string{
-				"state":       "completed",
-				"description": "Created by CreateImage(i-abc)",
-				"started":     time.Now().Format(time.RFC3339),
-			},
-			want: resource.ColorHealthy,
-		},
-		{
-			name: "manual_old",
-			fields: map[string]string{
-				"state":       "completed",
-				"description": "manual snap",
-				"started":     time.Now().AddDate(-2, 0, 0).Format(time.RFC3339),
-			},
-			want: resource.ColorHealthy,
 		},
 		{
 			name: "orphan_flag",

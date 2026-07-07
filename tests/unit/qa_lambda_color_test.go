@@ -10,6 +10,15 @@ package unit
 // in precedence order: last-update failure, then deprecated runtime, then
 // lifecycle state, then no-DLQ fallback. Fields are kept for realism/context
 // only — they are no longer read by Color.
+//
+// colorLambda is a bare `colorFromAnyFinding(r) or ColorHealthy` — it does
+// not branch on finding Code, only on Severity, Source-prefix, and
+// worst-severity-wins across multiple Findings. One representative case per
+// severity tier (plus the no-finding Healthy anchor) exercises every branch
+// colorLambda can take, and the multi-finding case pins the worst-wins
+// reduction. Which structural signal (last-update failure, deprecated
+// runtime, lifecycle state, missing DLQ) produces which code/severity is
+// pinned at the fetcher layer, not here.
 
 import (
 	"testing"
@@ -61,46 +70,6 @@ func TestLambdaColor_StateAndOverrides(t *testing.T) {
 				{Code: "lambda.state.failed", Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 			},
 			want: resource.ColorBroken,
-		},
-		{
-			name:   "state=Active+last_update_status=Failed",
-			fields: map[string]string{"state": "Active", "last_update_status": "Failed", "dlq_target_arn": "arn:aws:sqs:us-east-1:123456789012:my-queue"},
-			findings: []domain.Finding{
-				{
-					Code: "lambda.last-update.failed", Phrase: "last update failed to apply",
-					Severity: domain.SevBroken, Source: "wave1",
-				},
-			},
-			want: resource.ColorBroken,
-		},
-		{
-			name:   "state=Active+deprecated_runtime=python3.7",
-			fields: map[string]string{"state": "Active", "runtime": "python3.7", "dlq_target_arn": "arn:aws:sqs:us-east-1:123456789012:my-queue"},
-			findings: []domain.Finding{
-				{
-					Code: "lambda.runtime.deprecated", Phrase: "runtime is end-of-life",
-					Severity: domain.SevBroken, Source: "wave1",
-				},
-			},
-			want: resource.ColorBroken,
-		},
-		{
-			name:   "state=Active+current_runtime=python3.12",
-			fields: map[string]string{"state": "Active", "runtime": "python3.12", "dlq_target_arn": "arn:aws:sqs:us-east-1:123456789012:my-queue"},
-			want:   resource.ColorHealthy,
-		},
-		{
-			name:   "state=Active+no_dlq",
-			fields: map[string]string{"state": "Active"},
-			findings: []domain.Finding{
-				{Code: "lambda.dlq.missing", Phrase: "no dead-letter queue configured", Severity: domain.SevWarn, Source: "wave1"},
-			},
-			want: resource.ColorWarning,
-		},
-		{
-			name:   "state=Active+dlq_present",
-			fields: map[string]string{"state": "Active", "dlq_target_arn": "arn:aws:sqs:us-east-1:123456789012:my-dlq"},
-			want:   resource.ColorHealthy,
 		},
 		{
 			// Synthetic multi-finding case (the real fetcher's switch only
