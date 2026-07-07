@@ -88,9 +88,26 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 	},
 }
 
-func colorSQS(_ domain.Resource) domain.Color { return domain.ColorHealthy }
-func colorSNS(_ domain.Resource) domain.Color { return domain.ColorHealthy }
-func colorSFN(_ domain.Resource) domain.Color { return domain.ColorHealthy }
+func colorSQS(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
+
+func colorSNS(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
+
+func colorSFN(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
 
 func colorSNSSub(r domain.Resource) domain.Color {
 	switch r.Fields["subscription_arn"] {
@@ -104,6 +121,9 @@ func colorSNSSub(r domain.Resource) domain.Color {
 }
 
 func colorEBRule(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
 	switch strings.ToUpper(r.Fields["state"]) {
 	case "ENABLED", "ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS":
 		return domain.ColorHealthy

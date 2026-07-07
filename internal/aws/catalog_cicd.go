@@ -9,11 +9,35 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func colorCFN(r domain.Resource) domain.Color          { return cfnStackColor(r.Fields["status"]) }
-func colorPipeline(_ domain.Resource) domain.Color     { return domain.ColorHealthy }
-func colorCB(_ domain.Resource) domain.Color           { return domain.ColorHealthy }
-func colorECR(_ domain.Resource) domain.Color          { return domain.ColorHealthy }
-func colorCodeArtifact(_ domain.Resource) domain.Color { return domain.ColorHealthy }
+func colorCFN(r domain.Resource) domain.Color { return cfnStackColor(r.Fields["status"]) }
+
+func colorPipeline(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
+
+func colorCB(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
+
+func colorECR(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
+
+func colorCodeArtifact(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
 
 var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
