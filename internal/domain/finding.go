@@ -16,8 +16,8 @@ type FindingCode string
 // Drives row coloring, list-view Status display, menu issue badges, and
 // the ctrl+z attention filter.
 type Finding struct {
-	Code     FindingCode
-	Phrase   string
+	Code   FindingCode
+	Phrase string
 	// Detail is the S5 "concrete operator sentence" — a full remedy/context
 	// sentence for the detail-view Attention section. Empty ⇒ callers fall
 	// back to rendering Phrase alone (no stray blank line). Distinct from
@@ -37,6 +37,24 @@ type Finding struct {
 // the "wave2:" prefix check.
 func (f Finding) IsWave2Sourced() bool {
 	return strings.HasPrefix(f.Source, wave2SourcePrefix)
+}
+
+// WorstSeverityFinding returns the highest-Severity entry in fs (ties keep
+// the first-seen entry). This is the single shared reducer every
+// render-boundary consumer that must collapse a resource's independently-
+// evaluated Finding slice down to one value (a row glyph, a single-Finding
+// detail-apply signature) uses — never a first-seen pick, which silently
+// prefers whichever condition an enricher happened to evaluate first over
+// the one an operator most needs to see. Callers must ensure len(fs) > 0;
+// WorstSeverityFinding does not guard against an empty slice.
+func WorstSeverityFinding(fs []Finding) Finding {
+	worst := fs[0]
+	for _, f := range fs[1:] {
+		if f.Severity > worst.Severity {
+			worst = f
+		}
+	}
+	return worst
 }
 
 // AttentionDetail carries the rows shown in the detail-view Attention

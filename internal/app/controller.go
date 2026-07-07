@@ -33,37 +33,22 @@ type Controller struct {
 	stack []Screen
 
 	// enrichmentStore stores Wave-2 per-resource findings per resource type,
-	// keyed by canonical short name. Populated by ApplyEnrichmentState.
-	enrichmentStore map[string]map[string]domain.Finding
-
-	// enrichmentStoreAll mirrors enrichmentStore but carries every
-	// independently-evaluated Wave-2 Finding per Resource.ID (not just the
-	// single worst-severity representative in enrichmentStore). Populated
-	// only by the PatchResourceList intent path (runtime.ListEnrichmentPatch.
-	// AllFindings), which is the only producer that has the full slice —
-	// ApplyEnrichmentState's public single-Finding signature cannot carry it.
-	// listEnrichmentAllFindings falls back to wrapping enrichmentStore's
-	// single Finding per ID when a type has no entry here (e.g. a caller that
-	// only ever used ApplyEnrichmentState directly).
-	enrichmentStoreAll map[string]map[string][]domain.Finding
+	// keyed by canonical short name then Resource.ID. A resource with more
+	// than one independently-evaluated Wave-2 condition keeps every one of
+	// them in its per-ID slice — never collapsed to a single worst-severity
+	// representative. Populated by ApplyEnrichmentState.
+	enrichmentStore map[string]map[string][]domain.Finding
 
 	// enrichmentDetails stores Wave-2 per-resource AttentionDetail per
-	// resource type, keyed by canonical short name then Resource.ID. Delivered
-	// alongside enrichmentStore's findings in the same EnrichmentChecked
-	// payload; kept separate so a findings-only re-apply (e.g. a fresh-fetch
-	// re-apply that only needs the finding for row glyphs) can still recover
-	// the paired AttentionDetail without re-deriving it.
-	enrichmentDetails map[string]map[string]domain.AttentionDetail
-
-	// enrichmentDetailsAll mirrors enrichmentDetails but carries the
-	// per-Code nested AttentionDetails for every independently-evaluated
-	// Wave-2 Finding (not just the single-representative form in
-	// enrichmentDetails), keyed by canonical short name then Resource.ID then
-	// FindingCode. Populated only by the PatchResourceList intent path
-	// (runtime.ListEnrichmentPatch.AttentionDetailsAll), which is the only
-	// producer that has the full nested shape — ApplyEnrichmentState's public
-	// single-AttentionDetail signature cannot carry it.
-	enrichmentDetailsAll map[string]map[string]map[domain.FindingCode]domain.AttentionDetail
+	// resource type, keyed by canonical short name then Resource.ID then the
+	// owning Finding's Code — so a resource with more than one
+	// independently-evaluated condition keeps every condition's own
+	// supporting rows. Delivered alongside enrichmentStore's findings in the
+	// same EnrichmentChecked payload; kept separate so a findings-only
+	// re-apply (e.g. a fresh-fetch re-apply that only needs the findings for
+	// row glyphs) can still recover the paired AttentionDetail without
+	// re-deriving it.
+	enrichmentDetails map[string]map[string]map[domain.FindingCode]domain.AttentionDetail
 
 	// enrichmentTruncated stores the truncation flag per resource type from
 	// ApplyEnrichmentState, parallel to enrichmentStore.

@@ -40,9 +40,7 @@ type ProbeAvailabilityResult struct {
 // (e.g. messages.EnrichmentChecked for the Bubble Tea adapter).
 //
 // Findings is keyed by Resource.ID and carries every independently-evaluated
-// Wave-2 Finding per resource (IssueEnricherResult.Findings, unfiltered) —
-// the adapter derives the single-representative form its own
-// single-Finding-per-resource fields need via WorstFindingPerID.
+// Wave-2 Finding per resource (IssueEnricherResult.Findings, unfiltered).
 // AttentionDetails is keyed by Resource.ID then by the owning Finding's Code
 // (IssueEnricherResult.AttentionDetails, unfiltered) — the fold layer
 // (runtime.Core.applyEnrichment) reads it directly against the matching
@@ -56,35 +54,6 @@ type ProbeEnrichmentResult struct {
 	FieldUpdates     map[string]map[string]string
 	TruncatedIDs     map[string]bool
 	Err              error
-}
-
-// WorstFindingPerID reduces a per-resource slice-valued Wave-2 finding map to
-// a single-Finding-per-resource map, keeping only the highest-severity entry
-// for each resource ID (ties keep the first-seen entry). Adapters use this to
-// populate single-Finding-per-resource fields (messages.EnrichmentChecked.
-// Findings, and transitively PatchDetail.EnrichmentFindings/
-// ListEnrichmentPatch.Findings) from ProbeEnrichmentResult.Findings/
-// IssueEnricherResult.Findings, which may carry more than one
-// independently-evaluated condition per resource. Returns nil for a nil/empty
-// input.
-func WorstFindingPerID(findings map[string][]domain.Finding) map[string]domain.Finding {
-	if len(findings) == 0 {
-		return nil
-	}
-	out := make(map[string]domain.Finding, len(findings))
-	for id, fs := range findings {
-		if len(fs) == 0 {
-			continue
-		}
-		worst := fs[0]
-		for _, f := range fs[1:] {
-			if f.Severity > worst.Severity {
-				worst = f
-			}
-		}
-		out[id] = worst
-	}
-	return out
 }
 
 // DemoPrefetchResult carries the combined outcome of a synchronous demo

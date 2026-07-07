@@ -79,10 +79,10 @@ func TestSyncExactTotalToMenu_DoesNotClearEnrichmentTruncation_OnEqualExactRows(
 	// Step 1: the authoritative Wave-2 enrichment result lands first — 5
 	// issues found, but the enrichment scan itself was capped/truncated
 	// (e.g. a 50-row enrichment budget on a much larger bucket list).
-	findings := map[string]domain.Finding{
-		"arn:aws:s3:::a9s-test-bucket-a": {Code: "s3.public_access", Phrase: "public access not blocked", Severity: domain.SevWarn, Source: "wave2:s3"},
+	findings := map[string][]domain.Finding{
+		"arn:aws:s3:::a9s-test-bucket-a": {{Code: "s3.public_access", Phrase: "public access not blocked", Severity: domain.SevWarn, Source: "wave2:s3"}},
 	}
-	c.ApplyEnrichmentState("s3", 5, true, findings, map[string]domain.AttentionDetail{})
+	c.ApplyEnrichmentState("s3", 5, true, findings, map[string]map[domain.FindingCode]domain.AttentionDetail{})
 
 	if got := c.GetMenuIssueCounts()["s3"]; got != 5 {
 		t.Fatalf("precondition failed: GetMenuIssueCounts()[s3] = %d, want 5", got)

@@ -124,7 +124,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		rl.SetSize(m.innerSize())
 		issueCount := m.ctrl.GetMenuIssueCounts()[canon]
 		issueTrunc := m.ctrl.GetMenuIssueTruncated()[canon]
-		rl.SetEnrichmentState(issueCount, issueTrunc, findingsFromRows(entry.Resources), attentionDetailsFromRows(entry.Resources))
+		rl.SetEnrichmentState(issueCount, issueTrunc, primaryWave2FindingByID(entry.Resources), primaryWave2DetailByID(entry.Resources))
 		rl.SetTruncatedIDs(m.core.EnrichmentTruncatedIDs(canon))
 		rs := newListRS(canon)
 		w, h := m.innerSize()
@@ -217,7 +217,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		// ScreenDetail always hits ensureDetailState's non-nil branch), which
 		// already carries every wave-2 finding ApplyWave2ToRow appended (#52 —
 		// a resource with more than one independently-evaluated condition).
-		// findingFromResource only ever surfaces the FIRST one; re-applying it
+		// primaryWave2Finding only ever surfaces the WORST-severity one; re-applying it
 		// here would strip the ones EnsureDetailState just correctly seeded
 		// down to that single entry.
 		// Create a transient detail model only to configure the controller state
@@ -673,7 +673,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// missing from that map is correctly cleared at that point — pre-clearing
 	// here only widened the visible gap without changing the eventual state.
 	if parentCtx == nil && !escPops {
-		(&m).applyEnrichment(rt, nil, nil)
+		(&m).applyEnrichment(rt)
 	}
 
 	m.core.DeleteResourceCache(rt) // clear cache for refreshed type only
@@ -700,7 +700,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			// ProbeResources/LazyResourceCache (those paths are NOT covered by
 			// the pre-fetch cleanup above, which only covers the ResourceCache
 			// entry before deletion).
-			(&m).applyEnrichment(rt, nil, nil)
+			(&m).applyEnrichment(rt)
 			// Deliberately NOT clearing the controller's enrichment store
 			// (ApplyEnrichmentState(rt, 0, false, nil)) here — see the
 			// pre-fetch cleanup comment above. The menu issue badge and row

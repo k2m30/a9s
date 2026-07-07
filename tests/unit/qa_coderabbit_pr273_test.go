@@ -119,7 +119,7 @@ func TestCR273_Item18_MenuCtrlZ_NoFalsePositives_AllTypes(t *testing.T) {
 			ResourceType: ent.ShortName,
 			Issues:       0,
 			Truncated:    false,
-			Findings:     map[string]domain.Finding{},
+			Findings:     map[string][]domain.Finding{},
 			Err:          nil,
 			Gen:          0,
 			TypeGen:      0,
@@ -182,7 +182,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 			ResourceType: ent.ShortName,
 			Issues:       0,
 			Truncated:    false,
-			Findings:     map[string]domain.Finding{},
+			Findings:     map[string][]domain.Finding{},
 			Err:          nil,
 			Gen:          0,
 			TypeGen:      0,
@@ -253,7 +253,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 			ResourceType: ent.ShortName,
 			Issues:       0,
 			Truncated:    true,
-			Findings:     map[string]domain.Finding{},
+			Findings:     map[string][]domain.Finding{},
 			Err:          nil,
 			Gen:          0,
 			TypeGen:      0,
@@ -408,8 +408,8 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 		ResourceType: "ec2",
 		Issues:       1,
 		Truncated:    false,
-		Findings: map[string]domain.Finding{
-			"i-0abc1111aaa111111": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+		Findings: map[string][]domain.Finding{
+			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		},
 		Gen:     0, // test-injection sentinel
 		TypeGen: 0,

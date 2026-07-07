@@ -1,7 +1,6 @@
 package app
 
 import (
-	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 )
 
@@ -183,9 +182,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			// resurrect its glyphs on a same-ID resource under the new pair. A
 			// frame may never mix findings from two profile/region pairs.
 			c.enrichmentStore = nil
-			c.enrichmentStoreAll = nil
 			c.enrichmentDetails = nil
-			c.enrichmentDetailsAll = nil
 			c.enrichmentTruncated = nil
 
 		case runtime.PatchResourceList:
@@ -207,32 +204,13 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// above is a defensive fallback standing in for "no issue-badge
 				// result carried by this intent", not a confirmed zero-issue
 				// Wave-2 result — it must not flip the menu's IssueKnown flag.
+				//
+				// v.Enrichment.Findings/AttentionDetails carry every
+				// independently-evaluated Wave-2 condition per resource —
+				// applyEnrichmentState stores them directly in the controller's
+				// single enrichment store; no single-representative reduction or
+				// fallback wrapping happens on this write path.
 				c.applyEnrichmentState(v.ResourceType, issueCount, issueTruncated, v.Enrichment.Findings, v.Enrichment.AttentionDetails, issuesAuthoritative)
-				// allFindings carries every independently-evaluated Wave-2
-				// Finding per resource; falls back to wrapping the single
-				// representative when the producer only set Findings (a
-				// pre-#52 or hand-built ListEnrichmentPatch).
-				allFindings := v.Enrichment.AllFindings
-				if allFindings == nil {
-					allFindings = wrapSingleFindingMap(v.Enrichment.Findings)
-				}
-				if c.enrichmentStoreAll == nil {
-					c.enrichmentStoreAll = make(map[string]map[string][]domain.Finding)
-				}
-				c.enrichmentStoreAll[v.ResourceType] = allFindings
-				// allDetails mirrors allFindings for AttentionDetails: every
-				// independently-evaluated finding's own rows, keyed by Code;
-				// falls back to wrapping the single-representative AttentionDetails
-				// against Findings' Codes when the producer only set the legacy
-				// single-value field (a hand-built ListEnrichmentPatch).
-				allDetails := v.Enrichment.AttentionDetailsAll
-				if allDetails == nil {
-					allDetails = wrapSingleAttentionDetailMap(v.Enrichment.Findings, v.Enrichment.AttentionDetails)
-				}
-				if c.enrichmentDetailsAll == nil {
-					c.enrichmentDetailsAll = make(map[string]map[string]map[domain.FindingCode]domain.AttentionDetail)
-				}
-				c.enrichmentDetailsAll[v.ResourceType] = allDetails
 				// applyEnrichmentState only stores findings + the issue badge; the
 				// Wave-2 column updates (status/summary) must also reach the cached
 				// list rows or enriched columns render stale (ECR/WAF/CodeArtifact).
@@ -240,14 +218,10 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// ...and the findings themselves must land on the controller's own
 				// rows (ls.Rows / the RowStore-backed type cache) — the list-open
 				// save path persists from them, so without this the on-disk cache
-				// rows carry no findings and reseed glyphless (DEF-8). Uses
-				// allFindings/allDetails (not the single-representative
-				// Findings/AttentionDetails) so a multi-condition resource keeps
-				// every Finding — and every finding's own AttentionDetail — on the
-				// row — otherwise this call would strip runtime.Core.applyEnrichment's
-				// already-correct multi-Finding write (made moments earlier in
-				// the same handleEnrichmentChecked call) back down to one.
-				c.applyRowFindings(v.ResourceType, allFindings, allDetails)
+				// rows carry no findings and reseed glyphless (DEF-8). A
+				// multi-condition resource keeps every Finding — and every
+				// finding's own AttentionDetail — on the row.
+				c.applyRowFindings(v.ResourceType, v.Enrichment.Findings, v.Enrichment.AttentionDetails)
 			}
 
 		case runtime.SetIdentityIntent:

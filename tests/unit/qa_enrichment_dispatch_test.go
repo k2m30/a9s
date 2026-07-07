@@ -96,8 +96,8 @@ func TestEnrichmentCheckedMsg_StaleSessionGenDropped(t *testing.T) {
 		ResourceType: "ec2",
 		Issues:       42,
 		Truncated:    false,
-		Findings: map[string]domain.Finding{
-			"i-abc": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+		Findings: map[string][]domain.Finding{
+			"i-abc": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		},
 		Gen:     999, // stale — fresh model's enrichmentGen is 0
 		TypeGen: 0,
@@ -121,7 +121,7 @@ func TestEnrichmentCheckedMsg_StaleTypeGenDropped(t *testing.T) {
 		ResourceType: "ec2",
 		Issues:       5,
 		Truncated:    false,
-		Findings:     map[string]domain.Finding{},
+		Findings:     map[string][]domain.Finding{},
 		Gen:          0,  // matches fresh model's enrichmentGen=0
 		TypeGen:      99, // stale — fresh model's enrichmentTypeGen["ec2"] is 0
 	}
@@ -177,8 +177,8 @@ func TestEnrichmentCheckedMsg_ValidSuccessDoesNotCrash(t *testing.T) {
 		ResourceType: "glue",
 		Issues:       1,
 		Truncated:    false,
-		Findings: map[string]domain.Finding{
-			"my-glue-job": {Code: "glue.job.last.run.failed", Phrase: "latest run FAILED", Severity: domain.SevBroken, Source: "wave2:glue"},
+		Findings: map[string][]domain.Finding{
+			"my-glue-job": {{Code: "glue.job.last.run.failed", Phrase: "latest run FAILED", Severity: domain.SevBroken, Source: "wave2:glue"}},
 		},
 		Gen:     0,
 		TypeGen: 0,

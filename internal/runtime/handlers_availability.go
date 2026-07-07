@@ -448,23 +448,14 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		c.session.EnrichmentTruncatedIDs[msg.ResourceType] = msg.TruncatedIDs
 
 		// allFindings is the full per-resource slice this call folds onto rows
-		// and counts from. msg.AllFindings is nil only when a caller built
-		// EnrichmentChecked by hand without setting it (pre-#52 test
-		// construction, or any future caller that only knows about the
-		// single-representative Findings field) — in that case every
-		// resource's slice is exactly the one Finding msg.Findings already
-		// carries, so the fold/count below observes the identical result a
-		// direct AllFindings-aware caller would have produced.
-		allFindings := msg.AllFindings
-		if allFindings == nil {
-			allFindings = wrapSingleFindings(msg.Findings)
-		}
+		// and counts from — every independently-evaluated Wave-2 condition per
+		// resource, keyed by Resource.ID. Nil when the enricher found nothing.
+		allFindings := msg.Findings
 
 		// applyEnrichment directly mutates r.Findings and r.AttentionDetails on
-		// every cached row of this type. Uses allFindings (every
-		// independently-evaluated Wave-2 condition per resource), not the
-		// single-representative Findings, so a multi-condition resource keeps
-		// every Finding on its cached row.
+		// every cached row of this type, using allFindings — every
+		// independently-evaluated Wave-2 condition per resource — so a
+		// multi-condition resource keeps every Finding on its cached row.
 		c.applyEnrichment(msg.ResourceType, allFindings, msg.AttentionDetails)
 
 		// Merge FieldUpdates into RowStore (task #17 wave 1 stage 3 — the
@@ -513,7 +504,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		//      that lower-bound signal is authoritative even when the visible
 		//      subset shows zero issues, so the badge must remain truncated.
 		issueTruncated := msg.Truncated
-		if unified == 0 && len(msg.Findings) == 0 {
+		if unified == 0 && len(allFindings) == 0 {
 			issueTruncated = false
 		}
 		// task #17 wave 1 stage 2: the removed session.ProbeTruncated map's
@@ -535,17 +526,14 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		})
 
 		// Emit resource-list enrichment patch (updates list badge + row markers).
-		// AttentionDetails is the legacy single-representative reduction (feeds
-		// ApplyEnrichmentState's single-Finding contract); AttentionDetailsAll
-		// carries every independently-evaluated condition's own rows (feeds
-		// applyRowFindings/ApplyWave2ToRow so a multi-condition resource's row
-		// fold keeps every finding's own AttentionDetail).
+		// Findings/AttentionDetails carry every independently-evaluated
+		// condition per resource (feeds applyRowFindings/ApplyWave2ToRow so a
+		// multi-condition resource's row fold keeps every finding's own
+		// AttentionDetail).
 		enrichPatch := &ListEnrichmentPatch{
-			Findings:            msg.Findings,
-			AllFindings:         allFindings,
-			AttentionDetails:    singleAttentionDetailFor(msg.Findings, msg.AttentionDetails),
-			AttentionDetailsAll: msg.AttentionDetails,
-			TruncatedIDs:        msg.TruncatedIDs,
+			Findings:         allFindings,
+			AttentionDetails: msg.AttentionDetails,
+			TruncatedIDs:     msg.TruncatedIDs,
 		}
 		if len(msg.FieldUpdates) > 0 {
 			enrichPatch.FieldUpdates = msg.FieldUpdates
@@ -559,10 +547,9 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		// Emit detail-view patch for any open detail views of this type.
 		// ResourceID empty = all detail views of this type; the adapter looks up
 		// the findings for each view's specific resource ID from
-		// EnrichmentFindings. Uses allFindings (every independently-evaluated
-		// Wave-2 condition per resource), not the single-representative
-		// msg.Findings, so an already-open detail's Attention block shows every
-		// condition, not just the worst-severity one.
+		// EnrichmentFindings. allFindings carries every independently-evaluated
+		// Wave-2 condition per resource, so an already-open detail's Attention
+		// block shows every condition, not just the worst-severity one.
 		intents = append(intents, PatchDetail{
 			ResourceType:               msg.ResourceType,
 			EnrichmentFindings:         allFindings,
@@ -702,51 +689,6 @@ func rowsFromCacheRows(shortName string, rows []cache.Row) []resource.Resource {
 			Fields:   fields,
 			Findings: append([]domain.Finding(nil), row.Findings...),
 		}
-	}
-	return out
-}
-
-// wrapSingleFindings converts a single-representative Wave-2 finding map
-// (messages.EnrichmentChecked.Findings) into the one-element-per-ID slice
-// form handleEnrichmentChecked's fold/count logic needs when a caller built
-// the message without setting AllFindings. Returns nil for a nil input.
-func wrapSingleFindings(findings map[string]domain.Finding) map[string][]domain.Finding {
-	if findings == nil {
-		return nil
-	}
-	out := make(map[string][]domain.Finding, len(findings))
-	for id, f := range findings {
-		out[id] = []domain.Finding{f}
-	}
-	return out
-}
-
-// singleAttentionDetailFor reduces the per-Code nested AttentionDetails map
-// (messages.EnrichmentChecked.AttentionDetails) to the legacy
-// single-AttentionDetail-per-resource form ListEnrichmentPatch.AttentionDetails
-// still carries for ApplyEnrichmentState's single-Finding-per-resource
-// contract. Selects each resource's entry via findings' matching
-// single-representative Finding.Code, mirroring WorstFindingPerID's own
-// single-representative selection for Findings. Returns nil when nested is
-// empty or no entry matches a Code in findings.
-func singleAttentionDetailFor(findings map[string]domain.Finding, nested map[string]map[domain.FindingCode]domain.AttentionDetail) map[string]domain.AttentionDetail {
-	if len(nested) == 0 {
-		return nil
-	}
-	var out map[string]domain.AttentionDetail
-	for id, f := range findings {
-		byCode, ok := nested[id]
-		if !ok {
-			continue
-		}
-		ad, ok := byCode[f.Code]
-		if !ok {
-			continue
-		}
-		if out == nil {
-			out = make(map[string]domain.AttentionDetail, len(nested))
-		}
-		out[id] = ad
 	}
 	return out
 }

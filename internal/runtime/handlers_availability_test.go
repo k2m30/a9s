@@ -122,8 +122,8 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_Wave2WithFindings_StaysTru
 		ResourceType: rt,
 		Issues:       3,
 		Truncated:    true,
-		Findings: map[string]domain.Finding{
-			"id-1": {Code: "test.broken", Phrase: "broken", Severity: domain.SevBroken, Source: "wave2:" + rt},
+		Findings: map[string][]domain.Finding{
+			"id-1": {{Code: "test.broken", Phrase: "broken", Severity: domain.SevBroken, Source: "wave2:" + rt}},
 		},
 	})
 
@@ -169,9 +169,9 @@ func TestHandleEnrichmentChecked_PatchDetail_NonNilFindings_PassesThrough(t *tes
 	sess := session.New()
 	c := New(sess, catalog.All())
 
-	findings := map[string]domain.Finding{
-		"id-1": {Code: "test.broken", Phrase: "broken", Severity: domain.SevBroken, Source: "wave2:" + rt},
-		"id-2": {Code: "test.warn", Phrase: "warn", Severity: domain.SevWarn, Source: "wave2:" + rt},
+	findings := map[string][]domain.Finding{
+		"id-1": {{Code: "test.broken", Phrase: "broken", Severity: domain.SevBroken, Source: "wave2:" + rt}},
+		"id-2": {{Code: "test.warn", Phrase: "warn", Severity: domain.SevWarn, Source: "wave2:" + rt}},
 	}
 	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
@@ -190,11 +190,11 @@ func TestHandleEnrichmentChecked_PatchDetail_NonNilFindings_PassesThrough(t *tes
 		if !ok {
 			t.Fatalf("missing finding for %q", k)
 		}
-		if len(got) != 1 {
-			t.Fatalf("finding %q: want exactly 1 wrapped Finding (wrapSingleFindings), got %d: %+v", k, len(got), got)
+		if len(got) != len(v) {
+			t.Fatalf("finding %q: want %d Finding(s) passed through unchanged, got %d: %+v", k, len(v), len(got), got)
 		}
-		if got[0].Severity != v.Severity || got[0].Phrase != v.Phrase {
-			t.Fatalf("finding %q mismatch: want %+v, got %+v", k, v, got[0])
+		if got[0].Severity != v[0].Severity || got[0].Phrase != v[0].Phrase {
+			t.Fatalf("finding %q mismatch: want %+v, got %+v", k, v[0], got[0])
 		}
 	}
 }

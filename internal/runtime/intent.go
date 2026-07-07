@@ -30,29 +30,16 @@ type IssueBadgePatch struct {
 
 // ListEnrichmentPatch carries Wave 2 enrichment data for the rows of a
 // resource-list view. Findings is keyed by Resource.ID; nil means clear.
-// AttentionDetails is paired by Resource.ID (not FindingCode) — the adapter
-// re-keys when applying to per-row detail state.
+// AttentionDetails is keyed by Resource.ID then by the owning Finding's
+// Code (mirrors messages.EnrichmentChecked.AttentionDetails) — the adapter
+// folds both directly onto cached rows (applyRowFindings/
+// runtime.ApplyWave2ToRow) so a multi-condition resource keeps every
+// independently-evaluated Finding, each with its own AttentionDetail rows.
 type ListEnrichmentPatch struct {
-	Findings         map[string]domain.Finding
-	AttentionDetails map[string]domain.AttentionDetail
+	Findings         map[string][]domain.Finding
+	AttentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail
 	TruncatedIDs     map[string]bool
 	FieldUpdates     map[string]map[string]string
-	// AllFindings carries every independently-evaluated Wave-2 Finding per
-	// Resource.ID (mirrors messages.EnrichmentChecked.AllFindings) — the
-	// adapter folds this onto cached rows so a multi-condition resource keeps
-	// every Finding, not just the single worst-severity representative in
-	// Findings above. Nil when the producer only knows about the
-	// single-representative form; adapters fall back to wrapping Findings.
-	AllFindings map[string][]domain.Finding
-	// AttentionDetailsAll mirrors AllFindings for AttentionDetails: keyed by
-	// Resource.ID then by the owning Finding's Code (mirrors
-	// messages.EnrichmentChecked.AttentionDetails), so a multi-condition
-	// resource's row fold (applyRowFindings/runtime.ApplyWave2ToRow) can
-	// attach each independently-evaluated finding its OWN AttentionDetail
-	// instead of the single shared entry in AttentionDetails above. Nil when
-	// the producer only knows about the single-representative form; adapters
-	// fall back to wrapping AttentionDetails against Findings' Codes.
-	AttentionDetailsAll map[string]map[domain.FindingCode]domain.AttentionDetail
 }
 
 // PatchResourceList instructs the adapter to apply the contained patches
@@ -81,7 +68,7 @@ type PatchDetail struct {
 	// clear enrichment. An already-open detail must show every
 	// independently-evaluated condition, not just the worst-severity one, so
 	// this carries the full per-resource slice (mirrors
-	// messages.EnrichmentChecked.AllFindings) rather than a single
+	// messages.EnrichmentChecked.Findings) rather than a single
 	// representative.
 	EnrichmentFindings map[string][]domain.Finding
 	// EnrichmentAttentionDetails carries the supporting rows for each per-

@@ -48,16 +48,16 @@ func newEnrichmentMenuBadgeController(t *testing.T) *app.Controller {
 // s3EnrichmentFindings builds n wave2-sourced findings for distinct fake S3
 // bucket IDs, matching the shape ResourceListModel.SetEnrichmentState passes
 // in production (internal/tui/views/resourcelist.go).
-func s3EnrichmentFindings(n int) map[string]domain.Finding {
-	findings := make(map[string]domain.Finding, n)
+func s3EnrichmentFindings(n int) map[string][]domain.Finding {
+	findings := make(map[string][]domain.Finding, n)
 	for i := range n {
 		id := "arn:aws:s3:::a9s-test-bucket-" + string(rune('a'+i))
-		findings[id] = domain.Finding{
+		findings[id] = []domain.Finding{{
 			Code:     "s3.public_access",
 			Phrase:   "public access not blocked",
 			Severity: domain.SevWarn,
 			Source:   "wave2:s3",
-		}
+		}}
 	}
 	return findings
 }
@@ -83,7 +83,7 @@ func TestApplyEnrichmentState_SyncsMenuIssueBadge_S3(t *testing.T) {
 	c := newEnrichmentMenuBadgeController(t)
 
 	findings := s3EnrichmentFindings(5)
-	details := map[string]domain.AttentionDetail{}
+	details := map[string]map[domain.FindingCode]domain.AttentionDetail{}
 	c.ApplyEnrichmentState("s3", 5, true, findings, details)
 
 	if got := c.GetMenuIssueCounts()["s3"]; got != 5 {
@@ -167,8 +167,8 @@ func TestApplyEnrichmentState_MenuBadge_ClearsTruncationAtEqualCount(t *testing.
 func TestApplyEnrichmentState_MenuBadge_CanonicalizesAlias(t *testing.T) {
 	c := newEnrichmentMenuBadgeController(t)
 
-	findings := map[string]domain.Finding{
-		"workgroup-1": {Code: "athena.stale_config", Phrase: "stale workgroup config", Severity: domain.SevWarn, Source: "wave2:athena"},
+	findings := map[string][]domain.Finding{
+		"workgroup-1": {{Code: "athena.stale_config", Phrase: "stale workgroup config", Severity: domain.SevWarn, Source: "wave2:athena"}},
 	}
 	c.ApplyEnrichmentState("workgroups", 1, false, findings, nil)
 
@@ -190,7 +190,7 @@ func TestApplyEnrichmentState_MenuBadge_CanonicalizesAlias(t *testing.T) {
 func TestApplyEnrichmentState_ZeroIssues_StillBecomesKnown(t *testing.T) {
 	c := newEnrichmentMenuBadgeController(t)
 
-	c.ApplyEnrichmentState("s3", 0, false, map[string]domain.Finding{}, map[string]domain.AttentionDetail{})
+	c.ApplyEnrichmentState("s3", 0, false, map[string][]domain.Finding{}, map[string]map[domain.FindingCode]domain.AttentionDetail{})
 
 	if got := c.GetMenuIssueKnown()["s3"]; !got {
 		t.Errorf("GetMenuIssueKnown()[s3] = %v, want true — a confirmed Wave-2 zero-issue result must still flip Known", got)

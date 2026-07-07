@@ -24,7 +24,7 @@ import (
 // Unit tests and isolated callers leave ctrl nil; View() builds a live body and
 // delegates to RenderDetail so parity tests remain unaffected.
 type DetailModel struct {
-	ctrl                   *app.Controller             // non-nil = controller-backed TUI path
+	ctrl                   *app.Controller // non-nil = controller-backed TUI path
 	res                    resource.Resource
 	resourceType           string // e.g. "ec2", "s3", "rds" — used to look up correct ViewDef
 	viewConfig             *config.ViewsConfig
@@ -37,14 +37,14 @@ type DetailModel struct {
 	keys                   keys.Map
 	search                 SearchModel
 	rightCol               RightColumnModel
-	rightColVisible        bool                        // true when explicitly toggled on
-	rightColAutoShown      bool                        // true when right column was auto-shown on SetSize (wide terminal + registered defs)
-	rightColUserToggled    bool                        // true after user explicitly toggles related visibility
-	rightColWidth          int                         // width of right column panel (default 32)
-	pendingRelatedDispatch bool                        // true when a narrow→wide resize should dispatch RelatedCheckStartedMsg
-	fieldList              []fieldpath.FieldItem       // structured field data; nil = not yet computed
-	fieldCursor            int                         // index into fieldList for navigable cursor
-	plainMode              bool                        // true only during PlainContent(); causes Attention entries to render Key: Value (full text for clipboard/search)
+	rightColVisible        bool                  // true when explicitly toggled on
+	rightColAutoShown      bool                  // true when right column was auto-shown on SetSize (wide terminal + registered defs)
+	rightColUserToggled    bool                  // true after user explicitly toggles related visibility
+	rightColWidth          int                   // width of right column panel (default 32)
+	pendingRelatedDispatch bool                  // true when a narrow→wide resize should dispatch RelatedCheckStartedMsg
+	fieldList              []fieldpath.FieldItem // structured field data; nil = not yet computed
+	fieldCursor            int                   // index into fieldList for navigable cursor
+	plainMode              bool                  // true only during PlainContent(); causes Attention entries to render Key: Value (full text for clipboard/search)
 }
 
 // updateKeyMsgWithCtrl handles tea.KeyMsg events when m.ctrl is non-nil.
@@ -439,7 +439,7 @@ func inferDetailResourceType(res resource.Resource) string {
 
 // wave2FindingFromResource extracts the first wave-2 Finding and its companion
 // AttentionDetail from r.Findings / r.AttentionDetails. Returns (nil, nil) when
-// no wave-2 finding is present. Mirrors findingFromResource in tui/app_enrich_fold.go
+// no wave-2 finding is present. Mirrors primaryWave2Finding in tui/app_enrich_fold.go
 // but is local to the views package to avoid a cross-package import cycle.
 func wave2FindingFromResource(r resource.Resource) (*domain.Finding, *domain.AttentionDetail) {
 	for _, f := range r.Findings {

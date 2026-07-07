@@ -171,6 +171,22 @@ func listParityFindings(resources []resource.Resource) map[string]domain.Finding
 	return out
 }
 
+// wrapFindingsForApply converts a listParityFindings single-value map into
+// the one-element-slice-per-ID shape Controller.ApplyEnrichmentState requires,
+// preserving the exact same finding set listParityFindings built for the
+// SetEnrichmentState (single-value, render-boundary-reduced) side of the same
+// parity comparison.
+func wrapFindingsForApply(findings map[string]domain.Finding) map[string][]domain.Finding {
+	if findings == nil {
+		return nil
+	}
+	out := make(map[string][]domain.Finding, len(findings))
+	for id, f := range findings {
+		out[id] = []domain.Finding{f}
+	}
+	return out
+}
+
 // firstSortableColKey returns the first column key that is non-empty and not
 // a lifecycle/status key, suitable for sort toggle testing.
 func firstSortableColKey(td resource.ResourceTypeDef) string {
@@ -492,7 +508,7 @@ func TestResourceListRenderParity(t *testing.T) {
 
 				c := newListController(t, td.ShortName)
 				c.ApplyResourcesLoaded(td.ShortName, resources10, nil, false)
-				c.ApplyEnrichmentState(td.ShortName, len(findings), false, findings, nil)
+				c.ApplyEnrichmentState(td.ShortName, len(findings), false, wrapFindingsForApply(findings), nil)
 				body := *c.Snapshot().Body.List
 
 				assertListParity(t, td.ShortName, "S13_EnrichmentFindings", &m, body)
@@ -512,7 +528,7 @@ func TestResourceListRenderParity(t *testing.T) {
 
 				c := newListController(t, td.ShortName)
 				c.ApplyResourcesLoaded(td.ShortName, resources10, nil, false)
-				c.ApplyEnrichmentState(td.ShortName, len(findings), false, findings, nil)
+				c.ApplyEnrichmentState(td.ShortName, len(findings), false, wrapFindingsForApply(findings), nil)
 				c.Apply(app.Action{Kind: app.ActionToggleAttention})
 				body := *c.Snapshot().Body.List
 
@@ -539,7 +555,7 @@ func TestResourceListRenderParity(t *testing.T) {
 
 				c := newListController(t, td.ShortName)
 				c.ApplyResourcesLoaded(td.ShortName, resources10, nil, false)
-				c.ApplyEnrichmentState(td.ShortName, len(findings), false, findings, nil)
+				c.ApplyEnrichmentState(td.ShortName, len(findings), false, wrapFindingsForApply(findings), nil)
 				c.Apply(app.Action{Kind: app.ActionScrollRight})
 				body := *c.Snapshot().Body.List
 

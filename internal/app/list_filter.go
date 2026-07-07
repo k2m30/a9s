@@ -295,8 +295,10 @@ func (c *Controller) reapplyCheckerAgainst(ls *ListState, typeName string, newPa
 // Mirrors ResourceListModel.SetEnrichmentState. issueCount is always treated
 // as an authoritative Wave-2 result — every caller of this exported entry
 // point (ResourceListModel, tests) passes a real observed count, never a
-// defensive placeholder.
-func (c *Controller) ApplyEnrichmentState(typeName string, issueCount int, truncated bool, findings map[string]domain.Finding, details map[string]domain.AttentionDetail) {
+// defensive placeholder. findings/details carry every independently-
+// evaluated Wave-2 condition per resource (never a single worst-severity
+// representative).
+func (c *Controller) ApplyEnrichmentState(typeName string, issueCount int, truncated bool, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.applyEnrichmentState(typeName, issueCount, truncated, findings, details, true)
@@ -308,12 +310,12 @@ func (c *Controller) ApplyEnrichmentState(typeName string, issueCount int, trunc
 // by intents.go's PatchResourceList case when v.Issues is nil, so a
 // fabricated 0/false does not falsely mark the type's issue badge Known).
 // Callers must hold c.mu (write).
-func (c *Controller) applyEnrichmentState(typeName string, issueCount int, truncated bool, findings map[string]domain.Finding, details map[string]domain.AttentionDetail, authoritative bool) {
+func (c *Controller) applyEnrichmentState(typeName string, issueCount int, truncated bool, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail, authoritative bool) {
 	if c.enrichmentStore == nil {
-		c.enrichmentStore = make(map[string]map[string]domain.Finding)
+		c.enrichmentStore = make(map[string]map[string][]domain.Finding)
 	}
 	if c.enrichmentDetails == nil {
-		c.enrichmentDetails = make(map[string]map[string]domain.AttentionDetail)
+		c.enrichmentDetails = make(map[string]map[string]map[domain.FindingCode]domain.AttentionDetail)
 	}
 	if c.enrichmentTruncated == nil {
 		c.enrichmentTruncated = make(map[string]bool)
@@ -350,47 +352,19 @@ func (c *Controller) applyEnrichmentState(typeName string, issueCount int, trunc
 	}
 }
 
-// listEnrichmentFindings returns the per-resource finding map for typeName, or nil.
-func (c *Controller) listEnrichmentFindings(typeName string) map[string]domain.Finding {
+// listEnrichmentFindings returns the per-resource, slice-valued Wave-2
+// finding map for typeName (every independently-evaluated condition, not
+// just a single worst-severity representative), or nil.
+func (c *Controller) listEnrichmentFindings(typeName string) map[string][]domain.Finding {
 	if c.enrichmentStore == nil {
 		return nil
 	}
 	return c.enrichmentStore[typeName]
 }
 
-// listEnrichmentAllFindings returns the per-resource slice-valued finding map
-// for typeName (every independently-evaluated Wave-2 condition, not just the
-// worst-severity representative), or nil. Falls back to wrapping
-// listEnrichmentFindings' single-representative form when typeName has no
-// entry in enrichmentStoreAll (a type only ever populated via the public
-// ApplyEnrichmentState, which cannot carry the full slice).
-func (c *Controller) listEnrichmentAllFindings(typeName string) map[string][]domain.Finding {
-	if c.enrichmentStoreAll != nil {
-		if all, ok := c.enrichmentStoreAll[typeName]; ok {
-			return all
-		}
-	}
-	return wrapSingleFindingMap(c.listEnrichmentFindings(typeName))
-}
-
-// listEnrichmentDetailsAll returns the per-resource, per-FindingCode nested
-// AttentionDetail map for typeName, or nil. Mirrors listEnrichmentAllFindings:
-// falls back to wrapping listEnrichmentDetails' single AttentionDetail per ID
-// (keyed against listEnrichmentFindings' matching Finding.Code) when typeName
-// has no entry in enrichmentDetailsAll (e.g. a caller that only ever used
-// ApplyEnrichmentState directly).
-func (c *Controller) listEnrichmentDetailsAll(typeName string) map[string]map[domain.FindingCode]domain.AttentionDetail {
-	if c.enrichmentDetailsAll != nil {
-		if all, ok := c.enrichmentDetailsAll[typeName]; ok {
-			return all
-		}
-	}
-	return wrapSingleAttentionDetailMap(c.listEnrichmentFindings(typeName), c.listEnrichmentDetails(typeName))
-}
-
-// listEnrichmentDetails returns the per-resource AttentionDetail map for
-// typeName, or nil. Mirrors listEnrichmentFindings.
-func (c *Controller) listEnrichmentDetails(typeName string) map[string]domain.AttentionDetail {
+// listEnrichmentDetails returns the per-resource, per-FindingCode nested
+// AttentionDetail map for typeName, or nil.
+func (c *Controller) listEnrichmentDetails(typeName string) map[string]map[domain.FindingCode]domain.AttentionDetail {
 	if c.enrichmentDetails == nil {
 		return nil
 	}

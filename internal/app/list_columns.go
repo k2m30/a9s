@@ -427,16 +427,19 @@ func hasWave2Finding(findings []domain.Finding) bool {
 //
 // DEF-3/C6: a row's OWN persisted findings (r.Findings — what a cold-boot
 // reseed from cache.Row.Findings populates, and what the demo/live fold
-// layer mutates directly via applyWave2ToRow) are consulted FIRST, before
-// falling back to the findings map (the session-scoped Wave-2 enrichment
-// store, which is empty until a live enrichment probe lands this session).
-// Without this, a seeded row's persisted Findings never drive render-time
-// severity — the map lookup alone only ever hits after a live probe
-// re-confirms the same finding, so a freshly cold-booted list shows no
-// glyph/severity on flagged rows until the sweep completes. r.Findings is
-// assumed pre-ordered by severity (the same convention listPhraseFromFindings
-// relies on via findings[0]), so the first entry is "the top" finding.
-func resolveListDecoratorFull(td *resource.ResourceTypeDef, r resource.Resource, findings map[string]domain.Finding) (RowDecorator, string, string) {
+// layer mutates directly) are consulted FIRST, before falling back to the
+// findings map (the session-scoped Wave-2 enrichment store, which is empty
+// until a live enrichment probe lands this session). Without this, a
+// seeded row's persisted Findings never drive render-time severity — the
+// map lookup alone only ever hits after a live probe re-confirms the same
+// finding, so a freshly cold-booted list shows no glyph/severity on
+// flagged rows until the sweep completes. r.Findings is assumed
+// pre-ordered by severity (the same convention listPhraseFromFindings
+// relies on via findings[0]), so the first entry is "the top" finding. A
+// resource may carry more than one independently-evaluated Wave-2
+// condition in the findings map's per-ID slice; the decorator reduces to
+// the WORST-severity one via domain.WorstSeverityFinding.
+func resolveListDecoratorFull(td *resource.ResourceTypeDef, r resource.Resource, findings map[string][]domain.Finding) (RowDecorator, string, string) {
 	if td == nil {
 		return DecoratorNormal, "", ""
 	}
@@ -450,8 +453,8 @@ func resolveListDecoratorFull(td *resource.ResourceTypeDef, r resource.Resource,
 			case domain.SevWarn:
 				return DecoratorWarning, "warn", colorTag
 			}
-		} else if f, ok := findings[r.ID]; ok {
-			switch f.Severity {
+		} else if fs, ok := findings[r.ID]; ok && len(fs) > 0 {
+			switch domain.WorstSeverityFinding(fs).Severity {
 			case domain.SevBroken:
 				return DecoratorError, "broken", colorTag
 			case domain.SevWarn:

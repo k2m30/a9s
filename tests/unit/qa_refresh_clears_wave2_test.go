@@ -40,8 +40,8 @@ func TestMainMenuCtrlR_ClearsEnrichmentFindings(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       3,
-		Findings: map[string]domain.Finding{
-			"i-0abc1111aaa111111": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+		Findings: map[string][]domain.Finding{
+			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		},
 		Gen:     0,
 		TypeGen: 0,
@@ -49,8 +49,8 @@ func TestMainMenuCtrlR_ClearsEnrichmentFindings(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ddb",
 		Issues:       1,
-		Findings: map[string]domain.Finding{
-			"arn:aws:dynamodb:us-east-1:123456789012:table/orders": {Code: "ddb.table.status.deleting", Phrase: "table status: DELETING", Severity: domain.SevBroken, Source: "wave2:ddb"},
+		Findings: map[string][]domain.Finding{
+			"arn:aws:dynamodb:us-east-1:123456789012:table/orders": {{Code: "ddb.table.status.deleting", Phrase: "table status: DELETING", Severity: domain.SevBroken, Source: "wave2:ddb"}},
 		},
 		Gen:     0,
 		TypeGen: 0,
@@ -65,8 +65,8 @@ func TestMainMenuCtrlR_ClearsEnrichmentFindings(t *testing.T) {
 	_, cmd1 := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       3,
-		Findings: map[string]domain.Finding{
-			"i-0abc1111aaa111111": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+		Findings: map[string][]domain.Finding{
+			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		},
 		Gen:     0,
 		TypeGen: 0,
@@ -78,8 +78,8 @@ func TestMainMenuCtrlR_ClearsEnrichmentFindings(t *testing.T) {
 	_, cmd2 := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ddb",
 		Issues:       1,
-		Findings: map[string]domain.Finding{
-			"arn:aws:dynamodb:us-east-1:123456789012:table/orders": {Code: "ddb.table.status.deleting", Phrase: "table status: DELETING", Severity: domain.SevBroken, Source: "wave2:ddb"},
+		Findings: map[string][]domain.Finding{
+			"arn:aws:dynamodb:us-east-1:123456789012:table/orders": {{Code: "ddb.table.status.deleting", Phrase: "table status: DELETING", Severity: domain.SevBroken, Source: "wave2:ddb"}},
 		},
 		Gen:     0,
 		TypeGen: 0,
@@ -102,7 +102,7 @@ func TestMainMenuCtrlR_EnrichmentGenIncremented(t *testing.T) {
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: rt,
 			Issues:       1,
-			Findings:     map[string]domain.Finding{},
+			Findings:     map[string][]domain.Finding{},
 			Gen:          0,
 			TypeGen:      0,
 		})
@@ -117,7 +117,7 @@ func TestMainMenuCtrlR_EnrichmentGenIncremented(t *testing.T) {
 	for _, rt := range []string{"ec2", "ebs", "ddb", "tg"} {
 		_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: rt,
-			Findings:     map[string]domain.Finding{},
+			Findings:     map[string][]domain.Finding{},
 			Gen:          0,
 			TypeGen:      0,
 		})
@@ -148,7 +148,7 @@ func TestMainMenuCtrlR_MapsSafeAfterReset(t *testing.T) {
 		}()
 		m2, _ := m.Update(messages.EnrichmentChecked{
 			ResourceType: "ec2",
-			Findings:     map[string]domain.Finding{},
+			Findings:     map[string][]domain.Finding{},
 			Gen:          0,
 			TypeGen:      99,
 		})

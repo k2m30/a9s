@@ -827,7 +827,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "s3",
 		Issues:       1,
-		Findings:     map[string]domain.Finding{"bucket-def8-1": finding},
+		Findings:     map[string][]domain.Finding{"bucket-def8-1": {finding}},
 	})
 
 	// Re-trigger the list-open save path — the same seam

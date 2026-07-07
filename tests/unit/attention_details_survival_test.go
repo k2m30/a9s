@@ -112,15 +112,17 @@ func TestControllerReapply_AttentionDetails_SurviveFreshFetchReplace(t *testing.
 
 	// --- Step 2: apply Wave-2 enrichment state carrying BOTH the finding and
 	// its AttentionDetail rows for dbi-instance-a. ---
-	details := map[string]domain.AttentionDetail{
+	details := map[string]map[domain.FindingCode]domain.AttentionDetail{
 		"dbi-instance-a": {
-			Rows: []domain.DetailRow{
-				{Label: "Action", Value: "system-update", Tier: "~"},
+			wave2Finding.Code: {
+				Rows: []domain.DetailRow{
+					{Label: "Action", Value: "system-update", Tier: "~"},
+				},
 			},
 		},
 	}
-	ctrl.ApplyEnrichmentState(attnSurvivalType, 1, false, map[string]domain.Finding{
-		"dbi-instance-a": wave2Finding,
+	ctrl.ApplyEnrichmentState(attnSurvivalType, 1, false, map[string][]domain.Finding{
+		"dbi-instance-a": {wave2Finding},
 	}, details)
 
 	// ApplyEnrichmentState alone only populates the controller's own

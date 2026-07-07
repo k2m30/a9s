@@ -189,11 +189,11 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// the controller rows (and therefore the list-open save path, DEF-8)
 	// glyph-blind until the next EnrichmentChecked. Mirrors the session-side
 	// fold, which re-applies onto Core stores after every result lands. Uses
-	// listEnrichmentAllFindings (every independently-evaluated Wave-2
-	// Finding per resource) so a multi-condition resource keeps every
-	// Finding across a silent-swap refetch, not just the worst one.
-	if known := c.listEnrichmentAllFindings(typeName); len(known) > 0 {
-		c.applyRowFindings(typeName, known, c.listEnrichmentDetailsAll(typeName))
+	// listEnrichmentFindings (every independently-evaluated Wave-2 Finding
+	// per resource) so a multi-condition resource keeps every Finding across
+	// a silent-swap refetch, not just the worst one.
+	if known := c.listEnrichmentFindings(typeName); len(known) > 0 {
+		c.applyRowFindings(typeName, known, c.listEnrichmentDetails(typeName))
 	}
 }
 
@@ -403,18 +403,21 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 		// has landed in the enrichment-store map but has NOT yet been mutated
 		// onto r.Findings (the live-mode lag the comment above describes). When
 		// r.Findings already carries a Wave-2 entry for this resource (the demo
-		// path and the fold-layer live path both mutate r.Findings directly via
-		// applyWave2ToRow), extractListCells has already derived the correct
-		// cell from listPhraseFromFindings(r.Findings) — including the "<top>
-		// (+N)" stacking notation for multi-finding rows. The enrichment-store
-		// map holds at most one Wave-2 entry per resource ID (see
-		// findingsFromRows) and carries no stacking information, so applying it
-		// on top of an already-stacked cell would silently drop the "(+N)"
-		// suffix and/or clobber a higher-priority Wave-1 phrase with a
-		// same-or-lower-severity Wave-2 one.
+		// path and the fold-layer live path both mutate r.Findings directly),
+		// extractListCells has already derived the correct cell from
+		// listPhraseFromFindings(r.Findings) — including the "<top> (+N)"
+		// stacking notation for multi-finding rows. This fallback instead picks
+		// the WORST-severity entry from the enrichment-store map's per-resource
+		// slice (a resource may carry more than one independently-evaluated
+		// Wave-2 condition) and bakes only its bare phrase — no stacking
+		// notation — so applying it on top of an already-stacked cell would
+		// silently drop the "(+N)" suffix and/or clobber a higher-priority
+		// Wave-1 phrase with a same-or-lower-severity Wave-2 one.
 		if statusCol >= 0 && statusCol < len(cells) && !hasWave2Finding(r.Findings) {
-			if f, ok := findings[r.ID]; ok && f.Severity.IsIssue() && f.Phrase != "" {
-				cells[statusCol] = f.Phrase
+			if fs, ok := findings[r.ID]; ok && len(fs) > 0 {
+				if f := domain.WorstSeverityFinding(fs); f.Severity.IsIssue() && f.Phrase != "" {
+					cells[statusCol] = f.Phrase
+				}
 			}
 		}
 		rows = append(rows, ListRow{
@@ -655,11 +658,13 @@ func (c *Controller) listIssueCount(ls *ListState, typeName string) int {
 			// such row. The color check is independent of r.Findings content.
 			ic++
 		case len(r.Findings) == 0:
-			if f, hasFinding := findings[r.ID]; hasFinding && f.Severity == domain.SevBroken {
+			if fs, hasFinding := findings[r.ID]; hasFinding && len(fs) > 0 && domain.WorstSeverityFinding(fs).Severity == domain.SevBroken {
 				// S1: Wave-2 findings bump the count only at "!" severity —
 				// "~ findings do not bump" (docs/attention-signals.md). Wave-1
 				// yellow/red rows are already counted by the color branch above,
-				// matching the menu badge's probe-side aggregation.
+				// matching the menu badge's probe-side aggregation. A resource
+				// may carry more than one independently-evaluated Wave-2
+				// condition; it counts once if ANY of them is SevBroken.
 				ic++
 			}
 		}
@@ -840,48 +845,6 @@ func (c *Controller) clearRowFindings(typeName string) {
 	}
 }
 
-// wrapSingleFindingMap converts a single-representative Wave-2 finding map
-// into the one-element-per-ID slice form applyRowFindings/runtime.
-// ApplyWave2ToRow need, for callers that only have the legacy
-// single-Finding-per-resource form (e.g. ApplyEnrichmentState's public
-// signature, unchanged by #52). Returns nil for a nil input.
-func wrapSingleFindingMap(findings map[string]domain.Finding) map[string][]domain.Finding {
-	if findings == nil {
-		return nil
-	}
-	out := make(map[string][]domain.Finding, len(findings))
-	for id, f := range findings {
-		out[id] = []domain.Finding{f}
-	}
-	return out
-}
-
-// wrapSingleAttentionDetailMap converts a single-representative Wave-2
-// AttentionDetail map into the per-FindingCode nested form
-// applyRowFindings/runtime.ApplyWave2ToRow need, for callers that only have
-// the legacy single-AttentionDetail-per-resource form (e.g.
-// ApplyEnrichmentState's public signature). Each entry is keyed by its
-// paired Finding's Code (from findings) so the nested per-Code lookup
-// ApplyWave2ToRow performs still resolves. Returns nil when details is
-// empty or no entry matches a Code in findings.
-func wrapSingleAttentionDetailMap(findings map[string]domain.Finding, details map[string]domain.AttentionDetail) map[string]map[domain.FindingCode]domain.AttentionDetail {
-	if len(details) == 0 {
-		return nil
-	}
-	var out map[string]map[domain.FindingCode]domain.AttentionDetail
-	for id, ad := range details {
-		f, ok := findings[id]
-		if !ok {
-			continue
-		}
-		if out == nil {
-			out = make(map[string]map[domain.FindingCode]domain.AttentionDetail, len(details))
-		}
-		out[id] = map[domain.FindingCode]domain.AttentionDetail{f.Code: ad}
-	}
-	return out
-}
-
 // applyRowFindings is the applying-direction mirror of clearRowFindings: it
 // writes Wave-2 findings (and their attention details) onto the controller's
 // own row stores — every matching list screen's ls.Rows plus the
@@ -893,10 +856,9 @@ func wrapSingleAttentionDetailMap(findings map[string]domain.Finding, details ma
 // PatchResourceList intent case is the production entry point. A nil
 // findings map clears Wave-2 entries, matching runtime.ApplyWave2ToRow's
 // contract. findings carries every independently-evaluated Wave-2 Finding
-// per resource ID (mirrors runtime.ApplyWave2ToRow's own contract) — callers
-// with only the single-representative form must wrap via
-// wrapSingleFindingMap first, so a multi-condition resource's second Finding
-// is never silently dropped by this write.
+// per resource ID (mirrors runtime.ApplyWave2ToRow's own contract), so a
+// multi-condition resource's second Finding is never silently dropped by
+// this write.
 func (c *Controller) applyRowFindings(typeName string, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail) {
 	canon := typeName
 	var td resource.ResourceTypeDef
@@ -1020,7 +982,7 @@ func (c *Controller) PushChildListScreen(typeName string) {
 // GetListEnrichmentFindings returns the enrichment findings map for typeName.
 // Used by renderDataRow to resolve glyph markers without accessing the deleted
 // findingsByID field on ResourceListModel.
-func (c *Controller) GetListEnrichmentFindings(typeName string) map[string]domain.Finding {
+func (c *Controller) GetListEnrichmentFindings(typeName string) map[string][]domain.Finding {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.listEnrichmentFindings(typeName)

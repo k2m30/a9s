@@ -212,7 +212,7 @@ func deliverVerifyFetch(ctrl *app.Controller, resources []resource.Resource, tru
 // other wiring that copies EnrichmentChecked's findings into
 // Controller.enrichmentStore, so this seam is the correct one to drive
 // glyph-visible wave-2 state on a bare app.Controller.
-func deliverEnrichment(ctrl *app.Controller, issues int, findings map[string]domain.Finding) {
+func deliverEnrichment(ctrl *app.Controller, issues int, findings map[string][]domain.Finding) {
 	ctrl.ApplyEnrichmentState(lifecycleShortName, issues, false, findings, nil)
 }
 
@@ -339,7 +339,7 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 	// finding already reached disk via Step 3's fetch result, which already
 	// carried it on the resource — this call additionally guards the
 	// render-time glyph path). ---
-	deliverEnrichment(ctrl, 1, map[string]domain.Finding{"bucket-s1-1": finding})
+	deliverEnrichment(ctrl, 1, map[string][]domain.Finding{"bucket-s1-1": {finding}})
 
 	// --- Step 5: persisted file must carry every renderable column's field,
 	// findings, and correct count/exact/issues ---
@@ -406,7 +406,7 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 		bootSeedFromDisk(ctrl1, profile, region)
 		openS3List(ctrl1)
 		deliverVerifyFetch(ctrl1, world, false)
-		deliverEnrichment(ctrl1, 1, map[string]domain.Finding{"bucket-s2-1": finding})
+		deliverEnrichment(ctrl1, 1, map[string][]domain.Finding{"bucket-s2-1": {finding}})
 	}()
 	resource.CleanupPaginatedForTest(lifecycleShortName)
 
@@ -488,7 +488,7 @@ func TestCacheLifecycle_Scenario2_CachePresent_WorldUnchanged(t *testing.T) {
 	// list here, so Body.Menu is nil per snapshot()'s
 	// "populated only when top.State.Menu != nil" contract; the accessors
 	// read rootMenuState() regardless of the current screen.
-	deliverEnrichment(ctrl2, 1, map[string]domain.Finding{"bucket-s2-1": finding})
+	deliverEnrichment(ctrl2, 1, map[string][]domain.Finding{"bucket-s2-1": {finding}})
 	availAfter := ctrl2.GetMenuAvailability()
 	if got := availAfter[lifecycleShortName]; got != 2 {
 		t.Errorf("GetMenuAvailability()[%q] after re-verify = %d, want 2 unchanged", lifecycleShortName, got)

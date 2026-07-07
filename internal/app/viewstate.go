@@ -135,18 +135,18 @@ type PaginationInfo struct {
 
 // ListBody is the body of a resource-list screen.
 type ListBody struct {
-	Columns             []ColumnDef               `json:"columns,omitempty"`
-	Rows                []ListRow                 `json:"rows,omitempty"`
-	Selected            int                       `json:"selected"`
-	ScrollX             int                       `json:"scroll_x"`
-	Filter              string                    `json:"filter,omitempty"`
-	Sort                SortSpec                  `json:"sort,omitzero"`
-	AttentionOnly       bool                      `json:"attention_only,omitempty"`
-	Loading             bool                      `json:"loading,omitempty"`
-	Truncated           bool                      `json:"truncated,omitempty"`
-	Pagination          PaginationInfo            `json:"pagination,omitzero"`
-	EnrichmentFindings  map[string]domain.Finding `json:"enrichment_findings,omitempty"`
-	EnrichmentTruncated map[string]bool           `json:"enrichment_truncated,omitempty"`
+	Columns             []ColumnDef                 `json:"columns,omitempty"`
+	Rows                []ListRow                   `json:"rows,omitempty"`
+	Selected            int                         `json:"selected"`
+	ScrollX             int                         `json:"scroll_x"`
+	Filter              string                      `json:"filter,omitempty"`
+	Sort                SortSpec                    `json:"sort,omitzero"`
+	AttentionOnly       bool                        `json:"attention_only,omitempty"`
+	Loading             bool                        `json:"loading,omitempty"`
+	Truncated           bool                        `json:"truncated,omitempty"`
+	Pagination          PaginationInfo              `json:"pagination,omitzero"`
+	EnrichmentFindings  map[string][]domain.Finding `json:"enrichment_findings,omitempty"`
+	EnrichmentTruncated map[string]bool             `json:"enrichment_truncated,omitempty"`
 	// MarkerCol is the full-column-list index (before hscroll) of the identity
 	// column that receives the enrichment-finding glyph ("! "/"~ ") prefix.
 	// Pre-computed by buildListBody so RenderList does not need typeDef.

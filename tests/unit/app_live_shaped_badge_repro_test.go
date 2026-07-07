@@ -107,16 +107,16 @@ func liveShapedBadgeReproS3Resources(n int) []resource.Resource {
 // counts SevBroken findings toward the "!" badge — a SevWarn-only fixture
 // would silently produce a badge count of 0 regardless of the defect under
 // test, which is not what this repro is pinning.
-func liveShapedBadgeReproWave2Findings(n int) map[string]domain.Finding {
-	findings := make(map[string]domain.Finding, n)
+func liveShapedBadgeReproWave2Findings(n int) map[string][]domain.Finding {
+	findings := make(map[string][]domain.Finding, n)
 	for i := range n {
 		id := "arn:aws:s3:::a9s-repro-bucket-" + string(rune('a'+i))
-		findings[id] = domain.Finding{
+		findings[id] = []domain.Finding{{
 			Code:     "s3.public_access",
 			Phrase:   "public access not blocked",
 			Severity: domain.SevBroken,
 			Source:   "wave2:s3",
-		}
+		}}
 	}
 	return findings
 }

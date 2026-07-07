@@ -208,7 +208,7 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 	// Apply the enriched resource to the controller's detail state. This
 	// replaces the old updateActiveView path where DetailModel.Update absorbed
 	// the enriched resource and rebuilt its field list.
-	ef, ad := findingFromResource(msg.EnrichedRes)
+	ef, ad := primaryWave2Finding(msg.EnrichedRes)
 	m.ctrl.ApplyDetailEnrichmentForResource(msg.ResourceType, msg.ResourceID, msg.EnrichedRes, ef, ad)
 
 	// When the active screen is a YAML or JSON text viewer for this resource,
@@ -249,5 +249,3 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 	}
 	return m, coreCmd
 }
-
-

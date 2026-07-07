@@ -33,7 +33,7 @@ type ResourcesLoaded struct {
 	Err error
 }
 
-func (ResourcesLoaded) isEvent()              {}
+func (ResourcesLoaded) isEvent()               {}
 func (m ResourcesLoaded) GenStamp() domain.Gen { return m.Gen }
 func (ResourcesLoaded) GenAspect() Aspect      { return AspectAvailability }
 func (ResourcesLoaded) AcceptZeroGen() bool    { return true }
@@ -48,7 +48,7 @@ type APIError struct {
 	Gen domain.Gen
 }
 
-func (APIError) isEvent()              {}
+func (APIError) isEvent()               {}
 func (m APIError) GenStamp() domain.Gen { return m.Gen }
 func (APIError) GenAspect() Aspect      { return AspectAvailability }
 func (APIError) AcceptZeroGen() bool    { return true }
@@ -80,7 +80,7 @@ type ValueRevealed struct {
 	Gen domain.Gen
 }
 
-func (ValueRevealed) isEvent()              {}
+func (ValueRevealed) isEvent()               {}
 func (m ValueRevealed) GenStamp() domain.Gen { return m.Gen }
 func (ValueRevealed) GenAspect() Aspect      { return AspectConnect }
 func (ValueRevealed) AcceptZeroGen() bool    { return true }
@@ -102,7 +102,7 @@ type ClientsReady struct {
 	Gen     domain.Gen // connect generation — ignore if != current connectGen
 }
 
-func (ClientsReady) isEvent()              {}
+func (ClientsReady) isEvent()               {}
 func (m ClientsReady) GenStamp() domain.Gen { return m.Gen }
 func (ClientsReady) GenAspect() Aspect      { return AspectConnect }
 func (ClientsReady) AcceptZeroGen() bool    { return true }
@@ -139,7 +139,7 @@ type RelatedCheckResult struct {
 	LazyAddError error
 }
 
-func (RelatedCheckResult) isEvent()              {}
+func (RelatedCheckResult) isEvent()               {}
 func (m RelatedCheckResult) GenStamp() domain.Gen { return m.Generation }
 func (RelatedCheckResult) GenAspect() Aspect      { return AspectRelated }
 func (RelatedCheckResult) AcceptZeroGen() bool    { return true }
@@ -158,7 +158,7 @@ type RelatedCheckBatch struct {
 	Generation       domain.Gen
 }
 
-func (RelatedCheckBatch) isEvent()              {}
+func (RelatedCheckBatch) isEvent()               {}
 func (m RelatedCheckBatch) GenStamp() domain.Gen { return m.Generation }
 func (RelatedCheckBatch) GenAspect() Aspect      { return AspectRelated }
 func (RelatedCheckBatch) AcceptZeroGen() bool    { return true }
@@ -196,7 +196,7 @@ type AvailabilityPrefetched struct {
 	PrefetchErr error
 }
 
-func (AvailabilityPrefetched) isEvent()              {}
+func (AvailabilityPrefetched) isEvent()               {}
 func (m AvailabilityPrefetched) GenStamp() domain.Gen { return m.Gen }
 func (AvailabilityPrefetched) GenAspect() Aspect      { return AspectAvailability }
 
@@ -221,7 +221,7 @@ type AvailabilityChecked struct {
 	Resources    []resource.Resource // Populated on success AND on partial-success (Err non-nil but partial results present)
 }
 
-func (AvailabilityChecked) isEvent()              {}
+func (AvailabilityChecked) isEvent()               {}
 func (m AvailabilityChecked) GenStamp() domain.Gen { return m.Gen }
 func (AvailabilityChecked) GenAspect() Aspect      { return AspectAvailability }
 func (AvailabilityChecked) AcceptZeroGen() bool    { return false } // session counter starts at 0; zero stamp is always stale
@@ -231,25 +231,21 @@ type EnrichmentChecked struct {
 	ResourceType string
 	Issues       int  // updated issue count after enrichment (menu badge — ! severity only)
 	Truncated    bool // whether the enrichment count is a lower bound
-	// Findings is the per-resource finding map for this type, keyed by
+	// Findings carries every independently-evaluated Wave-2 Finding per
+	// Resource.ID (IssueEnricherResult.Findings, unfiltered), keyed by
 	// resource.Resource.ID. Populated on success AND on partial-success (Err
 	// non-nil but partial results present). May include findings for resources
-	// off-page (account-wide enrichers). At most one Finding per Resource.ID —
-	// when an enricher emits more than one independently-evaluated condition,
-	// this carries only the worst-severity one; see AllFindings for the full
-	// per-resource slice. Kept single-valued for ListEnrichmentPatch.Findings'
-	// and ApplyEnrichmentState's legacy single-Finding-per-resource contract;
-	// PatchDetail.EnrichmentFindings is built from AllFindings, not this field
-	// (every independently-evaluated finding must reach an already-open detail).
-	Findings map[string]domain.Finding
-	// AllFindings carries every independently-evaluated Wave-2 Finding per
-	// Resource.ID (IssueEnricherResult.Findings, unfiltered) — the row-level
-	// fold (applyEnrichment/ApplyWave2ToRow) uses this so a multi-condition
-	// resource retains every Finding on its cached row, and unifiedIssueCount
-	// uses this to count a resource once if ANY entry is SevBroken. Findings
-	// above is the single worst-severity representative derived from this at
-	// message-construction time — the two share the same key set.
-	AllFindings map[string][]domain.Finding
+	// off-page (account-wide enrichers). A resource with more than one
+	// independently-evaluated condition carries every one of them — the
+	// row-level fold (applyEnrichment/ApplyWave2ToRow) uses this so a
+	// multi-condition resource retains every Finding on its cached row,
+	// unifiedIssueCount uses this to count a resource once if ANY entry is
+	// SevBroken, and PatchDetail.EnrichmentFindings is built from this so
+	// every independently-evaluated finding reaches an already-open detail.
+	// A render-boundary consumer that needs a single representative (a row's
+	// one-character glyph) reduces via domain.WorstSeverityFinding — never
+	// stored pre-reduced here.
+	Findings map[string][]domain.Finding
 	// AttentionDetails carries the supporting rows for each per-resource
 	// Finding, keyed by Resource.ID then by the owning Finding's Code
 	// (IssueEnricherResult.AttentionDetails, unfiltered) — every
@@ -271,7 +267,7 @@ type EnrichmentChecked struct {
 	// results whose TypeGen doesn't match the current per-type gen are discarded.
 }
 
-func (EnrichmentChecked) isEvent()              {}
+func (EnrichmentChecked) isEvent()               {}
 func (m EnrichmentChecked) GenStamp() domain.Gen { return m.Gen }
 func (EnrichmentChecked) GenAspect() Aspect      { return AspectEnrichment }
 func (EnrichmentChecked) AcceptZeroGen() bool    { return true }
@@ -288,7 +284,7 @@ type IdentityLoaded struct {
 	Gen domain.Gen
 }
 
-func (IdentityLoaded) isEvent()              {}
+func (IdentityLoaded) isEvent()               {}
 func (m IdentityLoaded) GenStamp() domain.Gen { return m.Gen }
 func (IdentityLoaded) GenAspect() Aspect      { return AspectConnect }
 func (IdentityLoaded) AcceptZeroGen() bool    { return true }
@@ -303,7 +299,7 @@ type IdentityError struct {
 	Gen domain.Gen
 }
 
-func (IdentityError) isEvent()              {}
+func (IdentityError) isEvent()               {}
 func (m IdentityError) GenStamp() domain.Gen { return m.Gen }
 func (IdentityError) GenAspect() Aspect      { return AspectConnect }
 func (IdentityError) AcceptZeroGen() bool    { return true }
@@ -320,7 +316,7 @@ type EnrichDetailResult struct {
 	Generation   domain.Gen
 }
 
-func (EnrichDetailResult) isEvent()              {}
+func (EnrichDetailResult) isEvent()               {}
 func (m EnrichDetailResult) GenStamp() domain.Gen { return m.Generation }
 func (EnrichDetailResult) GenAspect() Aspect      { return AspectEnrichDetail }
 func (EnrichDetailResult) AcceptZeroGen() bool    { return true }

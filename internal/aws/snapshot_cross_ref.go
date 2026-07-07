@@ -3,16 +3,16 @@
 //
 // Two signals fire from sibling-cache scans (zero AWS API calls):
 //
-//   1. orphan: snapshot's parent identifier NOT found in the loaded parent
-//      cache, AND the cache is not truncated.
-//      Phrase: configurable per-type (e.g. "orphan: source DB deleted").
+//  1. orphan: snapshot's parent identifier NOT found in the loaded parent
+//     cache, AND the cache is not truncated.
+//     Phrase: configurable per-type (e.g. "orphan: source DB deleted").
 //
-//   2. past-retention: automated snapshot older than the parent's
-//      `BackupRetentionPeriod` (1.0× — no multiplier; the operator's
-//      declared retention IS the policy). Only fires when the parent IS in
-//      the cache, the snapshot is "automated", and the parent retention > 0.
-//      Phrase: configurable per-type
-//      (e.g. "automated, <N>d past retention").
+//  2. past-retention: automated snapshot older than the parent's
+//     `BackupRetentionPeriod` (1.0× — no multiplier; the operator's
+//     declared retention IS the policy). Only fires when the parent IS in
+//     the cache, the snapshot is "automated", and the parent retention > 0.
+//     Phrase: configurable per-type
+//     (e.g. "automated, <N>d past retention").
 //
 // Wave classification stays Wave 1 (zero SDK calls) — the helper scans the
 // in-memory ResourceCache only. Both signals route through
@@ -118,8 +118,6 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 		if severity == "" {
 			severity = "!"
 		}
-		sev := glyphToSeverity(severity)
-		source := "wave2:" + cfg.ShortName
 
 		result := IssueEnricherResult{
 			Findings:         make(map[string][]domain.Finding),
@@ -211,20 +209,11 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				continue
 			}
 
-			// Findings emits the entry for the detail-view Attention section
-			// AND drives the S4 status column at render time via
-			// phraseFromFindings(r.Findings).
-			result.Findings[res.ID] = []domain.Finding{{
-				Code:     code,
-				Phrase:   phrase,
-				Severity: sev,
-				Source:   source,
-			}}
-			if len(rows) > 0 {
-				result.AttentionDetails[res.ID] = map[domain.FindingCode]domain.AttentionDetail{
-					code: {Rows: rows},
-				}
-			}
+			// setWave2Finding is the sole append-only builder for both Findings
+			// and AttentionDetails (internal/aws/issue_enrichment.go) — it
+			// drives the detail-view Attention section AND the S4 status
+			// column at render time via phraseFromFindings(r.Findings).
+			setWave2Finding(&result, res.ID, code, phrase, severity, cfg.ShortName, rows, "")
 		}
 
 		return result, nil
@@ -244,4 +233,3 @@ func glyphToSeverity(s string) domain.Severity {
 		return domain.SevDim
 	}
 }
-

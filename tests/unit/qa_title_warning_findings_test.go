@@ -37,15 +37,15 @@ import (
 
 // warnOnlyFindings builds a Wave-2 findings map where every resource ID in
 // ids carries a SevWarn ("~", informational) finding — never SevBroken/SevOK.
-func warnOnlyFindings(ids []string) map[string]domain.Finding {
-	findings := make(map[string]domain.Finding, len(ids))
+func warnOnlyFindings(ids []string) map[string][]domain.Finding {
+	findings := make(map[string][]domain.Finding, len(ids))
 	for _, id := range ids {
-		findings[id] = domain.Finding{
+		findings[id] = []domain.Finding{{
 			Code:     "ec2.test.tildeOnly",
 			Phrase:   "informational only",
 			Severity: domain.SevWarn,
 			Source:   "wave2:ec2",
-		}
+		}}
 	}
 	return findings
 }
@@ -93,22 +93,22 @@ func TestController_ListIssueCount_MixedSeverityFindings_CountsBangOnly(t *testi
 	resources := controllerIssueResourcesWithState(5, 0, "running", "stopped")
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 
-	findings := make(map[string]domain.Finding, len(resources))
+	findings := make(map[string][]domain.Finding, len(resources))
 	for i, r := range resources {
 		if i < 2 {
-			findings[r.ID] = domain.Finding{
+			findings[r.ID] = []domain.Finding{{
 				Code:     "ec2.test.bang",
 				Phrase:   "impaired",
 				Severity: domain.SevBroken,
 				Source:   "wave2:ec2",
-			}
+			}}
 		} else {
-			findings[r.ID] = domain.Finding{
+			findings[r.ID] = []domain.Finding{{
 				Code:     "ec2.test.tilde",
 				Phrase:   "informational only",
 				Severity: domain.SevWarn,
 				Source:   "wave2:ec2",
-			}
+			}}
 		}
 	}
 	c.ApplyEnrichmentState("ec2", 2, false, findings, nil)
@@ -139,23 +139,23 @@ func TestController_ListIssueCount_TitleSuffixParity_MatchesMenuAggregation(t *t
 	resources := controllerIssueResourcesWithState(7, 0, "running", "stopped")
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 
-	findings := make(map[string]domain.Finding, len(resources))
+	findings := make(map[string][]domain.Finding, len(resources))
 	for i, r := range resources {
 		switch {
 		case i < 3:
-			findings[r.ID] = domain.Finding{
+			findings[r.ID] = []domain.Finding{{
 				Code:     "ec2.test.bang",
 				Phrase:   "impaired",
 				Severity: domain.SevBroken,
 				Source:   "wave2:ec2",
-			}
+			}}
 		case i < 6:
-			findings[r.ID] = domain.Finding{
+			findings[r.ID] = []domain.Finding{{
 				Code:     "ec2.test.tilde",
 				Phrase:   "informational only",
 				Severity: domain.SevWarn,
 				Source:   "wave2:ec2",
-			}
+			}}
 		}
 	}
 	c.ApplyEnrichmentState("ec2", 3, false, findings, nil)

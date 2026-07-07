@@ -42,16 +42,16 @@ func newWebLaneMenuBadgeController(t *testing.T) *app.Controller {
 
 // s3PatchFindings builds n wave2-sourced findings for distinct fake S3
 // bucket IDs, matching the shape carried by runtime.ListEnrichmentPatch.
-func s3PatchFindings(n int) map[string]domain.Finding {
-	findings := make(map[string]domain.Finding, n)
+func s3PatchFindings(n int) map[string][]domain.Finding {
+	findings := make(map[string][]domain.Finding, n)
 	for i := range n {
 		id := "arn:aws:s3:::a9s-test-bucket-" + string(rune('a'+i))
-		findings[id] = domain.Finding{
+		findings[id] = []domain.Finding{{
 			Code:     "s3.public_access",
 			Phrase:   "public access not blocked",
 			Severity: domain.SevWarn,
 			Source:   "wave2:s3",
-		}
+		}}
 	}
 	return findings
 }
@@ -127,7 +127,7 @@ func TestApplyIntents_PatchResourceList_NilIssues_LeavesMenuBadgeUnknown(t *test
 			ResourceType: "ec2",
 			Issues:       nil,
 			Enrichment: &runtime.ListEnrichmentPatch{
-				Findings: map[string]domain.Finding{},
+				Findings: map[string][]domain.Finding{},
 			},
 		},
 	})

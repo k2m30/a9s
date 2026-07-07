@@ -1,29 +1,26 @@
-// qa_detail_open_enrichment_multifinding_test.go — RED regression pin for a P2
-// bug found by Codex in the v3.47.0 landing (internal/runtime/handlers_availability.go
+// qa_detail_open_enrichment_multifinding_test.go — regression pin for a P2 bug
+// found by Codex in the v3.47.0 landing (internal/runtime/handlers_availability.go
 // around the PatchDetail construction in handleEnrichmentChecked).
 //
 // handleEnrichmentChecked folds allFindings (map[string][]domain.Finding — every
 // independently-evaluated Wave-2 condition per resource) onto cached rows via
-// applyEnrichment/AmendRows, but the PatchDetail intent it emits for
-// ALREADY-OPEN detail views is built from msg.Findings (map[string]domain.Finding
-// — the single worst-severity representative), not allFindings:
+// applyEnrichment/AmendRows. The bug (now fixed) was that the PatchDetail
+// intent emitted for ALREADY-OPEN detail views used to be built from a single
+// worst-severity representative Finding per resource instead of the full
+// per-resource slice:
 //
 //	intents = append(intents, PatchDetail{
 //	    ResourceType:               msg.ResourceType,
-//	    EnrichmentFindings:         msg.Findings,          // <- single Finding per resource
+//	    EnrichmentFindings:         allFindings,           // now: every finding, not one
 //	    EnrichmentAttentionDetails: msg.AttentionDetails,
 //	})
 //
-// internal/app/intents.go's PatchDetail case then iterates that single-valued
-// map and calls applyDetailFindingForResource with exactly one *domain.Finding,
-// which strips any prior wave-2 finding and appends the one it was given
-// (internal/app/detail_state.go's applyFindingToState). So a resource that is
-// ALREADY OPEN in a detail view when a multi-finding EnrichmentChecked result
-// arrives shows only the worst finding in its Attention block — the second
-// (and any further) independently-evaluated condition never reaches the
-// live-open detail, until the user closes and reopens it (which re-seeds from
-// the freshly-folded row via ensureDetailState/RowStore, where allFindings WAS
-// correctly applied).
+// internal/app/intents.go's PatchDetail case iterates the per-resource slice
+// and calls applyDetailFindingsForResource with every finding
+// (internal/app/detail_state.go), so a resource that is ALREADY OPEN in a
+// detail view when a multi-finding EnrichmentChecked result arrives shows
+// every independently-evaluated condition in its Attention block, not just
+// the worst one.
 //
 // This mirrors qa_wave2_multifinding_test.go's Section 1 open-detail pattern
 // (PushScreen{ScreenDetail} + EnsureDetailState + read Body.Detail.Fields for
@@ -31,7 +28,10 @@
 // the public Controller.Handle seam instead of hand-folding through
 // runtime.ApplyWave2ToRow, so it pins the PatchDetail plumbing specifically
 // (a different seam than #52's enricher-level fold, which this file assumes
-// already fixed — AllFindings is what a real post-#52 enricher now populates).
+// already fixed — the per-resource slice is what a real post-#52 enricher now
+// populates on messages.EnrichmentChecked.Findings, the sole plural
+// representation since the legacy-purge rename retired the single-Finding
+// compat field of the same name).
 package unit_test
 
 import (
@@ -90,16 +90,10 @@ func TestHandleEnrichmentChecked_DetailAlreadyOpen_MultiFinding_BothFindingsReac
 		ResourceType: "ecs-svc",
 		Issues:       1,
 		Truncated:    false,
-		// Findings carries only the worst-severity representative — exactly what
-		// a real post-#52 enricher pipeline derives for the single-Finding-per-
-		// resource contract documented on messages.EnrichmentChecked.Findings.
-		Findings: map[string]domain.Finding{
-			detailOpenMultiFindingResourceID: detailOpenMultiFindingBroken,
-		},
-		// AllFindings carries every independently-evaluated condition — what a
+		// Findings carries every independently-evaluated condition — what a
 		// real enricher's IssueEnricherResult.Findings now holds per-resource
 		// (map[string][]domain.Finding, #52).
-		AllFindings: map[string][]domain.Finding{
+		Findings: map[string][]domain.Finding{
 			detailOpenMultiFindingResourceID: {detailOpenMultiFindingBroken, detailOpenMultiFindingWarn},
 		},
 	})

@@ -104,13 +104,13 @@ func newDetailParityTUIModel(t *testing.T) tui.Model {
 func detailParityEnrichmentCheckedEvent() messages.EnrichmentChecked {
 	return messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Findings: map[string]domain.Finding{
-			"i-detailparity01": {
+		Findings: map[string][]domain.Finding{
+			"i-detailparity01": {{
 				Code:     "ec2.status-impaired",
 				Phrase:   "instance status check failed",
 				Severity: domain.SevBroken,
 				Source:   "wave2:ec2-status",
-			},
+			}},
 		},
 		AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{
 			"i-detailparity01": {

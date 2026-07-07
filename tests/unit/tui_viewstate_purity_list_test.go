@@ -109,7 +109,7 @@ func TestViewStatePurity_List_GlyphFollowsDecoratorNotFindings_Present(t *testin
 		// Deliberately EMPTY — no finding for res-1. Re-derivation (which scans
 		// EnrichmentFindings[row.ResourceID]) will find nothing and skip the
 		// glyph. A pure consumer of row.Decorator must still show it.
-		EnrichmentFindings: map[string]domain.Finding{},
+		EnrichmentFindings: map[string][]domain.Finding{},
 	}
 
 	out := m.RenderList(body)
@@ -147,12 +147,12 @@ func TestViewStatePurity_List_GlyphFollowsDecoratorNotFindings_Absent(t *testing
 		StatusCol: 1, // "Status" column — matches purityColumns()[1]
 		// Deliberately carries an issue-severity finding for res-2. Re-derivation
 		// will find it and prepend "! " even though Decorator says otherwise.
-		EnrichmentFindings: map[string]domain.Finding{
-			"res-2": {
+		EnrichmentFindings: map[string][]domain.Finding{
+			"res-2": {{
 				Code:     "PURITY-TEST",
 				Phrase:   "should not surface as glyph",
 				Severity: domain.SevBroken,
-			},
+			}},
 		},
 	}
 
@@ -198,12 +198,12 @@ func TestViewStatePurity_List_StatusCellFollowsCellsNotFindingsPhrase(t *testing
 		Selected:  0,
 		MarkerCol: 0,
 		StatusCol: 1, // "Status" column — matches purityColumns()[1]
-		EnrichmentFindings: map[string]domain.Finding{
-			"res-3": {
+		EnrichmentFindings: map[string][]domain.Finding{
+			"res-3": {{
 				Code:     "PURITY-TEST",
 				Phrase:   findingsPhrase,
 				Severity: domain.SevBroken,
-			},
+			}},
 		},
 	}
 
@@ -250,12 +250,12 @@ func TestViewStatePurity_List_MarkerColSelectsPrefixedColumn(t *testing.T) {
 		// Marker column is column 1 ("Status"), NOT the default column 0 ("Name").
 		MarkerCol: 1,
 		StatusCol: 1, // "Status" column — matches purityColumns()[1]
-		EnrichmentFindings: map[string]domain.Finding{
-			"res-4": {
+		EnrichmentFindings: map[string][]domain.Finding{
+			"res-4": {{
 				Code:     "PURITY-TEST",
 				Phrase:   "needs-attention",
 				Severity: domain.SevBroken,
-			},
+			}},
 		},
 	}
 

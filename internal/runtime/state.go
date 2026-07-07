@@ -13,14 +13,6 @@ type RuntimeState struct {
 	// for the active session: per-resource-type cached list state.
 	ResourceCache map[string]*domain.ListViewCacheEntry
 
-	// EnrichmentFindings carries the most-recent Wave 2 findings per
-	// resource type, keyed by ResourceType -> ResourceID -> finding.
-	EnrichmentFindings map[string]map[string]domain.Finding
-	// EnrichmentAttentionDetails carries the supporting AttentionDetail rows
-	// for each Wave 2 finding, keyed by ResourceType -> ResourceID -> detail.
-	// Paired with EnrichmentFindings (same key shape; same ResourceID).
-	EnrichmentAttentionDetails map[string]map[string]domain.AttentionDetail
-
 	// MenuBadges is the current per-resource-type issue badge state used
 	// to render the main menu.
 	MenuBadges map[string]IssueBadgePatch

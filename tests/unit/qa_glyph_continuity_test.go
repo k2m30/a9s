@@ -159,7 +159,7 @@ func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 		ResourceType: "ec2",
 		Issues:       0,
 		Truncated:    false,
-		Findings:     map[string]domain.Finding{},
+		Findings:     map[string][]domain.Finding{},
 		Gen:          0,
 		TypeGen:      0,
 	}
@@ -275,8 +275,8 @@ func TestProfileSwitch_StillClearsFindings(t *testing.T) {
 		{ID: "i-sharedid", Name: "i-sharedid", Type: "ec2"},
 	}
 	ctrl.ApplyResourcesLoaded("ec2", seeded, nil, false)
-	ctrl.ApplyEnrichmentState("ec2", 1, false, map[string]domain.Finding{
-		"i-sharedid": {Code: "ec2.impaired", Phrase: "system check failed", Severity: domain.SevBroken, Source: "wave2:ec2"},
+	ctrl.ApplyEnrichmentState("ec2", 1, false, map[string][]domain.Finding{
+		"i-sharedid": {{Code: "ec2.impaired", Phrase: "system check failed", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 	}, nil)
 
 	if !hasDecoratorForID(ctrl, "i-sharedid", app.DecoratorError) {

@@ -203,8 +203,7 @@ func TestEnrichmentChecked_FetchOriginFindings_SurviveToCompletionSavePayload(t 
 	_, tasks := ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType:     sentinelType,
 		Issues:           result.Issues,
-		Findings:         runtime.WorstFindingPerID(result.Findings),
-		AllFindings:      result.Findings,
+		Findings:         result.Findings,
 		AttentionDetails: result.AttentionDetails,
 		FieldUpdates:     result.FieldUpdates,
 		TruncatedIDs:     result.TruncatedIDs,

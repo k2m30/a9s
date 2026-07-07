@@ -949,18 +949,22 @@ func TestPagination_AppendAccumulatesCount(t *testing.T) {
 func TestEnrichment_FindingsInBody(t *testing.T) {
 	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
-	c.ApplyEnrichmentState("ec2", 1, false, map[string]domain.Finding{
-		"i-0bbb222222222222b": {Code: "ec2.stopped", Phrase: "instance stopped", Severity: domain.SevWarn},
+	c.ApplyEnrichmentState("ec2", 1, false, map[string][]domain.Finding{
+		"i-0bbb222222222222b": {{Code: "ec2.stopped", Phrase: "instance stopped", Severity: domain.SevWarn}},
 	}, nil)
 
 	lb := listBodyOrFail(t, c)
 	if lb.EnrichmentFindings == nil {
 		t.Fatal("EnrichmentFindings should not be nil")
 	}
-	f, ok := lb.EnrichmentFindings["i-0bbb222222222222b"]
+	fs, ok := lb.EnrichmentFindings["i-0bbb222222222222b"]
 	if !ok {
 		t.Fatal("EnrichmentFindings missing key i-0bbb222222222222b")
 	}
+	if len(fs) != 1 {
+		t.Fatalf("EnrichmentFindings[i-0bbb222222222222b]: want 1 finding, got %d: %+v", len(fs), fs)
+	}
+	f := fs[0]
 	if f.Phrase != "instance stopped" {
 		t.Errorf("finding Phrase: got %q want %q", f.Phrase, "instance stopped")
 	}
@@ -975,8 +979,8 @@ func TestEnrichment_BrokenRowHasDecoratorError(t *testing.T) {
 		{ID: "i-0aaa111111111111a", Name: "web-server", Type: "ec2",
 			Fields: map[string]string{"instance_id": "i-0aaa111111111111a", "state": "running"}},
 	}, nil, false)
-	c.ApplyEnrichmentState("ec2", 1, false, map[string]domain.Finding{
-		"i-0aaa111111111111a": {Code: "ec2.impaired", Phrase: "system check failed", Severity: domain.SevBroken},
+	c.ApplyEnrichmentState("ec2", 1, false, map[string][]domain.Finding{
+		"i-0aaa111111111111a": {{Code: "ec2.impaired", Phrase: "system check failed", Severity: domain.SevBroken}},
 	}, nil)
 
 	lb := listBodyOrFail(t, c)
@@ -994,8 +998,8 @@ func TestEnrichment_WarnRowHasDecoratorWarning(t *testing.T) {
 		{ID: "i-0bbb222222222222b", Name: "db-server", Type: "ec2",
 			Fields: map[string]string{"instance_id": "i-0bbb222222222222b", "state": "running"}},
 	}, nil, false)
-	c.ApplyEnrichmentState("ec2", 1, false, map[string]domain.Finding{
-		"i-0bbb222222222222b": {Code: "ec2.degraded", Phrase: "instance degraded", Severity: domain.SevWarn},
+	c.ApplyEnrichmentState("ec2", 1, false, map[string][]domain.Finding{
+		"i-0bbb222222222222b": {{Code: "ec2.degraded", Phrase: "instance degraded", Severity: domain.SevWarn}},
 	}, nil)
 
 	lb := listBodyOrFail(t, c)
@@ -1016,8 +1020,8 @@ func TestEnrichment_AttentionFilterIncludesEnrichmentRows(t *testing.T) {
 			Fields: map[string]string{"instance_id": "i-0bbb222222222222b", "state": "running"}},
 	}
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
-	c.ApplyEnrichmentState("ec2", 1, false, map[string]domain.Finding{
-		"i-0bbb222222222222b": {Code: "ec2.degraded", Phrase: "degraded", Severity: domain.SevWarn},
+	c.ApplyEnrichmentState("ec2", 1, false, map[string][]domain.Finding{
+		"i-0bbb222222222222b": {{Code: "ec2.degraded", Phrase: "degraded", Severity: domain.SevWarn}},
 	}, nil)
 	c.Apply(app.Action{Kind: app.ActionToggleAttention})
 
@@ -1033,11 +1037,11 @@ func TestEnrichment_AttentionFilterIncludesEnrichmentRows(t *testing.T) {
 func TestEnrichment_TypeIsolation(t *testing.T) {
 	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
-	c.ApplyEnrichmentState("ec2", 1, false, map[string]domain.Finding{
-		"i-0aaa111111111111a": {Code: "test.x", Phrase: "broken", Severity: domain.SevBroken},
+	c.ApplyEnrichmentState("ec2", 1, false, map[string][]domain.Finding{
+		"i-0aaa111111111111a": {{Code: "test.x", Phrase: "broken", Severity: domain.SevBroken}},
 	}, nil)
 	// Applying s3 enrichment must not erase ec2 findings.
-	c.ApplyEnrichmentState("s3", 0, false, map[string]domain.Finding{}, nil)
+	c.ApplyEnrichmentState("s3", 0, false, map[string][]domain.Finding{}, nil)
 
 	lb := listBodyOrFail(t, c)
 	if lb.EnrichmentFindings == nil {

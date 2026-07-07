@@ -166,7 +166,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 
 			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType:     msgType,
-				Findings:         map[string]domain.Finding{rid: efFinding},
+				Findings:         map[string][]domain.Finding{rid: {efFinding}},
 				AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{rid: {wantCode: efAttention}},
 				Gen:              0,
 				TypeGen:          0,
@@ -218,7 +218,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 
 			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType:     msgType,
-				Findings:         map[string]domain.Finding{rid: efFinding},
+				Findings:         map[string][]domain.Finding{rid: {efFinding}},
 				AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{rid: {wantCode: efAttention}},
 				Gen:              0,
 				TypeGen:          0,
@@ -259,7 +259,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 
 			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType:     msgType,
-				Findings:         map[string]domain.Finding{rid: efFinding},
+				Findings:         map[string][]domain.Finding{rid: {efFinding}},
 				AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{rid: {wantCode: efAttention}},
 				Gen:              0,
 				TypeGen:          0,
@@ -363,7 +363,7 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 			// First enrichment: wave2 = summaryA
 			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
-				Findings:     map[string]domain.Finding{rid: efFirst},
+				Findings:     map[string][]domain.Finding{rid: {efFirst}},
 				Gen:          0,
 				TypeGen:      0,
 			})
@@ -371,7 +371,7 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 			// Second enrichment: wave2 = summaryB
 			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
-				Findings:     map[string]domain.Finding{rid: efSecond},
+				Findings:     map[string][]domain.Finding{rid: {efSecond}},
 				Gen:          0,
 				TypeGen:      0,
 			})
@@ -487,7 +487,7 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 			// Seed wave2 finding.
 			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType:     msgType,
-				Findings:         map[string]domain.Finding{rid: efInitialFinding},
+				Findings:         map[string][]domain.Finding{rid: {efInitialFinding}},
 				AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{rid: {efInitialCode: efInitialAttention}},
 				Gen:              0,
 				TypeGen:          0,
@@ -618,7 +618,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 	// Step 2: stamp wave2 findings into the cached row via EnrichmentCheckedMsg.
 	m = applyMsg(m, messages.EnrichmentChecked{
 		ResourceType:     "ec2",
-		Findings:         map[string]domain.Finding{rid: efFinding},
+		Findings:         map[string][]domain.Finding{rid: {efFinding}},
 		AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{rid: {efFinding.Code: efAttention}},
 		Gen:              0,
 		TypeGen:          0,
@@ -673,7 +673,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 	// rid (resource recovered) — this MUST remove the finding.
 	m = applyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Findings:     map[string]domain.Finding{},
+		Findings:     map[string][]domain.Finding{},
 		Gen:          0,
 		TypeGen:      0,
 	})
@@ -757,14 +757,14 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 	// Step 2: stamp wave2 findings via EnrichmentCheckedMsg for both types.
 	m = applyMsg(m, messages.EnrichmentChecked{
 		ResourceType:     ec2Short,
-		Findings:         map[string]domain.Finding{ec2ID: efEC2Finding},
+		Findings:         map[string][]domain.Finding{ec2ID: {efEC2Finding}},
 		AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{ec2ID: {efEC2Finding.Code: efEC2Attention}},
 		Gen:              0,
 		TypeGen:          0,
 	})
 	m = applyMsg(m, messages.EnrichmentChecked{
 		ResourceType:     s3Short,
-		Findings:         map[string]domain.Finding{s3ID: efS3Finding},
+		Findings:         map[string][]domain.Finding{s3ID: {efS3Finding}},
 		AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{s3ID: {efS3Finding.Code: efS3Attention}},
 		Gen:              0,
 		TypeGen:          0,
@@ -932,7 +932,7 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 			// Step 2: Wave 2 enrichment arrives.
 			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType:     msgType,
-				Findings:         map[string]domain.Finding{rid: efFinding},
+				Findings:         map[string][]domain.Finding{rid: {efFinding}},
 				AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{rid: {wantCode: efAttention}},
 				Gen:              0,
 				TypeGen:          0,

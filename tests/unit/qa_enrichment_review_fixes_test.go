@@ -172,7 +172,7 @@ func TestCtrlR_ClearsActiveListFindingsImmediately(t *testing.T) {
 		ResourceType: "ec2",
 		Issues:       0,
 		Truncated:    false,
-		Findings:     map[string]domain.Finding{},
+		Findings:     map[string][]domain.Finding{},
 		Gen:          0,
 		TypeGen:      0,
 	}

@@ -298,8 +298,8 @@ func TestMenuCount_MatchesListCount_AfterWave2(t *testing.T) {
 		ResourceType: "ec2",
 		Issues:       1,
 		Truncated:    false,
-		Findings: map[string]domain.Finding{
-			"i-0abc1111aaa111111": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+		Findings: map[string][]domain.Finding{
+			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		},
 		Gen:     0,
 		TypeGen: 0,
@@ -388,10 +388,10 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			ResourceType: "ec2",
 			Issues:       1,
 			Truncated:    false,
-			Findings: map[string]domain.Finding{
-				"i-aaa": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
-				"i-bbb": {Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"},
-				"i-ccc": {Code: "ec2.instance.quota", Phrase: "quota 80%+ used", Severity: domain.SevWarn, Source: "wave2:ec2"},
+			Findings: map[string][]domain.Finding{
+				"i-aaa": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
+				"i-bbb": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"}},
+				"i-ccc": {{Code: "ec2.instance.quota", Phrase: "quota 80%+ used", Severity: domain.SevWarn, Source: "wave2:ec2"}},
 			},
 			Gen:     0,
 			TypeGen: 0,
@@ -432,10 +432,10 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			ResourceType: "ec2",
 			Issues:       0,
 			Truncated:    false,
-			Findings: map[string]domain.Finding{
-				"i-aaa": {Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"},
-				"i-bbb": {Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"},
-				"i-ccc": {Code: "ec2.instance.quota", Phrase: "quota 80%+ used", Severity: domain.SevWarn, Source: "wave2:ec2"},
+			Findings: map[string][]domain.Finding{
+				"i-aaa": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"}},
+				"i-bbb": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"}},
+				"i-ccc": {{Code: "ec2.instance.quota", Phrase: "quota 80%+ used", Severity: domain.SevWarn, Source: "wave2:ec2"}},
 			},
 			Gen:     0,
 			TypeGen: 0,
@@ -479,8 +479,8 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			ResourceType: "ec2",
 			Issues:       0, // enricher excludes ~ from IssueCount
 			Truncated:    false,
-			Findings: map[string]domain.Finding{
-				"i-stopped": {Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"},
+			Findings: map[string][]domain.Finding{
+				"i-stopped": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"}},
 			},
 			Gen:     0,
 			TypeGen: 0,

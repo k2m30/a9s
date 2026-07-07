@@ -602,9 +602,9 @@ func TestStage2Pin_IssueCountParity_MenuBadgeMatchesStoreRowAggregation(t *testi
 		t.Fatalf("precondition: want EnrichTotal=1, got %d", s.EnrichTotal)
 	}
 
-	findings := map[string]domain.Finding{
-		"i-0issuerow0001": {Code: "ec2-stopped-has-eip", Phrase: "stopped, has EIP", Severity: domain.SevBroken, Source: "wave2:ec2"},
-		"i-0issuerow0002": {Code: "ec2-stopped-has-eip", Phrase: "stopped, has EIP", Severity: domain.SevBroken, Source: "wave2:ec2"},
+	findings := map[string][]domain.Finding{
+		"i-0issuerow0001": {{Code: "ec2-stopped-has-eip", Phrase: "stopped, has EIP", Severity: domain.SevBroken, Source: "wave2:ec2"}},
+		"i-0issuerow0002": {{Code: "ec2-stopped-has-eip", Phrase: "stopped, has EIP", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 	}
 	_, _ = c.Handle(messages.EnrichmentChecked{
 		ResourceType: stage2PinType,

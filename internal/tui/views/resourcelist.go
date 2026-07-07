@@ -827,11 +827,54 @@ func renderListDataRow(cols []listCol, row app.ListRow, base lipgloss.Style, tot
 	return b.String()
 }
 
-// SetEnrichmentState stores Wave 2 enrichment results for this resource type.
-// Delegates to the controller's ApplyEnrichmentState and invalidates the render cache.
+// SetEnrichmentState stores Wave 2 enrichment results for this resource
+// type. findings/details are single-valued: callers (the cache-hit
+// navigation seed via primaryWave2FindingByID/primaryWave2DetailByID, and
+// the live enrichment fold) have already reduced a resource's possibly-
+// several independently-evaluated Wave-2 conditions down to the single
+// WORST-severity one for the row glyph — a named render-boundary
+// derivation, not a compat shim. This method wraps that single value back
+// into the per-ID slice form Controller.ApplyEnrichmentState's plural
+// storage layer requires, then invalidates the render cache.
 func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated bool, findings map[string]domain.Finding, details map[string]domain.AttentionDetail) {
-	m.ctrl.ApplyEnrichmentState(m.typeDef.ShortName, issueCount, truncated, findings, details)
+	m.ctrl.ApplyEnrichmentState(m.typeDef.ShortName, issueCount, truncated, singleFindingMapToSlice(findings), singleAttentionDetailMapToNested(findings, details))
 	m.styledRowCache = nil
+}
+
+// singleFindingMapToSlice wraps a single-Finding-per-ID map into the per-ID
+// slice form the plural enrichment store requires. Returns nil for a nil
+// input.
+func singleFindingMapToSlice(findings map[string]domain.Finding) map[string][]domain.Finding {
+	if findings == nil {
+		return nil
+	}
+	out := make(map[string][]domain.Finding, len(findings))
+	for id, f := range findings {
+		out[id] = []domain.Finding{f}
+	}
+	return out
+}
+
+// singleAttentionDetailMapToNested wraps a single-AttentionDetail-per-ID map
+// into the per-ID, per-FindingCode nested form the plural enrichment store
+// requires, keying each entry by its paired Finding's Code. Returns nil when
+// details is empty or no entry matches a Code in findings.
+func singleAttentionDetailMapToNested(findings map[string]domain.Finding, details map[string]domain.AttentionDetail) map[string]map[domain.FindingCode]domain.AttentionDetail {
+	if len(details) == 0 {
+		return nil
+	}
+	var out map[string]map[domain.FindingCode]domain.AttentionDetail
+	for id, ad := range details {
+		f, ok := findings[id]
+		if !ok {
+			continue
+		}
+		if out == nil {
+			out = make(map[string]map[domain.FindingCode]domain.AttentionDetail, len(details))
+		}
+		out[id] = map[domain.FindingCode]domain.AttentionDetail{f.Code: ad}
+	}
+	return out
 }
 
 // ApplyFieldUpdates merges Wave-2-derived field values into the in-memory

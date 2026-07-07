@@ -135,7 +135,7 @@ func TestEnrichmentCheckedMsg_NilErrNoFlash(t *testing.T) {
 	m := newTestModel()
 	okMsg := messages.EnrichmentChecked{
 		ResourceType: "sfn",
-		Findings:     map[string]domain.Finding{},
+		Findings:     map[string][]domain.Finding{},
 	}
 
 	_, cmd := m.Update(okMsg)
