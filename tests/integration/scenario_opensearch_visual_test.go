@@ -164,8 +164,9 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	// Rule 7 U7c — S5 Attention section surfaces every Wave-2 finding
 	// on the multi-background fixture. The list Status is
 	// "software update forced soon (+1)" (rolled-up); the detail must
-	// enumerate BOTH the top finding's Summary AND the hidden
-	// encryption-off phrase (carried as an "Additional" row).
+	// enumerate BOTH conditions as their OWN Attention entry (#52: each
+	// wave-2 finding is independent — no more "Additional" cramming),
+	// each rendered with its first letter capitalized.
 	// -----------------------------------------------------------------
 	multi := selectOpenSearchByID(t, scenario, demofixtures.MultiBackgroundDomain)
 	scenario.OpenDetailResource("opensearch", multi)
@@ -175,10 +176,9 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	view := scenario.currentView()
 	t.Log("\n" + view)
 
-	// The top Wave-2 Summary (Attention renders with first letter capitalized).
+	// Both findings surface as their own capitalized Attention entry.
 	scenario.ExpectViewContains(openSearchDetailPhraseUpdate)
-	// The hidden `~` finding surfaces via the Additional row.
-	scenario.ExpectViewContains(openSearchPhraseEncryption)
+	scenario.ExpectViewContains(openSearchDetailPhraseEncOff)
 
 	scenario.Back()
 
