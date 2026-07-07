@@ -12,6 +12,9 @@ import (
 )
 
 func colorRole(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
 	doc := r.Fields["assume_role_policy_document"]
 	if doc != "" &&
 		(strings.Contains(doc, `"Principal":"*"`) || strings.Contains(doc, `"Principal": "*"`)) {
@@ -21,6 +24,9 @@ func colorRole(r domain.Resource) domain.Color {
 }
 
 func colorPolicy(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
 	if r.Fields["attachment_count"] == "0" && r.Fields["is_attachable"] == "true" {
 		return domain.ColorWarning
 	}
@@ -28,10 +34,8 @@ func colorPolicy(r domain.Resource) domain.Color {
 }
 
 func colorIAMUser(r domain.Resource) domain.Color {
-	for i := range r.Findings {
-		if r.Findings[i].Code == iamUserCodeNoMFA && r.Findings[i].IsWave2Sourced() {
-			return colorFromSeverity(r.Findings[i].Severity)
-		}
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
 	}
 	if r.Fields["has_console_password"] != "true" {
 		return domain.ColorHealthy
@@ -47,8 +51,19 @@ func colorIAMUser(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-func colorIAMGroup(_ domain.Resource) domain.Color { return domain.ColorHealthy }
-func colorWAF(_ domain.Resource) domain.Color      { return domain.ColorHealthy }
+func colorIAMGroup(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
+
+func colorWAF(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
 
 var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{

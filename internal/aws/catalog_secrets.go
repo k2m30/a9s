@@ -12,6 +12,9 @@ import (
 )
 
 func colorSecrets(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
 	if r.Fields["rotation_enabled"] == "No" {
 		return domain.ColorWarning
 	}
@@ -56,6 +59,9 @@ func colorSSM(r domain.Resource) domain.Color {
 }
 
 func colorKMS(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
 	switch r.Fields["status"] {
 	case "Enabled":
 		return domain.ColorHealthy
