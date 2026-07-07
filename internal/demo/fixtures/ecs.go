@@ -566,6 +566,39 @@ func buildECSTasks() []ecstypes.Task {
 			Connectivity:      ecstypes.ConnectivityConnected,
 			AvailabilityZone:  aws.String("us-east-1c"),
 		},
+		// LastStatus=PROVISIONING → wave1 finding (CodeECSTaskStateProvisioning, SevWarn) → Warning.
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-services/e1f2a7b8c9d0e1f2a8b9c0d1"),
+			ClusterArn:        aws.String(ecsClusterArnServices),
+			LastStatus:        aws.String("PROVISIONING"),
+			DesiredStatus:     aws.String("RUNNING"),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/web-frontend:8"),
+			LaunchType:        ecstypes.LaunchTypeFargate,
+			Cpu:               aws.String("256"),
+			Memory:            aws.String("512"),
+			Group:             aws.String("service:web-frontend"),
+			CreatedAt:         aws.Time(mustTime("2026-05-04T11:00:00Z")),
+			HealthStatus:      ecstypes.HealthStatusUnknown,
+			PlatformVersion:   aws.String("1.4.0"),
+			PlatformFamily:    aws.String("Linux"),
+			AvailabilityZone:  aws.String("us-east-1b"),
+		},
+		// LastStatus=DEPROVISIONING → wave1 finding (CodeECSTaskStateDeprovisioning, SevWarn) → Warning.
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-batch/f2a7b8c9d0e1f2a8b9c0d1e2"),
+			ClusterArn:        aws.String(ecsClusterArnBatch),
+			LastStatus:        aws.String("DEPROVISIONING"),
+			DesiredStatus:     aws.String("STOPPED"),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/batch-etl-runner:3"),
+			LaunchType:        ecstypes.LaunchTypeEc2,
+			Cpu:               aws.String("2048"),
+			Memory:            aws.String("4096"),
+			Group:             aws.String("service:batch-etl-runner"),
+			StartedAt:         aws.Time(mustTime("2026-05-04T03:00:00Z")),
+			HealthStatus:      ecstypes.HealthStatusUnknown,
+			Connectivity:      ecstypes.ConnectivityConnected,
+			AvailabilityZone:  aws.String("us-east-1c"),
+		},
 	}
 }
 
