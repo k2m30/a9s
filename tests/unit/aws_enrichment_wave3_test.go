@@ -833,10 +833,20 @@ var _ awsclient.ELBv2API = (*elbWave3Fake)(nil)
 // EnrichELBAttributes
 // =============================================================================
 
-// TestEnrichELBAttributes_BothMisconfigurations_BangFinding verifies that a
-// load balancer missing both deletion protection and access logging produces a
-// "!" finding (both-missing promotion rule).
-func TestEnrichELBAttributes_BothMisconfigurations_BangFinding(t *testing.T) {
+// TestEnrichELBAttributes_BothMisconfigurations_TildeFinding pins the CURRENT
+// (correct) contract: a load balancer missing both deletion protection and
+// access logging still produces only a "~" (SevWarn) finding, per commit
+// 8555b124 ("elb enricher stops promoting warn to broken") — both flags
+// missing at once is the AWS create-load-balancer default and must not
+// escalate to SevBroken (see EnrichELBAttributes' own doc comment in
+// internal/aws/elb_issue_enrichment.go), or every freshly-created,
+// unhardened LB would render red.
+//
+// RETIRED the old "both-missing promotion rule" invariant this test used to
+// pin (TestEnrichELBAttributes_BothMisconfigurations_BangFinding): that
+// promotion was deliberately removed in 8555b124, predating this task —
+// this test was simply never updated to match.
+func TestEnrichELBAttributes_BothMisconfigurations_TildeFinding(t *testing.T) {
 	lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/abc"
 	fake := &elbWave3Fake{
 		perLBAttrs: map[string][]elbtypes.LoadBalancerAttribute{
@@ -858,11 +868,11 @@ func TestEnrichELBAttributes_BothMisconfigurations_BangFinding(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for LB %q; findings: %v", lbName, result.Findings)
 	}
-	if f.Severity != domain.SevBroken {
-		t.Errorf("severity = %v, want %q (both misconfigured → promotion)", f.Severity, "!")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %q (both misconfigured must NOT promote to broken)", f.Severity, "~")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
+	if result.IssueCount != 0 {
+		t.Errorf("IssueCount = %d, want 0 for ~ findings", result.IssueCount)
 	}
 }
 

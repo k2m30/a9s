@@ -223,10 +223,20 @@ func TestEC2Fetcher_StoppedUserEmitsWarnFinding(t *testing.T) {
 // T03b-6 — terminated state → no Finding
 // ---------------------------------------------------------------------------
 
-// TestEC2Fetcher_TerminatedEmitsNoFinding asserts that a terminated instance
-// emits no Finding. Terminated is a lifecycle terminal state; it lives in
-// Fields["state"], not Findings.
-func TestEC2Fetcher_TerminatedEmitsNoFinding(t *testing.T) {
+// TestEC2Fetcher_TerminatedEmitsDimFinding pins the CURRENT (correct)
+// contract: a terminated instance emits exactly one SevDim Finding
+// (CodeEC2StateTerminated), because colorEC2 is now
+// colorFromAnyFinding-only (internal/aws/catalog_compute.go) — it needs a
+// Finding to color from, not a bare Fields["state"] read.
+//
+// RETIRED the old "terminated emits no Finding" invariant this test used to
+// pin (TestEC2Fetcher_TerminatedEmitsNoFinding): that was the
+// pre-color-findings-conformance contract. Since the fetcher
+// (internal/aws/ec2.go) now emits a SevDim Finding for the terminated
+// branch, "no Finding" is no longer true — terminated is no longer a silent
+// state. See qa_color_findings_conformance_test.go for the standing
+// architectural gate.
+func TestEC2Fetcher_TerminatedEmitsDimFinding(t *testing.T) {
 	mock := newEC2MockForPR03b([]ec2types.Instance{
 		{
 			InstanceId:   aws.String("i-0789ghi"),
@@ -251,8 +261,17 @@ func TestEC2Fetcher_TerminatedEmitsNoFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if len(r.Findings) != 0 {
-		t.Errorf("Findings: got %d findings, want 0 for terminated state (lifecycle terminal)", len(r.Findings))
+	if len(r.Findings) != 1 {
+		t.Fatalf("Findings: got %d findings, want 1 for terminated state (colorEC2 needs its own Finding to color from)", len(r.Findings))
+	}
+	if r.Findings[0].Code != awsclient.CodeEC2StateTerminated {
+		t.Errorf("Findings[0].Code = %q, want %q", r.Findings[0].Code, awsclient.CodeEC2StateTerminated)
+	}
+	if r.Findings[0].Severity != domain.SevDim {
+		t.Errorf("Findings[0].Severity = %v, want domain.SevDim", r.Findings[0].Severity)
+	}
+	if r.Findings[0].Source != "wave1" {
+		t.Errorf("Findings[0].Source = %q, want wave1", r.Findings[0].Source)
 	}
 }
 
@@ -301,14 +320,19 @@ func TestEC2Color_ReadsFindingsFirst(t *testing.T) {
 // T03b-8 — Color falls back to structural path when Findings is empty
 // ---------------------------------------------------------------------------
 
-// TestEC2Color_FallsBackWhenFindingsEmpty is a regression pin: when Findings
-// is nil the existing structural-field logic must still return ColorBroken for
-// a stopped instance with a Server.* reason code.
+// TestEC2Color_HealthyWhenFindingsEmpty pins the CURRENT (correct) contract:
+// colorEC2 is colorFromAnyFinding-only (internal/aws/catalog_compute.go, no
+// raw-field fallback at all) — a stopped+Server.* instance with Findings
+// empty/nil now resolves ColorHealthy, not ColorBroken, because Color no
+// longer reads Fields["state"]/Fields["state_reason_code"] at all.
 //
-// Pre-fix: passes (already works via Fields path).
-// Post-fix: still passes (fallback preserved). This test must stay green
-// across both before and after the migration.
-func TestEC2Color_FallsBackWhenFindingsEmpty(t *testing.T) {
+// RETIRED the old "falls back to the structural Fields path when Findings is
+// empty" invariant this test used to pin
+// (TestEC2Color_FallsBackWhenFindingsEmpty): that raw-field fallback was
+// removed entirely by the color-findings-conformance wave. See
+// qa_color_findings_conformance_test.go for the standing architectural gate
+// and qa_ec2_color_test.go for the full Findings-attached Color contract.
+func TestEC2Color_HealthyWhenFindingsEmpty(t *testing.T) {
 	td := resource.FindResourceType("ec2")
 	if td == nil {
 		t.Fatal("ec2 type not registered")
@@ -324,8 +348,8 @@ func TestEC2Color_FallsBackWhenFindingsEmpty(t *testing.T) {
 	}
 
 	got := td.Color(r)
-	if got != resource.ColorBroken {
-		t.Errorf("Color: got %v, want ColorBroken — fallback structural path: stopped+Server.* must yield ColorBroken when Findings is empty", got)
+	if got != resource.ColorHealthy {
+		t.Errorf("Color: got %v, want ColorHealthy — colorEC2 has no raw-field fallback; Findings empty means no signal at all", got)
 	}
 }
 

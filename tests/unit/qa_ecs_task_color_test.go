@@ -1,8 +1,18 @@
 package unit
 
+// qa_ecs_task_color_test.go — Color contract pin for ECS Tasks.
+//
+// Since the color-findings-conformance wave, colorECSTask
+// (internal/aws/catalog_compute.go) prefers colorFromAnyFinding, falling back
+// to a raw last_status switch that has NO stop_code/health_status logic —
+// those two overrides are Findings-only now (ecsTaskStructuralFindings,
+// internal/aws/ecs_task_codes.go). Cases exercising stop_code or
+// health_status must attach the matching Finding to be meaningful.
+
 import (
 	"testing"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -17,6 +27,7 @@ func TestEcsTaskColor(t *testing.T) {
 		lastStatus   string
 		stopCode     string
 		healthStatus string
+		findings     []domain.Finding
 		want         resource.Color
 	}{
 		{
@@ -49,13 +60,19 @@ func TestEcsTaskColor(t *testing.T) {
 			name:       "stopped_failed",
 			lastStatus: "STOPPED",
 			stopCode:   "TaskFailedToStart",
-			want:       resource.ColorBroken,
+			findings: []domain.Finding{
+				{Code: "ecs-task.stop-code.failed", Phrase: "stopped: TaskFailedToStart", Severity: domain.SevBroken, Source: "wave1"},
+			},
+			want: resource.ColorBroken,
 		},
 		{
 			name:       "stopped_essential_exit",
 			lastStatus: "STOPPED",
 			stopCode:   "EssentialContainerExited",
-			want:       resource.ColorBroken,
+			findings: []domain.Finding{
+				{Code: "ecs-task.stop-code.failed", Phrase: "stopped: EssentialContainerExited", Severity: domain.SevBroken, Source: "wave1"},
+			},
+			want: resource.ColorBroken,
 		},
 		{
 			name:       "stopped_no_code",
@@ -66,7 +83,10 @@ func TestEcsTaskColor(t *testing.T) {
 			name:         "unhealthy_running",
 			lastStatus:   "RUNNING",
 			healthStatus: "UNHEALTHY",
-			want:         resource.ColorBroken,
+			findings: []domain.Finding{
+				{Code: "ecs-task.health.unhealthy", Phrase: "unhealthy", Severity: domain.SevBroken, Source: "wave1"},
+			},
+			want: resource.ColorBroken,
 		},
 		{
 			name: "empty",
@@ -86,10 +106,10 @@ func TestEcsTaskColor(t *testing.T) {
 			if tc.healthStatus != "" {
 				fields["health_status"] = tc.healthStatus
 			}
-			got := td.Color(resource.Resource{Fields: fields})
+			got := td.Color(resource.Resource{Fields: fields, Findings: tc.findings})
 			if got != tc.want {
-				t.Errorf("Color(last_status=%q, stop_code=%q, health_status=%q) = %v, want %v",
-					tc.lastStatus, tc.stopCode, tc.healthStatus, got, tc.want)
+				t.Errorf("Color(last_status=%q, stop_code=%q, health_status=%q, findings=%v) = %v, want %v",
+					tc.lastStatus, tc.stopCode, tc.healthStatus, tc.findings, got, tc.want)
 			}
 		})
 	}

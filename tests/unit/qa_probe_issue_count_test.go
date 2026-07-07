@@ -9,6 +9,7 @@ package unit
 import (
 	"testing"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -33,11 +34,36 @@ func countIssueRowsForType(td *resource.ResourceTypeDef, resources []resource.Re
 // ---------------------------------------------------------------------------
 
 // TestCountIssueRowsForType_EC2 verifies the counting logic for EC2 instances.
-// EC2 issue classification reads Fields["state"] and status fields, not Resource.Status.
+//
+// Since the color-findings-conformance wave, colorEC2 is
+// colorFromAnyFinding-only (internal/aws/catalog_compute.go) — it has NO
+// raw-field fallback at all. Every non-healthy fixture here attaches the
+// Finding the real fetcher (internal/aws/ec2.go, wave1) or Wave-2 enricher
+// (internal/aws/ec2_issue_enrichment.go, Source "wave2:ec2") would produce.
 func TestCountIssueRowsForType_EC2(t *testing.T) {
 	td := resource.FindResourceType("ec2")
 	if td == nil {
 		t.Fatal("ec2 resource type not found")
+	}
+
+	stoppedWarn := []domain.Finding{{Code: "ec2.state.stopped", Phrase: "stopped", Severity: domain.SevWarn, Source: "wave1"}}
+	pendingWarn := []domain.Finding{{Code: "ec2.state.pending", Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+	stoppingWarn := []domain.Finding{{Code: "ec2.state.stopping", Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"}}
+	terminatedDim := []domain.Finding{{Code: "ec2.state.terminated", Phrase: "terminated", Severity: domain.SevDim, Source: "wave1"}}
+	shuttingDownWarn := []domain.Finding{
+		{Code: "ec2.state.shutting-down", Phrase: "shutting down", Severity: domain.SevWarn, Source: "wave1"},
+	}
+	impairedBroken := []domain.Finding{
+		{
+			Code: "ec2.instance-status-impaired", Phrase: "impaired: system checks failing",
+			Severity: domain.SevBroken, Source: "wave2:ec2",
+		},
+	}
+	initializingWarn := []domain.Finding{
+		{
+			Code: "ec2.instance-status-impaired", Phrase: "initializing: checks in progress",
+			Severity: domain.SevWarn, Source: "wave2:ec2",
+		},
 	}
 
 	tests := []struct {
@@ -48,11 +74,11 @@ func TestCountIssueRowsForType_EC2(t *testing.T) {
 		{
 			name: "mixed ec2 statuses: only stopped/pending counted",
 			resources: []resource.Resource{
-				{ID: "i-001", Fields: map[string]string{"state": "running"}},    // Healthy
-				{ID: "i-002", Fields: map[string]string{"state": "stopped"}},    // Broken — issue
-				{ID: "i-003", Fields: map[string]string{"state": "pending"}},    // Warning — issue
-				{ID: "i-004", Fields: map[string]string{"state": "terminated"}}, // Dim
-				{ID: "i-005", Fields: map[string]string{"state": "stopping"}},   // Broken — issue
+				{ID: "i-001", Fields: map[string]string{"state": "running"}},                             // Healthy
+				{ID: "i-002", Fields: map[string]string{"state": "stopped"}, Findings: stoppedWarn},      // Warning — issue
+				{ID: "i-003", Fields: map[string]string{"state": "pending"}, Findings: pendingWarn},      // Warning — issue
+				{ID: "i-004", Fields: map[string]string{"state": "terminated"}, Findings: terminatedDim}, // Dim
+				{ID: "i-005", Fields: map[string]string{"state": "stopping"}, Findings: stoppingWarn},    // Warning — issue
 			},
 			want: 3, // stopped + pending + stopping
 		},
@@ -67,16 +93,16 @@ func TestCountIssueRowsForType_EC2(t *testing.T) {
 		{
 			name: "all stopped",
 			resources: []resource.Resource{
-				{ID: "i-001", Fields: map[string]string{"state": "stopped"}},
-				{ID: "i-002", Fields: map[string]string{"state": "stopped"}},
-				{ID: "i-003", Fields: map[string]string{"state": "stopped"}},
+				{ID: "i-001", Fields: map[string]string{"state": "stopped"}, Findings: stoppedWarn},
+				{ID: "i-002", Fields: map[string]string{"state": "stopped"}, Findings: stoppedWarn},
+				{ID: "i-003", Fields: map[string]string{"state": "stopped"}, Findings: stoppedWarn},
 			},
 			want: 3,
 		},
 		{
 			name: "impaired running instance (system_status=impaired)",
 			resources: []resource.Resource{
-				{ID: "i-001", Fields: map[string]string{"state": "running", "system_status": "impaired"}},
+				{ID: "i-001", Fields: map[string]string{"state": "running", "system_status": "impaired"}, Findings: impairedBroken},
 				{ID: "i-002", Fields: map[string]string{"state": "running", "system_status": "ok"}},
 			},
 			want: 1,
@@ -84,7 +110,7 @@ func TestCountIssueRowsForType_EC2(t *testing.T) {
 		{
 			name: "initializing instance (instance_status=initializing)",
 			resources: []resource.Resource{
-				{ID: "i-001", Fields: map[string]string{"state": "running", "instance_status": "initializing"}},
+				{ID: "i-001", Fields: map[string]string{"state": "running", "instance_status": "initializing"}, Findings: initializingWarn},
 				{ID: "i-002", Fields: map[string]string{"state": "running"}},
 			},
 			want: 1,
@@ -97,8 +123,8 @@ func TestCountIssueRowsForType_EC2(t *testing.T) {
 		{
 			name: "terminated is dim, shutting-down is warning (issue)",
 			resources: []resource.Resource{
-				{ID: "i-001", Fields: map[string]string{"state": "terminated"}},
-				{ID: "i-002", Fields: map[string]string{"state": "shutting-down"}},
+				{ID: "i-001", Fields: map[string]string{"state": "terminated"}, Findings: terminatedDim},
+				{ID: "i-002", Fields: map[string]string{"state": "shutting-down"}, Findings: shuttingDownWarn},
 			},
 			want: 1, // shutting-down → Warning (transitional issue), terminated → Dim (not issue)
 		},

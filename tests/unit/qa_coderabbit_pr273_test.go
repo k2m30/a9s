@@ -570,10 +570,20 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, injected)
 
-	// Step 5: the "! " prefix marker must appear — meaning the finding was applied.
+	// Step 5: the finding must have been applied. Since the
+	// color-findings-conformance wave, colorEC2 derives ColorBroken directly
+	// from this Finding (colorFromAnyFinding) — resolveListDecoratorFull no
+	// longer emits the "! " glyph prefix for a non-Healthy row (that branch
+	// only fires when ResolveColor()==ColorHealthy; see
+	// internal/app/list_columns.go). The stronger, renderer-agnostic contract
+	// is that the row is now a counted issue: it must survive the ctrl+z
+	// attention filter, which only the real Wave-2 Finding could cause here
+	// (the fixture's Fields carry no lifecycle signal of their own).
+	m, _ = rootApplyMsg(m, ctrlZ())
 	content := stripANSI(m.View().Content)
-	if !strings.Contains(content, "! ") {
-		t.Errorf("Gen=0 EnrichmentCheckedMsg must bypass the session guard (enrichmentGen=%d) and apply findings — '! ' marker absent in rendered output:\n%s",
+	if !strings.Contains(content, "web-server-1") {
+		t.Errorf("Gen=0 EnrichmentCheckedMsg must bypass the session guard (enrichmentGen=%d) and apply findings — "+
+			"the impaired instance must remain visible under ctrl+z (it is now an issue row):\n%s",
 			genAfterSwitch, content)
 	}
 }
@@ -1061,6 +1071,17 @@ func TestCR273_Item18_TrivialColor_MustClassify(t *testing.T) {
 			}
 			r := resource.Resource{
 				Fields: fields,
+			}
+			// findingsOnlyColorTypes (ec2/lambda/ami/ebs-snap, since the
+			// color-findings-conformance wave) have NO raw-field fallback at
+			// all — a bare Fields probe can never produce non-Healthy for
+			// them. Attach a representative SevBroken Finding so this probe
+			// still exercises "can this type ever classify non-Healthy" for
+			// its real (Findings-driven) mechanism.
+			if findingsOnlyColorTypes[td.ShortName] {
+				r.Findings = []domain.Finding{
+					{Code: domain.FindingCode(td.ShortName + ".test.probe"), Phrase: s, Severity: domain.SevBroken, Source: "wave1"},
+				}
 			}
 			c := td.Color(r)
 			if c != resource.ColorHealthy {

@@ -535,16 +535,24 @@ func TestSilentSwap_NeverDropsKnownFindings(t *testing.T) {
 	}
 	ctrl.ApplyResourcesLoaded("s3", seeded, nil, false)
 
+	// Since the color-findings-conformance wave, colorS3 is
+	// colorFromAnyFinding-only (internal/aws/catalog_databases.go) — a
+	// SevBroken Finding resolves the row's whole-row color to "broken"
+	// directly (resolveListDecoratorFull's DecoratorError glyph branch only
+	// fires when ResolveColor()==ColorHealthy; see internal/app/list_columns.go
+	// and .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
+	// The stronger, correct check is ListRow.Color=="broken", not the glyph
+	// Decorator.
 	preSwap := ctrl.Snapshot()
 	preRows := preSwap.Body.List.Rows
-	foundGlyphBeforeSwap := false
+	foundBrokenBeforeSwap := false
 	for _, r := range preRows {
-		if r.ResourceID == "bucket-known-1" && r.Decorator == app.DecoratorError {
-			foundGlyphBeforeSwap = true
+		if r.ResourceID == "bucket-known-1" && r.Color == "broken" {
+			foundBrokenBeforeSwap = true
 		}
 	}
-	if !foundGlyphBeforeSwap {
-		t.Fatal("fixture assumption broken — seeded bucket-known-1 does not show an error decorator before the swap")
+	if !foundBrokenBeforeSwap {
+		t.Fatal("fixture assumption broken — seeded bucket-known-1 does not render as a broken row before the swap")
 	}
 
 	// Silent swap: same IDs, no findings attached, enrichment store empty
@@ -560,14 +568,14 @@ func TestSilentSwap_NeverDropsKnownFindings(t *testing.T) {
 	if lb == nil {
 		t.Fatal("Body.List is nil after the silent swap")
 	}
-	postGlyph := false
+	postBroken := false
 	for _, r := range lb.Rows {
-		if r.ResourceID == "bucket-known-1" && r.Decorator == app.DecoratorError {
-			postGlyph = true
+		if r.ResourceID == "bucket-known-1" && r.Color == "broken" {
+			postBroken = true
 		}
 	}
-	if !postGlyph {
-		t.Error("bucket-known-1's error decorator vanished after the silent swap even though the enrichment store never changed — the row's previously-known WAVE-2 finding must be inherited, not silently dropped")
+	if !postBroken {
+		t.Error("bucket-known-1's broken row color vanished after the silent swap even though the enrichment store never changed — the row's previously-known WAVE-2 finding must be inherited, not silently dropped")
 	}
 
 	all := ctrl.GetListAllResources()
@@ -617,15 +625,23 @@ func TestSilentSwap_Wave1FindingNotCarriedOnResolve(t *testing.T) {
 	}
 	ctrl.ApplyResourcesLoaded("s3", seeded, nil, false)
 
+	// Since the color-findings-conformance wave, colorS3 is
+	// colorFromAnyFinding-only (internal/aws/catalog_databases.go) — a
+	// SevBroken Finding resolves the row's whole-row color to "broken"
+	// directly (resolveListDecoratorFull's DecoratorError glyph branch only
+	// fires when ResolveColor()==ColorHealthy; see internal/app/list_columns.go
+	// and .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
+	// The stronger, correct check is ListRow.Color=="broken", not the glyph
+	// Decorator.
 	preSwap := ctrl.Snapshot()
-	foundGlyphBeforeSwap := false
+	foundBrokenBeforeSwap := false
 	for _, r := range preSwap.Body.List.Rows {
-		if r.ResourceID == "bucket-resolve-1" && r.Decorator == app.DecoratorError {
-			foundGlyphBeforeSwap = true
+		if r.ResourceID == "bucket-resolve-1" && r.Color == "broken" {
+			foundBrokenBeforeSwap = true
 		}
 	}
-	if !foundGlyphBeforeSwap {
-		t.Fatal("fixture assumption broken — seeded bucket-resolve-1 does not show an error decorator before the swap")
+	if !foundBrokenBeforeSwap {
+		t.Fatal("fixture assumption broken — seeded bucket-resolve-1 does not render as a broken row before the swap")
 	}
 
 	// Silent swap: same IDs, no findings attached — the fresh fetch's
@@ -642,8 +658,8 @@ func TestSilentSwap_Wave1FindingNotCarriedOnResolve(t *testing.T) {
 		t.Fatal("Body.List is nil after the silent swap")
 	}
 	for _, r := range lb.Rows {
-		if r.ResourceID == "bucket-resolve-1" && r.Decorator == app.DecoratorError {
-			t.Error("bucket-resolve-1 still shows an error decorator after the silent swap — a Wave-1 finding absent from a fresh fetch result means RESOLVED and must not be carried forward")
+		if r.ResourceID == "bucket-resolve-1" && r.Color == "broken" {
+			t.Error("bucket-resolve-1 still renders as a broken row after the silent swap — a Wave-1 finding absent from a fresh fetch result means RESOLVED and must not be carried forward")
 		}
 	}
 

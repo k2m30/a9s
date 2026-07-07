@@ -1,8 +1,20 @@
 package unit
 
+// qa_lambda_color_test.go — Color contract pin for Lambda functions.
+//
+// Since the color-findings-conformance wave (qa_color_findings_conformance_test.go),
+// colorLambda is colorFromAnyFinding-only (internal/aws/catalog_compute.go) —
+// it has NO raw-field fallback at all. Every non-healthy case here attaches a
+// Finding shaped exactly like the real fetcher (internal/aws/lambda.go, wave1
+// Findings, codes in lambda_codes.go), whose switch fires exactly ONE Finding
+// in precedence order: last-update failure, then deprecated runtime, then
+// lifecycle state, then no-DLQ fallback. Fields are kept for realism/context
+// only — they are no longer read by Color.
+
 import (
 	"testing"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -13,9 +25,10 @@ func TestLambdaColor_StateAndOverrides(t *testing.T) {
 	}
 
 	cases := []struct {
-		name   string
-		fields map[string]string
-		want   resource.Color
+		name     string
+		fields   map[string]string
+		findings []domain.Finding
+		want     resource.Color
 	}{
 		{
 			name:   "state=Active",
@@ -25,27 +38,51 @@ func TestLambdaColor_StateAndOverrides(t *testing.T) {
 		{
 			name:   "state=Pending",
 			fields: map[string]string{"state": "Pending", "dlq_target_arn": "arn:aws:sqs:us-east-1:123456789012:my-queue"},
-			want:   resource.ColorWarning,
+			findings: []domain.Finding{
+				{Code: "lambda.state.pending", Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			},
+			want: resource.ColorWarning,
 		},
 		{
 			name:   "state=Inactive",
 			fields: map[string]string{"state": "Inactive", "dlq_target_arn": "arn:aws:sqs:us-east-1:123456789012:my-queue"},
-			want:   resource.ColorDim,
+			findings: []domain.Finding{
+				{
+					Code: "lambda.state.inactive", Phrase: "inactive, evicted after extended idle time",
+					Severity: domain.SevDim, Source: "wave1",
+				},
+			},
+			want: resource.ColorDim,
 		},
 		{
 			name:   "state=Failed",
 			fields: map[string]string{"state": "Failed", "dlq_target_arn": "arn:aws:sqs:us-east-1:123456789012:my-queue"},
-			want:   resource.ColorBroken,
+			findings: []domain.Finding{
+				{Code: "lambda.state.failed", Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			},
+			want: resource.ColorBroken,
 		},
 		{
 			name:   "state=Active+last_update_status=Failed",
 			fields: map[string]string{"state": "Active", "last_update_status": "Failed", "dlq_target_arn": "arn:aws:sqs:us-east-1:123456789012:my-queue"},
-			want:   resource.ColorBroken,
+			findings: []domain.Finding{
+				{
+					Code: "lambda.last-update.failed", Phrase: "last update failed to apply",
+					Severity: domain.SevBroken, Source: "wave1",
+				},
+			},
+			want: resource.ColorBroken,
 		},
 		{
 			name:   "state=Active+deprecated_runtime=python3.7",
 			fields: map[string]string{"state": "Active", "runtime": "python3.7", "dlq_target_arn": "arn:aws:sqs:us-east-1:123456789012:my-queue"},
-			want:   resource.ColorBroken,
+			findings: []domain.Finding{
+				{
+					Code: "lambda.runtime.deprecated", Phrase: "runtime is end-of-life",
+					Severity: domain.SevBroken, Source: "wave1",
+				},
+			},
+			want: resource.ColorBroken,
 		},
 		{
 			name:   "state=Active+current_runtime=python3.12",
@@ -55,7 +92,10 @@ func TestLambdaColor_StateAndOverrides(t *testing.T) {
 		{
 			name:   "state=Active+no_dlq",
 			fields: map[string]string{"state": "Active"},
-			want:   resource.ColorWarning,
+			findings: []domain.Finding{
+				{Code: "lambda.dlq.missing", Phrase: "no dead-letter queue configured", Severity: domain.SevWarn, Source: "wave1"},
+			},
+			want: resource.ColorWarning,
 		},
 		{
 			name:   "state=Active+dlq_present",
@@ -63,6 +103,11 @@ func TestLambdaColor_StateAndOverrides(t *testing.T) {
 			want:   resource.ColorHealthy,
 		},
 		{
+			// Synthetic multi-finding case (the real fetcher's switch only
+			// ever emits ONE Finding, last-update-failed taking top
+			// precedence — see lambda.go) exercising colorFromAnyFinding's
+			// max-severity-wins reduction directly: SevBroken must win even
+			// when a SevWarn finding (no-DLQ) is also present.
 			name: "all_signals_broken_wins_over_warning",
 			fields: map[string]string{
 				"state":              "Active",
@@ -70,15 +115,22 @@ func TestLambdaColor_StateAndOverrides(t *testing.T) {
 				"runtime":            "python3.7",
 				"dlq_target_arn":     "",
 			},
+			findings: []domain.Finding{
+				{
+					Code: "lambda.last-update.failed", Phrase: "last update failed to apply",
+					Severity: domain.SevBroken, Source: "wave1",
+				},
+				{Code: "lambda.dlq.missing", Phrase: "no dead-letter queue configured", Severity: domain.SevWarn, Source: "wave1"},
+			},
 			want: resource.ColorBroken,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := td.Color(resource.Resource{Fields: tc.fields})
+			got := td.Color(resource.Resource{Fields: tc.fields, Findings: tc.findings})
 			if got != tc.want {
-				t.Errorf("Color(%v) = %v, want %v", tc.fields, got, tc.want)
+				t.Errorf("Color(%v, findings=%v) = %v, want %v", tc.fields, tc.findings, got, tc.want)
 			}
 		})
 	}

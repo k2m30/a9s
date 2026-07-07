@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -91,6 +92,13 @@ func projectRoot(t *testing.T) string {
 // Invariant #3 — EC2 Color func: impaired/initializing promotion.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// TestColorRefactor_EC2Color_ImpairedPromotion pins colorEC2
+// (internal/aws/catalog_compute.go), which since the color-findings-conformance
+// wave is colorFromAnyFinding-only with NO raw-field fallback — every
+// non-healthy case must attach a Finding shaped like the real fetcher
+// (internal/aws/ec2.go wave1 Findings) or Wave-2 enricher
+// (internal/aws/ec2_issue_enrichment.go, Source "wave2:ec2"). Fields are kept
+// for realism/context only — they are no longer read by Color.
 func TestColorRefactor_EC2Color_ImpairedPromotion(t *testing.T) {
 	td := resource.FindResourceType("ec2")
 	if td == nil {
@@ -101,29 +109,54 @@ func TestColorRefactor_EC2Color_ImpairedPromotion(t *testing.T) {
 	}
 
 	cases := []struct {
-		name   string
-		fields map[string]string
-		want   resource.Color
+		name     string
+		fields   map[string]string
+		findings []domain.Finding
+		want     resource.Color
 	}{
 		{
 			name:   "system_status=impaired → ColorBroken",
 			fields: map[string]string{"state": "running", "system_status": "impaired"},
-			want:   resource.ColorBroken,
+			findings: []domain.Finding{
+				{
+					Code: "ec2.instance-status-impaired", Phrase: "impaired: system checks failing",
+					Severity: domain.SevBroken, Source: "wave2:ec2",
+				},
+			},
+			want: resource.ColorBroken,
 		},
 		{
 			name:   "instance_status=impaired → ColorBroken",
 			fields: map[string]string{"state": "running", "instance_status": "impaired"},
-			want:   resource.ColorBroken,
+			findings: []domain.Finding{
+				{
+					Code: "ec2.instance-status-impaired", Phrase: "impaired: system checks failing",
+					Severity: domain.SevBroken, Source: "wave2:ec2",
+				},
+			},
+			want: resource.ColorBroken,
 		},
 		{
 			name:   "instance_status=initializing → ColorWarning",
 			fields: map[string]string{"state": "running", "instance_status": "initializing"},
-			want:   resource.ColorWarning,
+			findings: []domain.Finding{
+				{
+					Code: "ec2.instance-status-impaired", Phrase: "initializing: checks in progress",
+					Severity: domain.SevWarn, Source: "wave2:ec2",
+				},
+			},
+			want: resource.ColorWarning,
 		},
 		{
 			name:   "system_status=initializing → ColorWarning",
 			fields: map[string]string{"state": "running", "system_status": "initializing"},
-			want:   resource.ColorWarning,
+			findings: []domain.Finding{
+				{
+					Code: "ec2.instance-status-impaired", Phrase: "initializing: checks in progress",
+					Severity: domain.SevWarn, Source: "wave2:ec2",
+				},
+			},
+			want: resource.ColorWarning,
 		},
 		{
 			name:   "both ok → ColorHealthy",
@@ -141,41 +174,59 @@ func TestColorRefactor_EC2Color_ImpairedPromotion(t *testing.T) {
 			// in qa_ec2_color_test.go).
 			name:   "state=stopped → ColorWarning",
 			fields: map[string]string{"state": "stopped"},
-			want:   resource.ColorWarning,
+			findings: []domain.Finding{
+				{Code: "ec2.state.stopped", Phrase: "stopped", Severity: domain.SevWarn, Source: "wave1"},
+			},
+			want: resource.ColorWarning,
 		},
 		{
 			name:   "state=stopping → ColorWarning",
 			fields: map[string]string{"state": "stopping"},
-			want:   resource.ColorWarning,
+			findings: []domain.Finding{
+				{Code: "ec2.state.stopping", Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"},
+			},
+			want: resource.ColorWarning,
 		},
 		{
 			name:   "state=pending → ColorWarning",
 			fields: map[string]string{"state": "pending"},
-			want:   resource.ColorWarning,
+			findings: []domain.Finding{
+				{Code: "ec2.state.pending", Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			},
+			want: resource.ColorWarning,
 		},
 		{
+			// Terminated now emits a SevDim Finding (wave #42) — no longer a
+			// silent "no finding" state.
 			name:   "state=terminated → ColorDim",
 			fields: map[string]string{"state": "terminated"},
-			want:   resource.ColorDim,
+			findings: []domain.Finding{
+				{Code: "ec2.state.terminated", Phrase: "terminated", Severity: domain.SevDim, Source: "wave1"},
+			},
+			want: resource.ColorDim,
 		},
 		{
 			// shutting-down is transitional — Warning per doc, not Dim.
 			name:   "state=shutting-down → ColorWarning",
 			fields: map[string]string{"state": "shutting-down"},
-			want:   resource.ColorWarning,
+			findings: []domain.Finding{
+				{Code: "ec2.state.shutting-down", Phrase: "shutting down", Severity: domain.SevWarn, Source: "wave1"},
+			},
+			want: resource.ColorWarning,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := resource.Resource{
-				ID:     "i-0abc1234567",
-				Name:   "test-instance",
-				Fields: tc.fields,
+				ID:       "i-0abc1234567",
+				Name:     "test-instance",
+				Fields:   tc.fields,
+				Findings: tc.findings,
 			}
 			got := td.Color(r)
 			if got != tc.want {
-				t.Errorf("ec2.Color(%v) = %v, want %v", tc.fields, got, tc.want)
+				t.Errorf("ec2.Color(%v, findings=%v) = %v, want %v", tc.fields, tc.findings, got, tc.want)
 			}
 		})
 	}

@@ -10,6 +10,7 @@ import (
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // ---------------------------------------------------------------------------
@@ -86,11 +87,23 @@ func TestFetchEBEnvironments_ParsesMultipleEnvironments(t *testing.T) {
 		t.Error("expected RawStruct to be set")
 	}
 
-	// Second env (Yellow health): post-fix contract — no Status, no wave1 Finding.
-	// Color func reads Fields["health"] == "Yellow" to derive ColorWarning structurally.
+	// Second env (Yellow health): RETIRED the old "no Status, no wave1
+	// Finding" invariant — since the color-findings-conformance wave, colorEB
+	// is colorFromAnyFinding-first (internal/aws/catalog_compute.go) and
+	// ebEnvironmentFindings (internal/aws/eb_codes.go) now emits
+	// CodeEBHealthYellow/SevWarn for a Yellow-health environment, because
+	// Color needs its own Finding to color from. See
+	// qa_color_findings_conformance_test.go for the standing architectural
+	// gate and TestPR03b_EBFetcher_EmitsHealthAsWave1Finding for full coverage.
 	r2 := resources[1]
-	if len(r2.Findings) != 0 {
-		t.Errorf("expected 0 Findings for Yellow environment (health is structural, not wave1), got %d", len(r2.Findings))
+	if len(r2.Findings) != 1 {
+		t.Fatalf("expected 1 Finding for Yellow environment (colorEB needs its own Finding to color from), got %d", len(r2.Findings))
+	}
+	if r2.Findings[0].Code != awsclient.CodeEBHealthYellow {
+		t.Errorf("r2 Findings[0].Code = %q, want %q", r2.Findings[0].Code, awsclient.CodeEBHealthYellow)
+	}
+	if r2.Findings[0].Severity != domain.SevWarn {
+		t.Errorf("r2 Findings[0].Severity = %v, want domain.SevWarn", r2.Findings[0].Severity)
 	}
 }
 

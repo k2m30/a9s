@@ -105,10 +105,14 @@ func instanceStatus(id, sysStatus, instStatus string) ec2types.InstanceStatus {
 
 // TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired verifies that
 // a running instance with SystemStatus="impaired" and InstanceStatus="ok"
-// has Fields["system_status"] set and is classified as ColorBroken.
+// has Fields["system_status"] set and, once the real Wave-2 enricher
+// (EnrichEC2InstanceStatus) has run and its Finding is merged onto the
+// resource, is classified as ColorBroken.
 //
-// Post-cleanup contract: Resource.Status is always "" (no dual-write).
-// Color classification is driven by ec2td.Color(r) reading Fields directly.
+// Post-cleanup contract: Resource.Status is always "" (no dual-write). Since
+// the color-findings-conformance wave, colorEC2 is colorFromAnyFinding-only
+// (no raw-field fallback) — Color classification requires the Wave-2
+// Finding, not a bare Fields read.
 func TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired(t *testing.T) {
 	const id = "i-sys-impaired-001"
 	stub := &stubEC2WithStatusChecks{
@@ -138,7 +142,23 @@ func TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired(t *testing.T)
 		t.Errorf("expected Fields[\"state\"] == %q (original raw state preserved), got %q", "running", r.Fields["state"])
 	}
 
-	// Color func reads Fields["system_status"] directly → ColorBroken → IsIssue=true.
+	// Run the real Wave-2 enricher (the fetcher itself never writes the
+	// impaired Finding — enrichEC2StatusChecks only merges Fields) and merge
+	// its output onto r, mirroring the real fetch→enrich pipeline.
+	enrichClients := &awsclient.ServiceClients{EC2: &ec2InstanceStatusFake{
+		statuses: []ec2types.InstanceStatus{
+			instanceStatus(id, "impaired", "ok"),
+		},
+	}}
+	enrichResult, enrichErr := awsclient.EnrichEC2InstanceStatus(context.Background(), enrichClients, resources, nil)
+	if enrichErr != nil {
+		t.Fatalf("EnrichEC2InstanceStatus returned unexpected error: %v", enrichErr)
+	}
+	if f, ok := enrichResult.Findings[id]; ok {
+		r.Findings = append(r.Findings, f)
+	}
+
+	// Color func derives from the merged Wave-2 Finding → ColorBroken → IsIssue=true.
 	ec2td := resource.FindResourceType("ec2")
 	if ec2td != nil && ec2td.Color != nil {
 		got := ec2td.Color(r)
@@ -157,10 +177,14 @@ func TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired(t *testing.T)
 
 // TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired verifies that
 // a running instance with SystemStatus="ok" and InstanceStatus="impaired"
-// has Fields["instance_status"] set and is classified as ColorBroken.
+// has Fields["instance_status"] set and, once the real Wave-2 enricher
+// (EnrichEC2InstanceStatus) has run and its Finding is merged onto the
+// resource, is classified as ColorBroken.
 //
-// Post-cleanup contract: Resource.Status is always "" (no dual-write).
-// Color classification is driven by ec2td.Color(r) reading Fields directly.
+// Post-cleanup contract: Resource.Status is always "" (no dual-write). Since
+// the color-findings-conformance wave, colorEC2 is colorFromAnyFinding-only
+// (no raw-field fallback) — Color classification requires the Wave-2
+// Finding, not a bare Fields read.
 func TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired(t *testing.T) {
 	const id = "i-inst-impaired-001"
 	stub := &stubEC2WithStatusChecks{
@@ -190,7 +214,22 @@ func TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired(t *testing.
 		t.Errorf("expected Fields[\"state\"] == %q (original raw state preserved), got %q", "running", r.Fields["state"])
 	}
 
-	// Color func reads Fields["instance_status"] directly → ColorBroken → IsIssue=true.
+	// Run the real Wave-2 enricher and merge its output onto r, mirroring the
+	// real fetch→enrich pipeline (see the impaired system_status test above).
+	enrichClients := &awsclient.ServiceClients{EC2: &ec2InstanceStatusFake{
+		statuses: []ec2types.InstanceStatus{
+			instanceStatus(id, "ok", "impaired"),
+		},
+	}}
+	enrichResult, enrichErr := awsclient.EnrichEC2InstanceStatus(context.Background(), enrichClients, resources, nil)
+	if enrichErr != nil {
+		t.Fatalf("EnrichEC2InstanceStatus returned unexpected error: %v", enrichErr)
+	}
+	if f, ok := enrichResult.Findings[id]; ok {
+		r.Findings = append(r.Findings, f)
+	}
+
+	// Color func derives from the merged Wave-2 Finding → ColorBroken.
 	ec2td := resource.FindResourceType("ec2")
 	if ec2td != nil && ec2td.Color != nil {
 		got := ec2td.Color(r)
@@ -206,10 +245,14 @@ func TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired(t *testing.
 
 // TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing verifies
 // that a running instance with SystemStatus="ok" and InstanceStatus="initializing"
-// has Fields["instance_status"] set and is classified as ColorWarning.
+// has Fields["instance_status"] set and, once the real Wave-2 enricher
+// (EnrichEC2InstanceStatus) has run and its Finding is merged onto the
+// resource, is classified as ColorWarning.
 //
-// Post-cleanup contract: Resource.Status is always "" (no dual-write).
-// Color classification is driven by ec2td.Color(r) reading Fields directly.
+// Post-cleanup contract: Resource.Status is always "" (no dual-write). Since
+// the color-findings-conformance wave, colorEC2 is colorFromAnyFinding-only
+// (no raw-field fallback) — Color classification requires the Wave-2
+// Finding, not a bare Fields read.
 func TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing(t *testing.T) {
 	const id = "i-initializing-001"
 	stub := &stubEC2WithStatusChecks{
@@ -236,7 +279,22 @@ func TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing(t *
 		t.Errorf("expected Fields[\"instance_status\"] == %q, got %q", "initializing", r.Fields["instance_status"])
 	}
 
-	// Color func reads Fields["instance_status"] directly → ColorWarning → IsIssue=true.
+	// Run the real Wave-2 enricher and merge its output onto r, mirroring the
+	// real fetch→enrich pipeline (see the impaired system_status test above).
+	enrichClients := &awsclient.ServiceClients{EC2: &ec2InstanceStatusFake{
+		statuses: []ec2types.InstanceStatus{
+			instanceStatus(id, "ok", "initializing"),
+		},
+	}}
+	enrichResult, enrichErr := awsclient.EnrichEC2InstanceStatus(context.Background(), enrichClients, resources, nil)
+	if enrichErr != nil {
+		t.Fatalf("EnrichEC2InstanceStatus returned unexpected error: %v", enrichErr)
+	}
+	if f, ok := enrichResult.Findings[id]; ok {
+		r.Findings = append(r.Findings, f)
+	}
+
+	// Color func derives from the merged Wave-2 Finding → ColorWarning → IsIssue=true.
 	ec2tdInit := resource.FindResourceType("ec2")
 	if ec2tdInit != nil && ec2tdInit.Color != nil {
 		got := ec2tdInit.Color(r)
@@ -356,18 +414,30 @@ func TestCtrlZ_EC2_ImpairedRowsVisibleAfterPromotion(t *testing.T) {
 	m := newRootSizedModel()
 	m = navigateToEC2List(m)
 
-	// Post-cleanup: fetcher emits Status=="" and encodes degraded state in Fields.
-	// Color func reads Fields["system_status"]/["instance_status"] directly.
+	// Post-cleanup: fetcher emits Status=="" and encodes degraded state in
+	// Fields. Since the color-findings-conformance wave, colorEC2 is
+	// colorFromAnyFinding-only (no raw-field fallback) — each degraded
+	// resource must carry the Wave-2 Finding the real enricher would attach.
 	promotedResources := []resource.Resource{
 		{ID: "i-impaired-001", Name: "web-server-impaired", Fields: map[string]string{
 			"state":         "running",
 			"system_status": "impaired",
 			"name":          "web-server-impaired",
+		}, Findings: []domain.Finding{
+			{
+				Code: "ec2.instance-status-impaired", Phrase: "impaired: system checks failing",
+				Severity: domain.SevBroken, Source: "wave2:ec2",
+			},
 		}},
 		{ID: "i-initializing-001", Name: "web-server-init", Fields: map[string]string{
 			"state":           "running",
 			"instance_status": "initializing",
 			"name":            "web-server-init",
+		}, Findings: []domain.Finding{
+			{
+				Code: "ec2.instance-status-impaired", Phrase: "initializing: checks in progress",
+				Severity: domain.SevWarn, Source: "wave2:ec2",
+			},
 		}},
 	}
 
@@ -430,13 +500,39 @@ func TestMenuBadge_EC2_CountsImpairedRows(t *testing.T) {
 		ResourceType: "ec2",
 	})
 
-	// Post-cleanup: fetcher emits Status=="" for all EC2 instances.
-	// Color classification is driven by Fields (system_status/instance_status/state).
+	// Post-cleanup: fetcher emits Status=="" for all EC2 instances. Since the
+	// color-findings-conformance wave, colorEC2 is colorFromAnyFinding-only
+	// (no raw-field fallback) — each degraded resource must carry the Finding
+	// the real fetcher/Wave-2 enricher would attach for its Fields.
 	mixedResources := []resource.Resource{
 		{ID: "i-running-001", Name: "healthy-server", Fields: map[string]string{"state": "running", "name": "healthy-server"}},
-		{ID: "i-impaired-001", Name: "impaired-server", Fields: map[string]string{"state": "running", "system_status": "impaired", "name": "impaired-server"}},
-		{ID: "i-initializing-001", Name: "init-server", Fields: map[string]string{"state": "running", "instance_status": "initializing", "name": "init-server"}},
-		{ID: "i-stopped-001", Name: "stopped-server", Fields: map[string]string{"state": "stopped", "name": "stopped-server"}},
+		{
+			ID: "i-impaired-001", Name: "impaired-server",
+			Fields: map[string]string{"state": "running", "system_status": "impaired", "name": "impaired-server"},
+			Findings: []domain.Finding{
+				{
+					Code: "ec2.instance-status-impaired", Phrase: "impaired: system checks failing",
+					Severity: domain.SevBroken, Source: "wave2:ec2",
+				},
+			},
+		},
+		{
+			ID: "i-initializing-001", Name: "init-server",
+			Fields: map[string]string{"state": "running", "instance_status": "initializing", "name": "init-server"},
+			Findings: []domain.Finding{
+				{
+					Code: "ec2.instance-status-impaired", Phrase: "initializing: checks in progress",
+					Severity: domain.SevWarn, Source: "wave2:ec2",
+				},
+			},
+		},
+		{
+			ID: "i-stopped-001", Name: "stopped-server",
+			Fields: map[string]string{"state": "stopped", "name": "stopped-server"},
+			Findings: []domain.Finding{
+				{Code: "ec2.state.stopped", Phrase: "stopped", Severity: domain.SevWarn, Source: "wave1"},
+			},
+		},
 	}
 
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{

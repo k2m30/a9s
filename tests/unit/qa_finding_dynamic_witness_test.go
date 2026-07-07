@@ -83,7 +83,6 @@ var knownUnwitnessedFindings = map[string]bool{
 	"dbi:dbi.broken.incompatible_option_group":         true,
 	"dbi:dbi.broken.incompatible_restore":              true,
 	"ebs:ebs.volume-io-degraded":                       true,
-	"ec2:ec2.state.stopped.server":                     true,
 	"ecs:ecs.state.deprovisioning":                     true,
 	"ecs:ecs.state.inactive":                           true,
 	"ecs-task:ecs-task.state.provisioning":             true,

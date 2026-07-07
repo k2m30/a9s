@@ -1,9 +1,19 @@
 package unit
 
+// qa_ami_color_test.go — Color contract pin for AMIs.
+//
+// Since the color-findings-conformance wave (qa_color_findings_conformance_test.go),
+// colorAMI is colorFromAnyFinding-only (internal/aws/catalog_compute.go) — it
+// has NO raw-field fallback at all. Every non-healthy case here attaches a
+// Finding shaped exactly like the real fetcher (internal/aws/ami.go, wave1
+// state/deprecation Findings, codes in ami_codes.go). Fields are kept for
+// realism/context only — they are no longer read by Color.
+
 import (
 	"testing"
 	"time"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -17,9 +27,10 @@ func TestAmiColor_StateAndDeprecation(t *testing.T) {
 	futureYear := time.Now().AddDate(1, 0, 0).Format(time.RFC3339)
 
 	cases := []struct {
-		name   string
-		fields map[string]string
-		want   resource.Color
+		name     string
+		fields   map[string]string
+		findings []domain.Finding
+		want     resource.Color
 	}{
 		// State-based cases.
 		{
@@ -30,43 +41,71 @@ func TestAmiColor_StateAndDeprecation(t *testing.T) {
 		{
 			name:   "state=pending",
 			fields: map[string]string{"state": "pending"},
-			want:   resource.ColorWarning,
+			findings: []domain.Finding{
+				{Code: "ami.state.pending", Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			},
+			want: resource.ColorWarning,
 		},
 		{
 			name:   "state=transient",
 			fields: map[string]string{"state": "transient"},
-			want:   resource.ColorWarning,
+			findings: []domain.Finding{
+				{Code: "ami.state.pending", Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
+			},
+			want: resource.ColorWarning,
 		},
 		{
 			name:   "state=failed",
 			fields: map[string]string{"state": "failed"},
-			want:   resource.ColorBroken,
+			findings: []domain.Finding{
+				{Code: "ami.state.failed", Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			},
+			want: resource.ColorBroken,
 		},
 		{
 			name:   "state=error",
 			fields: map[string]string{"state": "error"},
-			want:   resource.ColorBroken,
+			findings: []domain.Finding{
+				{Code: "ami.state.failed", Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			},
+			want: resource.ColorBroken,
 		},
 		{
 			name:   "state=invalid",
 			fields: map[string]string{"state": "invalid"},
-			want:   resource.ColorBroken,
+			findings: []domain.Finding{
+				{Code: "ami.state.failed", Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			},
+			want: resource.ColorBroken,
 		},
 		{
 			name:   "state=deregistered",
 			fields: map[string]string{"state": "deregistered"},
-			want:   resource.ColorDim,
+			findings: []domain.Finding{
+				{Code: "ami.state.dim", Phrase: "deregistered", Severity: domain.SevDim, Source: "wave1"},
+			},
+			want: resource.ColorDim,
 		},
 		{
 			name:   "state=disabled",
 			fields: map[string]string{"state": "disabled"},
-			want:   resource.ColorDim,
+			findings: []domain.Finding{
+				{Code: "ami.state.dim", Phrase: "disabled", Severity: domain.SevDim, Source: "wave1"},
+			},
+			want: resource.ColorDim,
 		},
 		// Deprecation cases — only apply when state=available.
 		{
 			name:   "state=available+deprecation_in_past",
 			fields: map[string]string{"state": "available", "deprecation_time": pastYear},
-			want:   resource.ColorWarning,
+			findings: []domain.Finding{
+				{
+					Code: "ami.deprecated", Phrase: "deprecated",
+					Detail:   "DeprecationTime has passed — AWS no longer recommends this AMI for new launches.",
+					Severity: domain.SevWarn, Source: "wave1",
+				},
+			},
+			want: resource.ColorWarning,
 		},
 		{
 			name:   "state=available+deprecation_in_future",
@@ -87,9 +126,9 @@ func TestAmiColor_StateAndDeprecation(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := td.Color(resource.Resource{Fields: tc.fields})
+			got := td.Color(resource.Resource{Fields: tc.fields, Findings: tc.findings})
 			if got != tc.want {
-				t.Errorf("Color(%v) = %v, want %v", tc.fields, got, tc.want)
+				t.Errorf("Color(%v, findings=%v) = %v, want %v", tc.fields, tc.findings, got, tc.want)
 			}
 		})
 	}

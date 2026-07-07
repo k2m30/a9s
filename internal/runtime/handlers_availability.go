@@ -679,10 +679,11 @@ func rowsFromCacheRows(shortName string, rows []cache.Row) []resource.Resource {
 	return out
 }
 
-// unifiedIssueCount returns the distinct count of resource IDs with ≥1 issue
-// across both Wave-1 (IsIssue() status color) and Wave-2 (enrichment findings).
-// Only SevBroken findings contribute to the S1 badge ("!"-glyph equivalent;
-// SevWarn / "~" informational findings are excluded).
+// unifiedIssueCount returns the distinct count of resource IDs with ≥1
+// SevBroken-equivalent issue: a Wave-1 structural/wave1-Finding color of
+// ColorBroken/ColorWarning (IsIssue()), or a Wave-2 SevBroken finding from
+// findings. Never a SevWarn Wave-2 finding — those are excluded from both
+// halves of this single per-resource decision.
 func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceTypeDef, findings map[string]domain.Finding) int {
 	if td.ExcludeFromIssueBadge {
 		return 0
@@ -693,7 +694,7 @@ func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceT
 	}
 	ids := make(map[string]struct{})
 	for _, r := range wave1Resources {
-		if td.ResolveColor(r).IsIssue() {
+		if td.ResolveColor(wave1Only(r)).IsIssue() {
 			ids[r.ID] = struct{}{}
 		}
 	}
@@ -706,4 +707,24 @@ func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceT
 		}
 	}
 	return len(ids)
+}
+
+// wave1Only returns a copy of r with every Wave-2-sourced Finding
+// (Finding.IsWave2Sourced()) stripped, so a Color func reading
+// r.Findings (colorFromAnyFinding and friends) sees only wave1-sourced
+// signal — never a merged Wave-2 SevWarn/SevBroken finding. Wave-2's own
+// contribution to the badge is folded in separately from the live findings
+// map, which is why this copy must not leak wave2 Findings into ResolveColor.
+func wave1Only(r resource.Resource) resource.Resource {
+	if len(r.Findings) == 0 {
+		return r
+	}
+	kept := make([]domain.Finding, 0, len(r.Findings))
+	for _, f := range r.Findings {
+		if !f.IsWave2Sourced() {
+			kept = append(kept, f)
+		}
+	}
+	r.Findings = kept
+	return r
 }

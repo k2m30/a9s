@@ -62,10 +62,15 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 		ResourceType: "rds",
 	})
 
-	// Step 2: Load RDS resources.
+	// Step 2: Load RDS resources. Fields key is "db_identifier" (the dbi
+	// type's DisplayNameKey, internal/aws/catalog_databases.go) — a stale
+	// "db_instance_id" key here left the identity column blank, silently
+	// masked before because the old assertion only checked for the literal
+	// "! " glyph text (present regardless of an empty identity cell), never
+	// actually confirming the row was visible by name.
 	rdsResources := []resource.Resource{
-		{ID: "db-stacked-a-001", Name: "db-stacked-a-001", Fields: map[string]string{"db_instance_id": "db-stacked-a-001", "status": "available"}},
-		{ID: "db-stacked-b-001", Name: "db-stacked-b-001", Fields: map[string]string{"db_instance_id": "db-stacked-b-001", "status": "available"}},
+		{ID: "db-stacked-a-001", Name: "db-stacked-a-001", Fields: map[string]string{"db_identifier": "db-stacked-a-001", "status": "available"}},
+		{ID: "db-stacked-b-001", Name: "db-stacked-b-001", Fields: map[string]string{"db_identifier": "db-stacked-b-001", "status": "available"}},
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "rds",
@@ -110,14 +115,22 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 		t.Fatalf("expected to be back at RDS list after pop, got: %s", plainList[:min(200, len(plainList))])
 	}
 
-	// ASSERTION: The ResourceListModel must show the "! " prefix marker for db-stacked-a-001.
-	// Pre-fix: The marker is absent because handleEnrichmentChecked only updated the
-	// DetailModel (active at the time). The ResourceListModel below on the stack was
-	// never called with SetEnrichmentState(findings).
-	// Post-fix: The stack is iterated; SetEnrichmentState was called on the
-	// ResourceListModel, so the "! " prefix appears for the affected row.
-	if !strings.Contains(plainList, "! ") {
-		t.Errorf("after pop from detail to RDS list, the '! ' prefix marker must be visible for the enrichment-affected row. "+
+	// ASSERTION: the enrichment-affected row (db-stacked-a-001) must be an
+	// applied issue after the pop. Pre-fix: handleEnrichmentChecked only
+	// updates activeView() (the DetailModel), leaving the stacked
+	// ResourceListModel's findingsByID empty. Post-fix: the stack is
+	// iterated; SetEnrichmentState was called on the ResourceListModel.
+	//
+	// Checked via ctrl+z survival, not the literal "! " glyph text: since the
+	// color-findings-conformance wave, colorDBI prefers colorFromAnyFinding
+	// (internal/aws/catalog_databases.go) — once the SevBroken Finding is
+	// applied, resolveListDecoratorFull's glyph branch is skipped entirely
+	// (only fires when ResolveColor()==ColorHealthy; see
+	// internal/app/list_columns.go and
+	// .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
+	_, ctrlZVisible := isVisibleUnderCtrlZ(m, "db-stacked-a-001")
+	if !ctrlZVisible {
+		t.Errorf("after pop from detail to RDS list, db-stacked-a-001 must survive ctrl+z (finding applied). "+
 			"Pre-fix: absent because handleEnrichmentChecked only updates activeView() (the DetailModel), "+
 			"leaving the stacked ResourceListModel's findingsByID empty. "+
 			"View excerpt: %s", plainList[:min(400, len(plainList))])

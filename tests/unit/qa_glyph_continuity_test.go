@@ -39,7 +39,6 @@
 package unit
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/app"
@@ -114,6 +113,16 @@ func hasDecoratorForID(ctrl *app.Controller, id string, want app.RowDecorator) b
 // exactly what the old TestCtrlR_ClearsActiveListFindingsImmediately in
 // qa_enrichment_review_fixes_test.go asserted as correct — that test now
 // pins the superseded contract and needs updating alongside this one).
+// TestRerunStart_KeepsVisibleFindingsUntilReplaced uses ctrl+z survival as
+// the "is this finding applied" check, not the literal "! " glyph text.
+// Since the color-findings-conformance wave, colorEC2 is
+// colorFromAnyFinding-only (internal/aws/catalog_compute.go) — once a
+// SevBroken Finding is applied, resolveListDecoratorFull's glyph branch is
+// skipped entirely (only fires when ResolveColor()==ColorHealthy; see
+// internal/app/list_columns.go and
+// .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
+// isVisibleUnderCtrlZ (qa_enrichment_review_fixes_test.go) is the
+// renderer-agnostic, stronger replacement.
 func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
@@ -128,22 +137,23 @@ func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 	// Populate a finding for i-0abc1111aaa111111 via the live-update path.
 	m, _ = rootApplyMsg(m, enrichmentCheckedWithFindings(0, 0))
 
-	before := rootViewContent(m)
-	if !strings.Contains(before, "! ") {
-		t.Fatalf("pre-condition failed: expected '! ' prefix marker in render before Ctrl+R; output:\n%s", before)
+	var visible bool
+	m, visible = isVisibleUnderCtrlZ(m, "web-server-1")
+	if !visible {
+		t.Fatal("pre-condition failed: expected web-server-1 to survive ctrl+z (finding applied) before Ctrl+R")
 	}
 
-	// Half 1: pressing Ctrl+R must not blank the marker before the fresh
+	// Half 1: pressing Ctrl+R must not clear the finding before the fresh
 	// enrichment result lands — the fetch/enrichment cmd has not run yet.
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
-	afterKeypress := rootViewContent(m)
-	if !strings.Contains(afterKeypress, "! ") {
-		t.Errorf("Ctrl+R must NOT clear the active list's findings before the fresh result lands (stale-until-replaced, not blank-until-replaced); '! ' prefix marker missing immediately after keypress:\n%s", afterKeypress)
+	m, visible = isVisibleUnderCtrlZ(m, "web-server-1")
+	if !visible {
+		t.Error("Ctrl+R must NOT clear the active list's findings before the fresh result lands (stale-until-replaced, not blank-until-replaced); web-server-1 no longer survives ctrl+z immediately after keypress")
 	}
 
 	// Half 2: once a fresh EnrichmentCheckedMsg lands with the SAME resource
-	// genuinely recovered (no finding for it in the fresh map), the marker
+	// genuinely recovered (no finding for it in the fresh map), the finding
 	// must be removed — this is real replacement, not merely "never clear".
 	recovered := messages.EnrichmentChecked{
 		ResourceType: "ec2",
@@ -155,9 +165,9 @@ func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, recovered)
 
-	afterFreshResult := rootViewContent(m)
-	if strings.Contains(afterFreshResult, "! ") {
-		t.Errorf("a finding absent from the fresh enrichment result must be removed once that result lands; '! ' prefix marker still present:\n%s", afterFreshResult)
+	_, visible = isVisibleUnderCtrlZ(m, "web-server-1")
+	if visible {
+		t.Error("a finding absent from the fresh enrichment result must be removed once that result lands; web-server-1 still survives ctrl+z")
 	}
 }
 

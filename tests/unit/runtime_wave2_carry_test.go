@@ -411,8 +411,20 @@ func TestRestartSeed_S3_Wave2FindingAndStatusVisibleOnFirstRender(t *testing.T) 
 	if row.ResourceID != "s3-bucket-x" {
 		t.Fatalf("Rows[0].ResourceID = %q, want %q", row.ResourceID, "s3-bucket-x")
 	}
-	if row.Decorator != app.DecoratorError {
-		t.Errorf("Rows[0].Decorator = %q, want %q — the FIRST rendered frame must already show the carried wave2 finding's glyph, no enrichment re-run needed (D17/C6b)", row.Decorator, app.DecoratorError)
+	// Since the color-findings-conformance wave, colorS3 is
+	// colorFromAnyFinding-only (internal/aws/catalog_databases.go) — the
+	// carried SevBroken Finding now resolves td.ResolveColor(r) to
+	// ColorBroken directly, so resolveListDecoratorFull's DecoratorError
+	// glyph branch (which only fires when ResolveColor()==ColorHealthy; see
+	// internal/app/list_columns.go) is skipped entirely. The row instead
+	// renders as a full broken row via colorTag: Decorator==DecoratorNormal
+	// (no glyph prefix needed — the WHOLE row is colored) and
+	// Severity=="issue" (see resolveListDecoratorFull's IsIssue() branch).
+	// This is the CORRECT, stronger contract — whole-row color beats a small
+	// glyph prefix — not a regression; see
+	// .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md.
+	if row.Decorator != app.DecoratorNormal {
+		t.Errorf("Rows[0].Decorator = %q, want %q — the FIRST rendered frame must already show the carried wave2 finding via whole-row color, no enrichment re-run needed (D17/C6b)", row.Decorator, app.DecoratorNormal)
 	}
 
 	// HandleNavigate's disk-store fallback (handlers_navigate.go:205-224) seeds
@@ -423,7 +435,7 @@ func TestRestartSeed_S3_Wave2FindingAndStatusVisibleOnFirstRender(t *testing.T) 
 	// which ran this session. Body.List.Rows above is therefore the correct
 	// (and only) place to observe the disk-seeded finding/status on the
 	// FIRST rendered frame.
-	if row.Severity != "broken" {
-		t.Errorf(`Rows[0].Severity = %q, want "broken" (resolveListDecoratorFull's SevBroken branch) — the FIRST render must already reflect the carried wave2 finding, no enrichment needed`, row.Severity)
+	if row.Severity != "issue" {
+		t.Errorf(`Rows[0].Severity = %q, want "issue" (resolveListDecoratorFull's IsIssue() branch, once ResolveColor() is ColorBroken directly) — the FIRST render must already reflect the carried wave2 finding, no enrichment needed`, row.Severity)
 	}
 }

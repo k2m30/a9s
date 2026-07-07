@@ -205,6 +205,21 @@ func TestCR273_AllTypes_ContractRegistryCoverage(t *testing.T) {
 // statusField is empty, the type has no lifecycle string on the list
 // response and this subtest is skipped — those types rely on enricher
 // findings or are purely config-only.
+// findingsOnlyColorTypes is the set of ShortNames whose Color func (since the
+// color-findings-conformance wave, qa_color_findings_conformance_test.go) is
+// colorFromAnyFinding-only with NO raw-field fallback at all (colorEC2,
+// colorLambda, colorEBSSnap, colorAMI in internal/aws/catalog_compute.go).
+// For these, injecting only Fields[statusField] can never produce a
+// non-Healthy Color — check() must also attach a synthetic Finding whose
+// Severity matches the intended bucket so this table still exercises the
+// classification contract instead of vacuously passing/failing on Healthy.
+var findingsOnlyColorTypes = map[string]bool{ //nolint:gochecknoglobals // test-only lookup table, mirrors typeContracts' style
+	"ec2":      true,
+	"lambda":   true,
+	"ami":      true,
+	"ebs-snap": true,
+}
+
 func TestCR273_AllTypes_ColorClassification(t *testing.T) {
 	for _, c := range typeContracts {
 		t.Run(c.shortName, func(t *testing.T) {
@@ -220,6 +235,20 @@ func TestCR273_AllTypes_ColorClassification(t *testing.T) {
 				r := resource.Resource{
 					ID:     c.shortName + "-test",
 					Fields: map[string]string{c.statusField: status},
+				}
+				if findingsOnlyColorTypes[c.shortName] && want != resource.ColorHealthy {
+					var sev domain.Severity
+					switch want {
+					case resource.ColorBroken:
+						sev = domain.SevBroken
+					case resource.ColorWarning:
+						sev = domain.SevWarn
+					case resource.ColorDim:
+						sev = domain.SevDim
+					}
+					r.Findings = []domain.Finding{
+						{Code: domain.FindingCode(c.shortName + ".test." + status), Phrase: status, Severity: sev, Source: "wave1"},
+					}
 				}
 				got := td.ResolveColor(r)
 				if got != want {
