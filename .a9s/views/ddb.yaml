@@ -12,7 +12,7 @@ list:
     key: size_bytes
     width: 14
   Billing:
-    path: BillingModeSummary.BillingMode
+    key: billing_mode
     width: 16
 
 detail:
