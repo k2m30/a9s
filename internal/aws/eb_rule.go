@@ -3,10 +3,12 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -73,9 +75,14 @@ func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI,
 			eventPattern = *rule.EventPattern
 		}
 
+		var findings []domain.Finding
+		if strings.EqualFold(state, "DISABLED") {
+			findings = []domain.Finding{{Code: CodeEBRuleDisabled, Phrase: "disabled", Severity: domain.SevDim, Source: "wave1"}}
+		}
+
 		r := resource.Resource{
-			ID:    name,
-			Name:  name,
+			ID:   name,
+			Name: name,
 			Fields: map[string]string{
 				"name":          name,
 				"state":         state,
@@ -84,6 +91,7 @@ func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI,
 				"schedule":      schedule,
 				"event_pattern": eventPattern,
 			},
+			Findings:  findings,
 			RawStruct: rule,
 		}
 

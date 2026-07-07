@@ -51,7 +51,7 @@ func colorEC2(r domain.Resource) domain.Color {
 }
 
 func colorECSSvc(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	switch r.Fields["status"] {
@@ -75,7 +75,7 @@ func colorECSSvc(r domain.Resource) domain.Color {
 }
 
 func colorECSCluster(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	switch r.Fields["status"] {
@@ -90,13 +90,7 @@ func colorECSCluster(r domain.Resource) domain.Color {
 }
 
 func colorECSTask(r domain.Resource) domain.Color {
-	if r.Fields["health_status"] == "UNHEALTHY" {
-		return domain.ColorBroken
-	}
-	if r.Fields["last_status"] == "STOPPED" && r.Fields["stop_code"] != "" && r.Fields["stop_code"] != "UserInitiated" {
-		return domain.ColorBroken
-	}
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	switch r.Fields["last_status"] {
@@ -148,7 +142,7 @@ func colorASG(r domain.Resource) domain.Color {
 }
 
 func colorEB(r domain.Resource) domain.Color {
-	if c, ok := colorFromWave1(r); ok {
+	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
 	var healthColor domain.Color
@@ -608,6 +602,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeECSTaskStateDeactivating, Phrase: "deactivating", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeECSTaskStateStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeECSTaskStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeECSTaskStateStopped, Phrase: "stopped", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeECSTaskStopCodeFailed, Phrase: "stopped: <stop code>", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeECSTaskHealthUnhealthy, Phrase: "unhealthy", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: ecsTaskCodeTaskFailed, Phrase: "<stop code or container> failed", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},

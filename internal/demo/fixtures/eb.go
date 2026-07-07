@@ -187,5 +187,20 @@ func buildEBEnvironments() []ebtypes.EnvironmentDescription {
 			DateCreated:       aws.Time(mustTime("2024-01-10T09:00:00Z")),
 			DateUpdated:       aws.Time(mustTime("2026-01-15T18:00:00Z")),
 		},
+		// Issue: Status=Terminating with a reporting (Green) health check →
+		// Dim via the status-only branch (no Grey/Yellow/Red health signal
+		// to take precedence).
+		{
+			EnvironmentName:   aws.String("acme-batch-worker-old"),
+			EnvironmentId:     aws.String("e-acmebatchold"),
+			ApplicationName:   aws.String("acme-worker"),
+			VersionLabel:      aws.String("v0.9.0"),
+			SolutionStackName: aws.String("64bit Amazon Linux 2 v3.5.9 running Python 3.8"),
+			Health:            ebtypes.EnvironmentHealthGreen,
+			Status:            ebtypes.EnvironmentStatusTerminating,
+			CNAME:             aws.String("acme-batch-worker-old.us-east-1.elasticbeanstalk.com"),
+			DateCreated:       aws.Time(mustTime("2023-02-15T10:00:00Z")),
+			DateUpdated:       aws.Time(mustTime("2026-05-01T09:00:00Z")),
+		},
 	}
 }

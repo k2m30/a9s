@@ -9,7 +9,12 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func colorCFN(r domain.Resource) domain.Color { return cfnStackColor(r.Fields["status"]) }
+func colorCFN(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return cfnStackColor(r.Fields["status"])
+}
 
 func colorPipeline(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
@@ -85,6 +90,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Code: CodeCFNStackFailed, Phrase: "<status, lowercased>", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeCFNStackRollback, Phrase: "<status, lowercased>", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeCFNStackInProgress, Phrase: "<status, lowercased>", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeCFNStackDeleted, Phrase: "delete_complete", Severity: domain.SevDim, Source: "wave1"},
 			{Code: cfnCodeRecentResourceFailure, Phrase: "recent resource failure: <ResourceType/LogicalResourceId>", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: cfnCodeStackDrifted, Phrase: "stack drifted from template", Severity: domain.SevWarn, Source: "wave2"},
 		},

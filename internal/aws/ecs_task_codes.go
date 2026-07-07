@@ -1,10 +1,6 @@
 // ecs_task_codes.go — canonical FindingCode constants for the ecs-task resource type.
 // The fetcher writes Findings using these codes; the
-// ecs-task Color func reads wave1 Findings (Source == "wave1") to color rows.
-//
-// NOTE: RUNNING and STOPPED are lifecycle states with no Finding emitted.
-// STOPPED's meaningful information is carried by stop_code and handled
-// structurally in the Color func.
+// ecs-task Color func reads them (any Finding, wave1 or wave2) to color rows.
 package aws
 
 import "github.com/k2m30/a9s/v3/internal/domain"
@@ -33,6 +29,22 @@ const (
 	// CodeECSTaskStateDeprovisioning — task is in the "DEPROVISIONING" lifecycle state.
 	// Severity: SevWarn (transitional).
 	CodeECSTaskStateDeprovisioning domain.FindingCode = "ecs-task.state.deprovisioning"
+
+	// CodeECSTaskStateStopped — task is in the "STOPPED" lifecycle state with a
+	// user-initiated or empty stop code (a normal, non-error stop).
+	// Severity: SevDim.
+	CodeECSTaskStateStopped domain.FindingCode = "ecs-task.state.stopped"
+
+	// CodeECSTaskStopCodeFailed — task is STOPPED with a stop code other than
+	// UserInitiated (AWS-initiated stop, e.g. task failed to start or its
+	// essential container exited).
+	// Severity: SevBroken.
+	CodeECSTaskStopCodeFailed domain.FindingCode = "ecs-task.stop-code.failed"
+
+	// CodeECSTaskHealthUnhealthy — task's container health check reports
+	// UNHEALTHY while the task itself is still RUNNING.
+	// Severity: SevBroken.
+	CodeECSTaskHealthUnhealthy domain.FindingCode = "ecs-task.health.unhealthy"
 )
 
 // ecsTaskWave1Findings returns the wave1 Finding slice for an ECS task's
@@ -55,4 +67,23 @@ func ecsTaskWave1Findings(status string) []domain.Finding {
 		return []domain.Finding{{Code: CodeECSTaskStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1"}}
 	}
 	return nil
+}
+
+// ecsTaskStructuralFindings returns the wave1 Finding slice for the ecs-task
+// top-level resource type, mirroring colorECSTask's own precedence: a
+// RUNNING task with an UNHEALTHY container health check is broken outright;
+// a STOPPED task with a non-UserInitiated stop code is broken; any other
+// STOPPED task is a normal, dim lifecycle stop; everything else falls
+// through to the shared transitional-state findings.
+func ecsTaskStructuralFindings(status, stopCode, healthStatus string) []domain.Finding {
+	if healthStatus == "UNHEALTHY" {
+		return []domain.Finding{{Code: CodeECSTaskHealthUnhealthy, Phrase: "unhealthy", Severity: domain.SevBroken, Source: "wave1"}}
+	}
+	if status == "STOPPED" {
+		if stopCode != "" && stopCode != "UserInitiated" {
+			return []domain.Finding{{Code: CodeECSTaskStopCodeFailed, Phrase: "stopped: " + stopCode, Severity: domain.SevBroken, Source: "wave1"}}
+		}
+		return []domain.Finding{{Code: CodeECSTaskStateStopped, Phrase: "stopped", Severity: domain.SevDim, Source: "wave1"}}
+	}
+	return ecsTaskWave1Findings(status)
 }
