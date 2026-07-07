@@ -84,7 +84,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Title: "Status", Key: "status", Width: 32},
 				{Title: "Items", Path: "ItemCount", Width: 12},
 				{Title: "Size", Key: "size_bytes", SortPath: "TableSizeBytes", Width: 14},
-				{Title: "Billing", Path: "BillingModeSummary.BillingMode", Width: 16},
+				{Title: "Billing", Key: "billing_mode", Width: 16},
 			},
 			Detail: []DetailField{
 				{Path: "TableName"}, {Path: "TableArn"}, {Path: "TableId"}, {Path: "TableStatus"},

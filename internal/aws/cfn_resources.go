@@ -105,7 +105,7 @@ func convertCfnResource(summary cfntypes.StackResourceSummary) resource.Resource
 
 	driftStatus := ""
 	if summary.DriftInformation != nil {
-		driftStatus = string(summary.DriftInformation.StackResourceDriftStatus)
+		driftStatus = domain.HumanizeStatusPhrase(string(summary.DriftInformation.StackResourceDriftStatus))
 	}
 
 	lastUpdated := ""

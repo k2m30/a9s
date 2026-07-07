@@ -219,12 +219,12 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		if stack.DriftInformation != nil {
 			driftStatus := string(stack.DriftInformation.StackDriftStatus)
 			result.FieldUpdates[key] = map[string]string{
-				"drift_status": driftStatus,
+				"drift_status": domain.HumanizeStatusPhrase(driftStatus),
 			}
 			if driftStatus == "DRIFTED" {
 				setWave2Finding(&result, key, cfnCodeStackDrifted, "stack drifted from template", "~", "cfn",
 					[]domain.DetailRow{
-						{Label: "Drift Status", Value: driftStatus, Tier: "~"},
+						{Label: "Drift Status", Value: domain.HumanizeStatusPhrase(driftStatus), Tier: "~"},
 					}, "")
 			}
 		}

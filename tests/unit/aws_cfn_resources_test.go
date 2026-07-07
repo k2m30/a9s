@@ -12,6 +12,7 @@ import (
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -130,15 +131,29 @@ func TestFetchCfnResources_Basic(t *testing.T) {
 
 	t.Run("resource_0_Fields_drift_status", func(t *testing.T) {
 		r := resources[0]
-		if r.Fields["drift_status"] != "IN_SYNC" {
-			t.Errorf("Fields[drift_status]: expected %q, got %q", "IN_SYNC", r.Fields["drift_status"])
+		want := domain.HumanizeStatusPhrase("IN_SYNC")
+		if want != "in sync" {
+			t.Fatalf("test sanity: domain.HumanizeStatusPhrase(%q) = %q, expected %q", "IN_SYNC", want, "in sync")
+		}
+		if r.Fields["drift_status"] != want {
+			t.Errorf("Fields[drift_status]: expected %q, got %q", want, r.Fields["drift_status"])
+		}
+		if r.Fields["drift_status"] == "IN_SYNC" {
+			t.Errorf("Fields[drift_status] must be humanized, not the raw enum %q", "IN_SYNC")
 		}
 	})
 
 	t.Run("resource_1_Fields_drift_status_modified", func(t *testing.T) {
 		r := resources[1]
-		if r.Fields["drift_status"] != "MODIFIED" {
-			t.Errorf("Fields[drift_status]: expected %q, got %q", "MODIFIED", r.Fields["drift_status"])
+		want := domain.HumanizeStatusPhrase("MODIFIED")
+		if want != "modified" {
+			t.Fatalf("test sanity: domain.HumanizeStatusPhrase(%q) = %q, expected %q", "MODIFIED", want, "modified")
+		}
+		if r.Fields["drift_status"] != want {
+			t.Errorf("Fields[drift_status]: expected %q, got %q", want, r.Fields["drift_status"])
+		}
+		if r.Fields["drift_status"] == "MODIFIED" {
+			t.Errorf("Fields[drift_status] must be humanized, not the raw enum %q", "MODIFIED")
 		}
 	})
 

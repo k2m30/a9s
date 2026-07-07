@@ -111,7 +111,7 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 
 		billingMode := ""
 		if table.BillingModeSummary != nil {
-			billingMode = string(table.BillingModeSummary.BillingMode)
+			billingMode = domain.HumanizeStatusPhrase(string(table.BillingModeSummary.BillingMode))
 		}
 
 		arn := ""
