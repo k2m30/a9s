@@ -390,20 +390,17 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 		}
 
 	case runtime.NavigationKindResourceList:
-		rt := resource.FindResourceType(msg.TargetType)
-		if rt == nil {
-			return m, func() tea.Msg {
-				return messages.Flash{
-					Text:    fmt.Sprintf("unknown resource type: %s", msg.TargetType),
-					IsError: true,
-				}
-			}
-		}
-		initCmd := m.newRelatedList(*rt, msg.SourceResource, relatedListOpts{
-			reapplyChecker: msg.Checker,
+		// Owner decision #38 (2026-07-06): a related row with no TargetID,
+		// RelatedIDs, or FetchFilter to narrow by (e.g. the transient "(?)"
+		// no-filter unknown state) carries no filtering information at all —
+		// there is nothing "related" left to scope the list by. Dispatch the
+		// SAME messages.Navigate a menu entry would produce so the pushed
+		// list is a plain, unfiltered top-level list (no RelatedTitleSuffix,
+		// no forced EscPops), not a related/contextual list.
+		return m.handleNavigate(messages.Navigate{
+			Target:       messages.TargetResourceList,
+			ResourceType: msg.TargetType,
 		})
-		fetchCmd := relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
-		return m, tea.Batch(initCmd, fetchCmd)
 	}
 
 	return m, nil

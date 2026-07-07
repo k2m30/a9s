@@ -242,7 +242,14 @@ func UnknownRelated(targetType string) RelatedCheckResult {
 //   - has a server-side filter → actionable regardless of the local count
 //     (FetchFilter pivots always carry Count:-1, never 0, so they remain
 //     actionable via this branch — the filtered fetch resolves the real count)
-//   - count == -1 (no filter)  → unknown, not drillable
+//   - count == -1 (no filter)  → transient-unknown, actionable (owner decision
+//     #38, 2026-07-06): Enter opens the target type's plain top-level list,
+//     the same navigation a menu entry would produce; returning to the
+//     detail re-dispatches the related checks so the "(?)" resolves to the
+//     real count once the target's cache is warm (see app_input.go's Escape
+//     handler and ResolveRelatedNavigate's NavigationKindResourceList
+//     fallback, both of which treat this case identically to a menu-driven
+//     list open)
 //   - approximate (N+)         → actionable when count > 0 (the target list
 //     re-runs the checker as more pages load, so matches surface incrementally)
 //   - otherwise                → count > 0
@@ -257,7 +264,7 @@ func IsRelatedActionable(count int, approximate, hasFetchFilter, loading, hasErr
 		return true
 	}
 	if count == -1 {
-		return false
+		return true
 	}
 	if approximate {
 		return true

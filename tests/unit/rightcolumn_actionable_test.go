@@ -60,7 +60,7 @@ func TestIsRelatedActionable_Table(t *testing.T) {
 		{"ApproxZero_NoFilter_NEW_NotActionable", 0, true, false, false, false, false},
 		{"DefiniteZero_WithFetchFilter_NEW_NotActionable", 0, false, true, false, false, false},
 		{"UnknownCount_WithFetchFilter_Actionable", -1, false, true, false, false, true},
-		{"UnknownCount_NoFilter_NotActionable", -1, false, false, false, false, false},
+		{"UnknownCount_NoFilter_Actionable", -1, false, false, false, false, true},
 		{"PositiveCount_NoFilter_Actionable", 3, false, false, false, false, true},
 		{"PositiveCount_Approximate_Actionable", 3, true, false, false, false, true},
 		{"Loading_BlocksRegardlessOfCount", 5, false, true, true, false, false},
@@ -265,7 +265,11 @@ func TestIsActionableRow_DefiniteZero_NoFilter(t *testing.T) {
 }
 
 // TestIsActionableRow_CountMinusOne_NoFilter — count=-1, approximate=false, no fetchFilter
-// Expected: NOT actionable (existing behavior)
+// Expected: actionable (owner decision #38, 2026-07-06: a transient "(?)" row
+// — resolved-unknown, cold-cache count==-1 with no FetchFilter — is now a
+// drillable pivot into the target type's plain top-level list, not a
+// dead end. See qa_related_transient_unknown_drill_test.go for the
+// app/controller-level end-to-end pin of this contract.)
 func TestIsActionableRow_CountMinusOne_NoFilter(t *testing.T) {
 	ensureNoColor(t)
 	d, cleanup := buildApproxDetail(t)
@@ -275,8 +279,8 @@ func TestIsActionableRow_CountMinusOne_NoFilter(t *testing.T) {
 	d = injectApproxResult(d, -1, false, nil, nil)
 
 	msg := pressEnterCmd(d)
-	if isApproxNavMsg(msg) {
-		t.Errorf("REGRESSION: count=-1 row without fetchFilter must NOT produce RelatedNavigateMsg; got RelatedNavigateMsg")
+	if !isApproxNavMsg(msg) {
+		t.Errorf("REGRESSION: count=-1 row without fetchFilter must produce RelatedNavigateMsg (owner decision #38: transient unknown rows are now actionable); got %T", msg)
 	}
 }
 

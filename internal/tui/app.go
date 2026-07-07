@@ -207,6 +207,31 @@ func (m Model) Init() tea.Cmd {
 // Update implements tea.Model. Routes messages to global handlers or active view.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.BatchMsg:
+		// charm.land/bubbletea/v2's own Program intercepts BatchMsg at the
+		// run-loop level and calls each sub-command directly — Update never
+		// observes this case in production. It only arrives here when a test
+		// harness invokes a tea.Batch cmd and feeds the resulting BatchMsg
+		// through Update directly (bypassing Program), e.g.
+		// tests/unit/related_cache_bug_test.go's drainCmds. Without this case
+		// such a harness sees the batch's own commands as a single opaque,
+		// unresolved message and never learns their results.
+		var cmds []tea.Cmd
+		for _, c := range msg {
+			if c == nil {
+				continue
+			}
+			sub := c()
+			if sub == nil {
+				continue
+			}
+			nextModel, next := m.Update(sub)
+			m = nextModel.(Model)
+			if next != nil {
+				cmds = append(cmds, next)
+			}
+		}
+		return m, tea.Batch(cmds...)
 	case tea.QuitMsg:
 		if m.appCancel != nil {
 			m.appCancel()

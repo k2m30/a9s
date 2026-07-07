@@ -119,7 +119,8 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Related-navigation resource lists should pop immediately on Esc.
 		if rs.kind == rsKindList && m.ctrl.GetListEscPops() {
 			m.popRS()
-			return m, nil
+			recomputeCmd := m.recomputeRelatedOnReveal()
+			return m, recomputeCmd
 		}
 		// If active screen has a confirmed filter, clear it first.
 		if rs.kind == rsKindMenu || rs.kind == rsKindList {
@@ -138,7 +139,8 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		// Otherwise pop; no-op on main menu (never quit from Esc).
 		m.popRS()
-		return m, nil
+		recomputeCmd := m.recomputeRelatedOnReveal()
+		return m, recomputeCmd
 	}
 	if key.Matches(msg, m.keys.Colon) {
 		m.inputMode = modeCommand

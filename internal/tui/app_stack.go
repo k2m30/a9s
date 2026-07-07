@@ -75,6 +75,35 @@ func (m *Model) popRSWithCtrlPop(ctrlPop bool) bool {
 	return true
 }
 
+// recomputeRelatedOnReveal re-dispatches the related-resource checks for the
+// detail screen revealed by a pop, when the pop landed back on a detail
+// screen. Owner decision #38 (2026-07-06): a related-panel pivot that was
+// left at the transient "(?)" state (count==-1, no FetchFilter — see
+// resource.IsRelatedActionable) must resolve to its real count once the
+// user drills into the target type and returns, without a manual Ctrl+R.
+// Esc-popping a list otherwise has no hook into the related-check machinery
+// (contrast with the Detail Ctrl+R handler, which explicitly re-dispatches
+// messages.RelatedCheckStarted) — this is the generic fix, applied to every
+// pop that reveals a detail screen, not just the list pushed by a related
+// drill.
+func (m *Model) recomputeRelatedOnReveal() tea.Cmd {
+	rs := m.activeRS()
+	if rs.kind != rsKindDetail {
+		return nil
+	}
+	rt := rs.resourceType
+	if len(resource.GetRelated(rt)) == 0 {
+		return nil
+	}
+	srcRes := m.ctrl.GetDetailResource()
+	return func() tea.Msg {
+		return messages.RelatedCheckStarted{
+			ResourceType:   rt,
+			SourceResource: srcRes,
+		}
+	}
+}
+
 // innerSize returns the content area dimensions inside the frame.
 func (m *Model) innerSize() (int, int) {
 	w := m.width - 2

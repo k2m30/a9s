@@ -96,11 +96,16 @@ func ngResourceForCacheMissBadge() resource.Resource {
 }
 
 // TestRenderRelatedPanel_TransientUnknownNoFilter_ShowsQuestionMarkBadge
-// verifies the badge text and dim (non-actionable) styling for a TRANSIENT
-// resolved-unknown row (a real registered checker, e.g. ng→ebs, whose
-// required cache entry has not warmed yet) — as opposed to a
-// budget-excluded/structurally-uncomputable pivot, which is removed from the
-// registry entirely rather than rendered with a badge.
+// verifies the badge TEXT for a TRANSIENT resolved-unknown row (a real
+// registered checker, e.g. ng→ebs, whose required cache entry has not warmed
+// yet) — as opposed to a budget-excluded/structurally-uncomputable pivot,
+// which is removed from the registry entirely rather than rendered with a
+// badge. The "(?)" badge text itself is untouched by owner decision #38
+// (resource.FormatRelatedCount's count<0/no-filter branch is unchanged); only
+// the row's actionability/styling flipped — a transient "(?)" row is now
+// actionable (a real drill target: Enter opens the target type's plain
+// top-level list per qa_related_transient_unknown_drill_test.go), so it
+// renders BRIGHT (styles.RowNormal) like any other actionable row, not dim.
 func TestRenderRelatedPanel_TransientUnknownNoFilter_ShowsQuestionMarkBadge(t *testing.T) {
 	ensureNoColor(t)
 	m := newRelatedDimParityDetail("ng", ngResourceForCacheMissBadge())
@@ -114,8 +119,8 @@ func TestRenderRelatedPanel_TransientUnknownNoFilter_ShowsQuestionMarkBadge(t *t
 		Actionable:   resource.IsRelatedActionable(-1, false, false, false, false),
 		CountDisplay: resource.FormatRelatedCount(-1, false),
 	}
-	if block.Actionable {
-		t.Fatal("test setup: transient-unknown-no-filter row must not be Actionable")
+	if !block.Actionable {
+		t.Fatal("test setup: transient-unknown-no-filter row must be Actionable (owner decision #38)")
 	}
 	if block.CountDisplay != "(?)" {
 		t.Fatalf("test setup: block.CountDisplay = %q, want \"(?)\"", block.CountDisplay)
@@ -131,9 +136,9 @@ func TestRenderRelatedPanel_TransientUnknownNoFilter_ShowsQuestionMarkBadge(t *t
 
 	line := extractRelatedLine(t, rendered, "EBS Volumes")
 	wantText := "  EBS Volumes (?)"
-	wantStyled := styles.DimText.Render(wantText)
+	wantStyled := styles.RowNormal.Render(wantText)
 	if line != wantStyled {
-		t.Errorf("transient-unknown row not rendered dim with \"(?)\" badge.\n  got:  %q\n  want: %q", line, wantStyled)
+		t.Errorf("transient-unknown row not rendered bright (actionable) with \"(?)\" badge.\n  got:  %q\n  want: %q", line, wantStyled)
 	}
 }
 

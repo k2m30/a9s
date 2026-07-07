@@ -335,7 +335,7 @@ func TestRelatedDim_PropertySweep_TableDrivenSanity(t *testing.T) {
 	want := map[string]bool{
 		"LoadingRow":        false,
 		"ErrRow":            false,
-		"UnknownNoFilter":   false,
+		"UnknownNoFilter":   true,
 		"UnknownWithFilter": true,
 		"ExactZero":         false,
 		"ApproxZero":        false,

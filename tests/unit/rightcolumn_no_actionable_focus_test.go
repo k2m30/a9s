@@ -3,16 +3,24 @@ package unit_test
 // rightcolumn_no_actionable_focus_test.go — Bug F regression tests.
 //
 // Bug F: The right column remains focusable (Tab moves focus there) even when every
-// row has been fully resolved and no row is actionable (Count=0 or Count=-1 without
-// FetchFilter). HasActionableRows() should return false in this state.
+// row has been fully resolved and no row is actionable (Count=0, the only
+// resolved-and-never-actionable state — see resource.IsRelatedActionable).
+// HasActionableRows() should return false in this state.
 //
 // The current HasActionableRows() implementation returns true for loading rows
 // (rows where no RelatedCheckResultMsg has been delivered yet). The bug is that
-// after ALL rows are delivered as Count=0 or Count=-1/no-FetchFilter, the right
-// column must NOT accept focus.
+// after ALL rows are delivered as Count=0, the right column must NOT accept focus.
+//
+// Owner decision #38 (2026-07-06) retired Count=-1/no-FetchFilter as a
+// non-actionable state: a transient "(?)" row is now a drillable pivot into
+// the target type's plain top-level list, so it counts as actionable here.
+// The "MixedNonActionable" subtests below inject a mix of Count=0 and
+// Count=-1/no-FetchFilter rows and — despite the historical helper name —
+// now assert that focus IS granted, since the panel has actionable rows.
 //
 // Test strategy: Use ct-events detail model (17+ registered related defs).
-// Inject non-actionable results for every registered related def. Verify:
+// Inject non-actionable (Count=0) results for every registered related def
+// to exercise the true all-non-actionable guard. Verify:
 //  1. HasActionableRows() == false (read from View output / Tab behaviour).
 //  2. Tab key does NOT transfer focus to right column.
 
@@ -61,8 +69,14 @@ func buildAllZeroDetail(t *testing.T, fixture resource.Resource) views.DetailMod
 	return d
 }
 
-// buildMixedNonActionableDetail creates a ct-events DetailModel and injects a mix
-// of Count=0 and Count=-1/no-FetchFilter rows. Neither variant is actionable.
+// buildMixedNonActionableDetail creates a ct-events DetailModel and injects a
+// mix of Count=0 (never actionable) and Count=-1/no-FetchFilter rows. Despite
+// the name, the Count=-1/no-FetchFilter half IS actionable as of owner
+// decision #38 (2026-07-06): a transient "(?)" row is now a drillable pivot
+// into the target type's plain top-level list (see
+// qa_related_transient_unknown_drill_test.go), so this panel is no longer
+// all-non-actionable — see TestRightColumnNoActionableRowsBlocksFocus's
+// "MixedNonActionable" subtests below, which now assert focus IS granted.
 func buildMixedNonActionableDetail(t *testing.T, fixture resource.Resource) views.DetailModel {
 	t.Helper()
 	k := keys.Default()
@@ -166,31 +180,32 @@ func TestRightColumnNoActionableRowsBlocksFocus(t *testing.T) {
 		}
 	})
 
-	// --- Subtest: mix of Count=0 and Count=-1/no-FetchFilter ---
-	t.Run("MixedNonActionable/TabDoesNotFocus", func(t *testing.T) {
+	// --- Subtest: mix of Count=0 (never actionable) and Count=-1/no-FetchFilter
+	// (actionable per owner decision #38) — the panel now DOES have actionable
+	// rows, so focus must be granted, mirroring WithOneActionableRow below. ---
+	t.Run("MixedNonActionable/TabFocuses", func(t *testing.T) {
 		d := buildMixedNonActionableDetail(t, fixture)
 
 		viewBefore := stripAnsi(d.View())
 		dAfterTab := pressTab(d)
 		viewAfterTab := stripAnsi(dAfterTab.View())
 
-		if viewBefore != viewAfterTab {
-			t.Errorf("Bug F: Tab changed view when all rows are Count=0/Count=-1-no-filter — right column gained focus illegally."+
-				"\nevent=%s defs=%d"+
-				"\nView diff: before=%d chars after=%d chars",
-				fixture.ID, len(defs), len(viewBefore), len(viewAfterTab))
+		if viewBefore == viewAfterTab {
+			t.Errorf("Tab did not change view when the panel has actionable Count=-1-no-filter rows (owner decision #38: transient unknown rows are now actionable) — right column should have gained focus."+
+				"\nevent=%s defs=%d",
+				fixture.ID, len(defs))
 		}
 	})
 
-	t.Run("MixedNonActionable/ScrollRightDoesNotFocus", func(t *testing.T) {
+	t.Run("MixedNonActionable/ScrollRightFocuses", func(t *testing.T) {
 		d := buildMixedNonActionableDetail(t, fixture)
 
 		viewBefore := stripAnsi(d.View())
 		dAfterL := pressScrollRight(d)
 		viewAfterL := stripAnsi(dAfterL.View())
 
-		if viewBefore != viewAfterL {
-			t.Errorf("Bug F: 'l' (ScrollRight) changed view when all rows are Count=0/Count=-1-no-filter — right column gained focus illegally."+
+		if viewBefore == viewAfterL {
+			t.Errorf("'l' (ScrollRight) did not change view when the panel has actionable Count=-1-no-filter rows (owner decision #38: transient unknown rows are now actionable) — right column should have gained focus."+
 				"\nevent=%s defs=%d",
 				fixture.ID, len(defs))
 		}
