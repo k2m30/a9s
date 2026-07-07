@@ -147,6 +147,84 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 					"Team":        "data",
 				},
 			},
+			// Issue: State=DELETING → Warning (cluster teardown in progress).
+			{
+				ClusterName:    aws.String("msk-deleting"),
+				ClusterArn:     aws.String("arn:aws:kafka:us-east-1:123456789012:cluster/msk-deleting/f1a2b3c4"),
+				ClusterType:    kafkatypes.ClusterTypeProvisioned,
+				State:          kafkatypes.ClusterStateDeleting,
+				CurrentVersion: aws.String("K3AEGXET"),
+				CreationTime:   aws.Time(mustParseMSKTime("2025-05-02T09:15:00+00:00")),
+				Provisioned: &kafkatypes.Provisioned{
+					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
+						ClientSubnets: []string{"subnet-0a1b2c3d4e5f60001"},
+						InstanceType:  aws.String("kafka.m5.large"),
+					},
+					NumberOfBrokerNodes: aws.Int32(3),
+				},
+				Tags: map[string]string{
+					"Environment": "staging",
+				},
+			},
+			// Issue: State=HEALING → Warning (MSK auto-remediating a degraded broker).
+			{
+				ClusterName:    aws.String("msk-healing"),
+				ClusterArn:     aws.String("arn:aws:kafka:us-east-1:123456789012:cluster/msk-healing/a2b3c4d5"),
+				ClusterType:    kafkatypes.ClusterTypeProvisioned,
+				State:          kafkatypes.ClusterStateHealing,
+				CurrentVersion: aws.String("K3AEGXET"),
+				CreationTime:   aws.Time(mustParseMSKTime("2025-08-11T13:45:00+00:00")),
+				Provisioned: &kafkatypes.Provisioned{
+					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
+						ClientSubnets: []string{"subnet-0a1b2c3d4e5f60001", "subnet-0a1b2c3d4e5f60002"},
+						InstanceType:  aws.String("kafka.m5.large"),
+					},
+					NumberOfBrokerNodes: aws.Int32(3),
+				},
+				Tags: map[string]string{
+					"Environment": "prod",
+					"Team":        "data",
+				},
+			},
+			// Issue: State=MAINTENANCE → Warning (scheduled maintenance window active).
+			{
+				ClusterName:    aws.String("msk-maintenance"),
+				ClusterArn:     aws.String("arn:aws:kafka:us-east-1:123456789012:cluster/msk-maintenance/b3c4d5e6"),
+				ClusterType:    kafkatypes.ClusterTypeProvisioned,
+				State:          kafkatypes.ClusterStateMaintenance,
+				CurrentVersion: aws.String("K3AEGXET"),
+				CreationTime:   aws.Time(mustParseMSKTime("2025-10-01T02:00:00+00:00")),
+				Provisioned: &kafkatypes.Provisioned{
+					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
+						ClientSubnets: []string{"subnet-0a1b2c3d4e5f60001", "subnet-0a1b2c3d4e5f60002"},
+						InstanceType:  aws.String("kafka.m5.large"),
+					},
+					NumberOfBrokerNodes: aws.Int32(3),
+				},
+				Tags: map[string]string{
+					"Environment": "prod",
+				},
+			},
+			// Issue: State=UPDATING → Warning (cluster config/version update in progress).
+			{
+				ClusterName:    aws.String("msk-updating"),
+				ClusterArn:     aws.String("arn:aws:kafka:us-east-1:123456789012:cluster/msk-updating/c4d5e6f7"),
+				ClusterType:    kafkatypes.ClusterTypeProvisioned,
+				State:          kafkatypes.ClusterStateUpdating,
+				CurrentVersion: aws.String("K3AEGXET"),
+				CreationTime:   aws.Time(mustParseMSKTime("2025-11-18T20:30:00+00:00")),
+				Provisioned: &kafkatypes.Provisioned{
+					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
+						ClientSubnets: []string{"subnet-0a1b2c3d4e5f60001"},
+						InstanceType:  aws.String("kafka.m5.large"),
+					},
+					NumberOfBrokerNodes: aws.Int32(3),
+				},
+				Tags: map[string]string{
+					"Environment": "staging",
+					"Team":        "platform",
+				},
+			},
 		},
 		// ScramSecretsByCluster — required for the msk:secrets related-panel
 		// pivot (checkMSKSecrets → kafka:ListScramSecrets). Points at the
