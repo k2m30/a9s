@@ -142,8 +142,8 @@ func assertNoFinding(t *testing.T, fake *backupJobsOnlyFake, planID string) {
 		context.Background(),
 		backupJobsFakeClients(fake),
 		nil,
-			nil,
-		)
+		nil,
+	)
 	require.NoError(t, err)
 	require.NotContains(t, result.Findings, planID,
 		"expected no finding for plan %s (found one: %+v)", planID, result.Findings[planID])
@@ -195,7 +195,7 @@ func TestBackup_Enricher_OneFailed_ShowsBrokenPhrase(t *testing.T) {
 	// "failed", which legitimately appears in both the Row.Value and the "N job(s) failed..."
 	// Phrase now that HumanizeStatusPhrase lowercases the raw AWS enum instead of leaving it
 	// as "FAILED"; that overlap is the intended shared vocabulary, not a U11 leak).
-	for _, row := range result.AttentionDetails[planID].Rows {
+	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 		if row.Value == "" || row.Value == "failed" {
 			continue
 		}
@@ -207,16 +207,16 @@ func TestBackup_Enricher_OneFailed_ShowsBrokenPhrase(t *testing.T) {
 	}
 
 	// Rows must carry the state value for the failed job (humanized: "failed", not "FAILED").
-	require.NotEmpty(t, result.AttentionDetails[planID].Rows, "Rows must not be empty — must carry job state detail")
+	require.NotEmpty(t, result.AttentionDetails[planID][finding.Code].Rows, "Rows must not be empty — must carry job state detail")
 	stateFound := false
-	for _, row := range result.AttentionDetails[planID].Rows {
+	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 		if row.Value == "failed" {
 			stateFound = true
 			break
 		}
 	}
 	require.True(t, stateFound,
-		"Rows must contain a row with Value='failed' (humanized job state detail); Rows: %v", result.AttentionDetails[planID].Rows)
+		"Rows must contain a row with Value='failed' (humanized job state detail); Rows: %v", result.AttentionDetails[planID][finding.Code].Rows)
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +254,7 @@ func TestBackup_Enricher_TwoFailed_CountsCorrectly(t *testing.T) {
 	// U11: skip pure-integer count values — they naturally appear in count phrases —
 	// and skip the humanized "failed" state word, which legitimately overlaps with
 	// the "N jobs failed..." Phrase (see TestBackup_Enricher_OneFailed_ShowsBrokenPhrase).
-	for _, row := range result.AttentionDetails[planID].Rows {
+	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 		if row.Value == "" || row.Value == "failed" {
 			continue
 		}
@@ -267,7 +267,7 @@ func TestBackup_Enricher_TwoFailed_CountsCorrectly(t *testing.T) {
 
 	// Both FAILED and EXPIRED states must appear in Rows (humanized: "failed"/"expired").
 	rowVals := make(map[string]bool)
-	for _, row := range result.AttentionDetails[planID].Rows {
+	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 		rowVals[row.Value] = true
 	}
 	require.True(t, rowVals["failed"], "Rows must carry humanized failed state; rowValues: %v", rowVals)
@@ -301,7 +301,7 @@ func TestBackup_Enricher_OneAborted_IsAlsoBroken(t *testing.T) {
 		"ABORTED must use the same canonical phrase as FAILED per spec §4")
 
 	// U11: skip pure-integer count values.
-	for _, row := range result.AttentionDetails[planID].Rows {
+	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 		if row.Value == "" {
 			continue
 		}
@@ -361,7 +361,7 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 		"S1: ~ findings must not increment IssueCount; no '!' findings expected for PARTIAL-only")
 
 	// U11: Phrase must not contain Row values (skip pure-integer counts).
-	for _, row := range result.AttentionDetails[planID].Rows {
+	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 		if row.Value == "" {
 			continue
 		}
@@ -373,8 +373,8 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 	}
 
 	// Rows must carry "Partial jobs" and "Total jobs" (or functionally equivalent integer counts).
-	rowVals := make(map[string]string, len(result.AttentionDetails[planID].Rows))
-	for _, row := range result.AttentionDetails[planID].Rows {
+	rowVals := make(map[string]string, len(result.AttentionDetails[planID][finding.Code].Rows))
+	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 		rowVals[row.Label] = row.Value
 	}
 
@@ -382,7 +382,7 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 	// "Partial jobs"/"Total jobs" labels or as any row carrying the integer values.
 	partialCountFound := false
 	totalCountFound := false
-	for _, row := range result.AttentionDetails[planID].Rows {
+	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 		if row.Value == "1" {
 			partialCountFound = true
 		}
@@ -391,9 +391,9 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 		}
 	}
 	require.True(t, partialCountFound,
-		"Rows must carry the partial job count (value '1'); Rows: %v", result.AttentionDetails[planID].Rows)
+		"Rows must carry the partial job count (value '1'); Rows: %v", result.AttentionDetails[planID][finding.Code].Rows)
 	require.True(t, totalCountFound,
-		"Rows must carry the total job count (value '3'); Rows: %v", result.AttentionDetails[planID].Rows)
+		"Rows must carry the total job count (value '3'); Rows: %v", result.AttentionDetails[planID][finding.Code].Rows)
 }
 
 // ---------------------------------------------------------------------------
@@ -449,16 +449,16 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 	// Rows must include both the failed job State AND partial job count
 	// so nothing silently disappears.
 	rowVals := make(map[string]bool)
-	for _, row := range result.AttentionDetails[planID].Rows {
+	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 		rowVals[row.Value] = true
 	}
 	require.True(t, rowVals["failed"],
-		"Rows must contain humanized State=failed; rows: %v", result.AttentionDetails[planID].Rows)
+		"Rows must contain humanized State=failed; rows: %v", result.AttentionDetails[planID][finding.Code].Rows)
 
 	// Partial evidence must be preserved alongside the FAILED evidence so the
 	// enricher cannot silently drop partial context when a failed job exists.
 	var sawPartial bool
-	for _, row := range result.AttentionDetails[planID].Rows {
+	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 		if row.Label == "Partial jobs" || row.Tier == "~" {
 			sawPartial = true
 			break
@@ -468,7 +468,7 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 
 	// U11: skip pure-integer count values, and skip the humanized "failed" state
 	// word, which legitimately overlaps with the "N job(s) failed..." Phrase.
-	for _, row := range result.AttentionDetails[planID].Rows {
+	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 		if row.Value == "" || row.Value == "failed" {
 			continue
 		}
@@ -766,7 +766,7 @@ func TestBackup_Enricher_FailedBucket_AllStatesMapToBang(t *testing.T) {
 			// EXPIRED and ABORTED both map to Row.Value "expired"/"aborted"
 			// (no overlap), but FAILED's Row.Value "failed" legitimately
 			// overlaps with the "N job(s) failed..." Phrase text.
-			for _, row := range result.AttentionDetails[tc.planID].Rows {
+			for _, row := range result.AttentionDetails[tc.planID][finding.Code].Rows {
 				if row.Value == "" || row.Value == "failed" {
 					continue
 				}
@@ -832,7 +832,7 @@ func TestBackup_Enricher_U11_SummaryNeverContainsRowValues(t *testing.T) {
 
 	for planID, findings := range result.Findings {
 		for _, finding := range findings {
-			for _, row := range result.AttentionDetails[planID].Rows {
+			for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 				if row.Value == "" || row.Value == "failed" {
 					continue
 				}

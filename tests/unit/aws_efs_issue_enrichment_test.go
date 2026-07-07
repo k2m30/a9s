@@ -92,13 +92,13 @@ func TestEnrichEFSMountTargets_HealthyRowWithDown(t *testing.T) {
 
 	// Rows must contain the four expected labels.
 	wantLabels := []string{"Mount Target", "AZ", "State", "Degraded"}
-	rowLabels := make(map[string]string, len(result.AttentionDetails[fsID].Rows))
-	for _, row := range result.AttentionDetails[fsID].Rows {
+	rowLabels := make(map[string]string, len(result.AttentionDetails[fsID][finding.Code].Rows))
+	for _, row := range result.AttentionDetails[fsID][finding.Code].Rows {
 		rowLabels[row.Label] = row.Value
 	}
 	for _, label := range wantLabels {
 		if _, ok := rowLabels[label]; !ok {
-			t.Errorf("Rows missing label %q; got rows: %v", label, result.AttentionDetails[fsID].Rows)
+			t.Errorf("Rows missing label %q; got rows: %v", label, result.AttentionDetails[fsID][finding.Code].Rows)
 		}
 	}
 
@@ -123,7 +123,7 @@ func TestEnrichEFSMountTargets_HealthyRowWithDown(t *testing.T) {
 	}
 
 	// U11: Phrase must NOT contain any Row Value as substring.
-	for _, row := range result.AttentionDetails[fsID].Rows {
+	for _, row := range result.AttentionDetails[fsID][finding.Code].Rows {
 		if row.Value != "" && strings.Contains(finding.Phrase, row.Value) {
 			t.Errorf("U11 violation: Phrase %q contains Row Value %q (label=%q)", finding.Phrase, row.Value, row.Label)
 		}
@@ -177,8 +177,8 @@ func TestEnrichEFSMountTargets_W1WarningPlusW2Bumps(t *testing.T) {
 	}
 
 	// The down MT-B must appear in Rows[Mount Target].
-	rowLabels := make(map[string]string, len(result.AttentionDetails[fsID].Rows))
-	for _, row := range result.AttentionDetails[fsID].Rows {
+	rowLabels := make(map[string]string, len(result.AttentionDetails[fsID][finding.Code].Rows))
+	for _, row := range result.AttentionDetails[fsID][finding.Code].Rows {
 		rowLabels[row.Label] = row.Value
 	}
 	if mtVal := rowLabels["Mount Target"]; !strings.Contains(mtVal, fixtures.UpdatingMTDownMountTargetBID) {
@@ -231,8 +231,8 @@ func TestEnrichEFSMountTargets_SummaryDoesNotContainRowValues(t *testing.T) {
 
 	// Both finding-producing fixtures.
 	findingFSIDs := []string{
-		"fs-0healthymtdown001",  // W2 on Healthy
-		"fs-0warnupdmtdown001",  // W1 Warning + W2
+		"fs-0healthymtdown001", // W2 on Healthy
+		"fs-0warnupdmtdown001", // W1 Warning + W2
 	}
 
 	res := efsResources(findingFSIDs...)
@@ -249,7 +249,7 @@ func TestEnrichEFSMountTargets_SummaryDoesNotContainRowValues(t *testing.T) {
 			continue
 		}
 		finding := findings[0]
-		for _, row := range result.AttentionDetails[fsID].Rows {
+		for _, row := range result.AttentionDetails[fsID][finding.Code].Rows {
 			if row.Value == "" {
 				continue
 			}
@@ -281,12 +281,14 @@ func TestEnrichEFSMountTargets_FindingRowsStructure(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, ok := result.Findings[fsID]; !ok {
+	findings, ok := result.Findings[fsID]
+	if !ok {
 		t.Fatalf("expected finding for %q", fsID)
 	}
+	finding := findings[0]
 
 	// Every row must have a non-empty Label.
-	for i, row := range result.AttentionDetails[fsID].Rows {
+	for i, row := range result.AttentionDetails[fsID][finding.Code].Rows {
 		if row.Label == "" {
 			t.Errorf("Rows[%d].Label is empty", i)
 		}
@@ -296,7 +298,7 @@ func TestEnrichEFSMountTargets_FindingRowsStructure(t *testing.T) {
 	// "State" row must have Tier="!".
 	// Other rows (AZ, Degraded) may have Tier="" (neutral context).
 	tierMap := make(map[string]string)
-	for _, row := range result.AttentionDetails[fsID].Rows {
+	for _, row := range result.AttentionDetails[fsID][finding.Code].Rows {
 		tierMap[row.Label] = row.Tier
 	}
 
@@ -411,12 +413,14 @@ func TestEnrichEFSMountTargets_DetailContent_U7c(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, ok := result.Findings[fsID]; !ok {
+	findings, ok := result.Findings[fsID]
+	if !ok {
 		t.Fatalf("expected finding for %q", fsID)
 	}
+	finding := findings[0]
 
-	rowMap := make(map[string]string, len(result.AttentionDetails[fsID].Rows))
-	for _, row := range result.AttentionDetails[fsID].Rows {
+	rowMap := make(map[string]string, len(result.AttentionDetails[fsID][finding.Code].Rows))
+	for _, row := range result.AttentionDetails[fsID][finding.Code].Rows {
 		rowMap[row.Label] = row.Value
 	}
 
@@ -435,4 +439,3 @@ func TestEnrichEFSMountTargets_DetailContent_U7c(t *testing.T) {
 		t.Errorf("Rows[Degraded] = %q, want %q", degVal, "1/2")
 	}
 }
-

@@ -304,20 +304,22 @@ func TestEnrichEventBridgeRule_DLQCheckAcrossAllPages(t *testing.T) {
 	}
 
 	// Findings must exist for the targets-without-DLQ from page 2
-	if _, ok := result.Findings[ruleName]; !ok {
+	fs, ok := result.Findings[ruleName]
+	if !ok {
 		t.Fatalf("expected finding for %q (targets on page 2 lack DLQ), none produced", ruleName)
 	}
+	f := fs[0]
 
 	// Verify at least one row references the no-DLQ issue
 	foundNoDLQ := false
-	for _, row := range result.AttentionDetails[ruleName].Rows {
+	for _, row := range result.AttentionDetails[ruleName][f.Code].Rows {
 		if strings.Contains(row.Value, "no dead-letter config") {
 			foundNoDLQ = true
 			break
 		}
 	}
 	if !foundNoDLQ {
-		t.Errorf("no row with 'no dead-letter config' in finding rows: %v", result.AttentionDetails[ruleName].Rows)
+		t.Errorf("no row with 'no dead-letter config' in finding rows: %v", result.AttentionDetails[ruleName][f.Code].Rows)
 	}
 }
 

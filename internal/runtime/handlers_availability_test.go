@@ -190,8 +190,11 @@ func TestHandleEnrichmentChecked_PatchDetail_NonNilFindings_PassesThrough(t *tes
 		if !ok {
 			t.Fatalf("missing finding for %q", k)
 		}
-		if got.Severity != v.Severity || got.Phrase != v.Phrase {
-			t.Fatalf("finding %q mismatch: want %+v, got %+v", k, v, got)
+		if len(got) != 1 {
+			t.Fatalf("finding %q: want exactly 1 wrapped Finding (wrapSingleFindings), got %d: %+v", k, len(got), got)
+		}
+		if got[0].Severity != v.Severity || got[0].Phrase != v.Phrase {
+			t.Fatalf("finding %q mismatch: want %+v, got %+v", k, v, got[0])
 		}
 	}
 }

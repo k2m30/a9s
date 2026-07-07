@@ -35,8 +35,8 @@ import (
 	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -171,7 +171,7 @@ func TestEnrichSESAccount_ShutdownFindingRowActionable(t *testing.T) {
 		t.Fatal("expected finding for identity acme-corp.com")
 	}
 	f := fs[0]
-	ad := result.AttentionDetails["acme-corp.com"]
+	ad := result.AttentionDetails["acme-corp.com"][f.Code]
 	if len(ad.Rows) == 0 {
 		t.Fatal("expected at least one row in SHUTDOWN finding")
 	}
@@ -248,7 +248,12 @@ func TestEnrichSESAccount_ProbationFindingRowActionable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	ad := result.AttentionDetails["acme-corp.com"]
+	fs, ok := result.Findings["acme-corp.com"]
+	if !ok {
+		t.Fatal("expected finding for identity acme-corp.com")
+	}
+	f := fs[0]
+	ad := result.AttentionDetails["acme-corp.com"][f.Code]
 	if len(ad.Rows) == 0 {
 		t.Fatal("expected at least one row in PROBATION finding")
 	}
@@ -534,7 +539,7 @@ func TestEnrichSESAccount_ShutdownSummaryDoesNotContainRowValue(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	f := result.Findings["acme-corp.com"][0]
-	for _, row := range result.AttentionDetails["acme-corp.com"].Rows {
+	for _, row := range result.AttentionDetails["acme-corp.com"][f.Code].Rows {
 		if row.Value != "" && strings.Contains(f.Phrase, row.Value) {
 			t.Errorf("U11 violation: Summary %q contains Row.Value %q", f.Phrase, row.Value)
 		}
@@ -552,7 +557,7 @@ func TestEnrichSESAccount_ProbationSummaryDoesNotContainRowValue(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	f := result.Findings["acme-corp.com"][0]
-	for _, row := range result.AttentionDetails["acme-corp.com"].Rows {
+	for _, row := range result.AttentionDetails["acme-corp.com"][f.Code].Rows {
 		if row.Value != "" && strings.Contains(f.Phrase, row.Value) {
 			t.Errorf("U11 violation: Summary %q contains Row.Value %q", f.Phrase, row.Value)
 		}
@@ -580,7 +585,7 @@ func TestEnrichSESAccount_QuotaSummaryDoesNotContainSentOrMaxValues(t *testing.T
 		t.Fatal("expected quota finding for 90% usage")
 	}
 	f := fs[0]
-	for _, row := range result.AttentionDetails["acme-corp.com"].Rows {
+	for _, row := range result.AttentionDetails["acme-corp.com"][f.Code].Rows {
 		if row.Value != "" && strings.Contains(f.Phrase, row.Value) {
 			t.Errorf("U11 violation: Summary %q contains Row.Value %q", f.Phrase, row.Value)
 		}

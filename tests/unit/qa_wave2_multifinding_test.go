@@ -154,7 +154,7 @@ func buildFoldedMultiFindingRow(t *testing.T) (*resource.ResourceTypeDef, domain
 	findings := map[string][]domain.Finding{
 		multiFindingResourceID: {multiFindingBang, multiFindingTilde},
 	}
-	attentionDetails := map[string]domain.AttentionDetail{}
+	attentionDetails := map[string]map[domain.FindingCode]domain.AttentionDetail{}
 
 	r := domain.Resource{ID: multiFindingResourceID, Name: multiFindingResourceID, Type: "ecs-svc"}
 	runtime.ApplyWave2ToRow(&r, *td, findings, attentionDetails)
@@ -493,10 +493,11 @@ func TestOpenSearch_Enrich_MultiBackground_BothConditionsSurfaceAsOwnFindings(t 
 		t.Errorf("encryption-off Finding.Detail = %q, want %q — its own S5 operator sentence must stay reachable as its own Finding.Detail, not a generic Additional row", encOff.Detail, opensearchEncryptionOffOperatorSentence)
 	}
 
-	rows := result.AttentionDetails[id].Rows
-	for _, row := range rows {
-		if row.Label == "Additional" {
-			t.Errorf(`Rows contains {Label:%q, Value:%q} — a generic "Additional" row means the second condition was demoted into a row instead of surfacing as its own Finding (#52)`, row.Label, row.Value)
+	for _, ad := range result.AttentionDetails[id] {
+		for _, row := range ad.Rows {
+			if row.Label == "Additional" {
+				t.Errorf(`Rows contains {Label:%q, Value:%q} — a generic "Additional" row means the second condition was demoted into a row instead of surfacing as its own Finding (#52)`, row.Label, row.Value)
+			}
 		}
 	}
 }

@@ -139,7 +139,7 @@ func TestEnrichDBIMaintenance_SummaryFormat(t *testing.T) {
 	}
 	if !strings.Contains(f.Detail, "system-update") {
 		var rowsHaveAction bool
-		if ad, ok := result.AttentionDetails["my-db"]; ok {
+		if ad, ok := result.AttentionDetails["my-db"][f.Code]; ok {
 			for _, row := range ad.Rows {
 				if row.Label == "Action" && row.Value == "system-update" {
 					rowsHaveAction = true

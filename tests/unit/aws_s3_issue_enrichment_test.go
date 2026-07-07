@@ -206,7 +206,7 @@ func TestS3_Enrich_NoPAB_Configuration(t *testing.T) {
 	}
 
 	// Rows must carry the detail.
-	rows := rowMap(result.AttentionDetails["a9s-demo-nopab"].Rows)
+	rows := rowMap(result.AttentionDetails["a9s-demo-nopab"][finding.Code].Rows)
 	if rows["Status"] != "no public access block configuration" {
 		t.Errorf("Rows[Status] = %q, want %q", rows["Status"], "no public access block configuration")
 	}
@@ -258,7 +258,7 @@ func TestS3_Enrich_PartialPAB_SingleFlagFalse(t *testing.T) {
 		t.Errorf("Phrase must not embed Row content; got %q", finding.Phrase)
 	}
 
-	rows := rowMap(result.AttentionDetails["a9s-demo-partial-pab"].Rows)
+	rows := rowMap(result.AttentionDetails["a9s-demo-partial-pab"][finding.Code].Rows)
 	if rows["BlockPublicAcls"] != "false" {
 		t.Errorf("Rows[BlockPublicAcls] = %q, want %q", rows["BlockPublicAcls"], "false")
 	}
@@ -311,7 +311,7 @@ func TestS3_Enrich_PartialPAB_MultipleFlagsFalse(t *testing.T) {
 		t.Errorf("Phrase must not embed Row content; got %q", finding.Phrase)
 	}
 
-	rows := rowMap(result.AttentionDetails["a9s-demo-multifail-pab"].Rows)
+	rows := rowMap(result.AttentionDetails["a9s-demo-multifail-pab"][finding.Code].Rows)
 	if rows["BlockPublicAcls"] != "false" {
 		t.Errorf("Rows[BlockPublicAcls] = %q, want %q", rows["BlockPublicAcls"], "false")
 	}
@@ -526,7 +526,7 @@ func TestS3_Enrich_U11_SummaryStable_NeverContainsRowValues(t *testing.T) {
 
 	for id, findings := range result.Findings {
 		for _, finding := range findings {
-			for _, row := range result.AttentionDetails[id].Rows {
+			for _, row := range result.AttentionDetails[id][finding.Code].Rows {
 				if row.Value != "" && strings.Contains(finding.Phrase, row.Value) {
 					t.Errorf("[%s] Phrase %q must not contain Row value %q (U11 Phrase≠Rows separation)",
 						id, finding.Phrase, row.Value)

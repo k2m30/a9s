@@ -112,10 +112,12 @@ func detailParityEnrichmentCheckedEvent() messages.EnrichmentChecked {
 				Source:   "wave2:ec2-status",
 			},
 		},
-		AttentionDetails: map[string]domain.AttentionDetail{
+		AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{
 			"i-detailparity01": {
-				Rows: []domain.DetailRow{
-					{Label: "Check", Value: "SystemStatusCheck"},
+				"ec2.status-impaired": {
+					Rows: []domain.DetailRow{
+						{Label: "Check", Value: "SystemStatusCheck"},
+					},
 				},
 			},
 		},

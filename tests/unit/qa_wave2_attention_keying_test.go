@@ -115,8 +115,11 @@ func TestWave2AttentionKeying_TwoFindingsOneResource_EachFindingsAttentionRowsSu
 		Findings: map[string][]domain.Finding{
 			resourceID: {findingUpdateForced, findingEncryptionOff},
 		},
-		AttentionDetails: map[string]domain.AttentionDetail{
-			resourceID: {Rows: rowsUpdateForced},
+		AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{
+			resourceID: {
+				codeUpdateForced:  {Rows: rowsUpdateForced},
+				codeEncryptionOff: {Rows: rowsEncryptionOff},
+			},
 		},
 	}
 

@@ -132,7 +132,7 @@ func TestOpenSearch_Enrich_UpdateAvailable_EmitsBangFinding(t *testing.T) {
 		t.Errorf("Phrase = %q, want %q", finding.Phrase, "software update forced soon")
 	}
 
-	rows := result.AttentionDetails[id].Rows
+	rows := result.AttentionDetails[id][finding.Code].Rows
 	// U11 — Phrase must not contain any row value.
 	u11SummaryRowCheck(t, finding, rows)
 
@@ -201,7 +201,7 @@ func TestOpenSearch_Enrich_EncryptionOff_EmitsTildeFinding(t *testing.T) {
 	}
 
 	// U11 — Phrase must not contain any row value.
-	u11SummaryRowCheck(t, finding, result.AttentionDetails[id].Rows)
+	u11SummaryRowCheck(t, finding, result.AttentionDetails[id][finding.Code].Rows)
 
 	if result.IssueCount != 0 {
 		t.Errorf("IssueCount = %d, want 0 (~ never bumps badge)", result.IssueCount)

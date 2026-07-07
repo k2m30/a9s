@@ -77,9 +77,9 @@ func makeCrossRefCfg(retentionEnabled bool) awsclient.SnapshotCrossRefConfig {
 			}
 			return p.BackupRetentionPeriod, p.BackupRetentionPeriod > 0
 		},
-		OrphanPhrase:    "orphan: source parent deleted",
-		ParentRowLabel:  "Source Parent",
-		RetentionPhrase: func(d int) string { return fmt.Sprintf("automated, %dd past retention", d) },
+		OrphanPhrase:     "orphan: source parent deleted",
+		ParentRowLabel:   "Source Parent",
+		RetentionPhrase:  func(d int) string { return fmt.Sprintf("automated, %dd past retention", d) },
 		RetentionEnabled: retentionEnabled,
 	}
 }
@@ -242,7 +242,7 @@ func TestSnapshotCrossRef_OrphanFinding(t *testing.T) {
 
 	// Must contain a row with Label="Source Parent" and Value containing "p1" and the hint.
 	found = false
-	for _, row := range result.AttentionDetails["snap-1"].Rows {
+	for _, row := range result.AttentionDetails["snap-1"][finding.Code].Rows {
 		if row.Label == "Source Parent" {
 			found = true
 			if !crossRefContains(row.Value, "p1") {
@@ -254,7 +254,7 @@ func TestSnapshotCrossRef_OrphanFinding(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("expected a row with Label=%q, rows were: %+v", "Source Parent", result.AttentionDetails["snap-1"].Rows)
+		t.Errorf("expected a row with Label=%q, rows were: %+v", "Source Parent", result.AttentionDetails["snap-1"][finding.Code].Rows)
 	}
 
 	// AS-140: FieldUpdates must be nil or empty — the enricher no longer overlays
@@ -305,7 +305,7 @@ func TestSnapshotCrossRef_PastRetention_Automated(t *testing.T) {
 	hasParentRow := false
 	hasRetentionRow := false
 	hasCreatedRow := false
-	for _, row := range result.AttentionDetails["snap-1"].Rows {
+	for _, row := range result.AttentionDetails["snap-1"][finding.Code].Rows {
 		switch row.Label {
 		case "Source Parent":
 			hasParentRow = true
@@ -326,13 +326,13 @@ func TestSnapshotCrossRef_PastRetention_Automated(t *testing.T) {
 		}
 	}
 	if !hasParentRow {
-		t.Errorf("missing Source Parent row; rows: %+v", result.AttentionDetails["snap-1"].Rows)
+		t.Errorf("missing Source Parent row; rows: %+v", result.AttentionDetails["snap-1"][finding.Code].Rows)
 	}
 	if !hasRetentionRow {
-		t.Errorf("missing Retention row; rows: %+v", result.AttentionDetails["snap-1"].Rows)
+		t.Errorf("missing Retention row; rows: %+v", result.AttentionDetails["snap-1"][finding.Code].Rows)
 	}
 	if !hasCreatedRow {
-		t.Errorf("missing Created row; rows: %+v", result.AttentionDetails["snap-1"].Rows)
+		t.Errorf("missing Created row; rows: %+v", result.AttentionDetails["snap-1"][finding.Code].Rows)
 	}
 
 	// AS-140: FieldUpdates must be nil or empty for snap-1 — the enricher no
@@ -626,8 +626,8 @@ func assertResultsIdentical(t *testing.T, id string, r1, r2 awsclient.IssueEnric
 		if f1.Phrase != f2.Phrase {
 			t.Errorf("idempotency: Phrase run1=%q run2=%q for %q", f1.Phrase, f2.Phrase, id)
 		}
-		rows1 := r1.AttentionDetails[id].Rows
-		rows2 := r2.AttentionDetails[id].Rows
+		rows1 := r1.AttentionDetails[id][f1.Code].Rows
+		rows2 := r2.AttentionDetails[id][f2.Code].Rows
 		if len(rows1) != len(rows2) {
 			t.Errorf("idempotency: len(Rows) run1=%d run2=%d for %q", len(rows1), len(rows2), id)
 		}

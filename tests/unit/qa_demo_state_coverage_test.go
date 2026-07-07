@@ -269,7 +269,7 @@ func findingCodesFor(
 	buckets := make(map[domain.Color]bool)
 
 	var wave2Findings map[string][]domain.Finding
-	var wave2AttentionDetails map[string]domain.AttentionDetail
+	var wave2AttentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail
 	hasEnricher := false
 
 	if enricher, ok := awsclient.Wave2EnricherFor(td.ShortName); ok && enricher.Fn != nil {

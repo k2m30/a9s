@@ -338,9 +338,9 @@ type iamGroupErrorFake struct {
 	attachedPoliciesByGroup map[string][]iamtypes.AttachedPolicy
 	inlinePoliciesByGroup   map[string][]string
 
-	getGroupErrFor            string
-	listAttachedErrFor        string
-	listInlineErrFor          string
+	getGroupErrFor     string
+	listAttachedErrFor string
+	listInlineErrFor   string
 }
 
 func (f *iamGroupErrorFake) GetGroup(
@@ -525,7 +525,7 @@ func TestEnrichASGScalingActivities_FailedWithStatusMessageSummarized(t *testing
 	}
 	// Rows must include a "Message" row.
 	var hasMessageRow, hasCauseRow, hasStartedRow bool
-	for _, row := range result.AttentionDetails["capacity-asg"].Rows {
+	for _, row := range result.AttentionDetails["capacity-asg"][f.Code].Rows {
 		switch row.Label {
 		case "Message":
 			hasMessageRow = true
@@ -588,7 +588,7 @@ func TestEnrichASGScalingActivities_FailedWithoutStatusMessagePlainSummary(t *te
 	if f.Phrase != "latest scaling activity failed" {
 		t.Errorf("summary = %q, want %q", f.Phrase, "latest scaling activity failed")
 	}
-	for _, row := range result.AttentionDetails["silent-fail-asg"].Rows {
+	for _, row := range result.AttentionDetails["silent-fail-asg"][f.Code].Rows {
 		if row.Label == "Message" {
 			t.Error("rows must NOT contain a Message label when StatusMessage is nil")
 		}
@@ -702,11 +702,13 @@ func TestEnrichCodePipelineStatus_ActionErrorDetailsAppended(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := result.Findings["err-pipe-id"]; !ok {
+	fs, ok := result.Findings["err-pipe-id"]
+	if !ok {
 		t.Fatalf("expected finding for err-pipe-id, got none")
 	}
+	f := fs[0]
 	var hasErrorRow bool
-	for _, row := range result.AttentionDetails["err-pipe-id"].Rows {
+	for _, row := range result.AttentionDetails["err-pipe-id"][f.Code].Rows {
 		if row.Label == "Error" {
 			hasErrorRow = true
 			if row.Value != errMsg {
@@ -748,10 +750,12 @@ func TestEnrichCodePipelineStatus_ActionNilExecutionSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := result.Findings["nil-exec-pipe"]; !ok {
+	fs, ok := result.Findings["nil-exec-pipe"]
+	if !ok {
 		t.Fatalf("expected finding for nil-exec-pipe")
 	}
-	for _, row := range result.AttentionDetails["nil-exec-pipe"].Rows {
+	f := fs[0]
+	for _, row := range result.AttentionDetails["nil-exec-pipe"][f.Code].Rows {
 		if row.Label == "Error" {
 			t.Error("no Error row should be appended when action LatestExecution is nil")
 		}

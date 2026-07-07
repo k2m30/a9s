@@ -792,7 +792,7 @@ func TestEnrichEBSVolumeStatus_WarningStatusProducesFinding(t *testing.T) {
 		t.Errorf("summary = %q, want %q", f.Phrase, "volume I/O degraded")
 	}
 	// The I/O State row must reflect the actual status string.
-	volWarnRows := result.AttentionDetails["vol-warn"].Rows
+	volWarnRows := result.AttentionDetails["vol-warn"][f.Code].Rows
 	if len(volWarnRows) == 0 {
 		t.Fatal("expected at least one finding row")
 	}
@@ -829,13 +829,15 @@ func TestEnrichEBSVolumeStatus_EventAndActionRowsPopulated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := result.Findings["vol-events"]; !ok {
+	fs, ok := result.Findings["vol-events"]
+	if !ok {
 		t.Fatalf("expected finding for impaired volume with events/actions")
 	}
+	f := fs[0]
 
 	hasEvent := false
 	hasAction := false
-	for _, row := range result.AttentionDetails["vol-events"].Rows {
+	for _, row := range result.AttentionDetails["vol-events"][f.Code].Rows {
 		if row.Label == "Event" {
 			hasEvent = true
 			if !strings.Contains(row.Value, "degraded") {

@@ -144,7 +144,7 @@ func TestDBI_Enrich_MaintenancePending_HealthyRow(t *testing.T) {
 		"Description": "New minor engine patch 16.2.3",
 	}
 	gotRows := map[string]string{}
-	for _, r := range result.AttentionDetails[fixtures.MaintDbiScheduledID].Rows {
+	for _, r := range result.AttentionDetails[fixtures.MaintDbiScheduledID][finding.Code].Rows {
 		gotRows[r.Label] = r.Value
 	}
 	for label, val := range wantRows {
@@ -202,7 +202,7 @@ func TestDBI_Enrich_MaintenancePending_NilDescription(t *testing.T) {
 		t.Errorf("Phrase = %q, want %q", finding.Phrase, "maintenance scheduled")
 	}
 	var labels []string
-	for _, r := range result.AttentionDetails[resourceID].Rows {
+	for _, r := range result.AttentionDetails[resourceID][finding.Code].Rows {
 		labels = append(labels, r.Label)
 	}
 	for _, l := range labels {

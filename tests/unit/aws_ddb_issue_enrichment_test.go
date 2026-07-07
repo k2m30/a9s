@@ -264,7 +264,7 @@ func TestDDB_Enrich_SummaryNotRows_Contract(t *testing.T) {
 		t.Errorf("Phrase = %q, want exactly %q", finding.Phrase, "point-in-time recovery disabled")
 	}
 	// U11: no Row value should appear in Phrase.
-	for _, row := range result.AttentionDetails[fixtures.AuditPITROffID].Rows {
+	for _, row := range result.AttentionDetails[fixtures.AuditPITROffID][finding.Code].Rows {
 		if row.Value != "" && strings.Contains(finding.Phrase, row.Value) {
 			t.Errorf("Phrase %q embeds Row[%q].Value %q — Phrase and Rows must be distinct channels (U11)", finding.Phrase, row.Label, row.Value)
 		}

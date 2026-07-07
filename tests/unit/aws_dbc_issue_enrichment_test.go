@@ -444,12 +444,14 @@ func TestDBC_Enrich_FindingRows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}
-	if _, ok := result.Findings[clusterID]; !ok {
+	fs, ok := result.Findings[clusterID]
+	if !ok {
 		t.Fatalf("expected finding for %q", clusterID)
 	}
+	finding := fs[0]
 
 	gotRows := map[string]string{}
-	for _, row := range result.AttentionDetails[clusterID].Rows {
+	for _, row := range result.AttentionDetails[clusterID][finding.Code].Rows {
 		gotRows[row.Label] = row.Value
 	}
 
