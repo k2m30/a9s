@@ -49,6 +49,11 @@ const (
 	// (elb.go), required for the apigw:elb related-panel pivot
 	// (checkApigwELB)'s security-group-based fallback match.
 	APIGWVpcLinkSecurityGroupID = "sg-0vpcl11111111111a"
+	// HealthyAPIGWID is the only API with a deployed stage that carries both
+	// non-zero throttling and access logging — the sole demo witness for the
+	// apigw Healthy color bucket (colorAPIGW falls through to structural
+	// Healthy only when EnrichAPIGatewayStage raises no finding at all).
+	HealthyAPIGWID = "opq234rst5"
 )
 
 // NewAPIGWFixtures constructs APIGWFixtures from the canonical demo data.
@@ -86,6 +91,18 @@ var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
 				Description:              aws.String("Internal microservice-to-microservice API"),
 				RouteSelectionExpression: aws.String("${request.method} ${request.path}"),
 				CreatedDate:              aws.Time(time.Date(2025, 9, 1, 11, 0, 0, 0, time.UTC)),
+			},
+			// HealthyAPIGWID's "prod" stage has non-zero throttling and access
+			// logging, so EnrichAPIGatewayStage raises no finding for it — the
+			// only demo API that resolves to colorAPIGW's Healthy fallback.
+			{
+				ApiId:                    aws.String(HealthyAPIGWID),
+				Name:                     aws.String("acme-partner-api"),
+				ProtocolType:             apigwtypes.ProtocolTypeHttp,
+				ApiEndpoint:              aws.String("https://" + HealthyAPIGWID + ".execute-api.us-east-1.amazonaws.com"),
+				Description:              aws.String("Partner integration API with production-grade throttling and access logging"),
+				RouteSelectionExpression: aws.String("${request.method} ${request.path}"),
+				CreatedDate:              aws.Time(time.Date(2025, 10, 12, 8, 0, 0, 0, time.UTC)),
 			},
 		},
 		// Integrations for PublicAPIGWID — required for the apigw:kms,
@@ -169,6 +186,22 @@ var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
 						ThrottlingRateLimit:  aws.Float64(0),
 					},
 					AccessLogSettings: nil,
+				},
+			},
+			// HealthyAPIGWID's "prod" stage has real throttling limits and
+			// access logging configured — no apigw.stage-config-issues finding.
+			HealthyAPIGWID: {
+				{
+					StageName:   aws.String("prod"),
+					CreatedDate: aws.Time(time.Date(2025, 10, 12, 8, 5, 0, 0, time.UTC)),
+					DefaultRouteSettings: &apigwtypes.RouteSettings{
+						ThrottlingBurstLimit: aws.Int32(500),
+						ThrottlingRateLimit:  aws.Float64(1000),
+					},
+					AccessLogSettings: &apigwtypes.AccessLogSettings{
+						DestinationArn: aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/apigateway/acme-partner-api"),
+						Format:         aws.String(`{"requestId":"$context.requestId","status":"$context.status"}`),
+					},
 				},
 			},
 		},

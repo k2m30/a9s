@@ -127,6 +127,18 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 			EventPattern: aws.String(`{"source":["aws.codecommit"],"detail-type":["CodeCommit Repository State Change"],"detail":{"referenceName":["main"]}}`),
 			Description:  aws.String("Triggers acme-api-deploy on main branch push"),
 		},
+		// scheduled-report-generator — ENABLED with exactly one target that
+		// carries a DeadLetterConfig, so EnrichEventBridgeRuleTargets raises
+		// no eb-rule.target-issue finding. The only demo rule that resolves
+		// to colorEBRule's Healthy fallback.
+		{
+			Name:               aws.String("scheduled-report-generator"),
+			Arn:                aws.String("arn:aws:events:us-east-1:123456789012:rule/scheduled-report-generator"),
+			State:              eventbridgetypes.RuleStateEnabled,
+			EventBusName:       aws.String("default"),
+			ScheduleExpression: aws.String("cron(0 7 * * ? *)"),
+			Description:        aws.String("Generates and emails the daily ops report"),
+		},
 	}
 
 	targetsByRule := map[string][]eventbridgetypes.Target{
@@ -199,6 +211,18 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 			{
 				Id:  aws.String("CodePipelineAcmeApiDeploy"),
 				Arn: aws.String("arn:aws:codepipeline:us-east-1:123456789012:acme-api-deploy"),
+			},
+		},
+		// scheduled-report-generator's only target carries a DeadLetterConfig —
+		// the DLQ ARN reuses the queue already referenced by
+		// eb-rule-disabled-with-targets's SQSDeadLetterQueue target.
+		"scheduled-report-generator": {
+			{
+				Id:  aws.String("LambdaReportGenerator"),
+				Arn: aws.String("arn:aws:lambda:us-east-1:123456789012:function:daily-report-generator"),
+				DeadLetterConfig: &eventbridgetypes.DeadLetterConfig{
+					Arn: aws.String("arn:aws:sqs:us-east-1:123456789012:scheduled-tasks-dlq"),
+				},
 			},
 		},
 	}

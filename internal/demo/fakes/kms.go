@@ -61,7 +61,7 @@ func (f *KMSFake) GetKeyRotationStatus(_ context.Context, input *kms.GetKeyRotat
 	if _, ok := f.fix.Keys[*input.KeyId]; !ok {
 		return nil, fmt.Errorf("GetKeyRotationStatus: key %q not found", *input.KeyId)
 	}
-	return &kms.GetKeyRotationStatusOutput{KeyRotationEnabled: false}, nil
+	return &kms.GetKeyRotationStatusOutput{KeyRotationEnabled: f.fix.RotationEnabled[*input.KeyId]}, nil
 }
 
 // ListGrants is a no-op stub satisfying KMSListGrantsAPI.

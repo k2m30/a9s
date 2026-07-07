@@ -17,6 +17,11 @@ type KMSFixtures struct {
 	// KeyPolicies maps key ID to its default key-policy JSON document — backs
 	// kms:GetKeyPolicy for the kms:role related-panel pivot (checkKMSRole).
 	KeyPolicies map[string]string
+	// RotationEnabled maps a key's bare KeyId to the KeyRotationEnabled value
+	// GetKeyRotationStatus reports for it. Keys with no entry report false
+	// (the fake's zero-value default), matching real CMKs that ship with
+	// rotation off. Backs EnrichKMSRotation's kms.rotation-disabled check.
+	RotationEnabled map[string]bool
 }
 
 // KMSAccessDeniedKeyID names the ListKeys entry whose DescribeKey call the
@@ -28,6 +33,9 @@ const KMSAccessDeniedKeyID = "b8c9d0e1-f2a3-5678-90bc-eeffaabbccdd"
 // NewKMSFixtures constructs KMSFixtures from the canonical demo data.
 var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 	keyMetadata := []*kmstypes.KeyMetadata{
+		// Rotation enabled (see RotationEnabled below) → the only demo CMK for
+		// which EnrichKMSRotation raises no kms.rotation-disabled finding,
+		// letting colorKMS fall through to its Enabled->Healthy branch.
 		{
 			KeyId:                aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
@@ -472,7 +480,13 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 		"a1b2c3d4-5678-90ab-cdef-111111111111": `{"Version":"2012-10-17","Statement":[{"Sid":"EnableRootAccess","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"kms:*","Resource":"*"},{"Sid":"AllowKeyUseByEC2InstanceRole","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/acme-ec2-instance-profile"},"Action":["kms:Decrypt","kms:GenerateDataKey"],"Resource":"*"}]}`,
 	}
 
-	return &KMSFixtures{Keys: keys, Aliases: aliases, KeyPolicies: keyPolicies}
+	// RotationEnabled — the primary production key is the sole demo CMK with
+	// rotation on; every other key defaults to false via the map zero value.
+	rotationEnabled := map[string]bool{
+		"a1b2c3d4-5678-90ab-cdef-111111111111": true,
+	}
+
+	return &KMSFixtures{Keys: keys, Aliases: aliases, KeyPolicies: keyPolicies, RotationEnabled: rotationEnabled}
 })
 
 func NewKMSFixtures() *KMSFixtures {

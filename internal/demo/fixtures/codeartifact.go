@@ -60,6 +60,21 @@ var sharedCodeArtifactFixtures = sync.OnceValue(func() *CodeArtifactFixtures {
 				AdministratorAccount: aws.String("123456789012"),
 				CreatedTime:          aws.Time(mustParseCATime("2025-04-01T09:30:00+00:00")),
 			},
+			// acme-docker carries a permissions policy scoped to a single IAM
+			// role (no "Principal":"*") — the only demo repository for which
+			// EnrichCodeArtifactRepository raises neither
+			// codeartifact.no-permissions-policy nor
+			// codeartifact.public-access-policy, so colorCodeArtifact falls
+			// through to its Healthy default.
+			{
+				Name:                 aws.String("acme-docker"),
+				DomainName:           aws.String("acme-artifacts"),
+				DomainOwner:          aws.String("123456789012"),
+				Arn:                  aws.String("arn:aws:codeartifact:us-east-1:123456789012:repository/acme-artifacts/acme-docker"),
+				Description:          aws.String("Private Docker registry for internal base images"),
+				AdministratorAccount: aws.String("123456789012"),
+				CreatedTime:          aws.Time(mustParseCATime("2025-04-01T09:45:00+00:00")),
+			},
 		},
 		Domains: map[string]codeartifacttypes.DomainDescription{
 			"acme-artifacts": {
@@ -79,6 +94,13 @@ var sharedCodeArtifactFixtures = sync.OnceValue(func() *CodeArtifactFixtures {
 			"acme-npm": {
 				ResourceArn: aws.String("arn:aws:codeartifact:us-east-1:123456789012:repository/acme-artifacts/acme-npm"),
 				Document:    aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"codeartifact:ReadFromRepository","Resource":"*"}]}`),
+			},
+			// acme-docker's policy scopes read access to a single role — no
+			// wildcard Principal, so the public-access-policy check does not
+			// fire, and the entry's mere presence skips no-permissions-policy.
+			"acme-docker": {
+				ResourceArn: aws.String("arn:aws:codeartifact:us-east-1:123456789012:repository/acme-artifacts/acme-docker"),
+				Document:    aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/acme-ci-deploy-role"},"Action":"codeartifact:ReadFromRepository","Resource":"*"}]}`),
 			},
 		},
 	}

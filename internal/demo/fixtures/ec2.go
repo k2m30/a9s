@@ -69,6 +69,10 @@ const (
 	// names no sibling fixture defines.
 	fixtProdEKSClusterName      = "acme-prod"
 	fixtRelatedEC2NGNodeGroupID = "general-pool"
+	// HealthyTGWID is the only demo Transit Gateway with a single VPC
+	// attachment left in the Available state — the sole witness for the tgw
+	// Healthy color bucket.
+	HealthyTGWID = "tgw-0healthy11111111h"
 )
 
 // AMIEBSKmsKeyID / AMIEBSKmsKeyARN back the ami→kms related-panel pivot.
@@ -116,6 +120,9 @@ var sharedEC2Fixtures = sync.OnceValue(func() *EC2Fixtures {
 	// FlowLogsByResourceID — the prod S3 gateway endpoint has a flow log
 	// delivering to CloudWatch Logs, backing the vpce:logs related-panel
 	// pivot (checkVPCELogs via ec2:DescribeFlowLogs filtered by resource-id).
+	// The staging VPC's own ACTIVE flow log is the only demo witness for the
+	// vpc Healthy color bucket (EnrichVPCFlowLogs raises vpc.no-flow-logs for
+	// every VPC without one).
 	f.FlowLogsByResourceID = map[string][]ec2types.FlowLog{
 		"vpce-0aaa111111111111a": {
 			{
@@ -126,6 +133,18 @@ var sharedEC2Fixtures = sync.OnceValue(func() *EC2Fixtures {
 				DeliverLogsStatus:  aws.String("SUCCESS"),
 				TrafficType:        ec2types.TrafficTypeAll,
 				CreationTime:       aws.Time(time.Date(2025, 6, 15, 12, 10, 0, 0, time.UTC)),
+			},
+		},
+		fixtStagingVPCID: {
+			{
+				FlowLogId:          aws.String("fl-0bbb222222222222b"),
+				ResourceId:         aws.String(fixtStagingVPCID),
+				LogDestinationType: ec2types.LogDestinationTypeCloudWatchLogs,
+				LogGroupName:       aws.String("/aws/vpc/flowlogs/acme-staging"),
+				DeliverLogsStatus:  aws.String("SUCCESS"),
+				FlowLogStatus:      aws.String("ACTIVE"),
+				TrafficType:        ec2types.TrafficTypeAll,
+				CreationTime:       aws.Time(time.Date(2025, 6, 20, 9, 0, 0, 0, time.UTC)),
 			},
 		},
 	}
@@ -2024,6 +2043,22 @@ func buildTransitGateways() []ec2types.TransitGateway {
 				{Key: aws.String("Environment"), Value: aws.String("dr")},
 			},
 		},
+		// State=available, and (per buildTGWAttachments below) its only
+		// attachment is also available → EnrichTGWAttachments raises no
+		// finding. The only demo TGW that resolves to colorTGW's structural
+		// Healthy branch.
+		{
+			TransitGatewayId:  aws.String(HealthyTGWID),
+			TransitGatewayArn: aws.String("arn:aws:ec2:us-east-1:123456789012:transit-gateway/" + HealthyTGWID),
+			State:             ec2types.TransitGatewayStateAvailable,
+			OwnerId:           aws.String("123456789012"),
+			Description:       aws.String("Spoke transit gateway with a single healthy VPC attachment"),
+			CreationTime:      aws.Time(time.Date(2025, 11, 1, 9, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-spoke-tgw")},
+				{Key: aws.String("Environment"), Value: aws.String("shared")},
+			},
+		},
 	}
 }
 
@@ -2125,6 +2160,20 @@ func buildTGWAttachments() []ec2types.TransitGatewayAttachment {
 			CreationTime:               aws.Time(time.Date(2026, 4, 5, 11, 0, 0, 0, time.UTC)),
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("hub-tgw-vpn-modifying")},
+			},
+		},
+		// HealthyTGWID's only attachment → staging VPC, left Available.
+		{
+			TransitGatewayAttachmentId: aws.String("tgw-attach-0healthy1111h"),
+			TransitGatewayId:           aws.String(HealthyTGWID),
+			ResourceType:               ec2types.TransitGatewayAttachmentResourceTypeVpc,
+			ResourceId:                 aws.String(fixtStagingVPCID),
+			State:                      ec2types.TransitGatewayAttachmentStateAvailable,
+			TransitGatewayOwnerId:      aws.String("123456789012"),
+			ResourceOwnerId:            aws.String("123456789012"),
+			CreationTime:               aws.Time(time.Date(2025, 11, 1, 9, 5, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("spoke-tgw-staging-vpc")},
 			},
 		},
 	}
