@@ -179,8 +179,8 @@ ses — MESSAGING. Lifecycle key: `status`.
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
 | ses.verification.failed | verification failed | broken | wave1 |
-| ses.verification.temp_failure | verify: temp failure | broken | wave1 |
-| ses.verification.not_started | verification not started | broken | wave1 |
+| ses.verification.temp\_failure | verify: temp failure | broken | wave1 |
+| ses.verification.not\_started | verification not started | broken | wave1 |
 | ses.verification.pending | pending verification | warn | wave1 |
 | ses.sending.disabled | sending disabled | warn | wave1 |
 | ses.account-shutdown | sending paused by AWS (shutdown) | broken | wave2 |

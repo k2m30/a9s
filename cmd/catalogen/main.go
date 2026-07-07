@@ -124,7 +124,8 @@ func generateAttentionSignals(repoRoot string, types []catalog.ResourceTypeDef) 
 	for _, rt := range types {
 		for _, f := range rt.Findings {
 			fmt.Fprintf(&rows, "| %s | %s | %s | %s | %s |\n",
-				rt.ShortName, string(f.Code), f.Phrase, severityLabel(f.Severity), f.Source)
+				escapeMarkdownCell(rt.ShortName), escapeMarkdownCell(string(f.Code)),
+				escapeMarkdownCell(f.Phrase), severityLabel(f.Severity), escapeMarkdownCell(f.Source))
 		}
 	}
 
@@ -145,7 +146,8 @@ func generateRelatedResources(repoRoot string, types []catalog.ResourceTypeDef) 
 				needsCache = "yes"
 			}
 			fmt.Fprintf(&rows, "| %s | %s | %s | %s |\n",
-				rt.ShortName, rel.TargetType, rel.DisplayName, needsCache)
+				escapeMarkdownCell(rt.ShortName), escapeMarkdownCell(rel.TargetType),
+				escapeMarkdownCell(rel.DisplayName), needsCache)
 		}
 	}
 
@@ -168,7 +170,8 @@ func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 		findingsContent.WriteString("| --- | --- | --- | --- |\n")
 		for _, f := range rt.Findings {
 			fmt.Fprintf(&findingsContent, "| %s | %s | %s | %s |\n",
-				string(f.Code), f.Phrase, severityLabel(f.Severity), f.Source)
+				escapeMarkdownCell(string(f.Code)), escapeMarkdownCell(f.Phrase),
+				severityLabel(f.Severity), escapeMarkdownCell(f.Source))
 		}
 	}
 
@@ -183,7 +186,7 @@ func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 				approx = "yes"
 			}
 			fmt.Fprintf(&relatedContent, "| %s | %s | %s |\n",
-				rel.TargetType, rel.DisplayName, approx)
+				escapeMarkdownCell(rel.TargetType), escapeMarkdownCell(rel.DisplayName), approx)
 		}
 	}
 
@@ -269,6 +272,21 @@ func findRepoRoot() (string, error) {
 		dir = parent
 	}
 	return "", fmt.Errorf("go.mod not found in any parent directory")
+}
+
+// escapeMarkdownCell escapes characters that are special inside a markdown
+// table cell: backslash (escape prefix), pipe (cell delimiter), and the
+// emphasis markers asterisk/underscore/backtick, which markdownlint's MD037
+// flags when they appear unbalanced (e.g. literal "*" in a catalog phrase).
+func escapeMarkdownCell(s string) string {
+	replacer := strings.NewReplacer(
+		`\`, `\\`,
+		`|`, `\|`,
+		`*`, `\*`,
+		`_`, `\_`,
+		"`", "\\`",
+	)
+	return replacer.Replace(s)
 }
 
 // severityLabel returns the human-readable label for a domain.Severity value.

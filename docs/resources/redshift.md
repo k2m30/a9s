@@ -221,12 +221,12 @@ redshift — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
-| redshift.broken.incompatible_hsm | incompatible-hsm | broken | wave1 |
-| redshift.broken.incompatible_network | incompatible-network | broken | wave1 |
-| redshift.broken.incompatible_parameters | incompatible-parameters | broken | wave1 |
-| redshift.broken.incompatible_restore | incompatible-restore | broken | wave1 |
-| redshift.broken.hardware_failure | hardware-failure | broken | wave1 |
-| redshift.broken.storage_full | storage-full | broken | wave1 |
+| redshift.broken.incompatible\_hsm | incompatible-hsm | broken | wave1 |
+| redshift.broken.incompatible\_network | incompatible-network | broken | wave1 |
+| redshift.broken.incompatible\_parameters | incompatible-parameters | broken | wave1 |
+| redshift.broken.incompatible\_restore | incompatible-restore | broken | wave1 |
+| redshift.broken.hardware\_failure | hardware-failure | broken | wave1 |
+| redshift.broken.storage\_full | storage-full | broken | wave1 |
 | redshift.broken.unavailable | unavailable | broken | wave1 |
 | redshift.broken.failed | failed | broken | wave1 |
 | redshift.warn.creating | creating | warn | wave1 |
@@ -236,11 +236,11 @@ redshift — DATABASES & STORAGE. Lifecycle key: `status`.
 | redshift.warn.renaming | renaming | warn | wave1 |
 | redshift.warn.deleting | deleting | warn | wave1 |
 | redshift.warn.maintenance | maintenance | warn | wave1 |
-| redshift.warn.availability_modifying | modifying | warn | wave1 |
-| redshift.warn.pending_change | pending change queued | warn | wave1 |
-| redshift.warn.maintenance_deferred | maintenance deferred | warn | wave1 |
-| redshift.warn.publicly_accessible | publicly accessible | warn | wave1 |
-| redshift.warn.unencrypted_at_rest | unencrypted at rest | warn | wave1 |
+| redshift.warn.availability\_modifying | modifying | warn | wave1 |
+| redshift.warn.pending\_change | pending change queued | warn | wave1 |
+| redshift.warn.maintenance\_deferred | maintenance deferred | warn | wave1 |
+| redshift.warn.publicly\_accessible | publicly accessible | warn | wave1 |
+| redshift.warn.unencrypted\_at\_rest | unencrypted at rest | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

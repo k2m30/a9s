@@ -221,7 +221,7 @@ efs — DATABASES & STORAGE. Lifecycle key: `status`.
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
 | efs.broken.error | error | broken | wave1 |
-| efs.broken.no_mount_targets | no mount targets | broken | wave1 |
+| efs.broken.no\_mount\_targets | no mount targets | broken | wave1 |
 | efs.warn.creating | creating | warn | wave1 |
 | efs.warn.updating | updating | warn | wave1 |
 | efs.warn.deleting | deleting | warn | wave1 |

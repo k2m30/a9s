@@ -229,7 +229,7 @@ msk — MESSAGING. Lifecycle key: `state`.
 | msk.warn.creating | creating | warn | wave1 |
 | msk.warn.updating | updating | warn | wave1 |
 | msk.warn.maintenance | maintenance | warn | wave1 |
-| msk.warn.rebooting_broker | rebooting broker | warn | wave1 |
+| msk.warn.rebooting\_broker | rebooting broker | warn | wave1 |
 | msk.warn.healing | healing | warn | wave1 |
 | msk.warn.deleting | deleting | warn | wave1 |
 | msk.broken.failed | failed | broken | wave1 |
