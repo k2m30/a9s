@@ -308,13 +308,13 @@ type ResourceTypeDef struct {
     RelatedContextFromIDs func(relatedIDs []string) map[string]string // extracts parent context for related-panel navigation
     CloudTrailKey string         // "LookupAttr:ValueSource" for CloudTrail pivot; empty = no `t` key
     IdentityKey string           // column key for enrichment row-marker placement; empty = use 5-step cascade
-    Color func(domain.Resource) domain.Color   // REQUIRED: classifies row health; reads structural fields directly
+    Color func(domain.Resource) domain.Color   // REQUIRED: classifies row health; findings-first, raw fields only as fallback
     ExcludeFromIssueBadge bool   // rows still colored + ctrl+z visible, but excluded from menu badge (used by ct-events)
     CellDecorators map[string]func(r Resource, value string) string // transforms cell values per column before render
 }
 ```
 
-`Color func(domain.Resource) domain.Color` is part of the type definition and drives row classification directly. It returns the renderer-free `domain.Color` health enum (the "Color → severity collapse" once contemplated was not pursued); the TUI maps it to a concrete style via `styles.ColorStyle` at render time.
+`Color func(domain.Resource) domain.Color` is part of the type definition and drives row classification. Classifiers resolve color findings-first via `colorFromAnyFinding` (worst finding severity wins, wave1 or wave2); raw-field branches survive only as fallback for rows that carry no findings. Color, the Status cell text and the detail Attention block therefore share one source — the row's findings — which is enforced by the color-vs-findings conformance gate (`tests/unit/qa_color_findings_conformance_test.go`, empty allowlist). The function returns the renderer-free `domain.Color` health enum; the TUI maps it to a concrete style via `styles.ColorStyle` at render time.
 
 Resource types are installed once at startup via `aws.Install()` + `catalog.SetTypes(...)`, aggregating the per-category `internal/aws/catalog_*.go` literals. Categories map to type definition files:
 
@@ -467,7 +467,7 @@ The main menu shows `issues:N` badges per resource type, counting resources in w
 **Row Coloring:**
 - `resource.Color` enum: `ColorHealthy` (green), `ColorWarning` (yellow), `ColorBroken` (red), `ColorDim` (grey).
 - `(Color).IsIssue() bool` — returns true for `ColorWarning` and `ColorBroken`. Used by both the attention filter and issue-count badges.
-- `ResourceTypeDef.Color func(Resource) Color` — per-type classification function. Two patterns: (1) status-driven types read `r.Fields["state"]` or `r.Fields["status"]` (e.g., EC2, ECS, VPC); (2) field-specific types check multi-field conditions (e.g., SG checks `dangerous_open_count > 0`, IAM Role checks `assume_role_policy_document` for wildcard principal). Types with Wave 1 = "None" in `docs/attention-signals.md` have a trivial `func(_ Resource) Color { return ColorHealthy }` — they rely on Wave 2 enrichers. REQUIRED for all registered types.
+- `ResourceTypeDef.Color func(Resource) Color` — per-type classification function. Classifiers resolve findings-first via `colorFromAnyFinding` (worst finding severity wins, wave1 or wave2-merged); the raw-field branches that remain are fallbacks for rows without findings (e.g., ad-hoc test doubles, states whose finding is still being emitted upstream). The conformance gate (`qa_color_findings_conformance_test.go`) pins color == findings-derived across the demo bench with an empty allowlist. REQUIRED for all registered types.
 - `ResourceTypeDef.ResolveColor(r Resource) Color` — dispatcher: calls `d.Color(r)` when non-nil, falls back to `resource.fallbackColor(r.Status)` for ad-hoc test doubles that omit `Color`.
 - `resource.fallbackColor(status string) Color` — status-string fallback covering common AWS vocabulary; used only when `Color` is nil (test doubles).
 - `styles.ColorStyle(c resource.Color) lipgloss.Style` — maps `resource.Color` to a palette foreground style for row rendering.

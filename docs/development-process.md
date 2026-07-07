@@ -150,8 +150,8 @@ For pure docs changes (`*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICEN
 ### Stage 6.5 — Post-merge real-AWS validation
 
 - **Trigger**: a merge to `main` touches `internal/aws/`, fetchers, child views, related-resource pivots, or fixtures. Skipped for pure-docs and pure-tooling changes. For a multi-PR refactor program, also run a batch pass at each phase boundary (≥ 3 PRs merged since the last real-AWS sign-off), since mocks cannot fully cover large refactor surfaces.
-- **Tools**: the integration test binaries under `tests/integration/`.
-- **Action**: run the integration suite against a real AWS profile (`A9S_CT_PROFILE=<profile>`), exercise the changed surface (list → detail → child view → related view) across ≥ 4 distinct resource types for a phase-boundary pass, and capture pass/fail per scenario.
+- **Tools**: the integration test binaries under `tests/integration/`; `make smoke-live PROFILE=<profile>-readonly [REGION=...]` — a data-independent TUI sweep over every non-empty resource type in the account (raw-enum and vacuous-status forbids, related-panel settle checks). Live smoke runs only on `*readonly` profiles by construction.
+- **Action**: run the integration suite against a real AWS profile (`A9S_CT_PROFILE=<profile>`), run `make smoke-live`, exercise the changed surface (list → detail → child view → related view) across ≥ 4 distinct resource types for a phase-boundary pass, and capture pass/fail per scenario.
 - **Exit**: all real-AWS scenarios green, or a scoped regression note with a follow-up fix.
 - **Anti-pattern**: treating Stage 6 (`make ready-to-push`) as sufficient for changes that depend on real AWS API behavior.
 

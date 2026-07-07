@@ -14,10 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Reason`/`Logging` columns are gone. The cell renders the row's finding
   phrase, else its humanized lifecycle state; no raw AWS enum reaches any
   rendered cell.
-- **Row color derives from findings** — all 66 classifiers resolve color
-  from the row's findings (worst severity wins); color, status text and the
-  detail Attention block share one source, so a colored row always explains
-  itself. Enforced by an empty-allowlist conformance gate.
+- **Row color derives from findings** — classifiers resolve color
+  findings-first (worst severity wins); color, status text and the detail
+  Attention block share one source, so a colored row always explains
+  itself. Enforced by an empty-allowlist conformance gate over the demo
+  bench.
 - **Finding phrases are operator sentences** — cause, not severity or
   benchmark citations ("reads sensitive data (ListSecrets)", "deletion
   protection disabled", "access key >90d old").
@@ -29,9 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   row maps at the source level.
 - **Related-panel contract hardened** — 24 pivots that returned zero or
   garbage on any data now implement their documented mechanisms (five new
-  AWS API integrations); the remaining 20 zero-count pivots are annotated
-  `budget-excluded` under the new one-extra-call policy rule; checkers
-  return IDs the drill-down can actually resolve.
+  AWS API integrations); 21 structurally-uncomputable pivots were removed
+  from the registry under the one-extra-call policy rule; checkers return
+  IDs the drill-down can actually resolve.
 
 ### Added
 
