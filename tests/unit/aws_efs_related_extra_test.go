@@ -13,6 +13,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -87,7 +88,7 @@ func TestRelated_EFS_Alarm_CacheMissNilClients(t *testing.T) {
 	checker := efsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
 	}
 }

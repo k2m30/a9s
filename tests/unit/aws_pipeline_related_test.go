@@ -7,6 +7,7 @@ import (
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -95,7 +96,7 @@ func TestRelated_Pipeline_EbRule_WrongRawStruct(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -148,7 +149,7 @@ func TestRelated_Pipeline_CB_NilClients(t *testing.T) {
 	checker := pipelineCheckerByTarget(t, "cb")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

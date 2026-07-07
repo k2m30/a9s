@@ -38,6 +38,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -103,15 +104,15 @@ func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 				}
 
 				// Bug E: cache-backed checker with nil clients + EMPTY cache returns
-				// Count=-1 (short-circuit fires). The fix should make it return 0
-				// (no match) instead of -1 (unknown/error).
+				// State: RelatedUnknown (short-circuit fires). The fix should make it
+				// return a resolved Count=0 (no match) instead of Unknown.
 				//
-				// We assert Count != -1 here. Currently this fails because the
-				// short-circuit in ctEventsRelatedResources returns nil resourceList.
-				if result.Count == -1 && len(result.FetchFilter) == 0 && result.Err == nil {
-					t.Errorf("Bug E: event=%s targetType=%s: checker returned Count=-1 with nil clients"+
+				// We assert State != RelatedUnknown here. Currently this fails because
+				// the short-circuit in ctEventsRelatedResources returns nil resourceList.
+				if result.State == domain.RelatedUnknown && len(result.FetchFilter) == 0 && result.Err == nil {
+					t.Errorf("Bug E: event=%s targetType=%s: checker returned State: RelatedUnknown with nil clients"+
 						" and empty cache — short-circuit ignores nil error from failed paginated fetcher."+
-						" Expected Count=0 (no match) because nil-client fetcher should not be treated as unknown.",
+						" Expected a resolved Count=0 (no match) because nil-client fetcher should not be treated as unknown.",
 						fixture.ID, result.TargetType)
 				}
 			}
@@ -171,13 +172,14 @@ func TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker(t *testing.T) {
 	}
 
 	// Bug E: with nil clients + empty cache, the paginated fetcher fails, the
-	// short-circuit fires, and the checker returns Count=-1. Expected: Count=0
-	// (definitive "not found" because the fetcher should not report unknown on nil clients).
-	if iamUserResult.Count == -1 && iamUserResult.Err == nil && len(iamUserResult.FetchFilter) == 0 {
+	// short-circuit fires, and the checker returns State: RelatedUnknown.
+	// Expected: a resolved Count=0 (definitive "not found" because the fetcher
+	// should not report unknown on nil clients).
+	if iamUserResult.State == domain.RelatedUnknown && iamUserResult.Err == nil && len(iamUserResult.FetchFilter) == 0 {
 		t.Errorf("Bug E pinned: event=e-e1f2a3b4 (AttachUserPolicy/alice.johnson):"+
-			" checkCtEventsUser returned Count=-1 with nil clients and empty cache"+
+			" checkCtEventsUser returned State: RelatedUnknown with nil clients and empty cache"+
 			" — short-circuit in ctEventsRelatedResources discards nil error from failed fetcher."+
-			" Expected Count=0 (no match, not unknown/error)."+
+			" Expected a resolved Count=0 (no match, not unknown/error)."+
 			" ResourceIDs=%v Err=%v FetchFilter=%v",
 			iamUserResult.ResourceIDs, iamUserResult.Err, iamUserResult.FetchFilter)
 	}
@@ -222,8 +224,8 @@ func TestCtEventsCheckersResolveFromDemoCache_RoleCheckerAssumedRoleEvents(t *te
 			if r.TargetType != "role" {
 				continue
 			}
-			// Bug E: nil clients + empty cache → short-circuit → Count=-1.
-			if r.Count == -1 && len(r.FetchFilter) == 0 && r.Err == nil {
+			// Bug E: nil clients + empty cache → short-circuit → State: RelatedUnknown.
+			if r.State == domain.RelatedUnknown && len(r.FetchFilter) == 0 && r.Err == nil {
 				bugECases = append(bugECases, bugECase{
 					fixtureID: fixture.ID,
 					count:     r.Count,

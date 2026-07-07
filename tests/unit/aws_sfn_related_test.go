@@ -9,6 +9,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -97,7 +98,7 @@ func TestRelated_SFN_Logs_CacheMissNoClients(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
 	}
 }
@@ -217,7 +218,7 @@ func TestRelated_SFN_Alarm_EmptyARN(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown — empty arn field)", result.Count)
 	}
 }
@@ -228,7 +229,7 @@ func TestRelated_SFN_Alarm_CacheMissNoClients(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, sfnSrcResource(), cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
 	}
 }
@@ -264,7 +265,7 @@ func TestRelated_SFN_Role_NilClients(t *testing.T) {
 	}
 	checker := sfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients — describe unavailable)", result.Count)
 	}
 }
@@ -333,7 +334,7 @@ func TestRelated_SFN_EbRule_WrongRawStruct(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

@@ -22,8 +22,8 @@ const DefaultPageSize = resource.DefaultPageSize
 //   - cache miss + registered fetcher: fetches first page only, returns IsTruncated from pagination.
 //   - cache miss + no fetcher: returns nil, false, nil (graceful no-op).
 //
-// Callers MUST return Count=-1 (unknown) when isTruncated==true and 0 matches
-// are found locally — never report a partial count as definitive.
+// Callers MUST return an UnknownRelated result when isTruncated==true and 0
+// matches are found locally — never report a partial count as definitive.
 func FetchRelatedTarget(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	if entry, ok := cache[target]; ok {
 		return entry.Resources, entry.IsTruncated, nil

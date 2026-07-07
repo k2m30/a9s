@@ -33,6 +33,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -86,18 +87,17 @@ func buildMixedNonActionableDetail(t *testing.T, fixture resource.Resource) view
 
 	defs := resource.GetRelated("ct-events")
 	for i, def := range defs {
-		var count int
-		if i%2 == 0 {
-			count = 0 // even indices: Count=0
-		} else {
-			count = -1 // odd indices: Count=-1, no FetchFilter
+		state := domain.RelatedResolved
+		if i%2 != 0 {
+			state = domain.RelatedUnknown // odd indices: resolved-unknown, no FetchFilter
 		}
 		d, _ = d.Update(messages.RelatedCheckResult{
 			ResourceType:   "ct-events",
 			DefDisplayName: def.DisplayName,
 			Result: resource.RelatedCheckResult{
 				TargetType:  def.TargetType,
-				Count:       count,
+				State:       state,
+				Count:       0,
 				FetchFilter: nil, // no FetchFilter — not a pivot row
 			},
 		})

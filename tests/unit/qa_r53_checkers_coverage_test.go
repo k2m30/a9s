@@ -19,6 +19,7 @@ import (
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -246,7 +247,7 @@ func TestRelated_R53_APIGW_NilClients(t *testing.T) {
 	source := resource.Resource{ID: "Z4NILCLIENTS", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count)
 	}
 }
@@ -429,7 +430,7 @@ func TestRelated_R53_S3_NilClients(t *testing.T) {
 	source := resource.Resource{ID: "Z9NILS3", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count)
 	}
 }
@@ -458,7 +459,7 @@ func TestRelated_R53_Logs_Unknown(t *testing.T) {
 	if result.TargetType != "logs" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "logs")
 	}
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (ListQueryLoggingConfigs not yet wired)", result.Count)
 	}
 }
@@ -555,7 +556,7 @@ func TestRelated_R53_VPC_PrivateZone_NilClients(t *testing.T) {
 	}
 	result := r53CheckerByTarget(t, "vpc")(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients → Route53 not initialized)", result.Count)
 	}
 }
@@ -782,7 +783,7 @@ func TestRelated_R53_ELB_NilClients(t *testing.T) {
 	source := resource.Resource{ID: "ZELB004", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count)
 	}
 }
@@ -880,7 +881,7 @@ func TestRelated_R53_CF_NilClients(t *testing.T) {
 	source := resource.Resource{ID: "ZCF003", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count)
 	}
 }
@@ -1012,7 +1013,7 @@ func TestRelated_R53_ACM_NilClients(t *testing.T) {
 	source := resource.Resource{ID: "ZACM004", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients → errClientMissing)", result.Count)
 	}
 }

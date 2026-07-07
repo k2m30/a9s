@@ -30,6 +30,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 )
@@ -429,9 +430,9 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 					}
 				}
 
-				// G2 (Bug C): Count=-1 + non-empty FetchFilter must route to
-				// NavigationKindFilteredList or NavigationKindEnterChildView.
-				if result.Count == -1 && len(result.FetchFilter) > 0 {
+				// G2 (Bug C): State: RelatedDeferred (+ non-empty FetchFilter) must
+				// route to NavigationKindFilteredList or NavigationKindEnterChildView.
+				if result.State == domain.RelatedDeferred {
 					navMsg := runtime.RelatedNavigateEvent{
 						TargetType:  result.TargetType,
 						FetchFilter: result.FetchFilter,
@@ -441,7 +442,7 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 					case runtime.NavigationKindFilteredList, runtime.NavigationKindEnterChildView:
 						// G2 OK
 					default:
-						t.Errorf("G2 (Bug C) FAIL: Count=-1+FetchFilter routed to %v, want NavigationKindFilteredList or NavigationKindEnterChildView — %s",
+						t.Errorf("G2 (Bug C) FAIL: State: RelatedDeferred routed to %v, want NavigationKindFilteredList or NavigationKindEnterChildView — %s",
 							navResult.Kind, rowLabel)
 					}
 				}

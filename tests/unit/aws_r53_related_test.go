@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -72,7 +73,7 @@ func TestRelated_R53_ELB_Unknown(t *testing.T) {
 	source := resource.Resource{ID: "Z1ABC123", Name: "example.com."}
 	checker := r53CheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown: alias records per-zone)", result.Count)
 	}
 	if result.TargetType != "elb" {
@@ -95,7 +96,7 @@ func TestRelated_R53_CF_Unknown(t *testing.T) {
 	source := resource.Resource{ID: "Z1ABC123", Name: "example.com."}
 	checker := r53CheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown: alias records per-zone)", result.Count)
 	}
 	if result.TargetType != "cf" {
@@ -118,7 +119,7 @@ func TestRelated_R53_ACM_Unknown(t *testing.T) {
 	source := resource.Resource{ID: "Z1ABC123", Name: "example.com."}
 	checker := r53CheckerByTarget(t, "acm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown: validation records per-zone)", result.Count)
 	}
 	if result.TargetType != "acm" {

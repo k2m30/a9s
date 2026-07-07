@@ -13,6 +13,7 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -108,7 +109,7 @@ func TestRelated_ECS_ECSService_CacheMissNoClients(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ecs-svc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -192,7 +193,7 @@ func TestRelated_ECS_Alarm_CacheMissNoClients(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -300,7 +301,7 @@ func TestRelated_ECS_CFN_CacheMissNoClients(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -428,7 +429,7 @@ func TestRelated_ECS_ASG_NilCache(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, resource.Resource{ID: "my-cluster"}, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
 	}
 }
@@ -522,7 +523,7 @@ func TestRelated_ECS_EC2_NilCache(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, resource.Resource{ID: "my-cluster"}, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
 	}
 }
@@ -600,7 +601,7 @@ func TestRelated_ECS_CTEvents_NilCache(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, resource.Resource{ID: "my-cluster"}, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
 	}
 }
@@ -687,7 +688,7 @@ func TestRelated_ECS_Tasks_NilCache(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, resource.Resource{ID: "my-cluster"}, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
 	}
 }
@@ -752,7 +753,7 @@ func TestRelated_ECS_Logs_NilCache(t *testing.T) {
 	checker := ecsCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, resource.Resource{ID: "my-cluster"}, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
 	}
 }

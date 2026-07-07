@@ -76,7 +76,7 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 			Checker: func(_ context.Context, _ any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 				entry, ok := cache[targetType]
 				if !ok {
-					return resource.RelatedCheckResult{Count: -1}
+					return resource.UnknownRelated(targetType)
 				}
 				return resource.RelatedCheckResult{Count: len(entry.Resources)}
 			},
@@ -352,7 +352,7 @@ func TestIssue240_CacheDependentChecker_DoesPrefetch(t *testing.T) {
 			Checker: func(_ context.Context, _ any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 				entry, ok := cache[targetType]
 				if !ok {
-					return resource.RelatedCheckResult{Count: -1}
+					return resource.UnknownRelated(targetType)
 				}
 				return resource.RelatedCheckResult{Count: len(entry.Resources)}
 			},

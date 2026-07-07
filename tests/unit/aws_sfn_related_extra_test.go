@@ -15,6 +15,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -165,7 +166,7 @@ func TestRelated_SFN_KMS_NilClients_ReturnsNegOne(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -397,7 +398,7 @@ func TestRelated_SFN_Lambda_NilClients_ReturnsNegOne(t *testing.T) {
 	checker := sfnCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, sfnExtSrc(sfnARN), resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

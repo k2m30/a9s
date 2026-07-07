@@ -12,6 +12,7 @@ import (
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -112,7 +113,7 @@ func TestRelated_Role_Lambda_CacheMissNoClients(t *testing.T) {
 	checker := roleCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -229,7 +230,7 @@ func TestRelated_Role_Glue_CacheMissNoClients(t *testing.T) {
 	checker := roleCheckerByTarget(t, "glue")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -317,7 +318,7 @@ func TestRelated_Role_NG_CacheMissNoClients(t *testing.T) {
 	checker := roleCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -346,7 +347,7 @@ func TestRelated_Role_Policy_NilClients(t *testing.T) {
 	checker := roleCheckerByTarget(t, "policy")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 	if result.TargetType != "policy" {
@@ -363,7 +364,7 @@ func TestRelated_Role_Policy_EmptyRoleName(t *testing.T) {
 	checker := roleCheckerByTarget(t, "policy")
 	// With nil clients it must return -1, not panic.
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -494,7 +495,7 @@ func TestRelated_Role_EC2_CacheMiss(t *testing.T) {
 	// Empty cache — no "ec2" entry at all.
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss)", result.Count)
 	}
 	if result.TargetType != "ec2" {

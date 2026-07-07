@@ -19,6 +19,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -117,7 +118,7 @@ func TestRelated_Secrets_CodeArtifact_WrongRawStruct(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "codeartifact")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -257,7 +258,7 @@ func TestRelated_Secrets_EB_WrongRawStruct(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "eb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -412,7 +413,7 @@ func TestRelated_Secrets_ECSTask_WrongRawStruct(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -492,7 +493,7 @@ func TestRelated_Secrets_Logs_WrongRawStruct(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -640,7 +641,7 @@ func TestRelated_Secrets_Role_WrongRawStruct(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -745,7 +746,7 @@ func TestRelated_Secrets_Sns_WrongRawStruct(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }

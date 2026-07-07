@@ -375,7 +375,7 @@ func TestKinesis_Related_Lambda_APIErrorSetsErrAndNegativeCount(t *testing.T) {
 	checker := checkerByTarget(t, "kinesis", "lambda")
 	result := checker(context.Background(), clients, streamRes, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedError {
 		t.Fatalf("Count = %d, want -1 on ListEventSourceMappings API error (matches sibling checker error convention in this file, e.g. checkKinesisCFN/checkKinesisKMS)", result.Count)
 	}
 	if result.Err == nil {
@@ -466,7 +466,7 @@ func TestMSK_Related_Lambda_APIErrorSetsErrAndNegativeCount(t *testing.T) {
 	checker := checkerByTarget(t, "msk", "lambda")
 	result := checker(context.Background(), clients, clusterRes, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedError {
 		t.Fatalf("Count = %d, want -1 on ListEventSourceMappings API error (matches sibling checker error convention in this file, e.g. checkMSKCFN/checkMSKVPC)", result.Count)
 	}
 	if result.Err == nil {

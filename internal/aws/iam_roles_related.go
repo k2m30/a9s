@@ -29,10 +29,10 @@ func checkRoleEKS(ctx context.Context, clients any, res resource.Resource, cache
 
 	eksList, truncated, err := roleRelatedResources(ctx, clients, cache, "eks")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eks", Count: -1, Err: err}
+		return resource.ErrorRelated("eks", err)
 	}
 	if eksList == nil {
-		return resource.RelatedCheckResult{TargetType: "eks", Count: -1}
+		return resource.UnknownRelated("eks")
 	}
 
 	var ids []string
@@ -152,10 +152,10 @@ func checkRoleLambda(ctx context.Context, clients any, res resource.Resource, ca
 
 	lambdaList, truncated, err := roleRelatedResources(ctx, clients, cache, "lambda")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	if lambdaList == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 
 	var ids []string
@@ -186,10 +186,10 @@ func checkRoleGlue(ctx context.Context, clients any, res resource.Resource, cach
 
 	glueList, truncated, err := roleRelatedResources(ctx, clients, cache, "glue")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "glue", Count: -1, Err: err}
+		return resource.ErrorRelated("glue", err)
 	}
 	if glueList == nil {
-		return resource.RelatedCheckResult{TargetType: "glue", Count: -1}
+		return resource.UnknownRelated("glue")
 	}
 
 	var ids []string
@@ -216,10 +216,10 @@ func checkRoleNG(ctx context.Context, clients any, res resource.Resource, cache 
 
 	ngList, truncated, err := roleRelatedResources(ctx, clients, cache, "ng")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1, Err: err}
+		return resource.ErrorRelated("ng", err)
 	}
 	if ngList == nil {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1}
+		return resource.UnknownRelated("ng")
 	}
 
 	var ids []string
@@ -244,7 +244,7 @@ func checkRoleNG(ctx context.Context, clients any, res resource.Resource, cache 
 func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "policy", Count: -1}
+		return resource.UnknownRelated("policy")
 	}
 	roleName := res.ID
 	if roleName == "" {
@@ -260,7 +260,7 @@ func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ 
 		RoleName: &roleName,
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "policy", Count: -1, Err: err}
+		return resource.ErrorRelated("policy", err)
 	}
 	ids := attachedPolicyNames(out.AttachedPolicies)
 	return relatedResult("policy", ids)
@@ -290,10 +290,10 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 
 	ec2List, truncated, err := roleRelatedResources(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+		return resource.ErrorRelated("ec2", err)
 	}
 	if ec2List == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 
 	var ids []string

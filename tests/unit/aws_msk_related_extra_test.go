@@ -17,6 +17,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -57,7 +58,7 @@ func TestRelated_MSK_SG_WrongRawStruct(t *testing.T) {
 	checker := mskCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -178,7 +179,7 @@ func TestRelated_MSK_Subnet_WrongRawStruct(t *testing.T) {
 	checker := mskCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -267,7 +268,7 @@ func TestRelated_MSK_VPC_SubnetNotInCache(t *testing.T) {
 	checker := mskCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
 	}
 }
@@ -347,7 +348,7 @@ func TestRelated_MSK_Logs_WrongRawStruct(t *testing.T) {
 	checker := mskCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -432,7 +433,7 @@ func TestRelated_MSK_S3_WrongRawStruct(t *testing.T) {
 	checker := mskCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -516,7 +517,7 @@ func TestRelated_MSK_Secrets_NilClients(t *testing.T) {
 	checker := mskCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

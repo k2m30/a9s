@@ -11,6 +11,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -134,7 +135,7 @@ func TestRelated_Cb_Pipeline_WrongRawStruct(t *testing.T) {
 	checker := cbCheckerByTarget(t, "pipeline")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }

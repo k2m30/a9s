@@ -30,10 +30,10 @@ func checkEbCFN(ctx context.Context, clients any, res resource.Resource, cache r
 
 	cfnList, truncated, err := ebRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 
 	var ids []string
@@ -67,10 +67,10 @@ func checkEbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 
 	logList, truncated, err := ebRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 
 	var ids []string
@@ -100,10 +100,10 @@ func checkEbASG(ctx context.Context, clients any, res resource.Resource, cache r
 
 	asgList, truncated, err := ebRelatedResources(ctx, clients, cache, "asg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
+		return resource.ErrorRelated("asg", err)
 	}
 	if asgList == nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.UnknownRelated("asg")
 	}
 
 	var ids []string
@@ -142,10 +142,10 @@ func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache r
 
 	ec2List, truncated, err := ebRelatedResources(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+		return resource.ErrorRelated("ec2", err)
 	}
 	if ec2List == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 
 	var ids []string
@@ -180,10 +180,10 @@ func checkEbAlarm(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	alarmList, truncated, err := ebRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 	var ids []string
 	for _, a := range alarmList {

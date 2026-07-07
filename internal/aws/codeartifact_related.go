@@ -26,18 +26,18 @@ import (
 func checkCodeartifactKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[catypes.RepositorySummary](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	if repo.DomainName == nil || *repo.DomainName == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.CodeArtifact == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	api, ok := c.CodeArtifact.(CodeArtifactDescribeDomainAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	input := &codeartifact.DescribeDomainInput{Domain: repo.DomainName}
 	if repo.DomainOwner != nil && *repo.DomainOwner != "" {
@@ -47,7 +47,7 @@ func checkCodeartifactKMS(ctx context.Context, clients any, res resource.Resourc
 		return api.DescribeDomain(ctx, input)
 	})
 	if err != nil || out == nil || out.Domain == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	if out.Domain.EncryptionKey == nil || *out.Domain.EncryptionKey == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}

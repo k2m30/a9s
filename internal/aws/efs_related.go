@@ -27,7 +27,7 @@ import (
 func checkEFSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fs, ok := assertStruct[efstypes.FileSystemDescription](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	if fs.KmsKeyId == nil || *fs.KmsKeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
@@ -56,10 +56,10 @@ func checkEFSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 
 	cfnList, truncated, err := efsRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 
 	var ids []string
@@ -104,10 +104,10 @@ func checkEFSSG(ctx context.Context, clients any, res resource.Resource, cache r
 
 	eniList, truncated, err := efsRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1, Err: err}
+		return resource.ErrorRelated("sg", err)
 	}
 	if eniList == nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 
 	sgSet := make(map[string]struct{})
@@ -146,10 +146,10 @@ func checkEFSSubnet(ctx context.Context, clients any, res resource.Resource, cac
 
 	eniList, truncated, err := efsRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1, Err: err}
+		return resource.ErrorRelated("subnet", err)
 	}
 	if eniList == nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 
 	subnetSet := make(map[string]struct{})
@@ -194,7 +194,7 @@ func efsRelatedResources(ctx context.Context, clients any, cache resource.Resour
 // points via efs:DescribeAccessPoints (Pattern A + C): collect this file
 // system's access point ARNs, then scan the lambda cache for
 // FunctionConfiguration.FileSystemConfigs entries whose Arn is in that set.
-// Returns Count: -1 when no live EFS client is available to list access points.
+// Returns an unknown result when no live EFS client is available to list access points.
 func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
 	if fsID == "" {
@@ -203,7 +203,7 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.EFS == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 
 	apOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeAccessPointsOutput, error) {
@@ -212,7 +212,7 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	apARNs := make(map[string]struct{})
 	for _, ap := range apOut.AccessPoints {
@@ -227,10 +227,10 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 
 	lambdaList, truncated, err := efsRelatedResources(ctx, clients, cache, "lambda")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	if lambdaList == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 
 	var ids []string

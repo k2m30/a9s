@@ -23,7 +23,7 @@ import (
 func checkEKSSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	if cluster.ResourcesVpcConfig == nil {
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
@@ -45,7 +45,7 @@ func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	ngList, truncated, err := eksRelatedResourcesExtra(ctx, clients, cache, "ng")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
+		return resource.ErrorRelated("asg", err)
 	}
 	if ngList == nil {
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
@@ -85,10 +85,10 @@ func checkEKSCTEvents(ctx context.Context, clients any, res resource.Resource, c
 	}
 	evList, truncated, err := eksRelatedResourcesExtra(ctx, clients, cache, "ct-events")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err}
+		return resource.ErrorRelated("ct-events", err)
 	}
 	if evList == nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.UnknownRelated("ct-events")
 	}
 	var ids []string
 	for _, evRes := range evList {
@@ -116,7 +116,7 @@ func checkEKSCTEvents(ctx context.Context, clients any, res resource.Resource, c
 func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: -1}
+		return resource.UnknownRelated("ami")
 	}
 	clusterName := res.ID
 	if clusterName == "" && cluster.Name != nil {
@@ -128,7 +128,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EKS == nil {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: -1}
+		return resource.UnknownRelated("ami")
 	}
 
 	ngOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListNodegroupsOutput, error) {
@@ -137,7 +137,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: -1, Err: err}
+		return resource.ErrorRelated("ami", err)
 	}
 
 	amiSet := make(map[string]struct{})
@@ -206,7 +206,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 	clusterName := res.ID
 	if clusterName == "" && cluster.Name != nil {
@@ -218,7 +218,7 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EKS == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 
 	ngOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListNodegroupsOutput, error) {
@@ -227,7 +227,7 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+		return resource.ErrorRelated("ec2", err)
 	}
 
 	var asgNames []string
@@ -257,12 +257,12 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 	ngAggErr := AggregateFailures("eks-related: DescribeNodegroup", ngFailures, ngTotal)
 	if len(asgNames) == 0 {
 		if ngAggErr != nil {
-			return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: ngAggErr}
+			return resource.ErrorRelated("ec2", ngAggErr)
 		}
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
 	}
 	if c.AutoScaling == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: ngAggErr}
+		return resource.ErrorRelated("ec2", ngAggErr)
 	}
 
 	asgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscalingPkg.DescribeAutoScalingGroupsOutput, error) {
@@ -271,7 +271,7 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+		return resource.ErrorRelated("ec2", err)
 	}
 
 	seen := make(map[string]struct{})

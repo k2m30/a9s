@@ -31,6 +31,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -81,7 +82,7 @@ func TestNGColdCacheGuard_EC2_NoCacheEntry_NoLiveFetch(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no ec2 cache entry, must not live-fetch)", result.Count)
 	}
 }
@@ -94,7 +95,7 @@ func TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ebs")
 	result := checker(context.Background(), clients, source, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no ec2 cache entry, must not live-fetch)", result.Count)
 	}
 }
@@ -128,7 +129,7 @@ func TestNGColdCacheGuard_EC2_StructLessCacheRows_Unknown(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown) — struct-less disk-seeded ec2 cache rows cannot be tag-matched, must not report as an exact zero", result.Count)
 	}
 }
@@ -140,7 +141,7 @@ func TestNGColdCacheGuard_EBS_StructLessCacheRows_Unknown(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ebs")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown) — struct-less disk-seeded ec2 cache rows cannot be tag-matched, must not report as an exact zero", result.Count)
 	}
 }

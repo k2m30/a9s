@@ -23,10 +23,10 @@ func checkEFSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	alarmList, truncated, err := efsRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 	var ids []string
 	for _, alarmRes := range alarmList {
@@ -55,7 +55,7 @@ func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	eniList, truncated, err := efsRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1, Err: err}
+		return resource.ErrorRelated("eni", err)
 	}
 	if eniList == nil {
 		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
@@ -84,7 +84,7 @@ func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	eniList, truncated, err := efsRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1, Err: err}
+		return resource.ErrorRelated("vpc", err)
 	}
 	if eniList == nil {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
@@ -122,7 +122,7 @@ func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache 
 // backup list is keyed by plan id.
 func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	// Missing RawStruct → we can't derive the source ARN. That's an early-exit
-	// (Count=0), not an error (Count=-1). Returning -1 here when the caller
+	// (Count=0), not an unknown result. Returning unknown here when the caller
 	// handed us a valid truncated cache would drop the honest lower bound.
 	fs, ok := assertStruct[efstypes.FileSystemDescription](res.RawStruct)
 	if !ok {
@@ -135,7 +135,7 @@ func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, cac
 
 	plans, truncated, err := efsRelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
+		return resource.ErrorRelated("backup", err)
 	}
 	var ids []string
 	for _, plan := range plans {

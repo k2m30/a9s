@@ -22,6 +22,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -144,7 +145,7 @@ func TestEC2Role_GetInstanceProfileError_ReturnsNegativeOneWithErr(t *testing.T)
 	checker := ec2RoleCheckerByTarget(t)
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedError {
 		t.Fatalf("Count = %d, want -1", result.Count)
 	}
 	if result.Err == nil {

@@ -16,7 +16,7 @@ import (
 func checkEbRuleRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rule, ok := assertStruct[eventbridgetypes.Rule](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	if rule.RoleArn == nil || *rule.RoleArn == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
@@ -97,7 +97,7 @@ func ebRuleTargetsByService(ctx context.Context, clients any, ruleName string, s
 func checkEbRuleKinesis(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids, ok := ebRuleTargetsByService(ctx, clients, res.ID, "kinesis")
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kinesis", Count: -1}
+		return resource.UnknownRelated("kinesis")
 	}
 	return relatedResult("kinesis", ids)
 }
@@ -105,7 +105,7 @@ func checkEbRuleKinesis(ctx context.Context, clients any, res resource.Resource,
 func checkEbRuleLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids, ok := ebRuleTargetsByService(ctx, clients, res.ID, "lambda")
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 	return relatedResult("lambda", ids)
 }
@@ -113,7 +113,7 @@ func checkEbRuleLambda(ctx context.Context, clients any, res resource.Resource, 
 func checkEbRuleLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids, ok := ebRuleTargetsByService(ctx, clients, res.ID, "logs")
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 	return relatedResult("logs", ids)
 }
@@ -121,7 +121,7 @@ func checkEbRuleLogs(ctx context.Context, clients any, res resource.Resource, _ 
 func checkEbRuleSFN(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids, ok := ebRuleTargetsByService(ctx, clients, res.ID, "states")
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sfn", Count: -1}
+		return resource.UnknownRelated("sfn")
 	}
 	return relatedResult("sfn", ids)
 }
@@ -129,7 +129,7 @@ func checkEbRuleSFN(ctx context.Context, clients any, res resource.Resource, _ r
 func checkEbRuleSNS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids, ok := ebRuleTargetsByService(ctx, clients, res.ID, "sns")
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 	return relatedResult("sns", ids)
 }
@@ -137,7 +137,7 @@ func checkEbRuleSNS(ctx context.Context, clients any, res resource.Resource, _ r
 func checkEbRuleSQS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids, ok := ebRuleTargetsByService(ctx, clients, res.ID, "sqs")
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1}
+		return resource.UnknownRelated("sqs")
 	}
 	return relatedResult("sqs", ids)
 }

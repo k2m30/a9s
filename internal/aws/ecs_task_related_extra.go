@@ -22,10 +22,10 @@ func checkECSTaskAlarm(ctx context.Context, clients any, res resource.Resource, 
 	}
 	alarmList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 	var ids []string
 	for _, alarmRes := range alarmList {
@@ -57,10 +57,10 @@ func checkECSTaskCTEvents(ctx context.Context, clients any, res resource.Resourc
 	}
 	evList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err}
+		return resource.ErrorRelated("ct-events", err)
 	}
 	if evList == nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.UnknownRelated("ct-events")
 	}
 	var ids []string
 	for _, evRes := range evList {
@@ -86,7 +86,7 @@ func checkECSTaskCTEvents(ctx context.Context, clients any, res resource.Resourc
 func checkECSTaskEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 	if task.ContainerInstanceArn == nil || *task.ContainerInstanceArn == "" {
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
@@ -108,7 +108,7 @@ func checkECSTaskEC2(_ context.Context, _ any, res resource.Resource, _ resource
 func checkECSTaskECR(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+		return resource.UnknownRelated("ecr")
 	}
 	seen := make(map[string]struct{})
 	for _, c := range task.Containers {
@@ -148,7 +148,7 @@ func checkECSTaskECR(_ context.Context, _ any, res resource.Resource, _ resource
 func checkECSTaskENI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.UnknownRelated("eni")
 	}
 	var ids []string
 	for _, att := range task.Attachments {
@@ -189,10 +189,10 @@ func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource
 
 	secretList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "secrets")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
+		return resource.ErrorRelated("secrets", err)
 	}
 	if secretList == nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.UnknownRelated("secrets")
 	}
 
 	var ids []string
@@ -235,10 +235,10 @@ func checkECSTaskSSM(ctx context.Context, clients any, res resource.Resource, ca
 
 	ssmList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "ssm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1, Err: err}
+		return resource.ErrorRelated("ssm", err)
 	}
 	if ssmList == nil {
-		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1}
+		return resource.UnknownRelated("ssm")
 	}
 
 	var ids []string
@@ -265,7 +265,7 @@ func checkECSTaskSSM(ctx context.Context, clients any, res resource.Resource, ca
 func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 	var eniIDs []string
 	for _, att := range task.Attachments {
@@ -283,10 +283,10 @@ func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cac
 
 	eniList, eniTruncated, err := ecsTaskRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1, Err: err}
+		return resource.ErrorRelated("sg", err)
 	}
 	if eniList == nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 
 	eniIDSet := make(map[string]struct{}, len(eniIDs))
@@ -306,17 +306,17 @@ func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	if len(sgIDSet) == 0 {
 		if eniTruncated {
-			return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+			return resource.UnknownRelated("sg")
 		}
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
 	}
 
 	sgList, sgTruncated, err := ecsTaskRelatedResources(ctx, clients, cache, "sg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1, Err: err}
+		return resource.ErrorRelated("sg", err)
 	}
 	if sgList == nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 
 	var ids []string
@@ -335,7 +335,7 @@ func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cac
 func checkECSTaskSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	seen := make(map[string]struct{})
 	for _, att := range task.Attachments {

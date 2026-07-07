@@ -26,6 +26,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -394,8 +395,8 @@ func TestDDB_Related_KMS_MalformedARN_NoSlash(t *testing.T) {
 	if got.Count != 0 {
 		t.Errorf("Count = %d, want 0 for malformed KMS ARN (no '/')", got.Count)
 	}
-	if got.Count == -1 {
-		t.Errorf("Count = -1, must never be -1 for malformed ARN — only nil RawStruct yields -1")
+	if got.State != domain.RelatedResolved {
+		t.Errorf("State = %v, must be RelatedResolved for malformed ARN — only nil RawStruct yields RelatedUnknown", got.State)
 	}
 }
 
@@ -696,8 +697,8 @@ func TestDDB_Related_CTEvents_UniversalPivot(t *testing.T) {
 		for _, def := range allDefs {
 			if def.TargetType == "ct-events" {
 				r := def.Checker(context.Background(), nil, res, cache)
-				if r.Count == 0 {
-					t.Errorf("ct-events Count = 0 — universal pivot must not return definitive zero when events exist")
+				if r.State == domain.RelatedResolved && r.Count == 0 {
+					t.Errorf("ct-events State = RelatedResolved, Count = 0 — universal pivot must not return a definite resolved zero when events exist")
 				}
 				return
 			}
@@ -721,8 +722,8 @@ func TestDDB_Related_CTEvents_UniversalPivot(t *testing.T) {
 	}
 
 	result := checker(context.Background(), nil, res, cache)
-	if result.Count == 0 {
-		t.Errorf("ct-events Count = 0 — universal pivot must not return definitive zero when events exist")
+	if result.State == domain.RelatedResolved && result.Count == 0 {
+		t.Errorf("ct-events State = RelatedResolved, Count = 0 — universal pivot must not return a definite resolved zero when events exist")
 	}
 	if result.FetchFilter == nil || result.FetchFilter["ResourceName"] != fixtures.OrdersProdID {
 		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter["ResourceName"], fixtures.OrdersProdID)

@@ -30,6 +30,7 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -190,20 +191,21 @@ func TestBuildCTEventsPivotChecker_Truncated_ReturnsMinusOne(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedDeferred {
 		t.Errorf(
-			"BuildCTEventsPivotChecker: truncated cache: Count = %d, want -1 — "+
-				"CT-EVENTS-PIVOT: truncated cache means partial window; count is unknown, not positive",
-			result.Count,
+			"BuildCTEventsPivotChecker: truncated cache: State = %v, want RelatedDeferred — "+
+				"CT-EVENTS-PIVOT: truncated cache means partial window; navigation defers to a server-side filtered fetch, not a positive count",
+			result.State,
 		)
 	}
 }
 
 // TestBuildCTEventsPivotChecker_NilCacheList_ReturnsMinusOne verifies that
-// when the ct-events type is absent from the cache entirely (nil list), the
-// checker returns Count=-1 (cannot determine without ct-events loaded).
-//
-// COMPILE-FAIL today: awsclient.BuildCTEventsPivotChecker undefined.
+// when the ct-events type is absent from the cache entirely, FetchRelatedTarget
+// falls through to the REGISTERED ct-events paginated fetcher (ct-events has
+// one, unlike targets with no fetcher, which would hit FetchRelatedTarget's
+// "no fetcher" no-op). Calling that real fetcher with nil clients fails, so
+// the checker surfaces the error via resource.ErrorRelated.
 func TestBuildCTEventsPivotChecker_NilCacheList_ReturnsMinusOne(t *testing.T) {
 	checker := awsclient.BuildCTEventsPivotChecker(awsclient.CTEventsPivotConfig{
 		IDExtractor: func(r resource.Resource) string { return r.ID },
@@ -213,39 +215,42 @@ func TestBuildCTEventsPivotChecker_NilCacheList_ReturnsMinusOne(t *testing.T) {
 	// Cache has no ct-events entry at all.
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedError {
 		t.Errorf(
-			"BuildCTEventsPivotChecker: absent cache entry: Count = %d, want -1 — "+
-				"CT-EVENTS-PIVOT: ct-events not loaded in cache; count is unknown",
-			result.Count,
+			"BuildCTEventsPivotChecker: absent cache entry: State = %v, want RelatedError — "+
+				"CT-EVENTS-PIVOT: ct-events not loaded in cache; FetchRelatedTarget calls the real registered "+
+				"fetcher with nil clients, which fails and must surface as an error, not a positive count",
+			result.State,
 		)
 	}
 }
 
 // TestBuildCTEventsPivotChecker_CacheError_ReturnsMinusOne verifies that when
 // the registered ct-events fetcher returns an error (cache miss + fetch error),
-// the checker returns Count=-1 with the error propagated.
+// the checker returns State: RelatedError with the error propagated.
 //
-// COMPILE-FAIL today: awsclient.BuildCTEventsPivotChecker undefined.
 // Note: this test exercises the error path by passing a non-nil clients object
-// that is NOT a *ServiceClients (wrong type), which FetchRelatedTarget treats
-// as a non-AWS client error — the checker should surface Count=-1.
+// that is NOT a *ServiceClients (wrong type). Empty cache forces
+// FetchRelatedTarget to fall through to the real registered ct-events
+// fetcher (unlike a target with no fetcher, which would no-op); the
+// wrong-typed clients value causes that live fetcher call to fail, so
+// FetchRelatedTarget returns a non-nil error and the checker surfaces it via
+// resource.ErrorRelated.
 func TestBuildCTEventsPivotChecker_CacheError_ReturnsMinusOne(t *testing.T) {
 	checker := awsclient.BuildCTEventsPivotChecker(awsclient.CTEventsPivotConfig{
 		IDExtractor: func(r resource.Resource) string { return r.ID },
 	})
 
 	res := ctPivotSrcResource("err-resource")
-	// Empty cache forces FetchRelatedTarget; passing a non-ServiceClients
-	// clients value triggers the clients-type guard in FetchRelatedTarget,
-	// which returns (nil, false, nil) — the checker then returns Count=-1.
+	// Empty cache forces FetchRelatedTarget to call the real registered
+	// ct-events fetcher; the wrong-typed clients value makes that call fail.
 	result := checker(context.Background(), struct{}{}, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedError {
 		t.Errorf(
-			"BuildCTEventsPivotChecker: cache miss + bad clients: Count = %d, want -1 — "+
-				"CT-EVENTS-PIVOT: unavailable ct-events must yield unknown count, not positive",
-			result.Count,
+			"BuildCTEventsPivotChecker: cache miss + bad clients: State = %v, want RelatedError — "+
+				"CT-EVENTS-PIVOT: a failed live fetch must surface as an error, not a positive count",
+			result.State,
 		)
 	}
 }

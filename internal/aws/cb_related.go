@@ -18,7 +18,7 @@ import (
 func checkCbRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	if project.ServiceRole == nil || *project.ServiceRole == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
@@ -31,10 +31,10 @@ func checkCbRole(ctx context.Context, clients any, res resource.Resource, cache 
 
 	roleList, _, err := cbRelatedResources(ctx, clients, cache, "role")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	if roleList == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 
 	var ids []string
@@ -53,7 +53,7 @@ func checkCbRole(ctx context.Context, clients any, res resource.Resource, cache 
 func checkCbLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 
 	// Determine expected log group name: explicit config or naming convention.
@@ -67,10 +67,10 @@ func checkCbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 
 	logList, truncated, err := cbRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 
 	var ids []string
@@ -90,7 +90,7 @@ func checkCbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 func checkCbSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 	if project.VpcConfig == nil {
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
@@ -110,7 +110,7 @@ func checkCbSG(_ context.Context, _ any, res resource.Resource, _ resource.Resou
 func checkCbVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	if project.VpcConfig == nil || project.VpcConfig.VpcId == nil || *project.VpcConfig.VpcId == "" {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
@@ -135,7 +135,7 @@ func checkCbKMS(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkCbSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	if project.VpcConfig == nil {
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
@@ -158,10 +158,10 @@ func checkCbAlarm(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	alarmList, truncated, err := cbRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 	var ids []string
 	for _, a := range alarmList {
@@ -192,7 +192,7 @@ func checkCbAlarm(ctx context.Context, clients any, res resource.Resource, cache
 func checkCbECR(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+		return resource.UnknownRelated("ecr")
 	}
 
 	candidates := map[string]struct{}{}
@@ -207,10 +207,10 @@ func checkCbECR(ctx context.Context, clients any, res resource.Resource, cache r
 
 	ecrList, truncated, err := cbRelatedResources(ctx, clients, cache, "ecr")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1, Err: err}
+		return resource.ErrorRelated("ecr", err)
 	}
 	if ecrList == nil {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+		return resource.UnknownRelated("ecr")
 	}
 	var ids []string
 	for _, r := range ecrList {
@@ -250,7 +250,7 @@ func cbRepoNameFromImage(img string) string {
 func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 
 	buckets := map[string]struct{}{}
@@ -282,10 +282,10 @@ func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache re
 
 	s3List, truncated, err := cbRelatedResources(ctx, clients, cache, "s3")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
+		return resource.ErrorRelated("s3", err)
 	}
 	if s3List == nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 	var ids []string
 	for _, b := range s3List {
@@ -309,7 +309,7 @@ func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache re
 func checkCbSecrets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.UnknownRelated("secrets")
 	}
 	if project.Environment == nil {
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
@@ -341,7 +341,7 @@ func checkCbSecrets(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkCbSSM(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1}
+		return resource.UnknownRelated("ssm")
 	}
 	if project.Environment == nil {
 		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}

@@ -10,6 +10,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -103,7 +104,7 @@ func TestRelated_Logs_Lambda_CacheMissNoClients(t *testing.T) {
 	checker := logsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
 	}
 }
@@ -193,7 +194,7 @@ func TestRelated_Logs_Alarms_CacheMissNoClients(t *testing.T) {
 	checker := logsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
 	}
 }
@@ -330,7 +331,7 @@ func TestRelated_Logs_APIGW_CacheMissNoClients(t *testing.T) {
 	checker := logsCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
 	}
 }
@@ -387,7 +388,7 @@ func TestRelated_Logs_ECSTask_CacheMissNoClients(t *testing.T) {
 	checker := logsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
 	}
 }
@@ -400,7 +401,7 @@ func TestRelated_Logs_Kinesis_NilClients(t *testing.T) {
 	checker := logsCheckerByTarget(t, "kinesis")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -413,7 +414,7 @@ func TestRelated_Logs_S3_NilClients(t *testing.T) {
 	checker := logsCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

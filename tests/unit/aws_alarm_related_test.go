@@ -8,6 +8,7 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -126,7 +127,7 @@ func TestRelated_Alarm_SNS_InvalidRawStruct(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
 	}
 }
@@ -229,7 +230,7 @@ func TestRelated_Alarm_ASG_NilCache(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
 	}
 }
@@ -299,7 +300,7 @@ func TestRelated_Alarm_APIGW_InvalidRawStruct(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (invalid RawStruct)", result.Count)
 	}
 }
@@ -780,7 +781,7 @@ func TestRelated_Alarm_CTEvents_NilCache(t *testing.T) {
 	checker := alarmCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, resource.Resource{ID: "my-alarm"}, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
 	}
 }

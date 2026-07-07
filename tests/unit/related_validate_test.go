@@ -2,35 +2,37 @@ package unit_test
 
 // related_validate_test.go — Tests for ARCH-06: ValidateRelatedResult helper.
 //
-// The coder is adding ValidateRelatedResult(r resource.RelatedCheckResult) error
-// to internal/resource/related.go. The function enforces invariants on
-// RelatedCheckResult values returned by RelatedCheckers:
+// ValidateRelatedResult(r resource.RelatedCheckResult) error
+// (internal/resource/related.go) enforces invariants on RelatedCheckResult
+// values returned by RelatedCheckers. Since task #58 replaced the Count==-1
+// sentinel with the domain.RelatedRowState enum, the invariants are keyed off
+// State rather than a negative Count:
 //
 //   Valid states (no error):
-//     - {Count: 0}                             — definitively zero
-//     - {Count: -1}                            — unknown (no IDs)
-//     - {Count: N, ResourceIDs: N items}       — confirmed N, IDs match
-//     - {Count: 0, Approximate: true}          — truncated scan, possibly more
+//     - {Count: 0}                                   — definitively zero (State: RelatedResolved, the zero value)
+//     - {State: RelatedUnknown}                       — unknown (Count 0, no IDs)
+//     - {Count: N, ResourceIDs: N items}             — confirmed N, IDs match (State: RelatedResolved)
+//     - {Count: 0, Approximate: true}                — truncated scan, possibly more (State: RelatedResolved)
 //     - {Count: N, Approximate: true, ResourceIDs: N items}
 //
 //   Invalid states (error):
-//     - TargetType == ""                       — missing target type
-//     - Count > 0 but ResourceIDs empty        — count/IDs inconsistency
-//     - Count == -1 with ResourceIDs non-empty — unknown can't carry IDs
-//     - Approximate == true with Count == -1   — Approximate requires Count >= 0
+//     - TargetType == ""                             — missing target type
+//     - Count > 0 but ResourceIDs empty               — count/IDs inconsistency
+//     - State != RelatedResolved but Count != 0       — non-resolved states must not carry a count
+//     - State != RelatedResolved with ResourceIDs set — non-resolved states can't carry IDs
+//     - Approximate == true with State != RelatedResolved — Approximate requires RelatedResolved
 //
 // TestRegisteredCheckers_ProduceValidResults: for parents in the scoped list,
 // calls each registered checker with empty cache + nil clients and asserts the
 // result passes ValidateRelatedResult. Catches checker invariant violations that
 // would cause silent UI corruption.
-//
-// TDD: these tests are RED until ValidateRelatedResult is added to related.go.
 
 import (
 	"context"
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws" // ensure all related registrations run
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -50,8 +52,8 @@ func TestValidateRelatedResult_Valid(t *testing.T) {
 			r:    resource.RelatedCheckResult{TargetType: "vpc", Count: 0},
 		},
 		{
-			name: "count -1 unknown is valid",
-			r:    resource.RelatedCheckResult{TargetType: "vpc", Count: -1},
+			name: "unknown state is valid",
+			r:    resource.RelatedCheckResult{TargetType: "vpc", State: domain.RelatedUnknown},
 		},
 		{
 			name: "count 3 with 3 IDs is valid",
@@ -111,18 +113,18 @@ func TestValidateRelatedResult_Invalid(t *testing.T) {
 			r:    resource.RelatedCheckResult{TargetType: "vpc", Count: 2, ResourceIDs: nil},
 		},
 		{
-			name: "count -1 with IDs",
+			name: "unknown state with IDs",
 			r: resource.RelatedCheckResult{
 				TargetType:  "vpc",
-				Count:       -1,
+				State:       domain.RelatedUnknown,
 				ResourceIDs: []string{"vpc-x"},
 			},
 		},
 		{
-			name: "approximate with count -1",
+			name: "approximate with unknown state",
 			r: resource.RelatedCheckResult{
 				TargetType:  "vpc",
-				Count:       -1,
+				State:       domain.RelatedUnknown,
 				Approximate: true,
 			},
 		},

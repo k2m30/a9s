@@ -26,12 +26,12 @@ func checkDbcSnapDBC(ctx context.Context, clients any, res resource.Resource, ca
 		}
 		clusterID = *snap.DBClusterIdentifier
 	} else {
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
+		return resource.UnknownRelated("dbc")
 	}
 
 	dbcList, truncated, err := dbcSnapRelatedResources(ctx, clients, cache, "dbc")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1, Err: err}
+		return resource.ErrorRelated("dbc", err)
 	}
 	if dbcList == nil {
 		// Cache not loaded and fetcher unavailable (nil/non-AWS clients) — fall back
@@ -69,7 +69,7 @@ func checkDbcSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource
 		}
 		keyID = *snap.KmsKeyId
 	} else {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	keyID = kmsKeyIDFromField(keyID, res.Type)
 	if keyID == "" {
@@ -127,7 +127,7 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 	if parentARN == "" {
 		dbcList, dbcTruncated, err := dbcRelatedResources(ctx, clients, cache, "dbc")
 		if err != nil {
-			return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
+			return resource.ErrorRelated("backup", err)
 		}
 		if dbcList == nil {
 			return resource.UnknownRelated("backup")
@@ -152,7 +152,7 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 
 	planList, truncated, err := dbcRelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
+		return resource.ErrorRelated("backup", err)
 	}
 	if planList == nil {
 		return resource.UnknownRelated("backup")

@@ -324,7 +324,7 @@ func (c *Controller) ApplyDetailRelated(rows []DetailRelatedRow) {
 // top screen (read by Snapshot()) never sees the update. Delegates to
 // mergeDetailRelatedRow so ResourceIDs are preserved (the controller-owned Enter
 // navigation reads them). No-op when no stacked detail matches.
-func (c *Controller) ApplyDetailRelatedResultForResource(sourceType, sourceID, displayName, targetType string, count int, loading bool, errMsg string, approximate bool, resourceIDs []string, fetchFilter map[string]string) {
+func (c *Controller) ApplyDetailRelatedResultForResource(sourceType, sourceID, displayName, targetType string, state domain.RelatedRowState, count int, loading bool, errMsg string, approximate bool, resourceIDs []string, fetchFilter map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for i := range c.stack {
@@ -332,7 +332,7 @@ func (c *Controller) ApplyDetailRelatedResultForResource(sourceType, sourceID, d
 			continue
 		}
 		if ds := c.stack[i].State.Detail; ds != nil && ds.Resource.ID == sourceID && ds.ResourceType == sourceType {
-			mergeDetailRelatedRow(ds, displayName, targetType, count, loading, errMsg, approximate, resourceIDs, fetchFilter)
+			mergeDetailRelatedRow(ds, displayName, targetType, state, count, loading, errMsg, approximate, resourceIDs, fetchFilter)
 		}
 	}
 }
@@ -365,7 +365,7 @@ func (c *Controller) initDetailRelatedRows(resourceType string) {
 		rows = append(rows, DetailRelatedRow{
 			TargetType:  def.TargetType,
 			DisplayName: def.DisplayName,
-			Count:       -1,
+			State:       domain.RelatedLoading,
 			Loading:     true,
 		})
 	}
@@ -423,7 +423,7 @@ func (c *Controller) ResetDetailRelatedRows(resourceType string) {
 		rows = append(rows, DetailRelatedRow{
 			TargetType:  def.TargetType,
 			DisplayName: def.DisplayName,
-			Count:       -1,
+			State:       domain.RelatedLoading,
 			Loading:     true,
 		})
 	}

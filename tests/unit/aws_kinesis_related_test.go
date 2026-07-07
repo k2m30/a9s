@@ -10,6 +10,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -118,7 +119,7 @@ func TestRelated_Kinesis_Alarms_CacheMissNoClients(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -231,7 +232,7 @@ func TestRelated_Kinesis_Lambda_CacheMissNoClients(t *testing.T) {
 	}
 	checker := kinesisCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
 	}
 }
@@ -245,7 +246,7 @@ func TestRelated_Kinesis_CFN_Unknown(t *testing.T) {
 	}
 	checker := kinesisCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (tags need ListTagsForStream enrichment)", result.Count)
 	}
 	if result.TargetType != "cfn" {
@@ -391,7 +392,7 @@ func TestRelated_Kinesis_DDB_NoClient(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "ddb")
 	result := checker(context.Background(), nil, kinesisSourceResource("clickstream-ingest", streamARN), cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no DynamoDB client)", result.Count)
 	}
 }

@@ -77,7 +77,7 @@ func (s *identityStore) Set(id string, err error) {
 	// both observe an empty store and both call STS.GetCallerIdentity;
 	// if the slower one times out (10s checker context) AFTER the faster
 	// one cached a good account ID, the naive write would erase the good
-	// value and leave the session stuck at Count:-1. See store godoc.
+	// value and leave the session stuck reporting RelatedUnknown. See store godoc.
 	if id == "" && err != nil && s.accountID != "" {
 		return
 	}

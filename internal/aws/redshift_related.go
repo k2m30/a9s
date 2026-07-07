@@ -22,10 +22,10 @@ func checkRedshiftAlarms(ctx context.Context, clients any, res resource.Resource
 
 	alarmList, truncated, err := redshiftRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -53,7 +53,7 @@ func checkRedshiftAlarms(ctx context.Context, clients any, res resource.Resource
 func checkRedshiftSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 	var ids []string
 	for _, vsg := range cluster.VpcSecurityGroups {
@@ -69,7 +69,7 @@ func checkRedshiftSG(_ context.Context, _ any, res resource.Resource, _ resource
 func checkRedshiftVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	if cluster.VpcId == nil || *cluster.VpcId == "" {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
@@ -83,7 +83,7 @@ func checkRedshiftVPC(_ context.Context, _ any, res resource.Resource, _ resourc
 func checkRedshiftRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	if len(cluster.IamRoles) == 0 {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
@@ -119,7 +119,7 @@ func checkRedshiftKMS(_ context.Context, _ any, res resource.Resource, _ resourc
 func checkRedshiftCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	stackName := ""
 	for _, tag := range cluster.Tags {
@@ -134,10 +134,10 @@ func checkRedshiftCFN(ctx context.Context, clients any, res resource.Resource, c
 
 	cfnList, truncated, err := redshiftRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 
 	var ids []string
@@ -163,7 +163,7 @@ func checkRedshiftCFN(ctx context.Context, clients any, res resource.Resource, c
 func checkRedshiftSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.UnknownRelated("secrets")
 	}
 	if cluster.MasterPasswordSecretArn == nil || *cluster.MasterPasswordSecretArn == "" {
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
@@ -172,10 +172,10 @@ func checkRedshiftSecrets(ctx context.Context, clients any, res resource.Resourc
 
 	secretList, truncated, err := redshiftRelatedResources(ctx, clients, cache, "secrets")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
+		return resource.ErrorRelated("secrets", err)
 	}
 	if secretList == nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.UnknownRelated("secrets")
 	}
 
 	var ids []string
@@ -197,10 +197,10 @@ func checkRedshiftSecrets(ctx context.Context, clients any, res resource.Resourc
 func checkRedshiftLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	status, err := redshiftLoggingStatus(ctx, clients, res)
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if status == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 	if status.LoggingEnabled == nil || !*status.LoggingEnabled {
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
@@ -232,10 +232,10 @@ func checkRedshiftLogs(ctx context.Context, clients any, res resource.Resource, 
 func checkRedshiftS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	status, err := redshiftLoggingStatus(ctx, clients, res)
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
+		return resource.ErrorRelated("s3", err)
 	}
 	if status == nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 	if status.LoggingEnabled == nil || !*status.LoggingEnabled {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
@@ -251,11 +251,11 @@ func checkRedshiftS3(ctx context.Context, clients any, res resource.Resource, _ 
 func checkRedshiftSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok || cluster.ClusterSubnetGroupName == nil || *cluster.ClusterSubnetGroupName == "" {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.Redshift == nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	name := *cluster.ClusterSubnetGroupName
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*redshift.DescribeClusterSubnetGroupsOutput, error) {
@@ -264,7 +264,7 @@ func checkRedshiftSubnet(ctx context.Context, clients any, res resource.Resource
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1, Err: err}
+		return resource.ErrorRelated("subnet", err)
 	}
 	if out == nil || len(out.ClusterSubnetGroups) == 0 {
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
@@ -281,9 +281,9 @@ func checkRedshiftSubnet(ctx context.Context, clients any, res resource.Resource
 // redshiftLoggingStatus performs a single DescribeLoggingStatus call for this
 // cluster's identifier, wrapped in RetryOnThrottle. Returns (nil, nil) when
 // the client is unavailable or the cluster ID is empty (no API call
-// attempted — callers render Count=-1 without a FlashMsg). Returns (nil, err)
-// on API failure so callers can surface the underlying error via Result.Err →
-// FlashMsg → error log.
+// attempted — callers render an UnknownRelated result without a FlashMsg).
+// Returns (nil, err) on API failure so callers can surface the underlying
+// error via Result.Err → FlashMsg → error log.
 func redshiftLoggingStatus(ctx context.Context, clients any, res resource.Resource) (*redshift.DescribeLoggingStatusOutput, error) {
 	clusterID := res.ID
 	if clusterID == "" {

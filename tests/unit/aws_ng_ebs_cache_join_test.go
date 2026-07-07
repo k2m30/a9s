@@ -9,6 +9,7 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -294,7 +295,7 @@ func TestRelated_NG_EBS_CacheJoin_NoEC2CacheEntry(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ebs")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no ec2 cache entry, cannot fetch with nil clients)", result.Count)
 	}
 }

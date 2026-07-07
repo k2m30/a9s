@@ -30,10 +30,10 @@ func checkKMSEBS(ctx context.Context, clients any, res resource.Resource, cache 
 
 	ebsList, truncated, err := kmsRelatedResources(ctx, clients, cache, "ebs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ebs", Count: -1, Err: err}
+		return resource.ErrorRelated("ebs", err)
 	}
 	if ebsList == nil {
-		return resource.RelatedCheckResult{TargetType: "ebs", Count: -1}
+		return resource.UnknownRelated("ebs")
 	}
 
 	var ids []string
@@ -64,10 +64,10 @@ func checkKMSRDS(ctx context.Context, clients any, res resource.Resource, cache 
 
 	dbiList, truncated, err := kmsRelatedResources(ctx, clients, cache, "dbi")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1, Err: err}
+		return resource.ErrorRelated("dbi", err)
 	}
 	if dbiList == nil {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
+		return resource.UnknownRelated("dbi")
 	}
 
 	var ids []string
@@ -99,10 +99,10 @@ func checkKMSSecrets(ctx context.Context, clients any, res resource.Resource, ca
 
 	secretsList, truncated, err := kmsRelatedResources(ctx, clients, cache, "secrets")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
+		return resource.ErrorRelated("secrets", err)
 	}
 	if secretsList == nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.UnknownRelated("secrets")
 	}
 
 	var ids []string
@@ -208,15 +208,15 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, _ res
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.KMS == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	policyAPI, ok := c.KMS.(KMSGetKeyPolicyAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	grantsAPI, ok := c.KMS.(KMSListGrantsAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 
 	seen := make(map[string]struct{})
@@ -231,7 +231,7 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, _ res
 	})
 	if err != nil {
 		// Permission errors, throttling, or any unrecoverable failure must yield -1.
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	if policyOut != nil && policyOut.Policy != nil {
 		for _, name := range kmsRoleNamesFromPolicyJSON(*policyOut.Policy) {
@@ -245,7 +245,7 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, _ res
 	})
 	if err != nil {
 		// Permission errors, throttling, or any unrecoverable failure must yield -1.
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	if grantsOut != nil {
 		for _, g := range grantsOut.Grants {

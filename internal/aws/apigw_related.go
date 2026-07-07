@@ -30,17 +30,17 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, _ re
 	items, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+			return resource.UnknownRelated("kms")
 		}
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+		return resource.ErrorRelated("kms", err)
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	lambdaAPI, ok := c.Lambda.(LambdaGetFunctionAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	seen := make(map[string]struct{})
 	var failures []string
@@ -101,10 +101,10 @@ func checkApigwLogs(ctx context.Context, clients any, res resource.Resource, cac
 
 	logList, truncated, err := apigwRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 
 	executionPrefix := "API-Gateway-Execution-Logs_" + apiID + "/"
@@ -154,9 +154,9 @@ func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, _
 	items, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+			return resource.UnknownRelated("lambda")
 		}
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	seen := make(map[string]bool)
 	var ids []string
@@ -198,22 +198,22 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, _ re
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.APIGatewayV2 == nil {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+		return resource.UnknownRelated("acm")
 	}
 	dnAPI, ok := c.APIGatewayV2.(APIGatewayV2GetDomainNamesAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+		return resource.UnknownRelated("acm")
 	}
 	mapAPI, ok := c.APIGatewayV2.(APIGatewayV2GetApiMappingsAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+		return resource.UnknownRelated("acm")
 	}
 	// Enumerate all custom domain names (one call).
 	dn, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetDomainNamesOutput, error) {
 		return dnAPI.GetDomainNames(ctx, &apigatewayv2.GetDomainNamesInput{})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1, Err: err}
+		return resource.ErrorRelated("acm", err)
 	}
 	seen := make(map[string]struct{})
 	var failures []string
@@ -267,10 +267,10 @@ func checkApigwAlarm(ctx context.Context, clients any, res resource.Resource, ca
 
 	alarmList, truncated, err := apigwRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -305,10 +305,10 @@ func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache
 
 	cfList, truncated, err := apigwRelatedResources(ctx, clients, cache, "cf")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1, Err: err}
+		return resource.ErrorRelated("cf", err)
 	}
 	if cfList == nil {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
+		return resource.UnknownRelated("cf")
 	}
 
 	var ids []string
@@ -345,9 +345,9 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 	items, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+			return resource.UnknownRelated("elb")
 		}
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+		return resource.ErrorRelated("elb", err)
 	}
 	var vpcLinkIDs []string
 	seenLinks := make(map[string]struct{})
@@ -367,11 +367,11 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.APIGatewayV2 == nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.UnknownRelated("elb")
 	}
 	vpcLinkAPI, ok := c.APIGatewayV2.(APIGatewayV2GetVpcLinksAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.UnknownRelated("elb")
 	}
 
 	wantedSubnets := make(map[string]struct{})
@@ -389,7 +389,7 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 			return vpcLinkAPI.GetVpcLinks(ctx, &input)
 		})
 		if err != nil {
-			return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+			return resource.ErrorRelated("elb", err)
 		}
 		if out == nil {
 			break
@@ -419,10 +419,10 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 
 	elbList, truncated, fetchErr := apigwRelatedResources(ctx, clients, cache, "elb")
 	if fetchErr != nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: fetchErr}
+		return resource.ErrorRelated("elb", fetchErr)
 	}
 	if elbList == nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.UnknownRelated("elb")
 	}
 
 	var ids []string
@@ -474,7 +474,7 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, _ r
 
 	items, err := apigwListIntegrations(ctx, clients, apiID)
 	if err != nil && !errors.Is(err, errClientMissing) {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	for _, item := range items {
 		if item.CredentialsArn != nil && *item.CredentialsArn != "" {
@@ -487,14 +487,14 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, _ r
 		if len(seen) > 0 {
 			return relatedResult("role", mapKeys(seen))
 		}
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	authAPI, ok := c.APIGatewayV2.(APIGatewayV2GetAuthorizersAPI)
 	if !ok {
 		if len(seen) > 0 {
 			return relatedResult("role", mapKeys(seen))
 		}
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	authOut, authErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetAuthorizersOutput, error) {
 		return authAPI.GetAuthorizers(ctx, &apigatewayv2.GetAuthorizersInput{ApiId: &apiID})
@@ -503,7 +503,7 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, _ r
 		if len(seen) > 0 {
 			return relatedResult("role", mapKeys(seen))
 		}
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: authErr}
+		return resource.ErrorRelated("role", authErr)
 	}
 	if authOut != nil {
 		for _, a := range authOut.Items {

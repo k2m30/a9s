@@ -20,7 +20,7 @@ import (
 func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dist, ok := assertStruct[cftypes.DistributionSummary](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 	if dist.Origins == nil {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
@@ -28,10 +28,10 @@ func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache re
 
 	s3List, truncated, err := cfRelatedResources(ctx, clients, cache, "s3")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
+		return resource.ErrorRelated("s3", err)
 	}
 	if s3List == nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 
 	// Collect bucket names from S3 origin domain names.
@@ -69,7 +69,7 @@ func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache re
 func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dist, ok := assertStruct[cftypes.DistributionSummary](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.UnknownRelated("elb")
 	}
 	if dist.Origins == nil {
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
@@ -91,10 +91,10 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 
 	elbList, truncated, err := cfRelatedResources(ctx, clients, cache, "elb")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+		return resource.ErrorRelated("elb", err)
 	}
 	if elbList == nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.UnknownRelated("elb")
 	}
 
 	var ids []string
@@ -115,7 +115,7 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 func checkCfWAF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dist, ok := assertStruct[cftypes.DistributionSummary](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: -1}
+		return resource.UnknownRelated("waf")
 	}
 	if dist.WebACLId == nil || *dist.WebACLId == "" {
 		return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
@@ -124,10 +124,10 @@ func checkCfWAF(ctx context.Context, clients any, res resource.Resource, cache r
 
 	wafList, truncated, err := cfRelatedResources(ctx, clients, cache, "waf")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: -1, Err: err}
+		return resource.ErrorRelated("waf", err)
 	}
 	if wafList == nil {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: -1}
+		return resource.UnknownRelated("waf")
 	}
 
 	var ids []string
@@ -147,7 +147,7 @@ func checkCfWAF(ctx context.Context, clients any, res resource.Resource, cache r
 func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dist, ok := assertStruct[cftypes.DistributionSummary](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+		return resource.UnknownRelated("acm")
 	}
 	if dist.ViewerCertificate == nil || dist.ViewerCertificate.ACMCertificateArn == nil || *dist.ViewerCertificate.ACMCertificateArn == "" {
 		return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
@@ -156,10 +156,10 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 
 	acmList, truncated, err := cfRelatedResources(ctx, clients, cache, "acm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1, Err: err}
+		return resource.ErrorRelated("acm", err)
 	}
 	if acmList == nil {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+		return resource.UnknownRelated("acm")
 	}
 
 	var ids []string
@@ -200,10 +200,10 @@ func checkCfR53(ctx context.Context, clients any, res resource.Resource, cache r
 
 	zoneList, truncated, err := cfRelatedResources(ctx, clients, cache, "r53")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1, Err: err}
+		return resource.ErrorRelated("r53", err)
 	}
 	if zoneList == nil {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+		return resource.UnknownRelated("r53")
 	}
 
 	var ids []string
@@ -275,10 +275,10 @@ func checkCfAlarm(ctx context.Context, clients any, res resource.Resource, cache
 
 	alarmList, truncated, err := cfRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -310,13 +310,13 @@ func checkCfLambda(ctx context.Context, clients any, res resource.Resource, _ re
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.CloudFront == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.GetDistributionConfigOutput, error) {
 		return c.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{Id: &distID})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	if out.DistributionConfig == nil {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
@@ -371,13 +371,13 @@ func checkCfLogs(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.CloudFront == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.GetDistributionConfigOutput, error) {
 		return c.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{Id: &distID})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if out.DistributionConfig == nil || out.DistributionConfig.Logging == nil {
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}

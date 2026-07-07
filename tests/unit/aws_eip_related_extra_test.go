@@ -12,6 +12,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -75,7 +76,7 @@ func TestRelated_EIP_CFN_WrongRawStruct(t *testing.T) {
 	checker := eipCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -162,7 +163,7 @@ func TestRelated_EIP_Alarm_WrongRawStruct(t *testing.T) {
 	checker := eipCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -252,7 +253,7 @@ func TestRelated_EIP_ASG_NilCacheNoClients(t *testing.T) {
 	checker := eipCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
 	}
 }

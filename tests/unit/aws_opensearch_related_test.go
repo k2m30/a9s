@@ -22,6 +22,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -455,8 +456,8 @@ func TestRelated_OpenSearch_PublicDomain_VPCPivotsZero(t *testing.T) {
 		if result.Count != 0 {
 			t.Errorf("%s: Count = %d, want 0 for public domain (no VPCOptions)", target, result.Count)
 		}
-		if result.Count == -1 {
-			t.Errorf("%s: Count = -1, want 0 — public domain has no VPC, not unknown", target)
+		if result.State != domain.RelatedResolved {
+			t.Errorf("%s: State = %v, want RelatedResolved — public domain has no VPC, not unknown", target, result.State)
 		}
 	}
 }
@@ -499,7 +500,7 @@ func TestRelated_OpenSearch_Adversarial_NilRawStruct(t *testing.T) {
 	for _, target := range []string{"sg", "subnet", "vpc", "logs"} {
 		checker := opensearchCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, nilRes, cache)
-		if result.Count != -1 {
+		if result.State != domain.RelatedUnknown {
 			t.Errorf("%s: Count = %d, want -1 (nil RawStruct → unknown)", target, result.Count)
 		}
 	}
@@ -522,8 +523,8 @@ func TestRelated_OpenSearch_Adversarial_ListTagsError(t *testing.T) {
 	checker := opensearchCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, osGraphRootResource(), cache)
 
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (ListTags error → unknown)", result.Count)
+	if result.State != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError (ListTags error)", result.State)
 	}
 }
 
@@ -542,7 +543,7 @@ func TestRelated_OpenSearch_Adversarial_DescribeDomainConfigError(t *testing.T) 
 	checker := opensearchCheckerByTarget(t, "acm")
 	result := checker(context.Background(), clients, osGraphRootResource(), cache)
 
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (DescribeDomainConfig error → unknown)", result.Count)
+	if result.State != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError (DescribeDomainConfig error)", result.State)
 	}
 }

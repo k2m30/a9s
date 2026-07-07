@@ -15,6 +15,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -135,7 +136,7 @@ func TestRelated_EKS_NodeGroups_CacheMissNoClients(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -247,7 +248,7 @@ func TestRelated_EKS_Alarms_CacheMissNoClients(t *testing.T) {
 	checker := eksCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -337,7 +338,7 @@ func TestRelated_EKS_CFN_CacheMissNoClients(t *testing.T) {
 	checker := eksCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -458,7 +459,7 @@ func TestRelated_EKS_AMI_WrongRawStruct(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ami")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -632,7 +633,7 @@ func TestRelated_EKS_EC2_WrongRawStruct(t *testing.T) {
 	checker := eksCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }

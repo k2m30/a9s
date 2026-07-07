@@ -5,7 +5,7 @@
 //
 // Resolution is best-effort: the per-session store is populated on first
 // access via STS GetCallerIdentity. Callers receive "" from these helpers
-// when the info cannot be resolved; honest Count: -1 follows.
+// when the info cannot be resolved; an honest UnknownRelated result follows.
 //
 // Concurrency note: no top-level lock is held across the
 // "check store / fetch / set" sequence. Two concurrent Pattern C checks may
@@ -33,7 +33,7 @@ type identityStore interface {
 
 // accountIDFromClients returns the caller's AWS account ID, fetched and
 // cached via STS GetCallerIdentity on first call. Returns "" on any failure
-// so callers emit Count: -1.
+// so callers emit an UnknownRelated result.
 //
 // The store argument carries per-session state; pass c.IdentityStore() at the
 // call site so each profile/region session uses an isolated cache.

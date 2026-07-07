@@ -32,10 +32,10 @@ func checkLambdaRole(ctx context.Context, clients any, res resource.Resource, ca
 
 	roleList, _, err := lambdaRelatedResources(ctx, clients, cache, "role")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	if roleList == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 
 	var ids []string
@@ -60,10 +60,10 @@ func checkLambdaAlarms(ctx context.Context, clients any, res resource.Resource, 
 
 	alarmList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -105,10 +105,10 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 
 	logList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 
 	var ids []string
@@ -129,7 +129,7 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 func checkLambdaSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 	if fn.VpcConfig == nil {
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
@@ -149,7 +149,7 @@ func checkLambdaSG(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkLambdaVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	if fn.VpcConfig == nil || fn.VpcConfig.VpcId == nil || *fn.VpcConfig.VpcId == "" {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
@@ -183,8 +183,8 @@ func lambdaRelatedResources(ctx context.Context, clients any, cache resource.Res
 // checkLambdaSQS finds SQS queues wired to this Lambda as event sources
 // (Pattern A — live API). Calls lambda:ListEventSourceMappings scoped to the
 // function and extracts SQS queue names from the returned EventSourceArn values.
-// Returns Count: -1 when no live clients are available, since the Lambda
-// FunctionConfiguration struct does not embed event source mappings.
+// Returns an unknown result when no live clients are available, since the
+// Lambda FunctionConfiguration struct does not embed event source mappings.
 func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	functionName := res.ID
 	if functionName == "" {
@@ -195,7 +195,7 @@ func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
-		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1}
+		return resource.UnknownRelated("sqs")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.ListEventSourceMappingsOutput, error) {
 		return c.Lambda.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
@@ -203,7 +203,7 @@ func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, _ r
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1, Err: err}
+		return resource.ErrorRelated("sqs", err)
 	}
 	var ids []string
 	for _, m := range out.EventSourceMappings {
@@ -227,24 +227,24 @@ func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, _ r
 // the function's tags (Pattern A — live API). FunctionConfiguration does NOT
 // embed tags, so this calls lambda:ListTags on the function ARN and then matches
 // the aws:cloudformation:stack-name tag against the cfn cache.
-// Returns Count: -1 when neither clients nor a usable ARN are available.
+// Returns an unknown result when neither clients nor a usable ARN are available.
 func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	if fn.FunctionArn == nil || *fn.FunctionArn == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 	c, sok := clients.(*ServiceClients)
 	if !sok || c == nil || c.Lambda == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	tagsOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.ListTagsOutput, error) {
 		return c.Lambda.ListTags(ctx, &lambda.ListTagsInput{Resource: fn.FunctionArn})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	stackName := tagsOut.Tags["aws:cloudformation:stack-name"]
 	if stackName == "" {
@@ -252,10 +252,10 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	cfnList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -285,27 +285,27 @@ func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, _ r
 		fnName = res.Name
 	}
 	if fnName == "" {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+		return resource.UnknownRelated("ecr")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+		return resource.UnknownRelated("ecr")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
 		return c.Lambda.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &fnName})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1, Err: err}
+		return resource.ErrorRelated("ecr", err)
 	}
 	if out == nil || out.Code == nil || out.Code.ImageUri == nil || *out.Code.ImageUri == "" {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+		return resource.UnknownRelated("ecr")
 	}
 	imageURI := *out.Code.ImageUri
 	// URI form: <account>.dkr.ecr.<region>.amazonaws.com/<repo>[:<tag>|@<digest>]
 	// We need the <repo> portion — everything after the hostname "/" and before ":" or "@".
 	slashIdx := strings.Index(imageURI, "/")
 	if slashIdx < 0 || slashIdx == len(imageURI)-1 {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+		return resource.UnknownRelated("ecr")
 	}
 	repoAndTag := imageURI[slashIdx+1:]
 	// Strip tag/digest suffix.
@@ -316,7 +316,7 @@ func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, _ r
 		repoAndTag = repoAndTag[:idx]
 	}
 	if repoAndTag == "" {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+		return resource.UnknownRelated("ecr")
 	}
 	return relatedResult("ecr", []string{repoAndTag})
 }
@@ -330,7 +330,7 @@ func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, _ r
 func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.UnknownRelated("eb-rule")
 	}
 	functionARN := ""
 	if fn.FunctionArn != nil {
@@ -350,14 +350,14 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 	if !sok || c == nil || c.EventBridge == nil {
 		// Without live EventBridge access there is no cached field on the rule
 		// struct that links to Lambda targets — targets come from a separate API.
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.UnknownRelated("eb-rule")
 	}
 	ruleList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "eb-rule")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: err}
+		return resource.ErrorRelated("eb-rule", err)
 	}
 	if ruleList == nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.UnknownRelated("eb-rule")
 	}
 	idSet := make(map[string]struct{})
 	var failures []string

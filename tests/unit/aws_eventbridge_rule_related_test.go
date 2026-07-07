@@ -9,6 +9,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -135,7 +136,7 @@ func TestRelated_EbRule_Role_WrongRawStruct(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -186,7 +187,7 @@ func TestRelated_EbRule_Kinesis_NilClients(t *testing.T) {
 	checker := ebRuleCheckerByTarget(t, "kinesis")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -350,7 +351,7 @@ func TestRelated_EbRule_TargetService_NilClients(t *testing.T) {
 	for _, target := range []string{"kinesis", "lambda", "logs", "sfn", "sns", "sqs"} {
 		checker := ebRuleCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, resource.ResourceCache{})
-		if result.Count != -1 {
+		if result.State != domain.RelatedUnknown {
 			t.Errorf("target=%s: Count = %d, want -1 (nil clients)", target, result.Count)
 		}
 	}

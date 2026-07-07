@@ -21,6 +21,7 @@ import (
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -91,7 +92,7 @@ func TestCheckDbcSnapBackup_TruncatedDBCCacheReturnsUnknown(t *testing.T) {
 	if result.TargetType != "backup" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "backup")
 	}
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (UnknownRelated — dbc truncated, parent not in visible window)\n"+
 			"NOTE: this test fails until the coder's fix to checkDbcSnapBackup is shipped",
 			result.Count)
@@ -146,7 +147,7 @@ func TestCheckDbcSnapBackup_TruncatedDBCCacheButParentResolved(t *testing.T) {
 	if result.TargetType != "backup" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "backup")
 	}
-	if result.Count == -1 {
+	if result.State == domain.RelatedUnknown {
 		t.Errorf("Count = -1 (Unknown), but parent was resolved — should scan backup plans normally")
 	}
 	// Verify the plan was found (Count should be 1).

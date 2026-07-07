@@ -19,7 +19,7 @@ import (
 func checkDbiSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 	var ids []string
 	for _, sg := range db.VpcSecurityGroups {
@@ -38,7 +38,7 @@ func checkDbiSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkDbiKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	if db.KmsKeyId == nil || *db.KmsKeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
@@ -55,7 +55,7 @@ func checkDbiKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkDbiSubnets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	if db.DBSubnetGroup == nil || len(db.DBSubnetGroup.Subnets) == 0 {
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
@@ -83,7 +83,7 @@ func checkDbiAlarm(ctx context.Context, clients any, res resource.Resource, cach
 
 	alarmList, truncated, err := dbiRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
 		return resource.ApproximateZero("alarm")
@@ -119,7 +119,7 @@ func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, ca
 
 	snapList, truncated, err := dbiRelatedResources(ctx, clients, cache, "dbi-snap")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "dbi-snap", Count: -1, Err: err}
+		return resource.ErrorRelated("dbi-snap", err)
 	}
 	if snapList == nil {
 		return resource.ApproximateZero("dbi-snap")
@@ -153,7 +153,7 @@ func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache
 
 	logList, truncated, err := dbiRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
 		return resource.ApproximateZero("logs")
@@ -201,7 +201,7 @@ func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, ca
 
 	secretList, truncated, err := dbiRelatedResources(ctx, clients, cache, "secrets")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
+		return resource.ErrorRelated("secrets", err)
 	}
 	if secretList == nil {
 		return resource.ApproximateZero("secrets")
@@ -250,7 +250,7 @@ func checkDbiDBC(ctx context.Context, clients any, res resource.Resource, cache 
 
 	dbcList, truncated, err := dbiRelatedResources(ctx, clients, cache, "dbc")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1, Err: err}
+		return resource.ErrorRelated("dbc", err)
 	}
 	if dbcList == nil {
 		return resource.ApproximateZero("dbc")
@@ -274,7 +274,7 @@ func checkDbiDBC(ctx context.Context, clients any, res resource.Resource, cache 
 func checkDbiRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	var ids []string
 	for _, r := range db.AssociatedRoles {
@@ -306,7 +306,7 @@ func checkDbiRole(_ context.Context, _ any, res resource.Resource, _ resource.Re
 func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.UnknownRelated("eni")
 	}
 	var sgIDs []string
 	for _, sg := range db.VpcSecurityGroups {
@@ -319,7 +319,7 @@ func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.EC2 == nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.UnknownRelated("eni")
 	}
 	descName := "description"
 	descVal := "RDSNetworkInterface"
@@ -333,7 +333,7 @@ func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1, Err: err}
+		return resource.ErrorRelated("eni", err)
 	}
 	var ids []string
 	for _, ni := range out.NetworkInterfaces {
@@ -345,7 +345,7 @@ func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ reso
 }
 
 // checkDbiCTEvents checks cached CloudTrail events for references to the DB instance.
-// Returns Count=-1 (unknown) when the cache is truncated or a cache miss occurs.
+// Returns an unknown result when the cache is truncated or a cache miss occurs.
 // FetchFilter["ResourceName"] is always set so the caller can do a filtered re-fetch.
 func checkDbiCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dbID := res.ID
@@ -355,10 +355,12 @@ func checkDbiCTEvents(ctx context.Context, clients any, res resource.Resource, c
 	fetchFilter := map[string]string{"ResourceName": dbID}
 	eventList, truncated, err := dbiRelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err, FetchFilter: fetchFilter}
+		r := resource.ErrorRelated("ct-events", err)
+		r.FetchFilter = fetchFilter
+		return r
 	}
 	if eventList == nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
+		return resource.DeferredRelated("ct-events", fetchFilter)
 	}
 	var ids []string
 	for _, eventRes := range eventList {

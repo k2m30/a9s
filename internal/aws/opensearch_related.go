@@ -24,10 +24,10 @@ func checkOpenSearchAlarms(ctx context.Context, clients any, res resource.Resour
 
 	alarmList, truncated, err := opensearchRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -54,7 +54,7 @@ func checkOpenSearchAlarms(ctx context.Context, clients any, res resource.Resour
 func checkOpenSearchLogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 	if len(domain.LogPublishingOptions) == 0 {
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
@@ -94,7 +94,7 @@ func checkOpenSearchLogs(_ context.Context, _ any, res resource.Resource, _ reso
 func checkOpenSearchSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 	if domain.VPCOptions == nil {
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
@@ -114,7 +114,7 @@ func checkOpenSearchSG(_ context.Context, _ any, res resource.Resource, _ resour
 func checkOpenSearchVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	if domain.VPCOptions == nil || domain.VPCOptions.VPCId == nil || *domain.VPCOptions.VPCId == "" {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
@@ -131,7 +131,7 @@ func checkOpenSearchKMS(_ context.Context, _ any, res resource.Resource, _ resou
 		// is "unknown" (cannot determine), not "no KMS key". Pattern-F
 		// contract: return -1 so the UI renders "?" rather than falsely
 		// reporting 0. Matches checkOpenSearchCFN / VPC / Subnet / SG / Logs.
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	if domain.EncryptionAtRestOptions == nil ||
 		domain.EncryptionAtRestOptions.KmsKeyId == nil ||
@@ -148,24 +148,24 @@ func checkOpenSearchKMS(_ context.Context, _ any, res resource.Resource, _ resou
 func checkOpenSearchCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	if domain.ARN == nil || *domain.ARN == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.OpenSearch == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	tagAPI, ok := c.OpenSearch.(OpenSearchListTagsAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*opensearch.ListTagsOutput, error) {
 		return tagAPI.ListTags(ctx, &opensearch.ListTagsInput{ARN: aws.String(*domain.ARN)})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	stackName := ""
 	for _, tag := range out.TagList {
@@ -179,10 +179,10 @@ func checkOpenSearchCFN(ctx context.Context, clients any, res resource.Resource,
 	}
 	cfnList, truncated, err := opensearchRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -206,7 +206,7 @@ func checkOpenSearchCFN(ctx context.Context, clients any, res resource.Resource,
 func checkOpenSearchSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	if domain.VPCOptions == nil {
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
@@ -236,17 +236,17 @@ func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource,
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.OpenSearch == nil {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+		return resource.UnknownRelated("acm")
 	}
 	cfgAPI, ok := c.OpenSearch.(OpenSearchDescribeDomainConfigAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+		return resource.UnknownRelated("acm")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*opensearch.DescribeDomainConfigOutput, error) {
 		return cfgAPI.DescribeDomainConfig(ctx, &opensearch.DescribeDomainConfigInput{DomainName: aws.String(domainName)})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1, Err: err}
+		return resource.ErrorRelated("acm", err)
 	}
 	if out.DomainConfig == nil ||
 		out.DomainConfig.DomainEndpointOptions == nil ||
@@ -263,10 +263,10 @@ func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource,
 	// matches. Return the target Resource.ID (DomainName) so drill lands.
 	acmList, truncated, err := opensearchRelatedResources(ctx, clients, cache, "acm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1, Err: err}
+		return resource.ErrorRelated("acm", err)
 	}
 	if acmList == nil {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+		return resource.UnknownRelated("acm")
 	}
 	for _, acmRes := range acmList {
 		cert, ok := assertStruct[acmtypes.CertificateSummary](acmRes.RawStruct)

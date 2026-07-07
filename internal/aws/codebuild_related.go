@@ -20,7 +20,7 @@ import (
 func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "pipeline", Count: -1}
+		return resource.UnknownRelated("pipeline")
 	}
 	projectName := ""
 	if project.Name != nil {
@@ -36,7 +36,7 @@ func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, ca
 	entry, ok := cache["pipeline"]
 	if !ok {
 		// cache not yet populated — unknown, not a definitive 0
-		return resource.RelatedCheckResult{TargetType: "pipeline", Count: -1}
+		return resource.UnknownRelated("pipeline")
 	}
 
 	// If there are pipelines to check but no CodePipeline client to call GetPipeline,
@@ -44,7 +44,7 @@ func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, ca
 	if len(entry.Resources) > 0 {
 		c, cok := clients.(*ServiceClients)
 		if !cok || c == nil || c.CodePipeline == nil {
-			return resource.RelatedCheckResult{TargetType: "pipeline", Count: -1}
+			return resource.UnknownRelated("pipeline")
 		}
 	}
 

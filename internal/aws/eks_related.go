@@ -24,10 +24,10 @@ func checkEKSNodeGroups(ctx context.Context, clients any, res resource.Resource,
 
 	ngList, truncated, err := eksRelatedResources(ctx, clients, cache, "ng")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1, Err: err}
+		return resource.ErrorRelated("ng", err)
 	}
 	if ngList == nil {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1}
+		return resource.UnknownRelated("ng")
 	}
 
 	var ids []string
@@ -56,10 +56,10 @@ func checkEKSAlarms(ctx context.Context, clients any, res resource.Resource, cac
 
 	alarmList, truncated, err := eksRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -95,10 +95,10 @@ func checkEKSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 
 	cfnList, truncated, err := eksRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 
 	var ids []string
@@ -130,10 +130,10 @@ func checkEKSLogs(ctx context.Context, clients any, res resource.Resource, cache
 
 	logList, truncated, err := eksRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 
 	var ids []string
@@ -154,7 +154,7 @@ func checkEKSLogs(ctx context.Context, clients any, res resource.Resource, cache
 func checkEKSSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 	if raw.ResourcesVpcConfig == nil {
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
@@ -176,7 +176,7 @@ func checkEKSSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 func checkEKSVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	if raw.ResourcesVpcConfig == nil || raw.ResourcesVpcConfig.VpcId == nil || *raw.ResourcesVpcConfig.VpcId == "" {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}

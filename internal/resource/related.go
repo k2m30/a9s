@@ -98,10 +98,15 @@ func s3BucketFromARN(s string) string {
 //
 // Semantics (FR-008 / FR-014):
 //
-//   - Count == -1: unknown — the checker could not determine a count.
-//   - Count == 0: definitively zero related resources of this type.
-//   - Count >= 1: confirmed N related resources.
-//   - Approximate == true: Count was derived from a truncated cache page.
+//   - State == RelatedResolved (zero value): Count (0..N) is authoritative.
+//   - State == RelatedUnknown: the checker could not determine a count.
+//   - State == RelatedLoading: no checker result has arrived yet — set only
+//     by row-mirror producers, never returned by a checker itself.
+//   - State == RelatedError: the checker (or a prerequisite lookup) failed.
+//   - State == RelatedDeferred: navigation uses FetchFilter's server-side
+//     filtered fetch instead of a local count.
+//   - Approximate == true: Count was derived from a truncated cache page;
+//     only meaningful when State == RelatedResolved.
 //   - FetchFilter non-nil: navigation should use a server-side filtered fetcher.
 type RelatedCheckResult = domain.RelatedCheckResult
 
@@ -128,8 +133,8 @@ type RelatedChecker = domain.RelatedChecker
 // Currently checks:
 //   - TargetType is non-empty
 //   - When Count > 0, ResourceIDs is non-empty
-//   - When Count is -1, no IDs are populated
-//   - When Approximate is true, Count must be >= 0 (never paired with -1)
+//   - When State != RelatedResolved, Count must be 0 and ResourceIDs empty
+//   - When Approximate is true, State must be RelatedResolved
 //
 // This is intended for test invariants and optional debug-mode runtime checks,
 // not for production error returns.
@@ -143,11 +148,16 @@ func ValidateRelatedResult(r RelatedCheckResult) error {
 	if r.Count > 0 && len(r.ResourceIDs) == 0 {
 		return fmt.Errorf("RelatedCheckResult[%s]: Count=%d but no ResourceIDs", r.TargetType, r.Count)
 	}
-	if r.Count == -1 && len(r.ResourceIDs) > 0 {
-		return fmt.Errorf("RelatedCheckResult[%s]: Count=-1 but %d ResourceIDs present", r.TargetType, len(r.ResourceIDs))
+	if r.State != domain.RelatedResolved {
+		if r.Count != 0 {
+			return fmt.Errorf("RelatedCheckResult[%s]: State=%s but Count=%d (must be 0)", r.TargetType, r.State, r.Count)
+		}
+		if len(r.ResourceIDs) > 0 {
+			return fmt.Errorf("RelatedCheckResult[%s]: State=%s but %d ResourceIDs present", r.TargetType, r.State, len(r.ResourceIDs))
+		}
 	}
-	if r.Approximate && r.Count < 0 {
-		return fmt.Errorf("RelatedCheckResult[%s]: Approximate=true paired with Count=%d (must be >=0)", r.TargetType, r.Count)
+	if r.Approximate && r.State != domain.RelatedResolved {
+		return fmt.Errorf("RelatedCheckResult[%s]: Approximate=true but State=%s (must be RelatedResolved)", r.TargetType, r.State)
 	}
 	return nil
 }
@@ -204,8 +214,8 @@ func ValidateRelatedResultAgainstCache(r RelatedCheckResult, cache ResourceCache
 // may exist beyond the cached window." Renders in the UI as "0+". This is the
 // honest answer for reverse-scan checkers when `truncated && len(ids)==0`.
 //
-// Prefer this over `{Count: -1}` which means "unknown" and renders as a dead-
-// ended dim row.
+// Prefer this over UnknownRelated, which means "unknown" and renders as a
+// dead-ended dim row.
 func ApproximateZero(targetType string) RelatedCheckResult {
 	return RelatedCheckResult{
 		TargetType:  targetType,
@@ -218,15 +228,38 @@ func ApproximateZero(targetType string) RelatedCheckResult {
 // could not determine the count because a prerequisite lookup failed". The
 // most common case is a two-hop checker (snapshot → source DB instance →
 // cluster) where the SOURCE was not found in a truncated intermediate cache,
-// so the hop to the TARGET was never attempted. Renders as "?".
+// so the hop to the TARGET was never attempted. Renders as "(?)".
 //
 // Distinct from ApproximateZero: ApproximateZero says "we scanned the target
 // cache and found 0 matches (more may exist)". UnknownRelated says "we could
-// not perform the scan at all". Distinct from the raw Count:-1 anti-pattern
-// because this is a deliberate, audited unknown state (the count-minus-one
-// guard test accepts this helper as an approved site).
+// not perform the scan at all".
 func UnknownRelated(targetType string) RelatedCheckResult {
-	return RelatedCheckResult{TargetType: targetType, Count: -1}
+	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedUnknown}
+}
+
+// ErrorRelated returns a RelatedCheckResult representing "the checker (or a
+// prerequisite AWS call) returned an error". Renders as "(?)" — but unlike
+// UnknownRelated, IsRelatedActionable treats RelatedError as a dead end
+// regardless of any other field (including a FetchFilter the checker may
+// also have computed before the failing call), since navigating on an
+// errored row would drill in on data that was never actually resolved.
+func ErrorRelated(targetType string, err error) RelatedCheckResult {
+	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedError, Err: err}
+}
+
+// DeferredRelated returns a RelatedCheckResult representing "the count is not
+// resolved locally; Enter should drill in via a server-side FetchFilter fetch
+// instead". Renders with a blank count badge and is always actionable.
+func DeferredRelated(targetType string, filter map[string]string) RelatedCheckResult {
+	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedDeferred, FetchFilter: filter}
+}
+
+// LoadingRelated returns a RelatedCheckResult representing "no checker result
+// has arrived yet". A checker call is synchronous, so a checker itself never
+// returns this state; it exists for row-mirror producers (and tests) that
+// need a placeholder RelatedCheckResult value.
+func LoadingRelated(targetType string) RelatedCheckResult {
+	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedLoading}
 }
 
 // IsRelatedActionable is the single source of truth for "can the user drill into
@@ -235,68 +268,68 @@ func UnknownRelated(targetType string) RelatedCheckResult {
 // RelatedBlock.Actionable), and — via that ViewState field — the web template,
 // so the rule cannot drift between renderers.
 //
-//   - loading or errored       → not actionable
-//   - resolved count == 0      → never actionable, even when approximate
-//     (ApproximateZero() sets Count:0 — those are the "(0)" rows; a resolved
-//     zero is a dead-end pivot regardless of the approximate flag)
-//   - has a server-side filter → actionable regardless of the local count
-//     (FetchFilter pivots always carry Count:-1, never 0, so they remain
-//     actionable via this branch — the filtered fetch resolves the real count)
-//   - count == -1 (no filter)  → transient-unknown, actionable (owner decision
-//     #38, 2026-07-06): Enter opens the target type's plain top-level list,
-//     the same navigation a menu entry would produce; returning to the
-//     detail re-dispatches the related checks so the "(?)" resolves to the
-//     real count once the target's cache is warm (see app_input.go's Escape
+//   - RelatedLoading / RelatedError    → not actionable
+//   - RelatedDeferred                  → actionable regardless of Count
+//     (navigation drills in via FetchFilter's server-side filtered fetch,
+//     which resolves the real count)
+//   - RelatedUnknown                   → actionable (owner decision #38,
+//     2026-07-06): Enter opens the target type's plain top-level list, the
+//     same navigation a menu entry would produce; returning to the detail
+//     re-dispatches the related checks so the "(?)" resolves to the real
+//     count once the target's cache is warm (see app_input.go's Escape
 //     handler and ResolveRelatedNavigate's NavigationKindResourceList
 //     fallback, both of which treat this case identically to a menu-driven
 //     list open)
-//   - approximate (N+)         → actionable when count > 0 (the target list
-//     re-runs the checker as more pages load, so matches surface incrementally)
-//   - otherwise                → count > 0
-func IsRelatedActionable(count int, approximate, hasFetchFilter, loading, hasErr bool) bool {
-	if loading || hasErr {
+//   - RelatedResolved, count == 0      → never actionable, even when
+//     approximate (ApproximateZero() sets Count:0 — those are the "(0)"
+//     rows; a resolved zero is a dead-end pivot regardless of the
+//     approximate flag)
+//   - RelatedResolved, count > 0       → actionable (the approximate/"N+"
+//     rows re-run the checker as more pages load, so matches surface
+//     incrementally)
+func IsRelatedActionable(state domain.RelatedRowState, count int, approximate bool) bool {
+	switch state {
+	case domain.RelatedLoading, domain.RelatedError:
 		return false
-	}
-	if count == 0 {
-		return false
-	}
-	if hasFetchFilter {
+	case domain.RelatedDeferred, domain.RelatedUnknown:
 		return true
+	default: // RelatedResolved
+		// A resolved zero is never actionable, even when approximate:
+		// ApproximateZero deliberately sets Count:0 for a truncated-but-empty
+		// scan window, and a zero pivot is a dead end regardless of how it
+		// was produced.
+		if count == 0 {
+			return false
+		}
+		return count > 0 || approximate
 	}
-	if count == -1 {
-		return true
-	}
-	if approximate {
-		return true
-	}
-	return count > 0
 }
 
 // FormatRelatedCount is the single source of truth for the count BADGE text on a
-// related-resource row (the resolved, non-loading/non-error case). It is
-// consumed by the TUI right column and — via RelatedBlock.CountDisplay computed
-// in the controller — the web template, so the displayed count cannot drift.
+// related-resource row. It is consumed by the TUI right column and — via
+// RelatedBlock.CountDisplay computed in the controller — the web template, so
+// the displayed count cannot drift.
 //
-//   - count == -1, hasFetchFilter → ""    (actionable navigation link, e.g.
-//     ct-events; the row reads as a drill-in, not an unresolved count, and the
-//     filtered fetch will resolve the real count once entered)
-//   - count == -1, no filter      → "(?)" (resolved unknown — budget-excluded
-//     or structurally uncomputable pivot, e.g. kms→s3; must be visually
-//     distinct from the loading state, which never reaches this function)
-//   - count >= 0                  → "(N)"
+//   - RelatedResolved → "(N)"
+//   - RelatedDeferred → ""    (actionable navigation link, e.g. ct-events; the
+//     row reads as a drill-in, not an unresolved count, and the filtered
+//     fetch will resolve the real count once entered)
+//   - anything else   → "(?)" (RelatedUnknown is the resolved-unknown case —
+//     budget-excluded or structurally uncomputable pivot, e.g. kms→s3;
+//     RelatedLoading/RelatedError also fall here, but the renderers show a
+//     spinner/em-dash instead of consulting this text for those two states)
 //
 // Approximate-ness is intentionally NOT marked in the text (no "N+"): per the
 // design spec it is conveyed by row style alone, and the integration tests
-// assert a literal "(<N>)" substring. Loading and error states are handled by
-// the renderers (spinner / em-dash), not here.
-func FormatRelatedCount(count int, hasFetchFilter bool) string {
-	if count < 0 {
-		if hasFetchFilter {
-			return ""
-		}
-		return "(?)"
+// assert a literal "(<N>)" substring.
+func FormatRelatedCount(state domain.RelatedRowState, count int) string {
+	if state == domain.RelatedResolved {
+		return fmt.Sprintf("(%d)", count)
 	}
-	return fmt.Sprintf("(%d)", count)
+	if state == domain.RelatedDeferred {
+		return ""
+	}
+	return "(?)"
 }
 
 // NoopChecker is a stub RelatedChecker suitable for tests that exercise

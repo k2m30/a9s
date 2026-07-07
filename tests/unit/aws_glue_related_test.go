@@ -10,6 +10,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -150,7 +151,7 @@ func TestRelated_Glue_Role_CacheMissNoClients(t *testing.T) {
 	checker := glueCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -249,7 +250,7 @@ func TestRelated_Glue_Alarms_CacheMissNoClients(t *testing.T) {
 	checker := glueCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -263,7 +264,7 @@ func TestRelated_Glue_CFN_Unknown(t *testing.T) {
 	}
 	checker := glueCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (tags need GetTags enrichment)", result.Count)
 	}
 	if result.TargetType != "cfn" {
@@ -327,7 +328,7 @@ func TestRelated_Glue_Logs_CacheMissNoClients(t *testing.T) {
 	checker := glueCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
 	}
 }
@@ -384,7 +385,7 @@ func TestRelated_Glue_S3_InvalidRawStruct(t *testing.T) {
 	checker := glueCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
 	}
 }
@@ -464,7 +465,7 @@ func TestRelated_Glue_Secrets_InvalidRawStruct(t *testing.T) {
 	checker := glueCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
 	}
 }
@@ -519,7 +520,7 @@ func TestRelated_Glue_Athena_CacheMissNoClients(t *testing.T) {
 	checker := glueCheckerByTarget(t, "athena")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
 	}
 }
@@ -534,7 +535,7 @@ func TestRelated_Glue_KMS_InvalidRawStruct(t *testing.T) {
 	source := resource.Resource{ID: "acme-etl-job", RawStruct: "not-a-job"}
 	checker := glueCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (bad raw struct)", result.Count)
 	}
 }
@@ -565,7 +566,7 @@ func TestRelated_Glue_KMS_NilClientsReturnsMinusOne(t *testing.T) {
 	}
 	checker := glueCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -640,7 +641,7 @@ func TestRelated_Glue_CFN_GlueDoesNotImplementGetTagsReturnsMinusOne(t *testing.
 	}
 	checker := glueCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (Glue client lacks GetTags)", result.Count)
 	}
 }

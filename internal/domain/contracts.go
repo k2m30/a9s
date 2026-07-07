@@ -120,11 +120,16 @@ type RelatedChecker func(ctx context.Context, clients any, res Resource, cache R
 // RelatedCheckResult is returned by a RelatedChecker.
 // Kept here alongside RelatedChecker to avoid a circular dependency.
 type RelatedCheckResult struct {
-	TargetType  string
-	Count       int      // -1 = unknown; 0+ = count
+	TargetType string
+	// State classifies how Count should be interpreted; see RelatedRowState.
+	// The zero value (RelatedResolved) means Count (0..N) is authoritative.
+	State       RelatedRowState
+	Count       int      // authoritative only when State == RelatedResolved
 	ResourceIDs []string // IDs of found related resources
 	Err         error
 	FetchFilter map[string]string
+	// Approximate stays orthogonal to State: it modifies a RelatedResolved
+	// result derived from a truncated cache page ("N+"), never the other states.
 	Approximate bool
 }
 

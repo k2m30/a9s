@@ -8,6 +8,7 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -50,7 +51,7 @@ func TestRelated_Policy_Role_NilClients(t *testing.T) {
 	}
 	checker := checkerByTarget(t, "policy", "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no clients)", result.Count)
 	}
 	if result.TargetType != "role" {
@@ -66,7 +67,7 @@ func TestRelated_Policy_Role_EmptyARN(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "role")
 	// nil clients: must return -1, not panic
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -85,7 +86,7 @@ func TestRelated_Policy_IAMUser_EmptyARN(t *testing.T) {
 	}
 	checker := checkerByTarget(t, "policy", "iam-user")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -104,7 +105,7 @@ func TestRelated_Policy_IAMGroup_EmptyARN(t *testing.T) {
 	}
 	checker := checkerByTarget(t, "policy", "iam-group")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

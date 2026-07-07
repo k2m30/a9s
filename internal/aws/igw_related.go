@@ -24,7 +24,7 @@ func checkIGWVPC(_ context.Context, _ any, res resource.Resource, cache resource
 
 	entry, hasEntry := cache["vpc"]
 	if !hasEntry {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	for _, vpcRes := range entry.Resources {
 		if vpcRes.ID == vpcID {
@@ -51,10 +51,10 @@ func checkIGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 
 	rtbList, truncated, err := igwRelatedResources(ctx, clients, cache, "rtb")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1, Err: err}
+		return resource.ErrorRelated("rtb", err)
 	}
 	if rtbList == nil {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1}
+		return resource.UnknownRelated("rtb")
 	}
 
 	var ids []string

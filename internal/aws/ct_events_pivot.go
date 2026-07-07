@@ -26,9 +26,9 @@ type CTEventsPivotConfig struct {
 //  2. Returns Count=0 immediately when the extracted ID is empty.
 //  3. Reads the "ct-events" entry from the cache (or fetches the first page via
 //     FetchRelatedTarget when the entry is absent).
-//  4. Returns Count=-1 when the event list cannot be loaded (error, nil list).
-//  5. Returns Count=-1 when the cache is truncated (partial window — actual count
-//     may exceed what is visible).
+//  4. Returns an error/unknown result when the event list cannot be loaded (error, nil list).
+//  5. Returns a deferred result when the cache is truncated (partial window —
+//     actual count may exceed what is visible).
 //  6. Counts events that reference the extracted ID via typed
 //     cloudtrailtypes.Event.Resources[].ResourceName (authoritative path) or the
 //     Fields["resource_name"] text fallback for resources without a typed RawStruct.
@@ -45,10 +45,12 @@ func BuildCTEventsPivotChecker(cfg CTEventsPivotConfig) resource.RelatedChecker 
 
 		eventList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "ct-events")
 		if err != nil {
-			return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err, FetchFilter: fetchFilter}
+			r := resource.ErrorRelated("ct-events", err)
+			r.FetchFilter = fetchFilter
+			return r
 		}
 		if eventList == nil {
-			return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
+			return resource.DeferredRelated("ct-events", fetchFilter)
 		}
 
 		var ids []string
@@ -73,7 +75,7 @@ func BuildCTEventsPivotChecker(cfg CTEventsPivotConfig) resource.RelatedChecker 
 		}
 
 		if truncated {
-			return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
+			return resource.DeferredRelated("ct-events", fetchFilter)
 		}
 
 		result := relatedResult("ct-events", ids)

@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
@@ -45,7 +45,7 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 
 	alarmList, truncated, err := redisRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
 		// Nil list from an unregistered / empty target cache is an honest zero,
@@ -96,7 +96,7 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ElastiCache == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	arn := *rg.ARN
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticache.ListTagsForResourceOutput, error) {
@@ -105,7 +105,7 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	stackName := ""
 	for _, tag := range out.TagList {
@@ -120,7 +120,7 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 
 	cfnList, truncated, err := redisRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
 		return resource.ApproximateZero("cfn")
@@ -170,7 +170,7 @@ func checkRedisCtEvents(ctx context.Context, clients any, res resource.Resource,
 
 	evList, truncated, err := redisRelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err}
+		return resource.ErrorRelated("ct-events", err)
 	}
 	if evList == nil {
 		return resource.ApproximateZero("ct-events")
@@ -246,7 +246,7 @@ func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cac
 
 	logList, truncated, err := redisRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
 		return resource.ApproximateZero("logs")
@@ -296,7 +296,7 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 
 	secretList, truncated, err := redisRelatedResources(ctx, clients, cache, "secrets")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
+		return resource.ErrorRelated("secrets", err)
 	}
 	if secretList == nil {
 		return resource.ApproximateZero("secrets")
@@ -343,7 +343,7 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	sgList, truncated, err := redisRelatedResources(ctx, clients, cache, "sg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1, Err: err}
+		return resource.ErrorRelated("sg", err)
 	}
 
 	var sgIDs []string
@@ -390,7 +390,7 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 
 	snsList, truncated, err := redisRelatedResources(ctx, clients, cache, "sns")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: err}
+		return resource.ErrorRelated("sns", err)
 	}
 	if snsList == nil {
 		return resource.ApproximateZero("sns")
@@ -430,7 +430,7 @@ func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, c
 
 	subnetList, truncated, err := redisRelatedResources(ctx, clients, cache, "subnet")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1, Err: err}
+		return resource.ErrorRelated("subnet", err)
 	}
 
 	var subnetIDs []string

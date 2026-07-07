@@ -23,6 +23,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -101,7 +102,7 @@ func TestDBI_Related_SG_NilRawStruct(t *testing.T) {
 	res := resource.Resource{ID: "x", RawStruct: nil}
 	checker := dbiCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 for nil RawStruct", result.Count)
 	}
 }
@@ -509,7 +510,7 @@ func TestDBI_Related_ENI_NilEC2Client(t *testing.T) {
 	clients := &awsclient.ServiceClients{EC2: nil}
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 for nil EC2 client", result.Count)
 	}
 }
@@ -588,10 +589,11 @@ func TestDBI_Related_CTEvents_NoMatchEmptyCache(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	// -1 = unknown (cache miss, no clients) OR FetchFilter set for navigation.
-	// Either is acceptable; the key invariant is Count != 0 (0 would claim definite absence).
-	if result.Count == 0 {
-		t.Errorf("Count = 0 on empty cache — should be -1 (unknown) when cache has no ct-events entry")
+	// RelatedUnknown (cache miss, no clients) OR RelatedDeferred (FetchFilter set
+	// for navigation) is acceptable; the key invariant is the result must not be
+	// a definite RelatedResolved zero (which would claim definite absence).
+	if result.State == domain.RelatedResolved {
+		t.Errorf("State = RelatedResolved (Count=%d) on empty cache — should be RelatedUnknown or RelatedDeferred when cache has no ct-events entry", result.Count)
 	}
 	if result.FetchFilter == nil || result.FetchFilter["ResourceName"] != fixtures.ProdDbiID {
 		t.Errorf("FetchFilter[ResourceName] = %q, want %q even on cache miss", result.FetchFilter["ResourceName"], fixtures.ProdDbiID)

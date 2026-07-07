@@ -10,8 +10,8 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // fullIntegrationNewDemoScenarioWithWave1 builds a demo scenario that has
@@ -182,11 +182,11 @@ func TestFourRules_Demo_R1_SpecificTypesShowIssueCounts(t *testing.T) {
 	pins := []string{
 		"EC2 Instances (27) issues:12",
 		"ECS Services (25) issues:6",
-		"DB Instances (41) issues:34",
+		"DB Instances (44) issues:37",
 		"EBS Volumes (8) issues:5",
 		"Elastic Beanstalk (7) issues:4",
 		"EBS Snapshots (9) issues:4",
-		"EKS Clusters (5) issues:3",
+		"EKS Clusters (6) issues:4",
 		"ElastiCache Redis (12) issues:9",
 		"DB Clusters (13) issues:10",
 		"EFS File Systems (9) issues:7",

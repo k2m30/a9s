@@ -17,7 +17,7 @@ import (
 func checkDdbKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	table, ok := assertStruct[ddbtypes.TableDescription](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	if table.SSEDescription == nil || table.SSEDescription.KMSMasterKeyArn == nil {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
@@ -42,7 +42,7 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 
 	alarmList, truncated, err := ddbRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
 		return resource.ApproximateZero("alarm")
@@ -84,7 +84,7 @@ func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	backupList, truncated, err := ddbRelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
+		return resource.ErrorRelated("backup", err)
 	}
 	if backupList == nil {
 		return resource.ApproximateZero("backup")
@@ -114,17 +114,17 @@ func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.DynamoDB == nil {
-		return resource.RelatedCheckResult{TargetType: "kinesis", Count: -1}
+		return resource.UnknownRelated("kinesis")
 	}
 	api, ok := c.DynamoDB.(DynamoDBDescribeKinesisStreamingDestinationAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kinesis", Count: -1}
+		return resource.UnknownRelated("kinesis")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
 		return api.DescribeKinesisStreamingDestination(ctx, &dynamodb.DescribeKinesisStreamingDestinationInput{TableName: &tableName})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "kinesis", Count: -1, Err: err}
+		return resource.ErrorRelated("kinesis", err)
 	}
 	var ids []string
 	for _, dest := range out.KinesisDataStreamDestinations {
@@ -162,12 +162,12 @@ func ddbRelatedResources(ctx context.Context, clients any, cache resource.Resour
 // (Pattern A — live API). DDB Streams are consumed through
 // lambda:ListEventSourceMappings; the EventSourceArn on each mapping matches
 // the table's LatestStreamArn. Lambda FunctionConfiguration does not embed
-// event-source info, so there is no cache-only path. Returns Count: -1 when
-// no live clients are available.
+// event-source info, so there is no cache-only path. Returns an unknown
+// result when no live clients are available.
 func checkDdbLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	table, ok := assertStruct[ddbtypes.TableDescription](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 	if table.LatestStreamArn == nil || *table.LatestStreamArn == "" {
 		// Streams not enabled on this table — no Lambda triggers are possible.
@@ -176,13 +176,13 @@ func checkDdbLambda(ctx context.Context, clients any, res resource.Resource, _ r
 	streamARN := *table.LatestStreamArn
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.Lambda == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 	out, err := c.Lambda.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
 		EventSourceArn: &streamARN,
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	var ids []string
 	for _, m := range out.EventSourceMappings {

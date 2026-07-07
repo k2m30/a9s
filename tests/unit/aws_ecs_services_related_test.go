@@ -16,6 +16,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -126,7 +127,7 @@ func TestRelated_ECSSvc_TargetGroups_InvalidRawStruct(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
 	}
 }
@@ -218,7 +219,7 @@ func TestRelated_ECSSvc_Alarms_CacheMissNoClients(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -333,7 +334,7 @@ func TestRelated_ECSSvc_CFN_CacheMissNoClients(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -593,7 +594,7 @@ func TestRelated_ECSSvc_SFN_WrongRawStruct(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "sfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -720,7 +721,7 @@ func TestRelated_ECSSvc_ECR_NoClient(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), nil, ecsSvcWithTaskDef("api-service", taskDefARN), resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no ECS client)", result.Count)
 	}
 }
@@ -735,7 +736,7 @@ func TestRelated_ECSSvc_ECR_WrongRawStruct(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -857,7 +858,7 @@ func TestRelated_ECSSvc_Secrets_NoClient(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, ecsSvcWithTaskDef("api-service", taskDefARN), resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no ECS client)", result.Count)
 	}
 }
@@ -966,7 +967,7 @@ func TestRelated_ECSSvc_CTEvents_CacheMissNoClients(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
 	}
 }
@@ -1054,7 +1055,7 @@ func TestRelated_ECSSvc_Tasks_CacheMissNoClients(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
 	}
 }
@@ -1125,7 +1126,7 @@ func TestRelated_ECSSvc_Subnet_InvalidRawStruct(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
 	}
 }
@@ -1208,7 +1209,7 @@ func TestRelated_ECSSvc_VPC_CacheMissNoClients(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (subnet cache miss, no clients)", result.Count)
 	}
 }
@@ -1291,7 +1292,7 @@ func TestRelated_ECSSvc_SG_WrongRawStruct(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -1391,7 +1392,7 @@ func TestRelated_ECSSvc_Logs_NilCache(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache, nil clients)", result.Count)
 	}
 }

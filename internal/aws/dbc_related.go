@@ -114,7 +114,7 @@ func dbcClusterMasterSecretARN(raw any) string {
 func checkDbcSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids, ok := dbcClusterVpcSecurityGroupIDs(res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 	if len(ids) == 0 {
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
@@ -133,7 +133,7 @@ func checkDbcAlarm(ctx context.Context, clients any, res resource.Resource, cach
 
 	alarmList, truncated, err := dbcRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
 		return resource.ApproximateZero("alarm")
@@ -169,7 +169,7 @@ func checkDbcLogs(ctx context.Context, clients any, res resource.Resource, cache
 
 	logList, truncated, err := dbcRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
 		return resource.ApproximateZero("logs")
@@ -218,7 +218,7 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 
 	dbiList, truncated, err := dbcRelatedResources(ctx, clients, cache, "dbi")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1, Err: err}
+		return resource.ErrorRelated("dbi", err)
 	}
 	if dbiList == nil {
 		return resource.ApproximateZero("dbi")
@@ -255,7 +255,7 @@ func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, ca
 
 	snapList, truncated, err := dbcRelatedResources(ctx, clients, cache, "dbc-snap")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "dbc-snap", Count: -1, Err: err}
+		return resource.ErrorRelated("dbc-snap", err)
 	}
 	if snapList == nil {
 		return resource.ApproximateZero("dbc-snap")
@@ -289,7 +289,7 @@ func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, ca
 func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sng := dbcSubnetGroup(ctx, clients, res)
 	if sng == nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	var ids []string
 	for _, s := range sng.Subnets {
@@ -306,7 +306,7 @@ func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 func checkDbcVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sng := dbcSubnetGroup(ctx, clients, res)
 	if sng == nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	if sng.VpcId == nil || *sng.VpcId == "" {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
@@ -401,7 +401,7 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 
 	secretList, truncated, err := dbcRelatedResources(ctx, clients, cache, "secrets")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
+		return resource.ErrorRelated("secrets", err)
 	}
 	if secretList == nil {
 		return resource.ApproximateZero("secrets")

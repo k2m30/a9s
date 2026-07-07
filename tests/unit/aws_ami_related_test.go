@@ -8,6 +8,7 @@ import (
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -69,7 +70,7 @@ func TestRelated_AMI_EC2_CacheMissNoClients(t *testing.T) {
 	checker := amiCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -128,7 +129,7 @@ func TestRelated_AMI_EBSSnaps_InvalidRawStruct(t *testing.T) {
 	checker := amiCheckerByTarget(t, "ebs-snap")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
 	}
 }
@@ -226,7 +227,7 @@ func TestRelated_AMI_ASG_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{ID: "ami-0abc1234def56789"}
 	checker := amiCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -320,7 +321,7 @@ func TestRelated_AMI_CFN_CacheMissNoClients(t *testing.T) {
 	checker := amiCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
 	}
 }
@@ -396,7 +397,7 @@ func TestRelated_AMI_KMS_InvalidRawStruct(t *testing.T) {
 	checker := amiCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
 	}
 }
@@ -472,7 +473,7 @@ func TestRelated_AMI_NG_CacheMissNoClients(t *testing.T) {
 	checker := amiCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
 	}
 }

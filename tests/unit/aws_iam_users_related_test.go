@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -25,7 +26,7 @@ func TestRelated_IAMUser_IAMGroup_NilClients(t *testing.T) {
 	}
 	checker := checkerByTarget(t, "iam-user", "iam-group")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no clients)", result.Count)
 	}
 	if result.TargetType != "iam-group" {
@@ -41,7 +42,7 @@ func TestRelated_IAMUser_IAMGroup_EmptyID(t *testing.T) {
 	checker := checkerByTarget(t, "iam-user", "iam-group")
 	// nil clients must return -1, not panic
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

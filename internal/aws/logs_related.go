@@ -33,10 +33,10 @@ func checkLogsLambda(ctx context.Context, clients any, res resource.Resource, ca
 
 	lambdaList, truncated, err := logsRelatedResources(ctx, clients, cache, "lambda")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	if lambdaList == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 
 	var ids []string
@@ -61,10 +61,10 @@ func checkLogsAlarms(ctx context.Context, clients any, res resource.Resource, ca
 
 	alarmList, truncated, err := logsRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -118,10 +118,10 @@ func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cac
 
 	apiList, truncated, err := logsRelatedResources(ctx, clients, cache, "apigw")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: -1, Err: err}
+		return resource.ErrorRelated("apigw", err)
 	}
 	if apiList == nil {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: -1}
+		return resource.UnknownRelated("apigw")
 	}
 	var ids []string
 	for _, api := range apiList {
@@ -156,10 +156,10 @@ func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, c
 
 	taskList, truncated, err := logsRelatedResources(ctx, clients, cache, "ecs-task")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1, Err: err}
+		return resource.ErrorRelated("ecs-task", err)
 	}
 	if taskList == nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
+		return resource.UnknownRelated("ecs-task")
 	}
 	var ids []string
 	for _, taskRes := range taskList {
@@ -215,7 +215,7 @@ func checkLogsKinesis(ctx context.Context, clients any, res resource.Resource, _
 		// Distinguish "no filters" from "API failed / cannot call".
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil || c.CloudWatchLogs == nil {
-			return resource.RelatedCheckResult{TargetType: "kinesis", Count: -1}
+			return resource.UnknownRelated("kinesis")
 		}
 		return resource.RelatedCheckResult{TargetType: "kinesis", Count: 0}
 	}
@@ -242,7 +242,7 @@ func checkLogsS3(ctx context.Context, clients any, res resource.Resource, _ reso
 	if filters == nil {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil || c.CloudWatchLogs == nil {
-			return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+			return resource.UnknownRelated("s3")
 		}
 		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
 	}

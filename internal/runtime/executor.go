@@ -664,11 +664,8 @@ func (c *Core) runRelatedCheckers(
 
 		var checkResult resource.RelatedCheckResult
 		if def.Checker == nil {
-			// No checker: unknown count (-1) so the row shows "?" not 0.
-			checkResult = resource.RelatedCheckResult{
-				TargetType: def.TargetType,
-				Count:      -1,
-			}
+			// No checker: unknown state so the row shows "?" not 0.
+			checkResult = resource.UnknownRelated(def.TargetType)
 		} else {
 			checkResult = def.Checker(ctx, c.session.Clients, res, resource.ResourceCache(localSnapToCache(localSnap)))
 			checkResult.TargetType = def.TargetType

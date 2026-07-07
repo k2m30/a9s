@@ -3,8 +3,9 @@
 // re-dispatches the related-check recompute that owner decision #38
 // (2026-07-06) requires.
 //
-// #38 made a transient "(?)" related row (Count==-1, no FetchFilter — see
-// resource.IsRelatedActionable) actionable in every renderer: Enter/select on
+// #38 made a transient "(?)" related row (State: RelatedUnknown, no
+// FetchFilter — see resource.IsRelatedActionable) actionable in every
+// renderer: Enter/select on
 // such a row opens the target type's plain top-level list, the same
 // navigation a menu entry would produce. Returning to the source detail must
 // then RECOMPUTE that pivot's count now that the target's cache is warm — but
@@ -43,6 +44,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 )
@@ -116,7 +118,7 @@ func TestActionBack_AfterTransientUnknownRelatedDrill_RedispatchesRelatedCheck(t
 	ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenDetail}})
 	ctrl.EnsureDetailState(ngRes, "ng")
 	ctrl.InitDetailRelatedRows("ng")
-	ctrl.ApplyDetailRelatedResultForResource("ng", ngRes.ID, ebsDef.DisplayName, "ebs", -1, false, "", false, nil, nil)
+	ctrl.ApplyDetailRelatedResultForResource("ng", ngRes.ID, ebsDef.DisplayName, "ebs", domain.RelatedUnknown, 0, false, "", false, nil, nil)
 
 	preDrill := ctrl.Snapshot()
 	if preDrill.Body.Detail == nil || len(preDrill.Body.Detail.Related) != 1 {

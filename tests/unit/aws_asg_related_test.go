@@ -16,6 +16,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -183,7 +184,7 @@ func TestRelated_ASG_Alarm_NilCache(t *testing.T) {
 	checker := asgCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
 	}
 }
@@ -297,7 +298,7 @@ func TestRelated_ASG_NG_NilCache(t *testing.T) {
 	checker := asgCheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
 	}
 }
@@ -370,7 +371,7 @@ func TestRelated_ASG_EC2_NoRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no RawStruct)", result.Count)
 	}
 }
@@ -504,7 +505,7 @@ func TestRelated_ASG_Subnets_NoRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no RawStruct)", result.Count)
 	}
 }
@@ -594,7 +595,7 @@ func TestRelated_ASG_AMI_WrongRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "ami")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -663,7 +664,7 @@ func TestRelated_ASG_ELB_WrongRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -802,7 +803,7 @@ func TestRelated_ASG_Role_WrongRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -883,7 +884,7 @@ func TestRelated_ASG_SG_WrongRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -967,7 +968,7 @@ func TestRelated_ASG_SNS_WrongRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -1051,7 +1052,7 @@ func TestRelated_ASG_VPC_WrongRawStruct(t *testing.T) {
 	checker := asgCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }

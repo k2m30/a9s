@@ -24,10 +24,10 @@ func checkMSKAlarms(ctx context.Context, clients any, res resource.Resource, cac
 
 	alarmList, truncated, err := mskRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -54,7 +54,7 @@ func checkMSKAlarms(ctx context.Context, clients any, res resource.Resource, cac
 func checkMSKSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 	if cluster.Provisioned == nil || cluster.Provisioned.BrokerNodeGroupInfo == nil {
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
@@ -85,7 +85,7 @@ func checkMSKLambda(ctx context.Context, clients any, res resource.Resource, cac
 func checkMSKCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	stackName := cluster.Tags["aws:cloudformation:stack-name"]
 	if stackName == "" {
@@ -94,10 +94,10 @@ func checkMSKCFN(ctx context.Context, clients any, res resource.Resource, cache 
 
 	cfnList, truncated, err := mskRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 
 	var ids []string
@@ -122,7 +122,7 @@ func checkMSKCFN(ctx context.Context, clients any, res resource.Resource, cache 
 func checkMSKSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	if cluster.Provisioned == nil || cluster.Provisioned.BrokerNodeGroupInfo == nil {
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
@@ -137,7 +137,7 @@ func checkMSKSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	if cluster.Provisioned == nil || cluster.Provisioned.BrokerNodeGroupInfo == nil {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
@@ -149,10 +149,10 @@ func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache 
 
 	subnetList, _, err := mskRelatedResources(ctx, clients, cache, "subnet")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1, Err: err}
+		return resource.ErrorRelated("vpc", err)
 	}
 	if subnetList == nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 
 	want := subnets[0]
@@ -166,7 +166,7 @@ func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 		return relatedResult("vpc", []string{*sn.VpcId})
 	}
-	return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+	return resource.UnknownRelated("vpc")
 }
 
 // checkMSKLogs would resolve the CloudWatch log group configured for broker
@@ -176,7 +176,7 @@ func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache 
 func checkMSKLogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 	if cluster.Provisioned == nil ||
 		cluster.Provisioned.LoggingInfo == nil ||
@@ -196,7 +196,7 @@ func checkMSKLogs(_ context.Context, _ any, res resource.Resource, _ resource.Re
 func checkMSKS3(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 	if cluster.Provisioned == nil ||
 		cluster.Provisioned.LoggingInfo == nil ||
@@ -221,17 +221,17 @@ func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.MSK == nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.UnknownRelated("secrets")
 	}
 	scramAPI, ok := c.MSK.(MSKListScramSecretsAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.UnknownRelated("secrets")
 	}
 	out, err := scramAPI.ListScramSecrets(ctx, &kafka.ListScramSecretsInput{
 		ClusterArn: aws.String(*cluster.ClusterArn),
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
+		return resource.ErrorRelated("secrets", err)
 	}
 	var ids []string
 	for _, arn := range out.SecretArnList {

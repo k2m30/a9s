@@ -17,6 +17,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -518,7 +519,7 @@ func TestRelated_EC2_TG_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
 	}
 }
@@ -604,7 +605,7 @@ func TestRelated_EC2_ASG_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
 	}
 }
@@ -694,7 +695,7 @@ func TestRelated_EC2_Alarm_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
 	}
 }
@@ -789,7 +790,7 @@ func TestRelated_EC2_CFN_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
 	}
 }
@@ -876,7 +877,7 @@ func TestRelated_EC2_EIP_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "eip")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
 	}
 }
@@ -971,7 +972,7 @@ func TestRelated_EC2_EBSSnap_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ebs-snap")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
 	}
 }
@@ -1072,7 +1073,7 @@ func TestRelated_EC2_NG_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ng")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
 	}
 }
@@ -1163,7 +1164,7 @@ func TestRelated_EC2_CTEvents_CacheMissNoClients(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown, empty cache)", result.Count)
 	}
 }
@@ -1244,7 +1245,7 @@ func TestRelated_EC2_SSM_WrongRawStruct(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "ssm")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients, non-Instance RawStruct)", result.Count)
 	}
 }

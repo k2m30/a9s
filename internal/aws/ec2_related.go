@@ -32,10 +32,10 @@ func checkEC2TargetGroups(ctx context.Context, clients any, res resource.Resourc
 	}
 	tgList, truncated, err := ec2RelatedResources(ctx, clients, cache, "tg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1, Err: err}
+		return resource.ErrorRelated("tg", err)
 	}
 	if tgList == nil {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+		return resource.UnknownRelated("tg")
 	}
 	var ids []string
 	for _, tgRes := range tgList {
@@ -74,10 +74,10 @@ func checkEC2ASG(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	asgList, truncated, err := ec2RelatedResources(ctx, clients, cache, "asg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
+		return resource.ErrorRelated("asg", err)
 	}
 	if asgList == nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.UnknownRelated("asg")
 	}
 	var ids []string
 	for _, asgRes := range asgList {
@@ -109,10 +109,10 @@ func checkEC2Alarms(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	alarmList, truncated, err := ec2RelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 	var ids []string
 	for _, alarmRes := range alarmList {
@@ -144,10 +144,10 @@ func checkEC2CFN(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	cfnList, truncated, err := ec2RelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -177,10 +177,10 @@ func checkEC2EIP(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	eipList, truncated, err := ec2RelatedResources(ctx, clients, cache, "eip")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: -1, Err: err}
+		return resource.ErrorRelated("eip", err)
 	}
 	if eipList == nil {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: -1}
+		return resource.UnknownRelated("eip")
 	}
 	var ids []string
 	for _, eipRes := range eipList {
@@ -213,7 +213,7 @@ func checkEC2EBS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 }
 
 // checkEC2NodeGroups checks for EKS node groups associated with this EC2 instance.
-// Returns Count=-1 (unknown) when the cache is truncated and no match was found
+// Returns an unknown result when the cache is truncated and no match was found
 // in the partial list.
 func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.RawStruct == nil {
@@ -231,10 +231,10 @@ func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource,
 	}
 	ngList, truncated, err := ec2RelatedResources(ctx, clients, cache, "ng")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1, Err: err}
+		return resource.ErrorRelated("ng", err)
 	}
 	if ngList == nil {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1}
+		return resource.UnknownRelated("ng")
 	}
 	var ids []string
 	for _, ngRes := range ngList {
@@ -266,7 +266,7 @@ func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource,
 }
 
 // checkEC2CloudTrailEvents checks cached CloudTrail events for references to the
-// instance. Returns Count=-1 (unknown) when the cache is truncated — the partial
+// instance. Returns an unknown result when the cache is truncated — the partial
 // list cannot yield a definitive count. FetchFilter["ResourceName"] is always set
 // so the caller can do a filtered re-fetch.
 func checkEC2CloudTrailEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -276,10 +276,10 @@ func checkEC2CloudTrailEvents(ctx context.Context, clients any, res resource.Res
 	}
 	eventList, truncated, err := ec2RelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err}
+		return resource.ErrorRelated("ct-events", err)
 	}
 	if eventList == nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.UnknownRelated("ct-events")
 	}
 	var ids []string
 	for _, eventRes := range eventList {
@@ -297,7 +297,7 @@ func checkEC2CloudTrailEvents(ctx context.Context, clients any, res resource.Res
 	fetchFilter := map[string]string{"ResourceName": instanceID}
 	if truncated {
 		// Cache is partial — the filtered fetch will determine the real count.
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
+		return resource.DeferredRelated("ct-events", fetchFilter)
 	}
 	result := relatedResult("ct-events", ids)
 	result.FetchFilter = fetchFilter
@@ -312,10 +312,10 @@ func checkEC2EBSSnap(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	snapList, truncated, err := ec2RelatedResources(ctx, clients, cache, "ebs-snap")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: -1, Err: err}
+		return resource.ErrorRelated("ebs-snap", err)
 	}
 	if snapList == nil {
-		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: -1}
+		return resource.UnknownRelated("ebs-snap")
 	}
 	var ids []string
 	for _, snapRes := range snapList {
@@ -339,7 +339,7 @@ func checkEC2EBSSnap(ctx context.Context, clients any, res resource.Resource, ca
 func checkEC2SG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Instance](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 	var ids []string
 	for _, sg := range raw.SecurityGroups {
@@ -352,8 +352,8 @@ func checkEC2SG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 
 // ec2RelatedResources returns the resource list for target from cache or by
 // fetching the first page. Returns (resources, isTruncated, error).
-// isTruncated=true means the list is partial; callers should return Count=-1
-// when 0 matches are found in a truncated list.
+// isTruncated=true means the list is partial; callers should return an
+// UnknownRelated result when 0 matches are found in a truncated list.
 func ec2RelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	// When AWS clients are not initialized (nil or wrong type), the registered
@@ -418,11 +418,11 @@ func checkEC2SSM(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.SSM == nil {
-		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1}
+		return resource.UnknownRelated("ssm")
 	}
 	api, ok := c.SSM.(SSMDescribeInstanceInformationAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1}
+		return resource.UnknownRelated("ssm")
 	}
 	filterKey := "InstanceIds"
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ssm.DescribeInstanceInformationOutput, error) {
@@ -433,7 +433,7 @@ func checkEC2SSM(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1, Err: err}
+		return resource.ErrorRelated("ssm", err)
 	}
 	if len(out.InstanceInformationList) == 0 {
 		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
@@ -511,7 +511,7 @@ func checkEC2Role(ctx context.Context, clients any, res resource.Resource, cache
 
 	roleList, truncated, err := ec2RelatedResources(ctx, clients, cache, "role")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	for _, roleRes := range roleList {
 		if roleRes.Name == profileName || roleRes.Fields["role_name"] == profileName {
@@ -535,7 +535,7 @@ func checkEC2Role(ctx context.Context, clients any, res resource.Resource, cache
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	if out == nil || out.InstanceProfile == nil || len(out.InstanceProfile.Roles) == 0 {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}

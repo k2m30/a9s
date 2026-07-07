@@ -15,6 +15,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -156,7 +157,7 @@ func TestRelated_Eb_ELB_WrongRawStruct(t *testing.T) {
 	checker := ebCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -271,7 +272,7 @@ func TestRelated_Eb_Role_WrongRawStruct(t *testing.T) {
 	checker := ebCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -373,7 +374,7 @@ func TestRelated_Eb_S3_WrongRawStruct(t *testing.T) {
 	checker := ebCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -480,7 +481,7 @@ func TestRelated_Eb_SG_WrongRawStruct(t *testing.T) {
 	checker := ebCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -596,7 +597,7 @@ func TestRelated_Eb_TG_WrongRawStruct(t *testing.T) {
 	checker := ebCheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }

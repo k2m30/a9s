@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -17,9 +18,10 @@ import (
 type rightColumnRow struct {
 	targetType  string
 	displayName string
-	count       int               // -1 = loading, 0+ = resolved
-	resourceIDs []string          // IDs from checker result (for navigation in US3)
-	fetchFilter map[string]string // server-side filter for filtered paginated fetcher
+	state       domain.RelatedRowState // classifies how count should be interpreted
+	count       int                    // authoritative only when state == RelatedResolved
+	resourceIDs []string               // IDs from checker result (for navigation in US3)
+	fetchFilter map[string]string      // server-side filter for filtered paginated fetcher
 	loading     bool
 	err         error
 	approximate bool                    // true when count was derived from a truncated cache; UI renders "N+"
@@ -52,7 +54,7 @@ func newRightColumn(defs []resource.RelatedDef, parentRes resource.Resource, sou
 		rows[i] = rightColumnRow{
 			targetType:  def.TargetType,
 			displayName: def.DisplayName,
-			count:       -1,
+			state:       domain.RelatedLoading,
 			loading:     true,
 			checker:     def.Checker,
 		}
@@ -114,6 +116,7 @@ func (m RightColumnModel) Update(msg tea.Msg) (RightColumnModel, tea.Cmd) {
 		if targetIdx >= 0 {
 			m.rows[targetIdx].loading = false
 			m.rows[targetIdx].err = msg.Result.Err
+			m.rows[targetIdx].state = msg.Result.State
 			m.rows[targetIdx].count = msg.Result.Count
 			m.rows[targetIdx].resourceIDs = msg.Result.ResourceIDs
 			m.rows[targetIdx].fetchFilter = msg.Result.FetchFilter
@@ -218,9 +221,10 @@ func (m RightColumnModel) View() string {
 		row := m.rows[idx]
 		rows[i] = app.RelatedBlock{
 			Name:         row.displayName,
+			State:        row.state,
 			Loading:      row.loading,
 			Err:          row.err != nil,
-			CountDisplay: resource.FormatRelatedCount(row.count, len(row.fetchFilter) > 0),
+			CountDisplay: resource.FormatRelatedCount(row.state, row.count),
 			Actionable:   isActionableRow(row),
 		}
 		if idx == m.cursor {
@@ -279,7 +283,7 @@ func (m RightColumnModel) SelectedTypeName() string {
 // renderer all share one definition and cannot drift (see that func for the
 // per-case rationale).
 func isActionableRow(row rightColumnRow) bool {
-	return resource.IsRelatedActionable(row.count, row.approximate, len(row.fetchFilter) > 0, row.loading, row.err != nil)
+	return resource.IsRelatedActionable(row.state, row.count, row.approximate)
 }
 
 // isSelfPivotZeroRow reports whether a row is a self-pivot row (its TargetType equals

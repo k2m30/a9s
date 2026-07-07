@@ -28,10 +28,10 @@ func checkSSMKMS(ctx context.Context, clients any, res resource.Resource, cache 
 
 	kmsList, truncated, err := ssmRelatedResources(ctx, clients, cache, "kms")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+		return resource.ErrorRelated("kms", err)
 	}
 	if kmsList == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 
 	var ids []string

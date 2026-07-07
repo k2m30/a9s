@@ -9,6 +9,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -196,8 +197,8 @@ func TestRelated_VPCE_BadRawStruct(t *testing.T) {
 	for _, target := range targets {
 		checker := vpceCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, resource.ResourceCache{})
-		if result.Count != -1 && result.Count != 0 {
-			t.Errorf("target %q: Count = %d, want -1 or 0 for bad RawStruct", target, result.Count)
+		if result.State == domain.RelatedResolved && result.Count != 0 {
+			t.Errorf("target %q: State=%v Count=%d, want RelatedUnknown or a resolved 0 for bad RawStruct", target, result.State, result.Count)
 		}
 	}
 }
@@ -271,7 +272,7 @@ func TestRelated_VPCE_R53_NonEmptyID(t *testing.T) {
 	res := vpceSrcInterfaceResource()
 	checker := vpceCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (private zones via ListHostedZonesByVPC not in list response)", result.Count)
 	}
 }
@@ -348,7 +349,7 @@ func TestRelated_VPCE_Alarm_CacheMissNoClients(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
 	}
 }
@@ -375,7 +376,7 @@ func TestRelated_VPCE_Logs_NilClients(t *testing.T) {
 	checker := vpceCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

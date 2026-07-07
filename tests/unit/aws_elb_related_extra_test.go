@@ -21,6 +21,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -126,7 +127,7 @@ func TestRelated_ELB_SG_WrongRawStruct(t *testing.T) {
 	checker := elbCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -320,7 +321,7 @@ func TestRelated_ELB_ACM_NilClients(t *testing.T) {
 	checker := elbCheckerByTarget(t, "acm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -572,7 +573,7 @@ func TestRelated_ELB_Subnet_WrongRawStruct(t *testing.T) {
 	checker := elbCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }

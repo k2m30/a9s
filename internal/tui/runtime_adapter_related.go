@@ -368,6 +368,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 							r.ID,
 							relMsg.DefDisplayName,
 							relMsg.Result.TargetType,
+							relMsg.Result.State,
 							relMsg.Result.Count,
 							false,
 							errMsg,
@@ -542,7 +543,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 						ResourceType:     res.Type,
 						SourceResourceID: res.ID,
 						DefDisplayName:   def.DisplayName,
-						Result:           resource.RelatedCheckResult{TargetType: def.TargetType, Count: -1},
+						Result:           resource.UnknownRelated(def.TargetType),
 						Generation:       gen,
 					}
 				}
@@ -552,7 +553,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 					ResourceType:     res.Type,
 					SourceResourceID: res.ID,
 					DefDisplayName:   def.DisplayName,
-					Result:           resource.RelatedCheckResult{TargetType: def.TargetType, Count: -1},
+					Result:           resource.UnknownRelated(def.TargetType),
 					Generation:       gen,
 				}
 			}

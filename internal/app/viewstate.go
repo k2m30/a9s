@@ -224,21 +224,24 @@ type AttentionBlock struct {
 
 // RelatedBlock is one related-resource panel entry.
 type RelatedBlock struct {
-	Name        string            `json:"name"`
-	Count       int               `json:"count"`
-	Items       []FieldRow        `json:"items,omitempty"`
-	Loading     bool              `json:"loading,omitempty"`
-	Err         bool              `json:"err,omitempty"`
-	Approximate bool              `json:"approximate,omitempty"`
-	FetchFilter map[string]string `json:"fetch_filter,omitempty"`
+	Name string `json:"name"`
+	// State classifies how Count should be interpreted; see domain.RelatedRowState.
+	State       domain.RelatedRowState `json:"state,omitempty"`
+	Count       int                    `json:"count"`
+	Items       []FieldRow             `json:"items,omitempty"`
+	Loading     bool                   `json:"loading,omitempty"`
+	Err         bool                   `json:"err,omitempty"`
+	Approximate bool                   `json:"approximate,omitempty"`
+	FetchFilter map[string]string      `json:"fetch_filter,omitempty"`
 	// TargetType is the canonical short name of the target resource type.
 	TargetType string `json:"target_type,omitempty"`
 	// Actionable is pre-computed by resource.IsRelatedActionable so the web
 	// template can use .Actionable directly without re-deriving the predicate.
 	Actionable bool `json:"actionable,omitempty"`
 	// CountDisplay is the pre-computed count badge from resource.FormatRelatedCount
-	// ("" for the unknown -1 sentinel, "(N)" for N>=0), so the web template
-	// renders it directly instead of re-deriving the format (which leaked "(-1)").
+	// ("" for RelatedDeferred, "(?)" for RelatedUnknown/RelatedLoading/RelatedError,
+	// "(N)" for RelatedResolved), so the web template renders it directly instead
+	// of re-deriving the format.
 	CountDisplay string `json:"count_display,omitempty"`
 }
 

@@ -32,10 +32,10 @@ func checkSGEC2(ctx context.Context, clients any, res resource.Resource, cache r
 
 	list, truncated, err := sgRelatedResources(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+		return resource.ErrorRelated("ec2", err)
 	}
 	if list == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 
 	var ids []string
@@ -67,10 +67,10 @@ func checkSGENI(ctx context.Context, clients any, res resource.Resource, cache r
 
 	list, truncated, err := sgRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1, Err: err}
+		return resource.ErrorRelated("eni", err)
 	}
 	if list == nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.UnknownRelated("eni")
 	}
 
 	var ids []string
@@ -102,10 +102,10 @@ func checkSGELB(ctx context.Context, clients any, res resource.Resource, cache r
 
 	list, truncated, err := sgRelatedResources(ctx, clients, cache, "elb")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+		return resource.ErrorRelated("elb", err)
 	}
 	if list == nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.UnknownRelated("elb")
 	}
 
 	var ids []string
@@ -129,7 +129,7 @@ func checkSGELB(ctx context.Context, clients any, res resource.Resource, cache r
 func checkSGCFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.SecurityGroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
 	if stackName == "" {
@@ -149,10 +149,10 @@ func checkSGSG(ctx context.Context, clients any, res resource.Resource, cache re
 
 	list, truncated, err := sgRelatedResources(ctx, clients, cache, "sg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1, Err: err}
+		return resource.ErrorRelated("sg", err)
 	}
 	if list == nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 
 	var ids []string
@@ -184,10 +184,10 @@ func checkSGLambda(ctx context.Context, clients any, res resource.Resource, cach
 
 	list, truncated, err := sgRelatedResources(ctx, clients, cache, "lambda")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	if list == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 
 	var ids []string

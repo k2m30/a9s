@@ -28,6 +28,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -173,7 +174,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 
 					// Classify the result.
 					isTypedHit := result.Count > 0
-					isPivot := result.Count == -1 && len(result.FetchFilter) > 0
+					isPivot := result.State == domain.RelatedDeferred
 					isNotActionable := result.Count == 0 && len(result.FetchFilter) == 0
 
 					if isNotActionable {
@@ -243,13 +244,13 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 					}
 
 					if isPivot {
-						// D3: Pivot row (Count=-1, FetchFilter non-empty, ResourceIDs empty)
-						// must dispatch RelatedNavigateMsg with non-empty FetchFilter and
-						// EMPTY RelatedIDs.
+						// D3: Pivot row (State: RelatedDeferred, FetchFilter non-empty,
+						// ResourceIDs empty) must dispatch RelatedNavigateMsg with
+						// non-empty FetchFilter and EMPTY RelatedIDs.
 						// This catches the actionability guard bug where len(resourceIDs)>0
 						// was checked instead of len(fetchFilter)>0.
 						if cmd == nil {
-							t.Errorf("D3 FAIL: pivot row (Count=-1, FetchFilter=%v) dispatched nil cmd"+
+							t.Errorf("D3 FAIL: pivot row (State: RelatedDeferred, FetchFilter=%v) dispatched nil cmd"+
 								" — right column actionability guard may be checking resourceIDs instead of fetchFilter — %s",
 								result.FetchFilter, label)
 							return

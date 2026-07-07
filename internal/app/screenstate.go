@@ -130,14 +130,16 @@ type DetailState struct {
 // DetailRelatedRow is one row in the detail screen's related panel, mirroring
 // rightColumnRow but as a serialisable value type (no funcs, no checker).
 type DetailRelatedRow struct {
-	TargetType  string            `json:"target_type"`
-	DisplayName string            `json:"display_name"`
-	Count       int               `json:"count"` // -1 = loading
-	Loading     bool              `json:"loading,omitempty"`
-	Err         string            `json:"err,omitempty"`
-	Approximate bool              `json:"approximate,omitempty"`
-	ResourceIDs []string          `json:"resource_ids,omitempty"`
-	FetchFilter map[string]string `json:"fetch_filter,omitempty"`
+	TargetType  string `json:"target_type"`
+	DisplayName string `json:"display_name"`
+	// State classifies how Count should be interpreted; see domain.RelatedRowState.
+	State       domain.RelatedRowState `json:"state,omitempty"`
+	Count       int                    `json:"count"` // authoritative only when State == RelatedResolved
+	Loading     bool                   `json:"loading,omitempty"`
+	Err         string                 `json:"err,omitempty"`
+	Approximate bool                   `json:"approximate,omitempty"`
+	ResourceIDs []string               `json:"resource_ids,omitempty"`
+	FetchFilter map[string]string      `json:"fetch_filter,omitempty"`
 }
 
 // TextState holds the mutable display state for a YAML/JSON text screen.

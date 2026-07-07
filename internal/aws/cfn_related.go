@@ -32,10 +32,10 @@ func checkCfnRole(ctx context.Context, clients any, res resource.Resource, cache
 
 	roleList, _, err := cfnRelatedResources(ctx, clients, cache, "role")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	if roleList == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 
 	var ids []string
@@ -58,10 +58,10 @@ func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache 
 
 	cfnList, truncated, err := cfnRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 
 	// Collect this stack's StackId for reverse lookup.
@@ -117,7 +117,7 @@ func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache 
 func checkCfnSNS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 	var ids []string
 	for _, arn := range stack.NotificationARNs {
@@ -167,7 +167,7 @@ func cfnStackResourcesByType(ctx context.Context, clients any, stackName, resour
 func checkCfnS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids, ok := cfnStackResourcesByType(ctx, clients, res.ID, "AWS::S3::Bucket")
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 	return relatedResult("s3", ids)
 }
@@ -178,7 +178,7 @@ func checkCfnS3(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkCfnEBRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids, ok := cfnStackResourcesByType(ctx, clients, res.ID, "AWS::Events::Rule")
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.UnknownRelated("eb-rule")
 	}
 	return relatedResult("eb-rule", ids)
 }

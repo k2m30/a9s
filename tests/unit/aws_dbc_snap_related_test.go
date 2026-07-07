@@ -10,6 +10,7 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -318,7 +319,7 @@ func TestRelated_DbcSnap_DBC_OrphanTruncated_DocDB(t *testing.T) {
 
 	// After fix: truncated cache + parent not found → UnknownRelated (Count=-1).
 	// FAILS today: Count=1 (no cache scan).
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf(
 			"checkDbcSnapDBC (docdb RawStruct): ghost cluster %q with truncated cache: "+
 				"Count = %d, want -1 (UnknownRelated) — DBC-SNAP-NO-CACHE-CHECK BUG: "+
@@ -340,7 +341,7 @@ func TestRelated_DbcSnap_DBC_OrphanTruncated_RDS(t *testing.T) {
 	checker := dbcSnapCheckerByTarget(t, "dbc")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf(
 			"checkDbcSnapDBC (rds RawStruct): ghost cluster %q with truncated cache: "+
 				"Count = %d, want -1 (UnknownRelated) — DBC-SNAP-NO-CACHE-CHECK BUG (RDS branch)",

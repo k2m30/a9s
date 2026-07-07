@@ -39,7 +39,7 @@ func checkTGELB(ctx context.Context, clients any, res resource.Resource, cache r
 
 	elbList, truncated, err := tgRelatedResources(ctx, clients, cache, "elb")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+		return resource.ErrorRelated("elb", err)
 	}
 	if elbList == nil {
 		// No ELB cache available — fall back to count from ARN slice.
@@ -81,10 +81,10 @@ func checkTGECSSvc(ctx context.Context, clients any, res resource.Resource, cach
 
 	svcList, truncated, err := tgRelatedResources(ctx, clients, cache, "ecs-svc")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: -1, Err: err}
+		return resource.ErrorRelated("ecs-svc", err)
 	}
 	if svcList == nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: -1}
+		return resource.UnknownRelated("ecs-svc")
 	}
 
 	var ids []string
@@ -116,10 +116,10 @@ func checkTGASG(ctx context.Context, clients any, res resource.Resource, cache r
 
 	asgList, truncated, err := tgRelatedResources(ctx, clients, cache, "asg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
+		return resource.ErrorRelated("asg", err)
 	}
 	if asgList == nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.UnknownRelated("asg")
 	}
 
 	var ids []string
@@ -148,10 +148,10 @@ func checkTGAlarm(ctx context.Context, clients any, res resource.Resource, cache
 
 	alarmList, truncated, err := tgRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	// Extract the TG suffix for dimension matching: "targetgroup/name/hash"
@@ -201,17 +201,17 @@ func checkTGCFN(ctx context.Context, clients any, res resource.Resource, _ resou
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	api, ok := c.ELBv2.(ELBv2DescribeTagsAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTagsOutput, error) {
 		return api.DescribeTags(ctx, &elbv2.DescribeTagsInput{ResourceArns: []string{arn}})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	for _, td := range out.TagDescriptions {
 		for _, tag := range td.Tags {
@@ -239,13 +239,13 @@ func checkTGEC2(ctx context.Context, clients any, res resource.Resource, _ resou
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ELBv2 == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTargetHealthOutput, error) {
 		return c.ELBv2.DescribeTargetHealth(ctx, &elbv2.DescribeTargetHealthInput{TargetGroupArn: &tgArn})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+		return resource.ErrorRelated("ec2", err)
 	}
 	seen := make(map[string]bool)
 	var ids []string
@@ -269,7 +269,7 @@ func checkTGEC2(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkTGLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[elbv2types.TargetGroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 	if raw.TargetType != elbv2types.TargetTypeEnumLambda {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
@@ -280,13 +280,13 @@ func checkTGLambda(ctx context.Context, clients any, res resource.Resource, _ re
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ELBv2 == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTargetHealthOutput, error) {
 		return c.ELBv2.DescribeTargetHealth(ctx, &elbv2.DescribeTargetHealthInput{TargetGroupArn: &tgArn})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	seen := make(map[string]bool)
 	var ids []string

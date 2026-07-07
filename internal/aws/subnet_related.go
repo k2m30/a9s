@@ -22,10 +22,10 @@ func checkSubnetEC2(ctx context.Context, clients any, res resource.Resource, cac
 
 	ec2List, truncated, err := subnetRelatedResources(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+		return resource.ErrorRelated("ec2", err)
 	}
 	if ec2List == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 
 	var ids []string
@@ -55,10 +55,10 @@ func checkSubnetENI(ctx context.Context, clients any, res resource.Resource, cac
 
 	eniList, truncated, err := subnetRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1, Err: err}
+		return resource.ErrorRelated("eni", err)
 	}
 	if eniList == nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.UnknownRelated("eni")
 	}
 
 	var ids []string
@@ -88,10 +88,10 @@ func checkSubnetNAT(ctx context.Context, clients any, res resource.Resource, cac
 
 	natList, truncated, err := subnetRelatedResources(ctx, clients, cache, "nat")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1, Err: err}
+		return resource.ErrorRelated("nat", err)
 	}
 	if natList == nil {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+		return resource.UnknownRelated("nat")
 	}
 
 	var ids []string
@@ -116,10 +116,10 @@ func checkSubnetELB(ctx context.Context, clients any, res resource.Resource, cac
 
 	elbList, truncated, err := subnetRelatedResources(ctx, clients, cache, "elb")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+		return resource.ErrorRelated("elb", err)
 	}
 	if elbList == nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.UnknownRelated("elb")
 	}
 
 	var ids []string
@@ -153,10 +153,10 @@ func checkSubnetRTB(ctx context.Context, clients any, res resource.Resource, cac
 
 	rtbList, truncated, err := subnetRelatedResources(ctx, clients, cache, "rtb")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1, Err: err}
+		return resource.ErrorRelated("rtb", err)
 	}
 	if rtbList == nil {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1}
+		return resource.UnknownRelated("rtb")
 	}
 
 	var ids []string
@@ -196,7 +196,7 @@ func checkSubnetRTB(ctx context.Context, clients any, res resource.Resource, cac
 func checkSubnetCFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Subnet](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
 	if stackName == "" {
@@ -225,10 +225,10 @@ func checkSubnetASG(ctx context.Context, clients any, res resource.Resource, cac
 
 	asgList, truncated, err := subnetRelatedResources(ctx, clients, cache, "asg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
+		return resource.ErrorRelated("asg", err)
 	}
 	if asgList == nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.UnknownRelated("asg")
 	}
 
 	var ids []string
@@ -264,10 +264,10 @@ func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cac
 
 	eniList, eniTruncated, err := subnetRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "efs", Count: -1, Err: err}
+		return resource.ErrorRelated("efs", err)
 	}
 	if eniList == nil {
-		return resource.RelatedCheckResult{TargetType: "efs", Count: -1}
+		return resource.UnknownRelated("efs")
 	}
 
 	const mountTargetPrefix = "EFS mount target for "
@@ -297,10 +297,10 @@ func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cac
 
 	efsList, efsTruncated, err := subnetRelatedResources(ctx, clients, cache, "efs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "efs", Count: -1, Err: err}
+		return resource.ErrorRelated("efs", err)
 	}
 	if efsList == nil {
-		return resource.RelatedCheckResult{TargetType: "efs", Count: -1}
+		return resource.UnknownRelated("efs")
 	}
 
 	var ids []string
@@ -325,10 +325,10 @@ func checkSubnetEKS(ctx context.Context, clients any, res resource.Resource, cac
 
 	eksList, truncated, err := subnetRelatedResources(ctx, clients, cache, "eks")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eks", Count: -1, Err: err}
+		return resource.ErrorRelated("eks", err)
 	}
 	if eksList == nil {
-		return resource.RelatedCheckResult{TargetType: "eks", Count: -1}
+		return resource.UnknownRelated("eks")
 	}
 
 	var ids []string
@@ -360,10 +360,10 @@ func checkSubnetVPCE(ctx context.Context, clients any, res resource.Resource, ca
 
 	vpceList, truncated, err := subnetRelatedResources(ctx, clients, cache, "vpce")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1, Err: err}
+		return resource.ErrorRelated("vpce", err)
 	}
 	if vpceList == nil {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1}
+		return resource.UnknownRelated("vpce")
 	}
 
 	var ids []string

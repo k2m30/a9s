@@ -359,7 +359,7 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 			// state (the focused ds.RelatedRows row), not the right-column
 			// widget — the renderer holds no duplicate copy of the IDs.
 			row, ok := m.ctrl.SelectedRelatedRow()
-			if !ok || !resource.IsRelatedActionable(row.Count, row.Approximate, len(row.FetchFilter) > 0, row.Loading, row.Err != "") {
+			if !ok || !resource.IsRelatedActionable(row.State, row.Count, row.Approximate) {
 				return m, nil
 			}
 			var checker resource.RelatedChecker

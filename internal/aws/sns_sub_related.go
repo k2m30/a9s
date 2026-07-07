@@ -18,10 +18,10 @@ func checkSNSSubTopic(ctx context.Context, clients any, res resource.Resource, c
 
 	snsList, truncated, err := snsSubRelatedResources(ctx, clients, cache, "sns")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: err}
+		return resource.ErrorRelated("sns", err)
 	}
 	if snsList == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 
 	var ids []string
@@ -57,10 +57,10 @@ func checkSNSSubLambda(ctx context.Context, clients any, res resource.Resource, 
 
 	lambdaList, truncated, err := snsSubRelatedResources(ctx, clients, cache, "lambda")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	if lambdaList == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 
 	var ids []string
@@ -96,10 +96,10 @@ func checkSNSSubSQS(ctx context.Context, clients any, res resource.Resource, cac
 
 	sqsList, truncated, err := snsSubRelatedResources(ctx, clients, cache, "sqs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1, Err: err}
+		return resource.ErrorRelated("sqs", err)
 	}
 	if sqsList == nil {
-		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1}
+		return resource.UnknownRelated("sqs")
 	}
 
 	var ids []string

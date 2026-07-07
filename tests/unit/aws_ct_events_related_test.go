@@ -10,6 +10,7 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -308,7 +309,7 @@ func TestRelated_CtEvents_IAMUser_FetchFilterSet_NoMatch_Truncated(t *testing.T)
 	checker := iamUserCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, iamUser, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedDeferred {
 		t.Errorf("Count = %d, want -1 (no match, truncated)", result.Count)
 	}
 	if result.FetchFilter == nil {
@@ -373,7 +374,7 @@ func TestRelated_CtEvents_IAMUser_FetchFilterSet_Match_Truncated(t *testing.T) {
 	checker := iamUserCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, iamUser, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedDeferred {
 		t.Errorf("Count = %d, want -1 (cache truncated, real count unknown)", result.Count)
 	}
 	if result.FetchFilter == nil {
@@ -475,7 +476,7 @@ func TestRelated_CtEvents_EC2_FetchFilterSet_NoMatch_Truncated(t *testing.T) {
 	checker := ec2CtEventsCheckerByTarget(t)
 	result := checker(context.Background(), nil, ec2Res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedDeferred {
 		t.Errorf("Count = %d, want -1 (no match, truncated)", result.Count)
 	}
 	if result.FetchFilter == nil {
@@ -509,7 +510,7 @@ func TestRelated_CtEvents_EC2_FetchFilterSet_Match_Truncated(t *testing.T) {
 	checker := ec2CtEventsCheckerByTarget(t)
 	result := checker(context.Background(), nil, ec2Res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedDeferred {
 		t.Errorf("Count = %d, want -1 (cache truncated, real count unknown)", result.Count)
 	}
 	if result.FetchFilter == nil {

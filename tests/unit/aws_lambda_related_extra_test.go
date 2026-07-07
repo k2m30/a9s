@@ -13,6 +13,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -113,7 +114,7 @@ func TestRelated_Lambda_Subnet_WrongRawStruct(t *testing.T) {
 	}
 	checker := lambdaExtraCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -189,7 +190,7 @@ func TestRelated_Lambda_EFS_WrongRawStruct(t *testing.T) {
 	}
 	checker := lambdaExtraCheckerByTarget(t, "efs")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -287,7 +288,7 @@ func TestRelated_Lambda_APIGW_NilCache(t *testing.T) {
 	src := resource.Resource{ID: "my-function", Name: "my-function"}
 	checker := lambdaExtraCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache, no clients)", result.Count)
 	}
 }
@@ -425,7 +426,7 @@ func TestRelated_Lambda_CF_NilCache(t *testing.T) {
 	}
 	checker := lambdaExtraCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache, no clients)", result.Count)
 	}
 }
@@ -444,7 +445,7 @@ func TestRelated_Lambda_DDB_NilClients(t *testing.T) {
 	}
 	checker := lambdaExtraCheckerByTarget(t, "ddb")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil Lambda client)", result.Count)
 	}
 }
@@ -529,7 +530,7 @@ func TestRelated_Lambda_CTEvents_NilCache(t *testing.T) {
 	src := resource.Resource{ID: "my-function", Name: "my-function"}
 	checker := lambdaExtraCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
 	}
 }
@@ -652,7 +653,7 @@ func TestRelated_Lambda_TG_NilCache(t *testing.T) {
 	src := resource.Resource{ID: "my-function", Name: "my-function"}
 	checker := lambdaExtraCheckerByTarget(t, "tg")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
 	}
 }
@@ -838,7 +839,7 @@ func TestRelated_Lambda_SNSSub_NilCache(t *testing.T) {
 	}
 	checker := lambdaExtraCheckerByTarget(t, "sns-sub")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
 	}
 }
@@ -939,7 +940,7 @@ func TestRelated_Lambda_S3_NilCache(t *testing.T) {
 	}
 	checker := lambdaExtraCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
 	}
 }
@@ -1024,7 +1025,7 @@ func TestRelated_Lambda_ENI_NilCache(t *testing.T) {
 	src := resource.Resource{ID: "my-vpc-function", Name: "my-vpc-function"}
 	checker := lambdaExtraCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
 	}
 }
@@ -1458,7 +1459,7 @@ func TestRelated_Lambda_SSM_NilCache(t *testing.T) {
 	}
 	checker := lambdaExtraCheckerByTarget(t, "ssm")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache after slash-value found)", result.Count)
 	}
 }

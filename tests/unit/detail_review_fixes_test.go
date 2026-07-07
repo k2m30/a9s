@@ -18,6 +18,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -559,12 +560,12 @@ func TestRightColumn_NegativeOneCountRendersWithoutNumber(t *testing.T) {
 		t.Skip("right column not auto-shown at width=140; skipping negative-one-count render test")
 	}
 
-	// Deliver Count == -1 (not a simple "no results" — unknown/not-applicable).
+	// Deliver State: RelatedUnknown (not a simple "no results" — unknown/not-applicable).
 	d = deliverResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
-			Count:       -1,
+			State:       domain.RelatedUnknown,
 			ResourceIDs: nil,
 			Err:         nil,
 		},
@@ -598,12 +599,12 @@ func TestRightColumn_NegativeOneCountRendersWithoutNumber_AfterAutoShow(t *testi
 		t.Skip("right column not auto-shown; skipping")
 	}
 
-	// Deliver -1 for "tg", positive for "asg".
+	// Deliver State: RelatedUnknown for "tg", positive for "asg".
 	d = deliverResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
-			Count:       -1,
+			State:       domain.RelatedUnknown,
 			ResourceIDs: nil,
 			Err:         nil,
 		},
@@ -654,12 +655,12 @@ func TestRightColumn_NegativeOneCount_NotZeroCount(t *testing.T) {
 		t.Skip("right column not auto-shown; skipping")
 	}
 
-	// tg: count -1, asg: count 0.
+	// tg: State: RelatedUnknown, asg: resolved count 0.
 	d = deliverResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
-			Count:       -1,
+			State:       domain.RelatedUnknown,
 			ResourceIDs: nil,
 			Err:         nil,
 		},

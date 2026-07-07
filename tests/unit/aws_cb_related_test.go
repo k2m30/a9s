@@ -9,6 +9,7 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -167,7 +168,7 @@ func TestRelated_CB_Role_NilCache(t *testing.T) {
 	checker := cbCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
 	}
 }
@@ -273,7 +274,7 @@ func TestRelated_CB_Logs_NilCache(t *testing.T) {
 	checker := cbCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
 	}
 }
@@ -301,7 +302,7 @@ func TestRelated_CB_Pipeline_ReturnsUnknown(t *testing.T) {
 	checker := cbCheckerByTarget(t, "pipeline")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (undeterminable — pipeline cache lacks stages)", result.Count)
 	}
 	if result.TargetType != "pipeline" {
@@ -354,7 +355,7 @@ func TestRelated_CB_SG_WrongRawStruct(t *testing.T) {
 	checker := cbCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -544,7 +545,7 @@ func TestRelated_CB_Alarm_NilCache(t *testing.T) {
 	checker := cbCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
 	}
 }

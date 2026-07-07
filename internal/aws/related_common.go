@@ -133,11 +133,11 @@ func relatedResult(target string, ids []string) resource.RelatedCheckResult {
 func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, eventSourceArn string, cache resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 	api, ok := c.Lambda.(LambdaListEventSourceMappingsAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.ListEventSourceMappingsOutput, error) {
@@ -146,7 +146,7 @@ func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, event
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 
 	functionArns := make(map[string]struct{}, len(out.EventSourceMappings))

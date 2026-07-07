@@ -21,10 +21,10 @@ func checkECRCTEvents(ctx context.Context, clients any, res resource.Resource, c
 	}
 	evList, truncated, err := ecrRelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err}
+		return resource.ErrorRelated("ct-events", err)
 	}
 	if evList == nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.UnknownRelated("ct-events")
 	}
 	var ids []string
 	for _, evRes := range evList {
@@ -52,10 +52,10 @@ func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	taskList, truncated, err := ecrRelatedResources(ctx, clients, cache, "ecs-task")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1, Err: err}
+		return resource.ErrorRelated("ecs-task", err)
 	}
 	if taskList == nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
+		return resource.UnknownRelated("ecs-task")
 	}
 	var ids []string
 	for _, tRes := range taskList {
@@ -85,7 +85,7 @@ func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, ca
 func checkECRPipeline(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "pipeline", Count: -1}
+		return resource.UnknownRelated("pipeline")
 	}
 	repoName := ""
 	if repo.RepositoryName != nil {
@@ -97,7 +97,7 @@ func checkECRPipeline(ctx context.Context, clients any, res resource.Resource, c
 
 	entry, ok := cache["pipeline"]
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "pipeline", Count: -1}
+		return resource.UnknownRelated("pipeline")
 	}
 
 	var ids []string
@@ -138,7 +138,7 @@ func ecrPipelineHasRepo(stages []cptypes.StageDeclaration, repoName string) bool
 func checkECRRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	repoName := ""
 	if repo.RepositoryName != nil {
@@ -150,11 +150,11 @@ func checkECRRole(ctx context.Context, clients any, res resource.Resource, _ res
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ECR == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	api, ok := c.ECR.(ECRGetRepositoryPolicyAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.GetRepositoryPolicyOutput, error) {
@@ -167,7 +167,7 @@ func checkECRRole(ctx context.Context, clients any, res resource.Resource, _ res
 		if strings.Contains(err.Error(), "RepositoryPolicyNotFoundException") {
 			return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 		}
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	if out.PolicyText == nil || *out.PolicyText == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}

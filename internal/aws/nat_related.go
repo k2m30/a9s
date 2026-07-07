@@ -24,7 +24,7 @@ func checkNATVPC(_ context.Context, _ any, res resource.Resource, cache resource
 
 	entry, hasEntry := cache["vpc"]
 	if !hasEntry {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	for _, vpcRes := range entry.Resources {
 		if vpcRes.ID == vpcID {
@@ -51,7 +51,7 @@ func checkNATSubnet(_ context.Context, _ any, res resource.Resource, cache resou
 
 	entry, hasEntry := cache["subnet"]
 	if !hasEntry {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	for _, subnetRes := range entry.Resources {
 		if subnetRes.ID == subnetID {
@@ -78,10 +78,10 @@ func checkNATRTB(ctx context.Context, clients any, res resource.Resource, cache 
 
 	rtbList, truncated, err := natRelatedResources(ctx, clients, cache, "rtb")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1, Err: err}
+		return resource.ErrorRelated("rtb", err)
 	}
 	if rtbList == nil {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1}
+		return resource.UnknownRelated("rtb")
 	}
 
 	var ids []string
@@ -122,10 +122,10 @@ func checkNATEIP(ctx context.Context, clients any, res resource.Resource, cache 
 
 	eipList, truncated, err := natRelatedResources(ctx, clients, cache, "eip")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: -1, Err: err}
+		return resource.ErrorRelated("eip", err)
 	}
 	if eipList == nil {
-		return resource.RelatedCheckResult{TargetType: "eip", Count: -1}
+		return resource.UnknownRelated("eip")
 	}
 	var ids []string
 	for _, eipRes := range eipList {
@@ -165,10 +165,10 @@ func checkNATENI(ctx context.Context, clients any, res resource.Resource, cache 
 
 	eniList, truncated, err := natRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1, Err: err}
+		return resource.ErrorRelated("eni", err)
 	}
 	if eniList == nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.UnknownRelated("eni")
 	}
 	var ids []string
 	for _, eniRes := range eniList {
@@ -197,10 +197,10 @@ func checkNATAlarm(ctx context.Context, clients any, res resource.Resource, cach
 
 	alarmList, truncated, err := natRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string

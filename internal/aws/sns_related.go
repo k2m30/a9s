@@ -38,18 +38,18 @@ func snsGetTopicAttrs(ctx context.Context, clients any, topicARN string) map[str
 func checkSNSAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	topicARN := res.Fields["topic_arn"]
 	if topicARN == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	alarmList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "alarm")
 	if err != nil {
 		if _, ok := clients.(*ServiceClients); !ok {
-			return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+			return resource.UnknownRelated("alarm")
 		}
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -76,18 +76,18 @@ func checkSNSSub(ctx context.Context, clients any, res resource.Resource, cache 
 		topicARN = res.ID
 	}
 	if topicARN == "" {
-		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1}
+		return resource.UnknownRelated("sns-sub")
 	}
 
 	subList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "sns-sub")
 	if err != nil {
 		if _, ok := clients.(*ServiceClients); !ok {
-			return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1}
+			return resource.UnknownRelated("sns-sub")
 		}
-		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1, Err: err}
+		return resource.ErrorRelated("sns-sub", err)
 	}
 	if subList == nil {
-		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1}
+		return resource.UnknownRelated("sns-sub")
 	}
 
 	var ids []string
@@ -114,7 +114,7 @@ func checkSNSKMS(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	attrs := snsGetTopicAttrs(ctx, clients, topicARN)
 	if attrs == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	keyID := attrs["KmsMasterKeyId"]
 	if keyID == "" {
@@ -136,7 +136,7 @@ func checkSNSRole(ctx context.Context, clients any, res resource.Resource, _ res
 	}
 	attrs := snsGetTopicAttrs(ctx, clients, topicARN)
 	if attrs == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	policy := attrs["Policy"]
 	if policy == "" {

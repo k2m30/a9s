@@ -23,15 +23,15 @@ func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	queueName := res.ID
 	if queueARN == "" && queueName == "" {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 
 	subList, truncated, err := sqsRelatedResources(ctx, clients, cache, "sns-sub")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: err}
+		return resource.ErrorRelated("sns", err)
 	}
 	if subList == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 
 	topicSet := make(map[string]struct{})
@@ -83,15 +83,15 @@ func checkSQSSNSSub(ctx context.Context, clients any, res resource.Resource, cac
 	// Fall back to constructing a partial match from the queue name.
 	queueName := res.ID
 	if queueARN == "" && queueName == "" {
-		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1}
+		return resource.UnknownRelated("sns-sub")
 	}
 
 	subList, truncated, err := sqsRelatedResources(ctx, clients, cache, "sns-sub")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1, Err: err}
+		return resource.ErrorRelated("sns-sub", err)
 	}
 	if subList == nil {
-		return resource.RelatedCheckResult{TargetType: "sns-sub", Count: -1}
+		return resource.UnknownRelated("sns-sub")
 	}
 
 	var ids []string
@@ -126,10 +126,10 @@ func checkSQSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 
 	alarmList, truncated, err := sqsRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -183,10 +183,10 @@ func checkSQSSQS(ctx context.Context, clients any, res resource.Resource, cache 
 
 	sqsList, truncated, err := sqsRelatedResources(ctx, clients, cache, "sqs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1, Err: err}
+		return resource.ErrorRelated("sqs", err)
 	}
 	if sqsList == nil {
-		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1}
+		return resource.UnknownRelated("sqs")
 	}
 
 	// Forward: find the DLQ that this queue targets.
@@ -254,7 +254,7 @@ func sqsRelatedResources(ctx context.Context, clients any, cache resource.Resour
 func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	row, ok := res.RawStruct.(SQSQueueAttributesRow)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 	queueARN := row.Attributes["QueueArn"]
 	if queueARN == "" {
@@ -262,13 +262,13 @@ func checkSQSLambda(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Lambda == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 	out, err := c.Lambda.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
 		EventSourceArn: &queueARN,
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	var ids []string
 	for _, m := range out.EventSourceMappings {
@@ -307,17 +307,17 @@ func checkSQSEbRule(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EventBridge == nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.UnknownRelated("eb-rule")
 	}
 	api, ok := c.EventBridge.(EventBridgeListRuleNamesByTargetAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.UnknownRelated("eb-rule")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eventbridge.ListRuleNamesByTargetOutput, error) {
 		return api.ListRuleNamesByTarget(ctx, &eventbridge.ListRuleNamesByTargetInput{TargetArn: &queueARN})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: err}
+		return resource.ErrorRelated("eb-rule", err)
 	}
 	return relatedResult("eb-rule", out.RuleNames)
 }

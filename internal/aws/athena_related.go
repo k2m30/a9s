@@ -13,7 +13,7 @@ import (
 )
 
 // athenaWorkGroupConfig fetches Configuration for a workgroup by name (Pattern
-// C helper). Returns nil on any failure so callers can emit Count: -1.
+// C helper). Returns nil on any failure so callers can emit an unknown result.
 func athenaWorkGroupConfig(ctx context.Context, clients any, wgName string) *athenatypes.WorkGroupConfiguration {
 	if wgName == "" {
 		return nil
@@ -35,7 +35,7 @@ func athenaWorkGroupConfig(ctx context.Context, clients any, wgName string) *ath
 func checkAthenaS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 	if cfg.ResultConfiguration == nil || cfg.ResultConfiguration.OutputLocation == nil {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
@@ -52,7 +52,7 @@ func checkAthenaS3(ctx context.Context, clients any, res resource.Resource, _ re
 func checkAthenaKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	if cfg.ResultConfiguration == nil ||
 		cfg.ResultConfiguration.EncryptionConfiguration == nil ||
@@ -71,7 +71,7 @@ func checkAthenaKMS(ctx context.Context, clients any, res resource.Resource, _ r
 func checkAthenaLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 	if cfg.PublishCloudWatchMetricsEnabled == nil || !*cfg.PublishCloudWatchMetricsEnabled {
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
@@ -87,7 +87,7 @@ func checkAthenaLogs(ctx context.Context, clients any, res resource.Resource, _ 
 func checkAthenaRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	if cfg.ExecutionRole == nil || *cfg.ExecutionRole == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}

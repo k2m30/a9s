@@ -17,6 +17,7 @@ import (
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -122,7 +123,7 @@ func TestRelated_Pipeline_CB_ReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "pipeline", "cb")
 	res := resource.Resource{ID: "my-pipeline", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != -1 {
+	if got.State != domain.RelatedUnknown {
 		t.Errorf("expected Count=-1 (undeterminable — no stages on PipelineSummary), got %d", got.Count)
 	}
 	if got.TargetType != "cb" {
@@ -136,7 +137,7 @@ func TestRelated_Pipeline_Role_ReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "pipeline", "role")
 	res := resource.Resource{ID: "my-pipeline", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != -1 {
+	if got.State != domain.RelatedUnknown {
 		t.Errorf("expected Count=-1 (undeterminable — no RoleArn on PipelineSummary), got %d", got.Count)
 	}
 	if got.TargetType != "role" {
@@ -152,7 +153,7 @@ func TestRelated_Lambda_SQS_UnknownWithoutClients(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "lambda", "sqs")
 	res := resource.Resource{ID: "my-function", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != -1 {
+	if got.State != domain.RelatedUnknown {
 		t.Errorf("expected Count=-1 (requires live API), got %d", got.Count)
 	}
 	if got.TargetType != "sqs" {
@@ -185,7 +186,7 @@ func TestRelated_Lambda_CFN_UnknownWithoutClients(t *testing.T) {
 		},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != -1 {
+	if got.State != domain.RelatedUnknown {
 		t.Errorf("expected Count=-1 (requires live API), got %d", got.Count)
 	}
 	if got.TargetType != "cfn" {
@@ -226,7 +227,7 @@ func TestRelated_Lambda_EbRule_UnknownWithoutClients(t *testing.T) {
 		},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != -1 {
+	if got.State != domain.RelatedUnknown {
 		t.Errorf("expected Count=-1, got %d", got.Count)
 	}
 	if got.TargetType != "eb-rule" {
@@ -261,7 +262,7 @@ func TestRelated_R53_ELB_ZoneReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "elb")
 	res := resource.Resource{ID: "Z1234ABCDEFG", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != -1 {
+	if got.State != domain.RelatedUnknown {
 		t.Errorf("expected Count=-1 (alias records per-zone), got %d", got.Count)
 	}
 	if got.TargetType != "elb" {
@@ -284,7 +285,7 @@ func TestRelated_R53_CF_ZoneReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "cf")
 	res := resource.Resource{ID: "Z1234ABCDEFG", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != -1 {
+	if got.State != domain.RelatedUnknown {
 		t.Errorf("expected Count=-1 (alias records per-zone), got %d", got.Count)
 	}
 	if got.TargetType != "cf" {
@@ -307,7 +308,7 @@ func TestRelated_R53_ACM_ZoneReturnsUnknown(t *testing.T) {
 	checker := checkerByTargetUncovered(t, "r53", "acm")
 	res := resource.Resource{ID: "Z1234ABCDEFG", Fields: map[string]string{}}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != -1 {
+	if got.State != domain.RelatedUnknown {
 		t.Errorf("expected Count=-1 (validation records per-zone), got %d", got.Count)
 	}
 	if got.TargetType != "acm" {
@@ -379,7 +380,7 @@ func TestRelated_DBI_SG_WrongType(t *testing.T) {
 		RawStruct: "not-a-struct",
 	}
 	got := checker(context.Background(), nil, res, nil)
-	if got.Count != -1 {
+	if got.State != domain.RelatedUnknown {
 		t.Errorf("expected Count=-1 for wrong type, got %d", got.Count)
 	}
 }

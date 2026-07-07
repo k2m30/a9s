@@ -21,7 +21,7 @@ import (
 func checkGlueRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	if job.Role == nil || *job.Role == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
@@ -34,10 +34,10 @@ func checkGlueRole(ctx context.Context, clients any, res resource.Resource, cach
 
 	roleList, _, err := glueRelatedResources(ctx, clients, cache, "role")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	if roleList == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 
 	var ids []string
@@ -62,10 +62,10 @@ func checkGlueAlarms(ctx context.Context, clients any, res resource.Resource, ca
 
 	alarmList, truncated, err := glueRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -93,10 +93,10 @@ func checkGlueAlarms(ctx context.Context, clients any, res resource.Resource, ca
 func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	logList, truncated, err := glueRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 
 	var ids []string
@@ -121,7 +121,7 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Glue == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	region := c.Region
 	if region == "" {
@@ -132,16 +132,16 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 		// Identity unresolved (STS GetCallerIdentity failed or is unavailable):
 		// the ARN this checker needs cannot be constructed, so the result is
 		// unknown, not a real zero.
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	jobARN := "arn:aws:glue:" + region + ":" + account + ":job/" + jobName
 	tagAPI, ok := c.Glue.(GlueGetTagsAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	out, err := tagAPI.GetTags(ctx, &glue.GetTagsInput{ResourceArn: aws.String(jobARN)})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	stackName := out.Tags["aws:cloudformation:stack-name"]
 	if stackName == "" {
@@ -149,10 +149,10 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	cfnList, truncated, err := glueRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -177,7 +177,7 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 func checkGlueS3(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 	if job.Command == nil || job.Command.ScriptLocation == nil || *job.Command.ScriptLocation == "" {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
@@ -196,24 +196,24 @@ func checkGlueS3(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	if job.SecurityConfiguration == nil || *job.SecurityConfiguration == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Glue == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	secCfgAPI, ok := c.Glue.(GlueGetSecurityConfigurationAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	out, err := secCfgAPI.GetSecurityConfiguration(ctx, &glue.GetSecurityConfigurationInput{
 		Name: aws.String(*job.SecurityConfiguration),
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+		return resource.ErrorRelated("kms", err)
 	}
 	if out.SecurityConfiguration == nil || out.SecurityConfiguration.EncryptionConfiguration == nil {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
@@ -256,10 +256,10 @@ func checkGlueAthena(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	wgList, truncated, err := glueRelatedResources(ctx, clients, cache, "athena")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "athena", Count: -1, Err: err}
+		return resource.ErrorRelated("athena", err)
 	}
 	if wgList == nil {
-		return resource.RelatedCheckResult{TargetType: "athena", Count: -1}
+		return resource.UnknownRelated("athena")
 	}
 	var ids []string
 	for _, wg := range wgList {
@@ -281,7 +281,7 @@ func checkGlueAthena(ctx context.Context, clients any, res resource.Resource, ca
 func checkGlueSecrets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.UnknownRelated("secrets")
 	}
 	if len(job.DefaultArguments) == 0 {
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}

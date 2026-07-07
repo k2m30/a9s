@@ -21,10 +21,10 @@ func checkEBSSnapAMI(ctx context.Context, clients any, res resource.Resource, ca
 
 	amiList, truncated, err := ebsSnapRelatedResources(ctx, clients, cache, "ami")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: -1, Err: err}
+		return resource.ErrorRelated("ami", err)
 	}
 	if amiList == nil {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: -1}
+		return resource.UnknownRelated("ami")
 	}
 
 	var ids []string
@@ -70,7 +70,7 @@ func checkEBSSnapEC2(_ context.Context, _ any, res resource.Resource, _ resource
 func checkEBSSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[ec2types.Snapshot](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
@@ -120,15 +120,15 @@ func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 		// Backup-created signature confirmed via Description alone, but no
 		// source-resource ARN to cross-reference against plan selections —
 		// honestly unresolvable to a specific plan.
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+		return resource.UnknownRelated("backup")
 	}
 
 	backupList, truncated, err := ebsSnapRelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
+		return resource.ErrorRelated("backup", err)
 	}
 	if backupList == nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+		return resource.UnknownRelated("backup")
 	}
 
 	var ids []string

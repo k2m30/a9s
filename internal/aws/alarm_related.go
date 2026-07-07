@@ -14,7 +14,7 @@ import (
 func checkAlarmSNS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 
 	arnSet := map[string]bool{}
@@ -66,10 +66,10 @@ func checkAlarmASG(ctx context.Context, clients any, res resource.Resource, cach
 
 	asgList, truncated, err := alarmRelatedResources(ctx, clients, cache, "asg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
+		return resource.ErrorRelated("asg", err)
 	}
 	if asgList == nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.UnknownRelated("asg")
 	}
 
 	var ids []string

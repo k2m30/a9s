@@ -39,10 +39,10 @@ func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, ca
 
 	kmsList, truncated, err := secretsRelatedResources(ctx, clients, cache, "kms")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+		return resource.ErrorRelated("kms", err)
 	}
 	if kmsList == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 
 	var ids []string
@@ -78,10 +78,10 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 
 	lambdaList, truncated, err := secretsRelatedResources(ctx, clients, cache, "lambda")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	if lambdaList == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 
 	var ids []string
@@ -106,10 +106,10 @@ func checkSecretsCFN(ctx context.Context, clients any, res resource.Resource, ca
 
 	cfnList, truncated, err := secretsRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 
 	var ids []string
@@ -160,10 +160,10 @@ func checkSecretsDBI(ctx context.Context, clients any, res resource.Resource, ca
 
 	dbiList, truncated, err := secretsRelatedResources(ctx, clients, cache, "dbi")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1, Err: err}
+		return resource.ErrorRelated("dbi", err)
 	}
 	if dbiList == nil {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
+		return resource.UnknownRelated("dbi")
 	}
 
 	var ids []string
@@ -231,10 +231,10 @@ func checkSecretsCB(ctx context.Context, clients any, res resource.Resource, cac
 
 	cbList, truncated, err := secretsRelatedResources(ctx, clients, cache, "cb")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cb", Count: -1, Err: err}
+		return resource.ErrorRelated("cb", err)
 	}
 	if cbList == nil {
-		return resource.RelatedCheckResult{TargetType: "cb", Count: -1}
+		return resource.UnknownRelated("cb")
 	}
 
 	var ids []string

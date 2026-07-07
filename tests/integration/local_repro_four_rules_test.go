@@ -12,8 +12,8 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // liveProfile returns the AWS profile to use for live R1-R4 tests, or "" if
@@ -111,8 +111,11 @@ func drainWave2EnrichmentCollect(t *testing.T, m tui.Model, cmd tea.Cmd) (tui.Mo
 					if collected[em.ResourceType] == nil {
 						collected[em.ResourceType] = map[string]domain.Finding{}
 					}
-					for id, f := range em.Findings {
-						collected[em.ResourceType][id] = f
+					for id, fs := range em.Findings {
+						if len(fs) == 0 {
+							continue
+						}
+						collected[em.ResourceType][id] = domain.WorstSeverityFinding(fs)
 					}
 				}
 			}

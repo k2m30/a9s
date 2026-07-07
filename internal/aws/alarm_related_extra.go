@@ -24,7 +24,7 @@ func alarmDimension(alarm cwtypes.MetricAlarm, name string) string {
 func checkAlarmAPIGW(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: -1}
+		return resource.UnknownRelated("apigw")
 	}
 	if v := alarmDimension(alarm, "ApiName"); v != "" {
 		return relatedResult("apigw", []string{v})
@@ -38,7 +38,7 @@ func checkAlarmAPIGW(_ context.Context, _ any, res resource.Resource, _ resource
 func checkAlarmCB(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cb", Count: -1}
+		return resource.UnknownRelated("cb")
 	}
 	if v := alarmDimension(alarm, "ProjectName"); v != "" {
 		return relatedResult("cb", []string{v})
@@ -49,7 +49,7 @@ func checkAlarmCB(_ context.Context, _ any, res resource.Resource, _ resource.Re
 func checkAlarmDBI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
+		return resource.UnknownRelated("dbi")
 	}
 	if v := alarmDimension(alarm, "DBInstanceIdentifier"); v != "" {
 		return relatedResult("dbi", []string{v})
@@ -60,7 +60,7 @@ func checkAlarmDBI(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkAlarmEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 	if v := alarmDimension(alarm, "InstanceId"); v != "" {
 		return relatedResult("ec2", []string{v})
@@ -71,7 +71,7 @@ func checkAlarmEC2(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkAlarmECS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ecs", Count: -1}
+		return resource.UnknownRelated("ecs")
 	}
 	if v := alarmDimension(alarm, "ClusterName"); v != "" {
 		return relatedResult("ecs", []string{v})
@@ -82,7 +82,7 @@ func checkAlarmECS(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkAlarmEKS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eks", Count: -1}
+		return resource.UnknownRelated("eks")
 	}
 	if v := alarmDimension(alarm, "ClusterName"); v != "" {
 		// AWS/EKS namespace — differentiate from AWS/ECS via namespace check.
@@ -96,7 +96,7 @@ func checkAlarmEKS(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkAlarmKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	if v := alarmDimension(alarm, "KeyId"); v != "" {
 		return relatedResult("kms", []string{v})
@@ -107,7 +107,7 @@ func checkAlarmKMS(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkAlarmLambda(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 	if v := alarmDimension(alarm, "FunctionName"); v != "" {
 		return relatedResult("lambda", []string{v})
@@ -118,7 +118,7 @@ func checkAlarmLambda(_ context.Context, _ any, res resource.Resource, _ resourc
 func checkAlarmLogs(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 	if v := alarmDimension(alarm, "LogGroupName"); v != "" {
 		return relatedResult("logs", []string{v})
@@ -129,7 +129,7 @@ func checkAlarmLogs(_ context.Context, _ any, res resource.Resource, _ resource.
 func checkAlarmS3(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 	if v := alarmDimension(alarm, "BucketName"); v != "" {
 		return relatedResult("s3", []string{v})
@@ -140,7 +140,7 @@ func checkAlarmS3(_ context.Context, _ any, res resource.Resource, _ resource.Re
 func checkAlarmSFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sfn", Count: -1}
+		return resource.UnknownRelated("sfn")
 	}
 	if v := alarmDimension(alarm, "StateMachineArn"); v != "" {
 		if idx := strings.LastIndex(v, ":"); idx >= 0 && idx < len(v)-1 {
@@ -154,7 +154,7 @@ func checkAlarmSFN(_ context.Context, _ any, res resource.Resource, _ resource.R
 func checkAlarmWAF(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	alarm, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: -1}
+		return resource.UnknownRelated("waf")
 	}
 	if v := alarmDimension(alarm, "WebACL"); v != "" {
 		return relatedResult("waf", []string{v})
@@ -171,10 +171,10 @@ func checkAlarmCTEvents(ctx context.Context, clients any, res resource.Resource,
 	}
 	evList, truncated, err := alarmRelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err}
+		return resource.ErrorRelated("ct-events", err)
 	}
 	if evList == nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.UnknownRelated("ct-events")
 	}
 	var ids []string
 	for _, evRes := range evList {

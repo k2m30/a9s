@@ -8,6 +8,7 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -161,7 +162,7 @@ func TestRelated_SNS_Alarm_EmptyARN(t *testing.T) {
 	checker := snsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown — empty topic_arn)", result.Count)
 	}
 }
@@ -173,7 +174,7 @@ func TestRelated_SNS_Alarm_EmptyCache(t *testing.T) {
 	result := checker(context.Background(), nil, snsSrcResource(), cache)
 
 	// No clients, cache miss → -1 (unknown).
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
 	}
 }

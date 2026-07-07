@@ -8,6 +8,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -158,7 +159,7 @@ func TestRelated_NAT_VPC_CacheMissNoClients(t *testing.T) {
 	checker := natCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
 	}
 }
@@ -273,7 +274,7 @@ func TestRelated_NAT_Subnet_CacheMissNoClients(t *testing.T) {
 	checker := natCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
 	}
 }
@@ -407,7 +408,7 @@ func TestRelated_NAT_RTB_CacheMissNoClients(t *testing.T) {
 	checker := natCheckerByTarget(t, "rtb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
 	}
 }

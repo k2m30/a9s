@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -128,26 +129,28 @@ func TestFullRelatedViewValidation(t *testing.T) {
 							uiMsg, ok := relatedSnapshot[def.DisplayName]
 							if !ok {
 								// The UI did not emit a result for this def. This is unexpected
-								// if the checker returned a definitive count (not -1).
-								if expected.Count != -1 {
-									t.Errorf("related %q: checker returned Count=%d but detail view never emitted a RelatedCheckResultMsg",
+								// if the checker returned a definitive (RelatedResolved) count.
+								if expected.State == domain.RelatedResolved {
+									t.Errorf("related %q: checker returned State=RelatedResolved Count=%d but detail view never emitted a RelatedCheckResultMsg",
 										def.DisplayName, expected.Count)
 								}
 								return
 							}
 
-							// Only compare counts when the checker returned a definitive result.
-							// When checker=-1 (NeedsTargetCache=true with empty cache), the checker
-							// could not compute the count — skip the comparison in that case, but
-							// still verify navigation below.
-							if expected.Count != -1 && uiMsg.Result.Count != expected.Count {
+							// Only compare counts when the checker returned a definitive
+							// (RelatedResolved) result. When the checker returned a
+							// non-Resolved state (NeedsTargetCache=true with empty cache ->
+							// RelatedUnknown, or a server-side-filtered RelatedDeferred
+							// pivot), it could not compute the count — skip the comparison
+							// in that case, but still verify navigation below.
+							if expected.State == domain.RelatedResolved && uiMsg.Result.Count != expected.Count {
 								t.Errorf("related %q: count mismatch: UI=%d, checker=%d",
 									def.DisplayName, uiMsg.Result.Count, expected.Count)
 							}
 
 							// If actionable (count > 0), follow the related entry and verify navigation.
 							// Use a fresh scenario to avoid polluting the main scenario's state.
-							if uiMsg.Result.Count > 0 || (uiMsg.Result.Count == -1 && len(uiMsg.Result.FetchFilter) > 0) {
+							if uiMsg.Result.Count > 0 || uiMsg.Result.State == domain.RelatedDeferred {
 								// Fresh scenario for navigation — avoids relatedCache hit problem on re-entry.
 								// Shares root scenario's clients to skip STS AssumeRole per sub-test.
 								var navSc *fullIntegrationScenario

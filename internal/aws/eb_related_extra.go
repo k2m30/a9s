@@ -17,7 +17,7 @@ import (
 func checkEbELB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.UnknownRelated("elb")
 	}
 	envName := ""
 	if eb.EnvironmentName != nil {
@@ -32,7 +32,7 @@ func checkEbELB(ctx context.Context, clients any, res resource.Resource, _ resou
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.UnknownRelated("elb")
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeEnvironmentResourcesOutput, error) {
@@ -41,7 +41,7 @@ func checkEbELB(ctx context.Context, clients any, res resource.Resource, _ resou
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+		return resource.ErrorRelated("elb", err)
 	}
 	if out.EnvironmentResources == nil {
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
@@ -62,7 +62,7 @@ func checkEbELB(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+		return resource.UnknownRelated("tg")
 	}
 	envName := ""
 	if eb.EnvironmentName != nil {
@@ -77,7 +77,7 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resour
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+		return resource.UnknownRelated("tg")
 	}
 
 	resOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeEnvironmentResourcesOutput, error) {
@@ -86,7 +86,7 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resour
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1, Err: err}
+		return resource.ErrorRelated("tg", err)
 	}
 	if resOut.EnvironmentResources == nil || len(resOut.EnvironmentResources.LoadBalancers) == 0 {
 		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
@@ -157,7 +157,7 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resour
 func checkEbSG(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 
 	appName := ""
@@ -177,7 +177,7 @@ func checkEbSG(ctx context.Context, clients any, res resource.Resource, _ resour
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 
 	cfgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
@@ -187,7 +187,7 @@ func checkEbSG(ctx context.Context, clients any, res resource.Resource, _ resour
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1, Err: err}
+		return resource.ErrorRelated("sg", err)
 	}
 
 	var ids []string
@@ -230,7 +230,7 @@ func checkEbSG(ctx context.Context, clients any, res resource.Resource, _ resour
 func checkEbRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 
 	appName := ""
@@ -250,7 +250,7 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, _ reso
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 
 	cfgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
@@ -260,7 +260,7 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 
 	var ids []string
@@ -300,7 +300,7 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkEbS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	eb, ok := assertStruct[ebtypes.EnvironmentDescription](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 
 	appName := ""
@@ -313,7 +313,7 @@ func checkEbS3(ctx context.Context, clients any, res resource.Resource, _ resour
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticbeanstalk.DescribeApplicationVersionsOutput, error) {
@@ -322,7 +322,7 @@ func checkEbS3(ctx context.Context, clients any, res resource.Resource, _ resour
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
+		return resource.ErrorRelated("s3", err)
 	}
 
 	var buckets []string

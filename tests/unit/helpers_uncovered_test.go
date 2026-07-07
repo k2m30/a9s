@@ -21,6 +21,7 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 	"github.com/k2m30/a9s/v3/internal/buildinfo"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -168,7 +169,7 @@ func TestRelated_SQS_SQS_RedrivePolicy_EmptyCache(t *testing.T) {
 	checker := sqsSQSCheckerForTest(t)
 	result := checker(context.Background(), nil, thisRes, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache = unknown)", result.Count)
 	}
 }

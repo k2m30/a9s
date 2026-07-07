@@ -87,11 +87,11 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	tagAPI, ok := c.S3.(S3GetBucketTaggingAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketTaggingOutput, error) {
 		return tagAPI.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: aws.String(bucket)})
@@ -106,7 +106,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 		if isS3CrossRegionErr(err) {
 			return resource.ApproximateZero("cfn")
 		}
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	stackName := ""
 	for _, tag := range out.TagSet {
@@ -120,7 +120,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	cfnList, truncated, err := s3RelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
 		return resource.ApproximateZero("cfn")
@@ -152,11 +152,11 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resou
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	encAPI, ok := c.S3.(S3GetBucketEncryptionAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketEncryptionOutput, error) {
 		return encAPI.GetBucketEncryption(ctx, &s3.GetBucketEncryptionInput{Bucket: aws.String(bucket)})
@@ -171,7 +171,7 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resou
 		if isS3CrossRegionErr(err) {
 			return resource.ApproximateZero("kms")
 		}
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+		return resource.ErrorRelated("kms", err)
 	}
 	if out.ServerSideEncryptionConfiguration == nil {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
@@ -209,11 +209,11 @@ func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 	logAPI, ok := c.S3.(S3GetBucketLoggingAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketLoggingOutput, error) {
 		return logAPI.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
@@ -224,7 +224,7 @@ func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ reso
 		if isS3CrossRegionErr(err) {
 			return resource.ApproximateZero("s3")
 		}
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
+		return resource.ErrorRelated("s3", err)
 	}
 	if out.LoggingEnabled == nil || out.LoggingEnabled.TargetBucket == nil || *out.LoggingEnabled.TargetBucket == "" {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
@@ -243,7 +243,7 @@ func checkS3Athena(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	wgList, truncated, err := s3RelatedResources(ctx, clients, cache, "athena")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "athena", Count: -1, Err: err}
+		return resource.ErrorRelated("athena", err)
 	}
 	if wgList == nil {
 		return resource.ApproximateZero("athena")
@@ -269,7 +269,7 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	jobList, truncated, err := s3RelatedResources(ctx, clients, cache, "glue")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "glue", Count: -1, Err: err}
+		return resource.ErrorRelated("glue", err)
 	}
 	if jobList == nil {
 		return resource.ApproximateZero("glue")
@@ -308,7 +308,7 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 	bucketARN := "arn:aws:s3:::" + bucket
 	bkList, truncated, err := s3RelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
+		return resource.ErrorRelated("backup", err)
 	}
 	if bkList == nil {
 		return resource.ApproximateZero("backup")
@@ -337,7 +337,7 @@ func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	ruleList, truncated, err := s3RelatedResources(ctx, clients, cache, "eb-rule")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: err}
+		return resource.ErrorRelated("eb-rule", err)
 	}
 	if ruleList == nil {
 		return resource.ApproximateZero("eb-rule")
@@ -376,7 +376,7 @@ func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	zoneList, truncated, err := s3RelatedResources(ctx, clients, cache, "r53")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1, Err: err}
+		return resource.ErrorRelated("r53", err)
 	}
 	if zoneList == nil {
 		return resource.ApproximateZero("r53")
@@ -414,11 +414,11 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	policyAPI, ok := c.S3.(S3GetBucketPolicyAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketPolicyOutput, error) {
 		return policyAPI.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
@@ -434,7 +434,7 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		if isS3CrossRegionErr(err) {
 			return resource.ApproximateZero("role")
 		}
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	if out == nil || out.Policy == nil || *out.Policy == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
@@ -447,7 +447,7 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 
 	roleList, truncated, rerr := s3RelatedResources(ctx, clients, cache, "role")
 	if rerr != nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: rerr}
+		return resource.ErrorRelated("role", rerr)
 	}
 	if roleList == nil {
 		return resource.ApproximateZero("role")
@@ -532,7 +532,7 @@ func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache
 
 	trailList, truncated, err := s3RelatedResources(ctx, clients, cache, "trail")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "trail", Count: -1, Err: err}
+		return resource.ErrorRelated("trail", err)
 	}
 	if trailList == nil {
 		return resource.ApproximateZero("trail")
@@ -570,7 +570,7 @@ func checkS3CF(ctx context.Context, clients any, res resource.Resource, cache re
 
 	cfList, truncated, err := s3RelatedResources(ctx, clients, cache, "cf")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1, Err: err}
+		return resource.ErrorRelated("cf", err)
 	}
 	if cfList == nil {
 		return resource.ApproximateZero("cf")
@@ -612,4 +612,3 @@ func s3RelatedResources(ctx context.Context, clients any, cache resource.Resourc
 	}
 	return resources, isTruncated, err
 }
-

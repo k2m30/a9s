@@ -21,11 +21,7 @@ func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 		if filter == nil {
 			return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
 		}
-		return resource.RelatedCheckResult{
-			TargetType:  "ct-events",
-			Count:       -1,
-			FetchFilter: filter,
-		}
+		return resource.DeferredRelated("ct-events", filter)
 	}
 }
 

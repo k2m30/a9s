@@ -29,10 +29,10 @@ func checkEBSSnap(ctx context.Context, clients any, res resource.Resource, cache
 
 	snapList, truncated, err := ebsRelatedResources(ctx, clients, cache, "ebs-snap")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: -1, Err: err}
+		return resource.ErrorRelated("ebs-snap", err)
 	}
 	if snapList == nil {
-		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: -1}
+		return resource.UnknownRelated("ebs-snap")
 	}
 
 	var ids []string
@@ -51,7 +51,7 @@ func checkEBSSnap(ctx context.Context, clients any, res resource.Resource, cache
 func checkEBSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vol, ok := assertStruct[ec2types.Volume](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	if vol.KmsKeyId == nil || *vol.KmsKeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
@@ -74,10 +74,10 @@ func checkEBSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 
 	alarmList, truncated, err := ebsRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -120,10 +120,10 @@ func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 
 	cfnList, truncated, err := ebsRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 
 	var ids []string
@@ -165,10 +165,10 @@ func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, cac
 
 	backupList, truncated, err := ebsRelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
+		return resource.ErrorRelated("backup", err)
 	}
 	if backupList == nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+		return resource.UnknownRelated("backup")
 	}
 
 	var ids []string

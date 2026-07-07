@@ -9,6 +9,7 @@ import (
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -149,7 +150,7 @@ func TestRelated_SG_EC2_CacheMissNoClients(t *testing.T) {
 	checker := sgCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss with nil clients)", result.Count)
 	}
 }
@@ -246,7 +247,7 @@ func TestRelated_SG_ENI_CacheMissNoClients(t *testing.T) {
 	checker := sgCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss with nil clients)", result.Count)
 	}
 }
@@ -313,7 +314,7 @@ func TestRelated_SG_ELB_CacheMissNoClients(t *testing.T) {
 	checker := sgCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss with nil clients)", result.Count)
 	}
 }
@@ -501,7 +502,7 @@ func TestRelated_SG_SG_CacheMissNoClients(t *testing.T) {
 	checker := sgCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss)", result.Count)
 	}
 }

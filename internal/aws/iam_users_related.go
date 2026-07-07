@@ -15,7 +15,7 @@ import (
 func checkUserGroup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "iam-group", Count: -1}
+		return resource.UnknownRelated("iam-group")
 	}
 	userName := res.ID
 	if userName == "" {
@@ -25,7 +25,7 @@ func checkUserGroup(ctx context.Context, clients any, res resource.Resource, _ r
 		UserName: &userName,
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "iam-group", Count: -1, Err: err}
+		return resource.ErrorRelated("iam-group", err)
 	}
 	var ids []string
 	for _, g := range out.Groups {
@@ -41,7 +41,7 @@ func checkUserGroup(ctx context.Context, clients any, res resource.Resource, _ r
 func checkUserPolicy(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "policy", Count: -1}
+		return resource.UnknownRelated("policy")
 	}
 	userName := res.ID
 	if userName == "" {
@@ -51,7 +51,7 @@ func checkUserPolicy(ctx context.Context, clients any, res resource.Resource, _ 
 		UserName: &userName,
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "policy", Count: -1, Err: err}
+		return resource.ErrorRelated("policy", err)
 	}
 	ids := attachedPolicyNames(out.AttachedPolicies)
 	return relatedResult("policy", ids)
@@ -68,10 +68,10 @@ func checkIAMUserCtEvents(ctx context.Context, clients any, res resource.Resourc
 
 	eventList, truncated, err := iamUserRelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err}
+		return resource.ErrorRelated("ct-events", err)
 	}
 	if eventList == nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.UnknownRelated("ct-events")
 	}
 
 	var ids []string
@@ -90,7 +90,7 @@ func checkIAMUserCtEvents(ctx context.Context, clients any, res resource.Resourc
 	fetchFilter := map[string]string{"Username": userName}
 	if truncated {
 		// Cache is partial — the filtered fetch will determine the real count.
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
+		return resource.DeferredRelated("ct-events", fetchFilter)
 	}
 	result := relatedResult("ct-events", ids)
 	result.FetchFilter = fetchFilter

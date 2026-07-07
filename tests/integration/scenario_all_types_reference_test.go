@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	demofixtures "github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
@@ -141,7 +142,7 @@ func TestScenario_AllTypesReferenceSurfaces(t *testing.T) {
 						if !ok {
 							continue
 						}
-						if res.Result.Count >= 0 {
+						if res.Result.State == domain.RelatedResolved {
 							sawCountable = true
 						}
 						if witness == "" && res.Result.Count > 0 {
@@ -149,12 +150,12 @@ func TestScenario_AllTypesReferenceSurfaces(t *testing.T) {
 						}
 					}
 					if witness == "" {
-						// Count==-1 with a FetchFilter is a navigable pivot —
-						// the same actionable rule
+						// State: RelatedDeferred (server-side FetchFilter pivot) is a
+						// navigable pivot — the same actionable rule
 						// related_view_validation_test.go applies.
 						for _, def := range defs {
 							res, ok := snap[def.DisplayName]
-							if ok && res.Result.Count == -1 && len(res.Result.FetchFilter) > 0 {
+							if ok && res.Result.State == domain.RelatedDeferred {
 								witness = def.DisplayName
 								break
 							}
@@ -169,7 +170,7 @@ func TestScenario_AllTypesReferenceSurfaces(t *testing.T) {
 				}
 
 				if !sawCountable {
-					t.Skipf("%s: every pivot returned Count=-1 with no FetchFilter across %d sampled row(s) — budget-excluded-only type (cf. knownDisconnectedPivots in tests/unit/qa_demo_pivot_coverage_test.go)", shortName, sampled)
+					t.Skipf("%s: every pivot returned a non-Resolved state (Unknown/Deferred/Error) with no FetchFilter witness across %d sampled row(s) — budget-excluded-only type (cf. knownDisconnectedPivots in tests/unit/qa_demo_pivot_coverage_test.go)", shortName, sampled)
 				}
 				t.Errorf("%s: countable pivots exist but no witness (count>0 or fetch-filter pivot) among %d of %d fixture row(s) — fixture graph gap (internal/demo/fixtures/, contract docs/related-resources.md)", shortName, sampled, len(rows))
 			})

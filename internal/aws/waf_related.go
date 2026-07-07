@@ -22,18 +22,18 @@ import (
 func checkWAFELB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.UnknownRelated("elb")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.UnknownRelated("elb")
 	}
 	out, err := c.WAFv2.ListResourcesForWebACL(ctx, &wafv2.ListResourcesForWebACLInput{
 		WebACLArn:    &webACLArn,
 		ResourceType: wafv2types.ResourceTypeApplicationLoadBalancer,
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+		return resource.ErrorRelated("elb", err)
 	}
 	var ids []string
 	for _, arn := range out.ResourceArns {
@@ -66,10 +66,10 @@ func checkWAFAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 	var ids []string
 	for _, alarmRes := range alarmList {
@@ -100,7 +100,7 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, _ res
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2.GetLoggingConfigurationOutput, error) {
 		return c.WAFv2.GetLoggingConfiguration(ctx, &wafv2.GetLoggingConfigurationInput{ResourceArn: &webACLArn})
@@ -110,7 +110,7 @@ func checkWAFLogs(ctx context.Context, clients any, res resource.Resource, _ res
 		if _, ok := errors.AsType[*wafv2types.WAFNonexistentItemException](err); ok {
 			return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 		}
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if out.LoggingConfiguration == nil {
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
@@ -163,17 +163,17 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.CloudFront == nil {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
+		return resource.UnknownRelated("cf")
 	}
 	api, ok := c.CloudFront.(CloudFrontListDistributionsByWebACLIdAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
+		return resource.UnknownRelated("cf")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
 		return api.ListDistributionsByWebACLId(ctx, &cloudfront.ListDistributionsByWebACLIdInput{WebACLId: &webACLArn})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1, Err: err}
+		return resource.ErrorRelated("cf", err)
 	}
 	if out.DistributionList == nil {
 		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
@@ -192,18 +192,18 @@ func checkWAFCF(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkWAFAPIGW(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	webACLArn := res.Fields["arn"]
 	if webACLArn == "" {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: -1}
+		return resource.UnknownRelated("apigw")
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: -1}
+		return resource.UnknownRelated("apigw")
 	}
 	out, err := c.WAFv2.ListResourcesForWebACL(ctx, &wafv2.ListResourcesForWebACLInput{
 		WebACLArn:    &webACLArn,
 		ResourceType: wafv2types.ResourceTypeApiGateway,
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: -1, Err: err}
+		return resource.ErrorRelated("apigw", err)
 	}
 	var ids []string
 	for _, arn := range out.ResourceArns {

@@ -19,7 +19,7 @@ import (
 func checkVPCESubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	if len(vpce.SubnetIds) == 0 {
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
@@ -32,7 +32,7 @@ func checkVPCESubnet(_ context.Context, _ any, res resource.Resource, _ resource
 func checkVPCESG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 	var ids []string
 	for _, g := range vpce.Groups {
@@ -51,7 +51,7 @@ func checkVPCESG(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkVPCERTB(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1}
+		return resource.UnknownRelated("rtb")
 	}
 	if len(vpce.RouteTableIds) == 0 {
 		return resource.RelatedCheckResult{TargetType: "rtb", Count: 0}
@@ -64,7 +64,7 @@ func checkVPCERTB(_ context.Context, _ any, res resource.Resource, _ resource.Re
 func checkVPCEENI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.UnknownRelated("eni")
 	}
 	if len(vpce.NetworkInterfaceIds) == 0 {
 		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
@@ -98,10 +98,10 @@ func checkVPCEAlarm(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 	var ids []string
 	for _, alarmRes := range alarmList {
@@ -133,7 +133,7 @@ func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, _ re
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 	filterName := "resource-id"
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeFlowLogsOutput, error) {
@@ -144,7 +144,7 @@ func checkVPCELogs(ctx context.Context, clients any, res resource.Resource, _ re
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	seen := make(map[string]bool)
 	var ids []string
@@ -188,11 +188,11 @@ func checkVPCER53(ctx context.Context, clients any, res resource.Resource, _ res
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+		return resource.UnknownRelated("r53")
 	}
 	api, ok := c.Route53.(Route53ListHostedZonesByVPCAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+		return resource.UnknownRelated("r53")
 	}
 	region := c.Region
 	if region == "" {
@@ -205,7 +205,7 @@ func checkVPCER53(ctx context.Context, clients any, res resource.Resource, _ res
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1, Err: err}
+		return resource.ErrorRelated("r53", err)
 	}
 	if out == nil || len(out.HostedZoneSummaries) == 0 {
 		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
@@ -218,4 +218,3 @@ func checkVPCER53(ctx context.Context, clients any, res resource.Resource, _ res
 	}
 	return relatedResult("r53", ids)
 }
-

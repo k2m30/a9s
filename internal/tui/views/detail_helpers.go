@@ -12,8 +12,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
@@ -96,6 +96,7 @@ func (m DetailModel) buildLiveBody() app.DetailBody {
 			}
 			related = append(related, app.RelatedBlock{
 				Name:         row.displayName,
+				State:        row.state,
 				Count:        row.count,
 				Loading:      row.loading,
 				Err:          row.err != nil,
@@ -103,7 +104,7 @@ func (m DetailModel) buildLiveBody() app.DetailBody {
 				FetchFilter:  row.fetchFilter,
 				TargetType:   row.targetType,
 				Actionable:   isActionableRow(row),
-				CountDisplay: resource.FormatRelatedCount(row.count, len(row.fetchFilter) > 0),
+				CountDisplay: resource.FormatRelatedCount(row.state, row.count),
 			})
 		}
 	}
@@ -574,6 +575,7 @@ func (m *DetailModel) ApplyRelatedResults(msgs []messages.RelatedCheckResult) {
 				m.res.ID,
 				msg.DefDisplayName,
 				msg.Result.TargetType,
+				msg.Result.State,
 				msg.Result.Count,
 				false,
 				errMsg,
@@ -850,7 +852,6 @@ func renderDetailFieldsFromBody(m *DetailModel, body app.DetailBody) string {
 	tmp.rightCol.SetFocused(!leftFocused)
 	return tmp.renderFromFieldList()
 }
-
 
 // ensure the viewport import is used (it is used by SetSize / other methods —
 // this blank assignment guards against an "imported and not used" error if the

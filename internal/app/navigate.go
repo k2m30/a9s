@@ -302,7 +302,7 @@ func (c *Controller) replayRelatedCache(resourceType string, res resource.Resour
 			errMsg = entry.Result.Err.Error()
 		}
 		mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType,
-			entry.Result.Count, false, errMsg, entry.Result.Approximate, entry.Result.ResourceIDs, entry.Result.FetchFilter)
+			entry.Result.State, entry.Result.Count, false, errMsg, entry.Result.Approximate, entry.Result.ResourceIDs, entry.Result.FetchFilter)
 	}
 	return true
 }
@@ -397,7 +397,7 @@ func (c *Controller) openRelatedDetail(cached resource.Resource, targetType stri
 				errMsg = entry.Result.Err.Error()
 			}
 			mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType,
-				entry.Result.Count, false, errMsg, entry.Result.Approximate, entry.Result.ResourceIDs, entry.Result.FetchFilter)
+				entry.Result.State, entry.Result.Count, false, errMsg, entry.Result.Approximate, entry.Result.ResourceIDs, entry.Result.FetchFilter)
 		}
 		return nil
 	}

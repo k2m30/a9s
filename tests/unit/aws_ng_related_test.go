@@ -12,6 +12,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -135,7 +136,7 @@ func TestRelated_NG_EKS_CacheMissNoClients(t *testing.T) {
 	checker := ngCheckerByTarget(t, "eks")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -232,7 +233,7 @@ func TestRelated_NG_Role_CacheMissNoClients(t *testing.T) {
 	checker := ngCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -335,7 +336,7 @@ func TestRelated_NG_ASG_CacheMissNoClients(t *testing.T) {
 	checker := ngCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -425,7 +426,7 @@ func TestRelated_NG_AMI_WrongRawStruct(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ami")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -546,7 +547,7 @@ func TestRelated_NG_Subnet_WrongRawStruct(t *testing.T) {
 	checker := ngCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -630,7 +631,7 @@ func TestRelated_NG_SG_WrongRawStruct(t *testing.T) {
 	checker := ngCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -760,7 +761,7 @@ func TestRelated_NG_EC2_NilCache(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache, nil clients)", result.Count)
 	}
 }

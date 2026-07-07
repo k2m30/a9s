@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	apigwv2types "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -161,7 +162,7 @@ func TestRelated_APIGW_Logs_NilCache(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
 	}
 }
@@ -180,7 +181,7 @@ func TestRelated_APIGW_Lambda_Unknown(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown: integration targets via GetIntegrations)", result.Count)
 	}
 	if result.TargetType != "lambda" {
@@ -260,7 +261,7 @@ func TestRelated_Apigw_KMS_WrongRawStructType(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -401,7 +402,7 @@ func TestCheckApigwACM_ClientMissing(t *testing.T) {
 	checker := apigwCheckerByTarget(t, "acm")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil APIGatewayV2 client)", result.Count)
 	}
 }

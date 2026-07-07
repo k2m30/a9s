@@ -29,10 +29,10 @@ func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cac
 
 	lambdaList, truncated, err := ecrRelatedResources(ctx, clients, cache, "lambda")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	if lambdaList == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 
 	var ids []string
@@ -64,10 +64,10 @@ func checkECRCodeBuild(ctx context.Context, clients any, res resource.Resource, 
 
 	cbList, truncated, err := ecrRelatedResources(ctx, clients, cache, "cb")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cb", Count: -1, Err: err}
+		return resource.ErrorRelated("cb", err)
 	}
 	if cbList == nil {
-		return resource.RelatedCheckResult{TargetType: "cb", Count: -1}
+		return resource.UnknownRelated("cb")
 	}
 
 	var ids []string
@@ -92,7 +92,7 @@ func checkECRCodeBuild(ctx context.Context, clients any, res resource.Resource, 
 func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stackName, err := ecrCFNStackName(ctx, clients, res)
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if stackName == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
@@ -100,10 +100,10 @@ func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache 
 
 	cfnList, truncated, err := ecrRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 
 	var ids []string
@@ -176,7 +176,7 @@ func checkECRKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkECREbRule(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	repo, ok := assertStruct[ecrtypes.Repository](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.UnknownRelated("eb-rule")
 	}
 	repoName := ""
 	if repo.RepositoryName != nil {

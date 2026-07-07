@@ -108,7 +108,7 @@ func buildDetailRelatedLoadingBlocks(resourceType string) []RelatedBlock {
 	for _, def := range defs {
 		blocks = append(blocks, RelatedBlock{
 			Name:       def.DisplayName,
-			Count:      -1,
+			State:      domain.RelatedLoading,
 			Loading:    true,
 			TargetType: def.TargetType,
 		})
@@ -426,6 +426,7 @@ func buildDetailRelatedBlocks(ds *DetailState) []RelatedBlock {
 		}
 		blocks = append(blocks, RelatedBlock{
 			Name:         row.DisplayName,
+			State:        row.State,
 			Count:        row.Count,
 			Loading:      row.Loading,
 			Err:          row.Err != "",
@@ -433,7 +434,7 @@ func buildDetailRelatedBlocks(ds *DetailState) []RelatedBlock {
 			FetchFilter:  row.FetchFilter,
 			TargetType:   row.TargetType,
 			Actionable:   isActionableDetailRow(row),
-			CountDisplay: resource.FormatRelatedCount(row.Count, len(row.FetchFilter) > 0),
+			CountDisplay: resource.FormatRelatedCount(row.State, row.Count),
 		})
 	}
 	return blocks

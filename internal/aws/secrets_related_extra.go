@@ -27,7 +27,7 @@ import (
 func checkSecretsCodeArtifact(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "codeartifact", Count: -1}
+		return resource.UnknownRelated("codeartifact")
 	}
 	// Check name contains "codeartifact" (case-insensitive)
 	name := ""
@@ -77,7 +77,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "eb", Count: 0}
 	}
 	if _, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct); !ok {
-		return resource.RelatedCheckResult{TargetType: "eb", Count: -1}
+		return resource.UnknownRelated("eb")
 	}
 
 	secretARN, _ := secretIdentifiers(res)
@@ -87,12 +87,12 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 
 	entry, ok := cache["eb"]
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eb", Count: -1}
+		return resource.UnknownRelated("eb")
 	}
 
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "eb", Count: -1}
+		return resource.UnknownRelated("eb")
 	}
 
 	resolveRef := "{{resolve:secretsmanager:" + secretARN
@@ -156,7 +156,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
 	}
 	if _, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct); !ok {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
+		return resource.UnknownRelated("ecs-task")
 	}
 
 	secretARN, _ := secretIdentifiers(res)
@@ -171,12 +171,12 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
+		return resource.UnknownRelated("ecs-task")
 	}
 
 	ecsAPI, ok := c.ECS.(ECSDescribeTaskDefinitionAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
+		return resource.UnknownRelated("ecs-task")
 	}
 
 	var ids []string
@@ -256,7 +256,7 @@ func secretsECSTaskRefsSecret(td ecstypes.TaskDefinition, secretARN string) bool
 func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
@@ -318,7 +318,7 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, _
 
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 
 	var ids []string
@@ -393,7 +393,7 @@ func secretsPolicyRoleARNs(policyText string) []string {
 func checkSecretsSNS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	secret, ok := assertStruct[secretstypes.SecretListEntry](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 	if secret.RotationLambdaARN == nil || *secret.RotationLambdaARN == "" {
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
@@ -402,11 +402,11 @@ func checkSecretsSNS(ctx context.Context, clients any, res resource.Resource, _ 
 
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 	lambdaAPI, ok := c.Lambda.(LambdaGetFunctionAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {

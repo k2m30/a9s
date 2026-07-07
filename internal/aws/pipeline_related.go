@@ -69,7 +69,7 @@ func actionProvider(a cptypes.ActionDeclaration) string {
 func checkPipelineCB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p := pipelineGetDeclaration(ctx, clients, res.ID)
 	if p == nil {
-		return resource.RelatedCheckResult{TargetType: "cb", Count: -1}
+		return resource.UnknownRelated("cb")
 	}
 	seen := map[string]struct{}{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
@@ -88,7 +88,7 @@ func checkPipelineCB(ctx context.Context, clients any, res resource.Resource, _ 
 func checkPipelineRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p := pipelineGetDeclaration(ctx, clients, res.ID)
 	if p == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	var names []string
 	if p.RoleArn != nil && *p.RoleArn != "" {
@@ -110,7 +110,7 @@ func checkPipelineRole(ctx context.Context, clients any, res resource.Resource, 
 func checkPipelineCFN(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p := pipelineGetDeclaration(ctx, clients, res.ID)
 	if p == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	seen := map[string]struct{}{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
@@ -131,7 +131,7 @@ func checkPipelineCFN(ctx context.Context, clients any, res resource.Resource, _
 func checkPipelineCodeartifact(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p := pipelineGetDeclaration(ctx, clients, res.ID)
 	if p == nil {
-		return resource.RelatedCheckResult{TargetType: "codeartifact", Count: -1}
+		return resource.UnknownRelated("codeartifact")
 	}
 	seen := map[string]struct{}{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
@@ -150,7 +150,7 @@ func checkPipelineCodeartifact(ctx context.Context, clients any, res resource.Re
 func checkPipelineECR(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p := pipelineGetDeclaration(ctx, clients, res.ID)
 	if p == nil {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+		return resource.UnknownRelated("ecr")
 	}
 	seen := map[string]struct{}{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
@@ -170,7 +170,7 @@ func checkPipelineECR(ctx context.Context, clients any, res resource.Resource, _
 func checkPipelineECSSvc(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p := pipelineGetDeclaration(ctx, clients, res.ID)
 	if p == nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: -1}
+		return resource.UnknownRelated("ecs-svc")
 	}
 	seen := map[string]struct{}{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
@@ -190,7 +190,7 @@ func checkPipelineECSSvc(ctx context.Context, clients any, res resource.Resource
 func checkPipelineKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p := pipelineGetDeclaration(ctx, clients, res.ID)
 	if p == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	seen := map[string]struct{}{}
 	addKey := func(st *cptypes.ArtifactStore) {
@@ -213,7 +213,7 @@ func checkPipelineKMS(ctx context.Context, clients any, res resource.Resource, _
 func checkPipelineLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p := pipelineGetDeclaration(ctx, clients, res.ID)
 	if p == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 	seen := map[string]struct{}{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
@@ -233,7 +233,7 @@ func checkPipelineLambda(ctx context.Context, clients any, res resource.Resource
 func checkPipelineS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p := pipelineGetDeclaration(ctx, clients, res.ID)
 	if p == nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 	seen := map[string]struct{}{}
 	addBucket := func(st *cptypes.ArtifactStore) {
@@ -263,7 +263,7 @@ func checkPipelineS3(ctx context.Context, clients any, res resource.Resource, _ 
 func checkPipelineSNS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	p := pipelineGetDeclaration(ctx, clients, res.ID)
 	if p == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 	seen := map[string]struct{}{}
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
@@ -303,17 +303,17 @@ func checkPipelineEbRule(ctx context.Context, clients any, res resource.Resource
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EventBridge == nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.UnknownRelated("eb-rule")
 	}
 	api, ok := c.EventBridge.(EventBridgeListRuleNamesByTargetAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.UnknownRelated("eb-rule")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eventbridge.ListRuleNamesByTargetOutput, error) {
 		return api.ListRuleNamesByTarget(ctx, &eventbridge.ListRuleNamesByTargetInput{TargetArn: &pipelineARN})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: err}
+		return resource.ErrorRelated("eb-rule", err)
 	}
 	return relatedResult("eb-rule", out.RuleNames)
 }

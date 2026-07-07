@@ -32,10 +32,10 @@ func checkELBTargetGroups(ctx context.Context, clients any, res resource.Resourc
 
 	tgList, truncated, err := elbRelatedResources(ctx, clients, cache, "tg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1, Err: err}
+		return resource.ErrorRelated("tg", err)
 	}
 	if tgList == nil {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+		return resource.UnknownRelated("tg")
 	}
 
 	var ids []string
@@ -77,10 +77,10 @@ func checkELBAlarms(ctx context.Context, clients any, res resource.Resource, cac
 
 	alarmList, truncated, err := elbRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -108,7 +108,7 @@ func checkELBAlarms(ctx context.Context, clients any, res resource.Resource, cac
 func checkELBSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[elbv2types.LoadBalancer](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 	var ids []string
 	for _, sgID := range raw.SecurityGroups {
@@ -145,17 +145,17 @@ func checkELBCFN(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	api, ok := c.ELBv2.(ELBv2DescribeTagsAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTagsOutput, error) {
 		return api.DescribeTags(ctx, &elbv2.DescribeTagsInput{ResourceArns: []string{elbARN}})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	for _, td := range out.TagDescriptions {
 		for _, tag := range td.Tags {
@@ -183,13 +183,13 @@ func checkELBACM(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+		return resource.UnknownRelated("acm")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeListenersOutput, error) {
 		return c.ELBv2.DescribeListeners(ctx, &elbv2.DescribeListenersInput{LoadBalancerArn: &elbARN})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1, Err: err}
+		return resource.ErrorRelated("acm", err)
 	}
 	var ids []string
 	seen := make(map[string]bool)
@@ -219,10 +219,10 @@ func checkELBCF(ctx context.Context, clients any, res resource.Resource, cache r
 
 	cfList, truncated, err := elbRelatedResources(ctx, clients, cache, "cf")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1, Err: err}
+		return resource.ErrorRelated("cf", err)
 	}
 	if cfList == nil {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
+		return resource.UnknownRelated("cf")
 	}
 
 	var ids []string
@@ -258,10 +258,10 @@ func checkELBENI(ctx context.Context, clients any, res resource.Resource, cache 
 
 	eniList, truncated, err := elbRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1, Err: err}
+		return resource.ErrorRelated("eni", err)
 	}
 	if eniList == nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.UnknownRelated("eni")
 	}
 
 	var ids []string
@@ -307,13 +307,13 @@ func checkELBS3(ctx context.Context, clients any, res resource.Resource, _ resou
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ELBv2 == nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeLoadBalancerAttributesOutput, error) {
 		return c.ELBv2.DescribeLoadBalancerAttributes(ctx, &elbv2.DescribeLoadBalancerAttributesInput{LoadBalancerArn: &elbARN})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
+		return resource.ErrorRelated("s3", err)
 	}
 	var ids []string
 	for _, a := range out.Attributes {
@@ -328,7 +328,7 @@ func checkELBS3(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkELBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[elbv2types.LoadBalancer](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	var ids []string
 	seen := make(map[string]bool)
@@ -378,17 +378,17 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.WAFv2 == nil {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: -1}
+		return resource.UnknownRelated("waf")
 	}
 	api, ok := c.WAFv2.(WAFv2GetWebACLForResourceAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: -1}
+		return resource.UnknownRelated("waf")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2.GetWebACLForResourceOutput, error) {
 		return api.GetWebACLForResource(ctx, &wafv2.GetWebACLForResourceInput{ResourceArn: &elbARN})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: -1, Err: err}
+		return resource.ErrorRelated("waf", err)
 	}
 	if out.WebACL == nil {
 		return resource.RelatedCheckResult{TargetType: "waf", Count: 0}

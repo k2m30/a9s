@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -216,7 +217,7 @@ func TestRelated_SNSSub_NilClients(t *testing.T) {
 		checker := snsSubCheckerByTarget(t, target)
 		res := snsSubResForTarget(target)
 		result := checker(context.Background(), nil, res, emptyCache)
-		if result.Count != -1 {
+		if result.State != domain.RelatedUnknown {
 			t.Errorf("target=%s: Count = %d, want -1 (nil clients, empty cache)", target, result.Count)
 		}
 	}
@@ -227,7 +228,7 @@ func TestRelated_SNSSub_EmptyCache(t *testing.T) {
 		checker := snsSubCheckerByTarget(t, target)
 		res := snsSubResForTarget(target)
 		result := checker(context.Background(), nil, res, resource.ResourceCache{})
-		if result.Count != -1 {
+		if result.State != domain.RelatedUnknown {
 			t.Errorf("target=%s: Count = %d, want -1 (empty cache)", target, result.Count)
 		}
 	}

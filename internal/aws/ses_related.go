@@ -38,7 +38,7 @@ func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache 
 
 	r53List, truncated, err := sesRelatedResources(ctx, clients, cache, "r53")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1, Err: err}
+		return resource.ErrorRelated("r53", err)
 	}
 	if r53List == nil {
 		// Honest zero — target fetcher not registered or cache empty (r53 not yet fetched).
@@ -176,7 +176,7 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	out, err := sesEventDestinations(ctx, c, configSetName)
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: err}
+		return resource.ErrorRelated("eb-rule", err)
 	}
 	if out == nil {
 		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
@@ -204,7 +204,7 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 	// Scan the eb-rule cache for rules on matching buses.
 	ebRules, truncated, cacheErr := sesRelatedResources(ctx, clients, cache, "eb-rule")
 	if cacheErr != nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: cacheErr}
+		return resource.ErrorRelated("eb-rule", cacheErr)
 	}
 	if ebRules == nil {
 		return resource.ApproximateZero("eb-rule")
@@ -324,11 +324,11 @@ func sesRuleAppliesToIdentity(rule sestypes.ReceiptRule, identityName, identityT
 func checkSESLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 	out, err := sesActiveReceiptRuleSet(ctx, c)
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	if out == nil {
 		// No active rule set — pure outbound account. Operator-honest 0.
@@ -352,11 +352,11 @@ func checkSESLambda(ctx context.Context, clients any, res resource.Resource, _ r
 func checkSESS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 	out, err := sesActiveReceiptRuleSet(ctx, c)
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
+		return resource.ErrorRelated("s3", err)
 	}
 	if out == nil {
 		// No active rule set — pure outbound account. Operator-honest 0.
@@ -450,7 +450,7 @@ func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 	configSetName := sesConfigSetName(ctx, c, identityName)
 	if configSetName == "" {
@@ -458,7 +458,7 @@ func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	out, err := sesEventDestinations(ctx, c, configSetName)
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: err}
+		return resource.ErrorRelated("sns", err)
 	}
 	if out == nil {
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
@@ -481,4 +481,3 @@ func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ reso
 func truncatedResultSES(target string, ids []string) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Approximate: true}
 }
-

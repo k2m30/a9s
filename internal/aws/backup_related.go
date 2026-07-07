@@ -20,11 +20,11 @@ import (
 func checkBackupRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	planID := res.ID
 	if planID == "" {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.Backup == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListBackupSelectionsOutput, error) {
 		return c.Backup.ListBackupSelections(ctx, &backup.ListBackupSelectionsInput{
@@ -32,7 +32,7 @@ func checkBackupRole(ctx context.Context, clients any, res resource.Resource, _ 
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	seen := make(map[string]struct{})
 	var ids []string
@@ -60,14 +60,14 @@ func checkBackupRole(ctx context.Context, clients any, res resource.Resource, _ 
 func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vaults := backupPlanVaults(ctx, clients, res)
 	if vaults == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	if len(vaults) == 0 {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.Backup == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	seen := make(map[string]struct{})
 	var ids []string
@@ -79,7 +79,7 @@ func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, _ r
 			})
 		})
 		if err != nil {
-			return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+			return resource.ErrorRelated("kms", err)
 		}
 		if out == nil || out.EncryptionKeyArn == nil || *out.EncryptionKeyArn == "" {
 			continue
@@ -104,14 +104,14 @@ func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, _ r
 func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vaults := backupPlanVaults(ctx, clients, res)
 	if vaults == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 	if len(vaults) == 0 {
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.Backup == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 	seen := make(map[string]struct{})
 	var topicARNs []string
@@ -144,7 +144,7 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 	aggErr := AggregateFailures("backup-related: GetBackupVaultNotifications", failures, len(vaults))
 	if len(topicARNs) == 0 {
 		if aggErr != nil {
-			return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: aggErr}
+			return resource.ErrorRelated("sns", aggErr)
 		}
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}

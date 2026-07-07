@@ -16,7 +16,7 @@ import (
 func checkDBISnapDBI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[rdstypes.DBSnapshot](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
+		return resource.UnknownRelated("dbi")
 	}
 	if snap.DBInstanceIdentifier == nil || *snap.DBInstanceIdentifier == "" {
 		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
@@ -25,10 +25,10 @@ func checkDBISnapDBI(ctx context.Context, clients any, res resource.Resource, ca
 
 	dbiList, truncated, err := dbiSnapRelatedResources(ctx, clients, cache, "dbi")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1, Err: err}
+		return resource.ErrorRelated("dbi", err)
 	}
 	if dbiList == nil {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
+		return resource.UnknownRelated("dbi")
 	}
 
 	var ids []string
@@ -49,7 +49,7 @@ func checkDBISnapDBI(ctx context.Context, clients any, res resource.Resource, ca
 func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[rdstypes.DBSnapshot](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
@@ -65,10 +65,10 @@ func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 
 	kmsList, truncated, err := dbiSnapRelatedResources(ctx, clients, cache, "kms")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+		return resource.ErrorRelated("kms", err)
 	}
 	if kmsList == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 
 	var ids []string
@@ -115,7 +115,7 @@ func dbiSnapRelatedResources(ctx context.Context, clients any, cache resource.Re
 func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[rdstypes.DBSnapshot](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+		return resource.UnknownRelated("backup")
 	}
 	parentName := ""
 	if snap.DBInstanceIdentifier != nil {
@@ -130,7 +130,7 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 	// the parent ARN is unavailable and the answer is genuinely unknown.
 	dbiList, _, err := dbiSnapRelatedResources(ctx, clients, cache, "dbi")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
+		return resource.ErrorRelated("backup", err)
 	}
 	if dbiList == nil {
 		return resource.UnknownRelated("backup")
@@ -155,7 +155,7 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 
 	planList, truncated, err := dbiSnapRelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
+		return resource.ErrorRelated("backup", err)
 	}
 	if planList == nil {
 		return resource.UnknownRelated("backup")
@@ -172,7 +172,6 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 	}
 	return relatedResult("backup", ids)
 }
-
 
 // checkDBISnapCTEvents looks up cached CloudTrail events for the snapshot's
 // DBSnapshotIdentifier. Universal pivot — every registered type gets one;

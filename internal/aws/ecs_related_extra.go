@@ -27,10 +27,10 @@ func checkECSASG(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	asgList, truncated, err := ecsRelatedResources(ctx, clients, cache, "asg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
+		return resource.ErrorRelated("asg", err)
 	}
 	if asgList == nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.UnknownRelated("asg")
 	}
 	var ids []string
 	for _, asgRes := range asgList {
@@ -65,10 +65,10 @@ func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	ec2List, truncated, err := ecsRelatedResources(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+		return resource.ErrorRelated("ec2", err)
 	}
 	if ec2List == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 	var ids []string
 	for _, ec2Res := range ec2List {
@@ -101,10 +101,10 @@ func checkECSCTEvents(ctx context.Context, clients any, res resource.Resource, c
 	}
 	evList, truncated, err := ecsRelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err}
+		return resource.ErrorRelated("ct-events", err)
 	}
 	if evList == nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.UnknownRelated("ct-events")
 	}
 	var ids []string
 	for _, evRes := range evList {
@@ -137,10 +137,10 @@ func checkECSTasks(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	taskList, truncated, err := ecsRelatedResources(ctx, clients, cache, "ecs-task")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1, Err: err}
+		return resource.ErrorRelated("ecs-task", err)
 	}
 	if taskList == nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
+		return resource.UnknownRelated("ecs-task")
 	}
 	var ids []string
 	for _, tRes := range taskList {
@@ -172,10 +172,10 @@ func checkECSLogs(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	logList, truncated, err := ecsRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 	var ids []string
 	for _, logRes := range logList {

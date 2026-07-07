@@ -13,6 +13,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -123,7 +124,7 @@ func TestRelated_WAF_ELB_NilClients(t *testing.T) {
 	res := wafSrcResource()
 	checker := wafCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, nil)
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -136,7 +137,7 @@ func TestRelated_WAF_APIGW_NilClients(t *testing.T) {
 	res := wafSrcResource()
 	checker := wafCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, res, nil)
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -173,7 +174,7 @@ func TestRelated_WAF_CF_CloudfrontScopeUnknown(t *testing.T) {
 	}
 	checker := wafCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, res, nil)
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (CLOUDFRONT scope: requires ListResourcesForWebACL)", result.Count)
 	}
 }
@@ -246,7 +247,7 @@ func TestRelated_WAF_Alarm_CacheMissNoClients(t *testing.T) {
 	checker := wafCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
 	}
 }
@@ -303,7 +304,7 @@ func TestRelated_WAF_Logs_NilClients(t *testing.T) {
 	checker := wafCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

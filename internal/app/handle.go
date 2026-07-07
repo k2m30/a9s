@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -393,14 +394,14 @@ func (c *Controller) handleRelatedCheckBatch(batch messages.RelatedCheckBatch) {
 			errMsg = result.Result.Err.Error()
 		}
 		mergeDetailRelatedRow(targetDetail, result.DefDisplayName, result.Result.TargetType,
-			result.Result.Count, false, errMsg, result.Result.Approximate, result.Result.ResourceIDs, result.Result.FetchFilter)
+			result.Result.State, result.Result.Count, false, errMsg, result.Result.Approximate, result.Result.ResourceIDs, result.Result.FetchFilter)
 	}
 }
 
 // mergeDetailRelatedRow updates or appends one RelatedRow in ds, matching by
 // DisplayName and preserving ResourceIDs. The single merge used by every
 // related-result path (result lane, cache replay, batch, async adapter).
-func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, count int, loading bool, errMsg string, approximate bool, resourceIDs []string, fetchFilter map[string]string) {
+func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, state domain.RelatedRowState, count int, loading bool, errMsg string, approximate bool, resourceIDs []string, fetchFilter map[string]string) {
 	targetIdx := -1
 	for i := range ds.RelatedRows {
 		if ds.RelatedRows[i].DisplayName == displayName {
@@ -430,6 +431,7 @@ func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, coun
 		}
 	}
 	if targetIdx >= 0 {
+		ds.RelatedRows[targetIdx].State = state
 		ds.RelatedRows[targetIdx].Count = count
 		ds.RelatedRows[targetIdx].Loading = loading
 		ds.RelatedRows[targetIdx].Err = errMsg
@@ -441,6 +443,7 @@ func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, coun
 	ds.RelatedRows = append(ds.RelatedRows, DetailRelatedRow{
 		TargetType:  targetType,
 		DisplayName: displayName,
+		State:       state,
 		Count:       count,
 		Loading:     loading,
 		Err:         errMsg,

@@ -9,6 +9,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -105,7 +106,7 @@ func TestRelated_TGW_NilClients(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "rtb")
 	result := checker(context.Background(), nil, res, emptyCache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients, empty cache)", result.Count)
 	}
 }
@@ -118,7 +119,7 @@ func TestRelated_TGW_VPC_NilClients(t *testing.T) {
 	res := tgwSrcResource()
 	checker := tgwCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, nil)
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -235,7 +236,7 @@ func TestRelated_TGW_VPC_WrongRawStruct(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -292,7 +293,7 @@ func TestRelated_TGW_Role_NilClients(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -368,7 +369,7 @@ func TestRelated_TGW_Subnet_NilClients(t *testing.T) {
 	checker := tgwCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

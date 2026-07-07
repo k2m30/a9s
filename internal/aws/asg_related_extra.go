@@ -18,7 +18,7 @@ import (
 func checkASGSubnets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	if asg.VPCZoneIdentifier == nil || *asg.VPCZoneIdentifier == "" {
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
@@ -42,7 +42,7 @@ func checkASGSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 func checkASGTG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+		return resource.UnknownRelated("tg")
 	}
 	if len(asg.TargetGroupARNs) == 0 {
 		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
@@ -57,10 +57,10 @@ func checkASGTG(ctx context.Context, clients any, res resource.Resource, cache r
 
 	tgList, truncated, err := asgRelatedResources(ctx, clients, cache, "tg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1, Err: err}
+		return resource.ErrorRelated("tg", err)
 	}
 	if tgList == nil {
-		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+		return resource.UnknownRelated("tg")
 	}
 
 	var ids []string
@@ -81,12 +81,12 @@ func checkASGTG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 
 	var ids []string
@@ -99,7 +99,7 @@ func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resou
 			})
 		})
 		if err != nil {
-			return resource.RelatedCheckResult{TargetType: "sg", Count: -1, Err: err}
+			return resource.ErrorRelated("sg", err)
 		}
 		if len(out.LaunchConfigurations) > 0 {
 			ids = append(ids, out.LaunchConfigurations[0].SecurityGroups...)
@@ -127,7 +127,7 @@ func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resou
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1, Err: err}
+		return resource.ErrorRelated("sg", err)
 	}
 	for _, v := range ltOut.LaunchTemplateVersions {
 		if v.LaunchTemplateData == nil {
@@ -147,7 +147,7 @@ func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resou
 func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 	asgName := ""
 	if asg.AutoScalingGroupName != nil {
@@ -162,7 +162,7 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 
 	var ids []string
@@ -174,7 +174,7 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: err}
+		return resource.ErrorRelated("sns", err)
 	}
 	for _, n := range notifOut.NotificationConfigurations {
 		if n.TopicARN != nil && *n.TopicARN != "" {
@@ -189,7 +189,7 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: err}
+		return resource.ErrorRelated("sns", err)
 	}
 	for _, h := range hookOut.LifecycleHooks {
 		if h.NotificationTargetARN != nil && strings.HasPrefix(*h.NotificationTargetARN, "arn:aws:sns:") {
@@ -206,7 +206,7 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkASGVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	if asg.VPCZoneIdentifier == nil || *asg.VPCZoneIdentifier == "" {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
@@ -224,14 +224,14 @@ func checkASGVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeSubnetsOutput, error) {
 		return c.EC2.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{SubnetIds: subnetIDs})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1, Err: err}
+		return resource.ErrorRelated("vpc", err)
 	}
 	var vpcIDs []string
 	for _, sn := range out.Subnets {

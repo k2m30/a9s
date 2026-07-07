@@ -21,10 +21,10 @@ func checkTrailS3(ctx context.Context, clients any, res resource.Resource, cache
 
 	s3List, truncated, err := trailRelatedResources(ctx, clients, cache, "s3")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
+		return resource.ErrorRelated("s3", err)
 	}
 	if s3List == nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 
 	var ids []string
@@ -56,10 +56,10 @@ func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cac
 
 	logList, truncated, err := trailRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 
 	var ids []string
@@ -85,10 +85,10 @@ func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cach
 
 	snsList, truncated, err := trailRelatedResources(ctx, clients, cache, "sns")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: err}
+		return resource.ErrorRelated("sns", err)
 	}
 	if snsList == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.UnknownRelated("sns")
 	}
 
 	var ids []string
@@ -114,10 +114,10 @@ func checkTrailKMS(ctx context.Context, clients any, res resource.Resource, cach
 
 	kmsList, truncated, err := trailRelatedResources(ctx, clients, cache, "kms")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+		return resource.ErrorRelated("kms", err)
 	}
 	if kmsList == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 
 	var ids []string

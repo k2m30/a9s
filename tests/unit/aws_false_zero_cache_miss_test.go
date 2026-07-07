@@ -30,6 +30,7 @@ import (
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -45,7 +46,7 @@ func TestRelated_Cb_Pipeline_CacheMiss_ReturnsUnknown(t *testing.T) {
 	checker := cbCheckerByTarget(t, "pipeline")
 	result := checker(context.Background(), nil, cbSourceResource("my-build-project"), resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (missing pipeline cache is unknown, not a definitive zero)", result.Count)
 	}
 }
@@ -90,7 +91,7 @@ func TestRelated_ECR_Pipeline_CacheMiss_ReturnsUnknown(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "pipeline")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (missing pipeline cache is unknown, not a definitive zero)", result.Count)
 	}
 }
@@ -140,7 +141,7 @@ func TestRelated_Secrets_EB_CacheMiss_ReturnsUnknown(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "eb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (missing eb cache is unknown, not a definitive zero)", result.Count)
 	}
 }
@@ -188,7 +189,7 @@ func TestRelated_Kinesis_DDB_CacheMiss_ReturnsUnknown(t *testing.T) {
 	checker := kinesisCheckerByTarget(t, "ddb")
 	result := checker(context.Background(), clients, kinesisSourceResource("clickstream-ingest", streamARN), resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (missing ddb cache is unknown, not a definitive zero)", result.Count)
 	}
 }
@@ -228,7 +229,7 @@ func TestRelated_ECSSvc_SFN_CacheMiss_ReturnsUnknown(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "sfn")
 	result := checker(context.Background(), nil, ecsSvcSourceResource("api-service", "prod-cluster", taskDefARN), resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (missing sfn cache is unknown, not a definitive zero)", result.Count)
 	}
 }
@@ -269,7 +270,7 @@ func TestRelated_Secrets_ECSTask_CacheMiss_ReturnsUnknown(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (missing ecs-task cache is unknown, not a definitive zero)", result.Count)
 	}
 }
@@ -327,7 +328,7 @@ func TestRelated_ECR_EbRule_CacheMiss_ReturnsUnknown(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, ecrEbRuleSourceResource("acme/api-service"), resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (missing eb-rule cache is unknown, not a definitive zero)", result.Count)
 	}
 }
@@ -364,7 +365,7 @@ func TestRelated_ECSSvc_EbRule_CacheMiss_ReturnsUnknown(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, ecsSvcSourceResource("api-service", "prod-cluster", taskDefARN), resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (missing eb-rule cache is unknown, not a definitive zero)", result.Count)
 	}
 }

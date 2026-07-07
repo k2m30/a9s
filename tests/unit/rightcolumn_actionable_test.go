@@ -5,10 +5,10 @@ package unit_test
 //
 // Background (contract updated — resolved count==0 is NEVER actionable):
 //   resource.IsRelatedActionable now treats a RESOLVED count==0 as never
-//   actionable, even when approximate==true. ApproximateZero() (related.go:209)
+//   actionable, even when approximate==true. ApproximateZero() (related.go:219)
 //   sets Count:0, so "(0)" rows must not be drillable into an empty view.
-//   FetchFilter pivots always use Count:-1 (never 0), so they remain
-//   actionable regardless of the approximate flag.  These tests are
+//   RelatedDeferred pivots (server-side FetchFilter navigation) remain
+//   actionable regardless of Count/the approximate flag.  These tests are
 //   regression guards to ensure this invariant is never accidentally
 //   reverted back to "approximate implies actionable".
 //
@@ -35,6 +35,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -43,37 +44,45 @@ import (
 
 // ---------------------------------------------------------------------------
 // Direct resource.IsRelatedActionable table test — the single source of truth
-// consumed by isActionableRow. Covers the full contract from related.go:245.
+// consumed by isActionableRow. Covers the full contract from related.go:290.
+//
+// Each case name preserves its pre-task-#58 identity (count/hasFetchFilter/
+// loading/hasErr framing) for traceability; the state column is the mapping
+// migration rule 2/3 assigns: loading->RelatedLoading, hasErr->RelatedError,
+// hasFetchFilter(count<0)->RelatedDeferred, bare count<0->RelatedUnknown,
+// else->RelatedResolved (zero value). hasFetchFilter is no longer a function
+// parameter, so the two "*_WithFetchFilter_NEW_NotActionable" resolved-zero
+// cases now share identical (state,count,approximate) inputs with their
+// no-filter siblings — kept as separate cases rather than deleted, since both
+// still assert the real "resolved zero is never actionable" invariant.
 // ---------------------------------------------------------------------------
 
 func TestIsRelatedActionable_Table(t *testing.T) {
 	cases := []struct {
 		name           string
+		state          domain.RelatedRowState
 		count          int
 		approximate    bool
-		hasFetchFilter bool
-		loading        bool
-		hasErr         bool
 		wantActionable bool
 	}{
-		{"DefiniteZero_NoFilter", 0, false, false, false, false, false},
-		{"ApproxZero_NoFilter_NEW_NotActionable", 0, true, false, false, false, false},
-		{"DefiniteZero_WithFetchFilter_NEW_NotActionable", 0, false, true, false, false, false},
-		{"UnknownCount_WithFetchFilter_Actionable", -1, false, true, false, false, true},
-		{"UnknownCount_NoFilter_Actionable", -1, false, false, false, false, true},
-		{"PositiveCount_NoFilter_Actionable", 3, false, false, false, false, true},
-		{"PositiveCount_Approximate_Actionable", 3, true, false, false, false, true},
-		{"Loading_BlocksRegardlessOfCount", 5, false, true, true, false, false},
-		{"Error_BlocksRegardlessOfCount", 5, false, true, false, true, false},
-		{"ApproxZero_WithFetchFilter_NEW_NotActionable", 0, true, true, false, false, false},
+		{"DefiniteZero_NoFilter", domain.RelatedResolved, 0, false, false},
+		{"ApproxZero_NoFilter_NEW_NotActionable", domain.RelatedResolved, 0, true, false},
+		{"DefiniteZero_WithFetchFilter_NEW_NotActionable", domain.RelatedResolved, 0, false, false},
+		{"UnknownCount_WithFetchFilter_Actionable", domain.RelatedDeferred, 0, false, true},
+		{"UnknownCount_NoFilter_Actionable", domain.RelatedUnknown, 0, false, true},
+		{"PositiveCount_NoFilter_Actionable", domain.RelatedResolved, 3, false, true},
+		{"PositiveCount_Approximate_Actionable", domain.RelatedResolved, 3, true, true},
+		{"Loading_BlocksRegardlessOfCount", domain.RelatedLoading, 5, false, false},
+		{"Error_BlocksRegardlessOfCount", domain.RelatedError, 5, false, false},
+		{"ApproxZero_WithFetchFilter_NEW_NotActionable", domain.RelatedResolved, 0, true, false},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := resource.IsRelatedActionable(tc.count, tc.approximate, tc.hasFetchFilter, tc.loading, tc.hasErr)
+			got := resource.IsRelatedActionable(tc.state, tc.count, tc.approximate)
 			if got != tc.wantActionable {
-				t.Errorf("IsRelatedActionable(count=%d, approximate=%v, hasFetchFilter=%v, loading=%v, hasErr=%v) = %v, want %v",
-					tc.count, tc.approximate, tc.hasFetchFilter, tc.loading, tc.hasErr, got, tc.wantActionable)
+				t.Errorf("IsRelatedActionable(state=%v, count=%d, approximate=%v) = %v, want %v",
+					tc.state, tc.count, tc.approximate, got, tc.wantActionable)
 			}
 		})
 	}
@@ -111,9 +120,10 @@ func buildApproxDetail(t *testing.T) (views.DetailModel, func()) {
 }
 
 // injectApproxResult injects a RelatedCheckResultMsg for targetType "tg" with
-// the given count, approximate flag, fetchFilter, and error.
+// the given state, count, approximate flag, fetchFilter, and error.
 func injectApproxResult(
 	d views.DetailModel,
+	state domain.RelatedRowState,
 	count int,
 	approximate bool,
 	fetchFilter map[string]string,
@@ -123,6 +133,7 @@ func injectApproxResult(
 		ResourceType: "approx-test-ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
+			State:       state,
 			Count:       count,
 			Approximate: approximate,
 			FetchFilter: fetchFilter,
@@ -201,7 +212,7 @@ func TestIsActionableRow_ApproxZero_NoFilter(t *testing.T) {
 	d = focusRightColWhileLoading(t, d)
 
 	// Inject the approximate-zero result.
-	d = injectApproxResult(d, 0, true, nil, nil)
+	d = injectApproxResult(d, domain.RelatedResolved, 0, true, nil, nil)
 
 	// Enter must NOT produce RelatedNavigateMsg — resolved zero is a dead end
 	// regardless of the approximate flag.
@@ -222,7 +233,7 @@ func TestIsActionableRow_ApproxZero_WithFilter(t *testing.T) {
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
-	d = injectApproxResult(d, 0, true, map[string]string{"x": "y"}, nil)
+	d = injectApproxResult(d, domain.RelatedResolved, 0, true, map[string]string{"x": "y"}, nil)
 
 	msg := pressEnterCmd(d)
 	if isApproxNavMsg(msg) {
@@ -240,7 +251,7 @@ func TestIsActionableRow_DefiniteZero_WithFilter(t *testing.T) {
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
-	d = injectApproxResult(d, 0, false, map[string]string{"x": "y"}, nil)
+	d = injectApproxResult(d, domain.RelatedResolved, 0, false, map[string]string{"x": "y"}, nil)
 
 	msg := pressEnterCmd(d)
 	if isApproxNavMsg(msg) {
@@ -256,7 +267,7 @@ func TestIsActionableRow_DefiniteZero_NoFilter(t *testing.T) {
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
-	d = injectApproxResult(d, 0, false, nil, nil)
+	d = injectApproxResult(d, domain.RelatedResolved, 0, false, nil, nil)
 
 	msg := pressEnterCmd(d)
 	if isApproxNavMsg(msg) {
@@ -276,7 +287,7 @@ func TestIsActionableRow_CountMinusOne_NoFilter(t *testing.T) {
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
-	d = injectApproxResult(d, -1, false, nil, nil)
+	d = injectApproxResult(d, domain.RelatedUnknown, 0, false, nil, nil)
 
 	msg := pressEnterCmd(d)
 	if !isApproxNavMsg(msg) {
@@ -292,7 +303,7 @@ func TestIsActionableRow_CountMinusOne_WithFilter(t *testing.T) {
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
-	d = injectApproxResult(d, -1, false, map[string]string{"x": "y"}, nil)
+	d = injectApproxResult(d, domain.RelatedDeferred, 0, false, map[string]string{"x": "y"}, nil)
 
 	msg := pressEnterCmd(d)
 	if !isApproxNavMsg(msg) {
@@ -376,7 +387,7 @@ func TestIsActionableRow_Error_Blocks(t *testing.T) {
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
-	d = injectApproxResult(d, 0, true, nil, errors.New("boom"))
+	d = injectApproxResult(d, domain.RelatedError, 0, true, nil, errors.New("boom"))
 
 	msg := pressEnterCmd(d)
 	if isApproxNavMsg(msg) {
@@ -406,7 +417,7 @@ func TestIsActionableRow_HasActionableRows_ApproxZero_BlocksFocus(t *testing.T) 
 	}
 
 	// Inject approximate-zero BEFORE any focus attempt.
-	d = injectApproxResult(d, 0, true, nil, nil)
+	d = injectApproxResult(d, domain.RelatedResolved, 0, true, nil, nil)
 
 	// "l" focuses right column only when HasActionableRows()==true. Under the
 	// new contract, approximate-zero is not actionable, so focus must NOT transfer.
@@ -427,7 +438,7 @@ func TestIsActionableRow_HasActionableRows_DefiniteZero_BlocksFocus(t *testing.T
 		t.Skip("right column not visible — cannot test l-key focus behavior")
 	}
 
-	d = injectApproxResult(d, 0, false, nil, nil)
+	d = injectApproxResult(d, domain.RelatedResolved, 0, false, nil, nil)
 
 	_, focused := pressScrollRightDetail(d)
 	if focused {
@@ -458,7 +469,7 @@ func TestIsActionableRow_ApproxZero_ViewShape(t *testing.T) {
 	d, cleanup := buildApproxDetail(t)
 	defer cleanup()
 
-	d = injectApproxResult(d, 0, true, nil, nil)
+	d = injectApproxResult(d, domain.RelatedResolved, 0, true, nil, nil)
 	plain := stripAnsi(d.View())
 	if !strings.Contains(plain, "(0)") {
 		t.Errorf("approximate-zero row must render as 'Target Groups (0)' in View(); got:\n%s", plain)
@@ -475,7 +486,7 @@ func TestIsActionableRow_ApproxZero_ViewShape(t *testing.T) {
 	defer cleanup2()
 
 	d2 = focusRightColWhileLoading(t, d2)
-	d2 = injectApproxResult(d2, 0, true, nil, nil)
+	d2 = injectApproxResult(d2, domain.RelatedResolved, 0, true, nil, nil)
 
 	plain2 := stripAnsi(d2.View())
 	if !strings.Contains(plain2, "(0)") {
@@ -494,7 +505,7 @@ func TestIsActionableRow_DefiniteZero_ViewShape_NoPlusSign(t *testing.T) {
 	d, cleanup := buildApproxDetail(t)
 	defer cleanup()
 
-	d = injectApproxResult(d, 0, false, nil, nil)
+	d = injectApproxResult(d, domain.RelatedResolved, 0, false, nil, nil)
 	plain := stripAnsi(d.View())
 
 	if strings.Contains(plain, "(0+)") {

@@ -13,7 +13,7 @@ import (
 func checkGroupUser(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: -1}
+		return resource.UnknownRelated("iam-user")
 	}
 	groupName := res.ID
 	if groupName == "" {
@@ -23,7 +23,7 @@ func checkGroupUser(ctx context.Context, clients any, res resource.Resource, _ r
 		GroupName: &groupName,
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: -1, Err: err}
+		return resource.ErrorRelated("iam-user", err)
 	}
 	var ids []string
 	for _, u := range out.Users {
@@ -38,7 +38,7 @@ func checkGroupUser(ctx context.Context, clients any, res resource.Resource, _ r
 func checkGroupPolicy(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "policy", Count: -1}
+		return resource.UnknownRelated("policy")
 	}
 	groupName := res.ID
 	if groupName == "" {
@@ -56,7 +56,7 @@ func checkGroupPolicy(ctx context.Context, clients any, res resource.Resource, _
 		ids = append(ids, inline.PolicyNames...)
 	}
 	if err != nil && err2 != nil {
-		return resource.RelatedCheckResult{TargetType: "policy", Count: -1, Err: err}
+		return resource.ErrorRelated("policy", err)
 	}
 	return relatedResult("policy", ids)
 }

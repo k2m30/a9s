@@ -15,7 +15,7 @@ import (
 func checkECSTaskService(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: -1}
+		return resource.UnknownRelated("ecs-svc")
 	}
 	if raw.Group == nil || !strings.HasPrefix(*raw.Group, "service:") {
 		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
@@ -63,7 +63,7 @@ func arnLastSegment(arn string) string {
 func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 	taskDefARN := ""
 	if raw.TaskDefinitionArn != nil {
@@ -84,10 +84,10 @@ func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, c
 
 	logList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 
 	var ids []string
@@ -150,10 +150,10 @@ func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, c
 
 	roleList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "role")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	if roleList == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 
 	var ids []string

@@ -30,10 +30,10 @@ func checkNGEKS(ctx context.Context, clients any, res resource.Resource, cache r
 
 	eksList, _, err := ngRelatedResources(ctx, clients, cache, "eks")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eks", Count: -1, Err: err}
+		return resource.ErrorRelated("eks", err)
 	}
 	if eksList == nil {
-		return resource.RelatedCheckResult{TargetType: "eks", Count: -1}
+		return resource.UnknownRelated("eks")
 	}
 
 	var ids []string
@@ -63,10 +63,10 @@ func checkNGRole(ctx context.Context, clients any, res resource.Resource, cache 
 
 	roleList, _, err := ngRelatedResources(ctx, clients, cache, "role")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	if roleList == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 
 	var ids []string
@@ -101,10 +101,10 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 
 	asgList, truncated, err := ngRelatedResources(ctx, clients, cache, "asg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
+		return resource.ErrorRelated("asg", err)
 	}
 	if asgList == nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.UnknownRelated("asg")
 	}
 
 	var ids []string
@@ -136,7 +136,7 @@ func checkNGEC2(_ context.Context, _ any, res resource.Resource, cache resource.
 
 	ec2List, truncated, ok := ngCachedEC2Instances(cache)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 
 	matches := matchingNGInstances(ec2List, nodegroupName, clusterName)
@@ -209,7 +209,7 @@ func matchingNGInstances(ec2List []resource.Resource, nodegroupName, clusterName
 func checkNGSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 	if ng.Resources == nil || ng.Resources.RemoteAccessSecurityGroup == nil ||
 		*ng.Resources.RemoteAccessSecurityGroup == "" {
@@ -224,7 +224,7 @@ func checkNGSG(_ context.Context, _ any, res resource.Resource, _ resource.Resou
 func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: -1}
+		return resource.UnknownRelated("ami")
 	}
 	if ng.LaunchTemplate == nil || ng.LaunchTemplate.Id == nil || *ng.LaunchTemplate.Id == "" {
 		// Managed NG without custom LT — AMI resolution via SSM deferred.
@@ -233,7 +233,7 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: -1}
+		return resource.UnknownRelated("ami")
 	}
 
 	version := aws.String("$Latest")
@@ -254,7 +254,7 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidLaunchTemplateId.NotFound" {
 			return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
 		}
-		return resource.RelatedCheckResult{TargetType: "ami", Count: -1, Err: err}
+		return resource.ErrorRelated("ami", err)
 	}
 	for _, v := range ltOut.LaunchTemplateVersions {
 		if v.LaunchTemplateData != nil && v.LaunchTemplateData.ImageId != nil && *v.LaunchTemplateData.ImageId != "" {
@@ -278,7 +278,7 @@ func checkNGEBS(_ context.Context, _ any, res resource.Resource, cache resource.
 
 	ec2List, truncated, ok := ngCachedEC2Instances(cache)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ebs", Count: -1}
+		return resource.UnknownRelated("ebs")
 	}
 
 	matches := matchingNGInstances(ec2List, nodegroupName, clusterName)
@@ -307,7 +307,7 @@ func checkNGEBS(_ context.Context, _ any, res resource.Resource, cache resource.
 func checkNGSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	var ids []string
 	for _, s := range ng.Subnets {
@@ -324,7 +324,7 @@ func checkNGSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 // ngCachedEC2Instances reads the "ec2" entry directly from cache — it never
 // fetches. checkNGEC2 and checkNGEBS both join against the EC2 cache purely
 // as a tag scan (Pattern C), so a cold or missing cache must surface as
-// unknown (Count:-1, "?") rather than trigger a live DescribeInstances call.
+// unknown (RelatedUnknown, "?") rather than trigger a live DescribeInstances call.
 //
 // ok is false (unknown) when:
 //   - no "ec2" entry exists in cache at all, or

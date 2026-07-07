@@ -27,10 +27,10 @@ func checkECSServices(ctx context.Context, clients any, res resource.Resource, c
 
 	svcList, truncated, err := ecsRelatedResources(ctx, clients, cache, "ecs-svc")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: -1, Err: err}
+		return resource.ErrorRelated("ecs-svc", err)
 	}
 	if svcList == nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: -1}
+		return resource.UnknownRelated("ecs-svc")
 	}
 
 	var ids []string
@@ -62,10 +62,10 @@ func checkECSAlarms(ctx context.Context, clients any, res resource.Resource, cac
 
 	alarmList, truncated, err := ecsRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -105,10 +105,10 @@ func checkECSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 
 	cfnList, truncated, err := ecsRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 
 	var ids []string

@@ -33,10 +33,10 @@ func checkACMCF(ctx context.Context, clients any, res resource.Resource, cache r
 
 	cfList, truncated, err := acmRelatedResources(ctx, clients, cache, "cf")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1, Err: err}
+		return resource.ErrorRelated("cf", err)
 	}
 	if cfList == nil {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
+		return resource.UnknownRelated("cf")
 	}
 
 	var ids []string
@@ -94,9 +94,9 @@ func checkACMELB(ctx context.Context, clients any, res resource.Resource, _ reso
 	arns, err := acmCertInUseBy(ctx, clients, res)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+			return resource.UnknownRelated("elb")
 		}
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+		return resource.ErrorRelated("elb", err)
 	}
 	var ids []string
 	for _, arn := range arns {
@@ -125,9 +125,9 @@ func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, _ re
 	arns, err := acmCertInUseBy(ctx, clients, res)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.RelatedCheckResult{TargetType: "apigw", Count: -1}
+			return resource.UnknownRelated("apigw")
 		}
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: -1, Err: err}
+		return resource.ErrorRelated("apigw", err)
 	}
 	var ids []string
 	for _, arn := range arns {
@@ -167,13 +167,13 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ACM == nil {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+		return resource.UnknownRelated("r53")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*acm.DescribeCertificateOutput, error) {
 		return c.ACM.DescribeCertificate(ctx, &acm.DescribeCertificateInput{CertificateArn: &certARN})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1, Err: err}
+		return resource.ErrorRelated("r53", err)
 	}
 	if out.Certificate == nil {
 		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
@@ -190,7 +190,7 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 	zoneList, _, _ := FetchRelatedTarget(ctx, clients, cache, "r53")
 	if zoneList == nil {
 		// Without zone cache we can only report a "we saw validation records" signal.
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+		return resource.UnknownRelated("r53")
 	}
 	seen := map[string]bool{}
 	var ids []string

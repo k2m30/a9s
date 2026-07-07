@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -46,7 +47,7 @@ func TestRelated_IAMUser_Group_NilClients(t *testing.T) {
 	}
 	checker := iamUserCheckerByTarget(t, "iam-group")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 	if result.TargetType != "iam-group" {
@@ -62,7 +63,7 @@ func TestRelated_IAMUser_Group_EmptyID(t *testing.T) {
 	checker := iamUserCheckerByTarget(t, "iam-group")
 	// nil clients: expect -1 not panic (empty userName triggers early return in impl, but nil clients checked first)
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -81,7 +82,7 @@ func TestRelated_IAMUser_Policy_NilClients(t *testing.T) {
 	}
 	checker := iamUserCheckerByTarget(t, "policy")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 	if result.TargetType != "policy" {
@@ -99,7 +100,7 @@ func TestRelated_IAMUser_Policy_EmptyUsername(t *testing.T) {
 	}
 	checker := iamUserCheckerByTarget(t, "policy")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 	if result.Err != nil {

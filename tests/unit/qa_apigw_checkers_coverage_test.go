@@ -24,6 +24,7 @@ import (
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -40,7 +41,7 @@ func TestRelated_APIGW_ACM_Unknown(t *testing.T) {
 	if result.TargetType != "acm" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "acm")
 	}
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil client hits the client-missing guard before any AWS call)", result.Count)
 	}
 }
@@ -140,7 +141,7 @@ func TestRelated_APIGW_Alarm_CacheNotLoaded(t *testing.T) {
 	res := resource.Resource{ID: "api-xyz987", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (alarm cache not loaded, no clients)", result.Count)
 	}
 }
@@ -257,7 +258,7 @@ func TestRelated_APIGW_CF_CacheNotLoaded(t *testing.T) {
 	res := resource.Resource{ID: "api-no-cache", Fields: map[string]string{}}
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (CF cache not loaded)", result.Count)
 	}
 }
@@ -284,7 +285,7 @@ func TestRelated_APIGW_ELB_Unknown(t *testing.T) {
 	if result.TargetType != "elb" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "elb")
 	}
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (ELB links via VPC link require GetVpcLinks, not in budget)", result.Count)
 	}
 }
@@ -311,7 +312,7 @@ func TestRelated_APIGW_Role_Unknown(t *testing.T) {
 	if result.TargetType != "role" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
 	}
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (IAM role refs per route/authorizer, not in GetApis)", result.Count)
 	}
 }

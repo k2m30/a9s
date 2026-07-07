@@ -8,6 +8,7 @@ import (
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -161,7 +162,7 @@ func TestRelated_CFN_Role_NilCache(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
 	}
 }
@@ -298,7 +299,7 @@ func TestRelated_CFN_CFN_CacheMissNoClients(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count)
 	}
 }
@@ -384,7 +385,7 @@ func TestRelated_CFN_SNS_InvalidRawStruct(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count)
 	}
 }
@@ -404,7 +405,7 @@ func TestRelated_CFN_S3_NilClients(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -424,7 +425,7 @@ func TestRelated_CFN_EBRule_NilClients(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

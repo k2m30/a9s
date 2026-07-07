@@ -12,6 +12,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -151,7 +152,7 @@ func TestRelated_DBC_SG_WrongRawStruct(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -592,7 +593,7 @@ func TestRelated_DBC_Subnet_NilDocDB(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil DocDB client)", result.Count)
 	}
 }
@@ -614,7 +615,7 @@ func TestRelated_DBC_VPC_NilDocDB(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil DocDB client)", result.Count)
 	}
 }
@@ -632,7 +633,7 @@ func TestRelated_DBC_VPC_NoSubnetGroup(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no DBSubnetGroup → dbcSubnetGroup nil)", result.Count)
 	}
 }
@@ -647,7 +648,7 @@ func TestRelated_DBC_VPC_WrongRawStruct(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type → dbcSubnetGroup nil)", result.Count)
 	}
 }

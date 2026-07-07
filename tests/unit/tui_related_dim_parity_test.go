@@ -3,8 +3,8 @@
 // e.g. resource.ApproximateZero() results like trail/glue/backup on an S3
 // bucket) renders BRIGHT "(0)" in the live TUI detail RELATED panel while an
 // exact-zero row renders dim, even though both are dead-end pivots per
-// resource.IsRelatedActionable (any resolved zero, approximate or not, is
-// never actionable — related.go:249-266).
+// resource.IsRelatedActionable (any RelatedResolved zero, approximate or not,
+// is never actionable — related.go:290-306).
 //
 // Root cause: renderDetailRelatedFromBody (internal/tui/views/detail_helpers.go,
 // the LIVE renderer invoked by DetailModel.RenderDetail) carries an inline
@@ -31,6 +31,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
@@ -151,19 +152,21 @@ func TestRelatedDim_ApproximateZero_SameStyleAsExactZero(t *testing.T) {
 
 			approxBlock := app.RelatedBlock{
 				Name:         "Trail Events",
+				State:        domain.RelatedResolved,
 				Count:        0,
 				Approximate:  true,
 				TargetType:   "ct-events",
-				Actionable:   resource.IsRelatedActionable(0, true, false, false, false),
-				CountDisplay: resource.FormatRelatedCount(0, false),
+				Actionable:   resource.IsRelatedActionable(domain.RelatedResolved, 0, true),
+				CountDisplay: resource.FormatRelatedCount(domain.RelatedResolved, 0),
 			}
 			exactBlock := app.RelatedBlock{
 				Name:         "Backup Plans",
+				State:        domain.RelatedResolved,
 				Count:        0,
 				Approximate:  false,
 				TargetType:   "backup",
-				Actionable:   resource.IsRelatedActionable(0, false, false, false, false),
-				CountDisplay: resource.FormatRelatedCount(0, false),
+				Actionable:   resource.IsRelatedActionable(domain.RelatedResolved, 0, false),
+				CountDisplay: resource.FormatRelatedCount(domain.RelatedResolved, 0),
 			}
 			if approxBlock.Actionable {
 				t.Fatal("test setup: approxBlock.Actionable must be false (resolved zero is never actionable)")
@@ -222,20 +225,44 @@ type relatedDimParityCase struct {
 }
 
 // relatedDimParitySweepCases builds one RelatedBlock per state combination
-// named in the dispatch: loading / err / count -1 with+without filter /
-// 0 exact / 0 approximate / N>0. Actionable and CountDisplay are computed via
-// the same shared helpers the controller uses, so this table is itself a
-// pin on resource.IsRelatedActionable / resource.FormatRelatedCount wiring,
-// not just the renderer.
+// named in the dispatch: loading / err / resolved-unknown with+without filter
+// (deferred) / 0 exact / 0 approximate / N>0. Actionable and CountDisplay are
+// computed via the same shared helpers the controller uses, so this table is
+// itself a pin on resource.IsRelatedActionable / resource.FormatRelatedCount
+// wiring, not just the renderer.
+//
+// mk's (count, hasFilter, loading, hasErr) parameters preserve each sweep
+// case's pre-task-#58 identity; state is derived from them via the migration
+// rule 2/3 mapping (loading->RelatedLoading, hasErr->RelatedError,
+// count<0&&hasFilter->RelatedDeferred, count<0->RelatedUnknown,
+// else->RelatedResolved), matching what the real checker constructors
+// (LoadingRelated/ErrorRelated/DeferredRelated/UnknownRelated) now produce.
+// Count is normalized to 0 for every non-Resolved state, mirroring those
+// constructors.
 func relatedDimParitySweepCases() []relatedDimParityCase {
 	mk := func(name string, count int, approximate, hasFilter, loading, hasErr bool) relatedDimParityCase {
 		var filter map[string]string
 		if hasFilter {
 			filter = map[string]string{"instance-id": "i-0abc123def456789a"}
 		}
-		actionable := resource.IsRelatedActionable(count, approximate, hasFilter, loading, hasErr)
+		state := domain.RelatedResolved
+		switch {
+		case loading:
+			state = domain.RelatedLoading
+		case hasErr:
+			state = domain.RelatedError
+		case count < 0 && hasFilter:
+			state = domain.RelatedDeferred
+		case count < 0:
+			state = domain.RelatedUnknown
+		}
+		if state != domain.RelatedResolved {
+			count = 0
+		}
+		actionable := resource.IsRelatedActionable(state, count, approximate)
 		blk := app.RelatedBlock{
 			Name:        name,
+			State:       state,
 			Count:       count,
 			Approximate: approximate,
 			FetchFilter: filter,
@@ -245,7 +272,7 @@ func relatedDimParitySweepCases() []relatedDimParityCase {
 			Actionable:  actionable,
 		}
 		if !loading && !hasErr {
-			blk.CountDisplay = resource.FormatRelatedCount(count, hasFilter)
+			blk.CountDisplay = resource.FormatRelatedCount(state, count)
 		}
 		return relatedDimParityCase{name: name, block: blk, wantActionable: actionable}
 	}
@@ -274,7 +301,7 @@ func expectedRelatedRowText(c relatedDimParityCase) string {
 	case blk.Err:
 		return "  " + blk.Name + "  —"
 	default:
-		display := resource.FormatRelatedCount(blk.Count, len(blk.FetchFilter) > 0)
+		display := resource.FormatRelatedCount(blk.State, blk.Count)
 		if display == "" {
 			return "  " + blk.Name
 		}
@@ -406,7 +433,7 @@ func TestRelatedCursor_MoveDown_SkipsApproximateZeroRow(t *testing.T) {
 	// Sanity: the skipped row really is the approximate-zero one, and it is
 	// indeed non-actionable per the shared predicate — otherwise this test
 	// would pass for the wrong reason if the fixture were edited later.
-	if got := resource.IsRelatedActionable(0, true, false, false, false); got {
-		t.Fatalf("test setup: resource.IsRelatedActionable(0, approximate=true, ...) = %v, want false — the approximate-zero fixture in this test is no longer non-actionable per the shared contract", got)
+	if got := resource.IsRelatedActionable(domain.RelatedResolved, 0, true); got {
+		t.Fatalf("test setup: resource.IsRelatedActionable(RelatedResolved, 0, approximate=true) = %v, want false — the approximate-zero fixture in this test is no longer non-actionable per the shared contract", got)
 	}
 }

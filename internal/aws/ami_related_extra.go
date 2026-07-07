@@ -27,10 +27,10 @@ func checkAMICFN(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	cfnList, truncated, err := amiRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -49,7 +49,7 @@ func checkAMICFN(ctx context.Context, clients any, res resource.Resource, cache 
 func checkAMIKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	img, ok := assertStruct[ec2types.Image](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	seen := make(map[string]struct{})
 	for _, bdm := range img.BlockDeviceMappings {
@@ -80,10 +80,10 @@ func checkAMING(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	ngList, truncated, err := amiRelatedResources(ctx, clients, cache, "ng")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1, Err: err}
+		return resource.ErrorRelated("ng", err)
 	}
 	if ngList == nil {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1}
+		return resource.UnknownRelated("ng")
 	}
 	var ids []string
 	for _, ngRes := range ngList {

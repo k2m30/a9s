@@ -11,6 +11,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	internalaws "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -113,7 +114,7 @@ func TestRelated_Policy_Role_PropagatesAPIError(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "role")
 	result := checker(context.Background(), &internalaws.ServiceClients{}, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedError {
 		t.Errorf("Count = %d, want -1 on API error", result.Count)
 	}
 	if result.Err == nil {
@@ -126,7 +127,7 @@ func TestRelated_Policy_Role_NilClientsReturnsNegOne(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "role")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 	if result.TargetType != "role" {
@@ -184,7 +185,7 @@ func TestRelated_Policy_User_NilClientsReturnsNegOne(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "iam-user")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 	if result.TargetType != "iam-user" {
@@ -242,7 +243,7 @@ func TestRelated_Policy_Group_NilClientsReturnsNegOne(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "iam-group")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 	if result.TargetType != "iam-group" {

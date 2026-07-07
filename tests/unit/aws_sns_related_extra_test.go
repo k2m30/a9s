@@ -11,6 +11,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -99,7 +100,7 @@ func TestRelated_SNS_Sub_EmptyTopicARN(t *testing.T) {
 	checker := snsCheckerByTarget(t, "sns-sub")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no ARN)", result.Count)
 	}
 }
@@ -135,7 +136,7 @@ func TestRelated_SNS_Sub_NilCacheNoClients(t *testing.T) {
 	checker := snsCheckerByTarget(t, "sns-sub")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
 	}
 }
@@ -195,7 +196,7 @@ func TestRelated_SNS_KMS_NilClientsReturnsUnknown(t *testing.T) {
 	checker := snsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -316,7 +317,7 @@ func TestRelated_SNS_Role_NilClientsReturnsUnknown(t *testing.T) {
 	checker := snsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

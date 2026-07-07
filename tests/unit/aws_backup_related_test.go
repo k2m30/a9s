@@ -28,6 +28,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -239,8 +240,9 @@ func TestBackup_Related_HealthyPlan_Role_DefaultServiceRole_Resolves(t *testing.
 // ---------------------------------------------------------------------------
 
 // TestBackup_Related_EmptyPlanID_AllPivotsReturnUnknown verifies that when
-// the resource has an empty ID, every pivot returns Count == -1 (unknown)
-// rather than panicking or returning Count == 0 (which would be misleading).
+// the resource has an empty ID, every pivot returns State: RelatedUnknown
+// rather than panicking or returning a resolved Count == 0 (which would be
+// misleading).
 func TestBackup_Related_EmptyPlanID_AllPivotsReturnUnknown(t *testing.T) {
 	pivots := []string{"role", "kms", "sns"}
 	emptyRes := resource.Resource{
@@ -255,8 +257,8 @@ func TestBackup_Related_EmptyPlanID_AllPivotsReturnUnknown(t *testing.T) {
 		t.Run(pivot, func(t *testing.T) {
 			checker := backupCheckerByTarget(t, pivot)
 			result := checker(context.Background(), clients, emptyRes, resource.ResourceCache{})
-			require.Equal(t, -1, result.Count,
-				"pivot %q must return Count=-1 for empty plan ID (unknown, not zero)", pivot)
+			require.Equal(t, domain.RelatedUnknown, result.State,
+				"pivot %q must return State: RelatedUnknown for empty plan ID (unknown, not resolved)", pivot)
 		})
 	}
 }

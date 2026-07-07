@@ -25,6 +25,7 @@ import (
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -197,8 +198,8 @@ func TestContract_TruncatedZeroMatch_CloudTrailEvents_ReturnsUnknown(t *testing.
 	checker := ec2CheckerByTarget(t, "ct-events")
 	got := checker(context.Background(), nil, trunc232Instance, cache)
 
-	if got.Count != -1 {
-		t.Errorf("CloudTrail events checker with truncated cache and 0 matches: want Count=-1, got Count=%d", got.Count)
+	if got.State != domain.RelatedDeferred {
+		t.Errorf("CloudTrail events checker with truncated cache and 0 matches: want State=RelatedDeferred, got State=%v (Count=%d)", got.State, got.Count)
 	}
 	if got.TargetType != "ct-events" {
 		t.Errorf("CloudTrail events checker: want TargetType=%q, got %q", "ct-events", got.TargetType)

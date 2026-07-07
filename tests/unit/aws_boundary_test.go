@@ -21,6 +21,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws" // trigger init() registrations
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -54,7 +55,7 @@ func TestChecker_AccessDenied_ReturnsMinusOne(t *testing.T) {
 		}
 		checker := boundaryCheckerByTarget(t, "asg", "vpc")
 		got := checker(context.Background(), clients, parent, nil)
-		if got.Count != -1 {
+		if got.State != domain.RelatedError {
 			t.Errorf("Count = %d, want -1 (AccessDenied on DescribeSubnets)", got.Count)
 		}
 		if got.Err == nil {
@@ -77,7 +78,7 @@ func TestChecker_AccessDenied_ReturnsMinusOne(t *testing.T) {
 		}
 		checker := boundaryCheckerByTarget(t, "ddb", "kinesis")
 		got := checker(context.Background(), clients, parent, nil)
-		if got.Count != -1 {
+		if got.State != domain.RelatedError {
 			t.Errorf("Count = %d, want -1 (AccessDenied on DescribeKinesisStreamingDestination)", got.Count)
 		}
 		if got.Err == nil {
@@ -95,7 +96,7 @@ func TestChecker_AccessDenied_ReturnsMinusOne(t *testing.T) {
 		}
 		checker := boundaryCheckerByTarget(t, "kms", "role")
 		got := checker(context.Background(), clients, parent, nil)
-		if got.Count != -1 {
+		if got.State != domain.RelatedError {
 			t.Errorf("Count = %d, want -1 (AccessDenied on GetKeyPolicy)", got.Count)
 		}
 		if got.Err == nil {
@@ -381,7 +382,7 @@ func TestChecker_NilClients_ReturnsMinusOne(t *testing.T) {
 		checker := boundaryCheckerByTarget(t, "asg", "vpc")
 		// Ensure no panic occurs when clients is nil.
 		got := checker(context.Background(), nil, parent, resource.ResourceCache{})
-		if got.Count != -1 {
+		if got.State != domain.RelatedUnknown {
 			t.Errorf("Count = %d, want -1 (nil clients must return -1)", got.Count)
 		}
 	})
@@ -393,7 +394,7 @@ func TestChecker_NilClients_ReturnsMinusOne(t *testing.T) {
 		}
 		checker := boundaryCheckerByTarget(t, "ddb", "kinesis")
 		got := checker(context.Background(), nil, parent, resource.ResourceCache{})
-		if got.Count != -1 {
+		if got.State != domain.RelatedUnknown {
 			t.Errorf("Count = %d, want -1 (nil clients must return -1)", got.Count)
 		}
 	})

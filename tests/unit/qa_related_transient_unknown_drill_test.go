@@ -1,7 +1,7 @@
 // qa_related_transient_unknown_drill_test.go — pins FEATURE #38 (owner
 // decision 2026-07-06): a related-panel row showing the transient "(?)"
-// badge (resolved-unknown, cold-cache count==-1 with NO FetchFilter — see
-// resource.FormatRelatedCount / related_unknown_badge_test.go for the badge
+// badge (resolved-unknown, cold-cache State: RelatedUnknown with NO
+// FetchFilter — see resource.FormatRelatedCount / related_unknown_badge_test.go for the badge
 // contract, and TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch in
 // aws_ng_cold_cache_guard_test.go for the real checker that produces this
 // exact shape) must be ACTIONABLE end-to-end:
@@ -16,8 +16,8 @@
 // Fixture pair: "ng" (node group) -> "ebs" (EBS Volumes), the SAME pair
 // related_unknown_badge_test.go and TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch
 // use. checkNGEBS (internal/aws/ng_related.go) returns
-// RelatedCheckResult{TargetType: "ebs", Count: -1} — no FetchFilter, no
-// RelatedIDs — whenever the "ec2" RowStore entry is cold, because it joins
+// resource.UnknownRelated("ebs") (State: RelatedUnknown, Count: 0) — no
+// FetchFilter, no RelatedIDs — whenever the "ec2" RowStore entry is cold, because it joins
 // against the EC2 cache by tag rather than issuing a live AWS call
 // (docs/resources/ng.md §2 ebs bullet). This is constructible directly from
 // the harness: build an ng resource.Resource by hand (mirroring
@@ -57,14 +57,11 @@
 //     (app_stack.go:315-346). It reads m.ctrl.SelectedRelatedRow() (the
 //     controller-owned ds.RelatedCursor/ds.RelatedRows — NOT the renderer's
 //     own RightColumnModel.rows) and gates on
-//     resource.IsRelatedActionable(row.Count, row.Approximate,
-//     len(row.FetchFilter)>0, row.Loading, row.Err != ""). For count==-1
-//     with no FetchFilter, IsRelatedActionable returns false
-//     (internal/resource/related.go:259-261) — Enter is a silent no-op on a
-//     "(?)" row today (the guard at app_stack.go:320 returns before
-//     constructing any messages.RelatedNavigate). The owner's 2026-07-06
-//     decision changes this: a transient (no-filter, count==-1) row must
-//     become actionable so Enter fires the RelatedNavigate dispatch.
+//     resource.IsRelatedActionable(row.State, row.Count, row.Approximate).
+//     For State: RelatedUnknown with no FetchFilter, IsRelatedActionable
+//     now returns true (internal/resource/related.go:290-306) — the owner's
+//     2026-07-06 decision made this transient (no-filter, resolved-unknown)
+//     row actionable so Enter fires the RelatedNavigate dispatch.
 //
 //   - Pin 2 (RED today): even if Pin 1's gate is opened, ResolveRelatedNavigate
 //     (internal/runtime/handlers_related.go) resolves a RelatedNavigate with
@@ -94,8 +91,9 @@
 //     The revealed detail's rendererState.rightCol is the SAME
 //     RightColumnModel instance from before the drill (rendererState fields
 //     live underneath the popped list on m.stack, untouched by popRS), so
-//     its cached count==-1 row for "EBS Volumes" is never re-evaluated — the
-//     badge stays stale "(?)" forever without a manual Ctrl+R. This test
+//     its cached State: RelatedUnknown row for "EBS Volumes" is never
+//     re-evaluated — the badge stays stale "(?)" forever without a manual
+//     Ctrl+R. This test
 //     pins that after Esc-return, once the target cache has warmed, the
 //     ng->ebs row's badge must show the real resolved count, not the stale
 //     "(?)".
@@ -202,10 +200,7 @@ func transientUnknownSetup(t *testing.T) (tui.Model, resource.Resource, resource
 		ResourceType:     "ng",
 		SourceResourceID: ngRes.ID,
 		DefDisplayName:   def.DisplayName,
-		Result: resource.RelatedCheckResult{
-			TargetType: "ebs",
-			Count:      -1,
-		},
+		Result:           resource.UnknownRelated("ebs"),
 	})
 
 	view := stripANSI(rootViewContent(m))
@@ -247,10 +242,10 @@ func focusRelatedRow(m tui.Model) tui.Model {
 //
 // Distinguishing signals, read straight off the rendered frame (real,
 // user-visible facts, not implementation internals):
-//   - The view must actually change (RED gate: today
-//     resource.IsRelatedActionable(-1, false, false, false, false) is false,
-//     so handleDetailKeyMsg's Enter case returns early at app_stack.go:320-322
-//     and the ng detail stays on screen).
+//   - The view must actually change (pre-#38: resource.IsRelatedActionable
+//     for a resolved-unknown row with no FetchFilter was false, so
+//     handleDetailKeyMsg's Enter case returned early and the ng detail
+//     stayed on screen; #38 flipped RelatedUnknown to actionable).
 //   - The pushed list's rendered frame TITLE must NOT carry the
 //     RelatedTitleSuffix (" -- prod-workers (prod-workers)") that
 //     runtime.RelatedTitleSuffix unconditionally appends in the
@@ -332,8 +327,8 @@ func TestTransientUnknownDrill_EnterListShowsUnfilteredEBS(t *testing.T) {
 // dispatch anywhere in that path. The revealed rendererState's rightCol is
 // the SAME RightColumnModel instance from before the drill (rendererState
 // fields live underneath the popped list on m.stack), so its cached
-// count==-1 row for "EBS Volumes" is never re-evaluated — the badge stays
-// stale "(?)" forever without a manual Ctrl+R.
+// State: RelatedUnknown row for "EBS Volumes" is never re-evaluated — the
+// badge stays stale "(?)" forever without a manual Ctrl+R.
 func TestTransientUnknownDrill_ReturnRecomputesRealCount(t *testing.T) {
 	m, ngRes, def := transientUnknownSetup(t)
 	m = focusRelatedRow(m)

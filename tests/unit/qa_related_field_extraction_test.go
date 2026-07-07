@@ -16,6 +16,7 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -365,7 +366,7 @@ func TestRelatedFieldExtraction_EC2_SG_ReturnsNegOneOnBadRawStruct(t *testing.T)
 	checker := fieldExtractionChecker(t, "ec2", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count)
 	}
 }
@@ -444,7 +445,7 @@ func TestRelatedFieldExtraction_ELB_SG_ReturnsNegOneOnBadRawStruct(t *testing.T)
 	checker := fieldExtractionChecker(t, "elb", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count)
 	}
 }
@@ -528,7 +529,7 @@ func TestRelatedFieldExtraction_EKS_SG_ReturnsNegOneOnBadRawStruct(t *testing.T)
 	checker := fieldExtractionChecker(t, "eks", "sg")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count)
 	}
 }
@@ -584,7 +585,7 @@ func TestRelatedFieldExtraction_DBI_KMS_ReturnsNegOneOnBadRawStruct(t *testing.T
 	checker := fieldExtractionChecker(t, "dbi", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count)
 	}
 }
@@ -636,7 +637,7 @@ func TestRelatedFieldExtraction_DbcSnap_KMS_ReturnsNegOneOnBadRawStruct(t *testi
 	checker := fieldExtractionChecker(t, "dbc-snap", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count)
 	}
 }
@@ -702,7 +703,7 @@ func TestRelatedFieldExtraction_EBS_KMS_ReturnsNegOneOnBadRawStruct(t *testing.T
 	checker := fieldExtractionChecker(t, "ebs", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (bad RawStruct type)", result.Count)
 	}
 }

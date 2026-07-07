@@ -13,6 +13,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -120,7 +121,7 @@ func TestRelated_KMS_EBS_CacheMissNoClients(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "ebs")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -206,7 +207,7 @@ func TestRelated_KMS_RDS_CacheMissNoClients(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -294,7 +295,7 @@ func TestRelated_KMS_Secrets_CacheMissNoClients(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -396,7 +397,7 @@ func TestRelated_KMS_Role_AccessDenied_ReturnsMinusOne(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedError {
 		t.Errorf("Count = %d, want -1 (GetKeyPolicy AccessDenied must propagate as -1)", result.Count)
 	}
 	if result.Err == nil {
@@ -426,7 +427,7 @@ func TestRelated_KMS_Role_ListGrantsAccessDenied_ReturnsMinusOne(t *testing.T) {
 	checker := kmsCheckerByTarget(t, "role")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedError {
 		t.Errorf("Count = %d, want -1 (ListGrants AccessDenied must propagate as -1)", result.Count)
 	}
 	if result.Err == nil {

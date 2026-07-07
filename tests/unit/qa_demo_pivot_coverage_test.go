@@ -167,17 +167,21 @@ func buildDemoTypeCache(t *testing.T) (map[string][]resource.Resource, resource.
 
 // isWitnessResult reports whether a RelatedCheckResult demonstrates a
 // graph-connected pivot in the sense the UI actually cares about: the row
-// would be drillable. Mirrors resource.IsRelatedActionable's real ordering —
-// a FetchFilter-bearing result (the ct-events "search CloudTrail" affordance
-// family, per BuildCTEventsPivotChecker) is actionable whenever Count != 0,
-// including the Count=-1 "unknown, re-fetch server-side" case — it is NOT
-// required to resolve a concrete positive count the way a plain cache-scan
-// pivot is. A witness for a non-FetchFilter pivot still requires Count > 0
-// (matches IsRelatedActionable's approximate/count>0 branches; Count==-1
-// with no filter is genuinely a dead, unknown row).
+// would be drillable. Delegates directly to resource.IsRelatedActionable for
+// the FetchFilter-bearing branch (the ct-events "search CloudTrail" affordance
+// family, per BuildCTEventsPivotChecker) since that family can legitimately
+// reach every State — RelatedDeferred (absent/truncated cache — always
+// actionable regardless of Count, "re-fetch server-side"), RelatedError
+// (never actionable, even though FetchFilter is still populated for
+// navigation bookkeeping), or RelatedResolved with a real Count (actionable
+// only when Count > 0) — so no single Count-only proxy can distinguish them
+// post-task-#58 (RelatedDeferred and a resolved zero both carry Count==0). A
+// witness for a non-FetchFilter pivot still requires Count > 0 (matches
+// IsRelatedActionable's RelatedResolved count>0 branch; a resolved zero is
+// genuinely a dead row).
 func isWitnessResult(result resource.RelatedCheckResult) bool {
 	if len(result.FetchFilter) > 0 {
-		return result.Count != 0
+		return resource.IsRelatedActionable(result.State, result.Count, result.Approximate)
 	}
 	return result.Count > 0
 }

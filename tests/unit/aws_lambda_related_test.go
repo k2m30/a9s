@@ -10,6 +10,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -124,7 +125,7 @@ func TestRelated_Lambda_Role_CacheMissNoClients(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -223,7 +224,7 @@ func TestRelated_Lambda_Alarms_CacheMissNoClients(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -310,7 +311,7 @@ func TestRelated_Lambda_ECR_NoClientReturnsUnknown(t *testing.T) {
 	checker := lambdaCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no live Lambda client to call GetFunction)", result.Count)
 	}
 }
@@ -331,7 +332,7 @@ func TestRelated_Lambda_ECR_ImageTypeNoURI(t *testing.T) {
 
 	checker := lambdaCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (Image type but GetFunction returned no ImageUri)", result.Count)
 	}
 }
@@ -459,7 +460,7 @@ func TestRelated_Lambda_Logs_NilCache(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache, no clients)", result.Count)
 	}
 }
@@ -525,7 +526,7 @@ func TestRelated_Lambda_SG_WrongRawStruct(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -596,7 +597,7 @@ func TestRelated_Lambda_VPC_WrongRawStruct(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -697,7 +698,7 @@ func TestRelated_Lambda_SQS_NilClients(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "sqs")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil Lambda client)", result.Count)
 	}
 }
@@ -726,7 +727,7 @@ func TestRelated_Lambda_CFN_WrongRawStruct(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -758,7 +759,7 @@ func TestRelated_Lambda_EBRule_WrongRawStruct(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }

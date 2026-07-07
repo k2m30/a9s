@@ -12,6 +12,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -98,7 +99,7 @@ func TestRelated_ENI_Subnet_WrongRawStruct(t *testing.T) {
 	checker := eniCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -154,7 +155,7 @@ func TestRelated_ENI_ELB_ELBOwnedNoDescription(t *testing.T) {
 	checker := eniCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (ELB-owned but no description)", result.Count)
 	}
 }
@@ -181,7 +182,7 @@ func TestRelated_ENI_ELB_WrongRawStruct(t *testing.T) {
 	checker := eniCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -231,7 +232,7 @@ func TestRelated_ENI_Lambda_WrongRawStruct(t *testing.T) {
 	checker := eniCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count)
 	}
 }
@@ -317,7 +318,7 @@ func TestRelated_ENI_NAT_NilCacheNoClients(t *testing.T) {
 	checker := eniCheckerByTarget(t, "nat")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
 	}
 }
@@ -394,7 +395,7 @@ func TestRelated_ENI_VPCE_NilCacheNoClients(t *testing.T) {
 	checker := eniCheckerByTarget(t, "vpce")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
 	}
 }

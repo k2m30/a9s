@@ -10,6 +10,7 @@ import (
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -196,7 +197,7 @@ func TestRelated_TG_NilClients(t *testing.T) {
 	for _, target := range []string{"ecs-svc", "asg"} {
 		checker := tgCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, emptyCache)
-		if result.Count != -1 {
+		if result.State != domain.RelatedUnknown {
 			t.Errorf("target=%s: Count = %d, want -1 (nil clients, empty cache)", target, result.Count)
 		}
 	}

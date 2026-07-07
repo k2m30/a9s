@@ -20,7 +20,7 @@ func checkDdbLogs(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	logList, truncated, err := ddbRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
 		return resource.ApproximateZero("logs")
@@ -47,7 +47,7 @@ func checkDdbVPCE(ctx context.Context, clients any, res resource.Resource, cache
 	_ = res
 	vpceList, truncated, err := ddbRelatedResources(ctx, clients, cache, "vpce")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1, Err: err}
+		return resource.ErrorRelated("vpce", err)
 	}
 	if vpceList == nil {
 		return resource.ApproximateZero("vpce")

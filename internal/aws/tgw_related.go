@@ -22,7 +22,7 @@ import (
 func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.TransitGateway](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	tgwID := res.ID
 	if tgwID == "" && raw.TransitGatewayId != nil {
@@ -33,11 +33,11 @@ func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	api, ok := c.EC2.(EC2DescribeTransitGatewayVpcAttachmentsAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	filterName := "transit-gateway-id"
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error) {
@@ -48,7 +48,7 @@ func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1, Err: err}
+		return resource.ErrorRelated("vpc", err)
 	}
 	var ids []string
 	for _, att := range out.TransitGatewayVpcAttachments {
@@ -69,10 +69,10 @@ func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 
 	rtbList, truncated, err := tgwRelatedResources(ctx, clients, cache, "rtb")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1, Err: err}
+		return resource.ErrorRelated("rtb", err)
 	}
 	if rtbList == nil {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1}
+		return resource.UnknownRelated("rtb")
 	}
 
 	var ids []string
@@ -97,7 +97,7 @@ func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 // checkTGWRole checks whether the Transit Gateway service-linked role (SLR)
 // "AWSServiceRoleForVPCTransitGateway" exists via iam:GetRole.
 // Count: 1 with the role ARN if found; Count: 0 if the role does not exist
-// (NoSuchEntity); Count: -1 on unexpected errors.
+// (NoSuchEntity); unknown state on unexpected errors.
 func checkTGWRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
@@ -105,11 +105,11 @@ func checkTGWRole(ctx context.Context, clients any, res resource.Resource, _ res
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.IAM == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	getRoleAPI, ok := c.IAM.(IAMGetRoleAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 
 	const slrName = "AWSServiceRoleForVPCTransitGateway"
@@ -123,7 +123,7 @@ func checkTGWRole(ctx context.Context, clients any, res resource.Resource, _ res
 		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchEntity" {
 			return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 		}
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	if out.Role == nil || out.Role.Arn == nil || *out.Role.Arn == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
@@ -141,11 +141,11 @@ func checkTGWSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	api, ok := c.EC2.(EC2DescribeTransitGatewayVpcAttachmentsAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	filterName := "transit-gateway-id"
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error) {
@@ -156,7 +156,7 @@ func checkTGWSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1, Err: err}
+		return resource.ErrorRelated("subnet", err)
 	}
 	seen := make(map[string]bool)
 	var ids []string

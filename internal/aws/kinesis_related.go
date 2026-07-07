@@ -23,10 +23,10 @@ func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource,
 
 	alarmList, truncated, err := kinesisRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -71,17 +71,17 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Kinesis == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	tagAPI, ok := c.Kinesis.(KinesisListTagsForStreamAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kinesis.ListTagsForStreamOutput, error) {
 		return tagAPI.ListTagsForStream(ctx, &kinesis.ListTagsForStreamInput{StreamName: aws.String(streamName)})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	stackName := ""
 	for _, tag := range out.Tags {
@@ -95,10 +95,10 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	cfnList, truncated, err := kinesisRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -126,17 +126,17 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Kinesis == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	descAPI, ok := c.Kinesis.(KinesisDescribeStreamSummaryAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kinesis.DescribeStreamSummaryOutput, error) {
 		return descAPI.DescribeStreamSummary(ctx, &kinesis.DescribeStreamSummaryInput{StreamName: aws.String(streamName)})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+		return resource.ErrorRelated("kms", err)
 	}
 	if out.StreamDescriptionSummary == nil || out.StreamDescriptionSummary.KeyId == nil || *out.StreamDescriptionSummary.KeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
@@ -169,16 +169,16 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.DynamoDB == nil {
-		return resource.RelatedCheckResult{TargetType: "ddb", Count: -1}
+		return resource.UnknownRelated("ddb")
 	}
 	api, ok := c.DynamoDB.(DynamoDBDescribeKinesisStreamingDestinationAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ddb", Count: -1}
+		return resource.UnknownRelated("ddb")
 	}
 
 	entry, ok := cache["ddb"]
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ddb", Count: -1}
+		return resource.UnknownRelated("ddb")
 	}
 
 	var ids []string

@@ -16,7 +16,7 @@ import (
 func checkEC2AMI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Instance](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: -1}
+		return resource.UnknownRelated("ami")
 	}
 	if raw.ImageId == nil || *raw.ImageId == "" {
 		return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
@@ -29,7 +29,7 @@ func checkEC2AMI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkEC2ENI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Instance](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.UnknownRelated("eni")
 	}
 	var ids []string
 	for _, eni := range raw.NetworkInterfaces {
@@ -45,7 +45,7 @@ func checkEC2ENI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkEC2Subnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Instance](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	if raw.SubnetId == nil || *raw.SubnetId == "" {
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
@@ -64,7 +64,7 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 
 	ebsList, truncated, err := ec2RelatedResources(ctx, clients, cache, "ebs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+		return resource.ErrorRelated("kms", err)
 	}
 	if ebsList == nil {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
@@ -115,10 +115,10 @@ func checkEC2Logs(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	logList, truncated, err := ec2RelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 
 	var ids []string
@@ -161,10 +161,10 @@ func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cac
 
 	backupList, truncated, err := ec2RelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
+		return resource.ErrorRelated("backup", err)
 	}
 	if backupList == nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+		return resource.UnknownRelated("backup")
 	}
 
 	var ids []string

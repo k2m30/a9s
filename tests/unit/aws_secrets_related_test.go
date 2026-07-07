@@ -9,6 +9,7 @@ import (
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -106,7 +107,7 @@ func TestRelated_Secrets_KMS_CacheMissNoClients(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, secretsSource(), resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -183,7 +184,7 @@ func TestRelated_Secrets_Lambda_CacheMissNoClients(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, secretsSource(), resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -319,7 +320,7 @@ func TestRelated_Secrets_DBI_CacheMiss(t *testing.T) {
 	}
 	checker := secretsCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
 	}
 }
@@ -430,7 +431,7 @@ func TestRelated_Secrets_CFN_CacheMiss(t *testing.T) {
 	checker := secretsCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
 	}
 }

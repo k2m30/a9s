@@ -8,6 +8,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -121,7 +122,7 @@ func TestRelated_RTB_Subnet_CacheMissNoClients(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
 	}
 }
@@ -231,7 +232,7 @@ func TestRelated_RTB_NAT_CacheMissNoClients(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "nat")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
 	}
 }
@@ -312,7 +313,7 @@ func TestRelated_RTB_IGW_CacheMissNoClients(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "igw")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
 	}
 }
@@ -451,7 +452,7 @@ func TestRelated_RTB_CFN_CacheMiss(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count)
 	}
 }
@@ -741,7 +742,7 @@ func TestRelated_RTB_VPCE_CacheMiss(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "vpce")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (vpce cache absent, nil clients)", result.Count)
 	}
 }

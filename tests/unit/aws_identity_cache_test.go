@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
@@ -77,7 +78,7 @@ func TestIdentityCache_RegionFromEnv_EmptyWhenEnvUnset(t *testing.T) {
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
 	// With no AWS_REGION and no STS client, Count must be -1.
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (region unresolvable, no STS)", result.Count)
 	}
 	if result.TargetType != "backup" {
@@ -125,7 +126,7 @@ func TestIdentityCache_RegionFromEnv_FallbackToAWSDefaultRegion(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "backup")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no STS client to resolve account)", result.Count)
 	}
 }
@@ -141,7 +142,7 @@ func TestIdentityCache_NilClients_ReturnsMinusOne(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

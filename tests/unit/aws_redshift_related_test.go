@@ -27,6 +27,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -409,7 +410,7 @@ func TestRelated_Redshift_Logs_NilClientsReturnsNegOne(t *testing.T) {
 	src := redshiftSrcResource(redshiftFixtureWarehouse(t))
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -703,7 +704,7 @@ func TestRelated_Redshift_Subnet_NilClientsReturnsNegOne(t *testing.T) {
 	src := redshiftSrcResource(redshiftFixtureWarehouse(t))
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients → cannot call API)", result.Count)
 	}
 }

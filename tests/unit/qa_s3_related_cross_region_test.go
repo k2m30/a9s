@@ -27,6 +27,7 @@ import (
 	smithy "github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -203,7 +204,7 @@ func TestS3Related_CrossRegion_PreservesUnknownContract(t *testing.T) {
 	if got.TargetType != "cfn" {
 		t.Errorf("TargetType = %q, want %q", got.TargetType, "cfn")
 	}
-	if got.Count != -1 {
+	if got.State != domain.RelatedError {
 		t.Errorf("Count = %d, want -1 (real failure must NOT be swallowed)", got.Count)
 	}
 	if got.Approximate {

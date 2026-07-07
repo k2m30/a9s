@@ -7,6 +7,7 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -174,7 +175,7 @@ func TestRelated_SQS_NilClients(t *testing.T) {
 	for _, target := range []string{"sns-sub", "alarm"} {
 		checker := sqsCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, emptyCache)
-		if result.Count != -1 {
+		if result.State != domain.RelatedUnknown {
 			t.Errorf("target=%s: Count = %d, want -1 (nil clients, empty cache)", target, result.Count)
 		}
 	}
@@ -186,7 +187,7 @@ func TestRelated_SQS_EmptyCache(t *testing.T) {
 	for _, target := range []string{"sns-sub", "alarm"} {
 		checker := sqsCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, res, resource.ResourceCache{})
-		if result.Count != -1 {
+		if result.State != domain.RelatedUnknown {
 			t.Errorf("target=%s: Count = %d, want -1 (empty cache)", target, result.Count)
 		}
 	}
@@ -200,7 +201,7 @@ func TestRelated_SQS_Lambda_NilClients(t *testing.T) {
 	res := sqsPaymentRes()
 	checker := sqsCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, nil)
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

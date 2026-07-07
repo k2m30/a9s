@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -117,7 +118,7 @@ func TestRelated_EBSSnap_AMI_CacheMissNoClients(t *testing.T) {
 	checker := ebsSnapCheckerByTarget(t, "ami")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -283,7 +284,7 @@ func TestRelated_EBSSnap_KMS_NoRawStruct(t *testing.T) {
 	checker := ebsSnapCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1", result.Count)
 	}
 }

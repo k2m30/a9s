@@ -16,6 +16,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -145,7 +146,7 @@ func TestRelated_ECR_Lambda_CacheMissNoClients(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -245,7 +246,7 @@ func TestRelated_ECR_CB_CacheMissNoClients(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "cb")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }
@@ -380,8 +381,8 @@ func TestRelated_ECR_CFN_CacheMissNoClients(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "cfn")
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
+	if result.State != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError (CFN page-fetch failed)", result.State)
 	}
 }
 
@@ -504,7 +505,7 @@ func TestRelated_ECR_EbRule_WrongRawStruct(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "eb-rule")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -598,7 +599,7 @@ func TestRelated_ECR_Pipeline_WrongRawStruct(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "pipeline")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -700,7 +701,7 @@ func TestRelated_ECR_Role_WrongRawStruct(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, nil)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -721,7 +722,7 @@ func TestRelated_ECR_Role_NoClient(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, nil)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no client)", result.Count)
 	}
 }

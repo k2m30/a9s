@@ -11,6 +11,7 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -100,7 +101,7 @@ func TestRelated_ECSTask_Service_InvalidRawStruct(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("expected Count=-1 for invalid RawStruct, got %d", result.Count)
 	}
 }
@@ -433,7 +434,7 @@ func TestRelated_ECSTask_Alarm_NilCache(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, resource.Resource{ID: "abc123def456"}, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
 	}
 }
@@ -511,7 +512,7 @@ func TestRelated_ECSTask_CTEvents_NilCache(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, resource.Resource{ID: "abc123def456"}, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count)
 	}
 }
@@ -569,7 +570,7 @@ func TestRelated_ECSTask_EC2_InvalidRawStruct(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (invalid RawStruct)", result.Count)
 	}
 }
@@ -759,7 +760,7 @@ func TestRelated_ECSTask_Subnet_InvalidRawStruct(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (invalid RawStruct)", result.Count)
 	}
 }
@@ -831,7 +832,7 @@ func TestRelated_ECSTask_SG_InvalidRawStruct(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, res, nil)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (invalid RawStruct)", result.Count)
 	}
 }

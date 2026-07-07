@@ -19,10 +19,10 @@ func checkAMIEC2(ctx context.Context, clients any, res resource.Resource, cache 
 
 	ec2List, truncated, err := amiRelatedResources(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+		return resource.ErrorRelated("ec2", err)
 	}
 	if ec2List == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 
 	var ids []string
@@ -42,7 +42,7 @@ func checkAMIEC2(ctx context.Context, clients any, res resource.Resource, cache 
 func checkAMIEBSSnaps(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	img, ok := assertStruct[ec2types.Image](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: -1}
+		return resource.UnknownRelated("ebs-snap")
 	}
 
 	var ids []string
@@ -85,14 +85,14 @@ func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache 
 
 	asgList, asgTruncated, err := amiRelatedResources(ctx, clients, cache, "asg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
+		return resource.ErrorRelated("asg", err)
 	}
 	if asgList == nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1}
+		return resource.UnknownRelated("asg")
 	}
 	ec2List, ec2Truncated, err := amiRelatedResources(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "asg", Count: -1, Err: err}
+		return resource.ErrorRelated("asg", err)
 	}
 	// ec2List may be nil when no ec2 cache entry is present (secondary lookup).
 	// Continue with an empty map — results will be based on asg cache alone.

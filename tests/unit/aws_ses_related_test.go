@@ -30,6 +30,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/session"
 )
@@ -314,7 +315,7 @@ func TestRelated_SES_Sns_NilClientsReturnsNegOne(t *testing.T) {
 	checker := sesCheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }
@@ -350,7 +351,7 @@ func TestRelated_SES_S3_NilClientsReturnsNegOne(t *testing.T) {
 	checker := sesCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients → type assertion failed)", result.Count)
 	}
 }
@@ -842,10 +843,10 @@ func TestSESActiveReceiptRuleSet_RetriesAfterTransientError(t *testing.T) {
 
 	checker := sesCheckerByTarget(t, "lambda")
 
-	// Call 1: expect error (Count=-1) — transient API failure.
+	// Call 1: expect error (State: RelatedError) — transient API failure.
 	result1 := checker(context.Background(), clients, src, resource.ResourceCache{})
-	if result1.Count != -1 {
-		t.Errorf("call 1: Count = %d, want -1 (transient API error)", result1.Count)
+	if result1.State != domain.RelatedError {
+		t.Errorf("call 1: State = %v, want RelatedError (transient API error)", result1.State)
 	}
 
 	// Call 2: expect success (Count=1) — error must NOT be cached by sync.Once.

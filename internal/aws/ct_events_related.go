@@ -20,10 +20,10 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 
 	userList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "iam-user")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: -1, Err: err}
+		return resource.ErrorRelated("iam-user", err)
 	}
 	if userList == nil {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: -1}
+		return resource.UnknownRelated("iam-user")
 	}
 
 	var ids []string
@@ -49,10 +49,10 @@ func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, 
 
 	roleList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "role")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	if roleList == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 
 	var ids []string
@@ -211,10 +211,10 @@ func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, c
 
 	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+		return resource.ErrorRelated("ec2", err)
 	}
 	if resourceList == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -260,10 +260,10 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 
 	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "s3")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
+		return resource.ErrorRelated("s3", err)
 	}
 	if resourceList == nil {
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+		return resource.UnknownRelated("s3")
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -313,10 +313,10 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 
 	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "lambda")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	if resourceList == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -383,10 +383,10 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 
 	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "dbi")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1, Err: err}
+		return resource.ErrorRelated("dbi", err)
 	}
 	if resourceList == nil {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
+		return resource.UnknownRelated("dbi")
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -436,10 +436,10 @@ func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, c
 
 	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "kms")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+		return resource.ErrorRelated("kms", err)
 	}
 	if resourceList == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -494,10 +494,10 @@ func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resourc
 
 	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "secrets")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
+		return resource.ErrorRelated("secrets", err)
 	}
 	if resourceList == nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.UnknownRelated("secrets")
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -539,10 +539,10 @@ func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, 
 
 	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "vpce")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1, Err: err}
+		return resource.ErrorRelated("vpce", err)
 	}
 	if resourceList == nil {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1}
+		return resource.UnknownRelated("vpce")
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -588,10 +588,10 @@ func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, ca
 
 	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "sg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1, Err: err}
+		return resource.ErrorRelated("sg", err)
 	}
 	if resourceList == nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -637,10 +637,10 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 
 	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "ddb")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ddb", Count: -1, Err: err}
+		return resource.ErrorRelated("ddb", err)
 	}
 	if resourceList == nil {
-		return resource.RelatedCheckResult{TargetType: "ddb", Count: -1}
+		return resource.UnknownRelated("ddb")
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -683,11 +683,7 @@ func checkCtEventsPivotByAccessKeyId(_ context.Context, _ any, res resource.Reso
 	if accessKeyID == "" {
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
 	}
-	return resource.RelatedCheckResult{
-		TargetType:  "ct-events",
-		Count:       -1,
-		FetchFilter: map[string]string{"AccessKeyId": accessKeyID},
-	}
+	return resource.DeferredRelated("ct-events", map[string]string{"AccessKeyId": accessKeyID})
 }
 
 // checkCtEventsPivotByUsername returns a self-pivot FetchFilter for the Username
@@ -698,11 +694,7 @@ func checkCtEventsPivotByUsername(_ context.Context, _ any, res resource.Resourc
 	if username == "" {
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
 	}
-	return resource.RelatedCheckResult{
-		TargetType:  "ct-events",
-		Count:       -1,
-		FetchFilter: map[string]string{"Username": username},
-	}
+	return resource.DeferredRelated("ct-events", map[string]string{"Username": username})
 }
 
 // checkCtEventsPivotByEventName returns a self-pivot FetchFilter for the EventName.
@@ -715,11 +707,7 @@ func checkCtEventsPivotByEventName(_ context.Context, _ any, res resource.Resour
 	if eventName == "" {
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
 	}
-	return resource.RelatedCheckResult{
-		TargetType:  "ct-events",
-		Count:       -1,
-		FetchFilter: map[string]string{"EventName": eventName},
-	}
+	return resource.DeferredRelated("ct-events", map[string]string{"EventName": eventName})
 }
 
 // checkCtEventsPivotBySharedEventId returns a self-pivot FetchFilter for the
@@ -746,11 +734,7 @@ func checkCtEventsPivotBySharedEventId(_ context.Context, _ any, res resource.Re
 	if sharedEventID == "" {
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
 	}
-	return resource.RelatedCheckResult{
-		TargetType:  "ct-events",
-		Count:       -1,
-		FetchFilter: map[string]string{"SharedEventId": sharedEventID},
-	}
+	return resource.DeferredRelated("ct-events", map[string]string{"SharedEventId": sharedEventID})
 }
 
 // checkCtEventsTrail extracts CloudTrail trail identifiers from the CloudTrail
@@ -790,10 +774,10 @@ func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource,
 
 	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "trail")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "trail", Count: -1, Err: err}
+		return resource.ErrorRelated("trail", err)
 	}
 	if resourceList == nil {
-		return resource.RelatedCheckResult{TargetType: "trail", Count: -1}
+		return resource.UnknownRelated("trail")
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -841,10 +825,10 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 
 	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if resourceList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))

@@ -1,26 +1,28 @@
 package unit_test
 
-// related_approximate_zero_test.go — Failing tests for the new
-// resource.ApproximateZero helper and the anti-pattern fix.
+// related_approximate_zero_test.go — tests for resource.ApproximateZero and
+// the truncated-empty-cache honest-lower-bound contract.
 //
-// Anti-pattern (225 occurrences across 69 *_related*.go files):
+// Anti-pattern (pre-task-#58; historically 225 occurrences across 69
+// *_related*.go files):
 //
 //   if len(ids) == 0 && truncated {
 //       return resource.RelatedCheckResult{TargetType: "X", Count: -1}
 //   }
 //
-// Contract per resource.ValidateRelatedResult (related.go:85) and the docstring
-// at lines 34-38: the honest state for "truncated cache with zero hits" is:
+// Contract per resource.ValidateRelatedResult (related.go:144) and
+// resource.ApproximateZero's docstring: the honest state for "truncated cache
+// with zero hits" is:
 //
-//   {Count: 0, Approximate: true}   — a valid lower bound, not unknown
+//   {State: RelatedResolved (zero value), Count: 0, Approximate: true}   — a valid lower bound, not unknown
 //
-// Returning Count: -1 drops the honest lower bound and misrepresents the state
-// as "unknown" when we actually know the count is ≥0 (we just cannot confirm the
-// full total because the cache is partial).
-//
-// TDD status: all tests are RED until:
-//   1. resource.ApproximateZero is added to internal/resource/related.go
-//   2. The coder sweeps all 225 anti-pattern sites to use ApproximateZero
+// Task #58 replaced the Count==-1 sentinel with the domain.RelatedRowState
+// enum, so the anti-pattern's modern equivalent is a checker returning any
+// non-RelatedResolved state (RelatedUnknown/RelatedError/RelatedDeferred)
+// instead of the honest Resolved+Approximate lower bound — that misrepresents
+// a "we scanned what we could see and found nothing (more may exist)" result
+// as "unknown"/"errored"/"deferred" when the count is actually a known >=0
+// lower bound.
 
 import (
 	"context"
@@ -30,6 +32,7 @@ import (
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws" // ensure all related registrations run
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -157,9 +160,9 @@ func TestCheckVPC_TruncatedCacheReturnsApproximateZero(t *testing.T) {
 
 	result := checker(context.Background(), nil, vpcResource, cache)
 
-	if result.Count == -1 {
-		t.Errorf("checkVPCSubnet with truncated-empty cache returned Count=-1 "+
-			"(anti-pattern); want Count=0, Approximate=true. Result: %+v", result)
+	if result.State != domain.RelatedResolved {
+		t.Errorf("checkVPCSubnet with truncated-empty cache returned State=%s "+
+			"(anti-pattern); want RelatedResolved with Count=0, Approximate=true. Result: %+v", result.State, result)
 	}
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0", result.Count)
@@ -215,9 +218,9 @@ func TestCheckSG_TruncatedCacheReturnsApproximateZero(t *testing.T) {
 
 	result := checker(context.Background(), nil, sgResource, cache)
 
-	if result.Count == -1 {
-		t.Errorf("checkSGEC2 with truncated-empty cache returned Count=-1 "+
-			"(anti-pattern); want Count=0, Approximate=true. Result: %+v", result)
+	if result.State != domain.RelatedResolved {
+		t.Errorf("checkSGEC2 with truncated-empty cache returned State=%s "+
+			"(anti-pattern); want RelatedResolved with Count=0, Approximate=true. Result: %+v", result.State, result)
 	}
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0", result.Count)
@@ -273,9 +276,9 @@ func TestCheckAMI_NG_TruncatedCacheReturnsApproximateZero(t *testing.T) {
 
 	result := checker(context.Background(), nil, amiResource, cache)
 
-	if result.Count == -1 {
-		t.Errorf("checkAMING with truncated-empty NG cache returned Count=-1 "+
-			"(anti-pattern); want Count=0, Approximate=true. Result: %+v", result)
+	if result.State != domain.RelatedResolved {
+		t.Errorf("checkAMING with truncated-empty NG cache returned State=%s "+
+			"(anti-pattern); want RelatedResolved with Count=0, Approximate=true. Result: %+v", result.State, result)
 	}
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0", result.Count)
@@ -644,13 +647,14 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsApproximate(t *testing
 				// when it determines from the parent's own fields that there can be
 				// no related resources of this type). That is acceptable — it means
 				// the early-exit guard fired, not the truncated-cache path.
-				// What is NEVER acceptable is Count=-1 when we provided a real cache
-				// entry (not nil). Count=-1 combined with IsTruncated=true is the
-				// anti-pattern that drops the honest lower bound.
-				if result.Count == -1 {
-					t.Errorf("checker %s with truncated-empty %q cache returned Count=-1 "+
-						"(anti-pattern: drops honest lower bound); want Count=0, Approximate=true. "+
-						"Result: %+v", key, def.TargetType, result)
+				// What is NEVER acceptable is a non-RelatedResolved State when we
+				// provided a real cache entry (not nil). A non-Resolved State
+				// combined with IsTruncated=true is the anti-pattern that drops the
+				// honest lower bound.
+				if result.State != domain.RelatedResolved {
+					t.Errorf("checker %s with truncated-empty %q cache returned State=%s "+
+						"(anti-pattern: drops honest lower bound); want RelatedResolved with Count=0, Approximate=true. "+
+						"Result: %+v", key, def.TargetType, result.State, result)
 				}
 
 				// When Count==0, Approximate must be true if the truncated path was hit.

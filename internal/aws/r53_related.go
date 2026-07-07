@@ -17,7 +17,7 @@ import (
 
 // errClientMissing is a sentinel returned by related-resource checkers when
 // the service client required for the check is not initialized. Callers
-// should treat it as "unknown" (Count:-1) rather than a real API error.
+// should treat it as "unknown" (RelatedUnknown) rather than a real API error.
 var errClientMissing = errors.New("AWS service client not initialized")
 
 // r53ListRecordsFirstPage makes a single ListResourceRecordSets call for the
@@ -67,9 +67,9 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+			return resource.UnknownRelated("elb")
 		}
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+		return resource.ErrorRelated("elb", err)
 	}
 	aliases := r53AliasDNSNames(sets)
 	if len(aliases) == 0 {
@@ -125,9 +125,9 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
+			return resource.UnknownRelated("cf")
 		}
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1, Err: err}
+		return resource.ErrorRelated("cf", err)
 	}
 	aliases := r53AliasDNSNames(sets)
 	if len(aliases) == 0 {
@@ -176,9 +176,9 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.RelatedCheckResult{TargetType: "apigw", Count: -1}
+			return resource.UnknownRelated("apigw")
 		}
-		return resource.RelatedCheckResult{TargetType: "apigw", Count: -1, Err: err}
+		return resource.ErrorRelated("apigw", err)
 	}
 	aliases := r53AliasDNSNames(sets)
 	// Extract API IDs from execute-api hostnames.
@@ -223,9 +223,9 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
+			return resource.UnknownRelated("s3")
 		}
-		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
+		return resource.ErrorRelated("s3", err)
 	}
 	aliases := r53AliasDNSNames(sets)
 	wantedBuckets := make(map[string]struct{})
@@ -274,9 +274,9 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, _ reso
 	sets, err := r53ListRecordsFirstPage(ctx, clients, zoneID)
 	if err != nil {
 		if errors.Is(err, errClientMissing) {
-			return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+			return resource.UnknownRelated("acm")
 		}
-		return resource.RelatedCheckResult{TargetType: "acm", Count: -1, Err: err}
+		return resource.ErrorRelated("acm", err)
 	}
 	var ids []string
 	for _, r := range sets {
@@ -317,17 +317,17 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 	api, ok := c.Route53.(Route53ListQueryLoggingConfigsAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.ListQueryLoggingConfigsOutput, error) {
 		return api.ListQueryLoggingConfigs(ctx, &route53.ListQueryLoggingConfigsInput{HostedZoneId: &zoneID})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if out == nil || len(out.QueryLoggingConfigs) == 0 {
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
@@ -387,13 +387,13 @@ func checkR53VPC(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.Route53 == nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*route53.GetHostedZoneOutput, error) {
 		return c.Route53.GetHostedZone(ctx, &route53.GetHostedZoneInput{Id: &zoneID})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1, Err: err}
+		return resource.ErrorRelated("vpc", err)
 	}
 	var ids []string
 	seen := make(map[string]bool)

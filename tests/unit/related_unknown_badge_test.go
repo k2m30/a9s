@@ -1,35 +1,31 @@
 // related_unknown_badge_test.go — pins the user-visible fix where a RESOLVED
-// unknown related count (Count==-1, not loading, no error, no FetchFilter)
-// renders as an explicit "(?)" badge instead of an empty/no-badge row.
+// unknown related count (State: RelatedUnknown, not loading, no error, no
+// FetchFilter) renders as an explicit "(?)" badge instead of an empty/no-badge
+// row.
 //
 // Contract under test (resource.FormatRelatedCount, internal/resource/related.go):
-//   - count == -1, hasFetchFilter=true  → ""    (actionable drill-in link;
-//     the filtered re-fetch resolves the real count once entered, so no
-//     misleading "(?)" badge is shown on what is really a navigable pivot)
-//   - count == -1, hasFetchFilter=false → "(?)" (resolved unknown — a
-//     computable pivot whose required cache entry is cold, e.g. ng→ebs
-//     before the ec2 cache has warmed; see
+//   - State: RelatedDeferred (server-side FetchFilter pivot) → ""    (actionable
+//     drill-in link; the filtered re-fetch resolves the real count once
+//     entered, so no misleading "(?)" badge is shown on what is really a
+//     navigable pivot)
+//   - State: RelatedUnknown                                 → "(?)" (resolved
+//     unknown — a computable pivot whose required cache entry is cold, e.g.
+//     ng→ebs before the ec2 cache has warmed; see
 //     TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch in
 //     aws_ng_cold_cache_guard_test.go for the checker-level contract this
 //     badge represents. Must read as "we tried and can't tell you yet",
 //     distinct from the loading state, which never reaches this function)
-//   - count == 0                       → "(0)"
-//   - count == N (N > 0)               → "(N)"
+//   - State: RelatedResolved, count == 0                     → "(0)"
+//   - State: RelatedResolved, count == N (N > 0)              → "(N)"
 //
 // A prior revision of this file fixtured the no-filter case as a
 // budget-excluded/structurally-uncomputable pivot (e.g. kms→s3). That framing
 // no longer applies: budget-excluded pivots (the knownDisconnectedPivots set)
 // are being removed from the registry entirely by a parallel change, so their
-// rows never reach the panel at all. The remaining count==-1-no-filter case
-// is exclusively the TRANSIENT one — a real registered checker whose backing
-// cache entry has not warmed yet — so this file fixtures that scenario.
-//
-// This is RED at HEAD (committed 9f51cf80): the old FormatRelatedCount(count
-// int) string signature returns "" for every count < 0, regardless of any
-// filter. The coder's in-progress fix adds the hasFetchFilter parameter and
-// the "(?)" branch; verified RED via a scratch worktree checked out at HEAD,
-// where the two-argument call fails to compile against the one-argument
-// production function.
+// rows never reach the panel at all. The remaining resolved-unknown-no-filter
+// case is exclusively the TRANSIENT one — a real registered checker whose
+// backing cache entry has not warmed yet — so this file fixtures that
+// scenario.
 package unit_test
 
 import (
@@ -37,6 +33,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
@@ -47,26 +44,26 @@ import (
 
 func TestFormatRelatedCount_Table(t *testing.T) {
 	cases := []struct {
-		name           string
-		count          int
-		hasFetchFilter bool
-		want           string
+		name  string
+		state domain.RelatedRowState
+		count int
+		want  string
 	}{
-		{"ResolvedUnknown_NoFilter", -1, false, "(?)"},
-		{"ResolvedUnknown_WithFilter_NoBadge", -1, true, ""},
-		{"ExactZero_NoFilter", 0, false, "(0)"},
-		{"ExactZero_WithFilter", 0, true, "(0)"},
-		{"Positive_NoFilter", 7, false, "(7)"},
-		{"Positive_WithFilter", 7, true, "(7)"},
-		{"LargeCount", 1000, false, "(1000)"},
+		{"ResolvedUnknown_NoFilter", domain.RelatedUnknown, 0, "(?)"},
+		{"ResolvedUnknown_WithFilter_NoBadge", domain.RelatedDeferred, 0, ""},
+		{"ExactZero_NoFilter", domain.RelatedResolved, 0, "(0)"},
+		{"ExactZero_WithFilter", domain.RelatedResolved, 0, "(0)"},
+		{"Positive_NoFilter", domain.RelatedResolved, 7, "(7)"},
+		{"Positive_WithFilter", domain.RelatedResolved, 7, "(7)"},
+		{"LargeCount", domain.RelatedResolved, 1000, "(1000)"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := resource.FormatRelatedCount(tc.count, tc.hasFetchFilter)
+			got := resource.FormatRelatedCount(tc.state, tc.count)
 			if got != tc.want {
-				t.Errorf("FormatRelatedCount(%d, hasFetchFilter=%v) = %q, want %q",
-					tc.count, tc.hasFetchFilter, got, tc.want)
+				t.Errorf("FormatRelatedCount(state=%v, %d) = %q, want %q",
+					tc.state, tc.count, got, tc.want)
 			}
 		})
 	}
@@ -81,8 +78,8 @@ func TestFormatRelatedCount_Table(t *testing.T) {
 
 // ngResourceForCacheMissBadge returns a node-group resource, matching the
 // TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch fixture shape: a real
-// registered ng→ebs pivot whose Count:-1 comes from a cold ec2/ebs cache, not
-// from a structurally-uncomputable checker.
+// registered ng→ebs pivot whose State: RelatedUnknown comes from a cold
+// ec2/ebs cache, not from a structurally-uncomputable checker.
 func ngResourceForCacheMissBadge() resource.Resource {
 	return resource.Resource{
 		ID:   "prod-workers",
@@ -112,12 +109,13 @@ func TestRenderRelatedPanel_TransientUnknownNoFilter_ShowsQuestionMarkBadge(t *t
 
 	block := app.RelatedBlock{
 		Name:         "EBS Volumes",
-		Count:        -1,
+		State:        domain.RelatedUnknown,
+		Count:        0,
 		Approximate:  false,
 		FetchFilter:  nil,
 		TargetType:   "ebs",
-		Actionable:   resource.IsRelatedActionable(-1, false, false, false, false),
-		CountDisplay: resource.FormatRelatedCount(-1, false),
+		Actionable:   resource.IsRelatedActionable(domain.RelatedUnknown, 0, false),
+		CountDisplay: resource.FormatRelatedCount(domain.RelatedUnknown, 0),
 	}
 	if !block.Actionable {
 		t.Fatal("test setup: transient-unknown-no-filter row must be Actionable (owner decision #38)")
@@ -143,9 +141,9 @@ func TestRenderRelatedPanel_TransientUnknownNoFilter_ShowsQuestionMarkBadge(t *t
 }
 
 // TestRenderRelatedPanel_ResolvedUnknownWithFilter_NoQuestionMarkBadge is the
-// counterpart control: a FetchFilter pivot at count=-1 remains a plain,
-// badge-less, ACTIONABLE row (the filtered fetch resolves the real count on
-// entry), so "(?)" must never appear for this state.
+// counterpart control: a State: RelatedDeferred FetchFilter pivot remains a
+// plain, badge-less, ACTIONABLE row (the filtered fetch resolves the real
+// count on entry), so "(?)" must never appear for this state.
 func TestRenderRelatedPanel_ResolvedUnknownWithFilter_NoQuestionMarkBadge(t *testing.T) {
 	ensureNoColor(t)
 	for _, tc := range relatedDimParityTypes() {
@@ -156,12 +154,13 @@ func TestRenderRelatedPanel_ResolvedUnknownWithFilter_NoQuestionMarkBadge(t *tes
 			filter := map[string]string{"instance-id": "i-0abc123def456789a"}
 			block := app.RelatedBlock{
 				Name:         "CloudTrail Events",
-				Count:        -1,
+				State:        domain.RelatedDeferred,
+				Count:        0,
 				Approximate:  false,
 				FetchFilter:  filter,
 				TargetType:   "ct-events",
-				Actionable:   resource.IsRelatedActionable(-1, false, true, false, false),
-				CountDisplay: resource.FormatRelatedCount(-1, true),
+				Actionable:   resource.IsRelatedActionable(domain.RelatedDeferred, 0, false),
+				CountDisplay: resource.FormatRelatedCount(domain.RelatedDeferred, 0),
 			}
 			if !block.Actionable {
 				t.Fatal("test setup: resolved-unknown-with-filter row must be Actionable")
@@ -175,14 +174,14 @@ func TestRenderRelatedPanel_ResolvedUnknownWithFilter_NoQuestionMarkBadge(t *tes
 			plain := stripAnsi(rendered)
 
 			if strings.Contains(plain, "(?)") {
-				t.Errorf("[%s] FetchFilter pivot at count=-1 must NOT render \"(?)\" badge; got:\n%s", tc.shortName, plain)
+				t.Errorf("[%s] FetchFilter pivot (State: RelatedDeferred) must NOT render \"(?)\" badge; got:\n%s", tc.shortName, plain)
 			}
 
 			line := extractRelatedLine(t, rendered, "CloudTrail Events")
 			wantText := "  CloudTrail Events"
 			wantStyled := styles.RowNormal.Render(wantText)
 			if line != wantStyled {
-				t.Errorf("[%s] FetchFilter pivot at count=-1 must render bright with no badge.\n  got:  %q\n  want: %q", tc.shortName, line, wantStyled)
+				t.Errorf("[%s] FetchFilter pivot (State: RelatedDeferred) must render bright with no badge.\n  got:  %q\n  want: %q", tc.shortName, line, wantStyled)
 			}
 		})
 	}

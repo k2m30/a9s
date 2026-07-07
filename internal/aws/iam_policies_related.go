@@ -63,7 +63,7 @@ func resolveIAMAPI(c *ServiceClients) IAMListEntitiesForPolicyAPI {
 func checkPolicyRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	policyARN := policyARNFromResource(res)
 	if policyARN == "" {
@@ -71,7 +71,7 @@ func checkPolicyRole(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	var ids []string
 	for _, r := range out.PolicyRoles {
@@ -87,7 +87,7 @@ func checkPolicyRole(ctx context.Context, clients any, res resource.Resource, _ 
 func checkPolicyUser(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: -1}
+		return resource.UnknownRelated("iam-user")
 	}
 	policyARN := policyARNFromResource(res)
 	if policyARN == "" {
@@ -95,7 +95,7 @@ func checkPolicyUser(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: -1, Err: err}
+		return resource.ErrorRelated("iam-user", err)
 	}
 	var ids []string
 	for _, u := range out.PolicyUsers {
@@ -111,7 +111,7 @@ func checkPolicyUser(ctx context.Context, clients any, res resource.Resource, _ 
 func checkPolicyGroup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "iam-group", Count: -1}
+		return resource.UnknownRelated("iam-group")
 	}
 	// Inline policies: extract group name from path "inline/<group>"
 	if path := res.Fields["path"]; strings.HasPrefix(path, "inline/") {
@@ -124,7 +124,7 @@ func checkPolicyGroup(ctx context.Context, clients any, res resource.Resource, _
 	}
 	out, err := listAllPolicyEntities(ctx, resolveIAMAPI(c), policyARN)
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "iam-group", Count: -1, Err: err}
+		return resource.ErrorRelated("iam-group", err)
 	}
 	var ids []string
 	for _, g := range out.PolicyGroups {

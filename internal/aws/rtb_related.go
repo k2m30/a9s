@@ -32,10 +32,10 @@ func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cac
 
 	subnetList, truncated, err := rtbRelatedResources(ctx, clients, cache, "subnet")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1, Err: err}
+		return resource.ErrorRelated("subnet", err)
 	}
 	if subnetList == nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 
 	var ids []string
@@ -70,10 +70,10 @@ func checkRTBNAT(ctx context.Context, clients any, res resource.Resource, cache 
 
 	natList, truncated, err := rtbRelatedResources(ctx, clients, cache, "nat")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1, Err: err}
+		return resource.ErrorRelated("nat", err)
 	}
 	if natList == nil {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+		return resource.UnknownRelated("nat")
 	}
 
 	var ids []string
@@ -108,10 +108,10 @@ func checkRTBIGW(ctx context.Context, clients any, res resource.Resource, cache 
 
 	igwList, truncated, err := rtbRelatedResources(ctx, clients, cache, "igw")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "igw", Count: -1, Err: err}
+		return resource.ErrorRelated("igw", err)
 	}
 	if igwList == nil {
-		return resource.RelatedCheckResult{TargetType: "igw", Count: -1}
+		return resource.UnknownRelated("igw")
 	}
 
 	var ids []string
@@ -136,10 +136,10 @@ func checkRTBCFN(ctx context.Context, clients any, res resource.Resource, cache 
 
 	cfnList, truncated, err := rtbRelatedResources(ctx, clients, cache, "cfn")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
+		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 
 	var ids []string
@@ -198,10 +198,10 @@ func checkRTBENI(ctx context.Context, clients any, res resource.Resource, cache 
 
 	eniList, truncated, err := rtbRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1, Err: err}
+		return resource.ErrorRelated("eni", err)
 	}
 	if eniList == nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.UnknownRelated("eni")
 	}
 	var ids []string
 	for _, eniRes := range eniList {
@@ -234,10 +234,10 @@ func checkRTBTGW(ctx context.Context, clients any, res resource.Resource, cache 
 
 	tgwList, truncated, err := rtbRelatedResources(ctx, clients, cache, "tgw")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "tgw", Count: -1, Err: err}
+		return resource.ErrorRelated("tgw", err)
 	}
 	if tgwList == nil {
-		return resource.RelatedCheckResult{TargetType: "tgw", Count: -1}
+		return resource.UnknownRelated("tgw")
 	}
 	var ids []string
 	for _, tgwRes := range tgwList {
@@ -261,10 +261,10 @@ func checkRTBVPCE(ctx context.Context, clients any, res resource.Resource, cache
 
 	vpceList, truncated, err := rtbRelatedResources(ctx, clients, cache, "vpce")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1, Err: err}
+		return resource.ErrorRelated("vpce", err)
 	}
 	if vpceList == nil {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1}
+		return resource.UnknownRelated("vpce")
 	}
 	var ids []string
 	for _, vpceRes := range vpceList {

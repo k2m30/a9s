@@ -26,10 +26,10 @@ func checkECSSvcCTEvents(ctx context.Context, clients any, res resource.Resource
 	}
 	evList, truncated, err := ecsSvcRelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err}
+		return resource.ErrorRelated("ct-events", err)
 	}
 	if evList == nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.UnknownRelated("ct-events")
 	}
 	var ids []string
 	for _, evRes := range evList {
@@ -59,10 +59,10 @@ func checkECSSvcTasks(ctx context.Context, clients any, res resource.Resource, c
 	}
 	taskList, truncated, err := ecsSvcRelatedResources(ctx, clients, cache, "ecs-task")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1, Err: err}
+		return resource.ErrorRelated("ecs-task", err)
 	}
 	if taskList == nil {
-		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: -1}
+		return resource.UnknownRelated("ecs-task")
 	}
 	var ids []string
 	for _, tRes := range taskList {
@@ -85,7 +85,7 @@ func checkECSSvcTasks(ctx context.Context, clients any, res resource.Resource, c
 func checkECSSvcSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 	if raw.NetworkConfiguration == nil || raw.NetworkConfiguration.AwsvpcConfiguration == nil {
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
@@ -115,10 +115,10 @@ func checkECSSvcVPC(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	subnetList, truncated, err := ecsSvcRelatedResources(ctx, clients, cache, "subnet")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1, Err: err}
+		return resource.ErrorRelated("vpc", err)
 	}
 	if subnetList == nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		return resource.UnknownRelated("vpc")
 	}
 	wanted := make(map[string]struct{}, len(subnetIDs))
 	for _, s := range subnetIDs {
@@ -242,7 +242,7 @@ func ecsSvcEbRuleMatches(pattern, svcName, clusterName string) bool {
 func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+		return resource.UnknownRelated("ecr")
 	}
 	if raw.TaskDefinition == nil || *raw.TaskDefinition == "" {
 		return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
@@ -251,11 +251,11 @@ func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, _ r
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ECS == nil {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+		return resource.UnknownRelated("ecr")
 	}
 	api, ok := c.ECS.(ECSDescribeTaskDefinitionAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+		return resource.UnknownRelated("ecr")
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
@@ -264,7 +264,7 @@ func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, _ r
 		})
 	})
 	if err != nil || out.TaskDefinition == nil {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1, Err: err}
+		return resource.ErrorRelated("ecr", err)
 	}
 
 	seen := make(map[string]struct{})
@@ -310,7 +310,7 @@ func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, _ r
 func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.UnknownRelated("secrets")
 	}
 	if raw.TaskDefinition == nil || *raw.TaskDefinition == "" {
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
@@ -319,11 +319,11 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.ECS == nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.UnknownRelated("secrets")
 	}
 	api, ok := c.ECS.(ECSDescribeTaskDefinitionAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.UnknownRelated("secrets")
 	}
 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
@@ -332,7 +332,7 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 		})
 	})
 	if err != nil || out.TaskDefinition == nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
+		return resource.ErrorRelated("secrets", err)
 	}
 
 	seen := make(map[string]struct{})
@@ -378,7 +378,7 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	raw, ok := assertStruct[ecstypes.Service](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sfn", Count: -1}
+		return resource.UnknownRelated("sfn")
 	}
 	if raw.TaskDefinition == nil || *raw.TaskDefinition == "" {
 		return resource.RelatedCheckResult{TargetType: "sfn", Count: 0}
@@ -396,7 +396,7 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 
 	entry, ok := cache["sfn"]
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sfn", Count: -1}
+		return resource.UnknownRelated("sfn")
 	}
 
 	var ids []string

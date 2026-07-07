@@ -21,10 +21,10 @@ func checkVPCSubnet(ctx context.Context, clients any, res resource.Resource, cac
 
 	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "subnet")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1, Err: err}
+		return resource.ErrorRelated("subnet", err)
 	}
 	if list == nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		return resource.UnknownRelated("subnet")
 	}
 
 	var ids []string
@@ -49,10 +49,10 @@ func checkVPCSG(ctx context.Context, clients any, res resource.Resource, cache r
 
 	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "sg")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1, Err: err}
+		return resource.ErrorRelated("sg", err)
 	}
 	if list == nil {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		return resource.UnknownRelated("sg")
 	}
 
 	var ids []string
@@ -77,10 +77,10 @@ func checkVPCEC2(ctx context.Context, clients any, res resource.Resource, cache 
 
 	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "ec2")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
+		return resource.ErrorRelated("ec2", err)
 	}
 	if list == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 
 	var ids []string
@@ -105,10 +105,10 @@ func checkVPCELB(ctx context.Context, clients any, res resource.Resource, cache 
 
 	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "elb")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+		return resource.ErrorRelated("elb", err)
 	}
 	if list == nil {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.UnknownRelated("elb")
 	}
 
 	var ids []string
@@ -138,10 +138,10 @@ func checkVPCNAT(ctx context.Context, clients any, res resource.Resource, cache 
 
 	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "nat")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1, Err: err}
+		return resource.ErrorRelated("nat", err)
 	}
 	if list == nil {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: -1}
+		return resource.UnknownRelated("nat")
 	}
 
 	var ids []string
@@ -166,10 +166,10 @@ func checkVPCIGW(ctx context.Context, clients any, res resource.Resource, cache 
 
 	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "igw")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "igw", Count: -1, Err: err}
+		return resource.ErrorRelated("igw", err)
 	}
 	if list == nil {
-		return resource.RelatedCheckResult{TargetType: "igw", Count: -1}
+		return resource.UnknownRelated("igw")
 	}
 
 	var ids []string
@@ -194,10 +194,10 @@ func checkVPCRTB(ctx context.Context, clients any, res resource.Resource, cache 
 
 	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "rtb")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1, Err: err}
+		return resource.ErrorRelated("rtb", err)
 	}
 	if list == nil {
-		return resource.RelatedCheckResult{TargetType: "rtb", Count: -1}
+		return resource.UnknownRelated("rtb")
 	}
 
 	var ids []string
@@ -222,10 +222,10 @@ func checkVPCVPCE(ctx context.Context, clients any, res resource.Resource, cache
 
 	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "vpce")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1, Err: err}
+		return resource.ErrorRelated("vpce", err)
 	}
 	if list == nil {
-		return resource.RelatedCheckResult{TargetType: "vpce", Count: -1}
+		return resource.UnknownRelated("vpce")
 	}
 
 	var ids []string
@@ -245,7 +245,7 @@ func checkVPCVPCE(ctx context.Context, clients any, res resource.Resource, cache
 func checkVPCCFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Vpc](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.UnknownRelated("cfn")
 	}
 	stackName := tagValue(raw.Tags, "aws:cloudformation:stack-name")
 	if stackName == "" {
@@ -264,10 +264,10 @@ func checkVPCENI(ctx context.Context, clients any, res resource.Resource, cache 
 
 	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "eni")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1, Err: err}
+		return resource.ErrorRelated("eni", err)
 	}
 	if list == nil {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
+		return resource.UnknownRelated("eni")
 	}
 	var ids []string
 	for _, r := range list {
@@ -296,7 +296,7 @@ func checkVPCTGW(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EC2 == nil {
-		return resource.RelatedCheckResult{TargetType: "tgw", Count: -1}
+		return resource.UnknownRelated("tgw")
 	}
 	resIDName := "resource-id"
 	resTypeName := "resource-type"
@@ -309,7 +309,7 @@ func checkVPCTGW(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "tgw", Count: -1, Err: err}
+		return resource.ErrorRelated("tgw", err)
 	}
 	seen := make(map[string]bool)
 	var ids []string

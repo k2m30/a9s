@@ -8,6 +8,7 @@ import (
 	catypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -97,7 +98,7 @@ func TestRelated_Codeartifact_KMS_WrongRawStruct(t *testing.T) {
 	checker := codeartifactCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }

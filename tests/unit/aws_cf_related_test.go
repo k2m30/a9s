@@ -11,6 +11,7 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -182,7 +183,7 @@ func TestRelated_CF_S3_NilCache(t *testing.T) {
 	checker := cfCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
 	}
 }
@@ -277,7 +278,7 @@ func TestRelated_CF_ELB_NilCache(t *testing.T) {
 	checker := cfCheckerByTarget(t, "elb")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
 	}
 }
@@ -357,7 +358,7 @@ func TestRelated_CF_WAF_NilCache(t *testing.T) {
 	checker := cfCheckerByTarget(t, "waf")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
 	}
 }
@@ -435,7 +436,7 @@ func TestRelated_CF_ACM_NilCache(t *testing.T) {
 	checker := cfCheckerByTarget(t, "acm")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
 	}
 }
@@ -549,7 +550,7 @@ func TestRelated_CF_R53_NilCacheWithAliases(t *testing.T) {
 
 	checker := cfCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (aliases present but nil zone cache)", result.Count)
 	}
 }
@@ -696,7 +697,7 @@ func TestRelated_CF_Alarm_NilCache(t *testing.T) {
 	res := resource.Resource{ID: "E1TESTDISTID", Fields: map[string]string{}}
 	checker := cfAlarmCheckerByTarget(t)
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (empty alarm cache)", result.Count)
 	}
 }
@@ -759,7 +760,7 @@ func TestRelated_CF_Lambda_NilClients(t *testing.T) {
 	res := resource.Resource{ID: "E1A2B3C4D5E6F7", Fields: map[string]string{}}
 	checker := cfCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (no CloudFront client)", result.Count)
 	}
 	if result.TargetType != "lambda" {
@@ -864,7 +865,7 @@ func TestRelated_CF_S3_WrongRawStruct(t *testing.T) {
 	}
 	checker := cfCheckerByTarget(t, "s3")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
 	}
 }
@@ -1076,7 +1077,7 @@ func TestRelated_CF_Lambda_APIError(t *testing.T) {
 	checker := cfCheckerByTarget(t, "lambda")
 	result := checker(context.Background(), clients, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
+	if result.State != domain.RelatedError {
 		t.Errorf("Count = %d, want -1 (API error)", result.Count)
 	}
 	if result.Err == nil {
@@ -1158,7 +1159,7 @@ func TestRelated_CF_Logs_NilClientPath(t *testing.T) {
 	res := resource.Resource{ID: "E1NILCLIENT", Fields: map[string]string{}}
 	checker := cfCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
-	if result.Count != -1 {
+	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
 	}
 }

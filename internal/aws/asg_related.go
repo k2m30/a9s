@@ -21,7 +21,7 @@ import (
 func checkASGEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.UnknownRelated("ec2")
 	}
 	var ids []string
 	for _, inst := range asg.Instances {
@@ -46,10 +46,10 @@ func checkASGAlarm(ctx context.Context, clients any, res resource.Resource, cach
 
 	alarmList, truncated, err := asgRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -82,10 +82,10 @@ func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache r
 
 	ngList, truncated, err := asgRelatedResources(ctx, clients, cache, "ng")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1, Err: err}
+		return resource.ErrorRelated("ng", err)
 	}
 	if ngList == nil {
-		return resource.RelatedCheckResult{TargetType: "ng", Count: -1}
+		return resource.UnknownRelated("ng")
 	}
 
 	var ids []string
@@ -116,12 +116,12 @@ func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache r
 func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: -1}
+		return resource.UnknownRelated("ami")
 	}
 
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: -1}
+		return resource.UnknownRelated("ami")
 	}
 
 	// LaunchConfigurationName path
@@ -132,7 +132,7 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 			})
 		})
 		if err != nil {
-			return resource.RelatedCheckResult{TargetType: "ami", Count: -1, Err: err}
+			return resource.ErrorRelated("ami", err)
 		}
 		if len(out.LaunchConfigurations) > 0 && out.LaunchConfigurations[0].ImageId != nil {
 			imageID := *out.LaunchConfigurations[0].ImageId
@@ -164,7 +164,7 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ami", Count: -1, Err: err}
+		return resource.ErrorRelated("ami", err)
 	}
 	for _, v := range ltOut.LaunchTemplateVersions {
 		if v.LaunchTemplateData != nil && v.LaunchTemplateData.ImageId != nil && *v.LaunchTemplateData.ImageId != "" {
@@ -180,7 +180,7 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkASGELB(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+		return resource.UnknownRelated("elb")
 	}
 	if len(asg.LoadBalancerNames) == 0 && len(asg.TargetGroupARNs) == 0 {
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
@@ -198,7 +198,7 @@ func checkASGELB(ctx context.Context, clients any, res resource.Resource, _ reso
 			if len(ids) > 0 {
 				return relatedResult("elb", ids)
 			}
-			return resource.RelatedCheckResult{TargetType: "elb", Count: -1}
+			return resource.UnknownRelated("elb")
 		}
 		tgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTargetGroupsOutput, error) {
 			return c.ELBv2.DescribeTargetGroups(ctx, &elbv2.DescribeTargetGroupsInput{
@@ -209,7 +209,7 @@ func checkASGELB(ctx context.Context, clients any, res resource.Resource, _ reso
 			if len(ids) > 0 {
 				return relatedResult("elb", ids)
 			}
-			return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
+			return resource.ErrorRelated("elb", err)
 		}
 		for _, tg := range tgOut.TargetGroups {
 			ids = append(ids, tg.LoadBalancerArns...)
@@ -224,7 +224,7 @@ func checkASGELB(ctx context.Context, clients any, res resource.Resource, _ reso
 func checkASGRole(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 
 	var ids []string

@@ -15,7 +15,7 @@ import (
 
 // sfnDescribe wraps DescribeStateMachine in RetryOnThrottle. Returns (nil, nil)
 // when the client is unsupported or absent (no API call attempted — the caller
-// renders Count=-1 without a FlashMsg). Returns (nil, err) on API failure so
+// renders an UnknownRelated result without a FlashMsg). Returns (nil, err) on API failure so
 // callers can surface the underlying error via Result.Err → FlashMsg → error log.
 func sfnDescribe(ctx context.Context, clients any, stateMachineARN string) (*sfn.DescribeStateMachineOutput, error) {
 	c, ok := clients.(*ServiceClients)
@@ -44,10 +44,10 @@ func checkSFNLogs(ctx context.Context, clients any, res resource.Resource, cache
 
 	logList, truncated, err := sfnRelatedResources(ctx, clients, cache, "logs")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.UnknownRelated("logs")
 	}
 
 	var ids []string
@@ -68,15 +68,15 @@ func checkSFNLogs(ctx context.Context, clients any, res resource.Resource, cache
 func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sfnARN := res.Fields["arn"]
 	if sfnARN == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	alarmList, truncated, err := sfnRelatedResources(ctx, clients, cache, "alarm")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
+		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string
@@ -107,10 +107,10 @@ func checkSFNRole(ctx context.Context, clients any, res resource.Resource, _ res
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+		return resource.ErrorRelated("role", err)
 	}
 	if out == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.UnknownRelated("role")
 	}
 	if out.RoleArn == nil || *out.RoleArn == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
@@ -127,10 +127,10 @@ func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+		return resource.ErrorRelated("kms", err)
 	}
 	if out == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+		return resource.UnknownRelated("kms")
 	}
 	if out.EncryptionConfiguration == nil || out.EncryptionConfiguration.KmsKeyId == nil ||
 		*out.EncryptionConfiguration.KmsKeyId == "" {
@@ -149,10 +149,10 @@ func checkSFNLambda(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	out, err := sfnDescribe(ctx, clients, arn)
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+		return resource.ErrorRelated("lambda", err)
 	}
 	if out == nil {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
+		return resource.UnknownRelated("lambda")
 	}
 	if out.Definition == nil || *out.Definition == "" {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
@@ -242,17 +242,17 @@ func checkSFNEbRule(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.EventBridge == nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.UnknownRelated("eb-rule")
 	}
 	api, ok := c.EventBridge.(EventBridgeListRuleNamesByTargetAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.UnknownRelated("eb-rule")
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eventbridge.ListRuleNamesByTargetOutput, error) {
 		return api.ListRuleNamesByTarget(ctx, &eventbridge.ListRuleNamesByTargetInput{TargetArn: &sfnARN})
 	})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: err}
+		return resource.ErrorRelated("eb-rule", err)
 	}
 	return relatedResult("eb-rule", out.RuleNames)
 }
