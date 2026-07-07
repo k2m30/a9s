@@ -89,7 +89,7 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Title: "Name", Path: "", Width: 28},
 				{Title: "Route Table ID", Path: "RouteTableId", Width: 26},
 				{Title: "VPC ID", Path: "VpcId", Width: 24},
-				{Title: "Status", Key: "status", Width: 8},
+				{Title: "Status", Width: 8},
 				{Title: "Routes", Path: "", Key: "routes_count", Width: 8},
 				{Title: "Assoc.", Path: "", Key: "associations_count", Width: 8},
 				{Title: "Blackholes", Key: "blackhole_routes_count", Width: 10},

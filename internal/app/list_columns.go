@@ -221,7 +221,7 @@ func extractListCells(columns []ColumnDef, r resource.Resource, td *resource.Res
 	for i, col := range columns {
 		v := listExtractCellValue(col, td, r)
 		if td != nil && len(td.CellDecorators) > 0 {
-			if dec := lookupListDecorator(td.CellDecorators, col); dec != nil {
+			if dec := lookupListDecorator(td.CellDecorators, col, td.LifecycleKey); dec != nil {
 				v = dec(r, v)
 			}
 		}
@@ -233,7 +233,16 @@ func extractListCells(columns []ColumnDef, r resource.Resource, td *resource.Res
 // lookupListDecorator mirrors lookupDecorator in table_render.go but operates on
 // ColumnDef (Key+Title+Path) instead of listCol. Tries key, path, path last segment
 // (lowercased), and lowercased title — in that order.
-func lookupListDecorator(decs map[string]func(resource.Resource, string) string, col ColumnDef) func(resource.Resource, string) string {
+//
+// A status-qualifying column (same predicate as listExtractCellValue's isStatusCol)
+// additionally tries lifecycleKey (the type's LifecycleKey, "" meaning "state" per
+// listExtractCellValue's own default) and the literal "state" as decorator keys,
+// after the explicit key/path/title matches above. Config-driven status columns
+// (e.g. ec2's default-view {Title:"Status", Path:"State.Name"}, no Key) carry none
+// of the keys a CellDecorators map is normally registered under (e.g. ec2's
+// CellDecorators["state"]), so without this fallback a decorator registered under
+// the type's state/lifecycle key is unreachable.
+func lookupListDecorator(decs map[string]func(resource.Resource, string) string, col ColumnDef, lifecycleKey string) func(resource.Resource, string) string {
 	if len(decs) == 0 {
 		return nil
 	}
@@ -256,6 +265,19 @@ func lookupListDecorator(decs map[string]func(resource.Resource, string) string,
 	}
 	if col.Title != "" {
 		if d, ok := decs[strings.ToLower(col.Title)]; ok {
+			return d
+		}
+	}
+	if lifecycleKey == "" {
+		lifecycleKey = "state"
+	}
+	isStatusCol := col.Key == "status" || col.Key == lifecycleKey ||
+		strings.EqualFold(col.Title, "status") || strings.EqualFold(col.Title, "state")
+	if isStatusCol {
+		if d, ok := decs[lifecycleKey]; ok {
+			return d
+		}
+		if d, ok := decs["state"]; ok {
 			return d
 		}
 	}

@@ -6,7 +6,6 @@ list:
     path: Type
     width: 10
   Status:
-    key: status
     width: 12
   Last Run:
     key: last_run

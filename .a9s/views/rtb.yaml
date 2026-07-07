@@ -8,7 +8,6 @@ list:
     path: VpcId
     width: 24
   Status:
-    key: status
     width: 8
   Routes:
     key: routes_count

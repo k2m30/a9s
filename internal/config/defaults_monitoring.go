@@ -24,7 +24,7 @@ func monitoringDefaultViews() map[string]ViewDef {
 		"logs": {
 			List: []ListColumn{
 				{Title: "Log Group Name", Path: "LogGroupName", Width: 48},
-				{Title: "Status", Key: "status", Width: 12},
+				{Title: "Status", Width: 12},
 				{Title: "Size", Key: "stored_bytes", SortPath: "StoredBytes", Width: 14},
 				{Title: "Retention", Path: "RetentionInDays", Width: 10},
 				{Title: "Metric Filters", Path: "MetricFilterCount", Width: 8},
@@ -41,7 +41,7 @@ func monitoringDefaultViews() map[string]ViewDef {
 		"trail": {
 			List: []ListColumn{
 				{Title: "Trail Name", Path: "Name", Width: 28},
-				{Title: "Status", Key: "status", Width: 12},
+				{Title: "Status", Width: 12},
 				{Title: "Logging", Key: "is_logging", Width: 10},
 				{Title: "Last Error", Key: "latest_delivery_error", Width: 32},
 				{Title: "S3 Bucket", Path: "S3BucketName", Width: 28},

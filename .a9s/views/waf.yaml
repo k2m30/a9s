@@ -6,7 +6,6 @@ list:
     path: Id
     width: 38
   Status:
-    key: status
     width: 12
   Rules:
     key: rules_summary

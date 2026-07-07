@@ -5,7 +5,7 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 		"r53": {
 			List: []ListColumn{
 				{Title: "Name", Path: "Name", Width: 36},
-				{Title: "Status", Key: "status", Width: 12},
+				{Title: "Status", Width: 12},
 				{Title: "Zone ID", Path: "Id", Width: 30},
 				{Title: "Records", Path: "ResourceRecordSetCount", Width: 9},
 				{Title: "Private", Path: "Config.PrivateZone", Width: 9},
@@ -52,7 +52,7 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 		"apigw": {
 			List: []ListColumn{
 				{Title: "Name", Path: "Name", Width: 28},
-				{Title: "Status", Key: "status", Width: 12},
+				{Title: "Status", Width: 12},
 				{Title: "API ID", Path: "ApiId", Width: 14},
 				{Title: "Protocol", Path: "ProtocolType", Width: 12},
 				{Title: "Stages", Key: "stages_count", Width: 7},
