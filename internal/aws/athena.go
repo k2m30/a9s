@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -98,6 +99,19 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 				"result_output_location": outputLocation,
 			},
 			RawStruct: wg,
+		}
+
+		// state is admin-controlled and blocks all query execution while
+		// DISABLED — emit a wave1 Finding so colorAthena's DISABLED branch
+		// has a Finding to derive its Warning color from.
+		if state == "DISABLED" {
+			r.Findings = []domain.Finding{{
+				Code:   athenaCodeWorkgroupDisabled,
+				Phrase: "disabled",
+				Detail: "Workgroup is administratively disabled — queries " +
+					"submitted against it are rejected until re-enabled.",
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
 		}
 
 		resources = append(resources, r)
