@@ -169,6 +169,7 @@ role — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
+| role.trust.wildcard-principal | anyone can assume this role | broken | wave1 |
 | iam-role.dormant | dormant role (>90d) | warn | wave2 |
 <!-- END GENERATED: findings -->
 

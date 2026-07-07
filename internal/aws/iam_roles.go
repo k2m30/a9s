@@ -11,8 +11,33 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// roleCodeWildcardTrust is the canonical FindingCode for a role whose trust
+// policy allows any AWS principal ("*") to assume it without a mitigating
+// sts:ExternalId condition.
+const roleCodeWildcardTrust domain.FindingCode = "role.trust.wildcard-principal"
+
+// roleWildcardTrustFindings mirrors colorRole's own wildcard-principal
+// detection (catalog_security.go) so the Findings list and the row color
+// never disagree. Checks both the nested-object form ({"AWS":"*"}, caught by
+// trustWildcard=="true" from parseTrustWildcard) and the bare-string form
+// ("Principal":"*", which parseTrustWildcard's typed struct cannot
+// unmarshal since Principal is not an object in that shape) — the same two
+// shapes colorRole's substring check covers.
+func roleWildcardTrustFindings(trustWildcard, assumeRolePolicyDoc string) []domain.Finding {
+	if trustWildcard == "true" ||
+		strings.Contains(assumeRolePolicyDoc, `"Principal":"*"`) ||
+		strings.Contains(assumeRolePolicyDoc, `"Principal": "*"`) {
+		return []domain.Finding{{
+			Code: roleCodeWildcardTrust, Phrase: "anyone can assume this role",
+			Severity: domain.SevBroken, Source: "wave1",
+		}}
+	}
+	return nil
+}
 
 // FetchIAMRoles calls the IAM ListRoles API and returns all pages of roles.
 // Used by tests; the production path uses the per-page fetcher for pagination.
@@ -111,6 +136,7 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 				"trust_summary":               trustSummary,
 				"policy_resources":            policyResources,
 			},
+			Findings:  roleWildcardTrustFindings(trustWildcard, assumeRolePolicyDoc),
 			RawStruct: role,
 		}
 
@@ -243,6 +269,7 @@ func roleToResource(role iamtypes.Role) resource.Resource {
 			// fields rather than pay for it on every single-ID drill.
 			"policy_resources": "",
 		},
+		Findings:  roleWildcardTrustFindings(trustWildcard, assumeRolePolicyDoc),
 		RawStruct: role,
 	}
 }

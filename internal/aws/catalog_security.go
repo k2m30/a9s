@@ -122,6 +122,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("role"), NeedsTargetCache: false},
 		},
 		Findings: []catalog.FindingDef{
+			{Code: roleCodeWildcardTrust, Phrase: "anyone can assume this role", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: iamRoleCodeDormant, Phrase: "dormant role (>90d)", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},

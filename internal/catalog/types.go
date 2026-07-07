@@ -121,7 +121,9 @@ type ResourceTypeDef struct {
 	// ─── Color & Augmentation ──────────────────────────────────────────────
 
 	// Color classifies the row's health. REQUIRED for all registered types.
-	// Reads the resource's structural fields directly.
+	// Findings-first: derives the color from the resource's own Findings via
+	// colorFromAnyFinding (worst severity wins). Raw structural fields are a
+	// fallback consulted only when the resource carries no Finding at all.
 	Color func(domain.Resource) domain.Color
 
 	// Augment is an optional post-projector hook that injects additional sections
