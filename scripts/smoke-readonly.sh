@@ -51,7 +51,7 @@ i=0
 while [ $i -lt 18 ]; do
 	sleep 5
 	tmux capture-pane -t "$SESSION" -p > "$CAPDIR/menu.txt"
-	if grep -qE '\([0-9]+\+?\) *!' "$CAPDIR/menu.txt"; then
+	if grep -qE 'issues:[0-9]+' "$CAPDIR/menu.txt"; then
 		break
 	fi
 	i=$((i + 1))
@@ -95,7 +95,7 @@ forbid() {
 
 # Menu: sweep produced issue badges in-session (not only cached counts).
 expect menu.txt 'resource-types\(66\)' "menu shows the full catalog"
-expect menu.txt '\([0-9]+\+?\) *![0-9]' "sweep produced at least one issue badge"
+expect menu.txt 'issues:[0-9]+' "sweep produced at least one issue badge"
 
 # Whole-cell raw enums must not survive rendering anywhere we look.
 for cap in ec2.txt sg.txt lambda.txt menu.txt; do
