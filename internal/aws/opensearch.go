@@ -12,21 +12,45 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
+// openSearchUpdateForcedSoon reports whether AWS has scheduled a mandatory
+// service-software update: UpdateAvailable=true AND AutomatedUpdateDate is a
+// real timestamp in the past. A zero-value AutomatedUpdateDate (Go's
+// time.Time{} zero, which formats as 0001-01-01, or the Unix epoch some AWS
+// SDK paths substitute for "not scheduled") is NOT a past-due date — without
+// this guard a domain that has never had an update scheduled reads as
+// perpetually overdue. isZeroOrEpoch below rejects both zero-value forms.
+func openSearchUpdateForcedSoon(d opensearchtypes.DomainStatus, now time.Time) bool {
+	return d.ServiceSoftwareOptions != nil &&
+		d.ServiceSoftwareOptions.UpdateAvailable != nil &&
+		*d.ServiceSoftwareOptions.UpdateAvailable &&
+		d.ServiceSoftwareOptions.AutomatedUpdateDate != nil &&
+		!isZeroOrEpoch(*d.ServiceSoftwareOptions.AutomatedUpdateDate) &&
+		d.ServiceSoftwareOptions.AutomatedUpdateDate.Before(now)
+}
+
+// isZeroOrEpoch reports whether t is Go's zero time.Time or the Unix epoch —
+// both are "no real timestamp was set" sentinels a caller might receive from
+// an AWS SDK field instead of a nil pointer.
+func isZeroOrEpoch(t time.Time) bool {
+	return t.IsZero() || t.Unix() == 0
+}
+
 // openSearchSignals classifies a DomainStatus against the 5 spec signals.
 // Returns hard-state findings (for Resource.Findings) and the total signal count
 // (for computing the Fields["status"] display phrase with suffix).
 // Background-check signals (UpdateForcedSoon, EncryptionOff) contribute to the
-// display count but are NOT included in Findings — they are enricher territory.
+// display count but are NOT included in Findings — they are enricher territory
+// (EnrichOpenSearchDomains emits each as its own Wave-2 Finding/Code so
+// encryption-at-rest-off is never presented as an appendix of the unrelated
+// update-forced finding; when both fire on one resource only one Wave-2
+// Finding can attach per the IssueEnricherResult contract, so the enricher
+// picks the worse one and surfaces the other as a supporting DetailRow).
 func openSearchSignals(d opensearchtypes.DomainStatus, now time.Time) (hardFindings []domainpkg.Finding, totalCount int) {
 	isDeleted := d.Deleted != nil && *d.Deleted
 	isIsolated := d.DomainProcessingStatus == opensearchtypes.DomainProcessingStatusTypeIsolated
 	isProcessing := (d.Processing != nil && *d.Processing) ||
 		(d.UpgradeProcessing != nil && *d.UpgradeProcessing)
-	isUpdateForcedSoon := d.ServiceSoftwareOptions != nil &&
-		d.ServiceSoftwareOptions.UpdateAvailable != nil &&
-		*d.ServiceSoftwareOptions.UpdateAvailable &&
-		d.ServiceSoftwareOptions.AutomatedUpdateDate != nil &&
-		d.ServiceSoftwareOptions.AutomatedUpdateDate.Before(now)
+	isUpdateForcedSoon := openSearchUpdateForcedSoon(d, now)
 	isEncOff := d.EncryptionAtRestOptions != nil &&
 		d.EncryptionAtRestOptions.Enabled != nil &&
 		!*d.EncryptionAtRestOptions.Enabled
@@ -69,12 +93,7 @@ func openSearchStatusPhrase(d opensearchtypes.DomainStatus, now time.Time) strin
 		// Only background checks active — use first background phrase
 		// (this path means totalCount > 0 but no hard findings)
 		// Determine which background came first
-		isUpdateForcedSoon := d.ServiceSoftwareOptions != nil &&
-			d.ServiceSoftwareOptions.UpdateAvailable != nil &&
-			*d.ServiceSoftwareOptions.UpdateAvailable &&
-			d.ServiceSoftwareOptions.AutomatedUpdateDate != nil &&
-			d.ServiceSoftwareOptions.AutomatedUpdateDate.Before(now)
-		if isUpdateForcedSoon {
+		if openSearchUpdateForcedSoon(d, now) {
 			top := "software update forced soon"
 			if totalCount > 1 {
 				return fmt.Sprintf("%s (+%d)", top, totalCount-1)
@@ -195,9 +214,7 @@ func FetchOpenSearchDomainsAt(
 		newVersion := ""
 		if domain.ServiceSoftwareOptions != nil {
 			sso := domain.ServiceSoftwareOptions
-			if sso.UpdateAvailable != nil && *sso.UpdateAvailable &&
-				sso.AutomatedUpdateDate != nil &&
-				sso.AutomatedUpdateDate.Before(now) {
+			if openSearchUpdateForcedSoon(domain, now) {
 				updateAvailable = "true"
 			}
 			if sso.AutomatedUpdateDate != nil {
