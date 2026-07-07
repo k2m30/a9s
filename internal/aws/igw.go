@@ -79,6 +79,9 @@ func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatew
 		case "detaching":
 			findings = []domain.Finding{{Code: CodeIGWStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1"}}
 		}
+		if len(findings) == 0 && len(igw.Attachments) == 0 {
+			findings = []domain.Finding{{Code: CodeIGWNoAttachments, Phrase: "no VPC attachments", Severity: domain.SevWarn, Source: "wave1"}}
+		}
 
 		r := resource.Resource{
 			ID:   igwID,

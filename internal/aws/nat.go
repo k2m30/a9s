@@ -90,6 +90,8 @@ func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, co
 			findings = []domain.Finding{{Code: CodeNATStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
 		case "failed":
 			findings = []domain.Finding{{Code: CodeNATStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		case "deleted":
+			findings = []domain.Finding{{Code: CodeNATStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"}}
 		}
 
 		r := resource.Resource{

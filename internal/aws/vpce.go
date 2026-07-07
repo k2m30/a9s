@@ -81,6 +81,8 @@ func FetchVPCEndpointsPage(ctx context.Context, api EC2DescribeVpcEndpointsAPI, 
 			findings = []domain.Finding{{Code: CodeVPCEStateExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1"}}
 		case "Partial":
 			findings = []domain.Finding{{Code: CodeVPCEStatePartial, Phrase: "partial", Severity: domain.SevBroken, Source: "wave1"}}
+		case "Deleted":
+			findings = []domain.Finding{{Code: CodeVPCEStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"}}
 		}
 
 		r := resource.Resource{

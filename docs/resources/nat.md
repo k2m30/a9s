@@ -177,6 +177,7 @@ nat — NETWORKING. Lifecycle key: `state`.
 | nat.state.pending | pending | warn | wave1 |
 | nat.state.deleting | deleting | warn | wave1 |
 | nat.state.failed | failed | broken | wave1 |
+| nat.state.deleted | deleted | dim | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
