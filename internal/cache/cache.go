@@ -130,9 +130,22 @@ func cacheRoot() string {
 // Store holds the in-memory, loaded state of every resource type's TypeFile
 // for one profile+region pair. Obtained via LoadDir; Put stages a type's new
 // state, SaveType persists exactly that one type's file.
+//
+// dir is captured ONCE, at LoadDir construction time, from Dir(profile,
+// region) — every subsequent SaveType call reuses this captured value instead
+// of recomputing Dir/cacheRoot (which reads A9S_CONFIG_FOLDER live). Without
+// this, a Store's save path stays bound to whatever the environment variable
+// happens to be at the moment SaveType's goroutine finally runs, not at the
+// moment the Store was created — the exact seam a leaked
+// runAvailabilitySaveLoop writer exploited to land in a since-repurposed (or
+// already-removed) directory. A profile/region switch always constructs a
+// brand-new Store via a fresh LoadDir call (see Session.Rotate +
+// ensureCacheStoreLocked), so this capture is naturally per-pair and never
+// goes stale across a rotation.
 type Store struct {
 	profile string
 	region  string
+	dir     string
 	types   map[string]TypeFile
 }
 
@@ -142,13 +155,14 @@ type Store struct {
 // wrong-version file is skipped (one log line) without affecting the other
 // files' load (C7).
 func LoadDir(profile, region string) *Store {
+	dir := Dir(profile, region)
 	s := &Store{
 		profile: profile,
 		region:  region,
+		dir:     dir,
 		types:   make(map[string]TypeFile),
 	}
 
-	dir := Dir(profile, region)
 	if dir == "" {
 		return s
 	}
@@ -249,6 +263,17 @@ func (s *Store) Put(shortName string, tf TypeFile) {
 // aliased, without requiring any caller to take a lock it doesn't already
 // hold or without SaveType itself taking one (Store has none, and adding one
 // would only re-serialize callers, not fix the aliasing).
+//
+// Writes to s.dir — the root captured once at LoadDir construction time, NOT
+// a fresh Dir(s.profile, s.region) recompute (see Store's doc comment) — so a
+// SaveType call that runs on a goroutine outliving its owning Controller
+// always targets the directory that existed when the Store was built, even if
+// A9S_CONFIG_FOLDER has since changed or that directory has since been
+// removed. A leaked writer's SaveType against a removed s.dir returns an
+// error here (MkdirAll/rename against a deleted parent); every caller in this
+// codebase (queueAvailabilitySave's save loop) already logs and discards a
+// SaveType error rather than panicking, so this failure mode is tolerated by
+// design, not merely by accident.
 func (s *Store) SaveType(shortName string) error {
 	tf, ok := s.types[shortName]
 	if !ok {
@@ -256,7 +281,7 @@ func (s *Store) SaveType(shortName string) error {
 	}
 	tf.Rows = deepCopyRows(tf.Rows)
 
-	dir := Dir(s.profile, s.region)
+	dir := s.dir
 	if dir == "" {
 		return fmt.Errorf("cache: cannot determine cache directory")
 	}
