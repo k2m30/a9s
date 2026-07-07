@@ -10,9 +10,26 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func colorGlue(_ domain.Resource) domain.Color { return domain.ColorHealthy }
+// colorGlue prefers colorFromAnyFinding so real fetched resources (Findings
+// populated by EnrichGlueJobStatus, Source: "wave2") color from their own
+// Finding; glue jobs carry no other structural signal at fetch time, so
+// there is no raw-field fallback to keep.
+func colorGlue(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
 
+// colorAthena prefers colorFromAnyFinding so real fetched resources
+// (Findings populated by the fetcher's DISABLED-state wave1 Finding, Source:
+// "wave1", and EnrichAthenaWorkGroup, Source: "wave2:athena") color from
+// their own Finding; the raw-field switch below is the identical-precedence
+// fallback for callers that construct a Resource with only Fields set.
 func colorAthena(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
 	switch r.Fields["state"] {
 	case "ENABLED":
 		return domain.ColorHealthy
@@ -101,6 +118,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("athena")},
 		},
 		Findings: []catalog.FindingDef{
+			{Code: athenaCodeWorkgroupDisabled, Phrase: "disabled", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: athenaCodeGovernanceMisconfigured, Phrase: "EnforceWorkGroupConfiguration (<N> findings)", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},

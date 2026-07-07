@@ -442,6 +442,7 @@ resource-list frame title. The frame-title rules:
 | codeartifact | codeartifact.no-permissions-policy | no permissions policy | warn | wave2 |
 | codeartifact | codeartifact.public-access-policy | public access policy | broken | wave2 |
 | glue | glue.latest-run-failed | latest run <STATUS> | broken | wave2 |
+| athena | athena.workgroup-disabled | disabled | warn | wave1 |
 | athena | athena.governance-misconfigured | EnforceWorkGroupConfiguration (<N> findings) | warn | wave2 |
 | backup | backup.job-failed | <N> jobs failed in last 24h | broken | wave2 |
 | backup | backup.job-partial | partial: <N> of <M> resources skipped | warn | wave2 |
