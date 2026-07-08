@@ -60,6 +60,13 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 			Include:  []ecstypes.ClusterField{ecstypes.ClusterFieldStatistics},
 		})
 		if err != nil {
+			// The whole batch was skipped — mark each cluster so its row shows a
+			// "?" coverage gap. A "~"-only enricher never truncates the issue
+			// badge, but a failed batch must not vanish silently (no finding, no
+			// badge, no "?").
+			for _, name := range batch {
+				result.TruncatedIDs[name] = true
+			}
 			continue
 		}
 

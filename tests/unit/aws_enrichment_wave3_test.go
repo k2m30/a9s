@@ -417,14 +417,14 @@ func TestEnrichECSClusters_NoRunningTasksWithInstancesEmitsFinding(t *testing.T)
 	}
 }
 
-// TestEnrichECSClusters_APIErrorDoesNotSetTruncatedBadge verifies that a
-// DescribeClusters API error is swallowed without propagating an error and
-// without fabricating a finding for the cluster that could not be inspected.
-// ecs is a "~"-only enricher (IssueCount always 0), so the coverage gap must
-// never lower-bound the aggregate issue badge — Truncated stays false. (The
-// batched DescribeClusters call does not attribute the failure to individual
-// cluster IDs, so this enricher does not populate TruncatedIDs on this path.)
-func TestEnrichECSClusters_APIErrorDoesNotSetTruncatedBadge(t *testing.T) {
+// TestEnrichECSClusters_BatchErrorMarksRowsTruncatedIDsNotBadge verifies that a
+// DescribeClusters batch error is swallowed without propagating an error and
+// without fabricating a finding, but that every cluster in the failed batch is
+// marked in TruncatedIDs so its row shows a "?" coverage gap. ecs is a "~"-only
+// enricher (IssueCount always 0), so the gap must never lower-bound the
+// aggregate issue badge (Truncated stays false) — the per-row "?" is the
+// correct signal, and it keeps a batch failure from becoming invisible.
+func TestEnrichECSClusters_BatchErrorMarksRowsTruncatedIDsNotBadge(t *testing.T) {
 	fake := &ecsWave3Fake{
 		descClustersErr: errors.New("simulated DescribeClusters error"),
 	}
@@ -448,6 +448,12 @@ func TestEnrichECSClusters_APIErrorDoesNotSetTruncatedBadge(t *testing.T) {
 	}
 	if _, ok := result.Findings["err-cluster"]; ok {
 		t.Errorf("unexpected finding for err-cluster when DescribeClusters errored; findings: %v", result.Findings)
+	}
+	// The whole batch was skipped by the API error — each cluster in it must be
+	// marked in TruncatedIDs so its row shows a "?" coverage gap. Without this the
+	// batch failure is completely invisible (no finding, no badge, no "?").
+	if !result.TruncatedIDs["err-cluster"] {
+		t.Error("err-cluster must be in TruncatedIDs when its DescribeClusters batch failed — a skipped batch must surface a per-row \"?\", not vanish")
 	}
 }
 
