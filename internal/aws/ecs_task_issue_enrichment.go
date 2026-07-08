@@ -54,6 +54,9 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 
 	truncated := len(resources) > EnrichmentCap
 	checked := 0
+	var failures []string
+	total := 0
+	const op = "ecs-task-enrich: DescribeTasks"
 
 	// DescribeTasks accepts up to 100 task ARNs per call.
 	const descBatch = 100
@@ -66,6 +69,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 			end := min(i+descBatch, len(taskIDs))
 			batch := taskIDs[i:end]
 			checked += len(batch)
+			total += len(batch)
 
 			out, err := clients.ECS.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 				Cluster: aws.String(clusterARN),
@@ -73,6 +77,9 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 			})
 			if err != nil {
 				truncated = true
+				for _, taskID := range batch {
+					MarkSkipped(&result, taskID, &failures, op, err)
+				}
 				continue
 			}
 
@@ -133,5 +140,6 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 
 	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
-	return result, nil
+	err := Finish(&result, failures, total, op)
+	return result, err
 }

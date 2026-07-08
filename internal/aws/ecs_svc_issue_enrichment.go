@@ -53,6 +53,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 	checked := 0
 	var failures []string
 	total := 0
+	const op = "ecs-svc-enrich: DescribeServices"
 
 	for clusterName, svcNames := range clusterServices {
 		// ECS DescribeServices accepts up to 10 services per call.
@@ -75,9 +76,10 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 			})
 			if err != nil {
 				for _, svcName := range batch {
-					failures = append(failures, fmt.Sprintf("%s/%s: %v", clusterName, svcName, err))
 					if r, ok := resourceByService[svcName]; ok {
-						result.TruncatedIDs[r.ID] = true
+						MarkSkipped(&result, r.ID, &failures, op, err)
+					} else {
+						failures = append(failures, fmt.Sprintf("%s: %v", svcName, err))
 					}
 				}
 				truncated = true
@@ -173,5 +175,6 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 
 	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
-	return result, AggregateFailures("ecs-svc-enrich: DescribeServices", failures, total)
+	err := Finish(&result, failures, total, op)
+	return result, err
 }

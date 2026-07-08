@@ -10,6 +10,7 @@ package aws
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -152,6 +153,33 @@ func setWave2Finding(
 		}
 		r.AttentionDetails[resourceID][code] = domain.AttentionDetail{Rows: rows}
 	}
+}
+
+// MarkSkipped records one item from a failed batch call: it sets
+// result.TruncatedIDs[id] so the row renders "?" instead of vanishing, and
+// appends "<id>: <err>" to *failures for Finish to fold into the caller's
+// composite error. Every "!"-severity Wave 2 enricher that iterates batched
+// AWS calls (DescribeTasks, DescribeServices, …) MUST call this once per item
+// in a failed batch — recording only the aggregate Truncated flag drops the
+// per-row signal the list view needs to distinguish "not inspected" from
+// "inspected and healthy". op identifies the caller's operation for parity
+// with Finish's signature; the per-item string itself omits it since the
+// composite error built by Finish already carries the op prefix once.
+func MarkSkipped(result *IssueEnricherResult, id string, failures *[]string, op string, err error) {
+	result.TruncatedIDs[id] = true
+	*failures = append(*failures, fmt.Sprintf("%s: %v", id, err))
+}
+
+// Finish folds a Wave 2 enricher's accumulated per-batch failures into result
+// and returns the composite error via AggregateFailures. Truncated is only
+// ever set to true here, never reset to false, so a call with zero failures
+// composes safely with Truncated already set for other reasons (EnrichmentCap,
+// per-parent page caps) earlier in the same enricher.
+func Finish(result *IssueEnricherResult, failures []string, total int, op string) error {
+	if len(failures) > 0 {
+		result.Truncated = true
+	}
+	return AggregateFailures(op, failures, total)
 }
 
 // IssueEnricherResult is the typed return value of a Wave 2 issue enricher.

@@ -245,6 +245,9 @@ func TestEnrichECSServices_APIErrorSetsTruncated(t *testing.T) {
 	if !result.Truncated {
 		t.Error("expected Truncated=true on DescribeServices API error")
 	}
+	if !result.TruncatedIDs["svc-err"] {
+		t.Error("svc-err must be in TruncatedIDs when its DescribeServices batch failed — a skipped batch must surface a per-row \"?\", not vanish")
+	}
 }
 
 // TestEnrichECSServices_HealthyServiceNoFinding verifies that a service with
@@ -587,7 +590,9 @@ func TestEnrichECSTasks_ContainerNonZeroExitEmitsFinding(t *testing.T) {
 	}
 }
 
-// TestEnrichECSTasks_APIErrorSetsTruncated verifies API errors mark Truncated.
+// TestEnrichECSTasks_APIErrorSetsTruncated verifies API errors mark Truncated
+// and surface a composite error — matching the ecs-svc/ecs-clusters convention
+// for "!" bang-severity enrichers.
 func TestEnrichECSTasks_APIErrorSetsTruncated(t *testing.T) {
 	fake := &ecsWave3Fake{
 		descTasksErr: errors.New("simulated DescribeTasks error"),
@@ -605,11 +610,52 @@ func TestEnrichECSTasks_APIErrorSetsTruncated(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichECSTasks(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when DescribeTasks fails")
 	}
 	if !result.Truncated {
 		t.Error("expected Truncated=true on DescribeTasks API error")
+	}
+}
+
+// TestEnrichECSTasks_BatchErrorMarksRowsTruncatedIDsNotBadgeAndReturnsErr verifies
+// that a DescribeTasks batch error marks EVERY task in the failed batch in
+// TruncatedIDs (per-row "?" coverage) and surfaces a non-nil aggregate error —
+// matching the ecs-svc enricher's shape (both are "!" bang-severity enrichers,
+// unlike the "~"-only ecs-clusters enricher which intentionally keeps err nil).
+func TestEnrichECSTasks_BatchErrorMarksRowsTruncatedIDsNotBadgeAndReturnsErr(t *testing.T) {
+	fake := &ecsWave3Fake{
+		descTasksErr: errors.New("simulated DescribeTasks error"),
+	}
+	clients := &awsclient.ServiceClients{ECS: fake}
+	resources := []resource.Resource{
+		{
+			ID:   "id1",
+			Name: "id1",
+			Fields: map[string]string{
+				"cluster": "arn:aws:ecs:us-east-1:123456789012:cluster/my-cluster",
+				"task_id": "id1",
+			},
+		},
+		{
+			ID:   "id2",
+			Name: "id2",
+			Fields: map[string]string{
+				"cluster": "arn:aws:ecs:us-east-1:123456789012:cluster/my-cluster",
+				"task_id": "id2",
+			},
+		},
+	}
+
+	result, err := awsclient.EnrichECSTasks(context.Background(), clients, resources, nil)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when DescribeTasks fails")
+	}
+	if !result.TruncatedIDs["id1"] {
+		t.Error("id1 must be in TruncatedIDs when its DescribeTasks batch failed — a skipped batch must surface a per-row \"?\", not vanish")
+	}
+	if !result.TruncatedIDs["id2"] {
+		t.Error("id2 must be in TruncatedIDs when its DescribeTasks batch failed — a skipped batch must surface a per-row \"?\", not vanish")
 	}
 }
 
