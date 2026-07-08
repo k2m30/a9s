@@ -124,8 +124,12 @@ func TestBuildCloudTrailFilter_IAMUser(t *testing.T) {
 	}
 }
 
-// TestBuildCloudTrailFilter_IAMRole verifies that role (CloudTrailKey "Username:Name")
-// returns a Username filter using res.Name.
+// TestBuildCloudTrailFilter_IAMRole verifies that role
+// (CloudTrailKey "_localfield.role_name:Fields.role_name") returns a local-verify
+// filter keyed on the built event's role_name field, not a server-side Username
+// LookupAttribute — assumed-role sessions carry the session name in Username,
+// while the role name lives only in sessionContext.sessionIssuer.userName, which
+// CloudTrail LookupEvents cannot filter on.
 func TestBuildCloudTrailFilter_IAMRole(t *testing.T) {
 	res := resource.Resource{
 		ID:   "arn:aws:iam::000000000000:role/MyRole",
@@ -137,13 +141,16 @@ func TestBuildCloudTrailFilter_IAMRole(t *testing.T) {
 
 	got := resource.BuildCloudTrailFilter(res, "role")
 	want := map[string]string{
-		"Username": "MyRole",
+		"_localfield.role_name": "MyRole",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("filter length = %d, want %d; got %v", len(got), len(want), got)
 	}
-	if got["Username"] != want["Username"] {
-		t.Errorf("filter[Username] = %q, want %q", got["Username"], want["Username"])
+	if got["_localfield.role_name"] != want["_localfield.role_name"] {
+		t.Errorf("filter[_localfield.role_name] = %q, want %q", got["_localfield.role_name"], want["_localfield.role_name"])
+	}
+	if _, ok := got["Username"]; ok {
+		t.Errorf("role filter must not carry a server-side Username key: got %v", got)
 	}
 }
 

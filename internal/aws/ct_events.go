@@ -75,14 +75,41 @@ func FetchCloudTrailEventsPage(ctx context.Context, api CloudTrailLookupEventsAP
 	}, nil
 }
 
+// ctLocalFieldPrefix marks a filter key that CloudTrail's LookupEvents API
+// cannot filter on server-side. The value it maps to is instead the key of a
+// Fields entry on the built resource, checked with a local equality match
+// after the page is fetched. See splitCTFilter.
+const ctLocalFieldPrefix = "_localfield."
+
+// splitCTFilter partitions a CloudTrail filter map into the subset CloudTrail's
+// LookupEvents API can filter on server-side (server) and the subset that must
+// be checked locally against Resource.Fields after the page is fetched (local,
+// with the ctLocalFieldPrefix stripped from each key).
+func splitCTFilter(filter map[string]string) (server, local map[string]string) {
+	server = make(map[string]string, len(filter))
+	local = make(map[string]string, len(filter))
+	for k, v := range filter {
+		if key, ok := strings.CutPrefix(k, ctLocalFieldPrefix); ok {
+			local[key] = v
+			continue
+		}
+		server[k] = v
+	}
+	return server, local
+}
+
 // FetchCloudTrailEventsPageFiltered calls the CloudTrail LookupEvents API with server-side
 // attribute filters and returns a single page of matching events.
-// filter keys must be valid CloudTrail LookupAttributeKey values (e.g., "Username", "ResourceName").
+// filter keys must be valid CloudTrail LookupAttributeKey values (e.g., "Username", "ResourceName"),
+// or carry the ctLocalFieldPrefix for a local post-fetch equality check against Resource.Fields
+// (see splitCTFilter) when the target value is not queryable via LookupAttributes.
 func FetchCloudTrailEventsPageFiltered(ctx context.Context, api CloudTrailLookupEventsAPI, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
+	server, local := splitCTFilter(filter)
+
 	input := &cloudtrail.LookupEventsInput{
 		MaxResults: aws.Int32(DefaultPageSize),
 	}
-	for k, v := range filter {
+	for k, v := range server {
 		input.LookupAttributes = append(input.LookupAttributes, cloudtrailtypes.LookupAttribute{
 			AttributeKey:   cloudtrailtypes.LookupAttributeKey(k),
 			AttributeValue: aws.String(v),
@@ -103,7 +130,26 @@ func FetchCloudTrailEventsPageFiltered(ctx context.Context, api CloudTrailLookup
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata
+	if len(local) > 0 {
+		filtered := resources[:0]
+		for _, r := range resources {
+			match := true
+			for k, v := range local {
+				if r.Fields[k] != v {
+					match = false
+					break
+				}
+			}
+			if match {
+				filtered = append(filtered, r)
+			}
+		}
+		resources = filtered
+	}
+
+	// IsTruncated and NextToken reflect the SERVER page, not the locally
+	// filtered slice: a local drop must never make a truncated server page
+	// look complete, or lose the token needed to fetch the next page.
 	nextToken := ""
 	isTruncated := false
 	if output.NextToken != nil {

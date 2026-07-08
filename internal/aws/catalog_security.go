@@ -71,7 +71,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		ShortName:     "role",
 		Aliases:       []string{"role", "roles", "iam-roles", "iam_roles"},
 		Category:      "SECURITY & IAM",
-		CloudTrailKey: "Username:Name",
+		CloudTrailKey: "_localfield.role_name:Fields.role_name",
 		Columns: []domain.Column{
 			{Key: "role_name", Title: "Role Name", Width: 36, Sortable: true},
 			{Key: "role_id", Title: "Role ID", Width: 22, Sortable: true},

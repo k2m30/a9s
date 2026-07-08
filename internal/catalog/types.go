@@ -106,6 +106,15 @@ type ResourceTypeDef struct {
 	Capabilities []domain.CapabilityID
 	// CloudTrailKey specifies how to build the CloudTrail LookupEvents filter.
 	// Format: "LookupAttr:ValueSource" (e.g., "ResourceName:ID").
+	// LookupAttr is normally a CloudTrail LookupAttributeKey (e.g. "Username",
+	// "ResourceName") sent as a server-side filter. When LookupAttr instead
+	// starts with "_localfield." (e.g. "_localfield.role_name"), the filter is
+	// not sent to CloudTrail at all — it is checked locally, after the page is
+	// fetched, against the built event's Resource.Fields[<FieldsKey>] using the
+	// same value source. Use the "_localfield." form when the value CloudTrail
+	// should match on is not exposed as a queryable LookupAttribute (e.g. an
+	// assumed-role session's CloudTrail Username is the session name, not the
+	// role name — the role name only exists in a parsed event field).
 	// Empty string means no CloudTrail support.
 	CloudTrailKey string
 	// ExcludeFromIssueBadge, when true, excludes this type from the main-menu

@@ -839,7 +839,7 @@ AWS API: <https://docs.aws.amazon.com/redshift/latest/APIReference/API_Cluster.h
 
 AWS API: <https://docs.aws.amazon.com/IAM/latest/APIReference/API_Role.html>
 
-- **`ct-events`** — Audit trail for role AssumeRole / policy attach events.
+- **`ct-events`** — Events performed *under* this role. Uses local verification, not a server-side `LookupEvents` filter: CloudTrail's [`LookupAttributeKey`](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupAttribute.html) exposes only `{EventId, EventName, ReadOnly, Username, ResourceType, ResourceName, EventSource, AccessKeyId}`, none of which is the role identity — for `Type=AssumedRole`, `Username` is the *session* name and the role lives only in `userIdentity.sessionContext.sessionIssuer.userName` (a non-lookup-able field). The pivot therefore issues a broad time-bounded [`LookupEvents`](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html) page and locally verifies `sessionIssuer.userName == roleName` (CloudTrailKey `_localfield.role_name:Fields.role_name`); counts/results are best-effort within the fetched window.
 - **`ec2`** — EC2 instances assuming this role via instance profile.
 - **`eks`** — EKS service role.
 - **`glue`** — Glue jobs assuming this role.
