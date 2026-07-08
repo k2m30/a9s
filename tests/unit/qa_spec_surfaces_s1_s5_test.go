@@ -42,23 +42,31 @@ func stripANSISpec(s string) string {
 }
 
 // -----------------------------------------------------------------------------
-// S1 — Menu badge must be "issues:N" with no "+" suffix.
-// Spec §4 S1: "Aggregated count of `!`-severity findings." The format is an
-// integer; truncation state is behavioral (ctrl+z visibility), never rendered.
+// S1 — Menu badge renders "issues:N", and "issues:N+" when the count is a lower
+// bound (the list is truncated). Owner decision 2026-07-08 supersedes the
+// earlier "truncation is behavioral, never rendered" rule: the "+" mirrors the
+// availability "(N+)" marker and the web menu template. The separate list-view
+// ⓘ banner stays forbidden (see TestSpec_NoBanner_WhenEnrichmentTruncated).
 // -----------------------------------------------------------------------------
 
-func TestSpec_S1_MenuBadge_NoPlusSuffixWhenTruncated(t *testing.T) {
+func TestSpec_S1_MenuBadge_PlusSuffixWhenTruncated(t *testing.T) {
 	m := views.NewMainMenu(keys.Default())
-	// Seed: 3 ec2 issues with a truncated count — buggy code renders "issues:3+".
+	// ec2: a truncated issue count → lower bound → "issues:3+".
 	m.SetIssues("ec2", 3, true)
 	m.SetAvailability("ec2", 50)
+	// s3: a fully-scanned type → exact count → no "+".
+	m.SetIssues("s3", 4, false)
+	m.SetAvailability("s3", 8)
 	m.SetSize(120, 40)
 	view := stripANSISpec(m.View())
-	if !strings.Contains(view, "issues:3") {
-		t.Fatalf("badge missing entirely; menu must render 'issues:3'. view:\n%s", view)
+	if !strings.Contains(view, "issues:3+") {
+		t.Errorf("a truncated issue count must render 'issues:3+' (lower bound); view:\n%s", view)
 	}
-	if strings.Contains(view, "issues:3+") {
-		t.Errorf("spec §4 S1 violation: menu badge must be 'issues:N' with no '+' suffix; got '+' in:\n%s", view)
+	if !strings.Contains(view, "issues:4") {
+		t.Fatalf("badge missing; menu must render 'issues:4' for the exact type; view:\n%s", view)
+	}
+	if strings.Contains(view, "issues:4+") {
+		t.Errorf("a non-truncated issue count must NOT render '+'; view:\n%s", view)
 	}
 }
 

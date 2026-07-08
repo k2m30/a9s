@@ -34,9 +34,12 @@ Preferred title format:
 ec2(25)  issues:2
 ecs-svc(14)  issues:3
 alarm(18)  issues:4
+s3(50+)  issues:4+
 ```
 
-Avoid compressed forms like `ec2(25/2 issues)` because they are harder to scan.
+Both the total and the `issues:N` count carry a trailing `+` when they are lower
+bounds (the list is truncated), mirroring one another. Avoid compressed forms
+like `ec2(25/2 issues)` because they are harder to scan.
 
 ### 2.2 List Toggle
 
