@@ -405,17 +405,13 @@ func buildRenderLinesFromEntries(entries []app.MenuEntry) []renderLine {
 }
 
 // entryIssueBadge renders the " issues:N" suffix for a controller-supplied
-// entry, only when the count is positive. A truncated count is a lower bound
-// (the list has unfetched pages, so more issue rows may exist beyond the first
-// page) and gets a "+" suffix — matching the availability "(N+)" marker above
-// and the web menu template (menu.html: {{if $e.IssueBadge.Truncated}}+{{end}}).
+// entry, only when the count is positive. Per spec §4 S1 the badge is a plain
+// integer with NO "+" suffix even when the underlying list is truncated —
+// truncation is conveyed behaviorally (the ctrl+z issue filter), never rendered
+// on the badge (pinned by qa_spec_surfaces_s1_s5_test.go).
 func entryIssueBadge(e app.MenuEntry) string {
 	if e.IssueBadge.Count <= 0 {
 		return ""
 	}
-	suffix := " issues:" + itoa(e.IssueBadge.Count)
-	if e.IssueBadge.Truncated {
-		suffix += "+"
-	}
-	return suffix
+	return " issues:" + itoa(e.IssueBadge.Count)
 }
