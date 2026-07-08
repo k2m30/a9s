@@ -154,9 +154,9 @@ func TestMenuRenderParity(t *testing.T) {
 		if len(all) < 4 {
 			t.Skip("need at least 4 resource types for S2")
 		}
-		typePos := all[0].ShortName    // positive count
-		typeEmpty := all[1].ShortName  // confirmed-empty (known=0, not truncated)
-		typeTrunc0 := all[2].ShortName // truncated-zero (known=0, truncated=true)
+		typePos := all[0].ShortName      // positive count
+		typeEmpty := all[1].ShortName    // confirmed-empty (known=0, not truncated)
+		typeTrunc0 := all[2].ShortName   // truncated-zero (known=0, truncated=true)
 		typeTruncPos := all[3].ShortName // truncated-positive (known=5, truncated=true)
 
 		m, c := newParityPair(t, 80, 200)
@@ -438,9 +438,9 @@ func TestMenuRenderParity(t *testing.T) {
 		// Controller side: PatchMenuIssueBatch mirrors SetIssuesFromCache.
 		c.ApplyIntents([]runtime.UIIntent{
 			runtime.PatchMenuIssueBatch{
-				Counts:   counts,
+				Counts:    counts,
 				Truncated: trunc,
-				Known:    known,
+				Known:     known,
 			},
 		})
 
@@ -487,4 +487,47 @@ func TestMenuRenderParity(t *testing.T) {
 		body := *c.Snapshot().Body.Menu
 		assertParity(t, &m, body)
 	})
+}
+
+// TestMenuIssueBadge_TruncatedCountRendersPlusSuffix pins the fix for the
+// acme-dev "S3 Buckets (50+) issues:4" bug: when the list is truncated the
+// issue count is a lower bound, so the TUI badge must render "issues:N+" —
+// matching the availability "(N+)" marker and the web template
+// (menu.html: {{if $e.IssueBadge.Truncated}}+{{end}}). A non-truncated count
+// must render "issues:N" with no "+".
+func TestMenuIssueBadge_TruncatedCountRendersPlusSuffix(t *testing.T) {
+	tuitest.NoColor(t)
+
+	truncType := firstNonExcludedShortName(t)
+	var exactType string
+	for _, rt := range resource.AllResourceTypes() {
+		if rt.ShortName != truncType && !rt.ExcludeFromIssueBadge {
+			exactType = rt.ShortName
+			break
+		}
+	}
+	if exactType == "" {
+		t.Skip("need two non-excluded resource types")
+	}
+
+	m, c := newParityPair(t, 120, 200)
+	c.ApplyIntents([]runtime.UIIntent{
+		// Truncated list (50+) with 4 issues found so far → lower bound.
+		runtime.PatchMenuAvailability{ResourceType: truncType, Count: 50, Truncated: true},
+		runtime.PatchMenu{ResourceType: truncType, Issues: 4, Truncated: true},
+		// Fully-scanned list with an exact 7 issues → no "+".
+		runtime.PatchMenuAvailability{ResourceType: exactType, Count: 8, Truncated: false},
+		runtime.PatchMenu{ResourceType: exactType, Issues: 7, Truncated: false},
+	})
+	got := m.RenderBody(*c.Snapshot().Body.Menu)
+
+	if !strings.Contains(got, "issues:4+") {
+		t.Errorf("truncated issue count must render \"issues:4+\" (lower bound, matching the (50+) total), got:\n%s", got)
+	}
+	if !strings.Contains(got, "issues:7") {
+		t.Errorf("exact issue count must render \"issues:7\", got:\n%s", got)
+	}
+	if strings.Contains(got, "issues:7+") {
+		t.Errorf("a non-truncated issue count must NOT render a \"+\" suffix, got:\n%s", got)
+	}
 }
