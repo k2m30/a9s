@@ -3,13 +3,29 @@ package unit
 import (
 	"os"
 	"testing"
+	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
 func TestMain(m *testing.M) {
+	// Shrink the flash auto-clear windows: tests that drain the full tea.Cmd
+	// chain would otherwise block on the real 2 s / 5 s tea.Tick timers. The
+	// flash still fires and still clears — only the wall-clock shrinks — so no
+	// assertion changes, only ~30-40s of suite time is reclaimed.
+	runtime.SetFlashDurationsForTest(time.Millisecond, time.Millisecond)
+	// Same idea for AWS retry backoff: keep MaxAttempts so retry LOGIC is still
+	// exercised, but shrink the 500ms BaseDelay that throttle/server-error tests
+	// (e.g. TestFetchKMSKeysPage_*) were paying for real.
+	awsclient.SetRetryConfigForTest(&awsclient.RetryConfig{
+		MaxAttempts: 3,
+		BaseDelay:   time.Millisecond,
+		MaxDelay:    10 * time.Millisecond,
+		Jitter:      false,
+	})
 	// styles holds package-level vars rebuilt by styles.Reinit(), which reads
 	// NO_COLOR at call time. The invoking shell's NO_COLOR must not change
 	// which SGR assertions pass in this binary, so the baseline is normalized

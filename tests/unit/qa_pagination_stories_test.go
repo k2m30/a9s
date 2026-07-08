@@ -1801,6 +1801,7 @@ func TestStoryN1_CopyID_OnAppendedItems(t *testing.T) {
 	}
 	for _, rt := range sampleN1 {
 		t.Run(rt.ShortName+"_copy_on_appended", func(t *testing.T) {
+			t.Parallel()
 			k := keys.Default()
 			m := views.NewResourceList(rt, nil, k)
 			m.SetSize(120, 30)

@@ -124,7 +124,6 @@ func TestAllTypes_CachedRenderMarkedStale(t *testing.T) {
 	skipped := map[string]string{}
 
 	for _, td := range types {
-		td := td
 		t.Run(td.ShortName, func(t *testing.T) {
 			if td.Fetcher == nil {
 				skipped[td.ShortName] = "no Wave-1 Fetcher registered — cannot be driven generically"
@@ -193,7 +192,6 @@ func TestAllTypes_SilentSwap(t *testing.T) {
 	skipped := map[string]string{}
 
 	for _, td := range types {
-		td := td
 		t.Run(td.ShortName, func(t *testing.T) {
 			if td.Fetcher == nil {
 				skipped[td.ShortName] = "no Wave-1 Fetcher registered — cannot be driven generically"
@@ -271,12 +269,16 @@ func TestAllTypes_SilentSwap(t *testing.T) {
 func TestAllTypes_SaveIsolation(t *testing.T) {
 	types := resource.AllResourceTypes()
 	allNames := resource.AllShortNames()
+	// One shared config root for the whole test; each subtest isolates on disk
+	// via its unique "alltypes-iso-<type>" profile (cache dirs are profile-keyed),
+	// which lets the ~66 subtests run in parallel. t.Setenv is called on this
+	// non-parallel parent (permitted) and restored only after every parallel
+	// subtest has joined.
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
 	for _, td := range types {
-		td := td
 		t.Run(td.ShortName, func(t *testing.T) {
-			tmp := t.TempDir()
-			t.Setenv("A9S_CONFIG_FOLDER", tmp)
+			t.Parallel()
 			profile, region := "alltypes-iso-"+td.ShortName, "us-east-1"
 
 			// Seed every OTHER type plus the type under test, so there are real

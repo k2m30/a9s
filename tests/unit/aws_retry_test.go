@@ -138,6 +138,9 @@ func TestRetryOnThrottle_ContextCancellation(t *testing.T) {
 }
 
 func TestDefaultRetryConfig(t *testing.T) {
+	// This test pins the PRODUCTION default; TestMain installs a global
+	// speed-override (1ms BaseDelay) for the whole binary, so clear it here.
+	defer awsclient.SetRetryConfigForTest(nil)()
 	cfg := awsclient.DefaultRetryConfig()
 	if cfg.MaxAttempts != 3 {
 		t.Errorf("expected MaxAttempts=3, got %d", cfg.MaxAttempts)

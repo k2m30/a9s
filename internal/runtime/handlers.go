@@ -43,7 +43,9 @@ import (
 
 // Flash auto-clear durations. apiErrorFlashDuration is the longer 5 s window
 // for AWS errors; flashDuration is the default 2 s window for status flashes.
-const (
+// vars (not consts) only so SetFlashDurationsForTest can shrink them — tests
+// that drain the full tea.Cmd chain would otherwise block on the real tea.Tick.
+var (
 	flashDuration         = 2 * time.Second
 	apiErrorFlashDuration = 5 * time.Second
 )
