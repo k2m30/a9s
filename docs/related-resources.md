@@ -51,18 +51,18 @@
    sub-objects are inside the budget, fan-outs over the TARGET type's whole
    population are not. A mechanism that cannot resolve within that budget on
    ANY cache state is NOT REGISTERED — it is documented under
-   **Explicitly excluded** below instead of shipping a checker that always
-   returns `Count: -1`. A permanently-unknowable row (never drillable, never
-   countable) is noise, not a decision the operator can act on. `Count: -1`
-   remains legitimate only as the TRANSIENT answer of a REGISTERED,
-   computable checker hitting a cold cache or a not-yet-loaded sibling type
-   (unknown — renders a `(?)` badge, dimmed and not drillable; a `-1` row
-   that carries a `FetchFilter` is a working drill-in link instead and stays
-   bare, no badge) — such a checker MUST (a) say so in a one-line comment
-   citing this rule, and (b) be marked `budget-excluded` in its per-type row
-   here and in `docs/resources/<type>.md` §2. An undocumented, always-`-1`
-   `Count: -1` is a defect, not a decision. Lifting a pivot back into the
-   registry requires the same evidence bar as rule 1.
+   **Explicitly excluded** below instead of shipping a checker that never
+   produces a real answer. A permanently-unknowable row (never drillable, never
+   countable) is noise, not a decision the operator can act on. How a checker's
+   result renders — exact `(N)`, lower-bound `(N+)`/`(0+)`, dimmed proven-zero
+   `(0)`, a blank navigable "drill in" row, or a dimmed error dead-end — is
+   defined once in
+   [`related-resources-engine.md`](related-resources-engine.md); the retired
+   `Count: -1` sentinel and the `(?)` badge no longer exist and MUST NOT be
+   produced. A blank, navigable transient-unknown row (a registered, computable
+   checker whose backing sibling cache is cold) is legitimate; an
+   always-unresolvable pivot is a defect. Lifting a pivot back into the registry
+   requires the same evidence bar as rule 1.
 
 ## Per-type contract
 
