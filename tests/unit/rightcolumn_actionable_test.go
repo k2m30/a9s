@@ -3,14 +3,12 @@ package unit_test
 // rightcolumn_actionable_test.go — regression tests for isActionableRow
 // approximate-zero handling.
 //
-// Background (contract updated — resolved count==0 is NEVER actionable):
-//   resource.IsRelatedActionable now treats a RESOLVED count==0 as never
-//   actionable, even when approximate==true. ApproximateZero() (related.go:219)
-//   sets Count:0, so "(0)" rows must not be drillable into an empty view.
-//   RelatedDeferred pivots (server-side FetchFilter navigation) remain
-//   actionable regardless of Count/the approximate flag.  These tests are
-//   regression guards to ensure this invariant is never accidentally
-//   reverted back to "approximate implies actionable".
+// Background (contract — only a PROVEN zero is a dead end):
+//   resource.IsRelatedActionable treats a RESOLVED count==0 as ACTIONABLE when
+//   it is APPROXIMATE (a "0+" lower bound from a truncated target scan — more
+//   may exist on later pages, so the user can drill in). Only a proven exact
+//   zero (approximate==false) is a non-actionable dead end. RelatedDeferred
+//   pivots (server-side FetchFilter navigation) remain actionable regardless.
 //
 // Test strategy:
 //   isActionableRow is unexported and lives in internal/tui/views.  Tests in
@@ -65,16 +63,14 @@ func TestIsRelatedActionable_Table(t *testing.T) {
 		approximate    bool
 		wantActionable bool
 	}{
-		{"DefiniteZero_NoFilter", domain.RelatedResolved, 0, false, false},
-		{"ApproxZero_NoFilter_NEW_NotActionable", domain.RelatedResolved, 0, true, false},
-		{"DefiniteZero_WithFetchFilter_NEW_NotActionable", domain.RelatedResolved, 0, false, false},
+		{"ProvenZero_NotActionable", domain.RelatedResolved, 0, false, false},
+		{"ApproxZero_IsActionable", domain.RelatedResolved, 0, true, true},
 		{"UnknownCount_WithFetchFilter_Actionable", domain.RelatedDeferred, 0, false, true},
 		{"UnknownCount_NoFilter_Actionable", domain.RelatedUnknown, 0, false, true},
 		{"PositiveCount_NoFilter_Actionable", domain.RelatedResolved, 3, false, true},
 		{"PositiveCount_Approximate_Actionable", domain.RelatedResolved, 3, true, true},
 		{"Loading_BlocksRegardlessOfCount", domain.RelatedLoading, 5, false, false},
 		{"Error_BlocksRegardlessOfCount", domain.RelatedError, 5, false, false},
-		{"ApproxZero_WithFetchFilter_NEW_NotActionable", domain.RelatedResolved, 0, true, false},
 	}
 
 	for _, tc := range cases {
@@ -200,9 +196,9 @@ func pressScrollRightDetail(d views.DetailModel) (views.DetailModel, bool) {
 // the actual gating logic regardless of whether focus was acquired via loading.
 
 // TestIsActionableRow_ApproxZero_NoFilter — count=0, approximate=true, no fetchFilter
-// Expected: NOT actionable. NEW contract: a resolved count==0 is never
-// actionable even when approximate==true — ApproximateZero() rows must not
-// let the user drill into an empty view.
+// Expected: ACTIONABLE. A "0+" lower bound (truncated scan, more may exist on
+// later pages) is drillable — Enter opens the target list so the user can see
+// the rest.
 func TestIsActionableRow_ApproxZero_NoFilter(t *testing.T) {
 	ensureNoColor(t)
 	d, cleanup := buildApproxDetail(t)
@@ -211,23 +207,19 @@ func TestIsActionableRow_ApproxZero_NoFilter(t *testing.T) {
 	// Get focus while row is loading (always succeeds).
 	d = focusRightColWhileLoading(t, d)
 
-	// Inject the approximate-zero result.
+	// Inject the approximate-zero (0+) result.
 	d = injectApproxResult(d, domain.RelatedResolved, 0, true, nil, nil)
 
-	// Enter must NOT produce RelatedNavigateMsg — resolved zero is a dead end
-	// regardless of the approximate flag.
+	// Enter MUST produce RelatedNavigateMsg — a 0+ lower bound is drillable.
 	msg := pressEnterCmd(d)
-	if isApproxNavMsg(msg) {
-		t.Errorf("Enter on approximate-zero row (count=0, approximate=true, no fetchFilter) must NOT produce RelatedNavigateMsg; got RelatedNavigateMsg")
+	if !isApproxNavMsg(msg) {
+		t.Errorf("Enter on approximate-zero row (0+, count=0, approximate=true) must produce RelatedNavigateMsg (drillable lower bound); got %T", msg)
 	}
 }
 
 // TestIsActionableRow_ApproxZero_WithFilter — count=0, approximate=true, fetchFilter={"x":"y"}
-// Expected: NOT actionable. NEW contract: count==0 is never actionable even
-// with a fetchFilter set, because FetchFilter pivots always carry
-// State: RelatedDeferred (never a resolved Count) in production — a
-// resolved Count:0 with a fetchFilter is still a definite empty result and
-// must not be navigable.
+// Expected: ACTIONABLE. An approximate "0+" lower bound is drillable regardless
+// of a fetchFilter being present.
 func TestIsActionableRow_ApproxZero_WithFilter(t *testing.T) {
 	ensureNoColor(t)
 	d, cleanup := buildApproxDetail(t)
@@ -237,8 +229,8 @@ func TestIsActionableRow_ApproxZero_WithFilter(t *testing.T) {
 	d = injectApproxResult(d, domain.RelatedResolved, 0, true, map[string]string{"x": "y"}, nil)
 
 	msg := pressEnterCmd(d)
-	if isApproxNavMsg(msg) {
-		t.Errorf("Enter on approximate-zero row (count=0, approximate=true, fetchFilter set) must NOT produce RelatedNavigateMsg; got RelatedNavigateMsg")
+	if !isApproxNavMsg(msg) {
+		t.Errorf("Enter on approximate-zero row (0+, count=0, approximate=true, fetchFilter set) must produce RelatedNavigateMsg; got %T", msg)
 	}
 }
 
@@ -405,11 +397,10 @@ func TestIsActionableRow_Error_Blocks(t *testing.T) {
 // Probing "l" AFTER injecting a result (from an unfocused state) directly tests
 // whether HasActionableRows() considers the injected row actionable.
 
-// TestIsActionableRow_HasActionableRows_ApproxZero_BlocksFocus
-// NEW contract: a resolved approximate-zero row is never actionable, so with
-// only that single row registered, "l" must NOT transfer focus (mirrors the
-// existing definite-zero behavior below).
-func TestIsActionableRow_HasActionableRows_ApproxZero_BlocksFocus(t *testing.T) {
+// TestIsActionableRow_HasActionableRows_ApproxZero_AllowsFocus
+// An approximate "0+" row IS actionable, so with only that single row
+// registered, "l" transfers focus to the right column.
+func TestIsActionableRow_HasActionableRows_ApproxZero_AllowsFocus(t *testing.T) {
 	ensureNoColor(t)
 	d, cleanup := buildApproxDetail(t)
 	defer cleanup()
@@ -418,14 +409,14 @@ func TestIsActionableRow_HasActionableRows_ApproxZero_BlocksFocus(t *testing.T) 
 		t.Skip("right column not visible — cannot test l-key focus behavior")
 	}
 
-	// Inject approximate-zero BEFORE any focus attempt.
+	// Inject approximate-zero (0+) BEFORE any focus attempt.
 	d = injectApproxResult(d, domain.RelatedResolved, 0, true, nil, nil)
 
-	// "l" focuses right column only when HasActionableRows()==true. Under the
-	// new contract, approximate-zero is not actionable, so focus must NOT transfer.
+	// "l" focuses right column only when HasActionableRows()==true. A 0+ lower
+	// bound is actionable, so focus MUST transfer.
 	_, focused := pressScrollRightDetail(d)
-	if focused {
-		t.Errorf("REGRESSION: 'l' key must NOT transfer focus when the only row is a resolved approximate-zero row (count==0 is never actionable); view changed after l press")
+	if !focused {
+		t.Errorf("'l' key must transfer focus when the row is a drillable approximate-zero (0+) row; view did not change after l press")
 	}
 }
 
@@ -452,38 +443,29 @@ func TestIsActionableRow_HasActionableRows_DefiniteZero_BlocksFocus(t *testing.T
 // Render-level smoke tests
 // ---------------------------------------------------------------------------
 
-// TestIsActionableRow_ApproxZero_ViewShape verifies the "(0)" suffix
-// rendering for approximate-zero rows. Per AS-378, the renderer collapses
-// "(0+)" → "(0)" so the integration test (which asserts the literal
-// substring `"<Pivot> (<N>)"` for every count >= 0) is satisfied and the
-// design-spec table (`docs/design/related-resources.md §5.3`) stays the
-// SSOT. Approximate-ness is signaled via the RowNormal style (vs DimText
-// for confirmed-zero), and navigability is preserved by isActionableRow,
-// not by the text suffix.
-//   - Part 1: approximate-zero row renders as "Target Groups (0)" without
-//     the "+" marker.
-//   - Part 2: after focus transition via loading state, the same "(0)"
-//     suffix is present.
+// TestIsActionableRow_ApproxZero_ViewShape verifies the "(0+)" suffix
+// rendering for approximate-zero rows: a truncated scan that found nothing yet
+// is a lower bound, so it renders with the "+" marker (and is drillable).
+//   - Part 1: approximate-zero row renders as "Target Groups (0+)".
+//   - Part 2: after focus transition via loading state, the "(0+)" suffix is
+//     still present.
 func TestIsActionableRow_ApproxZero_ViewShape(t *testing.T) {
 	ensureNoColor(t)
 
-	// --- Part 1: (0) present in unfocused view, "(0+)" must be absent ---
+	// --- Part 1: "(0+)" present in unfocused view ---
 	d, cleanup := buildApproxDetail(t)
 	defer cleanup()
 
 	d = injectApproxResult(d, domain.RelatedResolved, 0, true, nil, nil)
 	plain := stripAnsi(d.View())
-	if !strings.Contains(plain, "(0)") {
-		t.Errorf("approximate-zero row must render as 'Target Groups (0)' in View(); got:\n%s", plain)
-	}
-	if strings.Contains(plain, "(0+)") {
-		t.Errorf("approximate-zero row must NOT render the '+' marker after AS-378; got:\n%s", plain)
+	if !strings.Contains(plain, "(0+)") {
+		t.Errorf("approximate-zero row must render as 'Target Groups (0+)' in View(); got:\n%s", plain)
 	}
 	if !strings.Contains(plain, "Target Groups") {
 		t.Errorf("approximate-zero row display name 'Target Groups' missing from View(); got:\n%s", plain)
 	}
 
-	// --- Part 2: (0) present after focus transition via loading state ---
+	// --- Part 2: "(0+)" present after focus transition via loading state ---
 	d2, cleanup2 := buildApproxDetail(t)
 	defer cleanup2()
 
@@ -491,11 +473,8 @@ func TestIsActionableRow_ApproxZero_ViewShape(t *testing.T) {
 	d2 = injectApproxResult(d2, domain.RelatedResolved, 0, true, nil, nil)
 
 	plain2 := stripAnsi(d2.View())
-	if !strings.Contains(plain2, "(0)") {
-		t.Errorf("approximate-zero row must still show '(0)' when right column is focused; got:\n%s", plain2)
-	}
-	if strings.Contains(plain2, "(0+)") {
-		t.Errorf("approximate-zero row must NOT render '(0+)' when focused after AS-378; got:\n%s", plain2)
+	if !strings.Contains(plain2, "(0+)") {
+		t.Errorf("approximate-zero row must still show '(0+)' when right column is focused; got:\n%s", plain2)
 	}
 }
 
@@ -525,9 +504,8 @@ func TestIsActionableRow_DefiniteZero_ViewShape_NoPlusSign(t *testing.T) {
 // ---------------------------------------------------------------------------
 //
 // buildMixedRelatedDetail registers three RelatedDefs on "ec2":
-//   - "Zero A" (targetType "tg")  — resolved to count=0 (approximate=true, a
-//     realistic ApproximateZero() result)
-//   - "Zero B" (targetType "vpc") — resolved to count=0 (approximate=false)
+//   - "Zero A" (targetType "tg")  — resolved to a PROVEN count=0 (non-actionable)
+//   - "Zero B" (targetType "vpc") — resolved to a PROVEN count=0 (non-actionable)
 //   - "Positive" (targetType "asg") — resolved to count=3 (actionable)
 //
 // All three results are injected before any cursor movement, then focus is
@@ -559,7 +537,7 @@ func buildMixedRelatedDetail(t *testing.T) (views.DetailModel, func()) {
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
 			Count:       0,
-			Approximate: true,
+			Approximate: false,
 		},
 	})
 	d, _ = d.Update(messages.RelatedCheckResult{
@@ -654,7 +632,7 @@ func TestRightColumn_EnterOnAllZeroRows_NoNavigate(t *testing.T) {
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
 			Count:       0,
-			Approximate: true,
+			Approximate: false,
 		},
 	})
 	d, _ = d.Update(messages.RelatedCheckResult{

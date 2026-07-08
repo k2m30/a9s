@@ -11,13 +11,13 @@ package unit_test
 //   integration assertion failed for ~6 pivots across 6 unrelated primaries
 //   (`lambda`, `dbi`, `dbc`, `s3`, `ddb`, `ecr`).
 //
-// Contract pinned here (post-AS-378):
+// Contract pinned here:
 //   actual = -1, FetchFilter present       → "DisplayName"            (no parens, navigable)
 //   actual = -1, FetchFilter absent        → "DisplayName (?)"        (transient-unknown, navigable)
-//   actual = 0,  approximate = false       → "DisplayName (0)"        (dim, confirmed zero)
-//   actual = 0,  approximate = true        → "DisplayName (0)"        (normal, lower bound)
+//   actual = 0,  approximate = false       → "DisplayName (0)"        (dim, proven zero, dead end)
+//   actual = 0,  approximate = true        → "DisplayName (0+)"       (normal, lower bound, drillable)
 //   actual = N>0, approximate = false      → "DisplayName (N)"        (normal)
-//   actual = N>0, approximate = true       → "DisplayName (N)"        (normal, lower bound)
+//   actual = N>0, approximate = true       → "DisplayName (N+)"       (normal, lower bound, drillable)
 //
 // Acceptance criterion #2 from AS-378 explicitly enumerates the affected
 // pivots (CT Events / CW Alarms / Glue Jobs / Network Interfaces / CT
@@ -142,8 +142,8 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 			count:          0,
 			approximate:    true,
 			fetchFilter:    nil,
-			wantContains:   "CloudWatch Alarms (0)",
-			mustNotContain: []string{"CloudWatch Alarms (0+)"},
+			wantContains:   "CloudWatch Alarms (0+)",
+			mustNotContain: nil,
 		},
 		// CloudWatch Alarms — actual=0 with approximate=false (cache
 		// fully scanned, confirmed zero). Renderer must emit "(0)".
@@ -179,8 +179,8 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 			count:          7,
 			approximate:    true,
 			fetchFilter:    nil,
-			wantContains:   "CloudWatch Alarms (7)",
-			mustNotContain: []string{"CloudWatch Alarms (7+)"},
+			wantContains:   "CloudWatch Alarms (7+)",
+			mustNotContain: nil,
 		},
 		// Glue Jobs — actual=0 confirmed (s3 / ecr pivot). Confirmed zero
 		// renders "(0)" dim.
@@ -202,8 +202,8 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 			count:          0,
 			approximate:    true,
 			fetchFilter:    nil,
-			wantContains:   "Glue Jobs (0)",
-			mustNotContain: []string{"Glue Jobs (0+)"},
+			wantContains:   "Glue Jobs (0+)",
+			mustNotContain: nil,
 		},
 		// Network Interfaces — lambda's ENI pivot with actual=-1 (cache
 		// miss, no fetch fallback) → RelatedUnknown; renderer emits the
@@ -227,8 +227,8 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 			count:          0,
 			approximate:    true,
 			fetchFilter:    nil,
-			wantContains:   "Network Interfaces (0)",
-			mustNotContain: []string{"Network Interfaces (0+)"},
+			wantContains:   "Network Interfaces (0+)",
+			mustNotContain: nil,
 		},
 		// CloudTrail Trails — s3 pivot, actual=0 confirmed.
 		{

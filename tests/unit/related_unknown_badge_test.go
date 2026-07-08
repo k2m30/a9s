@@ -44,26 +44,28 @@ import (
 
 func TestFormatRelatedCount_Table(t *testing.T) {
 	cases := []struct {
-		name  string
-		state domain.RelatedRowState
-		count int
-		want  string
+		name   string
+		state  domain.RelatedRowState
+		count  int
+		approx bool
+		want   string
 	}{
-		{"ResolvedUnknown_NoFilter", domain.RelatedUnknown, 0, "(?)"},
-		{"ResolvedUnknown_WithFilter_NoBadge", domain.RelatedDeferred, 0, ""},
-		{"ExactZero_NoFilter", domain.RelatedResolved, 0, "(0)"},
-		{"ExactZero_WithFilter", domain.RelatedResolved, 0, "(0)"},
-		{"Positive_NoFilter", domain.RelatedResolved, 7, "(7)"},
-		{"Positive_WithFilter", domain.RelatedResolved, 7, "(7)"},
-		{"LargeCount", domain.RelatedResolved, 1000, "(1000)"},
+		{"ResolvedUnknown_NoFilter", domain.RelatedUnknown, 0, false, "(?)"},
+		{"ResolvedUnknown_WithFilter_NoBadge", domain.RelatedDeferred, 0, false, ""},
+		{"ExactZero", domain.RelatedResolved, 0, false, "(0)"},
+		{"Positive", domain.RelatedResolved, 7, false, "(7)"},
+		{"LargeCount", domain.RelatedResolved, 1000, false, "(1000)"},
+		// Approximate lower bounds from a truncated target scan render "N+".
+		{"ApproxZero", domain.RelatedResolved, 0, true, "(0+)"},
+		{"ApproxPositive", domain.RelatedResolved, 3, true, "(3+)"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := resource.FormatRelatedCount(tc.state, tc.count)
+			got := resource.FormatRelatedCount(tc.state, tc.count, tc.approx)
 			if got != tc.want {
-				t.Errorf("FormatRelatedCount(state=%v, %d) = %q, want %q",
-					tc.state, tc.count, got, tc.want)
+				t.Errorf("FormatRelatedCount(state=%v, %d, approx=%v) = %q, want %q",
+					tc.state, tc.count, tc.approx, got, tc.want)
 			}
 		})
 	}
@@ -115,7 +117,7 @@ func TestRenderRelatedPanel_TransientUnknownNoFilter_ShowsQuestionMarkBadge(t *t
 		FetchFilter:  nil,
 		TargetType:   "ebs",
 		Actionable:   resource.IsRelatedActionable(domain.RelatedUnknown, 0, false),
-		CountDisplay: resource.FormatRelatedCount(domain.RelatedUnknown, 0),
+		CountDisplay: resource.FormatRelatedCount(domain.RelatedUnknown, 0, false),
 	}
 	if !block.Actionable {
 		t.Fatal("test setup: transient-unknown-no-filter row must be Actionable (owner decision #38)")
@@ -160,7 +162,7 @@ func TestRenderRelatedPanel_ResolvedUnknownWithFilter_NoQuestionMarkBadge(t *tes
 				FetchFilter:  filter,
 				TargetType:   "ct-events",
 				Actionable:   resource.IsRelatedActionable(domain.RelatedDeferred, 0, false),
-				CountDisplay: resource.FormatRelatedCount(domain.RelatedDeferred, 0),
+				CountDisplay: resource.FormatRelatedCount(domain.RelatedDeferred, 0, false),
 			}
 			if !block.Actionable {
 				t.Fatal("test setup: resolved-unknown-with-filter row must be Actionable")

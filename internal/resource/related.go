@@ -294,14 +294,14 @@ func IsRelatedActionable(state domain.RelatedRowState, count int, approximate bo
 	case domain.RelatedDeferred, domain.RelatedUnknown:
 		return true
 	default: // RelatedResolved
-		// A resolved zero is never actionable, even when approximate:
-		// ApproximateZero deliberately sets Count:0 for a truncated-but-empty
-		// scan window, and a zero pivot is a dead end regardless of how it
-		// was produced.
-		if count == 0 {
+		// Only a PROVEN zero — a complete (non-truncated) scan that found
+		// nothing — is a dead end. An approximate lower bound ("N+"/"0+",
+		// produced when the target list was truncated so more may exist on
+		// later pages) stays actionable: the user drills in to see the rest.
+		if count == 0 && !approximate {
 			return false
 		}
-		return count > 0 || approximate
+		return true
 	}
 }
 
@@ -310,7 +310,10 @@ func IsRelatedActionable(state domain.RelatedRowState, count int, approximate bo
 // RelatedBlock.CountDisplay computed in the controller — the web template, so
 // the displayed count cannot drift.
 //
-//   - RelatedResolved → "(N)"
+//   - RelatedResolved, exact       → "(N)"
+//   - RelatedResolved, approximate → "(N+)" — a lower bound from a truncated
+//     target scan; the real count is at least N and more may exist on later
+//     pages. "(0+)" is the honest form of "scanned one page, found none yet".
 //   - RelatedDeferred → ""    (actionable navigation link, e.g. ct-events; the
 //     row reads as a drill-in, not an unresolved count, and the filtered
 //     fetch will resolve the real count once entered)
@@ -318,12 +321,11 @@ func IsRelatedActionable(state domain.RelatedRowState, count int, approximate bo
 //     budget-excluded or structurally uncomputable pivot, e.g. kms→s3;
 //     RelatedLoading/RelatedError also fall here, but the renderers show a
 //     spinner/em-dash instead of consulting this text for those two states)
-//
-// Approximate-ness is intentionally NOT marked in the text (no "N+"): per the
-// design spec it is conveyed by row style alone, and the integration tests
-// assert a literal "(<N>)" substring.
-func FormatRelatedCount(state domain.RelatedRowState, count int) string {
+func FormatRelatedCount(state domain.RelatedRowState, count int, approximate bool) string {
 	if state == domain.RelatedResolved {
+		if approximate {
+			return fmt.Sprintf("(%d+)", count)
+		}
 		return fmt.Sprintf("(%d)", count)
 	}
 	if state == domain.RelatedDeferred {

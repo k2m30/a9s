@@ -104,7 +104,7 @@ func (m DetailModel) buildLiveBody() app.DetailBody {
 				FetchFilter:  row.fetchFilter,
 				TargetType:   row.targetType,
 				Actionable:   isActionableRow(row),
-				CountDisplay: resource.FormatRelatedCount(row.state, row.count),
+				CountDisplay: resource.FormatRelatedCount(row.state, row.count, row.approximate),
 			})
 		}
 	}

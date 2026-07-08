@@ -139,12 +139,12 @@ func extractRelatedLine(t *testing.T, rendered, needle string) string {
 // Pin 1: approximate-zero renders with the SAME dim style as exact-zero.
 // ---------------------------------------------------------------------------
 
-// TestRelatedDim_ApproximateZero_SameStyleAsExactZero is RED at HEAD: the live
-// renderer's `case blk.Count == 0 && blk.Approximate` branch assigns
-// styles.RowNormal (bright) instead of styles.DimText, so the approximate-zero
-// row's styled prefix diverges from the exact-zero row's styled prefix even
-// though both carry Actionable=false.
-func TestRelatedDim_ApproximateZero_SameStyleAsExactZero(t *testing.T) {
+// TestRelatedDim_ApproximateZero_BrightAndActionable pins the correct contract:
+// an approximate lower bound ("0+", from a truncated target scan where more may
+// exist on later pages) renders BRIGHT and actionable with a "(0+)" badge — the
+// user can drill in — while only a PROVEN exact zero renders dim "(0)" as a
+// dead end. The two must therefore render DIFFERENTLY.
+func TestRelatedDim_ApproximateZero_BrightAndActionable(t *testing.T) {
 	for _, tc := range relatedDimParityTypes() {
 		tc := tc
 		t.Run(tc.shortName, func(t *testing.T) {
@@ -157,7 +157,7 @@ func TestRelatedDim_ApproximateZero_SameStyleAsExactZero(t *testing.T) {
 				Approximate:  true,
 				TargetType:   "ct-events",
 				Actionable:   resource.IsRelatedActionable(domain.RelatedResolved, 0, true),
-				CountDisplay: resource.FormatRelatedCount(domain.RelatedResolved, 0),
+				CountDisplay: resource.FormatRelatedCount(domain.RelatedResolved, 0, true),
 			}
 			exactBlock := app.RelatedBlock{
 				Name:         "Backup Plans",
@@ -166,13 +166,13 @@ func TestRelatedDim_ApproximateZero_SameStyleAsExactZero(t *testing.T) {
 				Approximate:  false,
 				TargetType:   "backup",
 				Actionable:   resource.IsRelatedActionable(domain.RelatedResolved, 0, false),
-				CountDisplay: resource.FormatRelatedCount(domain.RelatedResolved, 0),
+				CountDisplay: resource.FormatRelatedCount(domain.RelatedResolved, 0, false),
 			}
-			if approxBlock.Actionable {
-				t.Fatal("test setup: approxBlock.Actionable must be false (resolved zero is never actionable)")
+			if !approxBlock.Actionable {
+				t.Fatal("test setup: approxBlock.Actionable must be true (0+ lower bound is drillable)")
 			}
 			if exactBlock.Actionable {
-				t.Fatal("test setup: exactBlock.Actionable must be false")
+				t.Fatal("test setup: exactBlock.Actionable must be false (proven zero is a dead end)")
 			}
 
 			body := relatedDimParityBody([]app.RelatedBlock{approxBlock, exactBlock})
@@ -181,33 +181,19 @@ func TestRelatedDim_ApproximateZero_SameStyleAsExactZero(t *testing.T) {
 			approxLine := extractRelatedLine(t, rendered, "Trail Events")
 			exactLine := extractRelatedLine(t, rendered, "Backup Plans")
 
-			wantApproxText := "  Trail Events (0)"
-			wantExactText := "  Backup Plans (0)"
-			wantApproxStyled := styles.DimText.Render(wantApproxText)
-			wantExactStyled := styles.DimText.Render(wantExactText)
+			// Approximate row: BRIGHT with a "(0+)" badge.
+			wantApproxStyled := styles.RowNormal.Render("  Trail Events (0+)")
+			// Exact zero: DIM with a plain "(0)" badge.
+			wantExactStyled := styles.DimText.Render("  Backup Plans (0)")
 
 			if approxLine != wantApproxStyled {
-				t.Errorf("[%s] approximate-zero row not rendered with DimText style.\n  got:  %q\n  want: %q", tc.shortName, approxLine, wantApproxStyled)
+				t.Errorf("[%s] approximate-zero row not rendered BRIGHT with \"(0+)\" badge.\n  got:  %q\n  want: %q", tc.shortName, approxLine, wantApproxStyled)
 			}
 			if exactLine != wantExactStyled {
-				t.Errorf("[%s] exact-zero row not rendered with DimText style.\n  got:  %q\n  want: %q", tc.shortName, exactLine, wantExactStyled)
+				t.Errorf("[%s] exact-zero row not rendered DIM with \"(0)\" badge.\n  got:  %q\n  want: %q", tc.shortName, exactLine, wantExactStyled)
 			}
-			// Same SGR prefix on both rows (the style code up to the row text)
-			// pins "same style" independent of the two rows' differing names —
-			// a byte-for-byte full-line comparison would always fail because
-			// the row text itself legitimately differs.
-			approxSGR := approxLine[:strings.Index(approxLine, "m")+1]
-			exactSGR := exactLine[:strings.Index(exactLine, "m")+1]
-			if approxSGR != exactSGR {
-				t.Errorf("[%s] approximate-zero and exact-zero rows render with DIFFERENT styles even though both are non-actionable dead ends.\n  approx SGR: %q (full: %q)\n  exact SGR:  %q (full: %q)", tc.shortName, approxSGR, approxLine, exactSGR, exactLine)
-			}
-
-			// Guard against the historical bug reappearing under a different
-			// guise: the approximate-zero row must never carry RowNormal
-			// (bright) styling.
-			brightApprox := styles.RowNormal.Render(wantApproxText)
-			if approxLine == brightApprox {
-				t.Errorf("[%s] approximate-zero row rendered BRIGHT (styles.RowNormal) — this is the exact defect under test", tc.shortName)
+			if approxLine == exactLine {
+				t.Errorf("[%s] approximate-zero and exact-zero rows render identically — a drillable lower bound must be visually distinct from a proven dead-end zero", tc.shortName)
 			}
 		})
 	}
@@ -272,7 +258,7 @@ func relatedDimParitySweepCases() []relatedDimParityCase {
 			Actionable:  actionable,
 		}
 		if !loading && !hasErr {
-			blk.CountDisplay = resource.FormatRelatedCount(state, count)
+			blk.CountDisplay = resource.FormatRelatedCount(state, count, approximate)
 		}
 		return relatedDimParityCase{name: name, block: blk, wantActionable: actionable}
 	}
@@ -301,7 +287,7 @@ func expectedRelatedRowText(c relatedDimParityCase) string {
 	case blk.Err:
 		return "  " + blk.Name + "  —"
 	default:
-		display := resource.FormatRelatedCount(blk.State, blk.Count)
+		display := resource.FormatRelatedCount(blk.State, blk.Count, blk.Approximate)
 		if display == "" {
 			return "  " + blk.Name
 		}
@@ -365,7 +351,7 @@ func TestRelatedDim_PropertySweep_TableDrivenSanity(t *testing.T) {
 		"UnknownNoFilter":   true,
 		"UnknownWithFilter": true,
 		"ExactZero":         false,
-		"ApproxZero":        false,
+		"ApproxZero":        true,
 		"PositiveCount":     true,
 		"PositiveApprox":    true,
 	}
@@ -405,35 +391,32 @@ func relatedRowApprox(targetType string, count int, approximate bool) app.Detail
 	}
 }
 
-// TestRelatedCursor_MoveDown_SkipsApproximateZeroRow verifies that moving
-// down from a non-dim row past an APPROXIMATE-zero row (Count=0,
-// Approximate=true — an ApproximateZero() result) lands on the next non-dim
-// row, not on the approximate-zero one. This is the cursor-side half of the
-// approximate-zero contract: the dispatch's defect was purely visual
-// (renderer brightness), and this test confirms the cursor-skip and
-// Actionable-flag paths were never affected — a real navigation must never
-// stop on an approximate-zero row any more than an exact-zero one.
-func TestRelatedCursor_MoveDown_SkipsApproximateZeroRow(t *testing.T) {
+// TestRelatedCursor_MoveDown_LandsOnApproximateZeroRow verifies that moving
+// down from an actionable row LANDS ON an approximate-zero row (Count=0,
+// Approximate=true — an ApproximateZero() result), because a "0+" lower bound
+// is drillable (more may exist on later pages). The cursor skip predicate,
+// render brightness, and Enter/click gating all delegate to the single shared
+// resource.IsRelatedActionable, so an approximate-zero row is a valid landing
+// row exactly like any other actionable row.
+func TestRelatedCursor_MoveDown_LandsOnApproximateZeroRow(t *testing.T) {
 	rows := []app.DetailRelatedRow{
-		relatedRow("sg", 3),                    // index 0: non-dim, cursor starts here
-		relatedRowApprox("ct-events", 0, true), // index 1: approximate-zero, dimmed
-		relatedRow("eni", 2),                   // index 2: non-dim
+		relatedRow("sg", 3),                    // index 0: actionable, cursor starts here
+		relatedRowApprox("ct-events", 0, true), // index 1: approximate-zero, actionable (0+ drillable)
+		relatedRow("eni", 2),                   // index 2: actionable
 	}
 	c := newRelatedSkipController(t, rows)
 
 	vs, _ := c.Apply(app.Action{Kind: app.ActionMoveDown})
 
 	cursor, actionable := relatedCursorAndActionable(t, vs)
-	if cursor != 2 {
-		t.Errorf("RelatedCursor after MoveDown = %d, want 2 (should skip approximate-zero index 1)", cursor)
+	if cursor != 1 {
+		t.Errorf("RelatedCursor after MoveDown = %d, want 1 (approximate-zero row is actionable and must NOT be skipped)", cursor)
 	}
 	if !actionable {
-		t.Errorf("row at RelatedCursor=%d is dimmed (Actionable=false), want a non-dim landing row", cursor)
+		t.Errorf("row at RelatedCursor=%d is dimmed (Actionable=false), want the actionable approximate-zero landing row", cursor)
 	}
-	// Sanity: the skipped row really is the approximate-zero one, and it is
-	// indeed non-actionable per the shared predicate — otherwise this test
-	// would pass for the wrong reason if the fixture were edited later.
-	if got := resource.IsRelatedActionable(domain.RelatedResolved, 0, true); got {
-		t.Fatalf("test setup: resource.IsRelatedActionable(RelatedResolved, 0, approximate=true) = %v, want false — the approximate-zero fixture in this test is no longer non-actionable per the shared contract", got)
+	// Sanity: an approximate-zero row is actionable per the shared predicate.
+	if got := resource.IsRelatedActionable(domain.RelatedResolved, 0, true); !got {
+		t.Fatalf("test setup: resource.IsRelatedActionable(RelatedResolved, 0, approximate=true) = %v, want true — a 0+ lower bound must be drillable", got)
 	}
 }

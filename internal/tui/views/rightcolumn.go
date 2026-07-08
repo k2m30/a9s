@@ -224,7 +224,7 @@ func (m RightColumnModel) View() string {
 			State:        row.state,
 			Loading:      row.loading,
 			Err:          row.err != nil,
-			CountDisplay: resource.FormatRelatedCount(row.state, row.count),
+			CountDisplay: resource.FormatRelatedCount(row.state, row.count, row.approximate),
 			Actionable:   isActionableRow(row),
 		}
 		if idx == m.cursor {
