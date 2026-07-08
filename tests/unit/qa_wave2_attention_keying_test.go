@@ -4,61 +4,20 @@
 // evaluated findings on the same resource can each carry their own
 // supporting rows.
 //
-// CURRENT SHAPE (verified by direct read):
-//   - IssueEnricherResult.AttentionDetails is map[string]domain.AttentionDetail
-//     — keyed by Resource.ID ONLY (internal/aws/issue_enrichment.go:203).
-//   - setWave2Finding's own doc comment (issue_enrichment.go:117-124) already
-//     documents the gap this test pins: "rows, when non-empty, become this
-//     resourceID's single AttentionDetail entry — the first call for a given
-//     resourceID that supplies non-empty rows wins that slot... The
-//     AttentionDetail is keyed by resourceID only (not per-Code), so a second
-//     independently-evaluated condition with its own rows on the same
-//     resourceID is a case this helper does not disambiguate." The doc
-//     comment names the exact real-world case this test drives:
-//     "opensearch's update-forced + encryption-off" (issue_enrichment.go:107).
-//   - The fold layer, runtime.ApplyWave2ToRow (internal/runtime/helpers.go:70),
-//     inherits the same one-slot-per-resource limit: it looks up ONE ad,
-//     hasAD := attentionDetails[r.ID] (helpers.go:98) before the per-finding
-//     loop, then attaches it to only the FIRST finding it appends via the
-//     `if hasAD && len(ad.Rows) > 0 && !adAssigned` guard (helpers.go:119) —
-//     every subsequent finding for that resource gets no AttentionDetails
-//     entry at all, regardless of whether the enricher intended it to have
-//     its own rows.
-//   - One level further down the pipe, domain.Resource.AttentionDetails is
-//     ALREADY map[domain.FindingCode]domain.AttentionDetail (internal/domain/
-//     finding.go:45), and internal/app/detail_body.go's buildAttentionEntries
-//     reads exactly attentionDetails[f.Code] per finding — so the per-code
-//     keying this test wants already exists at the ROW level. The gap is one
-//     level up: IssueEnricherResult.AttentionDetails (the enricher-result
-//     level) and ApplyWave2ToRow's attentionDetails parameter (the fold-level
-//     bridge) are still keyed by Resource.ID only, so there is nowhere for a
-//     second finding's distinct rows to live before the row level even sees
-//     them.
-//
-// INTENDED FIX: IssueEnricherResult.AttentionDetails must become
+// LANDED SHAPE: IssueEnricherResult.AttentionDetails is
 // map[string]map[domain.FindingCode]domain.AttentionDetail (Resource.ID, then
-// FindingCode), and ApplyWave2ToRow's attentionDetails parameter (plus
-// applyEnrichment's threading of it, internal/runtime/helpers.go:39) must
-// follow — so setWave2Finding can record each independently-evaluated
-// condition's own rows without a later call silently losing them.
+// FindingCode), and runtime.ApplyWave2ToRow threads that nested map — so
+// setWave2Finding records each independently-evaluated condition's own rows
+// under its own Code, and a later call for the same resource never overwrites
+// them. One level down, domain.Resource.AttentionDetails is
+// map[domain.FindingCode]domain.AttentionDetail and buildAttentionEntries
+// reads attentionDetails[f.Code] per finding, so each finding surfaces its own
+// Attention rows end to end.
 //
-// TEST SHAPE — behaviorally RED, not compile-red (a deliberate deviation from
-// the dispatch's "may be compile-red" option, documented here per this
-// project's verify-before-pinning discipline): tests/unit is compiled as a
-// single Go package (unit / unit_test) — a compile-red file here would break
-// `go build`/`go vet`/`go test` for every OTHER file in the package,
-// including the sibling qa57 regression tests this same dispatch explicitly
-// scoped as untouchable and disjoint. Attempting to assign the intended
-// map[string]map[domain.FindingCode]domain.AttentionDetail shape directly
-// into IssueEnricherResult.AttentionDetails would be a genuine compile error
-// today, but the resulting package-wide build break has a larger blast
-// radius than this dispatch's own "disjoint files" contract anticipates. The
-// test below instead drives the REAL, exported runtime.ApplyWave2ToRow fold
-// function with TODAY's real types end to end and asserts on its output —
-// compiles clean, fails at runtime for the exact mechanism traced above, and
-// requires exactly the same production fix (promoting AttentionDetails to be
-// keyed by FindingCode, at both the IssueEnricherResult and ApplyWave2ToRow
-// layers) to turn green.
+// This test drives the REAL, exported runtime.ApplyWave2ToRow fold with
+// today's types and asserts each finding's rows survive independently — the
+// exact case issue_enrichment.go names as motivating per-Code keying
+// (opensearch's forced-update + encryption-off).
 package unit_test
 
 import (
@@ -149,19 +108,11 @@ func TestWave2AttentionKeying_TwoFindingsOneResource_EachFindingsAttentionRowsSu
 	adEncryptionOff, hasEncryptionOff := row.AttentionDetails[codeEncryptionOff]
 	if !hasEncryptionOff || len(adEncryptionOff.Rows) != 1 || adEncryptionOff.Rows[0] != rowsEncryptionOff[0] {
 		t.Errorf(
-			"row.AttentionDetails[%q] = %+v (present=%v), want Rows=%v — FAILS TODAY: runtime.ApplyWave2ToRow "+
-				"(internal/runtime/helpers.go:70) reads exactly one shared AttentionDetail per resourceID "+
-				"(`ad, hasAD := attentionDetails[r.ID]` at helpers.go:98) and attaches it to only the FIRST "+
-				"finding it appends (the `!adAssigned` guard at helpers.go:119) — the second "+
-				"independently-evaluated finding's own rows are unrepresentable under "+
-				"IssueEnricherResult.AttentionDetails' current map[string]domain.AttentionDetail shape "+
-				"(issue_enrichment.go:203) and never reach internal/app/detail_body.go's "+
-				"buildAttentionEntries, which reads exactly this row.AttentionDetails[f.Code] map when "+
-				"rendering the detail view's Attention section. Fix requires promoting "+
-				"IssueEnricherResult.AttentionDetails to map[string]map[domain.FindingCode]domain.AttentionDetail "+
-				"(keyed by Resource.ID then FindingCode) so setWave2Finding can record each finding's own "+
-				"rows independently, and updating ApplyWave2ToRow's attentionDetails parameter and fold "+
-				"logic to match.",
+			"row.AttentionDetails[%q] = %+v (present=%v), want Rows=%v — each independently-"+
+				"evaluated finding must keep its OWN AttentionDetail: setWave2Finding keys "+
+				"IssueEnricherResult.AttentionDetails by (Resource.ID, FindingCode), and "+
+				"ApplyWave2ToRow folds that nested map so buildAttentionEntries reads "+
+				"row.AttentionDetails[f.Code] per finding when rendering the Attention section.",
 			codeEncryptionOff, adEncryptionOff, hasEncryptionOff, rowsEncryptionOff,
 		)
 	}

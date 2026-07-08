@@ -236,7 +236,7 @@ func TestBackup_Related_HealthyPlan_Role_DefaultServiceRole_Resolves(t *testing.
 }
 
 // ---------------------------------------------------------------------------
-// Edge: empty plan ID — all pivots return Count == -1
+// Edge: empty plan ID — all pivots return State: RelatedUnknown
 // ---------------------------------------------------------------------------
 
 // TestBackup_Related_EmptyPlanID_AllPivotsReturnUnknown verifies that when

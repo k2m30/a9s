@@ -244,8 +244,9 @@ func TestIsActionableRow_ApproxZero_WithFilter(t *testing.T) {
 
 // TestIsActionableRow_DefiniteZero_WithFilter — count=0, approximate=false, fetchFilter={"x":"y"}
 // Expected: NOT actionable. A resolved zero count must block navigation even
-// when a fetchFilter is present — only count==-1 (unknown) is rescued by
-// hasFetchFilter.
+// when a fetchFilter is present — the FetchFilter alone does not make a
+// Resolved row actionable; only a non-resolved state (RelatedDeferred /
+// RelatedUnknown) is.
 func TestIsActionableRow_DefiniteZero_WithFilter(t *testing.T) {
 	ensureNoColor(t)
 	d, cleanup := buildApproxDetail(t)
@@ -276,13 +277,13 @@ func TestIsActionableRow_DefiniteZero_NoFilter(t *testing.T) {
 	}
 }
 
-// TestIsActionableRow_CountMinusOne_NoFilter — count=-1, approximate=false, no fetchFilter
+// TestIsActionableRow_UnknownState_NoFilter — RelatedUnknown, approximate=false, no fetchFilter
 // Expected: actionable (owner decision #38, 2026-07-06: a transient "(?)" row
-// — resolved-unknown, cold-cache count==-1 with no FetchFilter — is now a
+// — a resolved-unknown (RelatedUnknown) cold-cache pivot with no FetchFilter — is now a
 // drillable pivot into the target type's plain top-level list, not a
 // dead end. See qa_related_transient_unknown_drill_test.go for the
 // app/controller-level end-to-end pin of this contract.)
-func TestIsActionableRow_CountMinusOne_NoFilter(t *testing.T) {
+func TestIsActionableRow_UnknownState_NoFilter(t *testing.T) {
 	ensureNoColor(t)
 	d, cleanup := buildApproxDetail(t)
 	defer cleanup()
@@ -292,13 +293,13 @@ func TestIsActionableRow_CountMinusOne_NoFilter(t *testing.T) {
 
 	msg := pressEnterCmd(d)
 	if !isApproxNavMsg(msg) {
-		t.Errorf("REGRESSION: count=-1 row without fetchFilter must produce RelatedNavigateMsg (owner decision #38: transient unknown rows are now actionable); got %T", msg)
+		t.Errorf("REGRESSION: a RelatedUnknown row without fetchFilter must produce RelatedNavigateMsg (owner decision #38: transient unknown rows are now actionable); got %T", msg)
 	}
 }
 
-// TestIsActionableRow_CountMinusOne_WithFilter — count=-1, approximate=false, fetchFilter={"x":"y"}
+// TestIsActionableRow_DeferredState_WithFilter — RelatedDeferred, approximate=false, fetchFilter={"x":"y"}
 // Expected: actionable (existing behavior — must keep passing)
-func TestIsActionableRow_CountMinusOne_WithFilter(t *testing.T) {
+func TestIsActionableRow_DeferredState_WithFilter(t *testing.T) {
 	ensureNoColor(t)
 	d, cleanup := buildApproxDetail(t)
 	defer cleanup()
@@ -308,7 +309,7 @@ func TestIsActionableRow_CountMinusOne_WithFilter(t *testing.T) {
 
 	msg := pressEnterCmd(d)
 	if !isApproxNavMsg(msg) {
-		t.Errorf("REGRESSION: Enter on count=-1 row with fetchFilter must produce RelatedNavigateMsg; got %T", msg)
+		t.Errorf("REGRESSION: Enter on a RelatedDeferred row with fetchFilter must produce RelatedNavigateMsg; got %T", msg)
 	}
 }
 

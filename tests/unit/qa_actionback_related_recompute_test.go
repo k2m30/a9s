@@ -93,7 +93,7 @@ func scopeNGToEBSOnlyForActionBackTest(t *testing.T) resource.RelatedDef {
 // TestActionBack_AfterTransientUnknownRelatedDrill_RedispatchesRelatedCheck
 // drives the full #38 user journey at the controller/headless altitude:
 //  1. Open the "ng" detail and seed its lone related row (scoped to ebs) with
-//     the transient "(?)" state (Count==-1, no FetchFilter, not loading) —
+//     the transient "(?)" state (RelatedUnknown, no FetchFilter, not loading) —
 //     exactly what a real cold-cache checkNGEBS result delivers via
 //     ApplyDetailRelatedResultForResource (the same merge every related-result
 //     path uses, including the TUI adapter's messages.RelatedCheckResult

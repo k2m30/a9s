@@ -1,49 +1,17 @@
-// qa_wave2_multifinding_test.go — RED pins for OWNER CONTRACT #52.
+// qa_wave2_multifinding_test.go — pins OWNER CONTRACT #52 (multi-finding).
 //
-// #52's contract (as re-scoped by the architect after the coder's prior
-// interim fix — setWave2Finding's "worse-severity wins the slot, the other
-// demotes into an AttentionDetail row" — was found to still cap
-// IssueEnricherResult at one Finding per resource): IssueEnricherResult.
-// Findings becomes map[string][]domain.Finding. Enrichers may emit N
-// independently-evaluated findings per resource; ALL of them fold onto
-// domain.Resource.Findings (already a plain []domain.Finding slice, no
-// change needed there); the worst severity drives td.ResolveColor (already
-// true — internal/aws/catalog_color_helpers.go's colorFromAnyFinding scans
-// the WHOLE r.Findings slice for the worst severity, order-independent); and
-// the detail-view Attention block lists each finding as its own entry — own
-// Phrase, own Detail — never a demoted row of another finding
-// (internal/app/detail_body.go's buildAttentionEntries already iterates
-// ds.Findings and builds one attentionEntry per issue-severity finding, so
-// once ApplyWave2ToRow appends N findings instead of ≤1, this needs no
-// change either).
+// #52's contract: IssueEnricherResult.Findings is map[string][]domain.Finding.
+// Enrichers may emit N independently-evaluated findings per resource; ALL fold
+// onto domain.Resource.Findings (a plain []domain.Finding slice); the worst
+// severity drives td.ResolveColor (colorFromAnyFinding scans the WHOLE
+// r.Findings slice, order-independent); and the detail-view Attention block
+// lists each finding as its own entry — own Phrase, own Detail — never a
+// demoted row of another finding (buildAttentionEntries iterates ds.Findings,
+// one attentionEntry per issue-severity finding).
 //
-// PACKAGE DOES NOT COMPILE AGAINST CURRENT HEAD — INTENTIONALLY.
-// This is the correct RED signal for this TDD step: the type change IS the
-// contract. At HEAD, internal/aws/issue_enrichment.go's IssueEnricherResult.
-// Findings is still map[string]domain.Finding and internal/runtime/
-// helpers.go's ApplyWave2ToRow's findings parameter is still
-// map[string]domain.Finding to match. This file constructs/consumes the
-// INTENDED map[string][]domain.Finding shape directly against the REAL
-// (unmocked) runtime.ApplyWave2ToRow and awsclient.EnrichOpenSearchDomains,
-// so two call sites fail to COMPILE rather than merely fail at runtime:
-//
-//  1. buildFoldedMultiFindingRow's `runtime.ApplyWave2ToRow(&r, *td, findings,
-//     attentionDetails)` — findings is map[string][]domain.Finding; HEAD's
-//     ApplyWave2ToRow still declares `findings map[string]domain.Finding`.
-//     "cannot use findings (variable of type map[string][]domain.Finding) as
-//     map[string]domain.Finding value in argument to runtime.ApplyWave2ToRow".
-//  2. TestOpenSearch_Enrich_MultiBackground_BothConditionsSurfaceAsOwnFindings's
-//     `findings := result.Findings[id]` — HEAD's IssueEnricherResult.Findings
-//     is still map[string]domain.Finding, so `findings` is inferred as a bare
-//     domain.Finding; `len(findings)` and `range findings` both fail to
-//     compile against a non-slice, non-map, non-array, non-channel struct
-//     type ("invalid argument: findings (variable of type domain.Finding) for
-//     built-in len" / "cannot range over findings (variable of type
-//     domain.Finding)").
-//
-// No other line in this file is expected to fail to compile — every other
-// symbol, method, and field reference here is unchanged by #52 and already
-// exists at HEAD.
+// This suite drives the REAL, exported runtime.ApplyWave2ToRow fold and the
+// real awsclient.EnrichOpenSearchDomains against the landed
+// map[string][]domain.Finding shape, asserting the downstream behavior below.
 //
 // Section map:
 //

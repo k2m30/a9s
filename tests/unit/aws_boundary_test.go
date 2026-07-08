@@ -26,11 +26,11 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// T110 — TestChecker_AccessDenied_ReturnsMinusOne
+// T110 — TestChecker_AccessDenied_ReturnsError
 //
 // For 3 representative forward checkers from different parent types, inject a
 // fake client that returns AccessDeniedException and verify:
-//   - result.Count == -1
+//   - result.State == RelatedError
 //   - result.Err != nil
 //
 // Covered checkers:
@@ -39,7 +39,7 @@ import (
 //   kms → role  (IAM.SimulatePrincipalPolicy)
 // ---------------------------------------------------------------------------
 
-func TestChecker_AccessDenied_ReturnsMinusOne(t *testing.T) {
+func TestChecker_AccessDenied_ReturnsError(t *testing.T) {
 	t.Run("asg_vpc", func(t *testing.T) {
 		parent := resource.Resource{
 			ID:     "my-asg",
@@ -56,7 +56,7 @@ func TestChecker_AccessDenied_ReturnsMinusOne(t *testing.T) {
 		checker := boundaryCheckerByTarget(t, "asg", "vpc")
 		got := checker(context.Background(), clients, parent, nil)
 		if got.State != domain.RelatedError {
-			t.Errorf("Count = %d, want -1 (AccessDenied on DescribeSubnets)", got.Count)
+			t.Errorf("State = %v, want RelatedError (AccessDenied on DescribeSubnets)", got.State)
 		}
 		if got.Err == nil {
 			t.Error("Err = nil, want non-nil (AccessDenied must propagate)")
@@ -79,7 +79,7 @@ func TestChecker_AccessDenied_ReturnsMinusOne(t *testing.T) {
 		checker := boundaryCheckerByTarget(t, "ddb", "kinesis")
 		got := checker(context.Background(), clients, parent, nil)
 		if got.State != domain.RelatedError {
-			t.Errorf("Count = %d, want -1 (AccessDenied on DescribeKinesisStreamingDestination)", got.Count)
+			t.Errorf("State = %v, want RelatedError (AccessDenied on DescribeKinesisStreamingDestination)", got.State)
 		}
 		if got.Err == nil {
 			t.Error("Err = nil, want non-nil (AccessDenied must propagate)")
@@ -97,7 +97,7 @@ func TestChecker_AccessDenied_ReturnsMinusOne(t *testing.T) {
 		checker := boundaryCheckerByTarget(t, "kms", "role")
 		got := checker(context.Background(), clients, parent, nil)
 		if got.State != domain.RelatedError {
-			t.Errorf("Count = %d, want -1 (AccessDenied on GetKeyPolicy)", got.Count)
+			t.Errorf("State = %v, want RelatedError (AccessDenied on GetKeyPolicy)", got.State)
 		}
 		if got.Err == nil {
 			t.Error("Err = nil, want non-nil (AccessDenied must propagate)")
@@ -353,10 +353,10 @@ func TestChecker_DedupsDuplicateIDs(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T114 — TestChecker_NilClients_ReturnsMinusOne
+// T114 — TestChecker_NilClients_ReturnsError
 //
 // For representative forward checkers that make a LIVE AWS API call, call
-// with clients == nil and a valid parent. Assert Count == -1 and no panic.
+// with clients == nil and a valid parent. Assert State == RelatedError and no panic.
 //
 // Covered checkers:
 //   asg → vpc  (checkASGVPC)
@@ -364,12 +364,12 @@ func TestChecker_DedupsDuplicateIDs(t *testing.T) {
 //
 // ddb → backup is intentionally NOT covered here — checkDdbBackup is a pure
 // cache-scan (no live API call), so its nil-client semantics fall into the
-// "nil target list → ApproximateZero" rule, not the "nil client = error = -1"
+// "nil target list → ApproximateZero" rule, not the "nil client = error = RelatedError"
 // rule. See the four-category classifier in
 // .claude/skills/a9s-add-related-view/SKILL.md.
 // ---------------------------------------------------------------------------
 
-func TestChecker_NilClients_ReturnsMinusOne(t *testing.T) {
+func TestChecker_NilClients_ReturnsError(t *testing.T) {
 	t.Run("asg_vpc", func(t *testing.T) {
 		parent := resource.Resource{
 			ID:     "my-asg",
@@ -383,7 +383,7 @@ func TestChecker_NilClients_ReturnsMinusOne(t *testing.T) {
 		// Ensure no panic occurs when clients is nil.
 		got := checker(context.Background(), nil, parent, resource.ResourceCache{})
 		if got.State != domain.RelatedUnknown {
-			t.Errorf("Count = %d, want -1 (nil clients must return -1)", got.Count)
+			t.Errorf("State = %v, want RelatedError (nil clients must error)", got.State)
 		}
 	})
 
@@ -395,7 +395,7 @@ func TestChecker_NilClients_ReturnsMinusOne(t *testing.T) {
 		checker := boundaryCheckerByTarget(t, "ddb", "kinesis")
 		got := checker(context.Background(), nil, parent, resource.ResourceCache{})
 		if got.State != domain.RelatedUnknown {
-			t.Errorf("Count = %d, want -1 (nil clients must return -1)", got.Count)
+			t.Errorf("State = %v, want RelatedError (nil clients must error)", got.State)
 		}
 	})
 }

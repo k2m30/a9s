@@ -6,10 +6,7 @@ package unit_test
 // Fix 1: Tab works on auto-shown panel (rightColShowing() includes auto-shown state)
 // Fix 3: Independent field cursor — fieldCursor tracks position independently of viewport scroll
 // Fix 5: Enter blocked on unavailable right-column rows (loading or count == 0)
-// Fix 6: Count == -1 renders without number in right column
-//
-// TDD: these tests are written BEFORE the fixes land. Some will fail until the
-// coder fixes are merged. That is the expected red-state.
+// Fix 6: a RelatedUnknown row renders without a number in the right column
 
 import (
 	"strings"
@@ -20,8 +17,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -388,7 +385,7 @@ func TestDetail_FieldCursorUp_AtZeroStaysZero(t *testing.T) {
 
 // TestRightColumn_EnterBlockedOnLoadingRow verifies that pressing Enter on the
 // focused right column BEFORE any RelatedCheckResultMsg arrives returns nil cmd.
-// Row is in loading state (count == -1, loading == true).
+// Row is in loading state (State: RelatedLoading, before any result arrives).
 func TestRightColumn_EnterBlockedOnLoadingRow(t *testing.T) {
 	cleanup := registerEC2Defs([]resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
@@ -542,13 +539,13 @@ func TestRightColumn_EnterBlockedOnLoadingRow_AutoShown(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Fix 6: Count == -1 renders without number
+// Fix 6: a RelatedUnknown row renders without a number
 // ---------------------------------------------------------------------------
 
-// TestRightColumn_NegativeOneCountRendersWithoutNumber verifies that when a
-// RelatedCheckResultMsg delivers Count == -1 (unknown / not applicable), the
-// right column does NOT render "(-1)" but DOES show the display name.
-func TestRightColumn_NegativeOneCountRendersWithoutNumber(t *testing.T) {
+// TestRightColumn_UnknownStateRendersWithoutNumber verifies that when a
+// RelatedCheckResultMsg delivers a RelatedUnknown result (unknown / not
+// applicable), the right column does NOT render "(-1)" but DOES show the name.
+func TestRightColumn_UnknownStateRendersWithoutNumber(t *testing.T) {
 	cleanup := registerEC2Defs([]resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
@@ -584,9 +581,9 @@ func TestRightColumn_NegativeOneCountRendersWithoutNumber(t *testing.T) {
 	}
 }
 
-// TestRightColumn_NegativeOneCountRendersWithoutNumber_AfterAutoShow verifies
+// TestRightColumn_UnknownStateRendersWithoutNumber_AfterAutoShow verifies
 // the same behavior when the right column was auto-shown (no explicit toggle).
-func TestRightColumn_NegativeOneCountRendersWithoutNumber_AfterAutoShow(t *testing.T) {
+func TestRightColumn_UnknownStateRendersWithoutNumber_AfterAutoShow(t *testing.T) {
 	cleanup := registerEC2Defs([]resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
@@ -640,9 +637,10 @@ func TestRightColumn_NegativeOneCountRendersWithoutNumber_AfterAutoShow(t *testi
 	}
 }
 
-// TestRightColumn_NegativeOneCount_NotZeroCount verifies that count==-1 is
-// rendered differently from count==0: count==0 shows "(0)", count==-1 shows no number.
-func TestRightColumn_NegativeOneCount_NotZeroCount(t *testing.T) {
+// TestRightColumn_UnknownState_NotZeroCount verifies that a RelatedUnknown row
+// is rendered differently from a resolved count==0: count==0 shows "(0)", a
+// RelatedUnknown row shows no number.
+func TestRightColumn_UnknownState_NotZeroCount(t *testing.T) {
 	cleanup := registerEC2Defs([]resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
@@ -677,9 +675,9 @@ func TestRightColumn_NegativeOneCount_NotZeroCount(t *testing.T) {
 
 	view := d.View()
 
-	// count==-1: no number at all.
+	// RelatedUnknown: no number at all.
 	if strings.Contains(view, "(-1)") {
-		t.Errorf("count==-1 must not render as \"(-1)\"; got:\n%s", view)
+		t.Errorf("a RelatedUnknown row must not render as \"(-1)\"; got:\n%s", view)
 	}
 
 	// count==0: must show "(0)" per existing design.
