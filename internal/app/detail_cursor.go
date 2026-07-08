@@ -20,6 +20,25 @@ func detailPageSizeFor(a Action) int {
 	return detailPageSize
 }
 
+// reconcileDetailScrollToCursor keeps ds.FieldCursor within the visible
+// window [ScrollY, ScrollY+height) by adjusting ds.ScrollY. Mirrors the
+// proven legacy syncViewportToCursor (internal/tui/views/detail_helpers.go:250).
+// height is the usable viewport height supplied by the renderer via Action.N;
+// when height<=0 (unknown) it is a no-op, preserving prior behavior.
+func reconcileDetailScrollToCursor(ds *DetailState, height int) {
+	if height <= 0 {
+		return
+	}
+	if ds.FieldCursor < ds.ScrollY {
+		ds.ScrollY = ds.FieldCursor
+	} else if ds.FieldCursor >= ds.ScrollY+height {
+		ds.ScrollY = ds.FieldCursor - height + 1
+	}
+	if ds.ScrollY < 0 {
+		ds.ScrollY = 0
+	}
+}
+
 // applyDetailActions handles detail-screen-specific action kinds within
 // applyLocked. Returns (snapshot, tasks, handled). If handled is false the
 // caller should continue to the next action group.
@@ -42,6 +61,7 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 					ds.FieldCursor--
 				}
 			}
+			reconcileDetailScrollToCursor(ds, ds.ViewportHeight)
 		} else {
 			if ds.RelatedCursor > 0 {
 				ds.RelatedCursor--
@@ -62,6 +82,7 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 					ds.FieldCursor++
 				}
 			}
+			reconcileDetailScrollToCursor(ds, ds.ViewportHeight)
 		} else {
 			relatedCount := c.detailRelatedVisibleCount(ds)
 			if ds.RelatedCursor < relatedCount-1 {
@@ -88,6 +109,7 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 			if fieldCount > 0 {
 				ds.FieldCursor = fieldCount - 1
 			}
+			reconcileDetailScrollToCursor(ds, ds.ViewportHeight)
 		} else {
 			relatedCount := c.detailRelatedVisibleCount(ds)
 			if relatedCount > 0 {

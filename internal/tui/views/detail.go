@@ -243,7 +243,7 @@ func (m DetailModel) updateKeyMsgWithCtrl(msg tea.KeyMsg) (DetailModel, tea.Cmd)
 			return m, nil
 
 		case key.Matches(msg, m.keys.Down):
-			m.ctrl.Apply(app.Action{Kind: app.ActionMoveDown})
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveDown, N: m.viewport.Height()})
 			// Keep local fieldCursor in sync so Enter/Copy can index m.fieldList.
 			if body := m.ctrl.Snapshot().Body.Detail; body != nil {
 				m.fieldCursor = body.FieldCursor
@@ -251,7 +251,7 @@ func (m DetailModel) updateKeyMsgWithCtrl(msg tea.KeyMsg) (DetailModel, tea.Cmd)
 			return m, nil
 
 		case key.Matches(msg, m.keys.Up):
-			m.ctrl.Apply(app.Action{Kind: app.ActionMoveUp})
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveUp, N: m.viewport.Height()})
 			if body := m.ctrl.Snapshot().Body.Detail; body != nil {
 				m.fieldCursor = body.FieldCursor
 			}
@@ -265,7 +265,7 @@ func (m DetailModel) updateKeyMsgWithCtrl(msg tea.KeyMsg) (DetailModel, tea.Cmd)
 			return m, nil
 
 		case key.Matches(msg, m.keys.Bottom):
-			m.ctrl.Apply(app.Action{Kind: app.ActionMoveBottom})
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveBottom, N: m.viewport.Height()})
 			if body := m.ctrl.Snapshot().Body.Detail; body != nil {
 				m.fieldCursor = body.FieldCursor
 			}

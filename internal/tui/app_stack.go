@@ -322,6 +322,8 @@ func (m *Model) applyFilterToActiveRS(text string) {
 // controller (DetailBody.ScrollY set by ActionPageDown/Up) and applied in
 // RenderDetail via viewport.SetYOffset.
 func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model, tea.Cmd) {
+	m.ctrl.SetDetailViewportHeight(rs.height)
+
 	// Right-column focus or active filter: route all keys through the right-column
 	// widget first, then sync any filter-state changes to the controller.
 	if rs.rightCol.IsFocused() || rs.rightCol.IsFiltering() {

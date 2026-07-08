@@ -401,6 +401,22 @@ func (c *Controller) SetDetailRelatedVisible(visible, hidden bool) {
 	}
 }
 
+// SetDetailViewportHeight sets the ViewportHeight on the top detail screen's
+// DetailState to the renderer-supplied usable field-viewport clip height.
+// Move actions (ActionMoveUp/Down/Bottom) reconcile ScrollY against this
+// stored height, so the controller is the single owner of scroll
+// reconciliation and no call site needs to thread the height through
+// Action.N. No-op when the top screen is not ScreenDetail.
+func (c *Controller) SetDetailViewportHeight(h int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ds := c.topDetailState()
+	if ds == nil {
+		return
+	}
+	ds.ViewportHeight = h
+}
+
 // ResetDetailRelatedRows unconditionally resets RelatedRows to loading state
 // from the registered related defs, discarding any loaded counts. Called by
 // handleRefresh so stale counts are cleared before the new checker results

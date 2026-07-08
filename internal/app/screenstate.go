@@ -97,6 +97,11 @@ type DetailState struct {
 	Wrap         bool   `json:"wrap,omitempty"`
 	ScrollY      int    `json:"scroll_y"`
 	FieldCursor  int    `json:"field_cursor"`
+	// ViewportHeight is the renderer-supplied usable field-viewport clip
+	// height, set once per render via Controller.SetDetailViewportHeight so
+	// move actions (ActionMoveUp/Down/Bottom) can reconcile ScrollY without
+	// every call site needing to pass it through Action.N.
+	ViewportHeight int `json:"viewport_height,omitempty"`
 
 	// Related panel state
 	RelatedVisible bool `json:"related_visible,omitempty"`
