@@ -259,7 +259,7 @@ func focusRelatedRow(m tui.Model) tui.Model {
 //     the footer (internal/app/footer.go buildListFooterHints); a
 //     menu-driven TargetResourceList list leaves EscPops at its false
 //     default and never shows that hint.
-func TestTransientUnknownDrill_EnterOpensPlainTopLevelList(t *testing.T) {
+func TestTransientUnknownDrill_EnterResolvesInPlaceStaysOnDetail(t *testing.T) {
 	m, ngRes, def := transientUnknownSetup(t)
 	m = focusRelatedRow(m)
 
@@ -267,106 +267,43 @@ func TestTransientUnknownDrill_EnterOpensPlainTopLevelList(t *testing.T) {
 	m, _ = drainCmds(t, m, cmd, 6)
 
 	view := stripANSI(rootViewContent(m))
-	if strings.Contains(view, "detail -- "+ngRes.ID) {
-		t.Fatalf("BUG: Enter on the transient \"(?)\" row (%s) must navigate away from the ng detail to the ebs list; view unchanged:\n%s",
+	// Fix #3: a scoreless row (no ResourceIDs, no FetchFilter) RESOLVES IN
+	// PLACE — the ng detail stays rendered on top; had a list been pushed the
+	// view would render that list instead of "detail -- <id>".
+	if !strings.Contains(view, "detail -- "+ngRes.ID) {
+		t.Fatalf("BUG: Enter on the scoreless row (%s) must RESOLVE IN PLACE (stay on the ng detail), not navigate to a list; view:\n%s",
 			def.DisplayName, view)
 	}
-
-	suffix := " -- " + ngRes.ID + " (" + ngRes.Name + ")"
-	if strings.Contains(view, suffix) {
-		t.Errorf("BUG: pushed list's rendered frame carries the related-navigate title suffix %q — Enter on a transient \"(?)\" row must open a PLAIN top-level list (same as a menu entry), not a related/contextual list. View:\n%s",
-			suffix, view)
-	}
-
-	if strings.Contains(view, "esc Back") {
-		t.Errorf("BUG: pushed list's footer shows \"esc Back\" — only related/contextual lists (newRelatedList/SetEscPops(true)) show that hint; a plain menu-driven top-level list must not force immediate Esc-pop. View:\n%s", view)
-	}
 }
 
-// TestTransientUnknownDrill_EnterListShowsUnfilteredEBS verifies the pushed
-// list actually shows EBS volumes (a real, non-empty demo fixture set from
-// fakes.NewEC2()'s DescribeVolumes), rather than an empty filtered view. A
-// filtered/related list scoped to ng's own related IDs would show zero rows
-// here, since checkNGEBS never resolved any resourceIDs (cold cache, no IDs
-// collected) — only a genuine unfiltered top-level fetch surfaces the full
-// demo EBS fixture set.
-func TestTransientUnknownDrill_EnterListShowsUnfilteredEBS(t *testing.T) {
-	m, _, _ := transientUnknownSetup(t)
-	m = focusRelatedRow(m)
-
-	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	m, _ = drainCmds(t, m, cmd, 6)
-
-	ec2Client := fakes.NewEC2()
-	wantVolumes, err := awsclient.FetchEBSVolumes(t.Context(), ec2Client)
-	if err != nil || len(wantVolumes) == 0 {
-		t.Fatalf("demo EBS fixtures missing (err=%v, len=%d)", err, len(wantVolumes))
-	}
-
-	view := stripANSI(rootViewContent(m))
-	if !strings.Contains(view, wantVolumes[0].ID) {
-		t.Fatalf("BUG: pushed list does not show the unfiltered demo EBS fixture set (missing %q); Enter on a transient \"(?)\" row must open the full top-level ebs list, not an empty/filtered one. View:\n%s",
-			wantVolumes[0].ID, view)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Pin 3: returning to detail (Esc) recomputes the pivot's count once the
-// target cache has warmed.
-// ---------------------------------------------------------------------------
-
-// TestTransientUnknownDrill_ReturnRecomputesRealCount verifies owner decision
-// #38 bullet 2: after Enter drills into the ebs list, warming the "ec2"
-// RowStore entry that checkNGEBS actually joins against (it scans the ec2
-// cache for instances tagged with this node group, not the ebs cache
-// itself — internal/aws/ng_related.go's checkNGEBS/ngCachedEC2Instances),
-// returning via Esc must RECOMPUTE the real count so the stale "(?)" is
-// replaced without a manual Ctrl+R.
-//
-// RED today: app_input.go's Escape handler (rs.kind == rsKindList &&
-// m.ctrl.GetListEscPops()) calls popRS(), a bare stack pop
-// (app_stack.go:popRS/popRSWithCtrlPop) with no RelatedCheckStarted
-// dispatch anywhere in that path. The revealed rendererState's rightCol is
-// the SAME RightColumnModel instance from before the drill (rendererState
-// fields live underneath the popped list on m.stack), so its cached
-// State: RelatedUnknown row for "EBS Volumes" is never re-evaluated — the
-// badge stays stale "(?)" forever without a manual Ctrl+R.
-func TestTransientUnknownDrill_ReturnRecomputesRealCount(t *testing.T) {
+// TestTransientUnknownDrill_EnterRecomputesInPlace verifies that once the
+// "ec2" cache the ng->ebs pivot joins against is warm, Enter on the scoreless
+// row re-dispatches the checks and the row firms up to a numeric badge — in
+// place, still on the ng detail, with no target list ever pushed.
+func TestTransientUnknownDrill_EnterRecomputesInPlace(t *testing.T) {
 	m, ngRes, def := transientUnknownSetup(t)
 	m = focusRelatedRow(m)
-
-	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	m, _ = drainCmds(t, m, cmd, 6)
-
-	view := stripANSI(rootViewContent(m))
-	if strings.Contains(view, "detail -- "+ngRes.ID) {
-		t.Fatalf("setup: Enter must navigate to the ebs list before this pin can exercise the return path; view:\n%s", view)
-	}
 
 	ec2Client := fakes.NewEC2()
 	ec2Res, err := awsclient.FetchEC2Instances(t.Context(), ec2Client)
 	if err != nil || len(ec2Res) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
-		ResourceType: "ec2",
-		Resources:    ec2Res,
-	})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: ec2Res})
 
-	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
-	m, _ = drainCmds(t, m, cmd, 6)
+	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, _ = drainCmds(t, m, cmd, 8)
 
-	view = stripANSI(rootViewContent(m))
+	view := stripANSI(rootViewContent(m))
 	if !strings.Contains(view, "detail -- "+ngRes.ID) {
-		t.Fatalf("Esc did not return to the ng detail (\"detail -- %s\"); got:\n%s", ngRes.ID, view)
+		t.Fatalf("scoreless-row Enter must stay on the ng detail (resolve in place); view:\n%s", view)
 	}
-
-	// Four-state contract: "(?)" is never produced. After warming the "ec2" cache
-	// the ng->ebs pivot depends on, returning via Esc must RECOMPUTE the real
-	// count, so the row now carries a numeric badge (the blank transient row
-	// resolves to "(N)"/"(0)").
 	if !strings.Contains(view, def.DisplayName+" (") {
-		t.Fatalf("BUG: after visiting the ebs list and warming the \"ec2\" cache, returning via Esc must RECOMPUTE the real count for %q — the row must now show a numeric badge, not stay blank. View:\n%s",
+		t.Fatalf("BUG: scoreless-row Enter must RECOMPUTE %q to a numeric badge in place; row still blank. View:\n%s",
 			def.DisplayName, view)
 	}
 }
+
+// (Owner decision #38's "return via Esc recomputes" pin is retired: fix #3
+// makes a scoreless row resolve in place on the drill itself, so there is no
+// list to Esc back from — see TestTransientUnknownDrill_EnterRecomputesInPlace.)

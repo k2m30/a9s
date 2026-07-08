@@ -129,37 +129,28 @@ func TestActionBack_AfterTransientUnknownRelatedDrill_RedispatchesRelatedCheck(t
 		t.Fatalf(`test setup: expected a transient blank (no-badge) actionable row before the drill; got CountDisplay=%q Actionable=%v`, row.CountDisplay, row.Actionable)
 	}
 
-	// Drill: controller-level related-row select (web UI row-click path).
+	// Fix #3: a scoreless row (RelatedUnknown, no ResourceIDs, no FetchFilter)
+	// resolves IN PLACE — ActionRelatedSelect must NOT push a target list; it
+	// re-dispatches the source's related checks (KindRelatedCheck scoped to the
+	// source) so the row firms up in place, staying on the detail. There is no
+	// list to Back out of.
 	drillSnap, drillTasks := ctrl.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: "0"})
-	if drillSnap.Body.List == nil {
-		t.Fatalf("test setup: ActionRelatedSelect on the transient \"(?)\" row did not push a resource list (Body.List is nil) — cannot exercise the Back path. Tasks: %+v", drillTasks)
+	if drillSnap.Body.List != nil {
+		t.Fatalf("BUG: ActionRelatedSelect on a scoreless row must NOT push a target list (goes-to-all); got Body.List=%+v", drillSnap.Body.List)
 	}
-	hasFetch := false
-	for _, task := range drillTasks {
-		if task.Key.Kind == runtime.KindFetchResources && task.Key.Scope == "ebs" {
-			hasFetch = true
-		}
+	if drillSnap.Body.Detail == nil || ctrl.GetDetailResource().ID != ngRes.ID || ctrl.GetDetailResourceType() != "ng" {
+		t.Fatalf("BUG: ActionRelatedSelect on a scoreless row must stay on the ng detail; got resource=%+v type=%q",
+			ctrl.GetDetailResource(), ctrl.GetDetailResourceType())
 	}
-	if !hasFetch {
-		t.Fatalf("test setup: drill did not dispatch a KindFetchResources task for \"ebs\" — cannot exercise the Back path. Tasks: %+v", drillTasks)
-	}
-
-	// Back: pop the drilled-into ebs list, revealing the ng detail again —
-	// the ONLY Back action available to a web/headless caller.
-	backSnap, backTasks := ctrl.Apply(app.Action{Kind: app.ActionBack})
-	if backSnap.Body.Detail == nil || ctrl.GetDetailResource().ID != ngRes.ID || ctrl.GetDetailResourceType() != "ng" {
-		t.Fatalf("test setup: ActionBack did not reveal the ng detail (resource=%+v, type=%q) — cannot assert on the recompute dispatch", ctrl.GetDetailResource(), ctrl.GetDetailResourceType())
-	}
-
 	wantScope := "ng/" + ngRes.ID
 	hasRelatedCheck := false
-	for _, task := range backTasks {
+	for _, task := range drillTasks {
 		if task.Key.Kind == runtime.KindRelatedCheck && task.Key.Scope == wantScope {
 			hasRelatedCheck = true
 		}
 	}
 	if !hasRelatedCheck {
-		t.Errorf("BUG: ActionBack revealing the ng detail did not re-dispatch a KindRelatedCheck task (want Scope %q); got tasks: %+v. internal/app/actions_nav.go's handleActionBack only pops the screen stack (runtime.PopScreen{}) and always returns nil tasks — the TUI's parallel Escape path (internal/tui/app_stack.go's recomputeRelatedOnReveal, wired from app_input.go) re-dispatches a RelatedCheckStarted-equivalent, but the shared/headless ActionBack path has no analogous hook, so the %q pivot's \"(?)\" row on the ng detail never recomputes for a web/headless client without a manual refresh.",
-			wantScope, backTasks, ebsDef.DisplayName)
+		t.Errorf("BUG: ActionRelatedSelect on a scoreless row (%q) must re-dispatch KindRelatedCheck (scope %q) to resolve in place; got tasks: %+v",
+			ebsDef.DisplayName, wantScope, drillTasks)
 	}
 }

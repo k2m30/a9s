@@ -364,6 +364,19 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 			if !ok || !resource.IsRelatedActionable(row.State, row.Count, row.Approximate) {
 				return m, nil
 			}
+			// A row with nothing to scope by — no ResourceIDs and no server-side
+			// FetchFilter (a blank RelatedUnknown row, or an approximate "(0+)"
+			// that found nothing) — resolves IN PLACE rather than opening the
+			// target type's plain unfiltered list, which is not a related view.
+			// Re-dispatch this resource's related checks so the row firms up to
+			// its real count without a jarring navigation to the full list.
+			if len(row.ResourceIDs) == 0 && len(row.FetchFilter) == 0 {
+				res := m.ctrl.GetDetailResource()
+				rt := rs.resourceType
+				return m, func() tea.Msg {
+					return messages.RelatedCheckStarted{ResourceType: rt, SourceResource: res}
+				}
+			}
 			var checker resource.RelatedChecker
 			for _, def := range resource.GetRelated(rs.resourceType) {
 				if def.TargetType == row.TargetType {

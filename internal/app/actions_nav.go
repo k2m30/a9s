@@ -409,6 +409,26 @@ func (c *Controller) handleActionRelatedSelect(a Action) (ViewState, []runtime.T
 	// navigation that follows.
 	ds.RelatedFocus = true
 	ds.RelatedCursor = clickIdx
+
+	// A row with nothing to scope by — no ResourceIDs and no server-side
+	// FetchFilter (a blank RelatedUnknown row, or an approximate "(0+)" that
+	// found nothing) — resolves IN PLACE rather than opening the target type's
+	// plain unfiltered list, which is not a related view. Re-dispatch this
+	// resource's related checks (same shape as handleActionBack's recompute) so
+	// the row firms up to its real count without a jarring navigation to the
+	// full target list.
+	if len(targetRow.ResourceIDs) == 0 && len(targetRow.FetchFilter) == 0 {
+		var tasks []runtime.TaskRequest
+		if len(resource.GetRelated(ds.ResourceType)) > 0 {
+			tasks = append(tasks, runtime.TaskRequest{
+				Key:     runtime.TaskKey{Kind: runtime.KindRelatedCheck, Scope: ds.ResourceType + "/" + ds.Resource.ID},
+				Cache:   runtime.CacheNone,
+				Payload: runtime.RelatedCheckPayload{ResourceType: ds.ResourceType, Resource: ds.Resource},
+			})
+		}
+		return c.snapshot(), tasks
+	}
+
 	// Navigate — identical to the ActionSelect related-Enter path.
 	targetID := ""
 	if len(targetRow.ResourceIDs) == 1 {
