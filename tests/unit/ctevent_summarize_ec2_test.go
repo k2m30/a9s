@@ -2,6 +2,7 @@ package unit
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
@@ -218,5 +219,78 @@ func TestCTDetailSummarizeEC2_UnknownEvent(t *testing.T) {
 	}()
 	if rows == nil {
 		t.Fatal("SummarizeEC2(unknown event) returned nil; want non-nil slice")
+	}
+}
+
+// TestCTDetailSummarizeEC2_RequestSection_NestedMapsRenderCompactJSON is a regression
+// test for the REQUEST-section fmt.Sprintf("%v", ...) bug: nested-map field values
+// (e.g. resourcesSet, tagSet) must render as compact JSON via jsonyaml.CompactValue,
+// not Go's default %v map dump (which surfaces as the literal substring "map[").
+func TestCTDetailSummarizeEC2_RequestSection_NestedMapsRenderCompactJSON(t *testing.T) {
+	params := map[string]any{
+		"resourcesSet": map[string]any{
+			"items": []any{
+				map[string]any{"resourceId": "i-0e99cfa17db308c06"},
+			},
+		},
+		"tagSet": map[string]any{
+			"items": []any{
+				map[string]any{"key": "aws:eks:cluster-name", "value": "acme-dev"},
+			},
+		},
+	}
+	rows := ctevent.SummarizeEC2("DescribeInstances", params)
+	if rows == nil {
+		t.Fatal("SummarizeEC2 returned nil; want non-nil slice")
+	}
+
+	emittedKeys := make(map[string]ctevent.Row, len(rows))
+	for _, r := range rows {
+		emittedKeys[r.Key] = r
+	}
+
+	resourcesSetRow, ok := emittedKeys["resourcesSet"]
+	if !ok {
+		t.Fatalf("expected a row for key %q; got rows=%v", "resourcesSet", rows)
+	}
+	wantResourcesSet := `{"items":[{"resourceId":"i-0e99cfa17db308c06"}]}`
+	if resourcesSetRow.Value != wantResourcesSet {
+		t.Errorf("resourcesSet row Value = %q, want %q", resourcesSetRow.Value, wantResourcesSet)
+	}
+
+	tagSetRow, ok := emittedKeys["tagSet"]
+	if !ok {
+		t.Fatalf("expected a row for key %q; got rows=%v", "tagSet", rows)
+	}
+	wantTagSet := `{"items":[{"key":"aws:eks:cluster-name","value":"acme-dev"}]}`
+	if tagSetRow.Value != wantTagSet {
+		t.Errorf("tagSet row Value = %q, want %q", tagSetRow.Value, wantTagSet)
+	}
+
+	for _, r := range rows {
+		if strings.Contains(r.Value, "map[") {
+			t.Errorf("row key=%q Value=%q contains the substring %q; nested maps must render as compact JSON, not Go's default %%v dump",
+				r.Key, r.Value, "map[")
+		}
+	}
+}
+
+// TestCTDetailSummarizeEC2_RequestSection_PrimitiveSliceStaysBracketJoined is a guard
+// against over-fixing the nested-map bug: a slice of primitives (no maps inside) must
+// keep rendering as the existing bracket-joined form, not get routed through compact JSON.
+func TestCTDetailSummarizeEC2_RequestSection_PrimitiveSliceStaysBracketJoined(t *testing.T) {
+	params := map[string]any{
+		"genericList": []any{"a", "b"},
+	}
+	rows := ctevent.SummarizeEC2("DescribeInstances", params)
+	if rows == nil {
+		t.Fatal("SummarizeEC2 returned nil; want non-nil slice")
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected exactly 1 row; got %d: %v", len(rows), rows)
+	}
+	want := "[a, b]"
+	if rows[0].Value != want {
+		t.Errorf("genericList row Value = %q, want %q (primitive slices must not be JSON-ified)", rows[0].Value, want)
 	}
 }

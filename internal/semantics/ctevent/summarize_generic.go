@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/k2m30/a9s/v3/internal/jsonyaml"
 )
 
 // SummarizeGeneric is the fallback summarizer for unrecognized event sources.
 // It performs a flat walk over params, emitting one Row per top-level key.
 // Values are rendered as human-readable strings; nested maps and slices are
-// rendered compactly via fmt.Sprintf rather than being recursed into.
+// rendered compactly as JSON via jsonyaml.CompactValue rather than being
+// recursed into.
 //
 // SummarizeGeneric is called directly from BuildSections when no service-specific
 // summarizer is registered for event.EventSource. It is never registered in
@@ -49,7 +52,8 @@ func SummarizeGeneric(_ string, params map[string]any) []Row {
 }
 
 // renderGenericValue converts an arbitrary value to a display string.
-// It does not recurse deeply — nested maps render as compact {k: v} strings.
+// It does not recurse deeply — nested maps render as compact JSON via
+// jsonyaml.CompactValue.
 func renderGenericValue(v any) string {
 	if v == nil {
 		return ""
@@ -73,12 +77,12 @@ func renderGenericValue(v any) string {
 	case []any:
 		return renderSlice(val)
 	default:
-		return fmt.Sprintf("%v", v)
+		return jsonyaml.CompactValue(v)
 	}
 }
 
 // renderSlice joins primitive elements with ", " wrapped in brackets.
-// Non-primitive elements fall back to fmt.Sprintf.
+// Non-primitive elements fall back to jsonyaml.CompactValue.
 func renderSlice(s []any) string {
 	parts := make([]string, len(s))
 	for i, elem := range s {
@@ -92,7 +96,7 @@ func renderSlice(s []any) string {
 				parts[i] = "false"
 			}
 		default:
-			parts[i] = fmt.Sprintf("%v", elem)
+			parts[i] = jsonyaml.CompactValue(elem)
 		}
 	}
 	return "[" + strings.Join(parts, ", ") + "]"

@@ -8,6 +8,7 @@ package jsonyaml
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -60,4 +61,23 @@ func TryJSONToYAMLLines(s string) []string {
 		return nil
 	}
 	return strings.Split(raw, "\n")
+}
+
+// CompactValue renders an arbitrary value as a compact, single-line string.
+// nil renders as "". Strings pass through bare (not JSON-quoted). Bools and
+// numbers render in their bare form. Maps and slices render as compact JSON
+// via json.Marshal, so map keys sort alphabetically. If json.Marshal errors,
+// it falls back to fmt.Sprintf("%v", v).
+func CompactValue(v any) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Sprintf("%v", v)
+	}
+	return string(b)
 }

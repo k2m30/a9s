@@ -106,6 +106,70 @@ func TestTryJSONToYAMLLines_NestedObject(t *testing.T) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// CompactValue — unit tests for the shared compact JSON-value rendering helper
+// ════════════════════════════════════════════════════════════════════════════
+
+// TestCompactValue verifies that CompactValue renders arbitrary parsed values as a
+// compact, single-line, readable string: nested maps/slices as compact JSON (via
+// json.Marshal, so map keys sort alphabetically), and scalars in their bare
+// (unquoted) form rather than JSON-quoted.
+func TestCompactValue(t *testing.T) {
+	tests := []struct {
+		name  string
+		input any
+		want  string
+	}{
+		{
+			name:  "nil returns empty string",
+			input: nil,
+			want:  "",
+		},
+		{
+			name: "nested map of slice of map renders as compact JSON (resourcesSet shape)",
+			input: map[string]any{
+				"items": []any{
+					map[string]any{"resourceId": "i-0e99cfa17db308c06"},
+				},
+			},
+			want: `{"items":[{"resourceId":"i-0e99cfa17db308c06"}]}`,
+		},
+		{
+			name: "nested map of slice of map renders as compact JSON (tagSet shape, key sorts before value)",
+			input: map[string]any{
+				"items": []any{
+					map[string]any{"key": "aws:eks:cluster-name", "value": "acme-dev"},
+				},
+			},
+			want: `{"items":[{"key":"aws:eks:cluster-name","value":"acme-dev"}]}`,
+		},
+		{
+			name:  "plain string passes through bare, not JSON-quoted",
+			input: "hello",
+			want:  "hello",
+		},
+		{
+			name:  "bool passes through bare",
+			input: true,
+			want:  "true",
+		},
+		{
+			name:  "number passes through bare",
+			input: float64(42),
+			want:  "42",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := jsonyaml.CompactValue(tt.input)
+			if got != tt.want {
+				t.Errorf("CompactValue(%#v) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // Detail view JSON expansion — integration tests via views.DetailModel
 // ════════════════════════════════════════════════════════════════════════════
 
