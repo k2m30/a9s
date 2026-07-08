@@ -368,7 +368,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 							r.ID,
 							relMsg.DefDisplayName,
 							relMsg.Result.TargetType,
-							relMsg.Result.State,
+							relMsg.Result.EffectiveState(),
 							relMsg.Result.Count,
 							false,
 							errMsg,

@@ -494,7 +494,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				m.res.ID,
 				msg.DefDisplayName,
 				msg.Result.TargetType,
-				msg.Result.State,
+				msg.Result.EffectiveState(),
 				msg.Result.Count,
 				false,
 				errMsg,

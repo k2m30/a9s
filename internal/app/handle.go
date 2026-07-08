@@ -394,7 +394,7 @@ func (c *Controller) handleRelatedCheckBatch(batch messages.RelatedCheckBatch) {
 			errMsg = result.Result.Err.Error()
 		}
 		mergeDetailRelatedRow(targetDetail, result.DefDisplayName, result.Result.TargetType,
-			result.Result.State, result.Result.Count, false, errMsg, result.Result.Approximate, result.Result.ResourceIDs, result.Result.FetchFilter)
+			result.Result.EffectiveState(), result.Result.Count, false, errMsg, result.Result.Approximate, result.Result.ResourceIDs, result.Result.FetchFilter)
 	}
 }
 

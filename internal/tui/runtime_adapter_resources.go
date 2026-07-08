@@ -176,7 +176,7 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 		sourceID,
 		msg.DefDisplayName,
 		msg.Result.TargetType,
-		msg.Result.State,
+		msg.Result.EffectiveState(),
 		msg.Result.Count,
 		false,
 		errMsg,

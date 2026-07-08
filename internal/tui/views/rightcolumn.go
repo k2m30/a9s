@@ -116,7 +116,7 @@ func (m RightColumnModel) Update(msg tea.Msg) (RightColumnModel, tea.Cmd) {
 		if targetIdx >= 0 {
 			m.rows[targetIdx].loading = false
 			m.rows[targetIdx].err = msg.Result.Err
-			m.rows[targetIdx].state = msg.Result.State
+			m.rows[targetIdx].state = msg.Result.EffectiveState()
 			m.rows[targetIdx].count = msg.Result.Count
 			m.rows[targetIdx].resourceIDs = msg.Result.ResourceIDs
 			m.rows[targetIdx].fetchFilter = msg.Result.FetchFilter
