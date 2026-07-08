@@ -37,5 +37,9 @@ func FetchRelatedTarget(ctx context.Context, clients any, cache resource.Resourc
 		return nil, false, err
 	}
 	isTruncated := result.Pagination != nil && result.Pagination.IsTruncated
-	return result.Resources, isTruncated, nil
+	resources := result.Resources
+	if resources == nil {
+		resources = []resource.Resource{}
+	}
+	return resources, isTruncated, nil
 }

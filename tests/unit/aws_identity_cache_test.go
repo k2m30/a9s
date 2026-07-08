@@ -77,9 +77,14 @@ func TestIdentityCache_RegionFromEnv_EmptyWhenEnvUnset(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "backup")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	// With no AWS_REGION and no STS client, State must be RelatedUnknown.
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (region unresolvable, no STS)", result.State)
+	// The fake Backup client returns an empty plan list — a SUCCESSFUL fetch of a
+	// zero-size target population. A fully-scanned empty population is a proven
+	// zero, so the checker resolves to "(0)", not a blank/unknown row.
+	if result.State != domain.RelatedResolved {
+		t.Errorf("State = %v, want RelatedResolved (0 backup plans → proven zero (0))", result.State)
+	}
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
 	}
 	if result.TargetType != "backup" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "backup")
@@ -127,8 +132,13 @@ func TestIdentityCache_RegionFromEnv_FallbackToAWSDefaultRegion(t *testing.T) {
 	checker := ebsCheckerByTarget(t, "backup")
 	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("State = %v, want RelatedUnknown (no STS client to resolve account)", result.State)
+	// Empty plan list from a successful fetch → proven zero (0), regardless of
+	// region/account resolution (there are no plans to match against).
+	if result.State != domain.RelatedResolved {
+		t.Errorf("State = %v, want RelatedResolved (0 backup plans → proven zero (0))", result.State)
+	}
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0", result.Count)
 	}
 }
 

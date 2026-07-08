@@ -6,6 +6,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -250,6 +251,27 @@ func TestRelated_Athena_Role_NoRole(t *testing.T) {
 
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (no ExecutionRole)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// checkAthenaS3 — demo default workgroup "primary"
+// ---------------------------------------------------------------------------
+
+// TestRelated_Athena_S3_PrimaryWorkgroup_NotUnknown pins FIX 2: the demo
+// default workgroup "primary" has no entry in fixtures.WorkGroupDetails, so
+// the demo AthenaFake's GetWorkGroup returns an empty Configuration and
+// checkAthenaS3 falls back to RelatedUnknown — leaving the RELATED panel
+// all-blank for the very first workgroup a demo user opens.
+func TestRelated_Athena_S3_PrimaryWorkgroup_NotUnknown(t *testing.T) {
+	res := resource.Resource{ID: "primary", Name: "primary", Fields: map[string]string{}}
+	clients := &awsclient.ServiceClients{Athena: fakes.NewAthena()}
+	checker := athenaCheckerByTarget(t, "s3")
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	if result.State == domain.RelatedUnknown {
+		t.Errorf("checkAthenaS3(%q) with demo fixtures: State = RelatedUnknown, want resolved "+
+			"(the \"primary\" workgroup needs a WorkGroupDetails entry in demo fixtures)", res.ID)
 	}
 }
 

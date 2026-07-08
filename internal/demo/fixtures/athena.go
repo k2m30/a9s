@@ -99,6 +99,64 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 			},
 		},
 		WorkGroupDetails: map[string]*athena.GetWorkGroupOutput{
+			// "primary" is the AWS-provisioned default workgroup every account
+			// starts with, so it is normally the very first workgroup a demo
+			// user opens. Without a Configuration entry here, GetWorkGroup
+			// returns an empty output and every related-panel pivot
+			// (s3/kms/logs/role) falls back to Unknown instead of a resolved
+			// count. Results are written to the same healthy bucket other
+			// fixtures share, encrypted with that bucket's KMS key
+			// (S3BucketKMSKeyID, s3.go) — no ExecutionRole/CloudWatch
+			// metrics, matching a real SQL-engine "primary" workgroup which
+			// never carries Spark-only config fields.
+			"primary": {
+				WorkGroup: &athenatypes.WorkGroup{
+					Name:  aws.String("primary"),
+					State: athenatypes.WorkGroupStateEnabled,
+					Configuration: &athenatypes.WorkGroupConfiguration{
+						ResultConfiguration: &athenatypes.ResultConfiguration{
+							OutputLocation: aws.String("s3://" + HealthyBucketName + "/athena-results/"),
+							EncryptionConfiguration: &athenatypes.EncryptionConfiguration{
+								EncryptionOption: athenatypes.EncryptionOptionSseKms,
+								KmsKey:           aws.String(S3BucketKMSKeyID),
+							},
+						},
+					},
+				},
+			},
+			"acme-analytics": {
+				WorkGroup: &athenatypes.WorkGroup{
+					Name:  aws.String("acme-analytics"),
+					State: athenatypes.WorkGroupStateEnabled,
+					Configuration: &athenatypes.WorkGroupConfiguration{
+						ResultConfiguration: &athenatypes.ResultConfiguration{
+							OutputLocation: aws.String("s3://" + HealthyBucketName + "/analytics-results/"),
+						},
+					},
+				},
+			},
+			"acme-data-science": {
+				WorkGroup: &athenatypes.WorkGroup{
+					Name:  aws.String("acme-data-science"),
+					State: athenatypes.WorkGroupStateDisabled,
+					Configuration: &athenatypes.WorkGroupConfiguration{
+						ResultConfiguration: &athenatypes.ResultConfiguration{
+							OutputLocation: aws.String("s3://" + HealthyBucketName + "/data-science-results/"),
+						},
+					},
+				},
+			},
+			"acme-etl-orders": {
+				WorkGroup: &athenatypes.WorkGroup{
+					Name:  aws.String("acme-etl-orders"),
+					State: athenatypes.WorkGroupStateEnabled,
+					Configuration: &athenatypes.WorkGroupConfiguration{
+						ResultConfiguration: &athenatypes.ResultConfiguration{
+							OutputLocation: aws.String("s3://" + HealthyBucketName + "/etl-orders-results/"),
+						},
+					},
+				},
+			},
 			"a9s-demo-s3-queries": {
 				WorkGroup: &athenatypes.WorkGroup{
 					Name:  aws.String("a9s-demo-s3-queries"),
