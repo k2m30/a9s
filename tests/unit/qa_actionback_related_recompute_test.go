@@ -125,8 +125,8 @@ func TestActionBack_AfterTransientUnknownRelatedDrill_RedispatchesRelatedCheck(t
 		t.Fatalf("test setup: expected exactly 1 related row on the ng detail before the drill; got Body.Detail=%+v", preDrill.Body.Detail)
 	}
 	row := preDrill.Body.Detail.Related[0]
-	if row.CountDisplay != "(?)" || !row.Actionable {
-		t.Fatalf(`test setup: expected a transient "(?)" actionable row before the drill; got CountDisplay=%q Actionable=%v`, row.CountDisplay, row.Actionable)
+	if row.CountDisplay != "" || !row.Actionable {
+		t.Fatalf(`test setup: expected a transient blank (no-badge) actionable row before the drill; got CountDisplay=%q Actionable=%v`, row.CountDisplay, row.Actionable)
 	}
 
 	// Drill: controller-level related-row select (web UI row-click path).

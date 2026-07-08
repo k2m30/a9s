@@ -18,8 +18,8 @@ func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskReques
 
 	// Owner decision #38 (2026-07-06): when the pop reveals a detail screen
 	// with registered related defs, re-dispatch its related-resource checks —
-	// a pivot left at the transient "(?)" state (domain.RelatedUnknown, no FetchFilter)
-	// must resolve to its real count once the user drills into the target
+	// a pivot left at the transient blank-navigable state (domain.RelatedUnknown,
+	// no FetchFilter) must resolve to its real count once the user drills into the target
 	// type and returns, without a manual Ctrl+R. Mirrors the shape
 	// HandleRelatedCheckStarted (internal/runtime/related.go) and
 	// openRelatedDetail (internal/app/navigate.go) already produce, so this

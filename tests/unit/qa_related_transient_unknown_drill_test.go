@@ -207,8 +207,10 @@ func transientUnknownSetup(t *testing.T) (tui.Model, resource.Resource, resource
 	if !strings.Contains(view, "detail -- "+ngRes.ID) {
 		t.Fatalf("setup did not land on ng detail (\"detail -- %s\"); got:\n%s", ngRes.ID, view)
 	}
-	if !strings.Contains(view, def.DisplayName+" (?)") {
-		t.Fatalf("test setup: ng detail's related panel must show the transient \"(?)\" badge for %q before driving Enter; got view:\n%s",
+	// Four-state contract: a transient resolved-unknown row shows NO count badge
+	// (blank), never "(?)". It must be present and badge-less before the drill.
+	if !strings.Contains(view, def.DisplayName) || strings.Contains(view, def.DisplayName+" (") {
+		t.Fatalf("test setup: ng detail's related panel must show %q as a blank (no-count) transient row before driving Enter; got view:\n%s",
 			def.DisplayName, view)
 	}
 
@@ -359,8 +361,12 @@ func TestTransientUnknownDrill_ReturnRecomputesRealCount(t *testing.T) {
 		t.Fatalf("Esc did not return to the ng detail (\"detail -- %s\"); got:\n%s", ngRes.ID, view)
 	}
 
-	if strings.Contains(view, def.DisplayName+" (?)") {
-		t.Fatalf("BUG: after visiting the ebs list and warming the \"ec2\" cache the ng->ebs pivot depends on, returning via Esc must RECOMPUTE the real count — the \"(?)\" badge for %q must not still be on screen. View:\n%s",
+	// Four-state contract: "(?)" is never produced. After warming the "ec2" cache
+	// the ng->ebs pivot depends on, returning via Esc must RECOMPUTE the real
+	// count, so the row now carries a numeric badge (the blank transient row
+	// resolves to "(N)"/"(0)").
+	if !strings.Contains(view, def.DisplayName+" (") {
+		t.Fatalf("BUG: after visiting the ebs list and warming the \"ec2\" cache, returning via Esc must RECOMPUTE the real count for %q — the row must now show a numeric badge, not stay blank. View:\n%s",
 			def.DisplayName, view)
 	}
 }

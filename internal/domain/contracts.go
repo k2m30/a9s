@@ -136,13 +136,15 @@ type RelatedCheckResult struct {
 // EffectiveState returns the row-disposition state consumers must act on. A
 // checker can return a partial success — a positive Count with real
 // ResourceIDs — alongside an aggregate Err (e.g. the lambda→eb-rule checker
-// when some ListTargetsByRule calls fail). The error dominates: such a row
-// renders as an error and must NOT be navigable, so Err != nil forces
-// RelatedError over whatever State the checker left (typically the zero-value
-// RelatedResolved). Results already constructed as RelatedError are unaffected.
-// Every site that derives a mirror-row State or actionability from a result
-// must go through this rather than reading State directly, so IsRelatedActionable
-// stays the single source of truth on a State that already reflects the error.
+// when some ListTargetsByRule calls fail). The error dominates: Err != nil
+// forces RelatedError over whatever State the checker left (typically the
+// zero-value RelatedResolved), so the row renders blank and dimmed — a dead
+// end — rather than showing a Count that could not be trusted. The failure is
+// surfaced separately (Flash{IsError:true} + "!" log) and the user retries with
+// Ctrl+R. Results already constructed as RelatedError are unaffected. Every
+// site that derives a mirror-row State or actionability from a result must go
+// through this rather than reading State directly, so IsRelatedActionable stays
+// the single source of truth.
 func (r RelatedCheckResult) EffectiveState() RelatedRowState {
 	if r.Err != nil {
 		return RelatedError

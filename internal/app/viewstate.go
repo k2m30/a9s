@@ -239,9 +239,9 @@ type RelatedBlock struct {
 	// template can use .Actionable directly without re-deriving the predicate.
 	Actionable bool `json:"actionable,omitempty"`
 	// CountDisplay is the pre-computed count badge from resource.FormatRelatedCount
-	// ("" for RelatedDeferred, "(?)" for RelatedUnknown/RelatedLoading/RelatedError,
-	// "(N)" for RelatedResolved), so the web template renders it directly instead
-	// of re-deriving the format.
+	// ("(N)"/"(N+)" for RelatedResolved, "" for every other state — the blank,
+	// navigable rows), so the web template renders it directly instead of
+	// re-deriving the format.
 	CountDisplay string `json:"count_display,omitempty"`
 }
 

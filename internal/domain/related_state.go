@@ -12,14 +12,17 @@ const (
 	RelatedResolved RelatedRowState = iota
 	// RelatedLoading means the checker is still in flight.
 	RelatedLoading
-	// RelatedError means the checker (or a prerequisite lookup) failed.
+	// RelatedError means the checker (or a prerequisite lookup) failed. Renders
+	// blank (no count — "(?)" is forbidden) AND dimmed: like a proven zero it is
+	// a dead end, not navigable. The failure is surfaced through a
+	// Flash{IsError:true} + the "!" error log; the user retries with Ctrl+R.
 	RelatedError
 	// RelatedUnknown means the result resolved but the count could not be
 	// computed (e.g. a two-hop checker whose source lookup missed in a
-	// truncated cache). Renders as "(?)".
+	// truncated cache). Renders as a blank, navigable row — never "(?)".
 	RelatedUnknown
 	// RelatedDeferred means navigation uses a server-side FetchFilter pivot
-	// instead of a local count. Renders with a blank count badge.
+	// instead of a local count. Renders as a blank, navigable row.
 	RelatedDeferred
 )
 

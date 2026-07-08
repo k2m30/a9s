@@ -228,21 +228,22 @@ func ApproximateZero(targetType string) RelatedCheckResult {
 // could not determine the count because a prerequisite lookup failed". The
 // most common case is a two-hop checker (snapshot → source DB instance →
 // cluster) where the SOURCE was not found in a truncated intermediate cache,
-// so the hop to the TARGET was never attempted. Renders as "(?)".
+// so the hop to the TARGET was never attempted. Renders as the fourth visible
+// state — a blank, navigable row (no count, drill in) — never "(?)".
 //
 // Distinct from ApproximateZero: ApproximateZero says "we scanned the target
-// cache and found 0 matches (more may exist)". UnknownRelated says "we could
-// not perform the scan at all".
+// cache and found 0 matches (more may exist)" and renders "(0+)". UnknownRelated
+// says "we could not perform the scan at all" and shows no count.
 func UnknownRelated(targetType string) RelatedCheckResult {
 	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedUnknown}
 }
 
 // ErrorRelated returns a RelatedCheckResult representing "the checker (or a
-// prerequisite AWS call) returned an error". Renders as "(?)" — but unlike
-// UnknownRelated, IsRelatedActionable treats RelatedError as a dead end
-// regardless of any other field (including a FetchFilter the checker may
-// also have computed before the failing call), since navigating on an
-// errored row would drill in on data that was never actually resolved.
+// prerequisite AWS call) returned an error". Renders blank (no count — "(?)"
+// is forbidden) AND dimmed: unlike UnknownRelated it is a dead end, not
+// navigable, because drilling into data that never resolved is misleading.
+// The failure is surfaced separately through a Flash{IsError:true} + the "!"
+// error log (Golden Contract rule 6); the user retries with Ctrl+R.
 func ErrorRelated(targetType string, err error) RelatedCheckResult {
 	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedError, Err: err}
 }
@@ -268,36 +269,31 @@ func LoadingRelated(targetType string) RelatedCheckResult {
 // RelatedBlock.Actionable), and — via that ViewState field — the web template,
 // so the rule cannot drift between renderers.
 //
-//   - RelatedLoading / RelatedError    → not actionable
-//   - RelatedDeferred                  → actionable regardless of Count
-//     (navigation drills in via FetchFilter's server-side filtered fetch,
-//     which resolves the real count)
-//   - RelatedUnknown                   → actionable (owner decision #38,
-//     2026-07-06): Enter opens the target type's plain top-level list, the
-//     same navigation a menu entry would produce; returning to the detail
-//     re-dispatches the related checks so the "(?)" resolves to the real
-//     count once the target's cache is warm (see app_input.go's Escape
-//     handler and ResolveRelatedNavigate's NavigationKindResourceList
-//     fallback, both of which treat this case identically to a menu-driven
-//     list open)
-//   - RelatedResolved, count == 0      → never actionable, even when
-//     approximate (ApproximateZero() sets Count:0 — those are the "(0)"
-//     rows; a resolved zero is a dead-end pivot regardless of the
-//     approximate flag)
-//   - RelatedResolved, count > 0       → actionable (the approximate/"N+"
-//     rows re-run the checker as more pages load, so matches surface
-//     incrementally)
+// A related row's final disposition is one of (never "(?)", which is forbidden):
+//   1. "(N)"        — an exact count                     (actionable)
+//   2. "(N+)"/"(0+)"— a lower bound                      (actionable)
+//   3. dimmed "(0)" — a proven zero                      (NOT actionable — dead end)
+//   4. blank        — "we aren't counting this, drill in" (actionable: Unknown/Deferred)
+//   5. blank dimmed — the checker errored                (NOT actionable — dead end)
+// RelatedError is a dead end like a proven zero: an error is surfaced through a
+// Flash{IsError:true} + the "!" error log (Golden Contract rule 6), and the user
+// retries with Ctrl+R rather than drilling into data that never resolved.
+// RelatedLoading is the transient in-progress spinner and resolves into one of
+// the above.
 func IsRelatedActionable(state domain.RelatedRowState, count int, approximate bool) bool {
 	switch state {
 	case domain.RelatedLoading, domain.RelatedError:
+		// Loading: transient spinner. Error: dead end — surfaced via flash + log,
+		// recovered with Ctrl+R, never navigable.
 		return false
 	case domain.RelatedDeferred, domain.RelatedUnknown:
+		// The blank-navigable state: no number, drill in to find out.
 		return true
 	default: // RelatedResolved
 		// Only a PROVEN zero — a complete (non-truncated) scan that found
-		// nothing — is a dead end. An approximate lower bound ("N+"/"0+",
-		// produced when the target list was truncated so more may exist on
-		// later pages) stays actionable: the user drills in to see the rest.
+		// nothing — is a dead end (state 3). An approximate lower bound
+		// ("N+"/"0+") stays actionable (state 2): the user drills in to see
+		// the rest.
 		if count == 0 && !approximate {
 			return false
 		}
@@ -314,13 +310,11 @@ func IsRelatedActionable(state domain.RelatedRowState, count int, approximate bo
 //   - RelatedResolved, approximate → "(N+)" — a lower bound from a truncated
 //     target scan; the real count is at least N and more may exist on later
 //     pages. "(0+)" is the honest form of "scanned one page, found none yet".
-//   - RelatedDeferred → ""    (actionable navigation link, e.g. ct-events; the
-//     row reads as a drill-in, not an unresolved count, and the filtered
-//     fetch will resolve the real count once entered)
-//   - anything else   → "(?)" (RelatedUnknown is the resolved-unknown case —
-//     budget-excluded or structurally uncomputable pivot, e.g. kms→s3;
-//     RelatedLoading/RelatedError also fall here, but the renderers show a
-//     spinner/em-dash instead of consulting this text for those two states)
+//   - everything else (RelatedDeferred / RelatedUnknown / RelatedError /
+//     RelatedLoading) → "" — NO number. RelatedDeferred/RelatedUnknown are the
+//     "we aren't giving a count, drill in" rows; RelatedError is a blank dead
+//     end (dimmed, not navigable); RelatedLoading shows a spinner. "(?)" is
+//     FORBIDDEN and is never produced.
 func FormatRelatedCount(state domain.RelatedRowState, count int, approximate bool) string {
 	if state == domain.RelatedResolved {
 		if approximate {
@@ -328,10 +322,7 @@ func FormatRelatedCount(state domain.RelatedRowState, count int, approximate boo
 		}
 		return fmt.Sprintf("(%d)", count)
 	}
-	if state == domain.RelatedDeferred {
-		return ""
-	}
-	return "(?)"
+	return ""
 }
 
 // NoopChecker is a stub RelatedChecker suitable for tests that exercise

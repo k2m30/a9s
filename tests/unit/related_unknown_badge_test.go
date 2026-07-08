@@ -1,31 +1,17 @@
-// related_unknown_badge_test.go — pins the user-visible fix where a RESOLVED
-// unknown related count (State: RelatedUnknown, not loading, no error, no
-// FetchFilter) renders as an explicit "(?)" badge instead of an empty/no-badge
-// row.
+// related_unknown_badge_test.go — pins the four-state contract that "(?)" is
+// FORBIDDEN: a RESOLVED unknown related count (State: RelatedUnknown, not
+// loading, no error, no FetchFilter) renders with NO count badge (blank) and is
+// ACTIONABLE, never as a "(?)" badge.
 //
 // Contract under test (resource.FormatRelatedCount, internal/resource/related.go):
-//   - State: RelatedDeferred (server-side FetchFilter pivot) → ""    (actionable
-//     drill-in link; the filtered re-fetch resolves the real count once
-//     entered, so no misleading "(?)" badge is shown on what is really a
-//     navigable pivot)
-//   - State: RelatedUnknown                                 → "(?)" (resolved
-//     unknown — a computable pivot whose required cache entry is cold, e.g.
-//     ng→ebs before the ec2 cache has warmed; see
-//     TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch in
-//     aws_ng_cold_cache_guard_test.go for the checker-level contract this
-//     badge represents. Must read as "we tried and can't tell you yet",
-//     distinct from the loading state, which never reaches this function)
+//   - State: RelatedDeferred (server-side FetchFilter pivot) → ""  (actionable
+//     drill-in link; the filtered re-fetch resolves the real count on entry)
+//   - State: RelatedUnknown (no filter)                      → ""  (blank,
+//     actionable — a real registered checker whose backing cache entry has not
+//     warmed yet; Enter drills into the target type's plain top-level list.
+//     "(?)" is never produced.)
 //   - State: RelatedResolved, count == 0                     → "(0)"
 //   - State: RelatedResolved, count == N (N > 0)              → "(N)"
-//
-// A prior revision of this file fixtured the no-filter case as a
-// budget-excluded/structurally-uncomputable pivot (e.g. kms→s3). That framing
-// no longer applies: budget-excluded pivots (the knownDisconnectedPivots set)
-// are being removed from the registry entirely by a parallel change, so their
-// rows never reach the panel at all. The remaining resolved-unknown-no-filter
-// case is exclusively the TRANSIENT one — a real registered checker whose
-// backing cache entry has not warmed yet — so this file fixtures that
-// scenario.
 package unit_test
 
 import (
@@ -50,7 +36,7 @@ func TestFormatRelatedCount_Table(t *testing.T) {
 		approx bool
 		want   string
 	}{
-		{"ResolvedUnknown_NoFilter", domain.RelatedUnknown, 0, false, "(?)"},
+		{"ResolvedUnknown_NoFilter", domain.RelatedUnknown, 0, false, ""},
 		{"ResolvedUnknown_WithFilter_NoBadge", domain.RelatedDeferred, 0, false, ""},
 		{"ExactZero", domain.RelatedResolved, 0, false, "(0)"},
 		{"Positive", domain.RelatedResolved, 7, false, "(7)"},
@@ -94,18 +80,15 @@ func ngResourceForCacheMissBadge() resource.Resource {
 	}
 }
 
-// TestRenderRelatedPanel_TransientUnknownNoFilter_ShowsQuestionMarkBadge
+// TestRenderRelatedPanel_TransientUnknownNoFilter_ShowsNoBadge
 // verifies the badge TEXT for a TRANSIENT resolved-unknown row (a real
 // registered checker, e.g. ng→ebs, whose required cache entry has not warmed
-// yet) — as opposed to a budget-excluded/structurally-uncomputable pivot,
-// which is removed from the registry entirely rather than rendered with a
-// badge. The "(?)" badge text itself is untouched by owner decision #38
-// (resource.FormatRelatedCount's count<0/no-filter branch is unchanged); only
-// the row's actionability/styling flipped — a transient "(?)" row is now
-// actionable (a real drill target: Enter opens the target type's plain
-// top-level list per qa_related_transient_unknown_drill_test.go), so it
-// renders BRIGHT (styles.RowNormal) like any other actionable row, not dim.
-func TestRenderRelatedPanel_TransientUnknownNoFilter_ShowsQuestionMarkBadge(t *testing.T) {
+// yet). Under the four-state contract "(?)" is FORBIDDEN: a resolved-unknown
+// no-filter row shows NO count badge (blank) and is ACTIONABLE — a real drill
+// target (Enter opens the target type's plain top-level list per
+// qa_related_transient_unknown_drill_test.go) — so it renders BRIGHT
+// (styles.RowNormal) like any other actionable row.
+func TestRenderRelatedPanel_TransientUnknownNoFilter_ShowsNoBadge(t *testing.T) {
 	ensureNoColor(t)
 	m := newRelatedDimParityDetail("ng", ngResourceForCacheMissBadge())
 
@@ -120,25 +103,25 @@ func TestRenderRelatedPanel_TransientUnknownNoFilter_ShowsQuestionMarkBadge(t *t
 		CountDisplay: resource.FormatRelatedCount(domain.RelatedUnknown, 0, false),
 	}
 	if !block.Actionable {
-		t.Fatal("test setup: transient-unknown-no-filter row must be Actionable (owner decision #38)")
+		t.Fatal("test setup: transient-unknown-no-filter row must be Actionable (four-state contract)")
 	}
-	if block.CountDisplay != "(?)" {
-		t.Fatalf("test setup: block.CountDisplay = %q, want \"(?)\"", block.CountDisplay)
+	if block.CountDisplay != "" {
+		t.Fatalf("test setup: block.CountDisplay = %q, want \"\" (no badge — \"(?)\" is forbidden)", block.CountDisplay)
 	}
 
 	body := relatedDimParityBody([]app.RelatedBlock{block})
 	rendered := m.RenderDetail(body)
 	plain := stripAnsi(rendered)
 
-	if !strings.Contains(plain, "(?)") {
-		t.Errorf("rendered related panel missing \"(?)\" badge for transient-unknown row; got:\n%s", plain)
+	if strings.Contains(plain, "(?)") {
+		t.Errorf("rendered related panel must NOT contain \"(?)\" (forbidden); got:\n%s", plain)
 	}
 
 	line := extractRelatedLine(t, rendered, "EBS Volumes")
-	wantText := "  EBS Volumes (?)"
+	wantText := "  EBS Volumes"
 	wantStyled := styles.RowNormal.Render(wantText)
 	if line != wantStyled {
-		t.Errorf("transient-unknown row not rendered bright (actionable) with \"(?)\" badge.\n  got:  %q\n  want: %q", line, wantStyled)
+		t.Errorf("transient-unknown row not rendered bright (actionable) with no badge.\n  got:  %q\n  want: %q", line, wantStyled)
 	}
 }
 
