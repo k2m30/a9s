@@ -35,7 +35,6 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 	if clients.EC2 == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -75,7 +74,6 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		mu.Lock()
 		defer mu.Unlock()
 		if flTruncated {
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -97,6 +95,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		}
 	})
 	result.IssueCount = 0
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result, nil
 }

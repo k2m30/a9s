@@ -39,7 +39,6 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 	if clients.APIGatewayV2 == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -126,7 +125,6 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		defer mu.Unlock()
 
 		if stagesTruncated || fetchErr {
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 		}
 		result.FieldUpdates[apiID] = map[string]string{"stages_count": stagesCountStr}
@@ -159,6 +157,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 	// All API Gateway findings are severity "~" (informational).
 	// IssueCount counts only "!" severity findings; "~" do not contribute.
 	result.IssueCount = 0
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result, nil
 }

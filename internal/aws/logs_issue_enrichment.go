@@ -49,7 +49,6 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 	// as a nil zero value will panic at call time — safeDescribeLogStreams recovers.
 	logStreamsAPI, hasStreams := clients.CloudWatchLogs.(CWLogsDescribeLogStreamsAPI)
 
-	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
 	n := min(len(resources), EnrichmentCap)
@@ -112,7 +111,6 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -129,7 +127,8 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 	sort.Strings(failures)
 	// Metric filter findings are severity "~" (informational); IssueCount stays 0.
 	result.IssueCount = 0
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result,
 		AggregateFailures("logs-enrich: DescribeMetricFilters", failures, total)
 }

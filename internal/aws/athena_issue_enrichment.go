@@ -37,7 +37,6 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 	if clients.Athena == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -55,7 +54,6 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -95,6 +93,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		// "~" severity does not contribute to IssueCount.
 	})
 	result.IssueCount = 0
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result, nil
 }

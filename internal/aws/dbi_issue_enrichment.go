@@ -38,13 +38,8 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 	// Paginate with a cap.
 	var allActions []rdstypes.ResourcePendingMaintenanceActions
 	var marker *string
-	truncated := false
 	pages := 0
-	for {
-		if pages >= EnrichmentCap {
-			truncated = true
-			break
-		}
+	for pages < EnrichmentCap {
 		out, err := clients.RDS.DescribePendingMaintenanceActions(ctx, &rds.DescribePendingMaintenanceActionsInput{Marker: marker})
 		pages++
 		if err != nil {
@@ -125,7 +120,8 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 	}
 
 	result.IssueCount = 0 // "~" findings never bump the S1 badge
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result, nil
 }
 

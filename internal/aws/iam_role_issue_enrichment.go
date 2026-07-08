@@ -38,7 +38,6 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 	if !ok {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -60,7 +59,6 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -79,6 +77,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 	})
 	// Dormant-role findings are severity "~" (informational); IssueCount stays 0.
 	result.IssueCount = 0
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result, nil
 }

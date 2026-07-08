@@ -35,7 +35,6 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 	if clients.SQS == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
 	n := min(len(resources), EnrichmentCap)
@@ -63,7 +62,6 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -97,7 +95,8 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 	})
 	sort.Strings(failures)
 	result.IssueCount = 0
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result,
 		AggregateFailures("sqs-enrich: GetQueueAttributes", failures, total)
 }

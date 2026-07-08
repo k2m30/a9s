@@ -260,11 +260,13 @@ func TestEnrichWAFLogging_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	}
 }
 
-// TestEnrichWAFLogging_APIErrorSetsTruncatedAndSurfacesError verifies that when the
-// API call returns a generic error, the enricher sets Truncated=true, produces 0
-// findings, and returns a composite error containing the enricher prefix and the
-// failing WebACL ARN.
-func TestEnrichWAFLogging_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
+// TestEnrichWAFLogging_APIErrorMarksRowTruncatedIDNotBadge verifies that when the
+// API call returns a generic error, the enricher marks each failing ACL's row
+// via TruncatedIDs, produces 0 findings, and returns a composite error
+// containing the enricher prefix and the failing WebACL ARN. waf only ever
+// emits "~" (informational) findings, so the aggregate Truncated flag must
+// stay false — a coverage gap never lower-bounds the issue badge.
+func TestEnrichWAFLogging_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("wafv2: GetLoggingConfiguration throttled")
 	fake := &wafLoggingFake{
 		loggingErrByARN: map[string]error{
@@ -288,8 +290,14 @@ func TestEnrichWAFLogging_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when an API call fails")
+	if result.Truncated {
+		t.Error("Truncated must stay false: waf only emits \"~\" findings, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
+	}
+	if !result.TruncatedIDs[wafACLARN1] {
+		t.Errorf("TruncatedIDs[%q] must be true", wafACLARN1)
+	}
+	if !result.TruncatedIDs[wafACLARN2] {
+		t.Errorf("TruncatedIDs[%q] must be true", wafACLARN2)
 	}
 }
 

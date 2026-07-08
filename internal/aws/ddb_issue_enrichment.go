@@ -29,7 +29,6 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 	if clients.DynamoDB == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -48,7 +47,6 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		defer mu.Unlock()
 		if err != nil {
 			// sub-call error: skip this table, mark truncated to signal incomplete data
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -69,6 +67,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		}
 	})
 	result.IssueCount = 0
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result, nil
 }

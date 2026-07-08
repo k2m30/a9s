@@ -2,21 +2,29 @@ package unit
 
 // enrichment_truncated_ids_test.go — Contract tests for EnricherResult.TruncatedIDs.
 //
-// TruncatedIDs is a per-resource truncation map (map[string]bool) that replaces the
-// coarse global Truncated bool for fine-grained UI resolution. When an enricher
-// bails on a specific resource (API error or cap hit), it MUST set:
-//   - result.TruncatedIDs[resourceID] = true
-//   - result.Truncated = true  (both signals survive)
+// TruncatedIDs is a per-resource truncation map (map[string]bool) signalling a
+// per-row "?" coverage gap (API error or cap hit) independent of the aggregate
+// Truncated bool. When an enricher bails on a specific resource, it MUST set
+// result.TruncatedIDs[resourceID] = true. The aggregate result.Truncated only
+// follows when the coverage gap could hide a severity "!" (SevBroken) finding
+// — i.e. the enricher's IssueCount is a lower bound. Enrichers that emit only
+// "~" (informational) findings, like iam-group, MUST leave Truncated false
+// regardless of TruncatedIDs: a coverage gap in informational-only data never
+// lower-bounds the issue badge (see internal/aws/issue_enrichment.go
+// IssueEnricherResult.Truncated godoc).
 //
 // Tests use existing fake infrastructure from aws_iam_group_enricher_test.go
 // and aws_eventbridge_pagination_test.go (same package unit).
 //
 // Tests:
-//   1. TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceError:
+//   1. TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceErrorNotBadge:
 //      GetGroup errors on the second group → TruncatedIDs["second-group"] == true,
-//      TruncatedIDs["first-group"] == false (first succeeded), Truncated == true.
+//      TruncatedIDs["first-group"] == false (first succeeded), Truncated == false
+//      (iam-group is "~"-only — the gap never lower-bounds the issue badge).
 //   2. TestEnrichEventBridgeRuleTargets_TruncatedIDsPopulatedOnCapHit:
 //      NextToken always set → after PerParentPageCap pages, TruncatedIDs[ruleID] == true.
+//      (eb-rule can emit SevBroken findings, so its Truncated follows IssueCount
+//      lower-bound rules independently of this file's iam-group case.)
 //   3. TestEnricher_TruncatedIDs_IsSubsetOfResourceIDs:
 //      Every key in TruncatedIDs must have been in the input resource IDs. No phantom keys.
 
@@ -111,11 +119,13 @@ var _ awsclient.IAMAPI = (*iamGroupErrorOnSecondFake)(nil)
 // Test 1: per-resource error → TruncatedIDs populated
 // ---------------------------------------------------------------------------
 
-// TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceError verifies that when
-// GetGroup returns an error for a specific group, TruncatedIDs[groupID] is true
-// for that group, TruncatedIDs[otherGroupID] is false (succeeded), and the global
-// Truncated flag is also true.
-func TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceError(t *testing.T) {
+// TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceErrorNotBadge verifies
+// that when GetGroup returns an error for a specific group,
+// TruncatedIDs[groupID] is true for that group, TruncatedIDs[otherGroupID]
+// is false (succeeded), and the global Truncated flag stays false — iam-group
+// is a "~"-only enricher (IssueCount always 0), so a per-resource coverage
+// gap must never lower-bound the aggregate issue badge.
+func TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceErrorNotBadge(t *testing.T) {
 	const firstGroup = "dev-team"
 	const secondGroup = "ops-team"
 
@@ -137,9 +147,11 @@ func TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceError(t *testing.T) {
 		t.Fatalf("unexpected top-level error: %v", err)
 	}
 
-	// Global Truncated must be true because at least one resource was skipped.
-	if !result.Truncated {
-		t.Error("Truncated must be true when a per-resource API call errors")
+	// Global Truncated must stay false: iam-group is a "~"-only enricher, so
+	// a per-resource API error marks the row via TruncatedIDs, never the
+	// aggregate issue badge.
+	if result.Truncated {
+		t.Error("Truncated must stay false when a per-resource API call errors — the gap is signalled via TruncatedIDs, not the badge")
 	}
 
 	// TruncatedIDs must carry a true entry for the failing group.

@@ -40,7 +40,6 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 	if clients.WAFv2 == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
 	n := min(len(resources), EnrichmentCap)
@@ -76,7 +75,6 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 				// Unexpected error — skip this ACL.
 				mu.Lock()
 				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
-				truncated = true
 				result.TruncatedIDs[r.ID] = true
 				mu.Unlock()
 				return
@@ -92,7 +90,6 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		if err != nil {
 			mu.Lock()
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			mu.Unlock()
 			return
@@ -151,7 +148,8 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 	sort.Strings(failures)
 	// All WAF logging findings are severity "~" (informational).
 	result.IssueCount = 0
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result,
 		AggregateFailures("waf-enrich", failures, total)
 }

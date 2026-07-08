@@ -205,10 +205,13 @@ func TestEnrichVPCFlowLogs_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	}
 }
 
-// TestEnrichVPCFlowLogs_APIErrorSetsTruncatedFindsOtherVPC verifies that when the
-// API call for VPC-1 returns an error, the enricher sets Truncated=true and still
-// produces a finding for VPC-2 (which has no active flow log).
-func TestEnrichVPCFlowLogs_APIErrorSetsTruncatedFindsOtherVPC(t *testing.T) {
+// TestEnrichVPCFlowLogs_APIErrorMarksRowTruncatedIDFindsOtherVPCNoBadge verifies
+// that when the API call for VPC-1 returns an error, the enricher marks that
+// VPC's row via TruncatedIDs and still produces a finding for VPC-2 (which
+// has no active flow log). vpc is a "~"-only enricher (IssueCount always 0),
+// so the coverage gap must never lower-bound the aggregate issue badge —
+// Truncated stays false.
+func TestEnrichVPCFlowLogs_APIErrorMarksRowTruncatedIDFindsOtherVPCNoBadge(t *testing.T) {
 	apiErr := errors.New("ec2: DescribeFlowLogs throttled")
 	fake := &vpcFlowLogFake{
 		errByVPC: map[string]error{
@@ -225,8 +228,11 @@ func TestEnrichVPCFlowLogs_APIErrorSetsTruncatedFindsOtherVPC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when an API call fails")
+	if result.Truncated {
+		t.Error("Truncated must stay false: vpc is a \"~\"-only enricher, so a DescribeFlowLogs error marks the row via TruncatedIDs, never the aggregate issue badge")
+	}
+	if !result.TruncatedIDs["vpc-00000001"] {
+		t.Error("TruncatedIDs[\"vpc-00000001\"] must be true — the DescribeFlowLogs error must mark that VPC's row with a \"?\" coverage gap")
 	}
 	if _, ok := result.Findings["vpc-00000001"]; ok {
 		t.Error("vpc-00000001 must NOT appear in Findings on API error")

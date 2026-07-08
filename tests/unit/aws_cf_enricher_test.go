@@ -279,10 +279,13 @@ func TestEnrichCloudFrontDistribution_NilClientReturnsEmptyFindingsNoError(t *te
 	}
 }
 
-// TestEnrichCloudFrontDistribution_APIErrorSetsTruncatedNoError verifies that when the API
-// call for distro-1 returns an error, the enricher sets Truncated=true, produces 0
-// findings for that distro, and does not propagate the error.
-func TestEnrichCloudFrontDistribution_APIErrorSetsTruncatedNoError(t *testing.T) {
+// TestEnrichCloudFrontDistribution_APIErrorMarksRowTruncatedIDNotBadge verifies that when
+// the API call for distro-1 returns an error, the enricher marks that
+// distribution's row via TruncatedIDs, produces 0 findings for that distro,
+// and does not propagate the error. cf is a "~"-only enricher (IssueCount
+// always 0), so the coverage gap must never lower-bound the aggregate issue
+// badge — Truncated stays false.
+func TestEnrichCloudFrontDistribution_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("cloudfront: GetDistributionConfig throttled")
 	fake := &cfGetDistributionConfigFake{
 		errByID: map[string]error{
@@ -302,7 +305,10 @@ func TestEnrichCloudFrontDistribution_APIErrorSetsTruncatedNoError(t *testing.T)
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when an API call fails")
+	if result.Truncated {
+		t.Error("Truncated must stay false: cf is a \"~\"-only enricher, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
+	}
+	if !result.TruncatedIDs[cfDistroID1] {
+		t.Errorf("TruncatedIDs[%q] must be true — the GetDistributionConfig error must mark that distribution's row with a \"?\" coverage gap", cfDistroID1)
 	}
 }

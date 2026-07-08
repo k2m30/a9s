@@ -19,7 +19,8 @@ const (
 
 // EnrichKMSRotation calls GetKeyRotationStatus for each customer-managed key (cap EnrichmentCap)
 // and returns a Finding when key rotation is not enabled.
-// Severity is "~" (informational); IssueCount counts rotation-disabled findings.
+// Severity is "~" (informational); IssueCount stays 0 — rotation-disabled is an
+// informational finding, not a "!" issue.
 // AWS-managed keys reject GetKeyRotationStatus with AccessDeniedException — that error is
 // silently skipped without marking Truncated. Other per-key errors set Truncated=true.
 func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
@@ -31,7 +32,6 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 	if clients.KMS == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -52,7 +52,6 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 				return
 			}
 			// Any other error: skip this key but signal incomplete data via truncated
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -68,6 +67,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 		}
 	})
 	result.IssueCount = 0
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result, nil
 }

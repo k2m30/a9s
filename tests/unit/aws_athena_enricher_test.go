@@ -229,10 +229,13 @@ func TestEnrichAthenaWorkGroup_NilClientReturnsEmptyFindingsNoError(t *testing.T
 	}
 }
 
-// TestEnrichAthenaWorkGroup_APIErrorSetsTruncatedNoError verifies that when the API
-// call for WG-1 returns a generic error, the enricher sets Truncated=true, produces
-// 0 findings for that workgroup, and does not propagate the error.
-func TestEnrichAthenaWorkGroup_APIErrorSetsTruncatedNoError(t *testing.T) {
+// TestEnrichAthenaWorkGroup_APIErrorMarksRowTruncatedIDNotBadge verifies that when the
+// API call for WG-1 returns a generic error, the enricher marks that
+// workgroup's row via TruncatedIDs, produces 0 findings for that workgroup,
+// and does not propagate the error. athena is a "~"-only enricher (IssueCount
+// always 0), so the coverage gap must never lower-bound the aggregate issue
+// badge — Truncated stays false.
+func TestEnrichAthenaWorkGroup_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("athena: GetWorkGroup throttled")
 	fake := &athenaGetWorkGroupFake{
 		errByName: map[string]error{
@@ -252,7 +255,10 @@ func TestEnrichAthenaWorkGroup_APIErrorSetsTruncatedNoError(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when a generic API call fails")
+	if result.Truncated {
+		t.Error("Truncated must stay false: athena is a \"~\"-only enricher, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
+	}
+	if !result.TruncatedIDs[athenaWG1] {
+		t.Errorf("TruncatedIDs[%q] must be true — the GetWorkGroup error must mark that workgroup's row with a \"?\" coverage gap", athenaWG1)
 	}
 }

@@ -35,7 +35,6 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 	if clients.Route53 == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
 	n := min(len(resources), EnrichmentCap)
@@ -61,7 +60,6 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -83,7 +81,8 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 	sort.Strings(failures)
 	// All Route53 findings are severity "~" (informational).
 	result.IssueCount = 0
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result,
 		AggregateFailures("r53-enrich: GetHostedZone", failures, total)
 }

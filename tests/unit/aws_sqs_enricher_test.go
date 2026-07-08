@@ -205,11 +205,14 @@ func TestEnrichSQSAttributes_NilClientReturnsEmptyFindingsNoError(t *testing.T) 
 	}
 }
 
-// TestEnrichSQSAttributes_APIErrorSetsTruncatedAndSurfacesError verifies that when
-// the GetQueueAttributes call for queue-1 returns an error, the enricher sets
-// Truncated=true, produces 0 findings for the failed queue, and returns a composite
-// error containing the enricher prefix and the failing queue ID.
-func TestEnrichSQSAttributes_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
+// TestEnrichSQSAttributes_APIErrorMarksRowTruncatedIDNotBadge verifies that when
+// the GetQueueAttributes call for queue-1 returns an error, the enricher
+// marks that queue's row via TruncatedIDs, produces 0 findings for the
+// failed queue, and returns a composite error containing the enricher
+// prefix and the failing queue ID. sqs only ever emits "~" (informational)
+// findings, so the aggregate Truncated flag must stay false — a coverage
+// gap never lower-bounds the issue badge.
+func TestEnrichSQSAttributes_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("sqs: GetQueueAttributes throttled")
 	fake := &sqsGetQueueAttributesFake{
 		errByURL: map[string]error{
@@ -238,7 +241,10 @@ func TestEnrichSQSAttributes_APIErrorSetsTruncatedAndSurfacesError(t *testing.T)
 	if _, ok := result.Findings["my-queue-1"]; ok {
 		t.Error("my-queue-1 must NOT have a finding when the API call fails")
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when an API call fails")
+	if result.Truncated {
+		t.Error("Truncated must stay false: sqs only emits \"~\" findings, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
+	}
+	if !result.TruncatedIDs["my-queue-1"] {
+		t.Error("TruncatedIDs[\"my-queue-1\"] must be true — the GetQueueAttributes error must mark that queue's row with a \"?\" coverage gap")
 	}
 }

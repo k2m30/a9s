@@ -83,11 +83,14 @@ func TestEnrichIAMRoleLastUsed_NilRoleOutputSkipped(t *testing.T) {
 	}
 }
 
-// TestEnrichIAMRoleLastUsed_APIErrorSetsTruncatedContinues verifies that a
-// GetRole API error marks Truncated=true, adds the role to TruncatedIDs, and
-// does not propagate the error. A second role that is dormant still produces a
-// finding — confirming the loop continues past the error.
-func TestEnrichIAMRoleLastUsed_APIErrorSetsTruncatedContinues(t *testing.T) {
+// TestEnrichIAMRoleLastUsed_APIErrorMarksRowTruncatedIDContinuesNoBadge verifies
+// that a GetRole API error adds the role to TruncatedIDs (a per-row "?"
+// coverage gap) and does not propagate the error. A second role that is
+// dormant still produces a finding — confirming the loop continues past the
+// error. iam-role is a "~"-only enricher (IssueCount always 0), so the
+// coverage gap must never lower-bound the aggregate issue badge — Truncated
+// stays false.
+func TestEnrichIAMRoleLastUsed_APIErrorMarksRowTruncatedIDContinuesNoBadge(t *testing.T) {
 	// broken-role errors on GetRole; dormant-role has nil RoleLastUsed → finding.
 	combo := &iamGetRoleFakeCombo{
 		errForRole:     "broken-role",
@@ -117,8 +120,8 @@ func TestEnrichIAMRoleLastUsed_APIErrorSetsTruncatedContinues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("enricher must not propagate GetRole errors: %v", err)
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when at least one GetRole call failed")
+	if result.Truncated {
+		t.Error("Truncated must stay false: iam-role is a \"~\"-only enricher, so a GetRole error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
 	if _, ok := result.TruncatedIDs["broken-role"]; !ok {
 		t.Error("TruncatedIDs must contain broken-role")
@@ -396,10 +399,13 @@ func (f *iamGroupErrorFake) ListGroupPolicies(
 
 var _ awsclient.IAMAPI = (*iamGroupErrorFake)(nil)
 
-// TestEnrichIAMGroup_GetGroupAPIErrorSkipsGroup verifies that when GetGroup
-// returns an error for a group, that group is skipped (no finding produced),
-// Truncated is set, and processing continues for the next group.
-func TestEnrichIAMGroup_GetGroupAPIErrorSkipsGroup(t *testing.T) {
+// TestEnrichIAMGroup_GetGroupAPIErrorSkipsGroupMarksTruncatedIDNotBadge verifies
+// that when GetGroup returns an error for a group, that group is skipped (no
+// finding produced), TruncatedIDs marks its row, and processing continues
+// for the next group. iam-group is a "~"-only enricher (IssueCount always
+// 0), so the aggregate Truncated flag must stay false — the coverage gap
+// never lower-bounds the issue badge.
+func TestEnrichIAMGroup_GetGroupAPIErrorSkipsGroupMarksTruncatedIDNotBadge(t *testing.T) {
 	fake := &iamGroupErrorFake{
 		getGroupErrFor: "broken-group",
 		usersByGroup: map[string][]iamtypes.User{
@@ -417,8 +423,11 @@ func TestEnrichIAMGroup_GetGroupAPIErrorSkipsGroup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("enricher must not propagate GetGroup errors: %v", err)
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when at least one GetGroup call failed")
+	if result.Truncated {
+		t.Error("Truncated must stay false: iam-group is a \"~\"-only enricher, so a GetGroup error marks the row via TruncatedIDs, never the aggregate issue badge")
+	}
+	if _, ok := result.TruncatedIDs["broken-group"]; !ok {
+		t.Error("TruncatedIDs must contain broken-group")
 	}
 	// broken-group errored on first call → memberFirstCallErrd=true → skipped from findings.
 	if _, ok := result.Findings["broken-group"]; ok {
@@ -805,7 +814,6 @@ func TestEnrichMSKCluster_VersionBoundaries(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			arn := mskARNForVersionTests
 			// Use TLS so no encryption finding masks the version result.

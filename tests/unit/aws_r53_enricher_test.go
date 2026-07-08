@@ -85,7 +85,6 @@ func r53ZoneResources(ids ...string) []resource.Resource {
 func r53ZoneOutput(zoneID string, private bool, vpcIDs []string) *route53.GetHostedZoneOutput {
 	vpcs := make([]r53types.VPC, 0, len(vpcIDs))
 	for _, vid := range vpcIDs {
-		vid := vid
 		vpcs = append(vpcs, r53types.VPC{
 			VPCId: aws.String(vid),
 		})
@@ -203,11 +202,14 @@ func TestEnrichRoute53Zone_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	}
 }
 
-// TestEnrichRoute53Zone_APIErrorSetsTruncatedAndSurfacesError verifies that when the
-// API call for zone-1 returns an error, the enricher sets Truncated=true, produces 0
-// findings for the failed zones, and returns a composite error containing the enricher
-// prefix and the failing zone ID.
-func TestEnrichRoute53Zone_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
+// TestEnrichRoute53Zone_APIErrorMarksRowTruncatedIDNotBadge verifies that when the
+// API call for zone-1 returns an error, the enricher marks each failing
+// zone's row via TruncatedIDs, produces 0 findings for the failed zones, and
+// returns a composite error containing the enricher prefix and the failing
+// zone ID. r53 only ever emits "~" (informational) findings, so the
+// aggregate Truncated flag must stay false — a coverage gap never
+// lower-bounds the issue badge.
+func TestEnrichRoute53Zone_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("route53: GetHostedZone throttled")
 	fake := &r53GetHostedZoneFake{
 		errByID: map[string]error{
@@ -231,7 +233,13 @@ func TestEnrichRoute53Zone_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when an API call fails")
+	if result.Truncated {
+		t.Error("Truncated must stay false: r53 only emits \"~\" findings, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
+	}
+	if !result.TruncatedIDs[r53ZoneID1] {
+		t.Errorf("TruncatedIDs[%q] must be true", r53ZoneID1)
+	}
+	if !result.TruncatedIDs[r53ZoneID2] {
+		t.Errorf("TruncatedIDs[%q] must be true", r53ZoneID2)
 	}
 }

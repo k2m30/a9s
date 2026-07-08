@@ -43,14 +43,12 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 
-	truncated := len(resources) > EnrichmentCap
 	checked := 0
 
 	// DescribeClusters accepts up to 100 cluster names per call.
 	const descBatch = 100
 	for i := 0; i < len(clusterNames); i += descBatch {
 		if checked >= EnrichmentCap {
-			truncated = true
 			break
 		}
 		end := min(i+descBatch, len(clusterNames))
@@ -62,7 +60,6 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 			Include:  []ecstypes.ClusterField{ecstypes.ClusterFieldStatistics},
 		})
 		if err != nil {
-			truncated = true
 			continue
 		}
 
@@ -112,6 +109,7 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 	// IssueCount is 0: all ECS cluster findings are "~" (informational) and
 	// do not contribute to the attention menu badge.
 	result.IssueCount = 0
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result, nil
 }

@@ -271,10 +271,13 @@ func TestDDB_Enrich_SummaryNotRows_Contract(t *testing.T) {
 	}
 }
 
-// TestDDB_Enrich_ErrorPath_TruncatedID verifies that when DescribeContinuousBackups
-// returns an error for a table, that table is skipped, Truncated=true, and
-// TruncatedIDs[id]=true.
-func TestDDB_Enrich_ErrorPath_TruncatedID(t *testing.T) {
+// TestDDB_Enrich_ErrorPath_TruncatedIDNotBadge verifies that when
+// DescribeContinuousBackups returns an error for a table, that table is
+// skipped and marked via TruncatedIDs[id]=true (a per-row "?" coverage gap),
+// while the aggregate Truncated flag stays false — ddb is a "~"-only
+// enricher (IssueCount always 0), so a coverage gap never lower-bounds the
+// issue badge.
+func TestDDB_Enrich_ErrorPath_TruncatedIDNotBadge(t *testing.T) {
 	errorTableID := fixtures.AuditPITROffID
 	fake := &ddbContinuousBackupsFake{
 		errTables: map[string]bool{errorTableID: true},
@@ -287,8 +290,8 @@ func TestDDB_Enrich_ErrorPath_TruncatedID(t *testing.T) {
 		t.Fatalf("EnrichDynamoDBPITR error: %v", err)
 	}
 
-	if !result.Truncated {
-		t.Errorf("Truncated = false, want true when a sub-call errors")
+	if result.Truncated {
+		t.Errorf("Truncated = true, want false: ddb is a \"~\"-only enricher, so a sub-call error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
 	if !result.TruncatedIDs[errorTableID] {
 		t.Errorf("TruncatedIDs[%q] = false, want true (error on this table)", errorTableID)

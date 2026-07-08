@@ -42,7 +42,6 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 	if clients.CloudFront == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -57,7 +56,6 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -112,6 +110,7 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 	// All CloudFront findings are severity "~" (informational).
 	// IssueCount counts only "!" severity findings; "~" do not contribute.
 	result.IssueCount = 0
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result, nil
 }

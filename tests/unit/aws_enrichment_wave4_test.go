@@ -289,12 +289,15 @@ func (f *scopeCaptureFake) capturedScopeSafe() string {
 var _ awsclient.WAFv2API = (*scopeCaptureFake)(nil)
 var _ awsclient.WAFv2GetWebACLAPI = (*scopeCaptureFake)(nil)
 
-// TestEnrichWAFLogging_ListResourcesErrorSetsTruncatedAndSurfacesError verifies that
-// when ListResourcesForWebACL returns an error, the enricher sets Truncated=true and
-// TruncatedIDs[ID]=true, continues to the next resource without a finding, and
-// surfaces a composite error containing the enricher prefix and the failing ARN.
+// TestEnrichWAFLogging_ListResourcesErrorMarksRowTruncatedIDNotBadge verifies that
+// when ListResourcesForWebACL returns an error, the enricher sets
+// TruncatedIDs[ID]=true for each failing ACL, continues to the next resource
+// without a finding, and surfaces a composite error containing the enricher
+// prefix and the failing ARN — while leaving the aggregate Truncated flag
+// false, since waf only ever emits "~" (informational) findings and a
+// coverage gap must never lower-bound the issue badge.
 // Covers EnrichWAFLogging ListResourcesForWebACL error branch.
-func TestEnrichWAFLogging_ListResourcesErrorSetsTruncatedAndSurfacesError(t *testing.T) {
+func TestEnrichWAFLogging_ListResourcesErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	assocErr := errors.New("wafv2: ListResourcesForWebACL throttled")
 	fake := &wafLoggingFake{
 		loggingResults: map[string]*wafv2svc.GetLoggingConfigurationOutput{
@@ -322,8 +325,8 @@ func TestEnrichWAFLogging_ListResourcesErrorSetsTruncatedAndSurfacesError(t *tes
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on ListResourcesForWebACL error, got %d", len(result.Findings))
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when ListResourcesForWebACL fails")
+	if result.Truncated {
+		t.Error("Truncated must stay false: waf only emits \"~\" findings, so a ListResourcesForWebACL error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
 	if !result.TruncatedIDs[wafACLARN1] {
 		t.Errorf("TruncatedIDs[%q] must be true", wafACLARN1)
@@ -550,12 +553,15 @@ func TestEnrichLogsMetricFilters_StreamsErrorNoLastEventAt(t *testing.T) {
 	}
 }
 
-// TestEnrichLogsMetricFilters_DescribeMetricFiltersErrorSetsTruncated verifies
+// TestEnrichLogsMetricFilters_DescribeMetricFiltersErrorMarksRowNotBadge verifies
 // that when DescribeMetricFilters returns an error the enricher sets
-// Truncated=true and TruncatedIDs[ID]=true, and surfaces a composite error
-// containing the enricher prefix and the failing log group ID.
+// TruncatedIDs[ID]=true for the failing log group's row, surfaces a
+// composite error containing the enricher prefix and the failing log group
+// ID, while leaving the aggregate Truncated flag false — logs is a
+// "~"-only enricher (IssueCount always 0), so a coverage gap must never
+// lower-bound the issue badge.
 // Covers EnrichLogsMetricFilters DescribeMetricFilters error branch.
-func TestEnrichLogsMetricFilters_DescribeMetricFiltersErrorSetsTruncated(t *testing.T) {
+func TestEnrichLogsMetricFilters_DescribeMetricFiltersErrorMarksRowNotBadge(t *testing.T) {
 	auditGroup := "/aws/cloudtrail/mf-err"
 	fake := &cwLogsFullFake{
 		metricFiltersErr: errors.New("cloudwatchlogs: DescribeMetricFilters throttled"),
@@ -576,8 +582,8 @@ func TestEnrichLogsMetricFilters_DescribeMetricFiltersErrorSetsTruncated(t *test
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on DescribeMetricFilters error, got %d", len(result.Findings))
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when DescribeMetricFilters fails")
+	if result.Truncated {
+		t.Error("Truncated must stay false: logs is a \"~\"-only enricher, so a DescribeMetricFilters error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
 	if !result.TruncatedIDs[auditGroup] {
 		t.Errorf("TruncatedIDs[%q] must be true", auditGroup)

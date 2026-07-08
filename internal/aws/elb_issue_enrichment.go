@@ -40,7 +40,6 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 	if clients.ELBv2 == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
 	n := min(len(resources), EnrichmentCap)
@@ -69,7 +68,6 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -108,6 +106,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		}
 	}
 	result.IssueCount = issueCount
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result, AggregateFailures("elb-enrich: DescribeLoadBalancerAttributes", failures, total)
 }

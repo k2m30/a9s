@@ -32,7 +32,6 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 	if clients.ElasticBeanstalk == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -51,7 +50,6 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -75,6 +73,7 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		setWave2Finding(&result, key, ebCodeEnvironmentCauses, fmt.Sprintf("EB causes: %s", firstCause), "~", "eb", rows, "")
 	})
 	result.IssueCount = 0
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result, nil
 }

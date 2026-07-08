@@ -37,7 +37,6 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 	if clients.MSK == nil {
 		return result, nil
 	}
-	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
 	n := min(len(resources), EnrichmentCap)
@@ -63,7 +62,6 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
-			truncated = true
 			result.TruncatedIDs[r.ID] = true
 			return
 		}
@@ -94,7 +92,8 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 	// All MSK findings are severity "~" (informational) and do not contribute to the
 	// attention menu badge. IssueCount is always 0 for this enricher.
 	result.IssueCount = 0
-	result.Truncated = truncated
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
 	return result,
 		AggregateFailures("msk-enrich: DescribeClusterV2", failures, total)
 }

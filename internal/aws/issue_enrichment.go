@@ -159,10 +159,12 @@ func setWave2Finding(
 //   - IssueCount: number of resources classified issue-worthy for the menu badge
 //     (severity "!" findings; "~" informational do NOT count).
 //
-//   - Truncated: GLOBAL signal — true when ANY part of the enricher's walk was
-//     cut short (EnrichmentCap hit, page cap hit, or API errors skipped records).
-//     Kept for back-compat and banner aggregation. Prefer TruncatedIDs for
-//     per-resource resolution.
+//   - Truncated: true when the ISSUE count (severity "!") is a lower bound —
+//     the enricher's walk was cut short (EnrichmentCap/page cap/API errors) AND
+//     this enricher can emit "!" findings. Enrichers that emit only "~"
+//     informational findings (IssueCount stays 0) MUST leave Truncated false:
+//     capping their walk hides no issues, only informational coverage. Use
+//     TruncatedIDs for per-resource "?" coverage gaps regardless of severity.
 //
 //   - TruncatedIDs: per-resource truncation. Key = Resource.ID that could not be
 //     fully inspected (API error on that resource, page cap hit during a

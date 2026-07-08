@@ -230,11 +230,13 @@ func TestEnrichSNSSubscriptions_NilClientReturnsEmptyFindingsNoError(t *testing.
 	}
 }
 
-// TestEnrichSNSSubscriptions_APIErrorSetsTruncatedNoError verifies that when
-// the ListSubscriptionsByTopic call for topic-1 returns an error, the enricher
-// sets Truncated=true, produces 0 findings for the failed topic, and does not
-// propagate the error.
-func TestEnrichSNSSubscriptions_APIErrorSetsTruncatedNoError(t *testing.T) {
+// TestEnrichSNSSubscriptions_APIErrorMarksRowTruncatedIDNotBadge verifies that
+// when the ListSubscriptionsByTopic call for topic-1 returns an error, the
+// enricher marks that topic's row via TruncatedIDs, produces 0 findings for
+// the failed topic, and does not propagate the error. sns is a "~"-only
+// enricher (IssueCount always 0), so the coverage gap must never
+// lower-bound the aggregate issue badge — Truncated stays false.
+func TestEnrichSNSSubscriptions_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("sns: ListSubscriptionsByTopic throttled")
 	topic1 := snsARNFor("my-topic-1")
 	topic2 := snsARNFor("my-topic-2")
@@ -258,7 +260,10 @@ func TestEnrichSNSSubscriptions_APIErrorSetsTruncatedNoError(t *testing.T) {
 	if _, ok := result.Findings[topic1]; ok {
 		t.Error("my-topic-1 must NOT have a finding when the API call fails")
 	}
-	if !result.Truncated {
-		t.Error("Truncated must be true when an API call fails")
+	if result.Truncated {
+		t.Error("Truncated must stay false: sns is a \"~\"-only enricher, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
+	}
+	if !result.TruncatedIDs[topic1] {
+		t.Errorf("TruncatedIDs[%q] must be true — the ListSubscriptionsByTopic error must mark that topic's row with a \"?\" coverage gap", topic1)
 	}
 }
