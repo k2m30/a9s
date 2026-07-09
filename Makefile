@@ -1,4 +1,4 @@
-.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security coverage verify-readonly verify-zero-init demo readme check-readme mdlint snapshot snapshot-update ready-to-push ready-to-release generate
+.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security coverage verify-readonly verify-zero-init demo readme check-readme mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live ready-to-push ready-to-release generate
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -194,11 +194,15 @@ ready-to-push: test-race lint security gofix verify-readonly verify-zero-init ch
 	@echo "PASS: ready-to-push gate green"
 
 # Stage 7 — Pre-release gate. Run before tagging a release. Subsumes ready-to-push
-# plus the full demo-mode integration suite. See docs/development-process.md.
-ready-to-release: ready-to-push integration
+# plus the full demo-mode integration suite AND the live read-only smokes
+# (smoke-live + smoke-related-live) — a real-AWS pass is a mandatory pre-tag gate,
+# not a checklist line. The live smokes default to a *readonly* profile and refuse
+# any non-readonly profile; override with PROFILE=<readonly> REGION=<region>.
+# Requires read-only AWS credentials and tmux. See docs/development-process.md.
+ready-to-release: ready-to-push integration smoke-live smoke-related-live
 	@echo "Manual checklist (not automatable, must be confirmed by release owner):"
 	@echo "  [ ] CHANGELOG.md updated for this version"
 	@echo "  [ ] releases/vX.Y.Z.md written"
 	@echo "  [ ] docs/architecture.md aligned with current codebase"
 	@echo "  [ ] Busywork audit on tests added/modified in this release complete"
-	@echo "PASS: ready-to-release automated gates green"
+	@echo "PASS: ready-to-release automated gates green (incl. live read-only smokes)"
