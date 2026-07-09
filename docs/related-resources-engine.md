@@ -129,6 +129,16 @@ store divergence — its two real causes were a checker emitting the wrong id
 silently no-op'ing on a cache miss instead of falling back to a by-ID fetch.
 Both are fixed (see §7); the ct-event role pivot drills into the role detail.
 
+A third cause surfaced on the live ec2 detail (again via instrumentation): Tab
+focus-entry landed on the first **actionable** row, which includes deferred
+`(?)` pivots (`RelatedUnknown`/`RelatedDeferred`, no IDs) whose Enter only
+re-dispatches their own check in place — a silent no-op sitting before the
+first resolved-with-IDs pivot. Focus-entry now lands on the first **drillable**
+row (`detailSkipToDrillable`: a row Enter would navigate from, i.e. carrying
+`ResourceIDs` or a `FetchFilter`), falling back to the first actionable row so
+deferred `(?)` rows stay reachable via Up/Down and the all-dimmed cursor-0
+fallback is unchanged.
+
 `RightColumnModel` remains as the related-panel **widget** (cursor movement,
 filter typing); its row slice is interaction state, not the navigation source of
 truth. Folding that residual cursor/filter state into the controller is a
