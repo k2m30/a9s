@@ -766,6 +766,99 @@ func TestRelated_CtEvents_Role_TruncatedNoTargetNamed_StillZero(t *testing.T) {
 	}
 }
 
+func TestRelated_CtEvents_IAMUser_TruncatedCacheResolvesByIdentity(t *testing.T) {
+	cache := resource.ResourceCache{
+		"iam-user": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{{ID: "other-user", Name: "other-user"}},
+			IsTruncated: true,
+		},
+	}
+	res := resource.Resource{
+		ID:     "evt-iamuser-trunc-001",
+		Fields: map[string]string{"user": "alice"},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "iam-user")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (named user resolved by identity, not exact 0)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "alice" {
+		t.Errorf("ResourceIDs = %v, want [alice]", result.ResourceIDs)
+	}
+	if result.Truncated {
+		t.Error("Truncated = true, want false")
+	}
+}
+
+func TestRelated_CtEvents_EC2_TruncatedPartialMatchIncludesAllNamedIDs(t *testing.T) {
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{{ID: "i-aaa"}}, // only one of the two named is cached
+			IsTruncated: true,
+		},
+	}
+	res := resource.Resource{
+		ID:     "evt-ec2-partial-001",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::EC2::Instance"), ResourceName: aws.String("i-aaa")},
+				{ResourceType: aws.String("AWS::EC2::Instance"), ResourceName: aws.String("i-bbb")},
+			},
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 2 {
+		t.Errorf("Count = %d, want 2 (both named instances, not just the cached one)", result.Count)
+	}
+	got := map[string]bool{}
+	for _, id := range result.ResourceIDs {
+		got[id] = true
+	}
+	if !got["i-aaa"] || !got["i-bbb"] {
+		t.Errorf("ResourceIDs = %v, want both i-aaa and i-bbb", result.ResourceIDs)
+	}
+	if result.Truncated {
+		t.Error("Truncated = true, want false")
+	}
+}
+
+func TestRelated_CtEvents_CFN_TruncatedResolvesStackNameNotUUID(t *testing.T) {
+	cache := resource.ResourceCache{
+		"cfn": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{{ID: "other-stack", Name: "other-stack"}},
+			IsTruncated: true,
+		},
+	}
+	res := resource.Resource{
+		ID:     "evt-cfn-arn-001",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			Resources: []cloudtrailtypes.Resource{
+				{
+					ResourceType: aws.String("AWS::CloudFormation::Stack"),
+					ResourceName: aws.String("arn:aws:cloudformation:eu-west-2:123456789012:stack/acme-vpc-stack/abcd1234-5678-uuid"),
+				},
+			},
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "cfn")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "acme-vpc-stack" {
+		t.Errorf("ResourceIDs = %v, want [acme-vpc-stack] (stack name, not the uuid)", result.ResourceIDs)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // §7b.10 completeness: all 13 typed RelatedDef entries must be registered
 // ---------------------------------------------------------------------------

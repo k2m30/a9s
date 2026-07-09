@@ -18,7 +18,7 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 		return resource.RelatedCheckResult{TargetType: "iam-user", Count: 0}
 	}
 
-	userList, _, err := ctEventsRelatedResources(ctx, clients, cache, "iam-user")
+	userList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "iam-user")
 	if err != nil {
 		return resource.ErrorRelated("iam-user", err)
 	}
@@ -31,6 +31,9 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 		if userRes.Name == username || userRes.ID == username {
 			ids = append(ids, userRes.ID)
 		}
+	}
+	if len(ids) == 0 && truncated {
+		ids = []string{username} // event names this exact user; truncated cache missed it → resolve by identity
 	}
 	return relatedResult("iam-user", ids)
 }
@@ -134,6 +137,21 @@ func extractCTResourceIDs(event cloudtrailtypes.Event, awsResourceType string) [
 	return ids
 }
 
+// cfnStackNameFromResourceName extracts the stack NAME from a CloudTrail
+// CloudFormation resource name. Stack ARNs are ".../stack/<name>/<uuid>"; the
+// generic last-segment trim (extractCTResourceIDs) would keep the uuid, but cfn
+// resources are keyed by stack name. A bare name (no "stack/" segment) passes
+// through unchanged.
+func cfnStackNameFromResourceName(s string) string {
+	if _, rest, ok := strings.Cut(s, ":stack/"); ok {
+		if name, _, ok := strings.Cut(rest, "/"); ok {
+			return name
+		}
+		return rest
+	}
+	return s
+}
+
 // ctJSONString walks a parsed CT event JSON map along the given keys and
 // returns the string value at the leaf, or "" if any step fails.
 func ctJSONString(m map[string]any, keys ...string) string {
@@ -226,7 +244,7 @@ func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, c
 			matched = append(matched, r.ID)
 		}
 	}
-	if len(matched) == 0 && truncated {
+	if truncated {
 		return relatedResult("ec2", ids)
 	}
 	return relatedResult("ec2", matched)
@@ -275,7 +293,7 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 			matched = append(matched, r.ID)
 		}
 	}
-	if len(matched) == 0 && truncated {
+	if truncated {
 		return relatedResult("s3", ids)
 	}
 	return relatedResult("s3", matched)
@@ -328,7 +346,7 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 			matched = append(matched, r.ID)
 		}
 	}
-	if len(matched) == 0 && truncated {
+	if truncated {
 		return relatedResult("lambda", ids)
 	}
 	return relatedResult("lambda", matched)
@@ -398,7 +416,7 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 			matched = append(matched, r.ID)
 		}
 	}
-	if len(matched) == 0 && truncated {
+	if truncated {
 		return relatedResult("dbi", ids)
 	}
 	return relatedResult("dbi", matched)
@@ -451,7 +469,7 @@ func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, c
 			matched = append(matched, r.ID)
 		}
 	}
-	if len(matched) == 0 && truncated {
+	if truncated {
 		return relatedResult("kms", ids)
 	}
 	return relatedResult("kms", matched)
@@ -509,7 +527,7 @@ func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resourc
 			matched = append(matched, r.ID)
 		}
 	}
-	if len(matched) == 0 && truncated {
+	if truncated {
 		return relatedResult("secrets", ids)
 	}
 	return relatedResult("secrets", matched)
@@ -554,7 +572,7 @@ func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, 
 			matched = append(matched, r.ID)
 		}
 	}
-	if len(matched) == 0 && truncated {
+	if truncated {
 		return relatedResult("vpce", ids)
 	}
 	return relatedResult("vpce", matched)
@@ -603,7 +621,7 @@ func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, ca
 			matched = append(matched, r.ID)
 		}
 	}
-	if len(matched) == 0 && truncated {
+	if truncated {
 		return relatedResult("sg", ids)
 	}
 	return relatedResult("sg", matched)
@@ -652,7 +670,7 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 			matched = append(matched, r.ID)
 		}
 	}
-	if len(matched) == 0 && truncated {
+	if truncated {
 		return relatedResult("ddb", ids)
 	}
 	return relatedResult("ddb", matched)
@@ -791,7 +809,7 @@ func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource,
 			matched = append(matched, r.ID)
 		}
 	}
-	if len(matched) == 0 && truncated {
+	if truncated {
 		return relatedResult("trail", ids)
 	}
 	return relatedResult("trail", matched)
@@ -804,7 +822,16 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 
-	ids := extractCTResourceIDs(event, "AWS::CloudFormation::Stack")
+	var ids []string
+	for _, r := range event.Resources {
+		if r.ResourceType == nil || !strings.EqualFold(*r.ResourceType, "AWS::CloudFormation::Stack") {
+			continue
+		}
+		if r.ResourceName == nil || *r.ResourceName == "" {
+			continue
+		}
+		ids = append(ids, cfnStackNameFromResourceName(*r.ResourceName))
+	}
 
 	if len(ids) == 0 {
 		parsed := parseCTEventJSON(event.CloudTrailEvent)
@@ -840,7 +867,7 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 			matched = append(matched, r.ID)
 		}
 	}
-	if len(matched) == 0 && truncated {
+	if truncated {
 		return relatedResult("cfn", ids)
 	}
 	return relatedResult("cfn", matched)

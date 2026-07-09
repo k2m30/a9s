@@ -131,12 +131,19 @@ func managedPolicyToResource(policy iamtypes.Policy) resource.Resource {
 	if policy.IsAttachable {
 		isAttachable = "true"
 	}
+	// Distinguish AWS-managed from customer-managed by ARN so lazy-added
+	// AWS-managed policies (resolved via getAWSManagedPolicyByName) match the
+	// vocabulary buildLocalPolicies uses and callers/tests rely on.
+	policyType := "managed"
+	if policy.Arn != nil && !IsCustomerManagedIAMPolicyARN(*policy.Arn) {
+		policyType = "aws-managed"
+	}
 	return resource.Resource{
 		ID:   policyName,
 		Name: policyName,
 		Fields: map[string]string{
 			"policy_name":      policyName,
-			"policy_type":      "managed",
+			"policy_type":      policyType,
 			"attachment_count": attachmentCount,
 			"is_attachable":    isAttachable,
 			"path":             path,
@@ -156,6 +163,7 @@ var awsManagedPolicyPathPrefixes = []string{
 	"arn:aws:iam::aws:policy/",
 	"arn:aws:iam::aws:policy/service-role/",
 	"arn:aws:iam::aws:policy/job-function/",
+	"arn:aws:iam::aws:policy/aws-service-role/",
 }
 
 // getAWSManagedPolicyByName resolves ONE AWS-managed policy by name via GetPolicy

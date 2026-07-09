@@ -247,6 +247,22 @@ func (c *Controller) handleActionSelect(a Action) (ViewState, []runtime.TaskRequ
 	if ds := c.topDetailState(); ds != nil && ds.RelatedFocus {
 		focusedRow := ds.focusedRelatedRow()
 		if focusedRow != nil && isActionableDetailRow(*focusedRow) {
+			// A row with nothing to scope by — no ResourceIDs and no server-side
+			// FetchFilter (a blank RelatedUnknown row, or a truncated "(0+)" that
+			// found nothing) — resolves IN PLACE rather than falling through to
+			// the target type's plain unfiltered list. Mirrors the mouse
+			// ActionRelatedSelect path so keyboard/web Enter behaves identically.
+			if len(focusedRow.ResourceIDs) == 0 && len(focusedRow.FetchFilter) == 0 {
+				var tasks []runtime.TaskRequest
+				if len(resource.GetRelated(ds.ResourceType)) > 0 {
+					tasks = append(tasks, runtime.TaskRequest{
+						Key:     runtime.TaskKey{Kind: runtime.KindRelatedCheck, Scope: ds.ResourceType + "/" + ds.Resource.ID},
+						Cache:   runtime.CacheNone,
+						Payload: runtime.RelatedCheckPayload{ResourceType: ds.ResourceType, Resource: ds.Resource},
+					})
+				}
+				return c.snapshot(), tasks
+			}
 			// Derive the single target ID when there is exactly one related
 			// resource (used by NavigationKindDetail cache-hit path).
 			targetID := ""
