@@ -596,6 +596,177 @@ func TestRelated_CtEvents_Role_AssumedRoleNoMatch(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Identity resolution: a CloudTrail event names an EXACT, finite set of
+// resources, so a forward ct-event->target checker must NEVER report a
+// truncated (N+). When the named target is absent from a truncated cache page,
+// resolve by identity (the event-extracted ID IS the resource ID) to a
+// navigable (N) instead of a scoreless (0+) dead-end.
+// ---------------------------------------------------------------------------
+
+func TestRelated_CtEvents_Role_TruncatedCacheResolvesByIdentity(t *testing.T) {
+	cache := resource.ResourceCache{
+		"role": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{{ID: "other-role", Name: "other-role"}},
+			IsTruncated: true,
+		},
+	}
+	res := resource.Resource{
+		ID:     "evt-truncated-role-001",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			Resources: []cloudtrailtypes.Resource{
+				{
+					ResourceType: aws.String("AWS::IAM::Role"),
+					ResourceName: aws.String("arn:aws:iam::123:role/my-role"),
+				},
+			},
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "role")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (named role resolved by identity)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-role" {
+		t.Errorf("ResourceIDs = %v, want [my-role]", result.ResourceIDs)
+	}
+	if result.Truncated {
+		t.Error("Truncated = true, want false (a named role is exact, never (N+))")
+	}
+	if result.Err != nil {
+		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+func TestRelated_CtEvents_Role_MatchInTruncatedCacheIsExactlyOne(t *testing.T) {
+	cache := resource.ResourceCache{
+		"role": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{ID: "my-role", Name: "my-role"},
+				{ID: "other-role", Name: "other-role"},
+			},
+			IsTruncated: true,
+		},
+	}
+	res := resource.Resource{
+		ID:     "evt-truncated-role-002",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			Resources: []cloudtrailtypes.Resource{
+				{
+					ResourceType: aws.String("AWS::IAM::Role"),
+					ResourceName: aws.String("arn:aws:iam::123:role/my-role"),
+				},
+			},
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "role")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if result.Truncated {
+		t.Error("Truncated = true, want false (matched exact role is (1), not (1+))")
+	}
+}
+
+func TestRelated_CtEvents_EC2_TruncatedCacheResolvesByIdentity(t *testing.T) {
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{{ID: "i-other"}},
+			IsTruncated: true,
+		},
+	}
+	res := resource.Resource{
+		ID:     "evt-truncated-ec2-001",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			Resources: []cloudtrailtypes.Resource{
+				{
+					ResourceType: aws.String("AWS::EC2::Instance"),
+					ResourceName: aws.String("i-05dc37e3db4cd5201"),
+				},
+			},
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "ec2")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (named instance resolved by identity)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "i-05dc37e3db4cd5201" {
+		t.Errorf("ResourceIDs = %v, want [i-05dc37e3db4cd5201]", result.ResourceIDs)
+	}
+	if result.Truncated {
+		t.Error("Truncated = true, want false")
+	}
+}
+
+func TestRelated_CtEvents_S3_TruncatedCacheResolvesByIdentity(t *testing.T) {
+	cache := resource.ResourceCache{
+		"s3": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{{ID: "other-bucket", Name: "other-bucket"}},
+			IsTruncated: true,
+		},
+	}
+	res := resource.Resource{
+		ID:     "evt-truncated-s3-001",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			Resources: []cloudtrailtypes.Resource{
+				{
+					ResourceType: aws.String("AWS::S3::Bucket"),
+					ResourceName: aws.String("my-bucket"),
+				},
+			},
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "s3")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (named bucket resolved by identity)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-bucket" {
+		t.Errorf("ResourceIDs = %v, want [my-bucket]", result.ResourceIDs)
+	}
+	if result.Truncated {
+		t.Error("Truncated = true, want false")
+	}
+}
+
+func TestRelated_CtEvents_Role_TruncatedNoTargetNamed_StillZero(t *testing.T) {
+	cache := resource.ResourceCache{
+		"role": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{{ID: "other-role", Name: "other-role"}},
+			IsTruncated: true,
+		},
+	}
+	res := resource.Resource{
+		ID:        "evt-truncated-role-003",
+		Fields:    map[string]string{},
+		RawStruct: cloudtrailtypes.Event{Resources: []cloudtrailtypes.Resource{}},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "role")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no role named in event → nothing to resolve)", result.Count)
+	}
+	if result.Truncated {
+		t.Error("Truncated = true, want false")
+	}
+}
+
+// ---------------------------------------------------------------------------
 // §7b.10 completeness: all 13 typed RelatedDef entries must be registered
 // ---------------------------------------------------------------------------
 
