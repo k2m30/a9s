@@ -650,12 +650,14 @@ func (c *Controller) listIssueCount(ls *ListState, typeName string) int {
 		switch {
 		case listHasBadgeFinding(r):
 			ic++
-		case td.ResolveColor(r).IsIssue():
-			// DEF-8: rows carry Wave-2 findings directly, so a row that is a
-			// Wave-1 issue by td.ResolveColor but whose only findings are
-			// non-badge (e.g. a lone Wave-2 "~" warn) must still count here —
-			// gating this fallback on len(r.Findings) == 0 undercounted any
-			// such row. The color check is independent of r.Findings content.
+		case td.ResolveColor(runtime.Wave1Only(r)).IsIssue():
+			// S1 contract (docs/attention-signals.md): a lone Wave-2 "~" warn
+			// must NOT bump the count — a warning is not an issue. runtime.Wave1Only
+			// strips merged Wave-2 findings before ResolveColor so this branch
+			// counts Wave-1 issue-colored rows only, matching the menu badge's
+			// unifiedIssueCount exactly (both call Wave1Only, so they cannot
+			// drift). Wave-2 "!"-severity findings are counted by the
+			// listHasBadgeFinding branch above and the findings-map branch below.
 			ic++
 		case len(r.Findings) == 0:
 			if fs, hasFinding := findings[r.ID]; hasFinding && len(fs) > 0 && domain.WorstSeverityFinding(fs).Severity == domain.SevBroken {

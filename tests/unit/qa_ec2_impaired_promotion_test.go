@@ -540,16 +540,15 @@ func TestMenuBadge_EC2_CountsImpairedRows(t *testing.T) {
 		Resources:    mixedResources,
 	})
 
-	// Spec §4: S1 "issues:N" is the MENU badge, not the list title. The
-	// invariant under test is that impaired + initializing + stopped all
-	// count as issues via ec2.Color(r).IsIssue() == true. Pop back to the
-	// main menu and verify the badge reads "issues:3".
-	// Pre-fix: badge was 1 because the fetcher left impaired/initializing as
-	// "running" and the old global string-set didn't catch them.
+	// Spec §4 + S1 contract (docs/attention-signals.md): "issues:N" is the MENU
+	// badge, and "~" (SevWarn) findings do NOT bump it. i-impaired-001 (Wave-2
+	// "!" broken) counts; i-stopped-001 (Wave-1 "~" warn — Wave-1 issue-colored
+	// rows count) counts; i-initializing-001 (Wave-2 "~" warn) does NOT. So the
+	// badge reads "issues:2".
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "issues:3") {
-		t.Errorf("expected menu badge 'issues:3' after popping to menu (impaired+initializing+stopped), got excerpt:\n%s",
+	if !strings.Contains(plain, "issues:2") {
+		t.Errorf("expected menu badge 'issues:2' (impaired[Wave-2 !] + stopped[Wave-1 ~]; initializing[Wave-2 ~] excluded per S1), got excerpt:\n%s",
 			plain[:min(600, len(plain))])
 	}
 }

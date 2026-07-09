@@ -186,22 +186,26 @@ func TestWarmListOpen_TruncatedDiskSeed_ShowsNPlus_BeforeRefetch(t *testing.T) {
 // that fallback on len(r.Findings)==0 (the pre-fix behavior) undercounts any
 // row carrying ANY finding at all, badge or not, even though the row's own
 // color is independently an issue.
-func TestGetListIssueCount_ColorIssueRow_OnlyNonBadgeFinding_StillCounted(t *testing.T) {
+// A row whose ONLY finding is a non-badge Wave-2 "~" (SevWarn) must NOT bump the
+// issue count: per docs/attention-signals.md S1 "~ findings do not bump", and
+// colorEC2 is colorFromAnyFinding-only (it does not read Fields["state"]), so
+// once runtime.Wave1Only strips the lone Wave-2 warn no issue signal remains.
+// This is the reversal of the former DEF-8 behavior — the list frame title now
+// matches the menu badge's unifiedIssueCount exactly.
+func TestGetListIssueCount_LoneWave2Warn_NotCounted(t *testing.T) {
 	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	rows := []resource.Resource{
 		{
 			ID:   "i-0badgefallback1",
-			Name: "badge-fallback-instance",
+			Name: "wave2-warn-only-instance",
 			Type: "ec2",
 			Fields: map[string]string{
-				"state": "stopped", // colorEC2: state=="stopped" -> ColorBroken (IsIssue()==true)
+				// Inert: colorEC2 does not read Fields["state"], so the only color
+				// signal for this row is the Wave-2 warn finding below.
+				"state": "stopped",
 			},
-			// The ONLY finding is a non-badge Wave-2 "~" (SevWarn) finding:
-			// listHasBadgeFinding returns false for it (SevWarn != SevBroken,
-			// and its Source carries the "wave2:" prefix so the Wave-1
-			// any-severity branch does not count it either).
 			Findings: []domain.Finding{
 				{Code: "ec2-idle-hint", Phrase: "instance idle > 7d", Severity: domain.SevWarn, Source: "wave2:ec2"},
 			},
@@ -211,19 +215,19 @@ func TestGetListIssueCount_ColorIssueRow_OnlyNonBadgeFinding_StillCounted(t *tes
 			Name: "healthy-instance",
 			Type: "ec2",
 			Fields: map[string]string{
-				"state": "running", // colorEC2: state=="running" -> ColorHealthy
+				"state": "running", // colorEC2: no finding -> ColorHealthy
 			},
 		},
 	}
 	ctrl.ApplyResourcesLoaded("ec2", rows, nil, false)
 
 	got := ctrl.GetListIssueCount()
-	if got != 1 {
-		t.Errorf("GetListIssueCount() = %d, want 1 — a row whose color is an issue (state=stopped) but whose only finding is a non-badge Wave-2 SevWarn must still be counted; gating the color check on len(r.Findings)==0 undercounts it", got)
+	if got != 0 {
+		t.Errorf("GetListIssueCount() = %d, want 0 — a lone Wave-2 \"~\" (SevWarn) finding must not bump the count (docs/attention-signals.md S1); Wave1Only strips it and colorEC2 reads no other signal", got)
 	}
 
 	title := ctrl.ListFrameTitle()
-	if !strings.Contains(title, "!1") {
-		t.Errorf("ListFrameTitle() = %q, want it to contain the issue-count suffix %q — buildListFrameTitle mirrors the same listIssueCount aggregation", title, "!1")
+	if strings.Contains(title, "!") {
+		t.Errorf("ListFrameTitle() = %q, want NO issue-count suffix — a lone Wave-2 warn does not bump the count", title)
 	}
 }

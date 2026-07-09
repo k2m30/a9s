@@ -710,7 +710,7 @@ func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceT
 	}
 	ids := make(map[string]struct{})
 	for _, r := range wave1Resources {
-		if td.ResolveColor(wave1Only(r)).IsIssue() {
+		if td.ResolveColor(Wave1Only(r)).IsIssue() {
 			ids[r.ID] = struct{}{}
 		}
 	}
@@ -728,13 +728,18 @@ func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceT
 	return len(ids)
 }
 
-// wave1Only returns a copy of r with every Wave-2-sourced Finding
+// Wave1Only returns a copy of r with every Wave-2-sourced Finding
 // (Finding.IsWave2Sourced()) stripped, so a Color func reading
 // r.Findings (colorFromAnyFinding and friends) sees only wave1-sourced
 // signal — never a merged Wave-2 SevWarn/SevBroken finding. Wave-2's own
 // contribution to the badge is folded in separately from the live findings
 // map, which is why this copy must not leak wave2 Findings into ResolveColor.
-func wave1Only(r resource.Resource) resource.Resource {
+//
+// Exported because both issue-count surfaces — the menu badge (unifiedIssueCount)
+// and the list title (Controller.listIssueCount) — must strip Wave-2 the same
+// way per docs/attention-signals.md S1 ("~ findings do not bump"), so the two
+// counts cannot drift.
+func Wave1Only(r resource.Resource) resource.Resource {
 	if len(r.Findings) == 0 {
 		return r
 	}
