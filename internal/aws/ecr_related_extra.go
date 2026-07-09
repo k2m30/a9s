@@ -171,11 +171,14 @@ func checkECRRole(ctx context.Context, clients any, res resource.Resource, _ res
 	}
 
 	roleARNs := ecrPolicyRoleARNs(*out.PolicyText)
-	roleNames := make([]string, 0, len(roleARNs))
-	for _, arn := range roleARNs {
-		roleNames = append(roleNames, arnRoleName(arn))
+	// role.ID is a bare RoleName; drop foreign-account principals (a
+	// cross-account role is not fetchable via iam:GetRole here). repo.RegistryId
+	// is the owning account; when absent, keep all (best effort).
+	ownerAccount := ""
+	if repo.RegistryId != nil {
+		ownerAccount = *repo.RegistryId
 	}
-	return relatedResult("role", roleNames)
+	return relatedResult("role", sameAccountRoleNames(roleARNs, ownerAccount))
 }
 
 // ecrPolicyRoleARNs parses an IAM policy JSON document and returns all IAM role

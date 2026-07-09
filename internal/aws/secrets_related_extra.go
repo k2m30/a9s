@@ -352,7 +352,11 @@ func checkSecretsRole(ctx context.Context, clients any, res resource.Resource, _
 		}
 	}
 
-	return relatedResult("role", ids)
+	// ids holds full role ARNs from policy principals (often cross-account) and
+	// the rotation lambda. role.ID is a bare RoleName, so normalize and drop
+	// foreign-account principals — a cross-account or full-ARN id fails
+	// iam:GetRole on drill.
+	return relatedResult("role", sameAccountRoleNames(ids, arnAccountID(secretID)))
 }
 
 // secretsPolicyRoleARNs parses a Secrets Manager resource policy JSON and returns

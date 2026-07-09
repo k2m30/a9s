@@ -9,7 +9,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
@@ -276,11 +275,10 @@ func checkPipelineSNS(ctx context.Context, clients any, res resource.Resource, _
 
 // arnRoleName extracts the role name from an IAM role ARN
 // (arn:aws:iam::acct:role/path/Name → Name), or returns the input as-is.
+// Thin alias over roleNameFromARN so ARN→name parsing (assumed-role forms
+// included) lives in exactly one place.
 func arnRoleName(a string) string {
-	if idx := strings.LastIndex(a, "/"); idx >= 0 && idx < len(a)-1 {
-		return a[idx+1:]
-	}
-	return a
+	return roleNameFromARN(a)
 }
 
 // mapKeys returns the keys of a map[string]struct{} as a slice (order-independent —

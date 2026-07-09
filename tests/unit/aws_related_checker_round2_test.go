@@ -837,6 +837,35 @@ func TestECR_Related_Role_ReturnsBareRoleNameFromPolicy(t *testing.T) {
 	}
 }
 
+// TestECR_Related_Role_DropsCrossAccountPrincipal locks the cross-account
+// filter: an ECR repository policy principal in a different account than the
+// repository owner (RegistryId) is not fetchable via iam:GetRole here and must
+// be dropped, leaving only the owner-account role as a bare name.
+func TestECR_Related_Role_DropsCrossAccountPrincipal(t *testing.T) {
+	repo := ecrtypes.Repository{
+		RepositoryName: aws.String("checkout-service"),
+		RegistryId:     aws.String("111111111111"),
+	}
+	repoRes := resource.Resource{ID: "checkout-service", Name: "checkout-service", RawStruct: repo}
+
+	policyText := `{"Statement":[{"Principal":{"AWS":[` +
+		`"arn:aws:iam::111111111111:role/local-ci-role",` +
+		`"arn:aws:iam::999999999999:role/foreign-ci-role"` +
+		`]}}]}`
+	fake := &fakeECRGetRepositoryPolicy{policyText: policyText}
+	clients := &awsclient.ServiceClients{ECR: fake}
+
+	checker := checkerByTarget(t, "ecr", "role")
+	result := checker(context.Background(), clients, repoRes, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Fatalf("Count = %d, want 1 (owner-account role only; cross-account dropped)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "local-ci-role" {
+		t.Fatalf("ResourceIDs = %v, want [local-ci-role] (foreign-account foreign-ci-role excluded)", result.ResourceIDs)
+	}
+}
+
 type fakeECRGetRepositoryPolicy struct {
 	awsclient.ECRAPI
 	policyText string

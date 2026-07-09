@@ -149,6 +149,46 @@ func roleNameFromARN(s string) string {
 	return s
 }
 
+// arnAccountID returns the account-id segment (index 4) of an ARN, or "" when
+// the string is not a well-formed ARN. ARN layout:
+// arn:partition:service:region:account-id:resource.
+func arnAccountID(arn string) string {
+	parts := strings.SplitN(arn, ":", 6)
+	if len(parts) < 5 {
+		return ""
+	}
+	return parts[4]
+}
+
+// sameAccountRoleNames normalizes IAM role ARNs to role names (== role.ID) and
+// keeps only roles owned by ownerAccount. Cross-account role ARNs are dropped:
+// iam:GetRole resolves only within the caller's account, so a foreign-account
+// role is not fetchable here — counting it would dead-end the drill or
+// false-match a same-named local role. A blank ownerAccount keeps every role
+// (best effort when the owner cannot be determined). Results are de-duplicated
+// by name in first-seen order; relatedResult sorts for final stability.
+func sameAccountRoleNames(arns []string, ownerAccount string) []string {
+	seen := make(map[string]struct{}, len(arns))
+	names := make([]string, 0, len(arns))
+	for _, arn := range arns {
+		if ownerAccount != "" {
+			if acct := arnAccountID(arn); acct != "" && acct != ownerAccount {
+				continue
+			}
+		}
+		name := roleNameFromARN(arn)
+		if name == "" {
+			continue
+		}
+		if _, dup := seen[name]; dup {
+			continue
+		}
+		seen[name] = struct{}{}
+		names = append(names, name)
+	}
+	return names
+}
+
 // checkRoleLambda searches the lambda cache for functions whose Role ARN references
 // this IAM role. It resolves both name-segment and full-ARN matches.
 func checkRoleLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {

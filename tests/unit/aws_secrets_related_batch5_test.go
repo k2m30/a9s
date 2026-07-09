@@ -7,6 +7,7 @@ package unit_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -541,15 +542,17 @@ func TestRelated_Secrets_Role_MatchByResourcePolicy(t *testing.T) {
 	if result.Count < 2 {
 		t.Errorf("Count = %d, want >= 2 (two role ARNs in resource policy)", result.Count)
 	}
-	roleFound := map[string]bool{role1ARN: false, role2ARN: false}
+	// IDs must be bare role names (== role.ID / iam:GetRole RoleName), never
+	// full ARNs — a full ARN fails GetRole with ValidationError.
+	roleFound := map[string]bool{"api-service-role": false, "batch-processor-role": false}
 	for _, id := range result.ResourceIDs {
 		if _, ok := roleFound[id]; ok {
 			roleFound[id] = true
 		}
 	}
-	for arn, found := range roleFound {
+	for name, found := range roleFound {
 		if !found {
-			t.Errorf("expected role ARN %q in ResourceIDs, got %v", arn, result.ResourceIDs)
+			t.Errorf("expected bare role name %q in ResourceIDs, got %v", name, result.ResourceIDs)
 		}
 	}
 	if result.Err != nil {
@@ -586,18 +589,58 @@ func TestRelated_Secrets_Role_MatchIncludesRotationLambdaRole(t *testing.T) {
 	if result.Count < 1 {
 		t.Errorf("Count = %d, want >= 1 (rotation Lambda execution role)", result.Count)
 	}
-	found := false
-	for _, id := range result.ResourceIDs {
-		if id == lambdaRoleARN {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("expected rotation Lambda role %q in ResourceIDs, got %v", lambdaRoleARN, result.ResourceIDs)
+	const lambdaRoleName = "rotate-db-creds-execution-role"
+	if !slices.Contains(result.ResourceIDs, lambdaRoleName) {
+		t.Errorf("expected rotation Lambda role name %q in ResourceIDs, got %v", lambdaRoleName, result.ResourceIDs)
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error: %v", result.Err)
+	}
+}
+
+// TestRelated_Secrets_Role_CrossAccountExcluded reproduces the live failure
+// where a resource policy grants access to both a same-account role and a
+// cross-account role. Only the same-account role is fetchable via iam:GetRole
+// here, so the cross-account principal must be dropped — never counted and
+// never passed to FetchByIDs (a cross-account ARN would dead-end the drill,
+// and a full ARN of any account fails GetRole with ValidationError).
+func TestRelated_Secrets_Role_CrossAccountExcluded(t *testing.T) {
+	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/app/creds"
+	const localRoleARN = "arn:aws:iam::123456789012:role/local-access-role"
+	const foreignRoleARN = "arn:aws:iam::210987654321:role/foreign-access-role"
+
+	policyJSON := `{
+		"Version": "2012-10-17",
+		"Statement": [
+			{
+				"Effect": "Allow",
+				"Principal": {
+					"AWS": [
+						"` + localRoleARN + `",
+						"` + foreignRoleARN + `"
+					]
+				},
+				"Action": ["secretsmanager:GetSecretValue"],
+				"Resource": "*"
+			}
+		]
+	}`
+
+	source := secretsSourceWithARN(secretARN, "prod/app/creds")
+	fakeSM := newFakeSecretsManagerWithResourcePolicy(policyJSON)
+	clients := &awsclient.ServiceClients{SecretsManager: fakeSM}
+
+	checker := secretsCheckerByTarget(t, "role")
+	result := checker(context.Background(), clients, source, resource.ResourceCache{})
+
+	if result.Err != nil {
+		t.Fatalf("unexpected error: %v", result.Err)
+	}
+	if result.Count != 1 {
+		t.Fatalf("Count = %d, want 1 (same-account role only; cross-account dropped)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "local-access-role" {
+		t.Fatalf("ResourceIDs = %v, want [local-access-role] (bare name, cross-account foreign-access-role excluded)", result.ResourceIDs)
 	}
 }
 
