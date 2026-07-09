@@ -595,7 +595,12 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 			result.TargetType = def.TargetType
 			var lazyAdded map[string][]resource.Resource
 			var lazyAddError error
-			if len(result.ResourceIDs) > 0 {
+			// CloudTrail-event pivots are event-derived: the ids come straight from
+			// the event body, so the count needs no fetch. Skip the eager
+			// prefetch — the drill fetches on demand (KindFetchByIDDetail) — so a
+			// cross-account target (an AssumeRole role in another account) no
+			// longer surfaces a "FetchByIDs failed" header error at detail open.
+			if res.Type != "ct-events" && len(result.ResourceIDs) > 0 {
 				if ff := resource.GetFetchByIDs(def.TargetType); ff != nil {
 					missing := runtime.MissingFromCache(localCache, def.TargetType, result.ResourceIDs)
 					if len(missing) > 0 {

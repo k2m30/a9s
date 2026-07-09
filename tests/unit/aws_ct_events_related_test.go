@@ -152,10 +152,13 @@ func TestRelated_CtEvents_User_NilCache(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "iam-user")
 	result := checker(context.Background(), nil, res, cache)
 
-	// Nil clients + empty cache is the demo/test scenario: the target list is
-	// definitively empty (not "unknown"). Checker must return Count=0, not Count=-1.
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty cache, nil clients → definitively empty)", result.Count)
+	// Event-derived: the event names the user in its body, so an empty/cold cache
+	// resolves by identity to a navigable (1) — zero fetch, no scoreless Unknown.
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event names the user; resolved by identity, zero-fetch)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "admin-user" {
+		t.Errorf("ResourceIDs = %v, want [admin-user]", result.ResourceIDs)
 	}
 }
 
@@ -245,10 +248,13 @@ func TestRelated_CtEvents_Role_NilCache(t *testing.T) {
 	checker := ctEventsCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	// Nil clients + empty cache is the demo/test scenario: the target list is
-	// definitively empty (not "unknown"). Checker must return Count=0, not Count=-1.
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty cache, nil clients → definitively empty)", result.Count)
+	// Event-derived: the event names the target role in its body, so an
+	// empty/cold cache resolves by identity to a navigable (1) — zero fetch.
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event names the role; resolved by identity, zero-fetch)", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-role" {
+		t.Errorf("ResourceIDs = %v, want [my-role]", result.ResourceIDs)
 	}
 }
 

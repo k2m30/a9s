@@ -23,7 +23,7 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 		return resource.ErrorRelated("iam-user", err)
 	}
 	if userList == nil {
-		return resource.UnknownRelated("iam-user")
+		return relatedResult("iam-user", []string{username})
 	}
 
 	var ids []string
@@ -115,16 +115,17 @@ func ctEventsExtractRoleName(res resource.Resource) string {
 	return ""
 }
 
-// ctEventsRelatedResources returns the resource list for target from cache or
-// fetches the first page via the registered paginated fetcher.
-func ctEventsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return []resource.Resource{}, false, nil
-		}
+// ctEventsRelatedResources reads the target list from the session cache ONLY —
+// it never triggers a fetch. A CloudTrail event names its related resources in
+// the event body, so the checkers resolve from that (identity) and use the
+// cache only to canonicalize/confirm an id when it happens to be warm already.
+// Returning nil on a cache miss keeps the ct-event related panel zero-fetch: no
+// ListRoles/DescribeInstances/… just to match ids the event already carries.
+func ctEventsRelatedResources(_ context.Context, _ any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+	if entry, ok := cache[target]; ok {
+		return entry.Resources, entry.IsTruncated, nil
 	}
-	return resources, isTruncated, err
+	return nil, false, nil
 }
 
 // extractCTResourceIDs scans the event's Resources slice for entries matching
@@ -240,7 +241,7 @@ func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, c
 		return resource.ErrorRelated("ec2", err)
 	}
 	if resourceList == nil {
-		return resource.UnknownRelated("ec2")
+		return relatedResult("ec2", ids)
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -289,7 +290,7 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.ErrorRelated("s3", err)
 	}
 	if resourceList == nil {
-		return resource.UnknownRelated("s3")
+		return relatedResult("s3", ids)
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -342,7 +343,7 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 		return resource.ErrorRelated("lambda", err)
 	}
 	if resourceList == nil {
-		return resource.UnknownRelated("lambda")
+		return relatedResult("lambda", ids)
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -412,7 +413,7 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 		return resource.ErrorRelated("dbi", err)
 	}
 	if resourceList == nil {
-		return resource.UnknownRelated("dbi")
+		return relatedResult("dbi", ids)
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -465,7 +466,7 @@ func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, c
 		return resource.ErrorRelated("kms", err)
 	}
 	if resourceList == nil {
-		return resource.UnknownRelated("kms")
+		return relatedResult("kms", ids)
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -523,7 +524,7 @@ func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resourc
 		return resource.ErrorRelated("secrets", err)
 	}
 	if resourceList == nil {
-		return resource.UnknownRelated("secrets")
+		return relatedResult("secrets", ids)
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -568,7 +569,7 @@ func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, 
 		return resource.ErrorRelated("vpce", err)
 	}
 	if resourceList == nil {
-		return resource.UnknownRelated("vpce")
+		return relatedResult("vpce", ids)
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -617,7 +618,7 @@ func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.ErrorRelated("sg", err)
 	}
 	if resourceList == nil {
-		return resource.UnknownRelated("sg")
+		return relatedResult("sg", ids)
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -666,7 +667,7 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 		return resource.ErrorRelated("ddb", err)
 	}
 	if resourceList == nil {
-		return resource.UnknownRelated("ddb")
+		return relatedResult("ddb", ids)
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -803,7 +804,7 @@ func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource,
 		return resource.ErrorRelated("trail", err)
 	}
 	if resourceList == nil {
-		return resource.UnknownRelated("trail")
+		return relatedResult("trail", ids)
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
@@ -863,7 +864,7 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 		return resource.ErrorRelated("cfn", err)
 	}
 	if resourceList == nil {
-		return resource.UnknownRelated("cfn")
+		return relatedResult("cfn", ids)
 	}
 
 	wantSet := make(map[string]struct{}, len(ids))
