@@ -2,7 +2,7 @@
 # smoke-related-readonly.sh — live TUI smoke over the RELATED panel against a
 # real read-only AWS profile.
 #
-#   PROFILE=acme-dev-readonly REGION=eu-west-2 ./scripts/smoke-related-readonly.sh
+#   PROFILE=<readonly-profile> REGION=<region> ./scripts/smoke-related-readonly.sh
 #
 # Asserts data-independent invariants the demo cannot exercise on a real
 # account's graph: at least one counted pivot settles on a real detail, a
@@ -18,8 +18,8 @@
 # touching the related-resource panel.
 set -u
 
-PROFILE="${PROFILE:-acme-dev-readonly}"
-REGION="${REGION:-eu-west-2}"
+: "${PROFILE:?smoke-related-readonly: set PROFILE=<a *readonly* AWS profile>}"
+: "${REGION:?smoke-related-readonly: set REGION=<an AWS region>}"
 case "$PROFILE" in
 *readonly*) ;;
 *) echo "smoke-related-readonly: refusing profile \"$PROFILE\" — live smoke runs only on *readonly* profiles"; exit 1 ;;

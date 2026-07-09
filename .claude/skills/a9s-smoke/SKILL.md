@@ -50,7 +50,7 @@ Role pivot.
 Live (data-independent patterns, credentials required, not in the gate):
 
 ```
-make smoke-live PROFILE=acme-dev-readonly REGION=eu-west-2
+make smoke-live PROFILE=<readonly-profile> REGION=<region>
 ```
 
 Sweep reaches issue badges in-session, no whole-cell raw enums anywhere,
@@ -61,7 +61,7 @@ profiles.
 Related panel, live (data-independent, credentials required, not in the gate):
 
 ```
-make smoke-related-live PROFILE=acme-dev-readonly REGION=eu-west-2
+make smoke-related-live PROFILE=<readonly-profile> REGION=<region>
 ```
 
 Pattern-based RELATED-panel checks against a real account: the first

@@ -160,7 +160,7 @@ For pure docs changes (`*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICEN
 
 - **Merge to `main`**: only with green CI plus Stage 5 review clean.
 - **Release path** (when cutting a tagged version):
-  1. `make ready-to-release PROFILE=<readonly> REGION=<region>` (Stage 6 gates + integration + the live read-only smokes `smoke-live` and `smoke-related-live`). All green. Requires read-only AWS credentials and tmux; the live smokes default to a `*readonly*` profile and refuse any non-readonly profile.
+  1. `make ready-to-release PROFILE=<readonly-profile> REGION=<region>` (Stage 6 gates + integration + the live read-only smokes `smoke-live` and `smoke-related-live`). All green. Requires read-only AWS credentials and tmux; the live smokes require an explicit `PROFILE`/`REGION` (no default) and refuse any profile whose name is not `*readonly*`.
   2. `CHANGELOG.md` updated with a Keep-a-Changelog entry; `releases/vX.Y.Z.md` written.
   3. `docs/architecture.md` aligned with the codebase. Outdated architecture docs are a release blocker.
   4. **Busywork audit**: every test added or modified in the release is reviewed and deleted if it is a tautology, a mock asserting its own input, a struct-shape pin instead of a behavior pin, or duplicate coverage. Coverage earned by busywork is a liability.

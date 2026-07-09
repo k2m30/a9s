@@ -167,7 +167,7 @@ smoke:
 # data-independent assertions (sweep reaches verified, no raw enum cells, no
 # fetch errors on drills). Companion to the Stage 6 live sub-rule; not part
 # of ready-to-push (needs credentials).
-# Usage: make smoke-live [PROFILE=acme-dev-readonly] [REGION=eu-west-2]
+# Usage: make smoke-live PROFILE=<readonly-profile> REGION=<region>
 smoke-live:
 	PROFILE="$(PROFILE)" REGION="$(REGION)" ./scripts/smoke-readonly.sh
 
@@ -184,7 +184,7 @@ smoke-related:
 # badge, a count-1/N drill landing on a detail or list frame, a surviving
 # "(?)" row staying actionable with no dead end). Companion to the Stage 6
 # live sub-rule; not part of ready-to-push (needs credentials).
-# Usage: make smoke-related-live [PROFILE=acme-dev-readonly] [REGION=eu-west-2]
+# Usage: make smoke-related-live PROFILE=<readonly-profile> REGION=<region>
 smoke-related-live:
 	PROFILE="$(PROFILE)" REGION="$(REGION)" ./scripts/smoke-related-readonly.sh
 
@@ -196,9 +196,10 @@ ready-to-push: test-race lint security gofix verify-readonly verify-zero-init ch
 # Stage 7 — Pre-release gate. Run before tagging a release. Subsumes ready-to-push
 # plus the full demo-mode integration suite AND the live read-only smokes
 # (smoke-live + smoke-related-live) — a real-AWS pass is a mandatory pre-tag gate,
-# not a checklist line. The live smokes default to a *readonly* profile and refuse
-# any non-readonly profile; override with PROFILE=<readonly> REGION=<region>.
+# not a checklist line. The live smokes require an explicit PROFILE and REGION
+# (no default) and refuse any profile whose name is not *readonly*.
 # Requires read-only AWS credentials and tmux. See docs/development-process.md.
+# Usage: make ready-to-release PROFILE=<readonly-profile> REGION=<region>
 ready-to-release: ready-to-push integration smoke-live smoke-related-live
 	@echo "Manual checklist (not automatable, must be confirmed by release owner):"
 	@echo "  [ ] CHANGELOG.md updated for this version"

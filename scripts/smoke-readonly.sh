@@ -1,7 +1,7 @@
 #!/bin/sh
 # smoke-readonly.sh — live TUI smoke against a real read-only AWS profile.
 #
-#   PROFILE=acme-dev-readonly REGION=eu-west-2 ./scripts/smoke-readonly.sh
+#   PROFILE=<readonly-profile> REGION=<region> ./scripts/smoke-readonly.sh
 #
 # Asserts data-independent invariants the demo cannot exercise: the in-session
 # availability sweep reaching "verified" origins, humanized statuses on real
@@ -15,8 +15,8 @@
 # sub-rule companion for changes touching internal/aws/ or rendering.
 set -u
 
-PROFILE="${PROFILE:-acme-dev-readonly}"
-REGION="${REGION:-eu-west-2}"
+: "${PROFILE:?smoke-readonly: set PROFILE=<a *readonly* AWS profile>}"
+: "${REGION:?smoke-readonly: set REGION=<an AWS region>}"
 case "$PROFILE" in
 *readonly*) ;;
 *) echo "smoke-readonly: refusing profile \"$PROFILE\" — live smoke runs only on *readonly* profiles"; exit 1 ;;
