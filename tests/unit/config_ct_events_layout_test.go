@@ -1,7 +1,7 @@
 package unit
 
 // TestCTEventsViewLayout_MatchesDesignSpec asserts the ct-events column layout
-// in the built-in defaults matches §8 of docs/design/ct-event-list-v2.md, plus
+// in the built-in defaults matches §8 of docs/historical/design/ct-event-list-v2.md, plus
 // the single Status column added by the title-based cascade (a56dc887): every
 // list view now carries exactly one column titled "Status", key="status",
 // populated by the ct-events fetcher (ct_events.go Fields["status"]).

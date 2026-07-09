@@ -3,7 +3,7 @@ package ctevent
 import "strings"
 
 // FormatCTTarget collapses an ARN to its resource portion per §5 of
-// docs/design/ct-event-list-v2.md. When the ARN's account segment differs
+// docs/historical/design/ct-event-list-v2.md. When the ARN's account segment differs
 // from localAccount, the account ID is retained inline as "<acct>:<resource>".
 // Non-ARN input is returned unchanged.
 func FormatCTTarget(rawARN, localAccount string) string {

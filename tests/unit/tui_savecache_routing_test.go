@@ -129,7 +129,7 @@ func runCmdTree(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 // present on the Wave-1 resource at dispatch time — exactly what a real
 // Wave-1 fetcher can emit (fetcher-sourced findings, e.g. public bucket ACL
 // detected inline during ListBuckets/GetBucketAcl, are a real and current
-// Wave-1 surface; see docs/refactor/03-finding-model.md). The Source label is
+// Wave-1 surface; see docs/historical/refactor/03-finding-model.md). The Source label is
 // deliberately NOT "wave2:s3" — since the wave-2-in-demo change made Wave-2
 // enrichment run for real even in demo mode, a "wave2:*" Source on a
 // synthetic finding that was never actually produced by the s3 enricher would

@@ -285,10 +285,10 @@ jobs:
         with:
           node-version: '22'
       - name: Run markdownlint-cli2
-        # TODO(AS-36): drop the docs/refactor/** exclusion once phase-03 lands
+        # TODO(AS-36): drop the docs/historical/refactor/** exclusion once phase-03 lands
         # and refactor-doc churn stops. Excluding here keeps unrelated doc PRs
         # from being gated by in-flight refactor-doc lint regressions (see AS-85).
-        run: npx --yes markdownlint-cli2 "docs/**/*.md" "!docs/refactor/**" "CLAUDE.md" "CONTRIBUTING.md" "CHANGELOG.md"
+        run: npx --yes markdownlint-cli2 "docs/**/*.md" "!docs/historical/refactor/**" "CLAUDE.md" "CONTRIBUTING.md" "CHANGELOG.md"
 
   coverage:
     name: Coverage

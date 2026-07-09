@@ -50,7 +50,7 @@ type ListState struct {
 	AttentionOnly    bool   `json:"attention_only,omitempty"`
 	PaginationCursor string `json:"pagination_cursor,omitempty"`
 
-	// Inventory fields from docs/web-ui-state-inventory.md §ResourceListModel.
+	// Inventory fields from docs/historical/analysis/web-ui-state-inventory.md §ResourceListModel.
 	HasPagination  bool                `json:"has_pagination,omitempty"`
 	AutoOpenSingle bool                `json:"auto_open_single,omitempty"`
 	RelatedIDSet   map[string]struct{} `json:"related_id_set,omitempty"`
@@ -89,7 +89,7 @@ type ListState struct {
 }
 
 // DetailState holds the mutable display state for a resource-detail screen.
-// Controller-owned fields (per docs/web-ui-state-inventory.md §DetailModel).
+// Controller-owned fields (per docs/historical/analysis/web-ui-state-inventory.md §DetailModel).
 type DetailState struct {
 	// Display-interaction state
 	SearchQuery  string `json:"search_query,omitempty"`
@@ -170,7 +170,7 @@ type SelectorState struct {
 }
 
 // MenuState holds the mutable display state for the main-menu screen.
-// Maps the CONTROLLER bucket from docs/web-ui-state-inventory.md §MainMenuModel.
+// Maps the CONTROLLER bucket from docs/historical/analysis/web-ui-state-inventory.md §MainMenuModel.
 type MenuState struct {
 	Filter         string          `json:"filter,omitempty"`
 	Cursor         int             `json:"cursor"`

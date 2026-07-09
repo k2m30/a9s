@@ -6,7 +6,7 @@ generatedFrom:
   - docs/architecture.md
   - docs/related-resources.md
   - docs/attention-signals.md
-  - docs/enrichment-visibility.md
+  - docs/historical/analysis/enrichment-visibility.md
 ---
 
 # backup — Resource Spec
@@ -120,7 +120,7 @@ At 3am, glancing at the list, the operator sees `! plan-daily-prod 2 jobs failed
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (copied above).
-- Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings. In particular, the derived list-level `⚠ N issues detected by background checks` banner, the row middle-dot `·` marker, and the `⚠ Background Check` detail header described in `docs/enrichment-visibility.md` are superseded HOW that this spec does not reuse.
+- Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings. In particular, the derived list-level `⚠ N issues detected by background checks` banner, the row middle-dot `·` marker, and the `⚠ Background Check` detail header described in `docs/historical/analysis/enrichment-visibility.md` are superseded HOW that this spec does not reuse.
 - Per-rule cadence comparison ("newest completed older than rule cadence × 2") — requires `GetBackupPlan` per plan and is Wave 3 by budget.
 - Write operations. a9s is read-only by design (`docs/architecture.md` — What is a9s?).
 - `backup` → `eb-rule` and `backup` → `logs` linkages. Both are explicitly excluded in `docs/related-resources.md` "Explicitly excluded" — the former is only achievable via reverse-scan of EventBridge rules for `source: aws.backup`, the latter has no direct Backup→Logs API.

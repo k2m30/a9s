@@ -1,7 +1,7 @@
 // Standalone preview for the redesigned CloudTrail event detail view.
 // Run with: go run ./cmd/preview/ct_event/
 //
-// Design source: docs/design/ct-event-detail-v2.md §3 (v2.1 wireframes)
+// Design source: docs/historical/design/ct-event-detail-v2.md §3 (v2.1 wireframes)
 //
 // Renders every canonical wireframe case from §3:
 //

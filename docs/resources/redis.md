@@ -6,7 +6,7 @@ generatedFrom:
   - docs/architecture.md
   - docs/related-resources.md
   - docs/attention-signals.md
-  - docs/enrichment-visibility.md
+  - docs/historical/analysis/enrichment-visibility.md
 ---
 
 # redis — Resource Spec
@@ -186,7 +186,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `ReplicationGroup.NodeGroups[]` — AWS SDK Go v2 `elasticache/types.ReplicationGroup` § `NodeGroups []NodeGroup`.
 - `NodeGroup.Status` / `NodeGroupId` / `NodeGroupMembers` — AWS SDK Go v2 `elasticache/types.NodeGroup` § `Status *string`, `NodeGroupId *string`, `NodeGroupMembers []NodeGroupMember`.
 - `NodeGroupMember.CurrentRole` / `PreferredAvailabilityZone` / `CacheClusterId` — AWS SDK Go v2 `elasticache/types.NodeGroupMember` § respective fields. Docs note `CurrentRole` is only populated for cluster-mode-DISABLED Redis.
-- Wave-1 Valkey / Memcached filter — a9s-devops (2026-04-23): non-Redis engines sharing the `DescribeReplicationGroups` response is a real-account hazard. Review finding P2-1 (see `docs/resources/redis-impl-plan.md` §0). Non-Redis RGs must be filtered at the fetcher boundary, matching the pre-migration behavior.
+- Wave-1 Valkey / Memcached filter — a9s-devops (2026-04-23): non-Redis engines sharing the `DescribeReplicationGroups` response is a real-account hazard. Review finding P2-1 (see `docs/historical/resources-impl-plans/redis-impl-plan.md` §0). Non-Redis RGs must be filtered at the fetcher boundary, matching the pre-migration behavior.
 - Wave-1 shard-level signals — a9s-devops (2026-04-23): cluster-mode-enabled Redis operators need shard ID + per-node AZ when a shard transitions. Data is free on the list response. Implemented as a shard-aware §4 phrase on multi-shard RGs; single-shard RGs preserve the existing phrase for UX stability.
 - Wave-3 CloudTrail-failover rationale — a9s-devops (2026-04-23): `LookupEvents` 2 TPS rate limit makes per-row Wave-2 lookup too slow on medium+ accounts; bulk-lookup per list fetch is technically possible but adds a second time budget and duplicates functionality already reachable via the `ct-events` related-panel pivot.
 - Tightened CT-events checker match — review finding P2-2 (2026-04-23): the `ResourceName` match must be exact equality (not substring) to avoid overmatching similarly named groups (`prod-redis` vs `prod-redis-sessions`); the `EventSource == "elasticache.amazonaws.com"` fallback must be removed because it matches ElastiCache activity for every RG on the account.

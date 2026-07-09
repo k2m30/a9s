@@ -5,7 +5,7 @@
 //   - Resource.Findings and Resource.AttentionDetails fields
 //   - ResourceTypeDef.LifecycleKey field
 //
-// Spec: docs/refactor/03-finding-model.md
+// Spec: docs/historical/refactor/03-finding-model.md
 package unit_test
 
 import (

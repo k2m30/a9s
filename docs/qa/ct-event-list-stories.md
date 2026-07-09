@@ -1,7 +1,7 @@
 # CloudTrail Events List View — QA Stories (#246)
 
 Scope: redesign of the `ct-events` resource list view per
-`docs/design/ct-event-list.md` and the event taxonomy in
+`docs/historical/design/ct-event-list.md` and the event taxonomy in
 `docs/design/ct-taxonomy.md`. Detail-view behavior is covered by
 `docs/qa/issue-59-cloudtrail-events.md` and the `#245` design;
 this file covers only the **list** view.

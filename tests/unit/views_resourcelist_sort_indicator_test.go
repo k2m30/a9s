@@ -1,6 +1,6 @@
 package unit
 
-// Tests for §6 of docs/design/ct-event-list-v2.md: sort indicator binding.
+// Tests for §6 of docs/historical/design/ct-event-list-v2.md: sort indicator binding.
 //
 // History: an earlier named-sort model matched sort sentinels against any
 // column whose key or title contained "time"/"event"/"date" etc. For

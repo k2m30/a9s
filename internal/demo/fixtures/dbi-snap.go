@@ -23,7 +23,7 @@ type DBISnapFixtures struct {
 // snapshots live in dbc-snap (real AWS rejects CreateDBSnapshot on Aurora
 // cluster members). The universal "≥50% Count ≥ 2" rule is structurally
 // unsatisfiable for this resource type and is documented as an exemption
-// in docs/resources/dbi-snap-impl-plan.md §9.3. The graph-root ProdDBISnapID
+// in docs/historical/resources-impl-plans/dbi-snap-impl-plan.md §9.3. The graph-root ProdDBISnapID
 // achieves Count ≥ 1 on every count-shown:yes pivot except dbc (which is
 // always Count=0 for dbi-snap by AWS-API contract).
 const (

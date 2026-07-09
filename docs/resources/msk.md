@@ -6,7 +6,7 @@ generatedFrom:
   - docs/architecture.md
   - docs/related-resources.md
   - docs/attention-signals.md
-  - docs/enrichment-visibility.md
+  - docs/historical/analysis/enrichment-visibility.md
 ---
 
 # msk — Resource Spec
@@ -217,7 +217,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `vpc` derivation via first subnet lookup — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. MSK clusters share one VPC across all broker subnets; any ClientSubnet's VpcId is the cluster's VPC. Avoids a dedicated DescribeSubnets call.`
 - `ct-events` is the universal pivot applied to every registered type — `docs/related-resources.md` § Policy.
 - a9s is read-only — `docs/architecture.md` § "What is a9s?".
-- Superseded HOW ignored — row middle-dot `·` marker, `⚠ Background Check` detail header, and derived list-level banner in `docs/enrichment-visibility.md` are not cited or reproduced per the skill's S1–S5 rules.
+- Superseded HOW ignored — row middle-dot `·` marker, `⚠ Background Check` detail header, and derived list-level banner in `docs/historical/analysis/enrichment-visibility.md` are not cited or reproduced per the skill's S1–S5 rules.
 
 <!-- BEGIN GENERATED: header -->
 msk — MESSAGING. Lifecycle key: `state`.

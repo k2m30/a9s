@@ -1,6 +1,6 @@
 // aws_efs_related_test.go — graph-root related-pivot tests for EFS.
 //
-// Tests the CONTRACT from docs/resources/efs.md §2 and docs/resources/efs-impl-plan.md §2.
+// Tests the CONTRACT from docs/resources/efs.md §2 and docs/historical/resources-impl-plans/efs-impl-plan.md §2.
 // One graph-root test per §2 pivot that has count shown: yes.
 // Expected counts (per impl-plan): alarm=2, backup=2, cfn=1, ecs-task=2,
 // eni=3, kms=1, lambda=2, sg=2, subnet=3, vpc=1, ec2=0 (intentional per spec §5).

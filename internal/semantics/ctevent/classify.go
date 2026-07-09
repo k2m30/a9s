@@ -6,7 +6,7 @@ import "strings"
 // "R" (read), "W" (write), "D" (destructive), "S" (service event),
 // "I" (insight), "N" (network activity), "?" (unknown).
 //
-// Implements §2.1 of docs/design/ct-event-list-v2.md. Order matters; first match wins.
+// Implements §2.1 of docs/historical/design/ct-event-list-v2.md. Order matters; first match wins.
 //  1. eventCategory == "Insight" → "I"
 //  2. eventCategory == "NetworkActivity" → "N"
 //  3. eventType == "AwsServiceEvent" → "S"

@@ -102,4 +102,4 @@ Resources where the existing detail/YAML view is sufficient. Brief justification
 
 ## Deliverable
 
-Write your analysis to `docs/design/child-views/devops-research.md`. This will be reviewed by the user before Phase 2 begins.
+Write your analysis to `docs/historical/design/devops-research.md`. This will be reviewed by the user before Phase 2 begins.

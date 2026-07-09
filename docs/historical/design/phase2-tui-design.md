@@ -2,7 +2,7 @@
 
 **Agent:** tui-designer
 **Constraint:** Do NOT read any *.go files. Only read files under `docs/design/` and `docs/design/child-views/`.
-**Prerequisite:** Phase 1 must be complete. Read `docs/design/child-views/devops-research.md` for the approved resource list.
+**Prerequisite:** Phase 1 must be complete. Read `docs/historical/design/devops-research.md` for the approved resource list.
 
 ## Context
 

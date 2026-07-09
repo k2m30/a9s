@@ -15,7 +15,7 @@ package integration
 //   - All Wave-2 `!`-severity count = 0 (PITR is ~ only), so the S1 badge
 //     carries no `issues:N` annotation (N=0).
 //
-// Rule-7 coverage matrix (see docs/resources/ddb-impl-plan.md §4):
+// Rule-7 coverage matrix (see docs/historical/resources-impl-plans/ddb-impl-plan.md §4):
 //   - U7a (multi Wave-1 suffix):       N/A — no Wave-1 signals.
 //   - U7b (Wave-1 + Wave-2 suffix):    N/A — no Wave-1 signals.
 //   - U7c (S5 every Wave-2 finding):   covered via `legacy-archived`

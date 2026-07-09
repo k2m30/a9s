@@ -1215,7 +1215,7 @@ in any registry.
 
 ## 9. Deliverables recap
 
-- `docs/design/ct-event-detail.md` (this file).
+- `docs/historical/design/ct-event-detail.md` (this file).
 - `cmd/preview/ct_event/main.go` — runnable Lipgloss v2 static render of
   all 9 wireframe cases in §4. No interactivity, no AWS calls.
 - No changes under `internal/`, `cmd/a9s/`, `tests/`, `.a9s/`.

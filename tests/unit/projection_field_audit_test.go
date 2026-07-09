@@ -6,7 +6,7 @@ package unit_test
 // via the Section structure around it). One focused test per audit row, using one
 // or two canonical fixtures per row.
 //
-// Source of truth: docs/refactor/01-projection-hook.md lines 38–55.
+// Source of truth: docs/historical/refactor/01-projection-hook.md lines 38–55.
 
 import (
 	"context"

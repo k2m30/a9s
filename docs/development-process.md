@@ -83,7 +83,7 @@ Every unit of work goes through these stages. Stages 2, 4, 6.5 may be **skipped*
 
 - **Trigger**: DoR met and size ≥ `M`. Skipped for `XS`/`S` bug fixes.
 - **Tools**: `a9s-resource-spec` skill (writes `docs/resources/<short>.md`); `a9s-devops` for AWS-practitioner priority sanity.
-- **Action**: produce a spec doc. Resources use `a9s-resource-spec`. Refactor PRs reference the per-PR spec in `docs/refactor/`. Features write to `specs/<n>-<feature>.md`.
+- **Action**: produce a spec doc. Resources use `a9s-resource-spec`. Refactor PRs reference the per-PR spec in `docs/historical/refactor/`. Features write to `specs/<n>-<feature>.md`.
 - **Exit**: spec doc committed to the feature branch. The spec is the contract; existing implementation is disposable.
 - **Anti-pattern**: skipping the spec for "obvious" features. If it is so obvious, the spec is one paragraph — write it anyway.
 
@@ -177,7 +177,7 @@ After each release (or on a regular cadence), write a short retro covering: a re
 ## Branching, Commits, PRs
 
 - **Trunk-based**: `main` is always releasable. Feature branches are short-lived (≤ 1 week) and named `<area>/<short-slug>`.
-- **One PR per concern**. Refactor PRs follow the per-PR spec in `docs/refactor/<phase>.md`.
+- **One PR per concern**. Refactor PRs follow the per-PR spec in `docs/historical/refactor/<phase>.md`.
 - **Conventional Commits**: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `test:`, `ci:`.
 - **`@coderabbitai ignore`** on PRs that don't need a re-review; `[skip ci]` on trivial follow-ups.
 - **Never `--no-verify`, never `--no-gpg-sign`**. Hook failures are diagnosed, not bypassed.

@@ -1,6 +1,6 @@
 // aws_efs_issue_enrichment_test.go — Wave-2 enricher behavioral tests for EFS.
 //
-// Tests the CONTRACT from docs/resources/efs-impl-plan.md §1 Wave-2,
+// Tests the CONTRACT from docs/historical/resources-impl-plans/efs-impl-plan.md §1 Wave-2,
 // U7b, U7c, U7e (detail content), U11.
 //
 // AS-140 (Wave-2 enricher migration): FieldUpdates["status"] is no longer

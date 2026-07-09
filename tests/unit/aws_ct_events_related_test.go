@@ -919,7 +919,7 @@ func TestRelated_CtEvents_Role_AssumedRoleARNResolvesRoleNotSession(t *testing.T
 
 // TestCtEventsRelatedGroups_AllTypedRegistered asserts that the "ct-events" related
 // registry contains entries for every resource type listed in §7b.10 of
-// docs/design/ct-event-detail.md. The test is intentionally expected to FAIL until
+// docs/historical/design/ct-event-detail.md. The test is intentionally expected to FAIL until
 // all 11 missing registrations are added to ct_events.go.
 func TestCtEventsRelatedGroups_AllTypedRegistered(t *testing.T) {
 	expected := []string{
@@ -973,7 +973,7 @@ func TestCtEventsRelatedGroups_AllTypedRegistered(t *testing.T) {
 
 // TestCtEventsRelatedGroups_PivotsRegistered asserts that the "ct-events" related
 // registry contains exactly 4 self-pivot entries (TargetType == "ct-events") with
-// the DisplayNames specified in §7b.10 of docs/design/ct-event-detail.md.
+// the DisplayNames specified in §7b.10 of docs/historical/design/ct-event-detail.md.
 // The test is expected to FAIL until all 4 pivot registrations are added.
 func TestCtEventsRelatedGroups_PivotsRegistered(t *testing.T) {
 	expectedPivots := []string{

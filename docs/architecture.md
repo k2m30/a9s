@@ -3,15 +3,15 @@
 > **CURRENT-STATE ARCHITECTURE.** This document describes how `main` is
 > built today. It is normative for code that still lives in the current
 > architecture, but it is not the target-state design document for the
-> refactor program under `docs/refactor/`.
+> refactor program under `docs/historical/refactor/`.
 
 This document is the first thing you should read when joining the project. It explains the runtime architecture that exists on `main` today, the constraints that current code must still honor, and the major implementation seams that the refactor plan is intentionally replacing.
 
 For the target "no legacy / no lazy compromise" architecture and the migration plan, read:
 
-- [`docs/refactor/00-overview.md`](refactor/00-overview.md) — program-level goals and invariants
-- [`docs/refactor/03-finding-model.md`](refactor/03-finding-model.md), [`docs/refactor/04-catalog.md`](refactor/04-catalog.md), [`docs/refactor/05-boundary.md`](refactor/05-boundary.md) — active phase specs
-- [`docs/refactor/landed/`](refactor/landed/) — archived per-PR specs for Phase 01 / 02 / 05a (preserved verbatim as landed)
+- [`docs/historical/refactor/00-overview.md`](refactor/00-overview.md) — program-level goals and invariants
+- [`docs/historical/refactor/03-finding-model.md`](refactor/03-finding-model.md), [`docs/historical/refactor/04-catalog.md`](refactor/04-catalog.md), [`docs/historical/refactor/05-boundary.md`](refactor/05-boundary.md) — active phase specs
+- [`docs/historical/refactor/landed/`](refactor/landed/) — archived per-PR specs for Phase 01 / 02 / 05a (preserved verbatim as landed)
 
 Latest target-architecture additions in the refactor docs:
 
@@ -120,7 +120,7 @@ These are **current-state invariants**. The 020-architecture-refactor that produ
    `*awsclient.ServiceClients` carries AWS clients only. Session-scoped
    caches live on `session.Session` (owned by `runtime.Core`) and reach
    detail enrichers via `*awsclient.DetailEnrichmentCtx`. Phase 02
-   (`docs/refactor/landed/02-session-owner.md`) deleted the legacy package-global
+   (`docs/historical/refactor/landed/02-session-owner.md`) deleted the legacy package-global
    caches in `internal/aws/` — `allPoliciesMu` (IAM policies),
    `identityCacheMu` (caller identity), and `sesRuleSetCacheMu` (SES rule
    sets) — and replaced them with `PolicyStore` / `IdentityStore` /
@@ -236,7 +236,7 @@ internal/
   demo/          # synthetic fixture data for --demo mode
     fixtures/    #   per-service Go structs (ec2.go, iam.go, etc.)
     fakes/       #   per-service fake API implementations
-  domain/        # leaf type-declaration package: Resource, Type, Severity, FindingCode, Finding, AttentionDetail, Color, Gen, plus query-contract types. Introduced in Phase 01 (`docs/refactor/landed/01-projection-hook.md`); `Gen` added in Phase 05a-gens.
+  domain/        # leaf type-declaration package: Resource, Type, Severity, FindingCode, Finding, AttentionDetail, Color, Gen, plus query-contract types. Introduced in Phase 01 (`docs/historical/refactor/landed/01-projection-hook.md`); `Gen` added in Phase 05a-gens.
   fieldpath/     # struct field extraction via reflection (frozen — don't modify)
   resource/      # backward-compat alias layer — `resource.Resource`, `resource.ResourceTypeDef`, `resource.Color` re-export `internal/domain` / `internal/catalog`; registry-style getters now read the catalog
   runtime/       # platform-agnostic app core: Core (orchestrator.go), handlers.go, screens.go, tasks.go, state.go, intent.go (zero Bubble Tea/Lipgloss deps)
@@ -261,7 +261,7 @@ tests/
 
 ## Resource Model
 
-This section describes the current resource model on `main`. It is intentionally conservative: it explains the struct the codebase uses today, not the canonical finding model planned in [`docs/refactor/03-finding-model.md`](refactor/03-finding-model.md).
+This section describes the current resource model on `main`. It is intentionally conservative: it explains the struct the codebase uses today, not the canonical finding model planned in [`docs/historical/refactor/03-finding-model.md`](refactor/03-finding-model.md).
 
 ```go
 // internal/domain/resource.go   (Phase 01 moved the struct out of internal/resource;
@@ -279,7 +279,7 @@ type Resource struct {
 }
 ```
 
-- **Type** — short-name field added in Phase 01 (`docs/refactor/landed/01-projection-hook.md`) so that downstream packages (semantics, projection) can route by type without re-deriving it.
+- **Type** — short-name field added in Phase 01 (`docs/historical/refactor/landed/01-projection-hook.md`) so that downstream packages (semantics, projection) can route by type without re-deriving it.
 - **Findings** — the canonical resource-health surface (`domain.Finding{Code, Phrase, Severity, Source}`). Drives row coloring, list-view status display, menu issue badges, and the ctrl+z attention filter. Wave 1 entries carry `Source = "wave1"`; Wave 2 entries carry `Source = "wave2:<short>"` and are written by `applyEnrichment` in `internal/tui/app_enrich_fold.go`. The legacy `Status string` / `Issues []string` fields and the `(+N)` suffix algebra were deleted when Phase 03 landed.
 - **AttentionDetails** — supporting facts (rows shown in the detail-view Attention section) keyed by stable `FindingCode`. `FindingCode` is never displayed.
 - **Fields** — flat key-value pairs populated by each fetcher. Used for list table columns and simple detail rendering. Keys are snake_case (e.g., `"instance_id"`, `"vpc_id"`).
@@ -287,7 +287,7 @@ type Resource struct {
 
 ### Resource Type Registration
 
-Resource types are registered declaratively through the catalog: each type is one `catalog.ResourceTypeDef` struct literal in a per-category `internal/aws/catalog_*.go` file, aggregated by `internal/catalog` and installed once at startup via `aws.Install()` + `catalog.SetTypes(...)`. There is no `init()`/`Register*` feature wiring — fetchers, enrichers, related defs, navigable fields, field keys, and aliases are all direct fields on the struct literal (see the `ResourceTypeDef` shape below). Adding a resource type is the mechanical four-file change described in [`docs/refactor/00-overview.md`](refactor/00-overview.md) (catalog literal + transport + demo fixture + tests); `make verify-zero-init` enforces zero feature-wiring `init()`.
+Resource types are registered declaratively through the catalog: each type is one `catalog.ResourceTypeDef` struct literal in a per-category `internal/aws/catalog_*.go` file, aggregated by `internal/catalog` and installed once at startup via `aws.Install()` + `catalog.SetTypes(...)`. There is no `init()`/`Register*` feature wiring — fetchers, enrichers, related defs, navigable fields, field keys, and aliases are all direct fields on the struct literal (see the `ResourceTypeDef` shape below). Adding a resource type is the mechanical four-file change described in [`docs/historical/refactor/00-overview.md`](refactor/00-overview.md) (catalog literal + transport + demo fixture + tests); `make verify-zero-init` enforces zero feature-wiring `init()`.
 
 ### Resource Type Definitions
 
@@ -356,7 +356,7 @@ Each fetcher takes `clients any` and type-asserts to `*aws.ServiceClients` inter
 
 Some resource types hide problems behind extra API calls (e.g., EC2 with impaired status checks, RDS with pending maintenance). Wave 2 enrichment discovers these hidden issues after Wave 1 probes complete.
 
-This section documents the current Wave 2 implementation on `main`. The refactor plan in [`docs/refactor/03-finding-model.md`](refactor/03-finding-model.md) and [`docs/refactor/04-catalog.md`](refactor/04-catalog.md) replaces this registry-and-markdown-driven model with canonical findings and catalog-owned metadata.
+This section documents the current Wave 2 implementation on `main`. The refactor plan in [`docs/historical/refactor/03-finding-model.md`](refactor/03-finding-model.md) and [`docs/historical/refactor/04-catalog.md`](refactor/04-catalog.md) replaces this registry-and-markdown-driven model with canonical findings and catalog-owned metadata.
 
 **Architecture:**
 - `internal/aws/issue_enrichment.go` — Wave 2 shared types and helpers: `NoOpIssueEnricher`, `IssueEnricher` struct, `IssueEnricherFunc` / `IssueEnricherResult` types, shared helpers, `EnrichmentCap` / `PerParentPageCap`. As of AS-795n, the package-init `IssueEnricherRegistry` map and `registerIssueEnricher` helper are gone — registrations now live on each `catalog.ResourceTypeDef` literal's `Wave2` field.
@@ -796,7 +796,7 @@ main.go → parseFlags → tui.New(profile, region, opts...)
 
 ## Extension Guide
 
-The steps below describe how to extend the current `main` architecture. They are intentionally not the target contributor workflow after the refactor lands. For the target shape, see [`docs/refactor/00-overview.md`](refactor/00-overview.md) and [`docs/refactor/04-catalog.md`](refactor/04-catalog.md).
+The steps below describe how to extend the current `main` architecture. They are intentionally not the target contributor workflow after the refactor lands. For the target shape, see [`docs/historical/refactor/00-overview.md`](refactor/00-overview.md) and [`docs/historical/refactor/04-catalog.md`](refactor/04-catalog.md).
 
 ### Adding a New Resource Type
 
@@ -823,7 +823,7 @@ The steps below describe how to extend the current `main` architecture. They are
 1. Keep the base list/detail fetch path fast; defer expensive or optional data to the enricher.
 2. Make the enricher idempotent and safe to re-run.
 3. Ensure stale results are rejectable by generation plus resource context.
-4. Treat this `Register*`/Wave-2 path as current-state implementation guidance, not the long-term target API. New refactor work should follow the phased design under `docs/refactor/`.
+4. Treat this `Register*`/Wave-2 path as current-state implementation guidance, not the long-term target API. New refactor work should follow the phased design under `docs/historical/refactor/`.
 5. If the enricher caches, document its scope and invalidation rules.
 6. Add tests for success, error, stale-result rejection, and cache invalidation paths.
 

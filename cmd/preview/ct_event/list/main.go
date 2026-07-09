@@ -1,7 +1,7 @@
 // Standalone preview for the redesigned CloudTrail events LIST view.
 // Run with: go run ./cmd/preview/ct_event/list/
 //
-// Renders the four wireframes from docs/design/ct-event-list.md §4:
+// Renders the four wireframes from docs/historical/design/ct-event-list.md §4:
 //
 //	4a — busy mixed list (default columns, 132 cols)
 //	4b — filtered to errors (/FAILED)
@@ -73,7 +73,7 @@ var (
 	stActor     = lipgloss.NewStyle().Foreground(colHeaderFg)
 
 	// Row tints — keyed by EC2-style Resource.Status value. See
-	// docs/design/ct-event-list.md §5 and internal/tui/styles/styles.go:109.
+	// docs/historical/design/ct-event-list.md §5 and internal/tui/styles/styles.go:109.
 	//
 	//   "ct-root"    (NEW)        → fg header on red bg, bold
 	//   "error"      (existing)   → red fg

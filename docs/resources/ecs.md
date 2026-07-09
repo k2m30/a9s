@@ -6,7 +6,7 @@ generatedFrom:
   - docs/architecture.md
   - docs/related-resources.md
   - docs/attention-signals.md
-  - docs/enrichment-visibility.md
+  - docs/historical/analysis/enrichment-visibility.md
 ---
 
 # ecs — Resource Spec
@@ -168,7 +168,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - All §3.3 Wave 3 signals (copied above).
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
-- Superseded HOW in `docs/enrichment-visibility.md`: row middle-dot `·` marker, `⚠ Background Check` detail header, and the derived list-level banner `⚠ N issues detected by background checks`. These are earlier UX calls replaced by the S1–S5 rules above and this per-resource spec.
+- Superseded HOW in `docs/historical/analysis/enrichment-visibility.md`: row middle-dot `·` marker, `⚠ Background Check` detail header, and the derived list-level banner `⚠ N issues detected by background checks`. These are earlier UX calls replaced by the S1–S5 rules above and this per-resource spec.
 
 ## 6. Citations
 

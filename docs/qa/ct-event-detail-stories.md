@@ -4,7 +4,7 @@ Covers the redesigned CloudTrail event detail view — the sectioned
 WHO/WHAT/WHERE/WHEN/REQUEST/RESPONSE rendering of a single CloudTrail
 event, replacing the previous flat key/value list.
 
-All stories are black-box: derived from `docs/design/ct-event-detail.md`
+All stories are black-box: derived from `docs/historical/design/ct-event-detail.md`
 and `docs/design/ct-taxonomy.md` only. No source code is referenced.
 
 Synthetic account IDs throughout: `111111111111`, `222222222222`,

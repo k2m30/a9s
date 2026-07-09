@@ -6,7 +6,7 @@ generatedFrom:
   - docs/architecture.md
   - docs/related-resources.md
   - docs/attention-signals.md
-  - docs/enrichment-visibility.md
+  - docs/historical/analysis/enrichment-visibility.md
 ---
 
 # ebs — Resource Spec
@@ -161,7 +161,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (CloudWatch `VolumeQueueLength`, `BurstBalance` on gp2).
-- Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings, no middle-dot row marker, no derived list-level banner, no ceremonial "Background Check" header in the detail view. (Superseded HOW passages in `docs/enrichment-visibility.md` describe such mechanisms; they are ignored by this spec per skill rules.)
+- Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings, no middle-dot row marker, no derived list-level banner, no ceremonial "Background Check" header in the detail view. (Superseded HOW passages in `docs/historical/analysis/enrichment-visibility.md` describe such mechanisms; they are ignored by this spec per skill rules.)
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?": "a9s never makes write calls to AWS. Every AWS API call is a List, Describe, or Get operation.").
 - Public-snapshot detection via `DescribeSnapshotAttribute` — covered by `ebs-snap`, not `ebs`.
 - Per-instance attachment permission analysis — no EBS-specific AWS field surfaces that without extra-cost calls.

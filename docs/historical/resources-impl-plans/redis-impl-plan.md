@@ -131,7 +131,7 @@ Changed files (per phase 7.5 gate):
 - `.a9s/views/redis.yaml` — regenerate if defaults change (no change expected).
 - `tests/unit/aws_redis_test.go`, `aws_redis_related_test.go` — new unit tests per §0b.1/0b.2/0b.4.
 - `tests/integration/scenario_redis_visual_test.go` — new scenario assertions for shard phrases + AZ visibility.
-- `docs/resources/redis.md`, `docs/resources/redis-impl-plan.md` — spec + plan updates.
+- `docs/resources/redis.md`, `docs/historical/resources-impl-plans/redis-impl-plan.md` — spec + plan updates.
 
 No new files should appear outside this list. Wave-3 CT-failover is documented as out-of-scope, NOT added as code.
 

@@ -1,7 +1,7 @@
 package unit
 
 // Tests for the §1.1 severity model: Resource.Status must be one of
-// "ct-info" / "ct-attention" / "ct-danger" per docs/design/ct-event-list-v2.md §1.1.
+// "ct-info" / "ct-attention" / "ct-danger" per docs/historical/design/ct-event-list-v2.md §1.1.
 //
 // Replaces the old ct-write / ct-read binary model (removed in v2 redesign).
 

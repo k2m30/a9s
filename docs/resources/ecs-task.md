@@ -6,7 +6,7 @@ generatedFrom:
   - docs/architecture.md
   - docs/related-resources.md
   - docs/attention-signals.md
-  - docs/enrichment-visibility.md
+  - docs/historical/analysis/enrichment-visibility.md
 ---
 
 # ecs-task — Resource Spec
@@ -213,7 +213,7 @@ One bullet per claim in §§2–4.1.
 - a9s golden doc — `ct-events` is a universal pivot — `docs/related-resources.md` § Policy item 4.
 - a9s golden doc — `ecs-task → kms` is explicitly out of the contract (no direct KMS reference on a task) — `docs/related-resources.md` § Unanimous `sometimes` entries.
 - a9s golden doc — read-only invariant cited in §5 — `docs/architecture.md` § "What is a9s?".
-- a9s golden doc — `list-attention-coverage.md` grades `ecs-task` "A-" and recommends adding `Stop Code` / `Health Status` information to the list, satisfied here via S4 — `docs/list-attention-coverage.md` § `ecs-task` row.
+- a9s golden doc — `list-attention-coverage.md` grades `ecs-task` "A-" and recommends adding `Stop Code` / `Health Status` information to the list, satisfied here via S4 — `docs/historical/analysis/list-attention-coverage.md` § `ecs-task` row.
 - a9s-devops persona (2026-04-20) — `alarm` pivot discovery via `ClusterName`/`ServiceName` alarm dimensions: possible=yes, worth=yes. Rationale: on-call uses CloudWatch alarm dimensions to scope cluster/service-level saturation alerts; the reverse join is zero-cost against the already-loaded alarm list. (Falling back to persona: agent dispatch unavailable in this session.)
 - a9s-devops persona (2026-04-20) — `ec2` pivot requires `DescribeContainerInstances` and is skipped for Fargate: possible=yes, worth=yes. Rationale: EC2-launch-type tasks frequently die because the host went unhealthy; the pivot avoids a mode-switch into the EC2 list to find the host by ARN.
 - a9s-devops persona (2026-04-20) — `ecr`, `logs`, `role`, `secrets`, `ssm` pivots require a `DescribeTaskDefinition` call: possible=yes, worth=yes. Rationale: these five pivots are the common "why did the task fail to start?" answers (image pull, log-group permission, IAM, secret rotation, parameter drift); one `DescribeTaskDefinition` per unique revision is a bounded cost and matches the Wave 2 budget already authorized for the `essential=true + ExitCode!=0` signal.

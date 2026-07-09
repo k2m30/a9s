@@ -132,7 +132,7 @@ func TestScenario_RedshiftVisual(t *testing.T) {
 	// U9 — related pivots on graph-root #1 (CloudWatch-logging variant).
 	//
 	// acme-warehouse covers every `count shown: yes` pivot EXCEPT s3 (AWS logging
-	// destinations are mutually exclusive — see docs/resources/redshift-impl-plan.md §5.1).
+	// destinations are mutually exclusive — see docs/historical/resources-impl-plans/redshift-impl-plan.md §5.1).
 	// Graph-root #2 (acme-reporting, S3-logging) covers s3. Together they cover
 	// 11/11 `count shown: yes` pivots.
 	// -----------------------------------------------------------------

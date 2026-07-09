@@ -3,7 +3,7 @@ package unit
 // Tests for ctevent.ExtractTarget — the TARGET section extraction function.
 //
 // Contract (per specs/013-ct-event-detail-v2/contracts/ctdetail-api.md and
-// docs/design/ct-event-detail-v2.md §2.3):
+// docs/historical/design/ct-event-detail-v2.md §2.3):
 //
 //  1. Prefer resources[] envelope → one Row per entry
 //  2. Fall back to per-event-name lookup table (requestParameters heuristics)
@@ -311,7 +311,7 @@ func TestCTDetailExtractTarget_CrossAccountARN_RetainsAccountPrefix(t *testing.T
 // ---------------------------------------------------------------------------
 
 // TestCTDetailExtractTarget_FallbackTable is a table-driven test covering all
-// per-event-name cases per docs/design/ct-event-detail-v2.md §2.3 / #246 §4.
+// per-event-name cases per docs/historical/design/ct-event-detail-v2.md §2.3 / #246 §4.
 func TestCTDetailExtractTarget_FallbackTable(t *testing.T) {
 	type tc struct {
 		name        string

@@ -6,7 +6,7 @@ generatedFrom:
   - docs/architecture.md
   - docs/related-resources.md
   - docs/attention-signals.md
-  - docs/enrichment-visibility.md
+  - docs/historical/analysis/enrichment-visibility.md
 ---
 
 # pipeline — Resource Spec
@@ -215,7 +215,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `role` discovery via `PipelineDeclaration.RoleArn` plus per-action overrides — `a9s-devops (2026-04-20): possible=yes, worth=yes. Service role always present; per-action roles common for cross-account deploy.`
 - `s3` discovery via `ArtifactStore.Location` plus `Provider==S3` source/deploy actions — `a9s-devops (2026-04-20): possible=yes, worth=yes. ArtifactStore.Location is the bucket name directly.`
 - `sns` discovery limited to manual-approval `Configuration["NotificationArn"]`; developer-tools notifications are a separate API and out of scope for this target — `a9s-devops (2026-04-20): possible=yes (approval only), worth=yes. The related-resources contract says "Approval SNS topic", so scope is bounded.`
-- Superseded HOW ignored — row middle-dot `·` marker, `⚠ Background Check` detail header, and derived list-level banner in `docs/enrichment-visibility.md` are not cited or reproduced per the skill's S1–S5 rules.
+- Superseded HOW ignored — row middle-dot `·` marker, `⚠ Background Check` detail header, and derived list-level banner in `docs/historical/analysis/enrichment-visibility.md` are not cited or reproduced per the skill's S1–S5 rules.
 
 <!-- BEGIN GENERATED: header -->
 pipeline — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).

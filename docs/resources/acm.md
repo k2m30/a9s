@@ -6,7 +6,7 @@ generatedFrom:
   - docs/architecture.md
   - docs/related-resources.md
   - docs/attention-signals.md
-  - docs/enrichment-visibility.md
+  - docs/historical/analysis/enrichment-visibility.md
 ---
 
 # acm — Resource Spec
@@ -186,7 +186,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Discovery of `r53` via longest-suffix match of `DomainName` against loaded hosted-zone `Name` — `a9s-devops (2026-04-20): possible=yes, worth=yes. ACM surfaces the domain but not the owning zone; suffix matching is the idiomatic pivot and operators rely on it when validation stalls.`
 - `ct-events` is the universal pivot applied to every registered type — `docs/related-resources.md` § Policy, rule 4.
 - a9s is read-only — `docs/architecture.md` § "What is a9s?".
-- Superseded HOW ignored — row middle-dot `·` marker, `⚠ Background Check` detail header, and derived list-level banner in `docs/enrichment-visibility.md` are not cited or reproduced per the skill's S1–S5 rules.
+- Superseded HOW ignored — row middle-dot `·` marker, `⚠ Background Check` detail header, and derived list-level banner in `docs/historical/analysis/enrichment-visibility.md` are not cited or reproduced per the skill's S1–S5 rules.
 
 <!-- BEGIN GENERATED: header -->
 acm — DNS & CDN. Lifecycle key: `status`.

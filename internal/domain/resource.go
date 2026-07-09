@@ -6,7 +6,7 @@ package domain
 // Resource represents a single AWS resource instance.
 // internal/resource re-exports this via a type alias.
 //
-// Canonical model — see `docs/refactor/03-finding-model.md`.
+// Canonical model — see `docs/historical/refactor/03-finding-model.md`.
 type Resource struct {
 	// ID is the primary identifier (instance ID, ARN, name).
 	ID string

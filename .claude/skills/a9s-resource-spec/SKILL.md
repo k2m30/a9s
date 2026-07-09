@@ -38,7 +38,7 @@ This split matters and anchors everything the skill does:
 - **WHAT** — which resources exist, which related pivots they have, which issues to watch for, which AWS APIs return what. Lives in the four a9s golden docs and the AWS API Reference. Changes slowly. Answers "does this resource have an X issue?"
 - **HOW** — how each WHAT is delivered to the operator: row color, glyph, Status column wording, detail-view sentence, menu count rule. **This is what the generated `docs/resources/<shortName>.md` establishes.** HOW is a UX/UI decision and is expected to evolve. Regenerating a spec captures the current HOW.
 
-The four a9s golden docs are **not** the HOW. Passages in `docs/enrichment-visibility.md` that look like HOW decisions (row middle-dot `·`, `⚠ Background Check` header, derived list-level banner) are stale HOW that this skill now supersedes. The current HOW lives in this skill's surface rules (S1–S5) and in the generated per-resource doc.
+The four a9s golden docs are **not** the HOW. Passages in `docs/historical/analysis/enrichment-visibility.md` that look like HOW decisions (row middle-dot `·`, `⚠ Background Check` header, derived list-level banner) are stale HOW that this skill now supersedes. The current HOW lives in this skill's surface rules (S1–S5) and in the generated per-resource doc.
 
 Ground each generated spec in:
 
@@ -116,7 +116,7 @@ If a sentence in the generated spec doesn't serve one of those questions, cut it
 1. `docs/architecture.md` — layering, read-only invariant, allowed UI surfaces.
 2. `docs/related-resources.md` — per-type contract of related targets. The AWS API Reference URL for each type lives here.
 3. `docs/attention-signals.md` — Wave 1 / Wave 2 / Wave 3 signals per type. Each row cites its AWS API.
-4. `docs/enrichment-visibility.md` — historical record of which surface categories exist (menu count, row color, glyph, status text, detail line). Treat it as WHAT only; its specific HOW mechanics are superseded by this skill's S1–S5 rules (see "Superseded HOW" below).
+4. `docs/historical/analysis/enrichment-visibility.md` — historical record of which surface categories exist (menu count, row color, glyph, status text, detail line). Treat it as WHAT only; its specific HOW mechanics are superseded by this skill's S1–S5 rules (see "Superseded HOW" below).
 
 **Secondary — the AWS Go SDK v2 types.** a9s vendors `github.com/aws/aws-sdk-go-v2`. The skill consults the SDK directly with `go doc` — authoritative, local, instant. Use it to:
 

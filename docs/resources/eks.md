@@ -6,7 +6,7 @@ generatedFrom:
   - docs/architecture.md
   - docs/related-resources.md
   - docs/attention-signals.md
-  - docs/enrichment-visibility.md
+  - docs/historical/analysis/enrichment-visibility.md
 ---
 
 # eks — Resource Spec
@@ -224,7 +224,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Discovery of `ng` via cluster-scoped node-group list — `docs/related-resources.md` § Per-target reasoning, `eks` row: "`ng` — Node groups attached to the cluster."
 - `ct-events` is the universal pivot applied to every registered type — `docs/related-resources.md` § Policy.
 - a9s is read-only — `docs/architecture.md` § "What is a9s?".
-- Superseded HOW ignored — row middle-dot `·` marker, `⚠ Background Check` detail header, and derived list-level banner in `docs/enrichment-visibility.md` are not cited or reproduced per the skill's S1–S5 rules.
+- Superseded HOW ignored — row middle-dot `·` marker, `⚠ Background Check` detail header, and derived list-level banner in `docs/historical/analysis/enrichment-visibility.md` are not cited or reproduced per the skill's S1–S5 rules.
 
 <!-- BEGIN GENERATED: header -->
 eks — CONTAINERS. Lifecycle key: `status`.

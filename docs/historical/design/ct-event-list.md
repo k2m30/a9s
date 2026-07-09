@@ -5,7 +5,7 @@
 Status: design spec, not implemented. No code under `internal/`, `cmd/a9s/`,
 `tests/`, or `.a9s/` changes as part of this document. Source of truth for
 event shapes is `docs/design/ct-taxonomy.md`; the sibling detail-view spec
-is `docs/design/ct-event-detail.md`. Every field path cited below points
+is `docs/historical/design/ct-event-detail.md`. Every field path cited below points
 back to a numbered section of the taxonomy.
 
 This document covers **only the resource list view** (the table users see

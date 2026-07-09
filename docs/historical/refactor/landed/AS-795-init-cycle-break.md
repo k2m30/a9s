@@ -323,7 +323,7 @@ Acceptance: rg '^func init\(\)' internal/aws/<cat-services>*.go is zero; behavio
 
 ## 7. Cross-references
 
-- **`docs/refactor/04-catalog.md`** — Phase 04 plan; this AS-795 program fills in the runtime-wiring migration that PR-04b–m left undone.
+- **`docs/historical/refactor/04-catalog.md`** — Phase 04 plan; this AS-795 program fills in the runtime-wiring migration that PR-04b–m left undone.
 - **`docs/architecture.md`** — Single-source-of-truth doc; AS-731 is part of the architecture-intent conformance program. After AS-795o lands, the catalog struct literal IS the single source of truth, matching the architecture intent.
 - **AS-731** — Blocked by this program; mechanical after AS-795o.
 - **AS-722 / AS-727 / AS-724** — Precedent for "category catalog PR closes done after types-file present + legacy deleted + build/test green"; AS-795b–m apply the same closure rule.

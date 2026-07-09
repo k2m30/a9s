@@ -102,7 +102,7 @@ const (
 )
 
 // NewRedshiftFixtures constructs RedshiftFixtures from the canonical demo data.
-// Every fixture in docs/resources/redshift-impl-plan.md §2 is present.
+// Every fixture in docs/historical/resources-impl-plans/redshift-impl-plan.md §2 is present.
 // Adversarial fixtures (nil-pointer Cluster, malformed Tags) are excluded —
 // those live inline in QA test files per the a9s-create-demo-fixture skill rule.
 var sharedRedshiftFixtures = sync.OnceValue(func() *RedshiftFixtures {

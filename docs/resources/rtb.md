@@ -6,7 +6,7 @@ generatedFrom:
   - docs/architecture.md
   - docs/related-resources.md
   - docs/attention-signals.md
-  - docs/enrichment-visibility.md
+  - docs/historical/analysis/enrichment-visibility.md
 ---
 
 # rtb — Resource Spec
@@ -161,7 +161,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `cfn` discovery via `aws:cloudformation:stack-name` tag — a9s-devops (2026-04-20): possible=yes, worth=yes. CloudFormation automatically stamps this tag on every managed resource; it is the canonical IaC-provenance pivot used throughout a9s and matches the pattern called out explicitly for `secrets` in `docs/related-resources.md` (`SecretListEntry.Tags["aws:cloudformation:stack-name"]`).
 - `vpce` discovered via `Routes[].GatewayId` with `vpce-` prefix (gateway endpoints, not interface endpoints) — a9s-devops (2026-04-20): possible=yes, worth=yes. S3 and DynamoDB gateway endpoints install themselves as a route whose target is the `vpce-*` gateway ID; interface endpoints attach via ENI/DNS rather than a route and pivot from elsewhere.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
-- Count-shown values left `unknown` — `docs/related-resources.md` and `docs/enrichment-visibility.md` do not specify per-target count visibility for `rtb`; HOW decision deferred to a per-resource UX review rather than invented here.
+- Count-shown values left `unknown` — `docs/related-resources.md` and `docs/historical/analysis/enrichment-visibility.md` do not specify per-target count visibility for `rtb`; HOW decision deferred to a per-resource UX review rather than invented here.
 
 <!-- BEGIN GENERATED: header -->
 rtb — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field).
