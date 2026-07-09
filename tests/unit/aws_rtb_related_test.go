@@ -99,8 +99,8 @@ func TestRelated_RTB_Subnet_NotFound(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error: %v", result.Err)
@@ -122,8 +122,8 @@ func TestRelated_RTB_Subnet_CacheMissNoClients(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
 	}
 }
 
@@ -209,8 +209,8 @@ func TestRelated_RTB_NAT_NotFound(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "nat")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error: %v", result.Err)
@@ -232,8 +232,8 @@ func TestRelated_RTB_NAT_CacheMissNoClients(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "nat")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
 	}
 }
 
@@ -290,8 +290,8 @@ func TestRelated_RTB_IGW_NotFound(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "igw")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error: %v", result.Err)
@@ -313,8 +313,8 @@ func TestRelated_RTB_IGW_CacheMissNoClients(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "igw")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
 	}
 }
 
@@ -550,8 +550,8 @@ func TestRelated_RTB_ENI_NotFound(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (ENI not in cache)", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
 	}
 }
 
@@ -634,8 +634,8 @@ func TestRelated_RTB_TGW_NotFound(t *testing.T) {
 	checker := rtbCheckerByTarget(t, "tgw")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (TGW not in cache)", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
 	}
 }
 

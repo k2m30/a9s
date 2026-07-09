@@ -12,7 +12,7 @@ import (
 // checkIGWVPC extracts Attachments[0].VpcId from the IGW RawStruct and searches
 // the vpc cache for a matching resource (Pattern F + C hybrid: field extraction
 // from self, then cache lookup).
-func checkIGWVPC(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkIGWVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.InternetGateway](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
@@ -20,21 +20,8 @@ func checkIGWVPC(_ context.Context, _ any, res resource.Resource, cache resource
 	if len(raw.Attachments) == 0 || raw.Attachments[0].VpcId == nil || *raw.Attachments[0].VpcId == "" {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 	}
-	vpcID := *raw.Attachments[0].VpcId
-
-	entry, hasEntry := cache["vpc"]
-	if !hasEntry {
-		return resource.UnknownRelated("vpc")
-	}
-	for _, vpcRes := range entry.Resources {
-		if vpcRes.ID == vpcID {
-			return relatedResult("vpc", []string{vpcID})
-		}
-	}
-	if entry.IsTruncated {
-		return relatedResultTrunc("vpc", nil, true)
-	}
-	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	// In-body: the IGW's own Attachments[0].VpcId IS the attached VPC.
+	return relatedResult("vpc", []string{*raw.Attachments[0].VpcId})
 }
 
 // checkIGWRTB searches the rtb cache for route tables that contain a route

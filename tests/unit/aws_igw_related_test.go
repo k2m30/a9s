@@ -150,8 +150,8 @@ func TestRelated_IGW_VPC_CacheMissNoClients(t *testing.T) {
 	checker := igwCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
 	}
 }
 

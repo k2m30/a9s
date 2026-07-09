@@ -129,8 +129,8 @@ func TestRelated_NAT_VPC_NotFound(t *testing.T) {
 	checker := natCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error: %v", result.Err)
@@ -159,8 +159,8 @@ func TestRelated_NAT_VPC_CacheMissNoClients(t *testing.T) {
 	checker := natCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
 	}
 }
 
@@ -244,8 +244,8 @@ func TestRelated_NAT_Subnet_NotFound(t *testing.T) {
 	checker := natCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error: %v", result.Err)
@@ -274,8 +274,8 @@ func TestRelated_NAT_Subnet_CacheMissNoClients(t *testing.T) {
 	checker := natCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
 	}
 }
 

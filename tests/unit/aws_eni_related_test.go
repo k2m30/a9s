@@ -8,7 +8,6 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -109,8 +108,8 @@ func TestRelated_ENI_EC2_NotFound(t *testing.T) {
 	checker := eniCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
 	}
 }
 
@@ -157,8 +156,8 @@ func TestRelated_ENI_EC2_CacheMissNoClients(t *testing.T) {
 	checker := eniCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
 	}
 }
 
@@ -225,8 +224,8 @@ func TestRelated_ENI_SG_NotFound(t *testing.T) {
 	checker := eniCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
 	}
 }
 
@@ -244,8 +243,8 @@ func TestRelated_ENI_SG_CacheMissNoClients(t *testing.T) {
 	checker := eniCheckerByTarget(t, "sg")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
 	}
 }
 
@@ -328,7 +327,7 @@ func TestRelated_ENI_EIP_CacheMissNoClients(t *testing.T) {
 	checker := eniCheckerByTarget(t, "eip")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count)
 	}
 }

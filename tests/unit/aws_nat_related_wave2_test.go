@@ -97,39 +97,28 @@ func TestRelated_NAT_EIP_NoMatchWhenAllocIDNotInCache(t *testing.T) {
 	checker := natCheckerByTarget(t, "eip")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
 	}
 }
 
-// Edge: EIP resource matched via RawStruct.AllocationId (not resource.ID).
+// Event-derived: the NAT's NatGatewayAddresses[].AllocationId IS the eip id
+// (real eip resources are keyed by AllocationId — see eip.go), so the checker
+// returns it straight from the NAT body with no eip-cache walk.
 func TestRelated_NAT_EIP_MatchByRawStructAllocationID(t *testing.T) {
 	const natID = "nat-0aaa111111111111a"
 	const allocID = "eipalloc-0aaa111111111111a"
 
-	// resource.ID is the public IP, not alloc ID; checker falls back to RawStruct.AllocationId.
-	eipRes := resource.Resource{
-		ID:   "54.200.1.100",
-		Name: "54.200.1.100",
-		RawStruct: ec2types.Address{
-			AllocationId: aws.String(allocID),
-			PublicIp:     aws.String("54.200.1.100"),
-		},
-	}
-	cache := resource.ResourceCache{
-		"eip": resource.ResourceCacheEntry{Resources: []resource.Resource{eipRes}},
-	}
-
 	src := natGatewaySource(natID, "vpc-0abc123def456789a", allocID, "eni-0aaa111111111111a")
 
 	checker := natCheckerByTarget(t, "eip")
-	result := checker(context.Background(), nil, src, cache)
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
 	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (matched via RawStruct.AllocationId)", result.Count)
+		t.Errorf("Count = %d, want 1", result.Count)
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "54.200.1.100" {
-		t.Errorf("ResourceIDs = %v, want [54.200.1.100]", result.ResourceIDs)
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != allocID {
+		t.Errorf("ResourceIDs = %v, want [%s] (AllocationId is the eip id, resolved by identity)", result.ResourceIDs, allocID)
 	}
 }
 
@@ -188,8 +177,8 @@ func TestRelated_NAT_ENI_NoMatchWhenENINotInCache(t *testing.T) {
 	checker := natCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: source names the target, no fetch)", result.Count)
 	}
 }
 

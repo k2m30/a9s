@@ -13,7 +13,7 @@ import (
 
 // checkENIEC2 extracts Attachment.InstanceId from the ENI RawStruct and searches
 // the ec2 cache for a matching instance.
-func checkENIEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkENIEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
@@ -21,64 +21,30 @@ func checkENIEC2(ctx context.Context, clients any, res resource.Resource, cache 
 	if raw.Attachment == nil || raw.Attachment.InstanceId == nil || *raw.Attachment.InstanceId == "" {
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
 	}
-	instanceID := *raw.Attachment.InstanceId
-
-	ec2List, truncated, err := eniRelatedResources(ctx, clients, cache, "ec2")
-	if err != nil {
-		return resource.ErrorRelated("ec2", err)
-	}
-	if ec2List == nil {
-		return resource.UnknownRelated("ec2")
-	}
-	var ids []string
-	for _, ec2Res := range ec2List {
-		if ec2Res.ID == instanceID {
-			ids = append(ids, ec2Res.ID)
-			break
-		}
-	}
-	return relatedResultTrunc("ec2", ids, truncated)
+	// In-body: the ENI's Attachment.InstanceId IS the related instance.
+	return relatedResult("ec2", []string{*raw.Attachment.InstanceId})
 }
 
 // checkENISG extracts Groups[].GroupId from the ENI RawStruct and searches
 // the sg cache for matching security groups.
-func checkENISG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkENISG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
 	}
-	if len(raw.Groups) == 0 {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
-	}
-	groupIDs := make(map[string]struct{}, len(raw.Groups))
+	// In-body: the ENI's own Groups[].GroupId are the related security groups.
+	var ids []string
 	for _, g := range raw.Groups {
 		if g.GroupId != nil && *g.GroupId != "" {
-			groupIDs[*g.GroupId] = struct{}{}
+			ids = append(ids, *g.GroupId)
 		}
 	}
-	if len(groupIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
-	}
-
-	sgList, truncated, err := eniRelatedResources(ctx, clients, cache, "sg")
-	if err != nil {
-		return resource.ErrorRelated("sg", err)
-	}
-	if sgList == nil {
-		return resource.UnknownRelated("sg")
-	}
-	var ids []string
-	for _, sgRes := range sgList {
-		if _, found := groupIDs[sgRes.ID]; found {
-			ids = append(ids, sgRes.ID)
-		}
-	}
-	return relatedResultTrunc("sg", ids, truncated)
+	return relatedResult("sg", ids)
 }
 
 // checkENIEIP extracts Association.AllocationId from the ENI RawStruct and searches
 // the eip cache for a matching Elastic IP.
-func checkENIEIP(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkENIEIP(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.NetworkInterface](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
@@ -86,28 +52,8 @@ func checkENIEIP(ctx context.Context, clients any, res resource.Resource, cache 
 	if raw.Association == nil || raw.Association.AllocationId == nil || *raw.Association.AllocationId == "" {
 		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
 	}
-	allocationID := *raw.Association.AllocationId
-
-	eipList, truncated, err := eniRelatedResources(ctx, clients, cache, "eip")
-	if err != nil {
-		return resource.ErrorRelated("eip", err)
-	}
-	if eipList == nil {
-		return resource.UnknownRelated("eip")
-	}
-	var ids []string
-	for _, eipRes := range eipList {
-		if eipRes.ID == allocationID {
-			ids = append(ids, eipRes.ID)
-			break
-		}
-		eipRaw, eipOk := assertStruct[ec2types.Address](eipRes.RawStruct)
-		if eipOk && eipRaw.AllocationId != nil && *eipRaw.AllocationId == allocationID {
-			ids = append(ids, eipRes.ID)
-			break
-		}
-	}
-	return relatedResultTrunc("eip", ids, truncated)
+	// In-body: Association.AllocationId IS the eip resource id (eip keyed by AllocationId).
+	return relatedResult("eip", []string{*raw.Association.AllocationId})
 }
 
 // checkENIVPC returns the VPC this network interface belongs to (Pattern F).

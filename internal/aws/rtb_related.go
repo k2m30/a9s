@@ -14,107 +14,53 @@ import (
 
 // checkRTBSubnet searches the subnet cache for subnets associated with this route table.
 // It extracts SubnetIds from ec2types.RouteTable.Associations[] (Pattern C — cache lookup).
-func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkRTBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 	}
-
-	subnetIDs := make(map[string]bool)
+	// In-body: RouteTable.Associations[].SubnetId ARE the associated subnets.
+	var ids []string
 	for _, assoc := range rtb.Associations {
 		if assoc.SubnetId != nil && *assoc.SubnetId != "" {
-			subnetIDs[*assoc.SubnetId] = true
+			ids = append(ids, *assoc.SubnetId)
 		}
 	}
-	if len(subnetIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
-	}
-
-	subnetList, truncated, err := rtbRelatedResources(ctx, clients, cache, "subnet")
-	if err != nil {
-		return resource.ErrorRelated("subnet", err)
-	}
-	if subnetList == nil {
-		return resource.UnknownRelated("subnet")
-	}
-
-	var ids []string
-	for _, subnetRes := range subnetList {
-		if subnetIDs[subnetRes.ID] {
-			ids = append(ids, subnetRes.ID)
-		}
-	}
-	return relatedResultTrunc("subnet", ids, truncated)
+	return relatedResult("subnet", ids)
 }
 
 // checkRTBNAT searches the nat cache for NAT gateways referenced in this route table's routes.
 // It extracts NatGatewayIds from ec2types.RouteTable.Routes[] (Pattern C — cache lookup).
-func checkRTBNAT(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkRTBNAT(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "nat", Count: 0}
 	}
-
-	natIDs := make(map[string]bool)
+	// In-body: RouteTable.Routes[].NatGatewayId ARE the referenced NAT gateways.
+	var ids []string
 	for _, route := range rtb.Routes {
 		if route.NatGatewayId != nil && *route.NatGatewayId != "" {
-			natIDs[*route.NatGatewayId] = true
+			ids = append(ids, *route.NatGatewayId)
 		}
 	}
-	if len(natIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "nat", Count: 0}
-	}
-
-	natList, truncated, err := rtbRelatedResources(ctx, clients, cache, "nat")
-	if err != nil {
-		return resource.ErrorRelated("nat", err)
-	}
-	if natList == nil {
-		return resource.UnknownRelated("nat")
-	}
-
-	var ids []string
-	for _, natRes := range natList {
-		if natIDs[natRes.ID] {
-			ids = append(ids, natRes.ID)
-		}
-	}
-	return relatedResultTrunc("nat", ids, truncated)
+	return relatedResult("nat", ids)
 }
 
 // checkRTBIGW searches the igw cache for Internet Gateways referenced in this route table's routes.
 // It extracts GatewayIds from Routes[] that start with "igw-" (Pattern C — cache lookup).
-func checkRTBIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkRTBIGW(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "igw", Count: 0}
 	}
-
-	igwIDs := make(map[string]bool)
+	// In-body: RouteTable.Routes[].GatewayId with the igw- prefix ARE the IGWs.
+	var ids []string
 	for _, route := range rtb.Routes {
 		if route.GatewayId != nil && strings.HasPrefix(*route.GatewayId, "igw-") {
-			igwIDs[*route.GatewayId] = true
+			ids = append(ids, *route.GatewayId)
 		}
 	}
-	if len(igwIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "igw", Count: 0}
-	}
-
-	igwList, truncated, err := rtbRelatedResources(ctx, clients, cache, "igw")
-	if err != nil {
-		return resource.ErrorRelated("igw", err)
-	}
-	if igwList == nil {
-		return resource.UnknownRelated("igw")
-	}
-
-	var ids []string
-	for _, igwRes := range igwList {
-		if igwIDs[igwRes.ID] {
-			ids = append(ids, igwRes.ID)
-		}
-	}
-	return relatedResultTrunc("igw", ids, truncated)
+	return relatedResult("igw", ids)
 }
 
 // checkRTBCFN checks EC2 RouteTable tags for aws:cloudformation:stack-name
@@ -169,68 +115,36 @@ func checkRTBVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 
 // checkRTBENI searches the eni cache for interfaces referenced by this route
 // table's routes via Routes[].NetworkInterfaceId.
-func checkRTBENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkRTBENI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
 	}
-	eniIDs := make(map[string]bool)
+	// In-body: RouteTable.Routes[].NetworkInterfaceId ARE the referenced ENIs.
+	var ids []string
 	for _, route := range rtb.Routes {
 		if route.NetworkInterfaceId != nil && *route.NetworkInterfaceId != "" {
-			eniIDs[*route.NetworkInterfaceId] = true
+			ids = append(ids, *route.NetworkInterfaceId)
 		}
 	}
-	if len(eniIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
-	}
-
-	eniList, truncated, err := rtbRelatedResources(ctx, clients, cache, "eni")
-	if err != nil {
-		return resource.ErrorRelated("eni", err)
-	}
-	if eniList == nil {
-		return resource.UnknownRelated("eni")
-	}
-	var ids []string
-	for _, eniRes := range eniList {
-		if eniIDs[eniRes.ID] {
-			ids = append(ids, eniRes.ID)
-		}
-	}
-	return relatedResultTrunc("eni", ids, truncated)
+	return relatedResult("eni", ids)
 }
 
 // checkRTBTGW searches the tgw cache for transit gateways referenced by this
 // route table's routes via Routes[].TransitGatewayId.
-func checkRTBTGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkRTBTGW(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "tgw", Count: 0}
 	}
-	tgwIDs := make(map[string]bool)
+	// In-body: RouteTable.Routes[].TransitGatewayId ARE the referenced TGWs.
+	var ids []string
 	for _, route := range rtb.Routes {
 		if route.TransitGatewayId != nil && *route.TransitGatewayId != "" {
-			tgwIDs[*route.TransitGatewayId] = true
+			ids = append(ids, *route.TransitGatewayId)
 		}
 	}
-	if len(tgwIDs) == 0 {
-		return resource.RelatedCheckResult{TargetType: "tgw", Count: 0}
-	}
-
-	tgwList, truncated, err := rtbRelatedResources(ctx, clients, cache, "tgw")
-	if err != nil {
-		return resource.ErrorRelated("tgw", err)
-	}
-	if tgwList == nil {
-		return resource.UnknownRelated("tgw")
-	}
-	var ids []string
-	for _, tgwRes := range tgwList {
-		if tgwIDs[tgwRes.ID] {
-			ids = append(ids, tgwRes.ID)
-		}
-	}
-	return relatedResultTrunc("tgw", ids, truncated)
+	return relatedResult("tgw", ids)
 }
 
 // checkRTBVPCE searches the vpce cache for Gateway-type VPC endpoints that
