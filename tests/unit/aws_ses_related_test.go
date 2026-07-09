@@ -927,10 +927,10 @@ func TestCheckSESR53_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) 
 	}
 }
 
-// TestCheckSESR53_TruncatedCacheNoMatches_ReturnsApproximateZero pins the
+// TestCheckSESR53_TruncatedCacheNoMatches_ReturnsTruncatedResult pins the
 // truncated+no-matches path of checkSESR53. No zone matches the domain; the
 // result must be Count==0 AND Truncated==true.
-func TestCheckSESR53_TruncatedCacheNoMatches_ReturnsApproximateZero(t *testing.T) {
+func TestCheckSESR53_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testing.T) {
 	src := resource.Resource{
 		ID:   "acme-corp.com",
 		Name: "acme-corp.com",
@@ -990,9 +990,9 @@ func TestCheckSESEbRule_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.
 	}
 }
 
-// TestCheckSESEbRule_TruncatedCacheNoMatches_ReturnsApproximateZero pins the
+// TestCheckSESEbRule_TruncatedCacheNoMatches_ReturnsTruncatedResult pins the
 // truncated+no-matches path of checkSESEbRule.
-func TestCheckSESEbRule_TruncatedCacheNoMatches_ReturnsApproximateZero(t *testing.T) {
+func TestCheckSESEbRule_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testing.T) {
 	clients := sesFixtureClients()
 	src := sesFixtureSrcIdentity(fixtures.SESGraphRootIdentity)
 

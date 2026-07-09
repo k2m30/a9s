@@ -1,6 +1,6 @@
 package unit_test
 
-// related_approximate_zero_test.go — tests for resource.ApproximateZero and
+// related_approximate_zero_test.go — tests for relatedResultTrunc and
 // the truncated-empty-cache honest-lower-bound contract.
 //
 // Anti-pattern (pre-task-#58; historically 225 occurrences across 69
@@ -11,7 +11,7 @@ package unit_test
 //   }
 //
 // Contract per resource.ValidateRelatedResult (related.go:144) and
-// resource.ApproximateZero's docstring: the honest state for "truncated cache
+// relatedResultTrunc's docstring: the honest state for "truncated cache
 // with zero hits" is:
 //
 //   {State: RelatedResolved (zero value), Count: 0, Truncated: true}   — a valid lower bound, not unknown
@@ -37,13 +37,13 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TestApproximateZero_ReturnsApproximateZero
+// TestTruncatedResult_ReturnsTruncatedResult
 // ─────────────────────────────────────────────────────────────────────────────
 
-// TestApproximateZero_ReturnsApproximateZero verifies that ApproximateZero
+// TestTruncatedResult_ReturnsTruncatedResult verifies that TruncatedResult
 // returns a fully-populated RelatedCheckResult with Count=0, Truncated=true,
 // the given TargetType, and nil ResourceIDs / Err.
-func TestApproximateZero_ReturnsApproximateZero(t *testing.T) {
+func TestTruncatedResult_ReturnsTruncatedResult(t *testing.T) {
 	result := resource.RelatedCheckResult{TargetType: "vpc", Truncated: true}
 
 	if result.TargetType != "vpc" {
@@ -64,16 +64,16 @@ func TestApproximateZero_ReturnsApproximateZero(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TestApproximateZero_EmptyTargetType
+// TestTruncatedResult_EmptyTargetType
 // ─────────────────────────────────────────────────────────────────────────────
 
-// TestApproximateZero_EmptyTargetType verifies that ApproximateZero("") returns a
+// TestTruncatedResult_EmptyTargetType verifies that TruncatedResult("") returns a
 // result with an empty TargetType, which ValidateRelatedResult reports as invalid.
 // This lets callers detect the empty-TargetType invariant at validation time.
-func TestApproximateZero_EmptyTargetType(t *testing.T) {
+func TestTruncatedResult_EmptyTargetType(t *testing.T) {
 	result := resource.RelatedCheckResult{TargetType: "", Truncated: true}
 
-	// The struct is returned (ApproximateZero does not panic on empty input).
+	// The struct is returned (TruncatedResult does not panic on empty input).
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0", result.Count)
 	}
@@ -84,17 +84,17 @@ func TestApproximateZero_EmptyTargetType(t *testing.T) {
 	// Callers can detect the mistake: ValidateRelatedResult must return an error.
 	err := resource.ValidateRelatedResult(result)
 	if err == nil {
-		t.Error("ValidateRelatedResult(ApproximateZero(\"\")) = nil, want non-nil error (empty TargetType invariant)")
+		t.Error("ValidateRelatedResult(TruncatedResult(\"\")) = nil, want non-nil error (empty TargetType invariant)")
 	}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TestApproximateZero_PassesValidation
+// TestTruncatedResult_PassesValidation
 // ─────────────────────────────────────────────────────────────────────────────
 
-// TestApproximateZero_PassesValidation verifies that for any non-empty targetType,
-// the result returned by ApproximateZero passes ValidateRelatedResult with no error.
-func TestApproximateZero_PassesValidation(t *testing.T) {
+// TestTruncatedResult_PassesValidation verifies that for any non-empty targetType,
+// the result returned by TruncatedResult passes ValidateRelatedResult with no error.
+func TestTruncatedResult_PassesValidation(t *testing.T) {
 	targetTypes := []string{
 		"vpc", "subnet", "sg", "ec2", "rds", "eks", "ng", "elb",
 		"nat", "igw", "rtb", "vpce", "eni", "tgw", "lambda", "s3",
@@ -106,17 +106,17 @@ func TestApproximateZero_PassesValidation(t *testing.T) {
 		t.Run(tt, func(t *testing.T) {
 			result := resource.RelatedCheckResult{TargetType: tt, Truncated: true}
 			if err := resource.ValidateRelatedResult(result); err != nil {
-				t.Errorf("ApproximateZero(%q) fails ValidateRelatedResult: %v", tt, err)
+				t.Errorf("TruncatedResult(%q) fails ValidateRelatedResult: %v", tt, err)
 			}
 		})
 	}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TestCheckVPC_TruncatedCacheReturnsApproximateZero
+// TestCheckVPC_TruncatedCacheReturnsTruncatedResult
 // ─────────────────────────────────────────────────────────────────────────────
 
-// TestCheckVPC_TruncatedCacheReturnsApproximateZero calls the registered
+// TestCheckVPC_TruncatedCacheReturnsTruncatedResult calls the registered
 // checkVPCSubnet checker (via the "vpc"→"subnet" RelatedDef) with a cache
 // that has only the VPC resource and a subnet entry that is truncated with
 // zero resources. The vpc resource has ID "vpc-12345678" which will not match
@@ -126,7 +126,7 @@ func TestApproximateZero_PassesValidation(t *testing.T) {
 // ACTUAL (BUG): {Count: -1}                (discards lower bound)
 //
 // This test stays RED until the coder fixes the anti-pattern in vpc_related.go.
-func TestCheckVPC_TruncatedCacheReturnsApproximateZero(t *testing.T) {
+func TestCheckVPC_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 	vpcResource := resource.Resource{
 		ID:   "vpc-12345678",
 		Name: "test-vpc",
@@ -176,17 +176,17 @@ func TestCheckVPC_TruncatedCacheReturnsApproximateZero(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TestCheckSG_TruncatedCacheReturnsApproximateZero
+// TestCheckSG_TruncatedCacheReturnsTruncatedResult
 // ─────────────────────────────────────────────────────────────────────────────
 
-// TestCheckSG_TruncatedCacheReturnsApproximateZero calls the registered
+// TestCheckSG_TruncatedCacheReturnsTruncatedResult calls the registered
 // checkSGEC2 checker (via the "sg"→"ec2" RelatedDef) with an EC2 cache that
 // is truncated with zero resources. The SG resource has a real ID that will
 // not match any instance in the empty list.
 //
 // EXPECTED: {Count: 0, Truncated: true}
 // ACTUAL (BUG): {Count: -1}
-func TestCheckSG_TruncatedCacheReturnsApproximateZero(t *testing.T) {
+func TestCheckSG_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 	sgResource := resource.Resource{
 		ID:   "sg-0abcdef123456789",
 		Name: "test-sg",
@@ -234,17 +234,17 @@ func TestCheckSG_TruncatedCacheReturnsApproximateZero(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TestCheckAMI_NG_TruncatedCacheReturnsApproximateZero
+// TestCheckAMI_NG_TruncatedCacheReturnsTruncatedResult
 // ─────────────────────────────────────────────────────────────────────────────
 
-// TestCheckAMI_NG_TruncatedCacheReturnsApproximateZero calls the registered
+// TestCheckAMI_NG_TruncatedCacheReturnsTruncatedResult calls the registered
 // checkAMING checker (via the "ami"→"ng" RelatedDef) with an NG cache that is
 // truncated with zero resources. The AMI resource has a real ID that will not
 // match any node group in the empty list.
 //
 // EXPECTED: {Count: 0, Truncated: true}
 // ACTUAL (BUG): {Count: -1}
-func TestCheckAMI_NG_TruncatedCacheReturnsApproximateZero(t *testing.T) {
+func TestCheckAMI_NG_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 	amiResource := resource.Resource{
 		ID:   "ami-0abcdef1234567890",
 		Name: "test-ami",

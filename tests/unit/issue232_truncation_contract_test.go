@@ -1,10 +1,10 @@
 // issue232_truncation_contract_test.go contains specification-driven tests for
 // issue #232: EC2 related checkers must return {Count:0, Truncated:true} (via
-// resource.ApproximateZero) when the cache is truncated and 0 local matches are
+// relatedResultTrunc) when the cache is truncated and 0 local matches are
 // found. A partial page cannot be treated as a definitive zero.
 //
 // New contract (Batch B): truncated-zero produces {Count:0, Truncated:true} —
-// the honest lower bound — not Count=-1 (unknown). See resource.ApproximateZero
+// the honest lower bound — not Count=-1 (unknown). See relatedResultTrunc
 // and resource.ValidateRelatedResult (related.go:34-38, 101-114) for the contract.
 //
 // Tests 1-4 FAIL against pre-fix code (ASG, EIP, NodeGroups, CT-Events discard
@@ -49,7 +49,7 @@ var trunc232Instance = resource.Resource{
 // ---------------------------------------------------------------------------
 
 // TestContract_TruncatedZeroMatch_ASG_ReturnsApproximate verifies that the ASG
-// checker returns {Count:0, Truncated:true} (resource.ApproximateZero) when the
+// checker returns {Count:0, Truncated:true} (relatedResultTrunc) when the
 // cache entry is truncated and no ASG in the partial list contains the instance.
 // See related.go:34-38 for the Truncated contract and ValidateRelatedResult for
 // the invariant that Truncated==true requires Count>=0.
@@ -89,7 +89,7 @@ func TestContract_TruncatedZeroMatch_ASG_ReturnsApproximate(t *testing.T) {
 }
 
 // TestContract_TruncatedZeroMatch_EIP_ReturnsApproximate verifies that the EIP
-// checker returns {Count:0, Truncated:true} (resource.ApproximateZero) when the
+// checker returns {Count:0, Truncated:true} (relatedResultTrunc) when the
 // cache entry is truncated and no EIP in the partial list is associated with the
 // instance. See related.go:34-38 and ValidateRelatedResult for the contract.
 func TestContract_TruncatedZeroMatch_EIP_ReturnsApproximate(t *testing.T) {
@@ -126,7 +126,7 @@ func TestContract_TruncatedZeroMatch_EIP_ReturnsApproximate(t *testing.T) {
 }
 
 // TestContract_TruncatedZeroMatch_NodeGroups_ReturnsApproximate verifies that
-// the NodeGroups checker returns {Count:0, Truncated:true} (resource.ApproximateZero)
+// the NodeGroups checker returns {Count:0, Truncated:true} (relatedResultTrunc)
 // when the cache entry is truncated and the only node group in the partial list
 // belongs to a different cluster.
 //
@@ -175,7 +175,7 @@ func TestContract_TruncatedZeroMatch_NodeGroups_ReturnsApproximate(t *testing.T)
 // the CloudTrail events checker returns Count=-1 when the cache entry is
 // truncated and no event in the partial list references the instance.
 // Note: ct-events uses FetchFilter-based navigation and returns Count=-1 (not
-// ApproximateZero) on truncated-zero, because the FetchFilter enables filtered
+// TruncatedResult) on truncated-zero, because the FetchFilter enables filtered
 // re-fetch from the navigation layer. Batch B did not migrate this checker.
 func TestContract_TruncatedZeroMatch_CloudTrailEvents_ReturnsUnknown(t *testing.T) {
 	cache := resource.ResourceCache{
@@ -272,7 +272,7 @@ func TestContract_TruncatedWithMatch_EIP_ReturnsCount(t *testing.T) {
 
 // TestContract_TruncatedZeroMatch_TG_ReturnsApproximate pins the correct behavior
 // of the target-group checker under the new truncated-zero contract.
-// resource.ApproximateZero returns {Count:0, Truncated:true}; see related.go:34-38.
+// relatedResultTrunc returns {Count:0, Truncated:true}; see related.go:34-38.
 func TestContract_TruncatedZeroMatch_TG_ReturnsApproximate(t *testing.T) {
 	cache := resource.ResourceCache{
 		"tg": {
@@ -308,7 +308,7 @@ func TestContract_TruncatedZeroMatch_TG_ReturnsApproximate(t *testing.T) {
 
 // TestContract_TruncatedZeroMatch_Alarm_ReturnsApproximate pins the correct behavior
 // of the CloudWatch alarm checker under the new truncated-zero contract.
-// resource.ApproximateZero returns {Count:0, Truncated:true}; see related.go:34-38.
+// relatedResultTrunc returns {Count:0, Truncated:true}; see related.go:34-38.
 func TestContract_TruncatedZeroMatch_Alarm_ReturnsApproximate(t *testing.T) {
 	cache := resource.ResourceCache{
 		"alarm": {
@@ -347,7 +347,7 @@ func TestContract_TruncatedZeroMatch_Alarm_ReturnsApproximate(t *testing.T) {
 // TestContract_TruncatedZeroMatch_CFN_ReturnsApproximate pins the correct behavior
 // of the CloudFormation checker under the new truncated-zero contract.
 // The instance has stack-name=stack-trunc; the fixture stack has a different name.
-// resource.ApproximateZero returns {Count:0, Truncated:true}; see related.go:34-38.
+// relatedResultTrunc returns {Count:0, Truncated:true}; see related.go:34-38.
 func TestContract_TruncatedZeroMatch_CFN_ReturnsApproximate(t *testing.T) {
 	cache := resource.ResourceCache{
 		"cfn": {
@@ -384,7 +384,7 @@ func TestContract_TruncatedZeroMatch_CFN_ReturnsApproximate(t *testing.T) {
 // of the EBS snapshot checker under the new truncated-zero contract.
 // The instance has one attached volume (vol-trunc-abc); the snapshot in the
 // truncated cache references a different volume.
-// resource.ApproximateZero returns {Count:0, Truncated:true}; see related.go:34-38.
+// relatedResultTrunc returns {Count:0, Truncated:true}; see related.go:34-38.
 func TestContract_TruncatedZeroMatch_EBSSnap_ReturnsApproximate(t *testing.T) {
 	instanceWithVolume := resource.Resource{
 		ID: "i-test-trunc",

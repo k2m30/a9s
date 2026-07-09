@@ -403,7 +403,7 @@ func TestRelated_DbcSnapVPC_RDSType_NilVpcID_ReturnsZero(t *testing.T) {
 // checkEIPECSTask / checkEIPECSSvc / checkEIPECS (internal/aws/eip_related.go)
 // Existing tests cover only the empty-EIP-ID (Count 0) and no-ENI (Count 0)
 // early returns. Uncovered: eipMatchingECSTask error propagation (-1, Err
-// set); truncated-cache no-match (ApproximateZero); a genuine match resolving
+// set); truncated-cache no-match (TruncatedResult); a genuine match resolving
 // the task/service-name/cluster; ECSSvc/ECS Group-prefix and ClusterArn
 // guard branches.
 // ---------------------------------------------------------------------------
@@ -435,7 +435,7 @@ func TestRelated_EIPECSTask_CacheMissNoClients_ReturnsZeroNotUnknown(t *testing.
 	}
 }
 
-func TestRelated_EIPECSTask_TruncatedNoMatch_ApproximateZero(t *testing.T) {
+func TestRelated_EIPECSTask_TruncatedNoMatch_TruncatedResult(t *testing.T) {
 	source := eipSrcWithENI("eni-0deadbeef00000002")
 	otherTask := resource.Resource{
 		ID: "task-other",

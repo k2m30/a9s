@@ -222,7 +222,7 @@ func TestRelated_NG_EBS_CacheJoin_CrossClusterNodegroupNameCollision(t *testing.
 	}
 }
 
-func TestRelated_NG_EBS_CacheJoin_TruncatedNoMatch_ApproximateZero(t *testing.T) {
+func TestRelated_NG_EBS_CacheJoin_TruncatedNoMatch_TruncatedResult(t *testing.T) {
 	const ngName = "general-pool"
 
 	otherNGInst := resource.Resource{

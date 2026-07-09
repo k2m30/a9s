@@ -589,7 +589,7 @@ type RelatedDef struct {
 
 `handleRelatedCheckStarted` (`app_related.go`) fans out one goroutine per `RelatedDef`, capped by `maxConcurrentProbes=4`. Results include a `Generation uint64` to discard stale results after Ctrl+R or profile/region switch.
 
-**Truncated-cache contract (`Truncated=true` / `ApproximateZero`)**: cache-scan checkers that can't see the full universe — because the target cache's `IsTruncated=true` after its first page — must signal the undercount rather than silently rendering `0`. `resource.ApproximateZero(shortName)` returns a sentinel `RelatedCheckResult{Count:0, Truncated:true}` used when a truncated cache yielded no matches yet later pages may contain some. File-local `truncatedResult*` helpers (in `ddb_related.go`, `s3_related.go`, `ses_related.go`, `redis_related.go`) produce the same shape when matches were found but the cache was still truncated. The UI renders these as `(N+)` or `(0+)` so operators know the real count is at least N.
+**Truncated-cache contract (`Truncated=true` / `TruncatedResult`)**: cache-scan checkers that can't see the full universe — because the target cache's `IsTruncated=true` after its first page — must signal the undercount rather than silently rendering `0`. `relatedResultTrunc(shortName)` returns a sentinel `RelatedCheckResult{Count:0, Truncated:true}` used when a truncated cache yielded no matches yet later pages may contain some. File-local `truncatedResult*` helpers (in `ddb_related.go`, `s3_related.go`, `ses_related.go`, `redis_related.go`) produce the same shape when matches were found but the cache was still truncated. The UI renders these as `(N+)` or `(0+)` so operators know the real count is at least N.
 
 ### Navigable Fields
 

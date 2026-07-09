@@ -208,7 +208,7 @@ func TestCheckCfR53_TruncatedEmptyCacheReturnsApproximate(t *testing.T) {
 
 	result := checker(context.Background(), nil, res, cache)
 
-	// Must be ApproximateZero — not confirmed-zero, because unscanned pages
+	// Must be TruncatedResult — not confirmed-zero, because unscanned pages
 	// might contain a matching zone.
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 for truncated-cache miss", result.Count)

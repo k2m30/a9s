@@ -1043,10 +1043,10 @@ func TestRelated_Redis_Alarm_TruncatedCacheWithMatches_ReturnsApproximate(t *tes
 	}
 }
 
-// TestRelated_Redis_Alarm_TruncatedCacheNoMatches_ReturnsApproximateZero
+// TestRelated_Redis_Alarm_TruncatedCacheNoMatches_ReturnsTruncatedResult
 // verifies that checkRedisAlarm returns Count=0, Truncated=true when the
 // alarm cache is truncated but no alarm matches.
-func TestRelated_Redis_Alarm_TruncatedCacheNoMatches_ReturnsApproximateZero(t *testing.T) {
+func TestRelated_Redis_Alarm_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testing.T) {
 	noMatchAlarm := resource.Resource{
 		ID:   "unrelated-alarm",
 		Name: "unrelated-alarm",

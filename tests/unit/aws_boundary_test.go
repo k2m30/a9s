@@ -364,7 +364,7 @@ func TestChecker_DedupsDuplicateIDs(t *testing.T) {
 //
 // ddb → backup is intentionally NOT covered here — checkDdbBackup is a pure
 // cache-scan (no live API call), so its nil-client semantics fall into the
-// "nil target list → ApproximateZero" rule, not the "nil client = error = RelatedError"
+// "nil target list → TruncatedResult" rule, not the "nil client = error = RelatedError"
 // rule. See the four-category classifier in
 // .claude/skills/a9s-add-related-view/SKILL.md.
 // ---------------------------------------------------------------------------

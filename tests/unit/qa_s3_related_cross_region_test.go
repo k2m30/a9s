@@ -7,7 +7,7 @@ package unit_test
 // IllegalLocationConstraintException (400) up as a State: RelatedError result.
 // Both codes indicate the configured S3 client's region differs from the target
 // bucket's region — a legitimate environmental condition on multi-region
-// accounts, not a bug. The checkers must soft-truncate to ApproximateZero
+// accounts, not a bug. The checkers must soft-truncate to TruncatedResult
 // ("0+"), preserving the existing RelatedError (resource.ErrorRelated) contract
 // for genuine failures (e.g. AccessDenied).
 //

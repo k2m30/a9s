@@ -345,7 +345,7 @@ func TestEC2RelatedCheckers_EBS_NonEC2RawStruct(t *testing.T) {
 
 // TestResourceCacheEntry_IsTruncated_Propagates verifies that when the cache
 // has IsTruncated=true for a target type and no matching resources are found,
-// the related checker returns {Count:0, Truncated:true} (resource.ApproximateZero —
+// the related checker returns {Count:0, Truncated:true} (relatedResultTrunc —
 // the honest lower bound) rather than a definitive Count=0.
 //
 // New contract (Batch B): truncated-zero produces {Count:0, Truncated:true}.

@@ -10,20 +10,20 @@ This spec is the contract. The CTO Stage 1 triage comment on AS-489 listed both 
 
 ---
 
-## 1. Decision — Pattern A (soft-truncate to ApproximateZero)
+## 1. Decision — Pattern A (soft-truncate to TruncatedResult)
 
-For each of the four related-def checkers in `internal/aws/s3_related.go` that today make a per-bucket S3 API call and return `Count:-1, Err:err` on any non-recognised error, detect the cross-region rejection pair `(PermanentRedirect | IllegalLocationConstraintException)` and return `resource.ApproximateZero(targetType)` instead — i.e. `Count:0, Truncated:true`, which renders as `0+`.
+For each of the four related-def checkers in `internal/aws/s3_related.go` that today make a per-bucket S3 API call and return `Count:-1, Err:err` on any non-recognised error, detect the cross-region rejection pair `(PermanentRedirect | IllegalLocationConstraintException)` and return `relatedResultTrunc(targetType)` instead — i.e. `Count:0, Truncated:true`, which renders as `0+`.
 
 ### Why Pattern A (not B)
 
-- **Literal AC match.** AS-489's AC2 says "no `<unknown>` fallout caused by 301." `ApproximateZero` renders as `0+`, never `<unknown>`. A region-pinned `s3:GetBucketLocation` + per-bucket client (Pattern B) would also satisfy the AC, but at 3–5× the LOC and a brand-new operational surface (per-bucket region cache + invalidation on profile/region switch).
+- **Literal AC match.** AS-489's AC2 says "no `<unknown>` fallout caused by 301." `TruncatedResult` renders as `0+`, never `<unknown>`. A region-pinned `s3:GetBucketLocation` + per-bucket client (Pattern B) would also satisfy the AC, but at 3–5× the LOC and a brand-new operational surface (per-bucket region cache + invalidation on profile/region switch).
 - **Consistency with existing precedent.** `internal/aws/s3_issue_enrichment.go:94–107` already treats this exact error pair as "operational, not a bug." We extend the same pattern to the related-defs and extract the detection into one helper.
 - **a9s is region-scoped by design.** The product stance documented in `docs/architecture.md` is that every per-resource view is region-scoped. `ListBuckets` is the one global outlier; soft-truncating per-bucket calls when the bucket lives outside the active region is the consistent stance.
 - **Reversibility.** Pattern A is ~80 LOC and one helper. If we later decide to do region-pinning (Pattern B), Pattern A doesn't get in the way — the helper just becomes one branch among several.
 
 ### Why the rendered token must be `0+` (Truncated), not `?` (UnknownRelated)
 
-- The bucket exists and is reachable — only the per-bucket call failed for an environmental reason. We have not "failed to scan"; we have scanned and the answer is "we cannot see across regions." That semantic maps cleanly to `ApproximateZero("…")`: Count=0, Truncated=true. See `internal/resource/related.go:202–215`.
+- The bucket exists and is reachable — only the per-bucket call failed for an environmental reason. We have not "failed to scan"; we have scanned and the answer is "we cannot see across regions." That semantic maps cleanly to `TruncatedResult("…")`: Count=0, Truncated=true. See `internal/resource/related.go:202–215`.
 - `UnknownRelated()` (Count=-1, renders `?`) would re-introduce exactly the `<unknown>` token AC2 forbids.
 
 ---
@@ -40,7 +40,7 @@ For each of the four related-def checkers in `internal/aws/s3_related.go` that t
 // endpoint. AWS rejects with PermanentRedirect (301) or
 // IllegalLocationConstraintException (400) when the configured client
 // region differs from the bucket's region. These are legitimate environmental
-// conditions, not bugs — related-defs return ApproximateZero ("0+") and
+// conditions, not bugs — related-defs return TruncatedResult ("0+") and
 // the issue enricher marks TruncatedIDs ("?" row marker).
 //
 // Precedent / first user: EnrichS3PublicAccessBlock in s3_issue_enrichment.go.
@@ -86,13 +86,13 @@ Insert one branch between the happy-empty sentinel and the bare `-1` return:
 
 ```go
 if isS3CrossRegionErr(err) {
-    return resource.ApproximateZero("<t>")
+    return relatedResultTrunc("<t>")
 }
 ```
 
 Exact sites (line numbers anchor on current `phase-05-pr-05b-msg-taxonomy-AS-74` HEAD):
 
-| Function | Line | API call | TargetType arg to `ApproximateZero` |
+| Function | Line | API call | TargetType arg to `TruncatedResult` |
 |---|---|---|---|
 | `checkS3CFN` | after the `NoSuchTagSet` branch (~line 102) | `GetBucketTagging` | `"cfn"` |
 | `checkS3KMS` | after the `ServerSideEncryptionConfigurationNotFoundError` branch (~line 163) | `GetBucketEncryption` | `"kms"` |
@@ -113,7 +113,7 @@ Line 196–228 already swallows ALL errors silently (`// Best effort enrichment:
 
 - Any per-bucket `s3:GetBucketLocation` lookup, bucket→region cache, or region-pinned client construction (this is Pattern B; if we later need it, file a new issue).
 - Any change to `firstS3NotificationTargets` error handling.
-- Any change to `RelatedCheckResult` semantics or to the `ApproximateZero` / `UnknownRelated` helpers.
+- Any change to `RelatedCheckResult` semantics or to the `TruncatedResult` / `UnknownRelated` helpers.
 - Any change to the integration test `TestLiveFullIntegration_AllResourcesBaseline/s3` itself — it is the failing AC repro; Coder must make it pass, not modify it. The test file currently lives at `tests/integration/full_integration_test.go` (or `_helpers_test.go`); do not touch.
 
 ---
@@ -199,5 +199,5 @@ Final scope: **9 tests** (8 checker × error-code combos + 1 contract-preservati
 - AS-481 (Stage 6.5 verdict that surfaced the bug — closed)
 - AS-431 (prior Stage 6.5 sign-off that missed it — gap acknowledged in AS-489 filing)
 - `internal/aws/s3_issue_enrichment.go:75–158` (Pattern A precedent, first user of `isS3CrossRegionErr`)
-- `internal/resource/related.go:202–215` (`ApproximateZero` definition and rendering contract)
+- `internal/resource/related.go:202–215` (`TruncatedResult` definition and rendering contract)
 - `docs/development-process.md` §"Stage 5 — Review" and §"Stage 6 — Pre-push Validation"

@@ -196,7 +196,7 @@ func TestEC2RelatedColdCache_FirstPageOnly_CFN(t *testing.T) {
 
 // T005: verifies that when the paginated fetcher returns a truncated first page with
 // zero matches for the given EC2 instance, the checker returns {Count: 0, Truncated: true}
-// (the ApproximateZero honest-lower-bound contract from internal/resource/related.go).
+// (the TruncatedResult honest-lower-bound contract from internal/resource/related.go).
 // This ensures partial pages are not treated as conclusive negatives but ALSO preserve
 // the honest lower bound instead of dropping it as Count=-1 (unknown).
 func TestEC2RelatedColdCache_TruncatedZeroMatch_IsApproximate(t *testing.T) {
@@ -218,7 +218,7 @@ func TestEC2RelatedColdCache_TruncatedZeroMatch_IsApproximate(t *testing.T) {
 	})
 
 	// Use an instance with no matching TG — the truncated page contains zero entries,
-	// so a correct implementation must return {Count: 0, Truncated: true} (ApproximateZero).
+	// so a correct implementation must return {Count: 0, Truncated: true} (TruncatedResult).
 	instance := resource.Resource{
 		ID: "i-no-matches",
 		RawStruct: ec2types.Instance{
@@ -233,7 +233,7 @@ func TestEC2RelatedColdCache_TruncatedZeroMatch_IsApproximate(t *testing.T) {
 		t.Errorf("T005: expected TargetType=\"tg\"; got %q", got.TargetType)
 	}
 	if got.Count != 0 {
-		t.Errorf("T005: expected Count=0 (ApproximateZero lower bound) for truncated zero-match page; got Count=%d", got.Count)
+		t.Errorf("T005: expected Count=0 (TruncatedResult lower bound) for truncated zero-match page; got Count=%d", got.Count)
 	}
 	if !got.Truncated {
 		t.Errorf("T005: expected Truncated=true for truncated zero-match page; got Truncated=false")

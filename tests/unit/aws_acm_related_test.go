@@ -261,10 +261,10 @@ func TestRelated_ACM_R53_EmptyCertARNInRawStruct(t *testing.T) {
 // by exercising the full checker through a cache-backed path is not possible without
 // a live client. Instead we verify nil-client → -1 with a real CertificateArn,
 // confirming the early-exit path is hit only when ID and Name are both empty.
-// --- checkACMCF: truncated cache → ApproximateZero ---
+// --- checkACMCF: truncated cache → TruncatedResult ---
 
 // TestRelated_ACM_CF_TruncatedCacheNoMatch: when the cache is truncated and no
-// distribution matches, returns ApproximateZero (Count: 0 with IsApproximate true).
+// distribution matches, returns TruncatedResult (Count: 0 with IsApproximate true).
 func TestRelated_ACM_CF_TruncatedCacheNoMatch(t *testing.T) {
 	certARN := "arn:aws:acm:us-east-1:111122223333:certificate/abc-123"
 	source := resource.Resource{

@@ -1,6 +1,6 @@
 // tui_related_dim_parity_test.go — pins the user-visible defect where an
 // truncated-zero related row (checker resolved Count=0, Truncated=true —
-// e.g. resource.ApproximateZero() results like trail/glue/backup on an S3
+// e.g. relatedResultTrunc() results like trail/glue/backup on an S3
 // bucket) renders BRIGHT "(0)" in the live TUI detail RELATED panel while an
 // exact-zero row renders dim, even though both are dead-end pivots per
 // resource.IsRelatedActionable (any RelatedResolved zero, truncated or not,
@@ -44,7 +44,7 @@ import (
 
 // relatedDimParityTypes returns representative resource types for the sweep.
 // "s3" matches the dispatch's real-world case (trail/glue/backup checkers on
-// a bucket resolving ApproximateZero); "ec2" is a non-S3 control to prove the
+// a bucket resolving TruncatedResult); "ec2" is a non-S3 control to prove the
 // bug (and its fix) is renderer-generic, not S3-specific.
 func relatedDimParityTypes() []struct {
 	shortName string
@@ -139,12 +139,12 @@ func extractRelatedLine(t *testing.T, rendered, needle string) string {
 // Pin 1: truncated-zero renders with the SAME dim style as exact-zero.
 // ---------------------------------------------------------------------------
 
-// TestRelatedDim_ApproximateZero_BrightAndActionable pins the correct contract:
+// TestRelatedDim_TruncatedResult_BrightAndActionable pins the correct contract:
 // an truncated lower bound ("0+", from a truncated target scan where more may
 // exist on later pages) renders BRIGHT and actionable with a "(0+)" badge — the
 // user can drill in — while only a PROVEN exact zero renders dim "(0)" as a
 // dead end. The two must therefore render DIFFERENTLY.
-func TestRelatedDim_ApproximateZero_BrightAndActionable(t *testing.T) {
+func TestRelatedDim_TruncatedResult_BrightAndActionable(t *testing.T) {
 	for _, tc := range relatedDimParityTypes() {
 		tc := tc
 		t.Run(tc.shortName, func(t *testing.T) {
@@ -391,14 +391,14 @@ func relatedRowApprox(targetType string, count int, truncated bool) app.DetailRe
 	}
 }
 
-// TestRelatedCursor_MoveDown_LandsOnApproximateZeroRow verifies that moving
+// TestRelatedCursor_MoveDown_LandsOnTruncatedResultRow verifies that moving
 // down from an actionable row LANDS ON an truncated-zero row (Count=0,
-// Truncated=true — an ApproximateZero() result), because a "0+" lower bound
+// Truncated=true — an TruncatedResult() result), because a "0+" lower bound
 // is drillable (more may exist on later pages). The cursor skip predicate,
 // render brightness, and Enter/click gating all delegate to the single shared
 // resource.IsRelatedActionable, so an truncated-zero row is a valid landing
 // row exactly like any other actionable row.
-func TestRelatedCursor_MoveDown_LandsOnApproximateZeroRow(t *testing.T) {
+func TestRelatedCursor_MoveDown_LandsOnTruncatedResultRow(t *testing.T) {
 	rows := []app.DetailRelatedRow{
 		relatedRow("sg", 3),                    // index 0: actionable, cursor starts here
 		relatedRowApprox("ct-events", 0, true), // index 1: truncated-zero, actionable (0+ drillable)

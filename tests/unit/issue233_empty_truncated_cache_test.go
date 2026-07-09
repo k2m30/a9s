@@ -11,10 +11,10 @@ package unit
 //
 // Result: After one empty-but-truncated cold miss, all subsequent related checks
 // see IsTruncated=false and report a definitive Count=0 instead of the honest
-// lower bound {Count:0, Truncated:true} (resource.ApproximateZero).
+// lower bound {Count:0, Truncated:true} (relatedResultTrunc).
 //
 // New contract (Batch B): truncated-zero produces {Count:0, Truncated:true} via
-// resource.ApproximateZero. See related.go:34-38 and ValidateRelatedResult.
+// relatedResultTrunc. See related.go:34-38 and ValidateRelatedResult.
 //
 // Three-step corruption path (from the issue):
 //   1. app_related.go:67-71 correctly captures IsTruncated=true even on empty Resources
@@ -137,10 +137,10 @@ func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model, sourceResourc
 // Contract: When CachedPages carries {Resources:[], IsTruncated:true}, the write-back
 // in app.go:378-387 MUST persist IsTruncated=true so that the next checker call
 // (via buildResourceCacheSnapshot) returns {Count:0, Truncated:true}
-// (resource.ApproximateZero — the honest lower bound), not a definitive Count=0.
+// (relatedResultTrunc — the honest lower bound), not a definitive Count=0.
 //
 // New contract (Batch B): truncated-zero path → {Count:0, Truncated:true}.
-// See related.go:34-38 (Truncated semantics) and ApproximateZero (related.go:101-114).
+// See related.go:34-38 (Truncated semantics) and TruncatedResult (related.go:101-114).
 //
 // Execution path:
 //
@@ -201,7 +201,7 @@ func TestContract_EmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 //
 // Contract: When CachedPages has 1+ Resources AND IsTruncated=true, the write-back
 // correctly persists IsTruncated (app.go:383 guard passes because len > 0).
-// The TG checker must return {Count:0, Truncated:true} (resource.ApproximateZero)
+// The TG checker must return {Count:0, Truncated:true} (relatedResultTrunc)
 // when no match is found in the partial list. See related.go:34-38.
 //
 // This test PASSES with current code — the bug only affects the empty-page case.
@@ -281,9 +281,9 @@ func TestContract_EmptyCompletePage_IsTruncatedFalse(t *testing.T) {
 // TestContract_EmptyTruncatedPage_CheckerBehavior_Direct directly validates
 // the TG checker's IsTruncated handling in isolation. This test confirms that
 // the checker itself correctly returns {Count:0, Truncated:true}
-// (resource.ApproximateZero) on an empty-but-truncated entry, and a definitive
+// (relatedResultTrunc) on an empty-but-truncated entry, and a definitive
 // {Count:0, Truncated:false} on an empty-but-complete entry.
-// See related.go:34-38 and ApproximateZero (related.go:101-114).
+// See related.go:34-38 and TruncatedResult (related.go:101-114).
 //
 // When this test passes but TestContract_EmptyTruncatedPage_PreservesIsTruncated fails,
 // the bug is definitively in the write-back (app.go:383), not in the checker.

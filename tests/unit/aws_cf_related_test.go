@@ -556,7 +556,7 @@ func TestRelated_CF_R53_NilCacheWithAliases(t *testing.T) {
 }
 
 // TestRelated_CF_R53_TruncatedCacheNoMatch: truncated zone cache, alias doesn't
-// match any loaded zone → ApproximateZero.
+// match any loaded zone → TruncatedResult.
 func TestRelated_CF_R53_TruncatedCacheNoMatch(t *testing.T) {
 	zoneRes := resource.Resource{
 		ID:     "/hostedzone/ZOTHER",
@@ -702,7 +702,7 @@ func TestRelated_CF_Alarm_NilCache(t *testing.T) {
 	}
 }
 
-// TestRelated_CF_Alarm_TruncatedCacheNoMatch: truncated alarm cache, no match → ApproximateZero.
+// TestRelated_CF_Alarm_TruncatedCacheNoMatch: truncated alarm cache, no match → TruncatedResult.
 func TestRelated_CF_Alarm_TruncatedCacheNoMatch(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "other-alarm",

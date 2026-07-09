@@ -21,7 +21,7 @@ import (
 
 // TestBuildResourceCacheSnapshot_IncludesTruncation verifies that when
 // IsTruncated=true is set in a ResourceCacheEntry passed to a related checker,
-// the checker returns {Count:0, Truncated:true} (resource.ApproximateZero —
+// the checker returns {Count:0, Truncated:true} (relatedResultTrunc —
 // the honest lower bound) when 0 local matches are found, rather than a
 // definitive {Count:0, Truncated:false}.
 //

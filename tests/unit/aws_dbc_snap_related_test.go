@@ -181,12 +181,12 @@ var _ = backuptypes.RecoveryPointByResource{}
 //
 // Bug: checkDbcSnapDBC (dbc_snap_related.go:17-31) emits relatedResult("dbc", [id])
 // directly from DBClusterIdentifier with NO cache existence check. Sister
-// checkDBISnapDBI does the cache scan + ApproximateZero/UnknownRelated logic.
+// checkDBISnapDBI does the cache scan + TruncatedResult/UnknownRelated logic.
 // Result: orphan dbc-snap rows whose source cluster is deleted will claim Count=1.
 //
 // These tests FAIL today because checkDbcSnapDBC always returns Count=1 for any
 // non-empty DBClusterIdentifier, regardless of whether the cluster is in the cache.
-// After fix, it must scan the dbc cache and return Count=0 (or ApproximateZero /
+// After fix, it must scan the dbc cache and return Count=0 (or TruncatedResult /
 // UnknownRelated) when the cluster is absent.
 // ---------------------------------------------------------------------------
 

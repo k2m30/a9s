@@ -828,7 +828,7 @@ func sortStrings(s []string) {
 //
 // Pre-fix: truncatedResultDDB was NOT called when backupList was truncated AND
 // there were matches — relatedResult was used instead, yielding Truncated=false.
-// Post-fix: truncated+matches → Truncated=true; truncated+no-matches → ApproximateZero.
+// Post-fix: truncated+matches → Truncated=true; truncated+no-matches → TruncatedResult.
 // ---------------------------------------------------------------------------
 
 // TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsApproximate pins the
@@ -883,10 +883,10 @@ func TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.
 	}
 }
 
-// TestCheckDdbBackup_TruncatedCacheNoMatches_ReturnsApproximateZero pins the
-// truncated+no-matches path (ApproximateZero). The plan in the cache does NOT
+// TestCheckDdbBackup_TruncatedCacheNoMatches_ReturnsTruncatedResult pins the
+// truncated+no-matches path (TruncatedResult). The plan in the cache does NOT
 // cover the table ARN; the result must be Count==0 AND Truncated==true.
-func TestCheckDdbBackup_TruncatedCacheNoMatches_ReturnsApproximateZero(t *testing.T) {
+func TestCheckDdbBackup_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testing.T) {
 	res := resource.Resource{
 		ID:   "orders",
 		Name: "orders",
@@ -914,7 +914,7 @@ func TestCheckDdbBackup_TruncatedCacheNoMatches_ReturnsApproximateZero(t *testin
 	checker := ddbCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, res, cache)
 
-	// ApproximateZero path: Count==0 but there may be matches on later pages.
+	// TruncatedResult path: Count==0 but there may be matches on later pages.
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (no matching plan in visible portion)", result.Count)
 	}

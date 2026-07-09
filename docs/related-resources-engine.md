@@ -230,7 +230,7 @@ the engine derives the state, so checkers cannot drift.)
 `(?)` and the `Count: -1` sentinel are retired: unknown/deferred rows are blank
 (clickable), a proven zero is `(0)` (dimmed), an error is the dimmed error row.
 The per-checker `State` / `Count` / `Truncated` fields and the
-`UnknownRelated` / `DeferredRelated` / `ApproximateZero` / `ErrorRelated`
+`UnknownRelated` / `DeferredRelated` / `TruncatedResult` / `ErrorRelated`
 constructors are replaced by `RelationFacts` (§2) plus the engine's derivation —
 checkers stop choosing a state.
 

@@ -20,7 +20,7 @@ package unit
 // so it was deleted here as redundant rather than kept permanently vacuous.
 //
 // The two tests below are unrelated to the sentinel encoding — they pin
-// resource.ApproximateZero's shape and its ValidateRelatedResult validity,
+// relatedResultTrunc's shape and its ValidateRelatedResult validity,
 // both still-current, unchanged contracts — so they are kept.
 
 import (
@@ -30,43 +30,43 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Test 1: ApproximateZero helper exists and compiles
+// Test 1: TruncatedResult helper exists and compiles
 // ---------------------------------------------------------------------------
 
-// TestApproximateZeroHelperExists proves that resource.ApproximateZero is
+// TestTruncatedResultHelperExists proves that relatedResultTrunc is
 // callable with a string argument and returns a resource.RelatedCheckResult.
 // If the function is removed or renamed, this test will fail to compile.
-func TestApproximateZeroHelperExists(t *testing.T) {
+func TestTruncatedResultHelperExists(t *testing.T) {
 	result := resource.RelatedCheckResult{TargetType: "test", Truncated: true}
 
 	// Verify the shape: Truncated=true, Count=0, TargetType echoed.
 	if result.TargetType != "test" {
-		t.Errorf("ApproximateZero(\"test\").TargetType = %q; want %q", result.TargetType, "test")
+		t.Errorf("TruncatedResult(\"test\").TargetType = %q; want %q", result.TargetType, "test")
 	}
 	if result.Count != 0 {
-		t.Errorf("ApproximateZero(\"test\").Count = %d; want 0", result.Count)
+		t.Errorf("TruncatedResult(\"test\").Count = %d; want 0", result.Count)
 	}
 	if !result.Truncated {
-		t.Errorf("ApproximateZero(\"test\").Truncated = false; want true")
+		t.Errorf("TruncatedResult(\"test\").Truncated = false; want true")
 	}
 	if result.Err != nil {
-		t.Errorf("ApproximateZero(\"test\").Err = %v; want nil", result.Err)
+		t.Errorf("TruncatedResult(\"test\").Err = %v; want nil", result.Err)
 	}
 	if len(result.ResourceIDs) != 0 {
-		t.Errorf("ApproximateZero(\"test\").ResourceIDs = %v; want empty", result.ResourceIDs)
+		t.Errorf("TruncatedResult(\"test\").ResourceIDs = %v; want empty", result.ResourceIDs)
 	}
 }
 
 // ---------------------------------------------------------------------------
-// Test 2: ApproximateZero result passes ValidateRelatedResult
+// Test 2: TruncatedResult result passes ValidateRelatedResult
 // ---------------------------------------------------------------------------
 
-// TestValidateRelatedResult_ApproximateZero_IsValid asserts that the result
-// produced by ApproximateZero satisfies the ValidateRelatedResult invariants.
+// TestValidateRelatedResult_TruncatedResult_IsValid asserts that the result
+// produced by TruncatedResult satisfies the ValidateRelatedResult invariants.
 // This pins the contract: Truncated=true + Count=0 must be a valid state.
-func TestValidateRelatedResult_ApproximateZero_IsValid(t *testing.T) {
+func TestValidateRelatedResult_TruncatedResult_IsValid(t *testing.T) {
 	result := resource.RelatedCheckResult{TargetType: "vpc", Truncated: true}
 	if err := resource.ValidateRelatedResult(result); err != nil {
-		t.Errorf("ValidateRelatedResult(ApproximateZero(\"vpc\")) returned error: %v; want nil", err)
+		t.Errorf("ValidateRelatedResult(TruncatedResult(\"vpc\")) returned error: %v; want nil", err)
 	}
 }
