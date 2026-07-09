@@ -30,7 +30,7 @@ hubs from name-collision artifacts.
 | 7 | `newDetailModel()` | `tests/unit/helpers_external_test.go:69` | 318 | 9 | Test helper | Harness hub — consolidate |
 | 8 | `buildResource()` | `tests/unit/helpers_external_test.go:95` | 299 | 8 | Test helper | Harness hub — consolidate |
 | 9 | `FindResourceType()` | `internal/resource/types.go:43` | 282 | 142 | Production | Healthy — registry facade |
-| 10 | `TruncatedResult()` | `internal/resource/related.go:209` | 254 | 76 | Production | Healthy primitive |
+| 10 | `ApproximateZero()` | `internal/resource/related.go:209` | 254 | 76 | Production | Healthy primitive |
 
 **Headline:** 6 of the top 10 god nodes are **test helpers**, concentrated in just
 **two** files (`tui_root_test.go`, `helpers_external_test.go`). The 4 production
@@ -111,12 +111,12 @@ hub-and-spoke around shared primitives.
 
 **Finding (real smell):** this generic, package-wide helper lives in a file named
 `ec2_related.go` and is named `relatedResult`, even though it serves *every*
-resource type's checkers, not EC2's. Its natural sibling — `TruncatedResult` /
+resource type's checkers, not EC2's. Its natural sibling — `ApproximateZero` /
 `UnknownRelated` (#10) — lives correctly in `internal/resource/related.go`.
 
 Suggestion (**Recommendation B**): move `relatedResult` (and any other
 ec2-named-but-generic related helpers) into a neutral file such as
-`internal/aws/related_common.go`, or promote it next to `TruncatedResult` /
+`internal/aws/related_common.go`, or promote it next to `ApproximateZero` /
 `UnknownRelated` if it can be exported without a circular import. This is a
 locality/naming fix only — no behavior change — but it removes a real
 "why is the universal helper in the EC2 file?" papercut for every checker author.
@@ -155,7 +155,7 @@ registry facade should look like — a single, stable lookup point over the
 declarative catalog. No change recommended; the thin indirection is the seam that
 lets the catalog be generated/swapped without touching callers.
 
-### 10. `TruncatedResult()` — related-check sentinel (PRODUCTION, healthy)
+### 10. `ApproximateZero()` — related-check sentinel (PRODUCTION, healthy)
 
 `internal/resource/related.go:209`. A trivial constructor returning a
 `RelatedCheckResult{Count:0, Truncated:true}` ("scanned the cache, found 0, but
@@ -182,12 +182,12 @@ change recommended.
 
 2. **Production hubs are healthy.** The 4 production god nodes are all
    single-source-of-truth registries (`Default`, `FindResourceType`) or shared
-   related-check primitives (`relatedResult`, `TruncatedResult`). High degree
+   related-check primitives (`relatedResult`, `ApproximateZero`). High degree
    there is the *intended* architecture, not debt. The graph effectively
    validates the project's "single source of truth" principle.
 
 3. **The related-resources subsystem is the production center of gravity.** Two of
-   the four production god nodes (`relatedResult`, `TruncatedResult`) plus the
+   the four production god nodes (`relatedResult`, `ApproximateZero`) plus the
    biggest cross-community *bridge* in the wider graph (`GetRelated()`,
    `internal/resource/related.go`, betweenness ≈ 0.27) all belong to it, fed by
    551 `check*` functions. This is why the project already gates it behind
@@ -235,13 +235,13 @@ hub).
 
 Move `relatedResult` out of `internal/aws/ec2_related.go` into a neutral
 `internal/aws/related_common.go` (or promote it beside
-`relatedResultTrunc`/`UnknownRelated`). Pure locality/naming fix, no
+`resource.ApproximateZero`/`UnknownRelated`). Pure locality/naming fix, no
 behavior change. Removes a recurring "why is the universal helper in the EC2
 file?" papercut for the 551 checker authors.
 
 ### C. Leave the production registries alone; invest review there instead
 
-`Default`, `FindResourceType`, `relatedResult`, and `TruncatedResult` are healthy
+`Default`, `FindResourceType`, `relatedResult`, and `ApproximateZero` are healthy
 hubs. Do **not** "refactor to reduce coupling" — their centralization is the
 design. Instead, treat the related-resources subsystem (theme #3) as the place
 that earns the deepest invariant tests and the closest review of new pivots, per
@@ -257,7 +257,7 @@ Recommendation C is "leave alone," so it has no tasks.
 | **B** — relocate generic related helpers | B | Moved `relatedResult` + `assertStruct` from `internal/aws/ec2_related.go` into new `internal/aws/related_common.go` (same `package aws`, zero call-site change). EC2-specific helpers and `tagValue` left in place. | `a9s-coder` | ✅ done |
 | **A1** — shared `tuitest` kit | A | Created `tests/unit/tuitest/tuitest.go` exporting `Step`, `StepModel`, `Render`, `Sized`, `StripANSI`, `Width`, `NoColor` — the canonical logic, once. | `a9s-qa` | ✅ done |
 | **A2** — forward the duplicates | A | `rootApplyMsg`/`applyMsg`, `rootViewContent`, `newRootSizedModel`, `stripANSI`/`stripAnsi`, `lipglossWidth`, `ensureNoColor`/`setupNoColor` are now thin forwarders over `tuitest`; the cross-package `ansiRegex` dup is gone. Names unchanged → ~150 call sites untouched. | `a9s-qa` | ✅ done |
-| **C** — production registries | C | `Default`, `FindResourceType`, `relatedResult`, `TruncatedResult` are healthy hubs by design. No change. | — | n/a (no-op) |
+| **C** — production registries | C | `Default`, `FindResourceType`, `relatedResult`, `ApproximateZero` are healthy hubs by design. No change. | — | n/a (no-op) |
 
 Verified on the integrated change: `make build`, `make test` (all packages incl. `tests/integration`), and `make lint` (0 issues) all green.
 
