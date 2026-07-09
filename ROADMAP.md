@@ -6,7 +6,7 @@ This document outlines the planned direction for a9s. Priorities may shift based
 
 - **66 AWS resource types** across 12 categories
 - **Search and filter** -- `/` to filter resource lists; `/` to search within YAML, detail, and JSON views with `n`/`N` for next/prev match
-- **Column sorting** -- `N`/`I`/`A` to sort by name, ID, or date; `1`-`0` keys to sort by any column position
+- **Column sorting** -- `1`-`0` keys to sort by any column position
 - **Customizable columns** -- `~/.a9s/views/` overrides which fields are displayed per resource type
 - **Multi-account** -- works out of the box via assume-role in `~/.aws/config`
 - **Demo mode** -- `--demo` flag runs the full UI with synthetic data, no AWS needed
@@ -24,7 +24,7 @@ This document outlines the planned direction for a9s. Priorities may shift based
 - **Help view** -- `?` for context-sensitive keybinding reference
 - **Horizontal scrolling** -- `h`/`l` to scroll wide tables
 - **Pagination** -- `M` to load more for large result sets (demo mode showcases this)
-- **8,700+ unit tests**
+- **22,900+ unit tests**
 
 ## Short-Term
 

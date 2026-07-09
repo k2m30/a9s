@@ -6,7 +6,8 @@
 - `internal/` holds production code:
   - `internal/aws/` read-only AWS fetchers and service clients.
   - `internal/tui/` Bubble Tea UI (views, layout, keys, styles, messages).
-  - `internal/resource/` resource registry/types and pagination metadata.
+  - `internal/catalog/` + per-category `internal/aws/catalog_*.go` the resource registry (`ResourceTypeDef` literals).
+  - `internal/resource/` backward-compat alias layer over `internal/catalog` (types + pagination metadata).
   - `internal/config/` default and user view configuration loading.
   - `internal/demo/` synthetic fixtures used by `--demo` mode.
 - `tests/unit/` is the primary regression suite; `tests/integration/` covers integration-tagged flows.
@@ -16,7 +17,7 @@
 
 - `make build` builds `./a9s` with version metadata.
 - `make run` builds then starts the binary locally.
-- `make test` runs race-enabled unit tests (`./tests/unit/`).
+- `make test` runs the unit suite (`go test ./... -count=1`, no race); `make test-race` adds `-race`.
 - `make integration` runs integration tests (`-tags integration`).
 - `make lint` runs `golangci-lint` with repo config.
 - `make security` runs `govulncheck ./...`.

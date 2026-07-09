@@ -96,7 +96,7 @@ This is the most common contribution. Just tell Claude Code:
 
 It will use the `a9s-add-resource` skill which covers:
 1. Fetcher in `internal/aws/`
-2. Type definition in `internal/resource/types.go`
+2. Type definition — a `catalog.ResourceTypeDef` literal in `internal/aws/catalog_<category>.go`
 3. Default view config in `internal/config/defaults.go`
 4. Demo fixtures in `internal/demo/`
 5. Unit tests for fetcher, view rendering, and demo fixtures
@@ -107,12 +107,18 @@ It will use the `a9s-add-resource` skill which covers:
 ```
 cmd/a9s/            main binary
 cmd/refgen/         views_reference.yaml generator
-internal/aws/       AWS service clients and resource fetchers (read-only)
+internal/aws/       AWS service clients, resource fetchers (read-only), catalog_*.go registry literals
+internal/app/       headless controller (ViewState, actions) shared by TUI and web
+internal/catalog/   the resource registry (ResourceTypeDef and friends)
 internal/config/    YAML config loading
 internal/demo/      synthetic fixture data for --demo mode
+internal/domain/    core value types (Finding, Resource, Gen, …)
 internal/fieldpath/ struct field extraction via reflection
-internal/resource/  generic resource model and registry
+internal/resource/  backward-compat alias layer over internal/catalog
+internal/runtime/   platform-agnostic app core (runtime.Core, message handlers)
+internal/session/   session-scoped state (RowStore, caches, generation counters)
 internal/tui/       Bubble Tea views, keys, layout, styles, messages
+internal/web/       web-UI adapter
 tests/unit/         unit tests
 tests/integration/  integration tests
 ```

@@ -71,7 +71,7 @@ The codebase has a clean separation of concerns. The 020-architecture-refactor h
 - **`internal/tui`** — UI shell and adapter: view stack, global key handling, message routing, sizing, and transient UI state. Holds a `*runtime.Core` and reaches session-scoped state through typed `m.core.*` accessors. As the renderer adapter it legitimately imports `internal/session` and `internal/aws` (to supply clients and translate runtime `TaskRequest`s into `tea.Cmd`s); the shared core never imports back into `internal/tui`.
 - **`internal/runtime`** — platform-agnostic app core: `runtime.Core` owns the active `*session.Session` and the catalog snapshot, dispatches inbound `messages.Event`s to handlers, and returns `UIIntent` / `TaskRequest` lists for adapters to apply. It compiles with zero Bubble Tea / Lipgloss dependencies (verified transitively via `go list -deps`). The cmd/event message taxonomy and screen-builder registry have landed; `HandleEvent` takes the typed `messages.Event` interface.
 - **`internal/session`** — session-scoped state container (Phase 02 deliverable, **done**): `session.Session` owns per-profile/region orchestration state — the `RowStore` (the single session-scoped per-type row store; see Caching Layers), `RelatedCache`, the enrichment queues and per-type maps, every generation counter (all typed `domain.Gen` after Phase 05a-gens), and the capability stores (`PolicyStore`, `IdentityStore`, `RuleSetStore`) that replaced the deleted `internal/aws/` package globals (`allPoliciesMu`, `identityCacheMu`, `sesRuleSetCacheMu`). `Session.Rotate()` is the single point that invalidates all of it on profile/region switch.
-- **`internal/resource`** — declarative registry: resource types, child-view metadata, related defs, navigable fields, and fetcher/enricher registration.
+- **`internal/resource`** — backward-compat alias layer (type aliases + thin wrapper funcs) over `internal/catalog`. The canonical declarative registry is `internal/catalog` (`ResourceTypeDef` and friends), populated by the per-category `internal/aws/catalog_*.go` literals: resource types, child-view metadata, related defs, navigable fields, and fetcher/enricher registration.
 - **`internal/aws`** — primarily the adapter layer: call AWS SDK APIs, transform responses into `resource.Resource`, and host a few non-UI helper subsystems that have not yet been split out. This layer should not know about Bubble Tea views.
 - **`internal/cache`** — persistence only: on-disk availability cache and TTL rules.
 - **`internal/demo`** — injected fake transport for development and tests, not a parallel feature architecture.
@@ -252,7 +252,7 @@ internal/
     views/       #   all view models (see View Types below)
 
 tests/
-  unit/          # all unit tests (run via `make test` with -race)
+  unit/          # all unit tests (run via `make test`; `make test-race` adds -race)
   integration/   # gated by //go:build integration
   testdata/      # hand-crafted JSON fixtures — AWS SDK response bodies for fetcher unit tests (no live AWS)
 ```
@@ -320,24 +320,24 @@ Resource types are installed once at startup via `aws.Install()` + `catalog.SetT
 
 | File | Category |
 |------|----------|
-| `types_compute.go` | Compute (EC2, Lambda, EKS Clusters, ASG, Elastic Beanstalk, EBS) |
-| `types_containers.go` | Containers (EKS Node Groups, ECS Clusters, ECS Services) |
-| `types_networking.go` | Networking (VPC, Subnet, SG, ELB, TG, IGW, NAT, Route Tables, ACM, API Gateway, WAF) |
-| `types_databases.go` | Databases & Storage (RDS, S3, Redis, OpenSearch, DynamoDB, Redshift, MSK, EFS, Kinesis) |
-| `types_security.go` | Security & IAM (IAM Roles, Users, Policies, Groups, KMS) |
-| `types_secrets.go` | Secrets & Config (Secrets Manager, SSM Parameter Store) |
-| `types_monitoring.go` | Monitoring (CloudWatch Alarms, Log Groups, CloudTrail) |
-| `types_messaging.go` | Messaging (SNS, SQS, EventBridge Rules, Step Functions) |
-| `types_cicd.go` | CI/CD (CloudFormation, CodePipeline, CodeBuild, ECR) |
-| `types_dns_cdn.go` | DNS & CDN (Route 53, CloudFront) |
-| `types_data.go` | Data & Analytics (Athena, Glue) |
-| `types_backup.go` | Backup (AWS Backup, SES) |
+| `catalog_compute.go` | Compute (EC2, Lambda, EKS Clusters, ASG, Elastic Beanstalk, EBS) |
+| `catalog_containers.go` | Containers (EKS Node Groups, ECS Clusters, ECS Services) |
+| `catalog_networking.go` | Networking (VPC, Subnet, SG, ELB, TG, IGW, NAT, Route Tables, ACM, API Gateway, WAF) |
+| `catalog_databases.go` | Databases & Storage (RDS, S3, Redis, OpenSearch, DynamoDB, Redshift, MSK, EFS, Kinesis) |
+| `catalog_security.go` | Security & IAM (IAM Roles, Users, Policies, Groups, KMS) |
+| `catalog_secrets.go` | Secrets & Config (Secrets Manager, SSM Parameter Store) |
+| `catalog_monitoring.go` | Monitoring (CloudWatch Alarms, Log Groups, CloudTrail) |
+| `catalog_messaging.go` | Messaging (SNS, SQS, EventBridge Rules, Step Functions) |
+| `catalog_cicd.go` | CI/CD (CloudFormation, CodePipeline, CodeBuild, ECR) |
+| `catalog_dns_cdn.go` | DNS & CDN (Route 53, CloudFront) |
+| `catalog_data.go` | Data & Analytics (Athena, Glue) |
+| `catalog_backup.go` | Backup (AWS Backup, SES) |
 
 ---
 
 ## Fetcher Patterns
 
-All registered in `internal/resource/registry.go`, implemented in `internal/aws/*.go`:
+All registered via `catalog.ResourceTypeDef` literals in `internal/aws/catalog_*.go`, implemented in `internal/aws/*.go`:
 
 | Pattern | Signature | Use Case |
 |---------|-----------|----------|
@@ -837,7 +837,7 @@ Tests verify **behavior**, not implementation. A test should assert on what the 
 
 ### Directory Layout
 
-- `tests/unit/` — all unit tests. Run via `make test` (with `-race`).
+- `tests/unit/` — all unit tests. Run via `make test`; `make test-race` adds `-race`.
 - `tests/integration/` — gated by `//go:build integration`. Run manually with specific flags.
 
 ### Test Categories
