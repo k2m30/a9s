@@ -919,6 +919,70 @@ func TestRelated_CtEvents_Role_AssumedRoleARNResolvesRoleNotSession(t *testing.T
 	}
 }
 
+func TestRelated_CtEvents_Role_ProvenEmptyCacheIsZeroNotIdentity(t *testing.T) {
+	// Cache HIT with a proven-empty (nil) role list — NOT a cold miss. The
+	// checker must trust it (0), not synthesize an event-derived (1).
+	cache := resource.ResourceCache{
+		"role": resource.ResourceCacheEntry{Resources: nil},
+	}
+	res := resource.Resource{
+		ID:     "evt-proven-empty-role",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::IAM::Role"), ResourceName: aws.String("arn:aws:iam::123:role/my-role")},
+			},
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "role")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (cache proved the role list empty; must not fake an event-derived (1))", result.Count)
+	}
+}
+
+func TestRelated_CtEvents_RDS_ClusterEventDoesNotFakeDBInstance(t *testing.T) {
+	cache := resource.ResourceCache{} // cold cache → event-derived branch
+	res := resource.Resource{
+		ID:     "evt-rds-cluster",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::RDS::DBCluster"), ResourceName: aws.String("my-cluster")},
+			},
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "dbi")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (a DBCluster id is not a DB-instance; must not fake an RDS Instance relation)", result.Count)
+	}
+}
+
+func TestRelated_CtEvents_RDS_DBInstanceEventResolves(t *testing.T) {
+	cache := resource.ResourceCache{}
+	res := resource.Resource{
+		ID:     "evt-rds-instance",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::RDS::DBInstance"), ResourceName: aws.String("my-instance")},
+			},
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "dbi")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 || len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-instance" {
+		t.Errorf("Count=%d ResourceIDs=%v, want 1 [my-instance] (a real DB instance is a dbi relation)", result.Count, result.ResourceIDs)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // §7b.10 completeness: all 13 typed RelatedDef entries must be registered
 // ---------------------------------------------------------------------------

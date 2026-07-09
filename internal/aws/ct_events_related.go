@@ -123,7 +123,15 @@ func ctEventsExtractRoleName(res resource.Resource) string {
 // ListRoles/DescribeInstances/… just to match ids the event already carries.
 func ctEventsRelatedResources(_ context.Context, _ any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	if entry, ok := cache[target]; ok {
-		return entry.Resources, entry.IsTruncated, nil
+		// A cache hit is authoritative — even a proven-EMPTY one. Normalize a nil
+		// Resources slice to non-nil so the checkers' `resourceList == nil`
+		// (cold-miss) branch doesn't misread a proven-zero target as absent and
+		// synthesize a fake event-derived row.
+		resources := entry.Resources
+		if resources == nil {
+			resources = []resource.Resource{}
+		}
+		return resources, entry.IsTruncated, nil
 	}
 	return nil, false, nil
 }
@@ -376,9 +384,12 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 	}
 
 	var ids []string
-	// Resources slice: match any AWS::RDS::DB* type
+	// Resources slice: DB INSTANCES only. AWS::RDS::DBCluster / DBSnapshot /
+	// DBClusterSnapshot identifiers are NOT dbi ids — emitting them here would
+	// fake an RDS Instance relation that can never resolve (clusters are a
+	// separate pivot).
 	for _, r := range event.Resources {
-		if r.ResourceType == nil || !strings.HasPrefix(*r.ResourceType, "AWS::RDS::DB") {
+		if r.ResourceType == nil || *r.ResourceType != "AWS::RDS::DBInstance" {
 			continue
 		}
 		if r.ResourceName == nil || *r.ResourceName == "" {
@@ -396,9 +407,6 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 		if parsed != nil {
 			req, _ := parsed["requestParameters"].(map[string]any)
 			if id := ctJSONString(req, "dBInstanceIdentifier"); id != "" {
-				ids = append(ids, id)
-			}
-			if id := ctJSONString(req, "dBClusterIdentifier"); id != "" {
 				ids = append(ids, id)
 			}
 		}
