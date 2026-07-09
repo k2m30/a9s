@@ -1,0 +1,30 @@
+#!/bin/sh
+# pre-push: the last gate before GitHub. A push to a public repo exposes its
+# content immediately, so real-data prevention happens HERE, not in CI (which
+# only runs after the ref is already public). Scans the added lines of every
+# commit range being pushed and aborts the push on a hit.
+#
+# Enable with: make install-hooks  (sets core.hooksPath to .githooks)
+z=0000000000000000000000000000000000000000
+root=$(git rev-parse --show-toplevel)
+status=0
+
+while read -r _local_ref local_oid _remote_ref remote_oid; do
+	[ "$local_oid" = "$z" ] && continue   # branch deletion — nothing to scan
+	if [ "$remote_oid" = "$z" ]; then
+		# New remote branch: scan every commit it adds over main (or all of it).
+		base=$(git merge-base origin/main "$local_oid" 2>/dev/null || true)
+		if [ -n "$base" ]; then range="$base..$local_oid"; else range="$local_oid"; fi
+	else
+		range="$remote_oid..$local_oid"
+	fi
+	# Scan EACH pushed commit's patch (git log -p), not the net tree diff, so a
+	# transient add-then-remove within the range is still caught.
+	if ! git log -p -U0 --no-color "$range" 2>/dev/null \
+		| "$root/scripts/check-no-real-data.sh" --diff; then
+		status=1
+	fi
+done
+
+[ "$status" -ne 0 ] && echo "pre-push: refusing to push real environment identifiers to the remote." >&2
+exit $status

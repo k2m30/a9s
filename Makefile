@@ -1,4 +1,4 @@
-.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security coverage verify-readonly verify-zero-init demo readme check-readme mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live ready-to-push ready-to-release generate
+.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security coverage verify-readonly verify-zero-init demo readme check-readme mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live check-no-real-data install-hooks ready-to-push ready-to-release generate
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -188,9 +188,22 @@ smoke-related:
 smoke-related-live:
 	PROFILE="$(PROFILE)" REGION="$(REGION)" ./scripts/smoke-related-readonly.sh
 
+# check-no-real-data blocks real AWS/environment identifiers (account IDs in
+# ARNs, previously-leaked profile/secret names) from entering tracked files.
+# Part of ready-to-push and CI; also runs as a pre-commit hook (make install-hooks).
+check-no-real-data:
+	./scripts/check-no-real-data.sh
+
+# install-hooks points core.hooksPath at .githooks so the real-data scan runs
+# on every commit. Run once per clone.
+install-hooks:
+	git config core.hooksPath .githooks
+	@grep -qxF '.githooks/sensitive_patterns.txt' .git/info/exclude 2>/dev/null || printf '%s\n' '.githooks/sensitive_patterns.txt' >> .git/info/exclude
+	@echo "installed .githooks (hooks active; sensitive_patterns.txt ignored via .git/info/exclude, not tracked .gitignore)"
+
 # Stage 6 — Pre-push gate. The single command every PR must pass before push.
 # See docs/development-process.md.
-ready-to-push: test-race lint security gofix verify-readonly verify-zero-init check-readme snapshot mdlint smoke smoke-related
+ready-to-push: check-no-real-data test-race lint security gofix verify-readonly verify-zero-init check-readme snapshot mdlint smoke smoke-related
 	@echo "PASS: ready-to-push gate green"
 
 # Stage 7 — Pre-release gate. Run before tagging a release. Subsumes ready-to-push
