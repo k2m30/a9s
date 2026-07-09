@@ -70,7 +70,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Wave2:     IssueEnricher{Fn: EnrichGlueJobStatus, Priority: 10},
 		FieldKeys: []string{"job_name", "glue_version", "worker_type", "num_workers", "last_modified"},
 		Related: []domain.RelatedDef{
-			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkGlueRole, NeedsTargetCache: true},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkGlueRole},
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkGlueAlarms, NeedsTargetCache: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkGlueLogs, NeedsTargetCache: true},
 			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkGlueCFN},

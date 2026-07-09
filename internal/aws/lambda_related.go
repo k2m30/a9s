@@ -16,7 +16,7 @@ import (
 // checkLambdaRole extracts the Role ARN from the Lambda FunctionConfiguration RawStruct.
 // It extracts the role name from the last path segment of the ARN (after the last "/")
 // and searches the role cache by name.
-func checkLambdaRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkLambdaRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
@@ -24,27 +24,10 @@ func checkLambdaRole(ctx context.Context, clients any, res resource.Resource, ca
 	if fn.Role == nil || *fn.Role == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
-	roleARN := *fn.Role
-	roleName := roleARN
-	if idx := strings.LastIndex(roleARN, "/"); idx >= 0 && idx < len(roleARN)-1 {
-		roleName = roleARN[idx+1:]
-	}
-
-	roleList, _, err := lambdaRelatedResources(ctx, clients, cache, "role")
-	if err != nil {
-		return resource.ErrorRelated("role", err)
-	}
-	if roleList == nil {
-		return resource.UnknownRelated("role")
-	}
-
-	var ids []string
-	for _, roleRes := range roleList {
-		if roleRes.Name == roleName || roleRes.Fields["role_name"] == roleName {
-			ids = append(ids, roleRes.ID)
-		}
-	}
-	return relatedResult("role", ids)
+	// In-body: the execution Role ARN normalizes to the role name, which IS the
+	// role's Resource.ID (roles keyed by name; role FetchByIDs drives the drill).
+	// Resolve by identity — no role-list fetch.
+	return relatedResult("role", []string{roleNameFromARN(*fn.Role)})
 }
 
 // checkLambdaAlarms searches the alarm cache for alarms with a "FunctionName" dimension

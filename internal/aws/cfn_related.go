@@ -3,7 +3,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
@@ -24,27 +23,9 @@ func checkCfnRole(ctx context.Context, clients any, res resource.Resource, cache
 	if stack.RoleARN == nil || *stack.RoleARN == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
-	roleARN := *stack.RoleARN
-	roleName := roleARN
-	if idx := strings.LastIndex(roleARN, "/"); idx >= 0 && idx < len(roleARN)-1 {
-		roleName = roleARN[idx+1:]
-	}
-
-	roleList, _, err := cfnRelatedResources(ctx, clients, cache, "role")
-	if err != nil {
-		return resource.ErrorRelated("role", err)
-	}
-	if roleList == nil {
-		return resource.UnknownRelated("role")
-	}
-
-	var ids []string
-	for _, roleRes := range roleList {
-		if roleRes.Name == roleName || roleRes.ID == roleName {
-			ids = append(ids, roleRes.ID)
-		}
-	}
-	return relatedResult("role", ids)
+	// In-body: the stack's service RoleARN normalizes to the role name (== the
+	// role's Resource.ID). Resolve by identity — no role-list fetch.
+	return relatedResult("role", []string{roleNameFromARN(*stack.RoleARN)})
 }
 
 // checkCFNCFN finds related CloudFormation stacks — parent and child (nested) stacks.

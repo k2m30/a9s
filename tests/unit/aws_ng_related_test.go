@@ -211,8 +211,8 @@ func TestRelated_NG_Role_NotFound(t *testing.T) {
 	checker := ngCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: role reference resolves by identity)", result.Count)
 	}
 }
 
@@ -233,7 +233,7 @@ func TestRelated_NG_Role_CacheMissNoClients(t *testing.T) {
 	checker := ngCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
-	if result.State != domain.RelatedUnknown {
+	if result.Count != 1 {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count)
 	}
 }

@@ -74,7 +74,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Wave2:     IssueEnricher{Fn: EnrichCFNCombined, Priority: 100},
 		FieldKeys: []string{"stack_name", "status", "creation_time", "last_updated", "description"},
 		Related: []domain.RelatedDef{
-			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCfnRole, NeedsTargetCache: true},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCfnRole},
 			{TargetType: "cfn", DisplayName: "Related Stacks", Checker: checkCFNCFN, NeedsTargetCache: true},
 			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkCfnSNS},
 			{TargetType: "s3", DisplayName: "S3 (stack resources)", Checker: checkCfnS3},
@@ -176,7 +176,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		IssueEnricherFieldKeys: []string{"last_build"},
 		Related: []domain.RelatedDef{
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkCbLogs, NeedsTargetCache: true},
-			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCbRole, NeedsTargetCache: true},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCbRole},
 			{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkCbPipeline, NeedsTargetCache: true},
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkCbSG},
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkCbSubnet, NeedsTargetCache: false},

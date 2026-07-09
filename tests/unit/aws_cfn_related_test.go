@@ -117,8 +117,8 @@ func TestRelated_CFN_Role_NoMatch(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (event-derived: role reference resolves by identity)", result.Count)
 	}
 }
 
@@ -162,7 +162,7 @@ func TestRelated_CFN_Role_NilCache(t *testing.T) {
 	checker := cfnCheckerByTarget(t, "role")
 	result := checker(context.Background(), nil, res, cache)
 
-	if result.State != domain.RelatedUnknown {
+	if result.Count != 1 {
 		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
 	}
 }

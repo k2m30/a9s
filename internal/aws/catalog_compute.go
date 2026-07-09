@@ -645,7 +645,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			"package_type", "event_source_arn", "dlq_target_arn", "arn",
 		},
 		Related: []domain.RelatedDef{
-			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkLambdaRole, NeedsTargetCache: true},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkLambdaRole},
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLambdaAlarms, NeedsTargetCache: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkLambdaLogs, NeedsTargetCache: true},
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkLambdaSG},

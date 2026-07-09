@@ -72,7 +72,7 @@ var sharedGlueFixtures = sync.OnceValue(func() *GlueFixtures {
 			},
 			{
 				Name:            aws.String("acme-data-catalog-crawler"),
-				Role:            aws.String("acme-glue-crawler-role"),
+				Role:            aws.String("acme-glue-role"),
 				GlueVersion:     aws.String("3.0"),
 				WorkerType:      gluetypes.WorkerTypeStandard,
 				NumberOfWorkers: aws.Int32(5),

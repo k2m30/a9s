@@ -23,27 +23,9 @@ func checkCbRole(ctx context.Context, clients any, res resource.Resource, cache 
 	if project.ServiceRole == nil || *project.ServiceRole == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
-	roleARN := *project.ServiceRole
-	roleName := roleARN
-	if idx := strings.LastIndex(roleARN, "/"); idx >= 0 && idx < len(roleARN)-1 {
-		roleName = roleARN[idx+1:]
-	}
-
-	roleList, _, err := cbRelatedResources(ctx, clients, cache, "role")
-	if err != nil {
-		return resource.ErrorRelated("role", err)
-	}
-	if roleList == nil {
-		return resource.UnknownRelated("role")
-	}
-
-	var ids []string
-	for _, roleRes := range roleList {
-		if roleRes.Name == roleName || roleRes.ID == roleName {
-			ids = append(ids, roleRes.ID)
-		}
-	}
-	return relatedResult("role", ids)
+	// In-body: the project's ServiceRole ARN normalizes to the role name (== the
+	// role's Resource.ID). Resolve by identity — no role-list fetch.
+	return relatedResult("role", []string{roleNameFromARN(*project.ServiceRole)})
 }
 
 // checkCbLogs searches the logs cache for the CloudWatch log group associated

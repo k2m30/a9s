@@ -26,27 +26,9 @@ func checkGlueRole(ctx context.Context, clients any, res resource.Resource, cach
 	if job.Role == nil || *job.Role == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
-	roleVal := *job.Role
-	roleName := roleVal
-	if idx := strings.LastIndex(roleVal, "/"); idx >= 0 && idx < len(roleVal)-1 {
-		roleName = roleVal[idx+1:]
-	}
-
-	roleList, _, err := glueRelatedResources(ctx, clients, cache, "role")
-	if err != nil {
-		return resource.ErrorRelated("role", err)
-	}
-	if roleList == nil {
-		return resource.UnknownRelated("role")
-	}
-
-	var ids []string
-	for _, roleRes := range roleList {
-		if roleRes.Name == roleName || roleRes.Fields["role_name"] == roleName {
-			ids = append(ids, roleRes.ID)
-		}
-	}
-	return relatedResult("role", ids)
+	// In-body: the job's Role ARN normalizes to the role name (== the role's
+	// Resource.ID). Resolve by identity — no role-list fetch.
+	return relatedResult("role", []string{roleNameFromARN(*job.Role)})
 }
 
 // checkGlueAlarms searches the alarm cache for alarms with a "JobName" dimension
