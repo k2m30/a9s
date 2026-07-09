@@ -80,47 +80,7 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 
 	var resources []resource.Resource
 	for _, policy := range output.Policies {
-		policyName := ""
-		if policy.PolicyName != nil {
-			policyName = *policy.PolicyName
-		}
-
-		attachmentCount := "0"
-		if policy.AttachmentCount != nil {
-			attachmentCount = fmt.Sprintf("%d", *policy.AttachmentCount)
-		}
-
-		path := ""
-		if policy.Path != nil {
-			path = *policy.Path
-		}
-
-		createDate := ""
-		if policy.CreateDate != nil {
-			createDate = policy.CreateDate.Format("2006-01-02 15:04")
-		}
-
-		isAttachable := "false"
-		if policy.IsAttachable {
-			isAttachable = "true"
-		}
-
-		r := resource.Resource{
-			ID:   policyName,
-			Name: policyName,
-			Fields: map[string]string{
-				"policy_name":      policyName,
-				"policy_type":      "managed",
-				"attachment_count": attachmentCount,
-				"is_attachable":    isAttachable,
-				"path":             path,
-				"create_date":      createDate,
-			},
-			Findings:  orphanUnattachedPolicyFinding(attachmentCount, policy.IsAttachable),
-			RawStruct: policy,
-		}
-
-		resources = append(resources, r)
+		resources = append(resources, managedPolicyToResource(policy))
 	}
 
 	// Build pagination metadata — IAM uses IsTruncated bool + Marker *string
@@ -146,6 +106,81 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 	}, nil
 }
 
+// managedPolicyToResource builds the canonical policy Resource (ID == policy
+// name, same Fields keys as the paginated fetcher) from an IAM Policy — used by
+// both the ListPolicies page fetch and the per-name GetPolicy lazy-add so the
+// two paths can never drift in shape.
+func managedPolicyToResource(policy iamtypes.Policy) resource.Resource {
+	policyName := ""
+	if policy.PolicyName != nil {
+		policyName = *policy.PolicyName
+	}
+	attachmentCount := "0"
+	if policy.AttachmentCount != nil {
+		attachmentCount = fmt.Sprintf("%d", *policy.AttachmentCount)
+	}
+	path := ""
+	if policy.Path != nil {
+		path = *policy.Path
+	}
+	createDate := ""
+	if policy.CreateDate != nil {
+		createDate = policy.CreateDate.Format("2006-01-02 15:04")
+	}
+	isAttachable := "false"
+	if policy.IsAttachable {
+		isAttachable = "true"
+	}
+	return resource.Resource{
+		ID:   policyName,
+		Name: policyName,
+		Fields: map[string]string{
+			"policy_name":      policyName,
+			"policy_type":      "managed",
+			"attachment_count": attachmentCount,
+			"is_attachable":    isAttachable,
+			"path":             path,
+			"create_date":      createDate,
+		},
+		Findings:  orphanUnattachedPolicyFinding(attachmentCount, policy.IsAttachable),
+		RawStruct: policy,
+	}
+}
+
+// awsManagedPolicyPathPrefixes are the ARN path prefixes AWS-managed policies
+// live under. Most are root ("/"); job-function and service-role policies carry
+// a path that the bare policy name does not reveal, so getAWSManagedPolicyByName
+// tries each in turn — a handful of GetPolicy calls, still bounded and vastly
+// cheaper than listing the whole ~1000+ AWS-managed catalog.
+var awsManagedPolicyPathPrefixes = []string{
+	"arn:aws:iam::aws:policy/",
+	"arn:aws:iam::aws:policy/service-role/",
+	"arn:aws:iam::aws:policy/job-function/",
+}
+
+// getAWSManagedPolicyByName resolves ONE AWS-managed policy by name via GetPolicy
+// on the well-known ARN(s) arn:aws:iam::aws:policy[/<path>]/<name>. This is how
+// the lazy-add resolves the handful of AWS-managed policy names a checker emitted,
+// WITHOUT listing the whole ~1000+ AWS-managed catalog.
+func getAWSManagedPolicyByName(ctx context.Context, api IAMGetPolicyAPI, name string) (resource.Resource, error) {
+	var lastErr error
+	for _, prefix := range awsManagedPolicyPathPrefixes {
+		arn := prefix + name
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.GetPolicyOutput, error) {
+			return api.GetPolicy(ctx, &iam.GetPolicyInput{PolicyArn: aws.String(arn)})
+		})
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if out != nil && out.Policy != nil {
+			return managedPolicyToResource(*out.Policy), nil
+		}
+		lastErr = fmt.Errorf("GetPolicy(%s): no policy returned", arn)
+	}
+	return resource.Resource{}, fmt.Errorf("AWS-managed policy %q not resolvable by name: %w", name, lastErr)
+}
+
 // FetchIAMPoliciesByIDsFull is the production entry point called by the
 // related-panel lazy-add path. It resolves policy PolicyNames across BOTH
 // managed (customer + AWS) and inline group policies, so a checker that
@@ -153,9 +188,11 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 // inline group policy name (group/policy pair surfaced by
 // ListGroupPolicies) drills into a real entry.
 //
-// Managed resolution: ListPolicies(Scope=All) paginated on first call,
-// memoized via store.MarkManagedBuilt(). Inline resolution: ListGroups +
-// ListGroupPolicies, memoized via store.MarkInlineBuilt().
+// Managed resolution: customer-managed via ListPolicies(Scope=Local) once
+// (memoized via store.MarkManagedBuilt()); AWS-managed names resolved on demand
+// via one GetPolicy per requested name — NEVER ListPolicies(Scope=All), whose
+// ~1000+ AWS-managed catalog times out even on empty accounts. Inline
+// resolution: ListGroups + ListGroupPolicies, memoized via MarkInlineBuilt().
 //
 // Invariant: the returned Resource shape matches FetchIAMPoliciesPage and
 // fetchInlineGroupPolicies (same Fields keys) so reverse-scan checkers
@@ -164,7 +201,7 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 //
 // Concurrency trade-off (acknowledged): no top-level lock is held across the
 // check-build-mark sequence. Two concurrent lazy-add calls can both observe
-// `store.ManagedBuilt() == false` and both invoke buildAllManagedPolicies.
+// `store.ManagedBuilt() == false` and both invoke buildLocalPolicies.
 // The store itself remains correct (writes are mutex-guarded inside the
 // PolicyStore impl), so duplicate Set calls are idempotent — but two AWS
 // ListPolicies pagination walks may run in parallel before one wins the
@@ -184,7 +221,7 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 	}
 
 	if !store.ManagedBuilt() {
-		if err := buildAllManagedPolicies(ctx, api, store); err != nil {
+		if err := buildLocalPolicies(ctx, api, store); err != nil {
 			// Managed is the trunk — without it we can't resolve any policy.
 			return nil, err
 		}
@@ -241,8 +278,16 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 		seen[id] = struct{}{}
 		if r, hit := store.Lookup(id); hit {
 			resources = append(resources, r)
+			continue
+		}
+		// Not customer-managed or inline — resolve as an AWS-managed policy by
+		// name via a single GetPolicy (arn:aws:iam::aws:policy/<name>), rather
+		// than having listed the whole AWS-managed catalog. Cache the hit.
+		if r, err := getAWSManagedPolicyByName(ctx, api, id); err == nil {
+			store.Set(id, r)
+			resources = append(resources, r)
 		} else {
-			failures = append(failures, fmt.Sprintf("%s: not found", id))
+			failures = append(failures, fmt.Sprintf("%s: %v", id, err))
 		}
 	}
 	return resources, AggregateFailures("policy FetchByIDs", failures, len(ids))
@@ -261,7 +306,7 @@ func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []st
 	}
 
 	if !store.ManagedBuilt() {
-		if err := buildAllManagedPolicies(ctx, api, store); err != nil {
+		if err := buildLocalPolicies(ctx, api, store); err != nil {
 			return nil, err
 		}
 		store.MarkManagedBuilt()
@@ -287,22 +332,24 @@ func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []st
 	return resources, AggregateFailures("policy FetchByIDs", failures, len(ids))
 }
 
-// buildAllManagedPolicies paginates ListPolicies(Scope=All) and populates
-// the store with every managed policy (customer + AWS). Each paginated
-// ListPolicies call is wrapped in RetryOnThrottle so throttling during
-// large accounts is handled gracefully.
-func buildAllManagedPolicies(ctx context.Context, api IAMListPoliciesAPI, store iamPolicyStore) error {
+// buildLocalPolicies paginates ListPolicies(Scope=Local) and populates the
+// store with the account's CUSTOMER-managed policies only. It deliberately does
+// NOT list Scope=All: the ~1000+ AWS-managed policy catalog is account-
+// independent and huge, so listing it blows the per-open call budget and times
+// out even on empty accounts. AWS-managed policy names are instead resolved
+// on demand, one GetPolicy per requested name, in FetchIAMPoliciesByIDsFull.
+func buildLocalPolicies(ctx context.Context, api IAMListPoliciesAPI, store iamPolicyStore) error {
 	var marker *string
 	for {
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListPoliciesOutput, error) {
 			return api.ListPolicies(ctx, &iam.ListPoliciesInput{
-				Scope:    iamtypes.PolicyScopeTypeAll,
+				Scope:    iamtypes.PolicyScopeTypeLocal,
 				MaxItems: aws.Int32(DefaultPageSize),
 				Marker:   marker,
 			})
 		})
 		if err != nil {
-			return fmt.Errorf("listing all IAM policies for lazy-add: %w", err)
+			return fmt.Errorf("listing customer-managed IAM policies for lazy-add: %w", err)
 		}
 		for _, p := range out.Policies {
 			policyName := ""
