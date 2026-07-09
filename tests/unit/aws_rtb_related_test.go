@@ -189,6 +189,28 @@ func TestRelated_RTB_NAT_Found(t *testing.T) {
 	}
 }
 
+func TestRelated_RTB_NAT_BlackholeRouteNotCounted(t *testing.T) {
+	source := resource.Resource{
+		ID: "rtb-test",
+		RawStruct: ec2types.RouteTable{
+			RouteTableId: aws.String("rtb-test"),
+			Routes: []ec2types.Route{
+				{DestinationCidrBlock: aws.String("10.0.0.0/16"), GatewayId: aws.String("local")},
+				// Blackhole route: AWS leaves the deleted NAT's stale id here. It
+				// must NOT be counted — the target can't be opened.
+				{DestinationCidrBlock: aws.String("0.0.0.0/0"), NatGatewayId: aws.String("nat-deleted"), State: ec2types.RouteStateBlackhole},
+			},
+		},
+	}
+
+	checker := rtbCheckerByTarget(t, "nat")
+	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (blackhole route target is stale/unopenable, must not be advertised)", result.Count)
+	}
+}
+
 func TestRelated_RTB_NAT_NotFound(t *testing.T) {
 	source := resource.Resource{
 		ID: "rtb-test",

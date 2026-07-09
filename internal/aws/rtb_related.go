@@ -37,8 +37,13 @@ func checkRTBNAT(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.RelatedCheckResult{TargetType: "nat", Count: 0}
 	}
 	// In-body: RouteTable.Routes[].NatGatewayId ARE the referenced NAT gateways.
+	// Skip blackhole routes — AWS leaves the stale target id on a route after the
+	// NAT is deleted, so counting it would advertise an unopenable target.
 	var ids []string
 	for _, route := range rtb.Routes {
+		if route.State == ec2types.RouteStateBlackhole {
+			continue
+		}
 		if route.NatGatewayId != nil && *route.NatGatewayId != "" {
 			ids = append(ids, *route.NatGatewayId)
 		}
@@ -54,8 +59,12 @@ func checkRTBIGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.RelatedCheckResult{TargetType: "igw", Count: 0}
 	}
 	// In-body: RouteTable.Routes[].GatewayId with the igw- prefix ARE the IGWs.
+	// Skip blackhole routes — the target id is stale once the gateway is gone.
 	var ids []string
 	for _, route := range rtb.Routes {
+		if route.State == ec2types.RouteStateBlackhole {
+			continue
+		}
 		if route.GatewayId != nil && strings.HasPrefix(*route.GatewayId, "igw-") {
 			ids = append(ids, *route.GatewayId)
 		}
@@ -121,8 +130,12 @@ func checkRTBENI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
 	}
 	// In-body: RouteTable.Routes[].NetworkInterfaceId ARE the referenced ENIs.
+	// Skip blackhole routes — the target id is stale once the ENI is gone.
 	var ids []string
 	for _, route := range rtb.Routes {
+		if route.State == ec2types.RouteStateBlackhole {
+			continue
+		}
 		if route.NetworkInterfaceId != nil && *route.NetworkInterfaceId != "" {
 			ids = append(ids, *route.NetworkInterfaceId)
 		}
@@ -138,8 +151,12 @@ func checkRTBTGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		return resource.RelatedCheckResult{TargetType: "tgw", Count: 0}
 	}
 	// In-body: RouteTable.Routes[].TransitGatewayId ARE the referenced TGWs.
+	// Skip blackhole routes — the target id is stale once the TGW is gone.
 	var ids []string
 	for _, route := range rtb.Routes {
+		if route.State == ec2types.RouteStateBlackhole {
+			continue
+		}
 		if route.TransitGatewayId != nil && *route.TransitGatewayId != "" {
 			ids = append(ids, *route.TransitGatewayId)
 		}
