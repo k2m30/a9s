@@ -113,20 +113,27 @@ detail is instant. Dropped on profile/region switch; no disk persistence.
 
 ---
 
-## 6. Known residual — two row stores
+## 6. Navigation reads one row — the controller's
 
-The row data still lives in **two** places, each with its own merge/seed/
-self-pivot copy:
+Enter/click navigation resolves the focused row from **`DetailState.RelatedRows`**
+(via `SelectedRelatedRow` / `focusedRelatedRow`), and that row carries the
+`ResourceIDs`/`FetchFilter` the drill needs. The live detail render is
+controller-sourced too (`RenderDetail(body.Related)`), so what the badge shows
+and what Enter navigates read the **same** row — they cannot disagree on whether
+a row is navigable.
 
-- controller: `DetailState.RelatedRows` + `mergeDetailRelatedRow`
-- TUI: `RightColumnModel.rows` + an inline merge in `rightcolumn.go`
+This was verified by instrumentation after a "renders `(N)` but Enter dead-ends"
+report: the controller row already held the IDs. The dead-end was **not** a
+store divergence — its two real causes were a checker emitting the wrong id
+(an assumed-role *session* name instead of the role) and `NavigationKindDetail`
+silently no-op'ing on a cache miss instead of falling back to a by-ID fetch.
+Both are fixed (see §7); the ct-event role pivot drills into the role detail.
 
-The **display verdict is single-owned** (`FormatRelatedCount` /
-`IsRelatedActionable`), so the badge/dim/nav can't drift — but merge, seed, and
-self-pivot are still hand-mirrored, and the cursor-clamp lives on the TUI side.
-Collapsing to one store (the controller owns it; the TUI renders from
-`Snapshot()`) is the outstanding cleanup. **It is not yet done** — do not treat
-this section as describing a completed change.
+`RightColumnModel` remains as the related-panel **widget** (cursor movement,
+filter typing); its row slice is interaction state, not the navigation source of
+truth. Folding that residual cursor/filter state into the controller is a
+code-structure cleanup with no known correctness impact — the navigation
+contract above already reads a single owned row.
 
 ---
 
@@ -139,4 +146,10 @@ this section as describing a completed change.
   via `ListPolicies(Scope=Local)` for customer-managed plus one `GetPolicy` per
   requested name for AWS-managed — never `ListPolicies(Scope=All)`, whose ~1000+
   catalog timed out even on empty accounts.
+- **CloudTrail → IAM Role pivot** resolves the *target* role of an AssumeRole\*
+  event from `requestParameters.roleArn`; `roleNameFromARN` extracts the role
+  from an STS assumed-role ARN (`assumed-role/<role>/<session>` → `<role>`),
+  never the trailing session name. `NavigationKindDetail` falls back to a by-ID
+  fetch when the target isn't in the adapter cache (e.g. a lazily-added role),
+  so the drill lands on the role detail instead of no-op'ing.
 - **Golden Contract rule 7** points here for how a checker result renders.
