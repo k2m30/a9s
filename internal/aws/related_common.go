@@ -114,6 +114,17 @@ func relatedResult(target string, ids []string) resource.RelatedCheckResult {
 	}
 }
 
+// relatedResultTrunc is relatedResult with the truncation flag carried through
+// UNIFORMLY for any count. A truncated scan renders "(N+)" — the "+" means the
+// target list is truncated, so navigating shows "m for more". 0+ and 10+ are the
+// same case (N found so far, list truncated), not two: there is no special
+// zero-truncated result.
+func relatedResultTrunc(target string, ids []string, truncated bool) resource.RelatedCheckResult {
+	r := relatedResult(target, ids)
+	r.Truncated = truncated
+	return r
+}
+
 // lambdaEventSourceMappingLambdaCheck is shared by checkKinesisLambda and
 // checkMSKLambda. Both pivots need the same mechanism: a stream/cluster ARN
 // is the Lambda event source, and lambda:ListEventSourceMappings filtered by

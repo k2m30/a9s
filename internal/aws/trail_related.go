@@ -33,10 +33,7 @@ func checkTrailS3(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, s3Res.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("s3")
-	}
-	return relatedResult("s3", ids)
+	return relatedResultTrunc("s3", ids, truncated)
 }
 
 // checkTrailLogs searches the logs cache for the CloudWatch log group associated
@@ -68,10 +65,7 @@ func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }
 
 // checkTrailSNS searches the sns cache for the topic this trail publishes to.
@@ -97,10 +91,7 @@ func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, snsRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("sns")
-	}
-	return relatedResult("sns", ids)
+	return relatedResultTrunc("sns", ids, truncated)
 }
 
 // checkTrailKMS searches the kms cache for the key used by this trail.
@@ -130,10 +121,7 @@ func checkTrailKMS(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, kmsRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("kms")
-	}
-	return relatedResult("kms", ids)
+	return relatedResultTrunc("kms", ids, truncated)
 }
 
 // checkTrailRole extracts the IAM role name from the trail's CloudWatchLogsRoleArn.

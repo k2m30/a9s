@@ -117,10 +117,7 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, asgRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("asg")
-	}
-	return relatedResult("asg", ids)
+	return relatedResultTrunc("asg", ids, truncated)
 }
 
 // checkNGEC2 scans the EC2 instance cache for instances tagged with this node
@@ -144,10 +141,7 @@ func checkNGEC2(_ context.Context, _ any, res resource.Resource, cache resource.
 	for _, m := range matches {
 		ids = append(ids, m.resource.ID)
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ec2")
-	}
-	return relatedResult("ec2", ids)
+	return relatedResultTrunc("ec2", ids, truncated)
 }
 
 // ngIdentity resolves a node group's nodegroup name and cluster name,
@@ -296,10 +290,7 @@ func checkNGEBS(_ context.Context, _ any, res resource.Resource, cache resource.
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ebs")
-	}
-	return relatedResult("ebs", ids)
+	return relatedResultTrunc("ebs", ids, truncated)
 }
 
 // checkNGSubnet returns the subnet IDs this node group deploys into.

@@ -86,7 +86,7 @@ func checkDbiAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.ApproximateZero("alarm")
+		return relatedResultTrunc("alarm", nil, true)
 	}
 
 	var ids []string
@@ -102,10 +102,7 @@ func checkDbiAlarm(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkDbiDBISnap searches the dbi-snap cache for snapshots whose DBInstanceIdentifier
@@ -122,7 +119,7 @@ func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.ErrorRelated("dbi-snap", err)
 	}
 	if snapList == nil {
-		return resource.ApproximateZero("dbi-snap")
+		return relatedResultTrunc("dbi-snap", nil, true)
 	}
 
 	var ids []string
@@ -135,10 +132,7 @@ func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, snapRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("dbi-snap")
-	}
-	return relatedResult("dbi-snap", ids)
+	return relatedResultTrunc("dbi-snap", ids, truncated)
 }
 
 // checkDBILogs searches the logs cache for log groups matching the RDS naming convention.
@@ -156,7 +150,7 @@ func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return resource.ApproximateZero("logs")
+		return relatedResultTrunc("logs", nil, true)
 	}
 
 	var ids []string
@@ -165,10 +159,7 @@ func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }
 
 // dbiRelatedResources returns the resource list for target from cache or by fetching the first page.
@@ -204,7 +195,7 @@ func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.ErrorRelated("secrets", err)
 	}
 	if secretList == nil {
-		return resource.ApproximateZero("secrets")
+		return relatedResultTrunc("secrets", nil, true)
 	}
 
 	var ids []string
@@ -218,10 +209,7 @@ func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, secretRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("secrets")
-	}
-	return relatedResult("secrets", ids)
+	return relatedResultTrunc("secrets", ids, truncated)
 }
 
 func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -253,7 +241,7 @@ func checkDbiDBC(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("dbc", err)
 	}
 	if dbcList == nil {
-		return resource.ApproximateZero("dbc")
+		return relatedResultTrunc("dbc", nil, true)
 	}
 	var ids []string
 	for _, dbcRes := range dbcList {
@@ -261,10 +249,7 @@ func checkDbiDBC(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, dbcRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("dbc")
-	}
-	return relatedResult("dbc", ids)
+	return relatedResultTrunc("dbc", ids, truncated)
 }
 
 // checkDbiRole extracts IAM role ARNs from the DBInstance's AssociatedRoles
@@ -383,13 +368,13 @@ func checkDbiCTEvents(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	if len(ids) == 0 && truncated {
-		r := resource.ApproximateZero("ct-events")
+		r := relatedResultTrunc("ct-events", nil, true)
 		r.FetchFilter = fetchFilter
 		return r
 	}
 	result := relatedResult("ct-events", ids)
 	if truncated {
-		result.Approximate = true
+		result.Truncated = true
 	}
 	result.FetchFilter = fetchFilter
 	return result

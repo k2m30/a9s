@@ -320,8 +320,8 @@ func TestRelated_Lambda_APIGW_TruncatedCacheNoMatch(t *testing.T) {
 	src := resource.Resource{ID: fnName, Name: fnName}
 	checker := lambdaExtraCheckerByTarget(t, "apigw")
 	result := checker(context.Background(), nil, src, cache)
-	if !result.Approximate {
-		t.Errorf("Approximate = false, want true (truncated cache, no match)")
+	if !result.Truncated {
+		t.Errorf("Truncated = false, want true (truncated cache, no match)")
 	}
 }
 

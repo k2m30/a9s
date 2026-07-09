@@ -42,10 +42,7 @@ func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource,
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkKinesisLambda calls lambda:ListEventSourceMappings with the
@@ -111,10 +108,7 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // checkKinesisKMS calls kinesis:DescribeStreamSummary and returns the KeyId
@@ -206,7 +200,7 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	result := relatedResult("ddb", ids)
-	result.Approximate = entry.IsTruncated
+	result.Truncated = entry.IsTruncated
 	result.Err = AggregateFailures("kinesis-related: DescribeKinesisStreamingDestination", failures, total)
 	return result
 }

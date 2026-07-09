@@ -292,7 +292,7 @@ func TestRelated_ACM_CF_TruncatedCacheNoMatch(t *testing.T) {
 
 	checker := acmCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, cache)
-	if !result.Approximate {
+	if !result.Truncated {
 		t.Errorf("IsApproximate = false, want true (truncated cache, no match)")
 	}
 }

@@ -340,7 +340,7 @@ The contract: every per-resource markdown file is annotated with section markers
 ## Related Resources
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | ...
 <!-- END GENERATED: related -->

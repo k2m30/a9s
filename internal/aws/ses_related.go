@@ -42,7 +42,7 @@ func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	if r53List == nil {
 		// Honest zero — target fetcher not registered or cache empty (r53 not yet fetched).
-		return resource.ApproximateZero("r53")
+		return relatedResultTrunc("r53", nil, true)
 	}
 
 	var ids []string
@@ -53,7 +53,7 @@ func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("r53")
+		return relatedResultTrunc("r53", nil, true)
 	}
 	if truncated {
 		return truncatedResultSES("r53", ids)
@@ -207,7 +207,7 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.ErrorRelated("eb-rule", cacheErr)
 	}
 	if ebRules == nil {
-		return resource.ApproximateZero("eb-rule")
+		return relatedResultTrunc("eb-rule", nil, true)
 	}
 
 	var ids []string
@@ -217,7 +217,7 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eb-rule")
+		return relatedResultTrunc("eb-rule", nil, true)
 	}
 	if truncated {
 		return truncatedResultSES("eb-rule", ids)
@@ -475,9 +475,9 @@ func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ reso
 	return relatedResult("sns", ids)
 }
 
-// truncatedResultSES returns a RelatedCheckResult with Approximate=true when the
+// truncatedResultSES returns a RelatedCheckResult with Truncated=true when the
 // target cache is truncated and matches were found. Later pages may contain
 // additional matches, so the displayed count is a lower bound — rendered as "(N+)".
 func truncatedResultSES(target string, ids []string) resource.RelatedCheckResult {
-	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Approximate: true}
+	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Truncated: true}
 }

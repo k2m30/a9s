@@ -81,10 +81,7 @@ func checkGlueAlarms(ctx context.Context, clients any, res resource.Resource, ca
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkGlueLogs searches the logs cache for the shared Glue job log groups.
@@ -105,10 +102,7 @@ func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache 
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }
 
 // checkGlueCFN calls glue:GetTags(resourceArn) and looks up the
@@ -165,10 +159,7 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // checkGlueS3 extracts the S3 bucket referenced by the job's
@@ -269,10 +260,7 @@ func checkGlueAthena(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, wg.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("athena")
-	}
-	return relatedResult("athena", ids)
+	return relatedResultTrunc("athena", ids, truncated)
 }
 
 // checkGlueSecrets scans the job's DefaultArguments (on the RawStruct) for

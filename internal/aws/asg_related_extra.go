@@ -70,10 +70,7 @@ func checkASGTG(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, tgRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("tg")
-	}
-	return relatedResult("tg", ids)
+	return relatedResultTrunc("tg", ids, truncated)
 }
 
 // checkASGSG resolves security groups associated with this ASG's launch configuration or template.

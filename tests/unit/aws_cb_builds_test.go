@@ -353,7 +353,7 @@ func TestFetchCBBuilds_Duration(t *testing.T) {
 }
 
 // TestFetchCBBuilds_InProgressDuration verifies that a build with no EndTime
-// produces a duration containing "~" to indicate it's approximate/ongoing.
+// produces a duration containing "~" to indicate it's truncated/ongoing.
 func TestFetchCBBuilds_InProgressDuration(t *testing.T) {
 	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 

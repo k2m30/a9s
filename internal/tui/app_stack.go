@@ -361,11 +361,11 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 			// state (the focused ds.RelatedRows row), not the right-column
 			// widget — the renderer holds no duplicate copy of the IDs.
 			row, ok := m.ctrl.SelectedRelatedRow()
-			if !ok || !resource.IsRelatedActionable(row.State, row.Count, row.Approximate) {
+			if !ok || !resource.IsRelatedActionable(row.State, row.Count, row.Truncated) {
 				return m, nil
 			}
 			// A row with nothing to scope by — no ResourceIDs and no server-side
-			// FetchFilter (a blank RelatedUnknown row, or an approximate "(0+)"
+			// FetchFilter (a blank RelatedUnknown row, or an truncated "(0+)"
 			// that found nothing) — resolves IN PLACE rather than opening the
 			// target type's plain unfiltered list, which is not a related view.
 			// Re-dispatch this resource's related checks so the row firms up to

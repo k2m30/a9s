@@ -32,7 +32,7 @@ func checkNATVPC(_ context.Context, _ any, res resource.Resource, cache resource
 		}
 	}
 	if entry.IsTruncated {
-		return resource.ApproximateZero("vpc")
+		return relatedResultTrunc("vpc", nil, true)
 	}
 	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 }
@@ -59,7 +59,7 @@ func checkNATSubnet(_ context.Context, _ any, res resource.Resource, cache resou
 		}
 	}
 	if entry.IsTruncated {
-		return resource.ApproximateZero("subnet")
+		return relatedResultTrunc("subnet", nil, true)
 	}
 	return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 }
@@ -97,10 +97,7 @@ func checkNATRTB(ctx context.Context, clients any, res resource.Resource, cache 
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("rtb")
-	}
-	return relatedResult("rtb", ids)
+	return relatedResultTrunc("rtb", ids, truncated)
 }
 
 // checkNATEIP extracts AllocationId values from the NAT gateway's
@@ -140,10 +137,7 @@ func checkNATEIP(ctx context.Context, clients any, res resource.Resource, cache 
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eip")
-	}
-	return relatedResult("eip", ids)
+	return relatedResultTrunc("eip", ids, truncated)
 }
 
 // checkNATENI extracts NetworkInterfaceId values from the NAT gateway's
@@ -176,10 +170,7 @@ func checkNATENI(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, eniRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eni")
-	}
-	return relatedResult("eni", ids)
+	return relatedResultTrunc("eni", ids, truncated)
 }
 
 // checkNATAlarm reports CloudWatch alarms for this NAT Gateway.
@@ -216,10 +207,7 @@ func checkNATAlarm(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // natRelatedResources returns the resource list for target from cache or fetches

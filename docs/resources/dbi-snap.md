@@ -204,7 +204,7 @@ dbi-snap — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | dbi | DB Instances | yes |
 | kms | KMS Keys | yes |

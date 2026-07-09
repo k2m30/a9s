@@ -456,8 +456,8 @@ func TestRelated_EIPECSTask_TruncatedNoMatch_ApproximateZero(t *testing.T) {
 	checker := eipCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, cache)
 
-	if result.Count != 0 || !result.Approximate {
-		t.Errorf("Count = %d, Approximate = %v, want Count=0, Approximate=true", result.Count, result.Approximate)
+	if result.Count != 0 || !result.Truncated {
+		t.Errorf("Count = %d, Truncated = %v, want Count=0, Truncated=true", result.Count, result.Truncated)
 	}
 }
 

@@ -176,7 +176,7 @@ ami — COMPUTE. Lifecycle key: `state`.
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | ec2 | EC2 Instances | yes |
 | ebs-snap | EBS Snapshots | no |

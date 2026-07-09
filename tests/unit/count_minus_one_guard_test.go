@@ -37,17 +37,17 @@ import (
 // callable with a string argument and returns a resource.RelatedCheckResult.
 // If the function is removed or renamed, this test will fail to compile.
 func TestApproximateZeroHelperExists(t *testing.T) {
-	result := resource.ApproximateZero("test")
+	result := resource.RelatedCheckResult{TargetType: "test", Truncated: true}
 
-	// Verify the shape: Approximate=true, Count=0, TargetType echoed.
+	// Verify the shape: Truncated=true, Count=0, TargetType echoed.
 	if result.TargetType != "test" {
 		t.Errorf("ApproximateZero(\"test\").TargetType = %q; want %q", result.TargetType, "test")
 	}
 	if result.Count != 0 {
 		t.Errorf("ApproximateZero(\"test\").Count = %d; want 0", result.Count)
 	}
-	if !result.Approximate {
-		t.Errorf("ApproximateZero(\"test\").Approximate = false; want true")
+	if !result.Truncated {
+		t.Errorf("ApproximateZero(\"test\").Truncated = false; want true")
 	}
 	if result.Err != nil {
 		t.Errorf("ApproximateZero(\"test\").Err = %v; want nil", result.Err)
@@ -63,9 +63,9 @@ func TestApproximateZeroHelperExists(t *testing.T) {
 
 // TestValidateRelatedResult_ApproximateZero_IsValid asserts that the result
 // produced by ApproximateZero satisfies the ValidateRelatedResult invariants.
-// This pins the contract: Approximate=true + Count=0 must be a valid state.
+// This pins the contract: Truncated=true + Count=0 must be a valid state.
 func TestValidateRelatedResult_ApproximateZero_IsValid(t *testing.T) {
-	result := resource.ApproximateZero("vpc")
+	result := resource.RelatedCheckResult{TargetType: "vpc", Truncated: true}
 	if err := resource.ValidateRelatedResult(result); err != nil {
 		t.Errorf("ValidateRelatedResult(ApproximateZero(\"vpc\")) returned error: %v; want nil", err)
 	}

@@ -77,7 +77,7 @@ func TestPipeline_Fetch_ArnHasNoPipelineSegment(t *testing.T) {
 // ~lines 150-154): when lambda:ListEventSourceMappings returns a mapping but
 // the lambda ResourceCache entry is not loaded ("cache[\"lambda\"]" absent),
 // the checker returns RelatedCheckResult{TargetType:"lambda"} — Count:0,
-// Approximate:false — a definitive zero. But the ListEventSourceMappings API
+// Truncated:false — a definitive zero. But the ListEventSourceMappings API
 // call already succeeded and is authoritative (kinesis.md/msk.md: "ESM is
 // the authoritative link" / "the API result is authoritative"); a cold
 // lambda cache must not erase a real API-confirmed trigger. This test
@@ -128,7 +128,7 @@ func TestKinesis_Related_Lambda_ColdCache_NotDefinitiveZero(t *testing.T) {
 	checker := checkerByTarget(t, "kinesis", "lambda")
 	result := checker(context.Background(), clients, streamRes, cache)
 
-	if result.Count == 0 && !result.Approximate {
+	if result.Count == 0 && !result.Truncated {
 		t.Fatalf("Count = %d (definitive zero), want a non-definitive-zero result — ListEventSourceMappings found a real mapping, the API result is authoritative even with a cold lambda cache", result.Count)
 	}
 	if result.Count != 1 {
@@ -166,7 +166,7 @@ func TestMSK_Related_Lambda_ColdCache_NotDefinitiveZero(t *testing.T) {
 	checker := checkerByTarget(t, "msk", "lambda")
 	result := checker(context.Background(), clients, clusterRes, cache)
 
-	if result.Count == 0 && !result.Approximate {
+	if result.Count == 0 && !result.Truncated {
 		t.Fatalf("Count = %d (definitive zero), want a non-definitive-zero result — ListEventSourceMappings found a real mapping, the API result is authoritative even with a cold lambda cache", result.Count)
 	}
 	if result.Count != 1 {

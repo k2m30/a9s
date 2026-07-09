@@ -175,7 +175,7 @@ rtb — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | subnet | Subnets | yes |
 | nat | NAT Gateways | yes |

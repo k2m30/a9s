@@ -46,10 +46,7 @@ func checkRoleEKS(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, e.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eks")
-	}
-	return relatedResult("eks", ids)
+	return relatedResultTrunc("eks", ids, truncated)
 }
 
 // checkRoleIamGroup extracts IAM group names from this role's AssumeRolePolicy (trust
@@ -173,10 +170,7 @@ func checkRoleLambda(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, lambdaRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("lambda")
-	}
-	return relatedResult("lambda", ids)
+	return relatedResultTrunc("lambda", ids, truncated)
 }
 
 // checkRoleGlue searches the glue cache for jobs whose Role references this IAM role.
@@ -203,10 +197,7 @@ func checkRoleGlue(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, glueRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("glue")
-	}
-	return relatedResult("glue", ids)
+	return relatedResultTrunc("glue", ids, truncated)
 }
 
 // checkRoleNG searches the ng (node group) cache for node groups whose NodeRole ARN
@@ -233,10 +224,7 @@ func checkRoleNG(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, ngRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ng")
-	}
-	return relatedResult("ng", ids)
+	return relatedResultTrunc("ng", ids, truncated)
 }
 
 // checkRolePolicy uses the IAM ListAttachedRolePolicies API to return the
@@ -310,10 +298,7 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, ec2Res.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ec2")
-	}
-	return relatedResult("ec2", ids)
+	return relatedResultTrunc("ec2", ids, truncated)
 }
 
 // roleRelatedResources returns the resource list for target from cache or by

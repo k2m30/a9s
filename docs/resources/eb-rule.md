@@ -193,7 +193,7 @@ eb-rule — MESSAGING. Lifecycle key: `state`.
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | role | IAM Role | no |
 | kinesis | Kinesis (targets) | no |

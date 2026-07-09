@@ -394,14 +394,14 @@ func (c *Controller) handleRelatedCheckBatch(batch messages.RelatedCheckBatch) {
 			errMsg = result.Result.Err.Error()
 		}
 		mergeDetailRelatedRow(targetDetail, result.DefDisplayName, result.Result.TargetType,
-			result.Result.EffectiveState(), result.Result.Count, false, errMsg, result.Result.Approximate, result.Result.ResourceIDs, result.Result.FetchFilter)
+			result.Result.EffectiveState(), result.Result.Count, false, errMsg, result.Result.Truncated, result.Result.ResourceIDs, result.Result.FetchFilter)
 	}
 }
 
 // mergeDetailRelatedRow updates or appends one RelatedRow in ds, matching by
 // DisplayName and preserving ResourceIDs. The single merge used by every
 // related-result path (result lane, cache replay, batch, async adapter).
-func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, state domain.RelatedRowState, count int, loading bool, errMsg string, approximate bool, resourceIDs []string, fetchFilter map[string]string) {
+func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, state domain.RelatedRowState, count int, loading bool, errMsg string, truncated bool, resourceIDs []string, fetchFilter map[string]string) {
 	targetIdx := -1
 	for i := range ds.RelatedRows {
 		if ds.RelatedRows[i].DisplayName == displayName {
@@ -435,7 +435,7 @@ func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, stat
 		ds.RelatedRows[targetIdx].Count = count
 		ds.RelatedRows[targetIdx].Loading = loading
 		ds.RelatedRows[targetIdx].Err = errMsg
-		ds.RelatedRows[targetIdx].Approximate = approximate
+		ds.RelatedRows[targetIdx].Truncated = truncated
 		ds.RelatedRows[targetIdx].ResourceIDs = resourceIDs
 		ds.RelatedRows[targetIdx].FetchFilter = fetchFilter
 		return
@@ -447,7 +447,7 @@ func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, stat
 		Count:       count,
 		Loading:     loading,
 		Err:         errMsg,
-		Approximate: approximate,
+		Truncated: truncated,
 		ResourceIDs: resourceIDs,
 		FetchFilter: fetchFilter,
 	})

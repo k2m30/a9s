@@ -84,10 +84,7 @@ func checkWAFAlarm(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkWAFLogs reports log destinations (CloudWatch Logs group or Firehose

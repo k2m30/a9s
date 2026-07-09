@@ -222,7 +222,7 @@ ct-events — MONITORING. Lifecycle key: none (the list API returns no lifecycle
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | role | IAM Roles | yes |
 | iam-user | IAM Users | yes |

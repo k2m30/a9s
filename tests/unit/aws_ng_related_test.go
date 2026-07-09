@@ -766,7 +766,7 @@ func TestRelated_NG_EC2_NilCache(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_EC2_TruncatedCacheNoMatch verifies Approximate=true when
+// TestRelated_NG_EC2_TruncatedCacheNoMatch verifies Truncated=true when
 // cache is truncated and zero matches found.
 func TestRelated_NG_EC2_TruncatedCacheNoMatch(t *testing.T) {
 	const ngName = "general-pool"
@@ -801,8 +801,8 @@ func TestRelated_NG_EC2_TruncatedCacheNoMatch(t *testing.T) {
 	checker := ngCheckerByTarget(t, "ec2")
 	result := checker(context.Background(), nil, source, cache)
 
-	if !result.Approximate {
-		t.Errorf("Approximate = false, want true (truncated cache, no match)")
+	if !result.Truncated {
+		t.Errorf("Truncated = false, want true (truncated cache, no match)")
 	}
 }
 

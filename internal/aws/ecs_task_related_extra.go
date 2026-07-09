@@ -43,10 +43,7 @@ func checkECSTaskAlarm(ctx context.Context, clients any, res resource.Resource, 
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkECSTaskCTEvents scans ct-events for events involving this task.
@@ -75,10 +72,7 @@ func checkECSTaskCTEvents(ctx context.Context, clients any, res resource.Resourc
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ct-events")
-	}
-	return relatedResult("ct-events", ids)
+	return relatedResultTrunc("ct-events", ids, truncated)
 }
 
 // checkECSTaskEC2 extracts container-instance EC2 IDs from task.ContainerInstanceArn.
@@ -207,10 +201,7 @@ func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("secrets")
-	}
-	return relatedResult("secrets", ids)
+	return relatedResultTrunc("secrets", ids, truncated)
 }
 
 // checkECSTaskSSM reads Fields["ssm_param_names"] (a comma-joined list of SSM
@@ -251,10 +242,7 @@ func checkECSTaskSSM(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, pRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ssm")
-	}
-	return relatedResult("ssm", ids)
+	return relatedResultTrunc("ssm", ids, truncated)
 }
 
 // checkECSTaskSG chains Task -> ENI -> SG per docs/resources/ecs-task.md:
@@ -325,10 +313,7 @@ func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, sgRes.ID)
 		}
 	}
-	if len(ids) == 0 && sgTruncated {
-		return resource.ApproximateZero("sg")
-	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, sgTruncated)
 }
 
 // checkECSTaskSubnet extracts subnet IDs from task.Attachments (awsvpc). Pattern F.

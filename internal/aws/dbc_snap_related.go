@@ -164,10 +164,7 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 			ids = append(ids, planRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("backup")
-	}
-	return relatedResult("backup", ids)
+	return relatedResultTrunc("backup", ids, truncated)
 }
 
 // dbcSnapParentRefs extracts (parentClusterName, parentClusterARN) from a

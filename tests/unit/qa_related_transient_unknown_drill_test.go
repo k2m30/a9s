@@ -57,7 +57,7 @@
 //     (app_stack.go:315-346). It reads m.ctrl.SelectedRelatedRow() (the
 //     controller-owned ds.RelatedCursor/ds.RelatedRows — NOT the renderer's
 //     own RightColumnModel.rows) and gates on
-//     resource.IsRelatedActionable(row.State, row.Count, row.Approximate).
+//     resource.IsRelatedActionable(row.State, row.Count, row.Truncated).
 //     For State: RelatedUnknown with no FetchFilter, IsRelatedActionable
 //     now returns true (internal/resource/related.go:290-306) — the owner's
 //     2026-07-06 decision made this transient (no-filter, resolved-unknown)

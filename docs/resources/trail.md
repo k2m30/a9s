@@ -178,7 +178,7 @@ trail — MONITORING. Lifecycle key: none (the list API returns no lifecycle fie
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | s3 | S3 Bucket | yes |
 | logs | Log Groups | yes |

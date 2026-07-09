@@ -345,11 +345,11 @@ func TestEC2RelatedCheckers_EBS_NonEC2RawStruct(t *testing.T) {
 
 // TestResourceCacheEntry_IsTruncated_Propagates verifies that when the cache
 // has IsTruncated=true for a target type and no matching resources are found,
-// the related checker returns {Count:0, Approximate:true} (resource.ApproximateZero —
+// the related checker returns {Count:0, Truncated:true} (resource.ApproximateZero —
 // the honest lower bound) rather than a definitive Count=0.
 //
-// New contract (Batch B): truncated-zero produces {Count:0, Approximate:true}.
-// See related.go:34-38 (Approximate semantics) and ValidateRelatedResult.
+// New contract (Batch B): truncated-zero produces {Count:0, Truncated:true}.
+// See related.go:34-38 (Truncated semantics) and ValidateRelatedResult.
 func TestResourceCacheEntry_IsTruncated_Propagates(t *testing.T) {
 	instance := resource.Resource{
 		ID: "i-truncated-test",
@@ -360,7 +360,7 @@ func TestResourceCacheEntry_IsTruncated_Propagates(t *testing.T) {
 	}
 
 	// Cache has alarm data but it's truncated — and none of the alarms match
-	// this instance. The checker should return {Count:0, Approximate:true} (honest lower bound).
+	// this instance. The checker should return {Count:0, Truncated:true} (honest lower bound).
 	cache := resource.ResourceCache{
 		"alarm": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
@@ -383,8 +383,8 @@ func TestResourceCacheEntry_IsTruncated_Propagates(t *testing.T) {
 	if got.Count != 0 {
 		t.Errorf("alarm checker with truncated cache and 0 matches: want Count=0, got Count=%d", got.Count)
 	}
-	if !got.Approximate {
-		t.Errorf("alarm checker with truncated cache and 0 matches: want Approximate=true, got false")
+	if !got.Truncated {
+		t.Errorf("alarm checker with truncated cache and 0 matches: want Truncated=true, got false")
 	}
 }
 

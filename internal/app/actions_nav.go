@@ -401,7 +401,7 @@ func (c *Controller) handleActionRelatedSelect(a Action) (ViewState, []runtime.T
 	targetRow := visibleRelatedRowAt(ds, clickIdx)
 	if targetRow == nil || !isActionableDetailRow(*targetRow) {
 		// Dead-end row: loading, error, unknown (RelatedUnknown) without
-		// FetchFilter, or confirmed zero without FetchFilter/Approximate. No
+		// FetchFilter, or confirmed zero without FetchFilter/Truncated. No
 		// navigation.
 		return c.snapshot(), nil
 	}
@@ -411,7 +411,7 @@ func (c *Controller) handleActionRelatedSelect(a Action) (ViewState, []runtime.T
 	ds.RelatedCursor = clickIdx
 
 	// A row with nothing to scope by — no ResourceIDs and no server-side
-	// FetchFilter (a blank RelatedUnknown row, or an approximate "(0+)" that
+	// FetchFilter (a blank RelatedUnknown row, or an truncated "(0+)" that
 	// found nothing) — resolves IN PLACE rather than opening the target type's
 	// plain unfiltered list, which is not a related view. Re-dispatch this
 	// resource's related checks (same shape as handleActionBack's recompute) so

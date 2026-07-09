@@ -48,10 +48,7 @@ func checkELBTargetGroups(ctx context.Context, clients any, res resource.Resourc
 			ids = append(ids, tgRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("tg")
-	}
-	return relatedResult("tg", ids)
+	return relatedResultTrunc("tg", ids, truncated)
 }
 
 // checkELBAlarms checks the cache for CloudWatch alarms with a "LoadBalancer"
@@ -96,10 +93,7 @@ func checkELBAlarms(ctx context.Context, clients any, res resource.Resource, cac
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkELBSG extracts security group IDs from the ELBv2 LoadBalancer's
@@ -238,10 +232,7 @@ func checkELBCF(ctx context.Context, clients any, res resource.Resource, cache r
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cf")
-	}
-	return relatedResult("cf", ids)
+	return relatedResultTrunc("cf", ids, truncated)
 }
 
 // checkELBENI reports ENIs owned by this ELB. ELB-owned ENIs have
@@ -285,10 +276,7 @@ func checkELBENI(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, eniRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eni")
-	}
-	return relatedResult("eni", ids)
+	return relatedResultTrunc("eni", ids, truncated)
 }
 
 // checkELBS3 reports the S3 bucket receiving ELB access logs.

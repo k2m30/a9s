@@ -210,7 +210,7 @@ dbc-snap — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | dbc | DocumentDB Cluster | yes |
 | kms | KMS Key | no |

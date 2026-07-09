@@ -49,10 +49,7 @@ func checkKMSEBS(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, ebsRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ebs")
-	}
-	return relatedResult("ebs", ids)
+	return relatedResultTrunc("ebs", ids, truncated)
 }
 
 // checkKMSRDS searches the dbi cache for RDS instances whose KmsKeyId contains this key's ID.
@@ -83,10 +80,7 @@ func checkKMSRDS(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, dbiRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("dbi")
-	}
-	return relatedResult("dbi", ids)
+	return relatedResultTrunc("dbi", ids, truncated)
 }
 
 // checkKMSSecrets searches the secrets cache for Secrets Manager secrets whose KmsKeyId
@@ -118,10 +112,7 @@ func checkKMSSecrets(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, secretRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("secrets")
-	}
-	return relatedResult("secrets", ids)
+	return relatedResultTrunc("secrets", ids, truncated)
 }
 
 // kmsIDMatches reports whether a KMS reference value (full ARN, bare key UUID,

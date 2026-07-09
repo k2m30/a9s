@@ -430,11 +430,11 @@ func buildDetailRelatedBlocks(ds *DetailState) []RelatedBlock {
 			Count:        row.Count,
 			Loading:      row.Loading,
 			Err:          row.Err != "",
-			Approximate:  row.Approximate,
+			Truncated:  row.Truncated,
 			FetchFilter:  row.FetchFilter,
 			TargetType:   row.TargetType,
 			Actionable:   isActionableDetailRow(row),
-			CountDisplay: resource.FormatRelatedCount(row.State, row.Count, row.Approximate),
+			CountDisplay: resource.FormatRelatedCount(row.State, row.Count, row.Truncated),
 		})
 	}
 	return blocks

@@ -50,10 +50,7 @@ func checkECSASG(ctx context.Context, clients any, res resource.Resource, cache 
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("asg")
-	}
-	return relatedResult("asg", ids)
+	return relatedResultTrunc("asg", ids, truncated)
 }
 
 // checkECSEC2 scans the ec2 cache for instances running this ECS cluster's
@@ -86,10 +83,7 @@ func checkECSEC2(ctx context.Context, clients any, res resource.Resource, cache 
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ec2")
-	}
-	return relatedResult("ec2", ids)
+	return relatedResultTrunc("ec2", ids, truncated)
 }
 
 // checkECSCTEvents scans the ct-events cache for events whose Resources or
@@ -122,10 +116,7 @@ func checkECSCTEvents(ctx context.Context, clients any, res resource.Resource, c
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ct-events")
-	}
-	return relatedResult("ct-events", ids)
+	return relatedResultTrunc("ct-events", ids, truncated)
 }
 
 // checkECSTasks scans the ecs-task cache for tasks whose ClusterArn refers
@@ -155,10 +146,7 @@ func checkECSTasks(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, tRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ecs-task")
-	}
-	return relatedResult("ecs-task", ids)
+	return relatedResultTrunc("ecs-task", ids, truncated)
 }
 
 // checkECSLogs scans the logs cache for log groups associated with this
@@ -183,8 +171,5 @@ func checkECSLogs(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }

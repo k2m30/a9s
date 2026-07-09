@@ -51,10 +51,7 @@ func checkSGEC2(ctx context.Context, clients any, res resource.Resource, cache r
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ec2")
-	}
-	return relatedResult("ec2", ids)
+	return relatedResultTrunc("ec2", ids, truncated)
 }
 
 // checkSGENI scans the ENI cache for network interfaces whose Groups slice
@@ -86,10 +83,7 @@ func checkSGENI(ctx context.Context, clients any, res resource.Resource, cache r
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eni")
-	}
-	return relatedResult("eni", ids)
+	return relatedResultTrunc("eni", ids, truncated)
 }
 
 // checkSGELB scans the ELB cache for load balancers whose SecurityGroups slice
@@ -118,10 +112,7 @@ func checkSGELB(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("elb")
-	}
-	return relatedResult("elb", ids)
+	return relatedResultTrunc("elb", ids, truncated)
 }
 
 // checkSGCFN checks the SG's tags for aws:cloudformation:stack-name.
@@ -168,10 +159,7 @@ func checkSGSG(ctx context.Context, clients any, res resource.Resource, cache re
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("sg")
-	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, truncated)
 }
 
 // checkSGLambda scans the Lambda cache for functions whose VpcConfig.SecurityGroupIds
@@ -203,10 +191,7 @@ func checkSGLambda(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("lambda")
-	}
-	return relatedResult("lambda", ids)
+	return relatedResultTrunc("lambda", ids, truncated)
 }
 
 // sgReferencedInPermissions returns true if any IpPermission in the slice contains

@@ -662,7 +662,7 @@ story; this list is a consolidated index for design follow-up.
    panel count reflect "emitted by the checker" or "resolvable right now"?
    The two diverge during permission errors.
 
-7. **Count unknown** (`?` / "approximate"): per `kms.md` §2, some targets
+7. **Count unknown** (`?` / "truncated"): per `kms.md` §2, some targets
    (e.g. `role` on KMS, `ct-events` generally) are documented as unknown-count.
    The drill-through UX for an unknown-count pivot is not specified —
    does Enter fire, or is the pivot inactive, or does Enter drill with a

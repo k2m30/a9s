@@ -100,11 +100,11 @@ func (m DetailModel) buildLiveBody() app.DetailBody {
 				Count:        row.count,
 				Loading:      row.loading,
 				Err:          row.err != nil,
-				Approximate:  row.approximate,
+				Truncated:  row.truncated,
 				FetchFilter:  row.fetchFilter,
 				TargetType:   row.targetType,
 				Actionable:   isActionableRow(row),
-				CountDisplay: resource.FormatRelatedCount(row.state, row.count, row.approximate),
+				CountDisplay: resource.FormatRelatedCount(row.state, row.count, row.truncated),
 			})
 		}
 	}
@@ -579,7 +579,7 @@ func (m *DetailModel) ApplyRelatedResults(msgs []messages.RelatedCheckResult) {
 				msg.Result.Count,
 				false,
 				errMsg,
-				msg.Result.Approximate,
+				msg.Result.Truncated,
 				msg.Result.ResourceIDs,
 				msg.Result.FetchFilter,
 			)

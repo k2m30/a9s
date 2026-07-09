@@ -105,7 +105,7 @@ func s3BucketFromARN(s string) string {
 //   - State == RelatedError: the checker (or a prerequisite lookup) failed.
 //   - State == RelatedDeferred: navigation uses FetchFilter's server-side
 //     filtered fetch instead of a local count.
-//   - Approximate == true: Count was derived from a truncated cache page;
+//   - Truncated == true: Count was derived from a truncated cache page;
 //     only meaningful when State == RelatedResolved.
 //   - FetchFilter non-nil: navigation should use a server-side filtered fetcher.
 type RelatedCheckResult = domain.RelatedCheckResult
@@ -134,7 +134,7 @@ type RelatedChecker = domain.RelatedChecker
 //   - TargetType is non-empty
 //   - When Count > 0, ResourceIDs is non-empty
 //   - When State != RelatedResolved, Count must be 0 and ResourceIDs empty
-//   - When Approximate is true, State must be RelatedResolved
+//   - When Truncated is true, State must be RelatedResolved
 //
 // This is intended for test invariants and optional debug-mode runtime checks,
 // not for production error returns.
@@ -156,8 +156,8 @@ func ValidateRelatedResult(r RelatedCheckResult) error {
 			return fmt.Errorf("RelatedCheckResult[%s]: State=%s but %d ResourceIDs present", r.TargetType, r.State, len(r.ResourceIDs))
 		}
 	}
-	if r.Approximate && r.State != domain.RelatedResolved {
-		return fmt.Errorf("RelatedCheckResult[%s]: Approximate=true but State=%s (must be RelatedResolved)", r.TargetType, r.State)
+	if r.Truncated && r.State != domain.RelatedResolved {
+		return fmt.Errorf("RelatedCheckResult[%s]: Truncated=true but State=%s (must be RelatedResolved)", r.TargetType, r.State)
 	}
 	return nil
 }
@@ -209,31 +209,12 @@ func ValidateRelatedResultAgainstCache(r RelatedCheckResult, cache ResourceCache
 	return nil
 }
 
-// ApproximateZero returns a RelatedCheckResult representing "the checker scanned
-// a truncated cache, found no matches in what was visible, but additional matches
-// may exist beyond the cached window." Renders in the UI as "0+". This is the
-// honest answer for reverse-scan checkers when `truncated && len(ids)==0`.
-//
-// Prefer this over UnknownRelated, which means "unknown" and renders as a
-// dead-ended dim row.
-func ApproximateZero(targetType string) RelatedCheckResult {
-	return RelatedCheckResult{
-		TargetType:  targetType,
-		Count:       0,
-		Approximate: true,
-	}
-}
-
 // UnknownRelated returns a RelatedCheckResult representing "the checker
 // could not determine the count because a prerequisite lookup failed". The
 // most common case is a two-hop checker (snapshot → source DB instance →
 // cluster) where the SOURCE was not found in a truncated intermediate cache,
 // so the hop to the TARGET was never attempted. Renders as the fourth visible
 // state — a blank, navigable row (no count, drill in) — never "(?)".
-//
-// Distinct from ApproximateZero: ApproximateZero says "we scanned the target
-// cache and found 0 matches (more may exist)" and renders "(0+)". UnknownRelated
-// says "we could not perform the scan at all" and shows no count.
 func UnknownRelated(targetType string) RelatedCheckResult {
 	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedUnknown}
 }
@@ -280,7 +261,7 @@ func LoadingRelated(targetType string) RelatedCheckResult {
 // retries with Ctrl+R rather than drilling into data that never resolved.
 // RelatedLoading is the transient in-progress spinner and resolves into one of
 // the above.
-func IsRelatedActionable(state domain.RelatedRowState, count int, approximate bool) bool {
+func IsRelatedActionable(state domain.RelatedRowState, count int, truncated bool) bool {
 	switch state {
 	case domain.RelatedLoading, domain.RelatedError:
 		// Loading: transient spinner. Error: dead end — surfaced via flash + log,
@@ -291,10 +272,10 @@ func IsRelatedActionable(state domain.RelatedRowState, count int, approximate bo
 		return true
 	default: // RelatedResolved
 		// Only a PROVEN zero — a complete (non-truncated) scan that found
-		// nothing — is a dead end (state 3). An approximate lower bound
+		// nothing — is a dead end (state 3). An truncated lower bound
 		// ("N+"/"0+") stays actionable (state 2): the user drills in to see
 		// the rest.
-		if count == 0 && !approximate {
+		if count == 0 && !truncated {
 			return false
 		}
 		return true
@@ -307,7 +288,7 @@ func IsRelatedActionable(state domain.RelatedRowState, count int, approximate bo
 // the displayed count cannot drift.
 //
 //   - RelatedResolved, exact       → "(N)"
-//   - RelatedResolved, approximate → "(N+)" — a lower bound from a truncated
+//   - RelatedResolved, truncated → "(N+)" — a lower bound from a truncated
 //     target scan; the real count is at least N and more may exist on later
 //     pages. "(0+)" is the honest form of "scanned one page, found none yet".
 //   - everything else (RelatedDeferred / RelatedUnknown / RelatedError /
@@ -315,9 +296,9 @@ func IsRelatedActionable(state domain.RelatedRowState, count int, approximate bo
 //     "we aren't giving a count, drill in" rows; RelatedError is a blank dead
 //     end (dimmed, not navigable); RelatedLoading shows a spinner. "(?)" is
 //     FORBIDDEN and is never produced.
-func FormatRelatedCount(state domain.RelatedRowState, count int, approximate bool) string {
+func FormatRelatedCount(state domain.RelatedRowState, count int, truncated bool) string {
 	if state == domain.RelatedResolved {
-		if approximate {
+		if truncated {
 			return fmt.Sprintf("(%d+)", count)
 		}
 		return fmt.Sprintf("(%d)", count)

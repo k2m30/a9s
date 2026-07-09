@@ -216,7 +216,7 @@ func TestEnrichAPIGatewayStage_CappedAtPerParentPageCap(t *testing.T) {
 	}
 	sc := updates["stages_count"]
 	if !strings.HasSuffix(sc, "+") {
-		t.Errorf("stages_count = %q, want suffix \"+\" (approximate)", sc)
+		t.Errorf("stages_count = %q, want suffix \"+\" (truncated)", sc)
 	}
 	wantPrefix := fmt.Sprintf("%d+", awsclient.PerParentPageCap*100)
 	if sc != wantPrefix {

@@ -108,7 +108,7 @@ func (f *s3PolicyErrFake) GetBucketPolicy(
 // ---------------------------------------------------------------------------
 // Cross-region soft-truncate matrix — 4 checkers × 2 error codes = 8 sub-tests.
 // Each asserts the soft-truncated contract:
-//   Count = 0, Approximate = true, Err = nil, TargetType = <expected>.
+//   Count = 0, Truncated = true, Err = nil, TargetType = <expected>.
 // ---------------------------------------------------------------------------
 
 func TestS3Related_CrossRegion_SoftTruncates(t *testing.T) {
@@ -179,8 +179,8 @@ func TestS3Related_CrossRegion_SoftTruncates(t *testing.T) {
 				if got.Count != 0 {
 					t.Errorf("Count = %d, want 0 (soft-truncate)", got.Count)
 				}
-				if !got.Approximate {
-					t.Error("Approximate = false, want true (rendered as 0+)")
+				if !got.Truncated {
+					t.Error("Truncated = false, want true (rendered as 0+)")
 				}
 				if got.Err != nil {
 					t.Errorf("Err = %v, want nil (cross-region is operational, not a failure)", got.Err)
@@ -208,8 +208,8 @@ func TestS3Related_CrossRegion_PreservesUnknownContract(t *testing.T) {
 	if got.State != domain.RelatedError {
 		t.Errorf("Count = %d, want -1 (real failure must NOT be swallowed)", got.Count)
 	}
-	if got.Approximate {
-		t.Error("Approximate = true; AccessDenied must remain a hard unknown, not an approximation")
+	if got.Truncated {
+		t.Error("Truncated = true; AccessDenied must remain a hard unknown, not an approximation")
 	}
 	if got.Err == nil {
 		t.Error("Err = nil; AccessDenied must surface the underlying error for diagnosis")

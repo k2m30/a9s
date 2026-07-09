@@ -48,10 +48,7 @@ func checkECRLambda(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("lambda")
-	}
-	return relatedResult("lambda", ids)
+	return relatedResultTrunc("lambda", ids, truncated)
 }
 
 // checkECRCodeBuild checks the cache for CodeBuild projects whose environment image
@@ -80,10 +77,7 @@ func checkECRCodeBuild(ctx context.Context, clients any, res resource.Resource, 
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cb")
-	}
-	return relatedResult("cb", ids)
+	return relatedResultTrunc("cb", ids, truncated)
 }
 
 // checkECRCFN checks the ECR repository's tags for aws:cloudformation:stack-name
@@ -117,10 +111,7 @@ func checkECRCFN(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // ecrCFNStackName extracts the aws:cloudformation:stack-name tag value from the
@@ -209,7 +200,7 @@ func checkECREbRule(_ context.Context, _ any, res resource.Resource, cache resou
 		}
 	}
 	result := relatedResult("eb-rule", ids)
-	result.Approximate = entry.IsTruncated
+	result.Truncated = entry.IsTruncated
 	return result
 }
 

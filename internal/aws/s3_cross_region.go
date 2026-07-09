@@ -10,7 +10,7 @@
 //
 // Two call sites use this classifier:
 //
-//  1. Related-def checkers in s3_related.go — return resource.ApproximateZero
+//  1. Related-def checkers in s3_related.go — return a truncated (0+) result
 //     (renders as "0+") instead of an UnknownRelated result. The bucket
 //     exists and was scanned; we just cannot see across regions for the
 //     per-bucket detail call. The honest answer is "0 known matches, more

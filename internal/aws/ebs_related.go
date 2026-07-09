@@ -41,10 +41,7 @@ func checkEBSSnap(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ebs-snap")
-	}
-	return relatedResult("ebs-snap", ids)
+	return relatedResultTrunc("ebs-snap", ids, truncated)
 }
 
 // checkEBSKMS returns the KMS key used to encrypt this volume (Pattern F).
@@ -93,10 +90,7 @@ func checkEBSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkEBSCFN matches the volume's aws:cloudformation:stack-name tag to a
@@ -137,10 +131,7 @@ func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // checkEBSBackup scans the backup cache for backup plans whose selection
@@ -177,10 +168,7 @@ func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, planRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("backup")
-	}
-	return relatedResult("backup", ids)
+	return relatedResultTrunc("backup", ids, truncated)
 }
 
 // ebsRelatedResources returns the resource list for target from cache or fetches

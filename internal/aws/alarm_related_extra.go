@@ -183,8 +183,5 @@ func checkAlarmCTEvents(ctx context.Context, clients any, res resource.Resource,
 			ids = append(ids, evRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ct-events")
-	}
-	return relatedResult("ct-events", ids)
+	return relatedResultTrunc("ct-events", ids, truncated)
 }

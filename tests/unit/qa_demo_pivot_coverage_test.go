@@ -181,7 +181,7 @@ func buildDemoTypeCache(t *testing.T) (map[string][]resource.Resource, resource.
 // genuinely a dead row).
 func isWitnessResult(result resource.RelatedCheckResult) bool {
 	if len(result.FetchFilter) > 0 {
-		return resource.IsRelatedActionable(result.State, result.Count, result.Approximate)
+		return resource.IsRelatedActionable(result.State, result.Count, result.Truncated)
 	}
 	return result.Count > 0
 }

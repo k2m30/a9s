@@ -117,10 +117,7 @@ func checkApigwLogs(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }
 
 // apigwListIntegrations makes a single apigatewayv2:GetIntegrations call for
@@ -286,10 +283,7 @@ func checkApigwAlarm(ctx context.Context, clients any, res resource.Resource, ca
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkApigwCF reports CloudFront distributions fronting this API. Distribution
@@ -324,10 +318,7 @@ func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cf")
-	}
-	return relatedResult("cf", ids)
+	return relatedResultTrunc("cf", ids, truncated)
 }
 
 // checkApigwELB reports the Network Load Balancer behind this API's VPC
@@ -452,10 +443,7 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, elbRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("elb")
-	}
-	return relatedResult("elb", ids)
+	return relatedResultTrunc("elb", ids, truncated)
 }
 
 // checkApigwRole reports IAM roles this API assumes to call the integration

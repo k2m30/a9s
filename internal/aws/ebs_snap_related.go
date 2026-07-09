@@ -40,10 +40,7 @@ func checkEBSSnapAMI(ctx context.Context, clients any, res resource.Resource, ca
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ami")
-	}
-	return relatedResult("ami", ids)
+	return relatedResultTrunc("ami", ids, truncated)
 }
 
 // checkEBSSnapEBS reads the source volume ID from Fields["volume_id"] (Pattern F).
@@ -140,10 +137,7 @@ func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("backup")
-	}
-	return relatedResult("backup", ids)
+	return relatedResultTrunc("backup", ids, truncated)
 }
 
 // ebsSnapRelatedResources returns cached resources for the target type, or fetches the first page.

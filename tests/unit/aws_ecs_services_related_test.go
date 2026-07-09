@@ -415,7 +415,7 @@ func TestRelated_ECSSvc_EbRule_Match(t *testing.T) {
 }
 
 // TestRelated_ECSSvc_EbRule_Match_Truncated verifies that IsTruncated propagates
-// to Approximate=true while Count still reflects found matches.
+// to Truncated=true while Count still reflects found matches.
 func TestRelated_ECSSvc_EbRule_Match_Truncated(t *testing.T) {
 	const svcName = "api-service"
 	const clusterName = "prod-cluster"
@@ -434,8 +434,8 @@ func TestRelated_ECSSvc_EbRule_Match_Truncated(t *testing.T) {
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1", result.Count)
 	}
-	if !result.Approximate {
-		t.Error("Approximate = false, want true (cache is truncated)")
+	if !result.Truncated {
+		t.Error("Truncated = false, want true (cache is truncated)")
 	}
 }
 
@@ -1397,7 +1397,7 @@ func TestRelated_ECSSvc_Logs_NilCache(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_Logs_TruncatedCacheNoMatch verifies Approximate=true when
+// TestRelated_ECSSvc_Logs_TruncatedCacheNoMatch verifies Truncated=true when
 // cache is truncated and no log groups match.
 func TestRelated_ECSSvc_Logs_TruncatedCacheNoMatch(t *testing.T) {
 	logRes := resource.Resource{
@@ -1422,8 +1422,8 @@ func TestRelated_ECSSvc_Logs_TruncatedCacheNoMatch(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "logs")
 	result := checker(context.Background(), nil, source, cache)
 
-	if !result.Approximate {
-		t.Errorf("Approximate = false, want true (truncated cache, no match)")
+	if !result.Truncated {
+		t.Errorf("Truncated = false, want true (truncated cache, no match)")
 	}
 }
 

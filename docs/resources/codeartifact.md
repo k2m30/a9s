@@ -154,7 +154,7 @@ codeartifact — CI/CD. Lifecycle key: none (the list API returns no lifecycle f
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | kms | KMS Key | no |
 | ct-events | CloudTrail Events | no |

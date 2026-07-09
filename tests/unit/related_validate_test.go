@@ -12,15 +12,15 @@ package unit_test
 //     - {Count: 0}                                   — definitively zero (State: RelatedResolved, the zero value)
 //     - {State: RelatedUnknown}                       — unknown (Count 0, no IDs)
 //     - {Count: N, ResourceIDs: N items}             — confirmed N, IDs match (State: RelatedResolved)
-//     - {Count: 0, Approximate: true}                — truncated scan, possibly more (State: RelatedResolved)
-//     - {Count: N, Approximate: true, ResourceIDs: N items}
+//     - {Count: 0, Truncated: true}                — truncated scan, possibly more (State: RelatedResolved)
+//     - {Count: N, Truncated: true, ResourceIDs: N items}
 //
 //   Invalid states (error):
 //     - TargetType == ""                             — missing target type
 //     - Count > 0 but ResourceIDs empty               — count/IDs inconsistency
 //     - State != RelatedResolved but Count != 0       — non-resolved states must not carry a count
 //     - State != RelatedResolved with ResourceIDs set — non-resolved states can't carry IDs
-//     - Approximate == true with State != RelatedResolved — Approximate requires RelatedResolved
+//     - Truncated == true with State != RelatedResolved — Truncated requires RelatedResolved
 //
 // TestRegisteredCheckers_ProduceValidResults: for parents in the scoped list,
 // calls each registered checker with empty cache + nil clients and asserts the
@@ -64,19 +64,19 @@ func TestValidateRelatedResult_Valid(t *testing.T) {
 			},
 		},
 		{
-			name: "count 0 approximate is valid",
+			name: "count 0 truncated is valid",
 			r: resource.RelatedCheckResult{
 				TargetType:  "vpc",
 				Count:       0,
-				Approximate: true,
+				Truncated: true,
 			},
 		},
 		{
-			name: "count 5 approximate with 5 IDs is valid",
+			name: "count 5 truncated with 5 IDs is valid",
 			r: resource.RelatedCheckResult{
 				TargetType:  "vpc",
 				Count:       5,
-				Approximate: true,
+				Truncated: true,
 				ResourceIDs: []string{"vpc-1", "vpc-2", "vpc-3", "vpc-4", "vpc-5"},
 			},
 		},
@@ -121,11 +121,11 @@ func TestValidateRelatedResult_Invalid(t *testing.T) {
 			},
 		},
 		{
-			name: "approximate with unknown state",
+			name: "truncated with unknown state",
 			r: resource.RelatedCheckResult{
 				TargetType:  "vpc",
 				State:       domain.RelatedUnknown,
-				Approximate: true,
+				Truncated: true,
 			},
 		},
 	}

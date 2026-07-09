@@ -669,7 +669,7 @@ input := &ec2.DescribeInstancesInput{
 ```
 
 For checkers where the API doesn't support `MaxResults`, fetch ONE page
-and treat the count as approximate. The fetcher (called on Enter) does
+and treat the count as truncated. The fetcher (called on Enter) does
 the full retrieval.
 
 #### Layer 5: Graceful degradation

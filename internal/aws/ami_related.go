@@ -31,10 +31,7 @@ func checkAMIEC2(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, ec2Res.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ec2")
-	}
-	return relatedResult("ec2", ids)
+	return relatedResultTrunc("ec2", ids, truncated)
 }
 
 // checkAMIEBSSnaps reads the backing snapshot IDs from the AMI's block device mappings.
@@ -121,8 +118,5 @@ func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache 
 			}
 		}
 	}
-	if len(ids) == 0 && (asgTruncated || ec2Truncated) {
-		return resource.ApproximateZero("asg")
-	}
-	return relatedResult("asg", ids)
+	return relatedResultTrunc("asg", ids, (asgTruncated || ec2Truncated))
 }

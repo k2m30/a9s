@@ -56,10 +56,7 @@ func checkSFNLogs(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }
 
 // checkSFNAlarm searches the alarm cache for alarms with a "StateMachineArn" dimension
@@ -92,10 +89,7 @@ func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkSFNRole resolves the IAM execution role for this state machine via

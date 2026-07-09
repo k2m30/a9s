@@ -63,7 +63,7 @@ func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	result := relatedResult("pipeline", ids)
-	result.Approximate = entry.IsTruncated
+	result.Truncated = entry.IsTruncated
 	return result
 }
 

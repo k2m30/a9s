@@ -24,7 +24,7 @@ type rightColumnRow struct {
 	fetchFilter map[string]string      // server-side filter for filtered paginated fetcher
 	loading     bool
 	err         error
-	approximate bool                    // true when count was derived from a truncated cache; UI renders "N+"
+	truncated bool                    // true when count was derived from a truncated cache; UI renders "N+"
 	checker     resource.RelatedChecker // originating RelatedDef.Checker — carried forward for re-apply on load-more
 }
 
@@ -120,7 +120,7 @@ func (m RightColumnModel) Update(msg tea.Msg) (RightColumnModel, tea.Cmd) {
 			m.rows[targetIdx].count = msg.Result.Count
 			m.rows[targetIdx].resourceIDs = msg.Result.ResourceIDs
 			m.rows[targetIdx].fetchFilter = msg.Result.FetchFilter
-			m.rows[targetIdx].approximate = msg.Result.Approximate
+			m.rows[targetIdx].truncated = msg.Result.Truncated
 		}
 		// Keep selection on an actionable row when possible.
 		m.ensureCursorValid()
@@ -224,7 +224,7 @@ func (m RightColumnModel) View() string {
 			State:        row.state,
 			Loading:      row.loading,
 			Err:          row.err != nil,
-			CountDisplay: resource.FormatRelatedCount(row.state, row.count, row.approximate),
+			CountDisplay: resource.FormatRelatedCount(row.state, row.count, row.truncated),
 			Actionable:   isActionableRow(row),
 		}
 		if idx == m.cursor {
@@ -283,7 +283,7 @@ func (m RightColumnModel) SelectedTypeName() string {
 // renderer all share one definition and cannot drift (see that func for the
 // per-case rationale).
 func isActionableRow(row rightColumnRow) bool {
-	return resource.IsRelatedActionable(row.state, row.count, row.approximate)
+	return resource.IsRelatedActionable(row.state, row.count, row.truncated)
 }
 
 // isSelfPivotZeroRow reports whether a row is a self-pivot row (its TargetType equals

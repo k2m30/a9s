@@ -57,10 +57,7 @@ func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache re
 			ids = append(ids, s3Res.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("s3")
-	}
-	return relatedResult("s3", ids)
+	return relatedResultTrunc("s3", ids, truncated)
 }
 
 // checkCfELB searches the ELB cache for load balancers whose DNS name is
@@ -104,10 +101,7 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, elbRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("elb")
-	}
-	return relatedResult("elb", ids)
+	return relatedResultTrunc("elb", ids, truncated)
 }
 
 // checkCfWAF searches the WAF cache for the Web ACL associated with this
@@ -136,10 +130,7 @@ func checkCfWAF(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, wafRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("waf")
-	}
-	return relatedResult("waf", ids)
+	return relatedResultTrunc("waf", ids, truncated)
 }
 
 // checkCfACM searches the ACM cache for the certificate associated with this
@@ -168,10 +159,7 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, acmRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("acm")
-	}
-	return relatedResult("acm", ids)
+	return relatedResultTrunc("acm", ids, truncated)
 }
 
 // checkCfR53 reports Route 53 hosted zones whose names plausibly contain this
@@ -184,7 +172,7 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 // O(1)-per-zone budget of all other related-panel checkers.
 //
 // When the r53 cache is truncated and zero matches found, returns
-// ApproximateZero (honest "0+").
+// a truncated "(0+)" result.
 func checkCfR53(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {
 		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
@@ -225,10 +213,7 @@ func checkCfR53(ctx context.Context, clients any, res resource.Resource, cache r
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("r53")
-	}
-	return relatedResult("r53", ids)
+	return relatedResultTrunc("r53", ids, truncated)
 }
 
 // extractCfAliases returns the distribution's alias domains from either
@@ -294,10 +279,7 @@ func checkCfAlarm(ctx context.Context, clients any, res resource.Resource, cache
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkCfLambda reports Lambda@Edge associations on this distribution.

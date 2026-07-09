@@ -41,10 +41,7 @@ func checkEKSNodeGroups(ctx context.Context, clients any, res resource.Resource,
 			ids = append(ids, ngRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ng")
-	}
-	return relatedResult("ng", ids)
+	return relatedResultTrunc("ng", ids, truncated)
 }
 
 // checkEKSAlarms checks the cache for CloudWatch alarms with ClusterName dimension matching this cluster.
@@ -75,10 +72,7 @@ func checkEKSAlarms(ctx context.Context, clients any, res resource.Resource, cac
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkEKSCFN checks the EKS cluster's tags for aws:cloudformation:stack-name and finds the matching CFN stack.
@@ -112,10 +106,7 @@ func checkEKSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // checkEKSLogs searches the logs cache for the EKS control-plane log group.
@@ -142,10 +133,7 @@ func checkEKSLogs(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }
 
 // checkEKSSG extracts security group IDs from the EKS Cluster's

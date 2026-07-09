@@ -136,7 +136,7 @@ func checkDbcAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return resource.ApproximateZero("alarm")
+		return relatedResultTrunc("alarm", nil, true)
 	}
 
 	var ids []string
@@ -152,10 +152,7 @@ func checkDbcAlarm(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkDbcLogs searches the logs cache for log groups matching the DocumentDB cluster's
@@ -172,7 +169,7 @@ func checkDbcLogs(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return resource.ApproximateZero("logs")
+		return relatedResultTrunc("logs", nil, true)
 	}
 
 	// dbc covers both DocumentDB (/aws/docdb/<cluster>/*) and Aurora
@@ -186,10 +183,7 @@ func checkDbcLogs(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }
 
 // dbcRelatedResources returns the resource list for target from cache or by fetching the first page.
@@ -221,7 +215,7 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("dbi", err)
 	}
 	if dbiList == nil {
-		return resource.ApproximateZero("dbi")
+		return relatedResultTrunc("dbi", nil, true)
 	}
 
 	var ids []string
@@ -234,10 +228,7 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, dbiRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("dbi")
-	}
-	return relatedResult("dbi", ids)
+	return relatedResultTrunc("dbi", ids, truncated)
 }
 
 // checkDbcDbcSnap does a reverse lookup — scans the dbc-snap cache for
@@ -258,7 +249,7 @@ func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.ErrorRelated("dbc-snap", err)
 	}
 	if snapList == nil {
-		return resource.ApproximateZero("dbc-snap")
+		return relatedResultTrunc("dbc-snap", nil, true)
 	}
 
 	var ids []string
@@ -274,10 +265,7 @@ func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, snapRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("dbc-snap")
-	}
-	return relatedResult("dbc-snap", ids)
+	return relatedResultTrunc("dbc-snap", ids, truncated)
 }
 
 // checkDbcSubnet resolves the subnets inside the cluster's DBSubnetGroup via
@@ -404,7 +392,7 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.ErrorRelated("secrets", err)
 	}
 	if secretList == nil {
-		return resource.ApproximateZero("secrets")
+		return relatedResultTrunc("secrets", nil, true)
 	}
 
 	var ids []string
@@ -418,10 +406,7 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, secretRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("secrets")
-	}
-	return relatedResult("secrets", ids)
+	return relatedResultTrunc("secrets", ids, truncated)
 }
 
 // checkDbcKMS extracts the KMS key from the DBCluster's KmsKeyId field.

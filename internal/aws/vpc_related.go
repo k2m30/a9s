@@ -33,10 +33,7 @@ func checkVPCSubnet(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("subnet")
-	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, truncated)
 }
 
 // checkVPCSG searches the sg cache for security groups whose vpc_id field
@@ -61,10 +58,7 @@ func checkVPCSG(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("sg")
-	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, truncated)
 }
 
 // checkVPCEC2 searches the ec2 cache for instances whose vpc_id field
@@ -89,10 +83,7 @@ func checkVPCEC2(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ec2")
-	}
-	return relatedResult("ec2", ids)
+	return relatedResultTrunc("ec2", ids, truncated)
 }
 
 // checkVPCELB searches the elb cache for load balancers whose vpc_id field
@@ -122,10 +113,7 @@ func checkVPCELB(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("elb")
-	}
-	return relatedResult("elb", ids)
+	return relatedResultTrunc("elb", ids, truncated)
 }
 
 // checkVPCNAT searches the nat cache for NAT gateways whose vpc_id field
@@ -150,10 +138,7 @@ func checkVPCNAT(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("nat")
-	}
-	return relatedResult("nat", ids)
+	return relatedResultTrunc("nat", ids, truncated)
 }
 
 // checkVPCIGW searches the igw cache for internet gateways whose vpc_id field
@@ -178,10 +163,7 @@ func checkVPCIGW(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("igw")
-	}
-	return relatedResult("igw", ids)
+	return relatedResultTrunc("igw", ids, truncated)
 }
 
 // checkVPCRTB searches the rtb cache for route tables whose vpc_id field
@@ -206,10 +188,7 @@ func checkVPCRTB(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("rtb")
-	}
-	return relatedResult("rtb", ids)
+	return relatedResultTrunc("rtb", ids, truncated)
 }
 
 // checkVPCVPCE searches the vpce cache for VPC endpoints whose vpc_id field
@@ -234,10 +213,7 @@ func checkVPCVPCE(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("vpce")
-	}
-	return relatedResult("vpce", ids)
+	return relatedResultTrunc("vpce", ids, truncated)
 }
 
 // checkVPCCFN checks the VPC's tags for aws:cloudformation:stack-name.
@@ -280,10 +256,7 @@ func checkVPCENI(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eni")
-	}
-	return relatedResult("eni", ids)
+	return relatedResultTrunc("eni", ids, truncated)
 }
 
 // checkVPCTGW reports transit gateways attached to this VPC.

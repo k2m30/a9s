@@ -372,7 +372,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 							relMsg.Result.Count,
 							false,
 							errMsg,
-							relMsg.Result.Approximate,
+							relMsg.Result.Truncated,
 							relMsg.Result.ResourceIDs,
 							relMsg.Result.FetchFilter,
 						)

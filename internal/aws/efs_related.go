@@ -73,10 +73,7 @@ func checkEFSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // efsCFNStackName extracts the aws:cloudformation:stack-name tag value from the
@@ -130,10 +127,7 @@ func checkEFSSG(ctx context.Context, clients any, res resource.Resource, cache r
 	for id := range sgSet {
 		ids = append(ids, id)
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("sg")
-	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, truncated)
 }
 
 // checkEFSSubnet finds subnets for this EFS file system by scanning the ENI
@@ -170,10 +164,7 @@ func checkEFSSubnet(ctx context.Context, clients any, res resource.Resource, cac
 	for id := range subnetSet {
 		ids = append(ids, id)
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("subnet")
-	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, truncated)
 }
 
 // efsRelatedResources returns the resource list for target from cache or fetches
@@ -249,10 +240,7 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("lambda")
-	}
-	return relatedResult("lambda", ids)
+	return relatedResultTrunc("lambda", ids, truncated)
 }
 
 // checkEFSECSTask is a reverse-scan checker for the efs→ecs-task relationship.
@@ -277,7 +265,7 @@ func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache reso
 	for _, tRes := range entry.Resources {
 		// A task whose DescribeTaskDefinition failed has incomplete
 		// efs_file_system_ids; treat its contribution as unknown and mark
-		// the overall result Approximate instead of a silently-wrong zero.
+		// the overall result Truncated instead of a silently-wrong zero.
 		if tRes.Fields["task_def_join_error"] == "true" {
 			joinIncomplete = true
 		}
@@ -290,6 +278,6 @@ func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache reso
 		}
 	}
 	result := relatedResult("ecs-task", ids)
-	result.Approximate = entry.IsTruncated || joinIncomplete
+	result.Truncated = entry.IsTruncated || joinIncomplete
 	return result
 }

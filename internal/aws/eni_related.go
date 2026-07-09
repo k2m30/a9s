@@ -37,10 +37,7 @@ func checkENIEC2(ctx context.Context, clients any, res resource.Resource, cache 
 			break
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ec2")
-	}
-	return relatedResult("ec2", ids)
+	return relatedResultTrunc("ec2", ids, truncated)
 }
 
 // checkENISG extracts Groups[].GroupId from the ENI RawStruct and searches
@@ -76,10 +73,7 @@ func checkENISG(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, sgRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("sg")
-	}
-	return relatedResult("sg", ids)
+	return relatedResultTrunc("sg", ids, truncated)
 }
 
 // checkENIEIP extracts Association.AllocationId from the ENI RawStruct and searches
@@ -113,10 +107,7 @@ func checkENIEIP(ctx context.Context, clients any, res resource.Resource, cache 
 			break
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eip")
-	}
-	return relatedResult("eip", ids)
+	return relatedResultTrunc("eip", ids, truncated)
 }
 
 // checkENIVPC returns the VPC this network interface belongs to (Pattern F).
@@ -258,10 +249,7 @@ func checkENINAT(ctx context.Context, clients any, res resource.Resource, cache 
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("nat")
-	}
-	return relatedResult("nat", ids)
+	return relatedResultTrunc("nat", ids, truncated)
 }
 
 // checkENIVPCE reports VPC endpoints that own this ENI via its
@@ -294,10 +282,7 @@ func checkENIVPCE(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, vpceRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("vpce")
-	}
-	return relatedResult("vpce", ids)
+	return relatedResultTrunc("vpce", ids, truncated)
 }
 
 // isLambdaENI reports whether an ENI is owned by AWS Lambda based on

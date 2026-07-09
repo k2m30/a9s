@@ -263,7 +263,7 @@ func isSelfPivotZeroDetailRow(row DetailRelatedRow, sourceType string) bool {
 // movement (detailSkipUnselectableRelated) skips a row under the identical
 // condition so the highlighted row and the dimmed row can never diverge.
 func isActionableDetailRow(row DetailRelatedRow) bool {
-	return resource.IsRelatedActionable(row.State, row.Count, row.Approximate)
+	return resource.IsRelatedActionable(row.State, row.Count, row.Truncated)
 }
 
 // visibleRelatedRowAt returns the related row at position idx in the visible

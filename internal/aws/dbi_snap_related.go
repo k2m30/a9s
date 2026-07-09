@@ -37,10 +37,7 @@ func checkDBISnapDBI(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, dbiRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("dbi")
-	}
-	return relatedResult("dbi", ids)
+	return relatedResultTrunc("dbi", ids, truncated)
 }
 
 // checkDBISnapKMS extracts KmsKeyId from the DBSnapshot RawStruct and matches
@@ -77,10 +74,7 @@ func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, kmsRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("kms")
-	}
-	return relatedResult("kms", ids)
+	return relatedResultTrunc("kms", ids, truncated)
 }
 
 // dbiSnapRelatedResources returns cached resources for the target type, or fetches the first page.
@@ -167,10 +161,7 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 			ids = append(ids, planRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("backup")
-	}
-	return relatedResult("backup", ids)
+	return relatedResultTrunc("backup", ids, truncated)
 }
 
 // checkDBISnapCTEvents looks up cached CloudTrail events for the snapshot's

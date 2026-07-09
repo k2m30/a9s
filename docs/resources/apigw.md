@@ -218,7 +218,7 @@ apigw — DNS & CDN. Lifecycle key: none (the list API returns no lifecycle fiel
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | logs | Log Groups | yes |
 | lambda | Lambda Functions | no |

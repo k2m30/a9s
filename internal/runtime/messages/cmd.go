@@ -122,7 +122,7 @@ type RelatedNavigate struct {
 	// Checker is the originating RelatedDef.Checker. Carried forward so
 	// each subsequent page of the target type (m-loads-more) can re-run
 	// the predicate and extend the visible ID set — essential for
-	// approximate pivots whose initial count is a lower bound.
+	// truncated pivots whose initial count is a lower bound.
 	Checker resource.RelatedChecker
 	// DirectDetail is true only when this event originates from a detail
 	// view's navigable-field Enter handler (internal/tui/app_stack.go). It

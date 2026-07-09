@@ -179,7 +179,7 @@ kinesis — MESSAGING. Lifecycle key: `status`.
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | alarm | CW Alarms | yes |
 | lambda | Lambda Functions | yes |

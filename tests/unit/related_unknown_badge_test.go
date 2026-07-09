@@ -41,7 +41,7 @@ func TestFormatRelatedCount_Table(t *testing.T) {
 		{"ExactZero", domain.RelatedResolved, 0, false, "(0)"},
 		{"Positive", domain.RelatedResolved, 7, false, "(7)"},
 		{"LargeCount", domain.RelatedResolved, 1000, false, "(1000)"},
-		// Approximate lower bounds from a truncated target scan render "N+".
+		// Truncated lower bounds from a truncated target scan render "N+".
 		{"ApproxZero", domain.RelatedResolved, 0, true, "(0+)"},
 		{"ApproxPositive", domain.RelatedResolved, 3, true, "(3+)"},
 	}
@@ -96,7 +96,7 @@ func TestRenderRelatedPanel_TransientUnknownNoFilter_ShowsNoBadge(t *testing.T) 
 		Name:         "EBS Volumes",
 		State:        domain.RelatedUnknown,
 		Count:        0,
-		Approximate:  false,
+		Truncated:  false,
 		FetchFilter:  nil,
 		TargetType:   "ebs",
 		Actionable:   resource.IsRelatedActionable(domain.RelatedUnknown, 0, false),
@@ -141,7 +141,7 @@ func TestRenderRelatedPanel_ResolvedUnknownWithFilter_NoQuestionMarkBadge(t *tes
 				Name:         "CloudTrail Events",
 				State:        domain.RelatedDeferred,
 				Count:        0,
-				Approximate:  false,
+				Truncated:  false,
 				FetchFilter:  filter,
 				TargetType:   "ct-events",
 				Actionable:   resource.IsRelatedActionable(domain.RelatedDeferred, 0, false),

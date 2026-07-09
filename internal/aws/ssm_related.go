@@ -40,10 +40,7 @@ func checkSSMKMS(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, kmsRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("kms")
-	}
-	return relatedResult("kms", ids)
+	return relatedResultTrunc("kms", ids, truncated)
 }
 
 // matchesKMSKeyRef returns true if the given KMS resource matches the key reference.

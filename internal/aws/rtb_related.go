@@ -44,10 +44,7 @@ func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, subnetRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("subnet")
-	}
-	return relatedResult("subnet", ids)
+	return relatedResultTrunc("subnet", ids, truncated)
 }
 
 // checkRTBNAT searches the nat cache for NAT gateways referenced in this route table's routes.
@@ -82,10 +79,7 @@ func checkRTBNAT(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, natRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("nat")
-	}
-	return relatedResult("nat", ids)
+	return relatedResultTrunc("nat", ids, truncated)
 }
 
 // checkRTBIGW searches the igw cache for Internet Gateways referenced in this route table's routes.
@@ -120,10 +114,7 @@ func checkRTBIGW(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, igwRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("igw")
-	}
-	return relatedResult("igw", ids)
+	return relatedResultTrunc("igw", ids, truncated)
 }
 
 // checkRTBCFN checks EC2 RouteTable tags for aws:cloudformation:stack-name
@@ -153,10 +144,7 @@ func checkRTBCFN(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // rtbCFNStackName extracts the aws:cloudformation:stack-name tag value from the
@@ -209,10 +197,7 @@ func checkRTBENI(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, eniRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eni")
-	}
-	return relatedResult("eni", ids)
+	return relatedResultTrunc("eni", ids, truncated)
 }
 
 // checkRTBTGW searches the tgw cache for transit gateways referenced by this
@@ -245,10 +230,7 @@ func checkRTBTGW(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, tgwRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("tgw")
-	}
-	return relatedResult("tgw", ids)
+	return relatedResultTrunc("tgw", ids, truncated)
 }
 
 // checkRTBVPCE searches the vpce cache for Gateway-type VPC endpoints that
@@ -276,10 +258,7 @@ func checkRTBVPCE(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, vpceRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("vpce")
-	}
-	return relatedResult("vpce", ids)
+	return relatedResultTrunc("vpce", ids, truncated)
 }
 
 // rtbRelatedResources returns the resource list for target from cache or fetches

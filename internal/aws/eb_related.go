@@ -44,10 +44,7 @@ func checkEbCFN(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // checkEbLogs checks the log groups cache for groups associated with this EB environment.
@@ -79,10 +76,7 @@ func checkEbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }
 
 // checkEbASG checks the ASG cache for groups tagged with this EB environment name.
@@ -120,10 +114,7 @@ func checkEbASG(ctx context.Context, clients any, res resource.Resource, cache r
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("asg")
-	}
-	return relatedResult("asg", ids)
+	return relatedResultTrunc("asg", ids, truncated)
 }
 
 // checkEbEC2 scans the EC2 instance cache for instances tagged with this EB
@@ -158,10 +149,7 @@ func checkEbEC2(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, ec2Res.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ec2")
-	}
-	return relatedResult("ec2", ids)
+	return relatedResultTrunc("ec2", ids, truncated)
 }
 
 // checkEbAlarm scans the alarm cache for alarms tagged with this environment's name
@@ -205,8 +193,5 @@ func checkEbAlarm(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, a.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }

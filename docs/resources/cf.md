@@ -204,7 +204,7 @@ cf — DNS & CDN. Lifecycle key: `status`.
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | s3 | S3 Buckets (origin) | yes |
 | elb | Load Balancers (origin) | yes |

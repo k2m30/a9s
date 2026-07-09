@@ -72,7 +72,7 @@ func TestRelated_Cb_Pipeline_Match(t *testing.T) {
 }
 
 // TestRelated_Cb_Pipeline_Match_Truncated verifies that when the pipeline cache
-// is truncated, a match still sets Count=1 and Approximate=true.
+// is truncated, a match still sets Count=1 and Truncated=true.
 func TestRelated_Cb_Pipeline_Match_Truncated(t *testing.T) {
 	const projectName = "my-build-project"
 	const pipelineName = "my-ci-pipeline"
@@ -95,8 +95,8 @@ func TestRelated_Cb_Pipeline_Match_Truncated(t *testing.T) {
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1", result.Count)
 	}
-	if !result.Approximate {
-		t.Error("Approximate = false, want true (cache is truncated)")
+	if !result.Truncated {
+		t.Error("Truncated = false, want true (cache is truncated)")
 	}
 }
 

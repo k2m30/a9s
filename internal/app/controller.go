@@ -55,7 +55,7 @@ type Controller struct {
 	enrichmentTruncated map[string]bool
 
 	// reapplyCheckers stores per-type reapply checker + source resource for
-	// approximate-pivot navigations. Populated by PatchListReapplyChecker.
+	// truncated-pivot navigations. Populated by PatchListReapplyChecker.
 	reapplyCheckers map[string]reapplyCheckerEntry
 
 	// viewConfig is the per-session view configuration used by resolveListColumns

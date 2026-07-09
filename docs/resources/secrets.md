@@ -115,7 +115,7 @@ One bullet per distinct signal. AWS field names from `SecretListEntry` are verba
 
 - **Signal**: `LastAccessedDate` older than 180 days → dormant.
   - **State bucket**: Warning.
-  - **How obtained**: `SecretListEntry.LastAccessedDate` on the `ListSecrets` response. Caveat carried from the golden doc: the field is day-truncated and excludes access in the current call, so the "180d" threshold is approximate.
+  - **How obtained**: `SecretListEntry.LastAccessedDate` on the `ListSecrets` response. Caveat carried from the golden doc: the field is day-truncated and excludes access in the current call, so the "180d" threshold is truncated.
 
 - **Signal**: `DeletedDate` set → scheduled for deletion.
   - **State bucket**: Broken.
@@ -219,7 +219,7 @@ secrets — SECRETS & CONFIG. Lifecycle key: none (the list API returns no lifec
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | kms | KMS Keys | yes |
 | lambda | Lambda (rotation) | yes |

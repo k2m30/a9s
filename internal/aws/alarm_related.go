@@ -78,10 +78,7 @@ func checkAlarmASG(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, asgRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("asg")
-	}
-	return relatedResult("asg", ids)
+	return relatedResultTrunc("asg", ids, truncated)
 }
 
 // alarmRelatedResources returns the resource list for target from cache or by fetching the first page.

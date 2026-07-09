@@ -82,8 +82,8 @@ func TestCheckAMING_MatchesWhenNGImageIDMatches(t *testing.T) {
 	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "ng-custom" {
 		t.Errorf("ResourceIDs = %v, want [\"ng-custom\"]", result.ResourceIDs)
 	}
-	if result.Approximate {
-		t.Error("Approximate = true, want false (non-truncated cache with full match)")
+	if result.Truncated {
+		t.Error("Truncated = true, want false (non-truncated cache with full match)")
 	}
 	if result.Err != nil {
 		t.Errorf("Err = %v, want nil", result.Err)
@@ -133,13 +133,13 @@ func TestCheckAMING_NoMatchWhenImageIDDiffers(t *testing.T) {
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (different AMI ID)", result.Count)
 	}
-	if result.Approximate {
-		t.Error("Approximate = true, want false (non-truncated cache — definitive zero)")
+	if result.Truncated {
+		t.Error("Truncated = true, want false (non-truncated cache — definitive zero)")
 	}
 }
 
 // ---------------------------------------------------------------------------
-// T-AMI-NG03: Approximate=true when cache is truncated and no match found
+// T-AMI-NG03: Truncated=true when cache is truncated and no match found
 // ---------------------------------------------------------------------------
 
 func TestCheckAMING_ApproximateWhenCacheTruncatedAndNoMatch(t *testing.T) {
@@ -183,8 +183,8 @@ func TestCheckAMING_ApproximateWhenCacheTruncatedAndNoMatch(t *testing.T) {
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0", result.Count)
 	}
-	if !result.Approximate {
-		t.Errorf("Approximate = false, want true (truncated cache — lower bound only). Result: %+v", result)
+	if !result.Truncated {
+		t.Errorf("Truncated = false, want true (truncated cache — lower bound only). Result: %+v", result)
 	}
 	if result.Err != nil {
 		t.Errorf("Err = %v, want nil", result.Err)
@@ -288,7 +288,7 @@ func TestCheckAMING_EmptyAMIIDReturnsZero(t *testing.T) {
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (empty AMI ID is an immediate non-match)", result.Count)
 	}
-	if result.Approximate {
-		t.Error("Approximate = true, want false (empty ID is a definitive non-match)")
+	if result.Truncated {
+		t.Error("Truncated = true, want false (empty ID is a definitive non-match)")
 	}
 }

@@ -154,7 +154,7 @@ iam-user — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecy
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | iam-group | IAM Groups | no |
 | policy | IAM Policies | no |

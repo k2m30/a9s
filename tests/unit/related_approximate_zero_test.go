@@ -14,12 +14,12 @@ package unit_test
 // resource.ApproximateZero's docstring: the honest state for "truncated cache
 // with zero hits" is:
 //
-//   {State: RelatedResolved (zero value), Count: 0, Approximate: true}   — a valid lower bound, not unknown
+//   {State: RelatedResolved (zero value), Count: 0, Truncated: true}   — a valid lower bound, not unknown
 //
 // Task #58 replaced the Count==-1 sentinel with the domain.RelatedRowState
 // enum, so the anti-pattern's modern equivalent is a checker returning any
 // non-RelatedResolved state (RelatedUnknown/RelatedError/RelatedDeferred)
-// instead of the honest Resolved+Approximate lower bound — that misrepresents
+// instead of the honest Resolved+Truncated lower bound — that misrepresents
 // a "we scanned what we could see and found nothing (more may exist)" result
 // as "unknown"/"errored"/"deferred" when the count is actually a known >=0
 // lower bound.
@@ -41,10 +41,10 @@ import (
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TestApproximateZero_ReturnsApproximateZero verifies that ApproximateZero
-// returns a fully-populated RelatedCheckResult with Count=0, Approximate=true,
+// returns a fully-populated RelatedCheckResult with Count=0, Truncated=true,
 // the given TargetType, and nil ResourceIDs / Err.
 func TestApproximateZero_ReturnsApproximateZero(t *testing.T) {
-	result := resource.ApproximateZero("vpc")
+	result := resource.RelatedCheckResult{TargetType: "vpc", Truncated: true}
 
 	if result.TargetType != "vpc" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "vpc")
@@ -52,8 +52,8 @@ func TestApproximateZero_ReturnsApproximateZero(t *testing.T) {
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0", result.Count)
 	}
-	if !result.Approximate {
-		t.Error("Approximate = false, want true")
+	if !result.Truncated {
+		t.Error("Truncated = false, want true")
 	}
 	if result.ResourceIDs != nil {
 		t.Errorf("ResourceIDs = %v, want nil", result.ResourceIDs)
@@ -71,14 +71,14 @@ func TestApproximateZero_ReturnsApproximateZero(t *testing.T) {
 // result with an empty TargetType, which ValidateRelatedResult reports as invalid.
 // This lets callers detect the empty-TargetType invariant at validation time.
 func TestApproximateZero_EmptyTargetType(t *testing.T) {
-	result := resource.ApproximateZero("")
+	result := resource.RelatedCheckResult{TargetType: "", Truncated: true}
 
 	// The struct is returned (ApproximateZero does not panic on empty input).
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0", result.Count)
 	}
-	if !result.Approximate {
-		t.Error("Approximate = false, want true")
+	if !result.Truncated {
+		t.Error("Truncated = false, want true")
 	}
 
 	// Callers can detect the mistake: ValidateRelatedResult must return an error.
@@ -104,7 +104,7 @@ func TestApproximateZero_PassesValidation(t *testing.T) {
 	for _, tt := range targetTypes {
 		tt := tt
 		t.Run(tt, func(t *testing.T) {
-			result := resource.ApproximateZero(tt)
+			result := resource.RelatedCheckResult{TargetType: tt, Truncated: true}
 			if err := resource.ValidateRelatedResult(result); err != nil {
 				t.Errorf("ApproximateZero(%q) fails ValidateRelatedResult: %v", tt, err)
 			}
@@ -122,7 +122,7 @@ func TestApproximateZero_PassesValidation(t *testing.T) {
 // zero resources. The vpc resource has ID "vpc-12345678" which will not match
 // any subnet in the empty (truncated) list.
 //
-// EXPECTED: {Count: 0, Approximate: true}  (honest lower bound)
+// EXPECTED: {Count: 0, Truncated: true}  (honest lower bound)
 // ACTUAL (BUG): {Count: -1}                (discards lower bound)
 //
 // This test stays RED until the coder fixes the anti-pattern in vpc_related.go.
@@ -162,13 +162,13 @@ func TestCheckVPC_TruncatedCacheReturnsApproximateZero(t *testing.T) {
 
 	if result.State != domain.RelatedResolved {
 		t.Errorf("checkVPCSubnet with truncated-empty cache returned State=%s "+
-			"(anti-pattern); want RelatedResolved with Count=0, Approximate=true. Result: %+v", result.State, result)
+			"(anti-pattern); want RelatedResolved with Count=0, Truncated=true. Result: %+v", result.State, result)
 	}
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0", result.Count)
 	}
-	if !result.Approximate {
-		t.Errorf("Approximate = false, want true (truncated cache means result is a lower bound). Result: %+v", result)
+	if !result.Truncated {
+		t.Errorf("Truncated = false, want true (truncated cache means result is a lower bound). Result: %+v", result)
 	}
 	if result.TargetType != "subnet" {
 		t.Errorf("TargetType = %q, want \"subnet\"", result.TargetType)
@@ -184,7 +184,7 @@ func TestCheckVPC_TruncatedCacheReturnsApproximateZero(t *testing.T) {
 // is truncated with zero resources. The SG resource has a real ID that will
 // not match any instance in the empty list.
 //
-// EXPECTED: {Count: 0, Approximate: true}
+// EXPECTED: {Count: 0, Truncated: true}
 // ACTUAL (BUG): {Count: -1}
 func TestCheckSG_TruncatedCacheReturnsApproximateZero(t *testing.T) {
 	sgResource := resource.Resource{
@@ -220,13 +220,13 @@ func TestCheckSG_TruncatedCacheReturnsApproximateZero(t *testing.T) {
 
 	if result.State != domain.RelatedResolved {
 		t.Errorf("checkSGEC2 with truncated-empty cache returned State=%s "+
-			"(anti-pattern); want RelatedResolved with Count=0, Approximate=true. Result: %+v", result.State, result)
+			"(anti-pattern); want RelatedResolved with Count=0, Truncated=true. Result: %+v", result.State, result)
 	}
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0", result.Count)
 	}
-	if !result.Approximate {
-		t.Errorf("Approximate = false, want true (truncated cache means result is a lower bound). Result: %+v", result)
+	if !result.Truncated {
+		t.Errorf("Truncated = false, want true (truncated cache means result is a lower bound). Result: %+v", result)
 	}
 	if result.TargetType != "ec2" {
 		t.Errorf("TargetType = %q, want \"ec2\"", result.TargetType)
@@ -242,7 +242,7 @@ func TestCheckSG_TruncatedCacheReturnsApproximateZero(t *testing.T) {
 // truncated with zero resources. The AMI resource has a real ID that will not
 // match any node group in the empty list.
 //
-// EXPECTED: {Count: 0, Approximate: true}
+// EXPECTED: {Count: 0, Truncated: true}
 // ACTUAL (BUG): {Count: -1}
 func TestCheckAMI_NG_TruncatedCacheReturnsApproximateZero(t *testing.T) {
 	amiResource := resource.Resource{
@@ -278,13 +278,13 @@ func TestCheckAMI_NG_TruncatedCacheReturnsApproximateZero(t *testing.T) {
 
 	if result.State != domain.RelatedResolved {
 		t.Errorf("checkAMING with truncated-empty NG cache returned State=%s "+
-			"(anti-pattern); want RelatedResolved with Count=0, Approximate=true. Result: %+v", result.State, result)
+			"(anti-pattern); want RelatedResolved with Count=0, Truncated=true. Result: %+v", result.State, result)
 	}
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0", result.Count)
 	}
-	if !result.Approximate {
-		t.Errorf("Approximate = false, want true (truncated cache means result is a lower bound). Result: %+v", result)
+	if !result.Truncated {
+		t.Errorf("Truncated = false, want true (truncated cache means result is a lower bound). Result: %+v", result)
 	}
 	if result.TargetType != "ng" {
 		t.Errorf("TargetType = %q, want \"ng\"", result.TargetType)
@@ -299,7 +299,7 @@ func TestCheckAMI_NG_TruncatedCacheReturnsApproximateZero(t *testing.T) {
 // every registered (sourceType, RelatedDef) where NeedsTargetCache is true,
 // constructs a ResourceCache where ALL target entries are {IsTruncated: true,
 // Resources: []}, calls the checker with a minimal parent resource, and asserts
-// the result is {Count: 0, Approximate: true} — NEVER {Count: -1}.
+// the result is {Count: 0, Truncated: true} — NEVER {Count: -1}.
 //
 // This is the regression pin: after the coder sweeps all 225 anti-pattern sites,
 // every reverse-scan checker must pass this test. The test stays RED (many
@@ -643,7 +643,7 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsApproximate(t *testing
 
 				result := def.Checker(context.Background(), nil, parent, cache)
 
-				// The checker MAY legitimately return Count=0 non-approximate (e.g.,
+				// The checker MAY legitimately return Count=0 non-truncated (e.g.,
 				// when it determines from the parent's own fields that there can be
 				// no related resources of this type). That is acceptable — it means
 				// the early-exit guard fired, not the truncated-cache path.
@@ -653,11 +653,11 @@ func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsApproximate(t *testing
 				// honest lower bound.
 				if result.State != domain.RelatedResolved {
 					t.Errorf("checker %s with truncated-empty %q cache returned State=%s "+
-						"(anti-pattern: drops honest lower bound); want RelatedResolved with Count=0, Approximate=true. "+
+						"(anti-pattern: drops honest lower bound); want RelatedResolved with Count=0, Truncated=true. "+
 						"Result: %+v", key, def.TargetType, result.State, result)
 				}
 
-				// When Count==0, Approximate must be true if the truncated path was hit.
+				// When Count==0, Truncated must be true if the truncated path was hit.
 				// We cannot distinguish "early exit" from "truncated path with 0 matches"
 				// purely from the outside, so we only assert on the invariant:
 				// Count >= 0 is required (already checked above).

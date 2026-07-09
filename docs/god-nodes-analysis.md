@@ -158,7 +158,7 @@ lets the catalog be generated/swapped without touching callers.
 ### 10. `ApproximateZero()` — related-check sentinel (PRODUCTION, healthy)
 
 `internal/resource/related.go:209`. A trivial constructor returning a
-`RelatedCheckResult{Count:0, Approximate:true}` ("scanned the cache, found 0, but
+`RelatedCheckResult{Count:0, Truncated:true}` ("scanned the cache, found 0, but
 more may exist"). Called by the same `check*()` checker family as #5 (76 files).
 It sits correctly in the shared `internal/resource/related.go` next to its
 siblings `UnknownRelated` (renders "?") and `NoopChecker`, which are well

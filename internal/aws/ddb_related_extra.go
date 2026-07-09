@@ -23,7 +23,7 @@ func checkDdbLogs(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.ErrorRelated("logs", err)
 	}
 	if logList == nil {
-		return resource.ApproximateZero("logs")
+		return relatedResultTrunc("logs", nil, true)
 	}
 	prefix := "/aws/dynamodb/tables/" + name + "/"
 	var ids []string
@@ -32,10 +32,7 @@ func checkDdbLogs(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }
 
 // checkDdbVPCE scans the vpce cache for DynamoDB Gateway endpoints in this
@@ -50,7 +47,7 @@ func checkDdbVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.ErrorRelated("vpce", err)
 	}
 	if vpceList == nil {
-		return resource.ApproximateZero("vpce")
+		return relatedResultTrunc("vpce", nil, true)
 	}
 	var ids []string
 	for _, vpceRes := range vpceList {
@@ -59,8 +56,5 @@ func checkDdbVPCE(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, vpceRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("vpce")
-	}
-	return relatedResult("vpce", ids)
+	return relatedResultTrunc("vpce", ids, truncated)
 }

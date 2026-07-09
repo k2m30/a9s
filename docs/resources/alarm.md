@@ -246,7 +246,7 @@ alarm — MONITORING. Lifecycle key: `state`.
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | sns | SNS Topics | no |
 | asg | Auto Scaling Groups | yes |

@@ -32,7 +32,7 @@ func checkIGWVPC(_ context.Context, _ any, res resource.Resource, cache resource
 		}
 	}
 	if entry.IsTruncated {
-		return resource.ApproximateZero("vpc")
+		return relatedResultTrunc("vpc", nil, true)
 	}
 	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 }
@@ -70,10 +70,7 @@ func checkIGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("rtb")
-	}
-	return relatedResult("rtb", ids)
+	return relatedResultTrunc("rtb", ids, truncated)
 }
 
 // igwRelatedResources returns the resource list for target from cache or fetches

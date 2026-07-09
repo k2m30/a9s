@@ -309,7 +309,7 @@ func TestRelated_Kinesis_DDB_Match(t *testing.T) {
 }
 
 // TestRelated_Kinesis_DDB_Match_Truncated verifies that IsTruncated propagates
-// to Approximate=true while Count still reflects found matches.
+// to Truncated=true while Count still reflects found matches.
 func TestRelated_Kinesis_DDB_Match_Truncated(t *testing.T) {
 	const streamName = "clickstream-ingest"
 	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
@@ -331,8 +331,8 @@ func TestRelated_Kinesis_DDB_Match_Truncated(t *testing.T) {
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1", result.Count)
 	}
-	if !result.Approximate {
-		t.Error("Approximate = false, want true (cache is truncated)")
+	if !result.Truncated {
+		t.Error("Truncated = false, want true (cache is truncated)")
 	}
 }
 

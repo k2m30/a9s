@@ -44,10 +44,7 @@ func checkECSSvcCTEvents(ctx context.Context, clients any, res resource.Resource
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ct-events")
-	}
-	return relatedResult("ct-events", ids)
+	return relatedResultTrunc("ct-events", ids, truncated)
 }
 
 // checkECSSvcTasks scans the ecs-task cache for tasks belonging to this
@@ -74,10 +71,7 @@ func checkECSSvcTasks(ctx context.Context, clients any, res resource.Resource, c
 			ids = append(ids, tRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ecs-task")
-	}
-	return relatedResult("ecs-task", ids)
+	return relatedResultTrunc("ecs-task", ids, truncated)
 }
 
 // checkECSSvcSubnet extracts subnet IDs from Service's
@@ -137,10 +131,7 @@ func checkECSSvcVPC(ctx context.Context, clients any, res resource.Resource, cac
 	for v := range vpcSet {
 		ids = append(ids, v)
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("vpc")
-	}
-	return relatedResult("vpc", ids)
+	return relatedResultTrunc("vpc", ids, truncated)
 }
 
 // checkECSSvcEbRule is a reverse-scan checker for the ecs-svc→eb-rule relationship.
@@ -173,7 +164,7 @@ func checkECSSvcEbRule(_ context.Context, _ any, res resource.Resource, cache re
 		}
 	}
 	result := relatedResult("eb-rule", ids)
-	result.Approximate = entry.IsTruncated
+	result.Truncated = entry.IsTruncated
 	return result
 }
 
@@ -419,7 +410,7 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	result := relatedResult("sfn", ids)
-	result.Approximate = entry.IsTruncated
+	result.Truncated = entry.IsTruncated
 	result.Err = AggregateFailures("ecs-svc-related: DescribeStateMachine", failures, len(entry.Resources))
 	return result
 }

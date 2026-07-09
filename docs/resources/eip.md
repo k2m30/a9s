@@ -189,7 +189,7 @@ eip — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | ec2 | EC2 Instances | no |
 | eni | Network Interfaces | no |

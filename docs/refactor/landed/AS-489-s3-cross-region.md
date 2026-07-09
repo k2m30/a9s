@@ -12,7 +12,7 @@ This spec is the contract. The CTO Stage 1 triage comment on AS-489 listed both 
 
 ## 1. Decision — Pattern A (soft-truncate to ApproximateZero)
 
-For each of the four related-def checkers in `internal/aws/s3_related.go` that today make a per-bucket S3 API call and return `Count:-1, Err:err` on any non-recognised error, detect the cross-region rejection pair `(PermanentRedirect | IllegalLocationConstraintException)` and return `resource.ApproximateZero(targetType)` instead — i.e. `Count:0, Approximate:true`, which renders as `0+`.
+For each of the four related-def checkers in `internal/aws/s3_related.go` that today make a per-bucket S3 API call and return `Count:-1, Err:err` on any non-recognised error, detect the cross-region rejection pair `(PermanentRedirect | IllegalLocationConstraintException)` and return `resource.ApproximateZero(targetType)` instead — i.e. `Count:0, Truncated:true`, which renders as `0+`.
 
 ### Why Pattern A (not B)
 
@@ -21,9 +21,9 @@ For each of the four related-def checkers in `internal/aws/s3_related.go` that t
 - **a9s is region-scoped by design.** The product stance documented in `docs/architecture.md` is that every per-resource view is region-scoped. `ListBuckets` is the one global outlier; soft-truncating per-bucket calls when the bucket lives outside the active region is the consistent stance.
 - **Reversibility.** Pattern A is ~80 LOC and one helper. If we later decide to do region-pinning (Pattern B), Pattern A doesn't get in the way — the helper just becomes one branch among several.
 
-### Why the rendered token must be `0+` (Approximate), not `?` (UnknownRelated)
+### Why the rendered token must be `0+` (Truncated), not `?` (UnknownRelated)
 
-- The bucket exists and is reachable — only the per-bucket call failed for an environmental reason. We have not "failed to scan"; we have scanned and the answer is "we cannot see across regions." That semantic maps cleanly to `ApproximateZero("…")`: Count=0, Approximate=true. See `internal/resource/related.go:202–215`.
+- The bucket exists and is reachable — only the per-bucket call failed for an environmental reason. We have not "failed to scan"; we have scanned and the answer is "we cannot see across regions." That semantic maps cleanly to `ApproximateZero("…")`: Count=0, Truncated=true. See `internal/resource/related.go:202–215`.
 - `UnknownRelated()` (Count=-1, renders `?`) would re-introduce exactly the `<unknown>` token AC2 forbids.
 
 ---
@@ -137,8 +137,8 @@ For each `(checker, errorCode)` pair, assert:
 
 ```go
 got := checker(ctx, &awsclient.ServiceClients{S3: fake}, emptyBucketResource("xregion"), nil)
-if got.Count != 0 || !got.Approximate || got.Err != nil {
-    t.Fatalf("want Count=0 Approximate=true Err=nil; got Count=%d Approximate=%v Err=%v", got.Count, got.Approximate, got.Err)
+if got.Count != 0 || !got.Truncated || got.Err != nil {
+    t.Fatalf("want Count=0 Truncated=true Err=nil; got Count=%d Truncated=%v Err=%v", got.Count, got.Truncated, got.Err)
 }
 if got.TargetType != "<expected target>" { t.Fatalf("...") }
 ```
@@ -171,7 +171,7 @@ Final scope: **9 tests** (8 checker × error-code combos + 1 contract-preservati
 
 ## 4. Acceptance criteria (refined from CTO triage)
 
-1. The four affected checkers (`checkS3CFN`, `checkS3KMS`, `checkS3Logs`, `checkS3Role`) return `RelatedCheckResult{Count:0, Approximate:true, Err:nil, TargetType:<their target>}` when the underlying `GetBucket*` call returns `PermanentRedirect` or `IllegalLocationConstraintException`. (Verified by §3.1 tests.)
+1. The four affected checkers (`checkS3CFN`, `checkS3KMS`, `checkS3Logs`, `checkS3Role`) return `RelatedCheckResult{Count:0, Truncated:true, Err:nil, TargetType:<their target>}` when the underlying `GetBucket*` call returns `PermanentRedirect` or `IllegalLocationConstraintException`. (Verified by §3.1 tests.)
 2. For non-cross-region errors (e.g. `AccessDenied`, transient throttle that survives retries, anything else), the four checkers still return `Count:-1, Err:err` — the existing contract is preserved. (Verified by §3.1 guard test.)
 3. `EnrichS3PublicAccessBlock` still passes its existing cross-region tests in `tests/unit/qa_s3_cross_region_test.go` after the refactor to use `isS3CrossRegionErr`. (Verified by re-running those tests.)
 4. `TestLiveFullIntegration_AllResourcesBaseline/s3` passes against an account that contains buckets in multiple regions. (Verified by E2ETester at Stage 6.5.)

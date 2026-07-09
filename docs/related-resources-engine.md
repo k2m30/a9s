@@ -203,7 +203,7 @@ they add complexity without changing what the operator sees:
 - **A `NavigationTarget` enum** — navigation is the single rule in §1 (found IDs
   → filter → plain list). Three cases in one place; no enum, no restating.
 - **`Coverage` / `Degraded` metadata objects** — "complete vs partial" is the
-  one `Approximate` bool; an errored check is the error row.
+  one `Truncated` bool; an errored check is the error row.
 - **A structured identity schema, `RelationEdge` provenance, per-relation cache
   signatures** — the canonical `Resource.ID` and the `type:id` cache key are
   enough for the states in §1.
@@ -229,7 +229,7 @@ the engine derives the state, so checkers cannot drift.)
 
 `(?)` and the `Count: -1` sentinel are retired: unknown/deferred rows are blank
 (clickable), a proven zero is `(0)` (dimmed), an error is the dimmed error row.
-The per-checker `State` / `Count` / `Approximate` fields and the
+The per-checker `State` / `Count` / `Truncated` fields and the
 `UnknownRelated` / `DeferredRelated` / `ApproximateZero` / `ErrorRelated`
 constructors are replaced by `RelationFacts` (§2) plus the engine's derivation —
 checkers stop choosing a state.

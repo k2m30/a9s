@@ -47,10 +47,7 @@ func checkECSServices(ctx context.Context, clients any, res resource.Resource, c
 			ids = append(ids, svcRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ecs-svc")
-	}
-	return relatedResult("ecs-svc", ids)
+	return relatedResultTrunc("ecs-svc", ids, truncated)
 }
 
 // checkECSAlarms checks the cache for CloudWatch alarms with ClusterName dimension matching this cluster.
@@ -81,10 +78,7 @@ func checkECSAlarms(ctx context.Context, clients any, res resource.Resource, cac
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkECSCFN checks the ECS cluster's tags for aws:cloudformation:stack-name and finds the matching CFN stack.
@@ -122,10 +116,7 @@ func checkECSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // checkECSKMS extracts the KMS key from the ECS Cluster's

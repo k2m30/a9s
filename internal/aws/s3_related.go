@@ -104,7 +104,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
 		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
 		if isS3CrossRegionErr(err) {
-			return resource.ApproximateZero("cfn")
+			return relatedResultTrunc("cfn", nil, true)
 		}
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -123,7 +123,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.ErrorRelated("cfn", err)
 	}
 	if cfnList == nil {
-		return resource.ApproximateZero("cfn")
+		return relatedResultTrunc("cfn", nil, true)
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -136,10 +136,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // checkS3KMS calls s3:GetBucketEncryption and returns the KMS key ID configured
@@ -169,7 +166,7 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resou
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
 		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
 		if isS3CrossRegionErr(err) {
-			return resource.ApproximateZero("kms")
+			return relatedResultTrunc("kms", nil, true)
 		}
 		return resource.ErrorRelated("kms", err)
 	}
@@ -222,7 +219,7 @@ func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ reso
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
 		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
 		if isS3CrossRegionErr(err) {
-			return resource.ApproximateZero("s3")
+			return relatedResultTrunc("s3", nil, true)
 		}
 		return resource.ErrorRelated("s3", err)
 	}
@@ -246,7 +243,7 @@ func checkS3Athena(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ErrorRelated("athena", err)
 	}
 	if wgList == nil {
-		return resource.ApproximateZero("athena")
+		return relatedResultTrunc("athena", nil, true)
 	}
 	var ids []string
 	for _, wg := range wgList {
@@ -254,10 +251,7 @@ func checkS3Athena(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, wg.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("athena")
-	}
-	return relatedResult("athena", ids)
+	return relatedResultTrunc("athena", ids, truncated)
 }
 
 // checkS3Glue scans the glue cache for Jobs whose Command.ScriptLocation
@@ -272,7 +266,7 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("glue", err)
 	}
 	if jobList == nil {
-		return resource.ApproximateZero("glue")
+		return relatedResultTrunc("glue", nil, true)
 	}
 	var ids []string
 	for _, jobRes := range jobList {
@@ -284,10 +278,7 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, jobRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("glue")
-	}
-	return relatedResult("glue", ids)
+	return relatedResultTrunc("glue", ids, truncated)
 }
 
 // checkS3Backup scans the backup cache for plans that cover this bucket.
@@ -311,7 +302,7 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ErrorRelated("backup", err)
 	}
 	if bkList == nil {
-		return resource.ApproximateZero("backup")
+		return relatedResultTrunc("backup", nil, true)
 	}
 	var ids []string
 	for _, bk := range bkList {
@@ -319,10 +310,7 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, bk.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("backup")
-	}
-	return relatedResult("backup", ids)
+	return relatedResultTrunc("backup", ids, truncated)
 }
 
 // checkS3EBRule scans the eb-rule cache for rules whose EventPattern filters
@@ -340,7 +328,7 @@ func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ErrorRelated("eb-rule", err)
 	}
 	if ruleList == nil {
-		return resource.ApproximateZero("eb-rule")
+		return relatedResultTrunc("eb-rule", nil, true)
 	}
 	bucketQuoted := `"` + bucket + `"`
 	var ids []string
@@ -357,10 +345,7 @@ func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cach
 		}
 		ids = append(ids, ruleRes.ID)
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eb-rule")
-	}
-	return relatedResult("eb-rule", ids)
+	return relatedResultTrunc("eb-rule", ids, truncated)
 }
 
 // checkS3R53 scans the r53 cache for hosted zones containing an S3-website
@@ -379,7 +364,7 @@ func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.ErrorRelated("r53", err)
 	}
 	if zoneList == nil {
-		return resource.ApproximateZero("r53")
+		return relatedResultTrunc("r53", nil, true)
 	}
 	var ids []string
 	for _, zone := range zoneList {
@@ -391,10 +376,7 @@ func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, zone.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("r53")
-	}
-	return relatedResult("r53", ids)
+	return relatedResultTrunc("r53", ids, truncated)
 }
 
 // checkS3Role resolves roles named as AWS principals in the bucket's
@@ -432,7 +414,7 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
 		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
 		if isS3CrossRegionErr(err) {
-			return resource.ApproximateZero("role")
+			return relatedResultTrunc("role", nil, true)
 		}
 		return resource.ErrorRelated("role", err)
 	}
@@ -450,7 +432,7 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ErrorRelated("role", rerr)
 	}
 	if roleList == nil {
-		return resource.ApproximateZero("role")
+		return relatedResultTrunc("role", nil, true)
 	}
 
 	// Match role ARNs against the loaded role cache. Anything that
@@ -469,10 +451,7 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("role")
-	}
-	return relatedResult("role", ids)
+	return relatedResultTrunc("role", ids, truncated)
 }
 
 // extractBucketPolicyAWSPrincipals parses a bucket-policy JSON document
@@ -535,7 +514,7 @@ func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.ErrorRelated("trail", err)
 	}
 	if trailList == nil {
-		return resource.ApproximateZero("trail")
+		return relatedResultTrunc("trail", nil, true)
 	}
 
 	var ids []string
@@ -551,10 +530,7 @@ func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, trailRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("trail")
-	}
-	return relatedResult("trail", ids)
+	return relatedResultTrunc("trail", ids, truncated)
 }
 
 // checkS3CF searches the CloudFront cache for distributions with origins that
@@ -573,7 +549,7 @@ func checkS3CF(ctx context.Context, clients any, res resource.Resource, cache re
 		return resource.ErrorRelated("cf", err)
 	}
 	if cfList == nil {
-		return resource.ApproximateZero("cf")
+		return relatedResultTrunc("cf", nil, true)
 	}
 
 	var ids []string
@@ -595,10 +571,7 @@ func checkS3CF(ctx context.Context, clients any, res resource.Resource, cache re
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cf")
-	}
-	return relatedResult("cf", ids)
+	return relatedResultTrunc("cf", ids, truncated)
 }
 
 // s3RelatedResources returns the resource list for target from cache or by

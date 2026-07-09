@@ -183,7 +183,7 @@ kms — SECRETS & CONFIG. Lifecycle key: `status`.
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | ebs | EBS Volumes | yes |
 | dbi | RDS Instances | yes |

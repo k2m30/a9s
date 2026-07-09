@@ -181,7 +181,7 @@ glue — DATA & ANALYTICS. Lifecycle key: none (the list API returns no lifecycl
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | role | IAM Roles | yes |
 | alarm | CW Alarms | yes |

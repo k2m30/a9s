@@ -231,7 +231,7 @@ type RelatedBlock struct {
 	Items       []FieldRow             `json:"items,omitempty"`
 	Loading     bool                   `json:"loading,omitempty"`
 	Err         bool                   `json:"err,omitempty"`
-	Approximate bool                   `json:"approximate,omitempty"`
+	Truncated bool                   `json:"truncated,omitempty"`
 	FetchFilter map[string]string      `json:"fetch_filter,omitempty"`
 	// TargetType is the canonical short name of the target resource type.
 	TargetType string `json:"target_type,omitempty"`

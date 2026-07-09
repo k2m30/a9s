@@ -38,10 +38,7 @@ func checkAMICFN(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // checkAMIKMS extracts KMS key IDs from the AMI's block device mappings
@@ -91,8 +88,5 @@ func checkAMING(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, ngRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ng")
-	}
-	return relatedResult("ng", ids)
+	return relatedResultTrunc("ng", ids, truncated)
 }

@@ -43,10 +43,7 @@ func checkMSKAlarms(ctx context.Context, clients any, res resource.Resource, cac
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkMSKSG returns the security groups associated with the MSK cluster's broker nodes.
@@ -111,10 +108,7 @@ func checkMSKCFN(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // checkMSKSubnet returns the subnets the cluster's broker nodes run in

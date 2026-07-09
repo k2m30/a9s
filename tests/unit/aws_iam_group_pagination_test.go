@@ -6,9 +6,9 @@ package unit
 // pagination for GetGroup, ListAttachedGroupPolicies, and ListGroupPolicies.
 //
 // All three operations use IAM's Marker/IsTruncated pagination pattern.
-// After pagination, counts are exact (not approximate) unless the walk is
+// After pagination, counts are exact (not truncated) unless the walk is
 // capped at PerParentPageCap = 10 pages, in which case the value carries
-// a "+" suffix to signal approximate.
+// a "+" suffix to signal truncated.
 //
 // Contract assertions:
 //   - GetGroup returns 2 pages (100+50 users) → Fields["member_count"] == "150"
@@ -439,14 +439,14 @@ func TestEnrichIAMGroup_CappedAtPerParentPageCap(t *testing.T) {
 		t.Errorf("GetGroup called %d times, want exactly %d (PerParentPageCap)", calls, awsclient.PerParentPageCap)
 	}
 
-	// member_count must carry "+" suffix to indicate approximate
+	// member_count must carry "+" suffix to indicate truncated
 	updates, ok := result.FieldUpdates[groupName]
 	if !ok {
 		t.Fatalf("FieldUpdates missing entry for %q", groupName)
 	}
 	mc := updates["member_count"]
 	if !strings.HasSuffix(mc, "+") {
-		t.Errorf("member_count = %q, want suffix \"+\" (approximate)", mc)
+		t.Errorf("member_count = %q, want suffix \"+\" (truncated)", mc)
 	}
 	// The numeric part must be PerParentPageCap * 100 = 1000
 	wantPrefix := fmt.Sprintf("%d+", awsclient.PerParentPageCap*100)

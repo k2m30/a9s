@@ -173,7 +173,7 @@ sfn — MESSAGING. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | alarm | CloudWatch Alarms | no |
 | logs | Log Groups | yes |

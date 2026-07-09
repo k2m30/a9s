@@ -44,7 +44,7 @@ import (
 // would be "" and navigation would fall through without emitting a fetch task.
 //
 // Pre-fix failure: mergeDetailRelatedRow's existing-row branch assigned
-// Count/Loading/Err/Approximate/FetchFilter but omitted
+// Count/Loading/Err/Truncated/FetchFilter but omitted
 // `ds.RelatedRows[i].ResourceIDs = resourceIDs`.
 func TestHandleRelatedCheckBatch_ResourceIDs_EnableSingleResourceNav(t *testing.T) {
 	res := fakeEC2Resources()[0]

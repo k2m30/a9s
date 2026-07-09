@@ -498,7 +498,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				msg.Result.Count,
 				false,
 				errMsg,
-				msg.Result.Approximate,
+				msg.Result.Truncated,
 				msg.Result.ResourceIDs,
 				msg.Result.FetchFilter,
 			)

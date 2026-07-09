@@ -39,10 +39,7 @@ func checkECRCTEvents(ctx context.Context, clients any, res resource.Resource, c
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ct-events")
-	}
-	return relatedResult("ct-events", ids)
+	return relatedResultTrunc("ct-events", ids, truncated)
 }
 
 func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -70,10 +67,10 @@ func checkECRECSTask(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ecs-task")
+		return relatedResultTrunc("ecs-task", nil, true)
 	}
 	result := relatedResult("ecs-task", ids)
-	result.Approximate = truncated
+	result.Truncated = truncated
 	return result
 }
 
@@ -115,7 +112,7 @@ func checkECRPipeline(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	result := relatedResult("pipeline", ids)
-	result.Approximate = entry.IsTruncated
+	result.Truncated = entry.IsTruncated
 	return result
 }
 

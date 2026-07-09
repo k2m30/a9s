@@ -105,10 +105,7 @@ func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		ids = append(ids, id)
 	}
 
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // checkCfnSNS extracts notification ARNs from the CloudFormation Stack's

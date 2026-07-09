@@ -52,10 +52,7 @@ func checkACMCF(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, cfRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cf")
-	}
-	return relatedResult("cf", ids)
+	return relatedResultTrunc("cf", ids, truncated)
 }
 
 // acmCertInUseBy returns the ARNs from acm:DescribeCertificate.InUseBy for

@@ -223,7 +223,7 @@ eb — MESSAGING. Lifecycle key: `status`.
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | cfn | CloudFormation Stack | yes |
 | logs | Log Groups | yes |

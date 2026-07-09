@@ -43,10 +43,7 @@ func checkOpenSearchAlarms(ctx context.Context, clients any, res resource.Resour
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkOpenSearchLogs extracts CloudWatch log group ARNs from the domain's LogPublishingOptions.
@@ -195,10 +192,7 @@ func checkOpenSearchCFN(ctx context.Context, clients any, res resource.Resource,
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // checkOpenSearchSubnet returns the subnets the VPC-attached domain is deployed
@@ -278,7 +272,7 @@ func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 	if truncated {
-		return resource.ApproximateZero("acm")
+		return relatedResultTrunc("acm", nil, true)
 	}
 	return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
 }

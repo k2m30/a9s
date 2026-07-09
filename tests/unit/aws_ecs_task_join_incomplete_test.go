@@ -12,7 +12,7 @@ package unit
 // NEW behaviour (fix):
 //   The fetcher sets Fields["task_def_join_error"]="true" on the affected task
 //   and keeps Pagination.IsTruncated=false. The reverse-scan checker
-//   (checkEFSECSTask) sets result.Approximate=true when any task carries that
+//   (checkEFSECSTask) sets result.Truncated=true when any task carries that
 //   field, surfacing an honest "~0" instead of a silently wrong "0".
 //
 // Tests A and B exercise the fetcher via the registered paginated closure
@@ -226,16 +226,16 @@ func TestFetchECSTasksPage_JoinSucceeds_NoErrorField(t *testing.T) {
 
 // TestCheckEFSECSTask_JoinIncompleteTask_MarksApproximate verifies that the
 // checkEFSECSTask checker (accessed via resource.GetRelated("efs")) returns
-// Approximate=true when any task in the cache carries Fields["task_def_join_error"]="true".
+// Truncated=true when any task in the cache carries Fields["task_def_join_error"]="true".
 //
 // Setup:
 //   - Source EFS resource ID: "fs-bar" (does not match any task's efs_file_system_ids).
 //   - Cache "ecs-task" entry has two tasks:
 //       task1: efs_file_system_ids="fs-foo" (no join error, does not match source).
 //       task2: task_def_join_error="true"   (join incomplete, no efs ids).
-//   - Expected result: Count==0 (no match), Approximate==true (join incomplete).
+//   - Expected result: Count==0 (no match), Truncated==true (join incomplete).
 //
-// This proves the zero is approximate (honest lower bound), not definitive.
+// This proves the zero is truncated (honest lower bound), not definitive.
 func TestCheckEFSECSTask_JoinIncompleteTask_MarksApproximate(t *testing.T) {
 	// Locate the efs→ecs-task checker via the registered related defs.
 	var checker resource.RelatedChecker
@@ -259,7 +259,7 @@ func TestCheckEFSECSTask_JoinIncompleteTask_MarksApproximate(t *testing.T) {
 		ID:     "task-with-ids-001",
 		Fields: map[string]string{"efs_file_system_ids": "fs-foo"},
 	}
-	// task2: join failed — efs ids unknown, marks result as approximate.
+	// task2: join failed — efs ids unknown, marks result as truncated.
 	task2 := resource.Resource{
 		ID:     "task-join-fail-002",
 		Fields: map[string]string{"task_def_join_error": "true"},
@@ -268,7 +268,7 @@ func TestCheckEFSECSTask_JoinIncompleteTask_MarksApproximate(t *testing.T) {
 	cache := resource.ResourceCache{
 		"ecs-task": {
 			Resources:   []resource.Resource{task1, task2},
-			IsTruncated: false, // not page-truncated; the Approximate comes from joinIncomplete
+			IsTruncated: false, // not page-truncated; the Truncated comes from joinIncomplete
 		},
 	}
 
@@ -277,8 +277,8 @@ func TestCheckEFSECSTask_JoinIncompleteTask_MarksApproximate(t *testing.T) {
 	if result.Count != 0 {
 		t.Errorf("Count: want 0 (no task matches fs-bar), got %d", result.Count)
 	}
-	if !result.Approximate {
-		t.Errorf("Approximate: want true (task2 has join error → result is a lower bound, not definitive zero); got false. "+
-			"This means the checker is not propagating joinIncomplete into result.Approximate.")
+	if !result.Truncated {
+		t.Errorf("Truncated: want true (task2 has join error → result is a lower bound, not definitive zero); got false. "+
+			"This means the checker is not propagating joinIncomplete into result.Truncated.")
 	}
 }

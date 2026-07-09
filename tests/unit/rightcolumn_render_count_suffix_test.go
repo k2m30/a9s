@@ -7,17 +7,17 @@ package unit_test
 //   `TestLiveFullIntegration_AllResourcesBaseline` greps the rendered
 //   RELATED panel for the literal substring `"<Pivot> (<N>)"` for every
 //   defined pivot whose checker returned `Count >= 0`. Pre-AS-378 the
-//   renderer emitted `(0+)` / `(N+)` for `Approximate==true` rows, so the
+//   renderer emitted `(0+)` / `(N+)` for `Truncated==true` rows, so the
 //   integration assertion failed for ~6 pivots across 6 unrelated primaries
 //   (`lambda`, `dbi`, `dbc`, `s3`, `ddb`, `ecr`).
 //
 // Contract pinned here:
 //   actual = -1, FetchFilter present       → "DisplayName"            (no parens, navigable)
 //   actual = -1, FetchFilter absent        → "DisplayName (?)"        (transient-unknown, navigable)
-//   actual = 0,  approximate = false       → "DisplayName (0)"        (dim, proven zero, dead end)
-//   actual = 0,  approximate = true        → "DisplayName (0+)"       (normal, lower bound, drillable)
-//   actual = N>0, approximate = false      → "DisplayName (N)"        (normal)
-//   actual = N>0, approximate = true       → "DisplayName (N+)"       (normal, lower bound, drillable)
+//   actual = 0,  truncated = false       → "DisplayName (0)"        (dim, proven zero, dead end)
+//   actual = 0,  truncated = true        → "DisplayName (0+)"       (normal, lower bound, drillable)
+//   actual = N>0, truncated = false      → "DisplayName (N)"        (normal)
+//   actual = N>0, truncated = true       → "DisplayName (N+)"       (normal, lower bound, drillable)
 //
 // Acceptance criterion #2 from AS-378 explicitly enumerates the affected
 // pivots (CT Events / CW Alarms / Glue Jobs / Network Interfaces / CT
@@ -60,7 +60,7 @@ func buildSuffixDetail(t *testing.T, displayName, targetType string) (views.Deta
 
 // injectSuffixResult delivers a RelatedCheckResultMsg for the named target
 // and waits for the model to apply it.
-func injectSuffixResult(d views.DetailModel, targetType string, count int, approximate bool, fetchFilter map[string]string) views.DetailModel {
+func injectSuffixResult(d views.DetailModel, targetType string, count int, truncated bool, fetchFilter map[string]string) views.DetailModel {
 	// Build the result the way a real checker does — via the state
 	// constructors — so a negative "count" produces the correct
 	// RelatedRowState instead of the retired {Count:-1, State:Resolved}
@@ -75,7 +75,7 @@ func injectSuffixResult(d views.DetailModel, targetType string, count int, appro
 		result = resource.RelatedCheckResult{
 			TargetType:  targetType,
 			Count:       count,
-			Approximate: approximate,
+			Truncated: truncated,
 			FetchFilter: fetchFilter,
 		}
 	}
@@ -99,7 +99,7 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 		displayName string
 		targetType  string
 		count       int
-		approximate bool
+		truncated bool
 		fetchFilter map[string]string
 
 		// wantContains is a literal substring the rendered panel MUST
@@ -115,7 +115,7 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 	// Jobs / Network Interfaces / CT Trails as the pivots that broke at
 	// Stage 6.5. Each row below exercises one of those display labels
 	// against one of the three `actual` axes (-1, 0, >0) with the
-	// approximate flag flipped where relevant.
+	// truncated flag flipped where relevant.
 	cases := []renderCase{
 		// CloudTrail Events — actual=-1 with FetchFilter, the production
 		// path for any resource whose CloudTrailKey resolves. Renderer
@@ -126,12 +126,12 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 			displayName:    "CloudTrail Events",
 			targetType:     "ct-events",
 			count:          -1,
-			approximate:    false,
+			truncated:    false,
 			fetchFilter:    map[string]string{"ResourceName": "my-resource"},
 			wantContains:   "CloudTrail Events",
 			mustNotContain: []string{"CloudTrail Events (0)", "CloudTrail Events (?)"},
 		},
-		// CloudWatch Alarms — actual=0 with approximate=true (truncated
+		// CloudWatch Alarms — actual=0 with truncated=true (truncated
 		// cache + 0 matches). This is the AS-378 root-cause path:
 		// pre-fix the renderer emitted "(0+)" and the integration test
 		// failed.
@@ -140,36 +140,36 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 			displayName:    "CloudWatch Alarms",
 			targetType:     "alarm",
 			count:          0,
-			approximate:    true,
+			truncated:    true,
 			fetchFilter:    nil,
 			wantContains:   "CloudWatch Alarms (0+)",
 			mustNotContain: nil,
 		},
-		// CloudWatch Alarms — actual=0 with approximate=false (cache
+		// CloudWatch Alarms — actual=0 with truncated=false (cache
 		// fully scanned, confirmed zero). Renderer must emit "(0)".
 		{
 			name:           "CW_Alarms_zero_confirmed",
 			displayName:    "CloudWatch Alarms",
 			targetType:     "alarm",
 			count:          0,
-			approximate:    false,
+			truncated:    false,
 			fetchFilter:    nil,
 			wantContains:   "CloudWatch Alarms (0)",
 			mustNotContain: []string{"CloudWatch Alarms (0+)"},
 		},
-		// CloudWatch Alarms — actual>0 with approximate=false. Renderer
+		// CloudWatch Alarms — actual>0 with truncated=false. Renderer
 		// must emit "(N)".
 		{
 			name:           "CW_Alarms_positive_exact",
 			displayName:    "CloudWatch Alarms",
 			targetType:     "alarm",
 			count:          3,
-			approximate:    false,
+			truncated:    false,
 			fetchFilter:    nil,
 			wantContains:   "CloudWatch Alarms (3)",
 			mustNotContain: []string{"CloudWatch Alarms (3+)"},
 		},
-		// CloudWatch Alarms — actual>0 with approximate=true (truncated
+		// CloudWatch Alarms — actual>0 with truncated=true (truncated
 		// cache lower-bound). Renderer must emit "(N)" without the "+"
 		// marker post-AS-378.
 		{
@@ -177,7 +177,7 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 			displayName:    "CloudWatch Alarms",
 			targetType:     "alarm",
 			count:          7,
-			approximate:    true,
+			truncated:    true,
 			fetchFilter:    nil,
 			wantContains:   "CloudWatch Alarms (7+)",
 			mustNotContain: nil,
@@ -189,18 +189,18 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 			displayName:    "Glue Jobs",
 			targetType:     "glue-job",
 			count:          0,
-			approximate:    false,
+			truncated:    false,
 			fetchFilter:    nil,
 			wantContains:   "Glue Jobs (0)",
 			mustNotContain: []string{"Glue Jobs (0+)"},
 		},
-		// Glue Jobs — actual=0 approximate (lower bound).
+		// Glue Jobs — actual=0 truncated (lower bound).
 		{
 			name:           "Glue_Jobs_zero_approximate",
 			displayName:    "Glue Jobs",
 			targetType:     "glue-job",
 			count:          0,
-			approximate:    true,
+			truncated:    true,
 			fetchFilter:    nil,
 			wantContains:   "Glue Jobs (0+)",
 			mustNotContain: nil,
@@ -213,19 +213,19 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 			displayName:    "Network Interfaces",
 			targetType:     "eni",
 			count:          -1,
-			approximate:    false,
+			truncated:    false,
 			fetchFilter:    nil,
 			wantContains:   "Network Interfaces",
 			mustNotContain: []string{"Network Interfaces (0)", "Network Interfaces (0+)"},
 		},
-		// Network Interfaces — actual=0 approximate (truncated ENI
+		// Network Interfaces — actual=0 truncated (truncated ENI
 		// cache, no matches for this Lambda's hyperplane).
 		{
 			name:           "Network_Interfaces_zero_approximate",
 			displayName:    "Network Interfaces",
 			targetType:     "eni",
 			count:          0,
-			approximate:    true,
+			truncated:    true,
 			fetchFilter:    nil,
 			wantContains:   "Network Interfaces (0+)",
 			mustNotContain: nil,
@@ -236,7 +236,7 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 			displayName:    "CloudTrail Trails",
 			targetType:     "trail",
 			count:          0,
-			approximate:    false,
+			truncated:    false,
 			fetchFilter:    nil,
 			wantContains:   "CloudTrail Trails (0)",
 			mustNotContain: []string{"CloudTrail Trails (0+)"},
@@ -247,7 +247,7 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 			displayName:    "CloudTrail Trails",
 			targetType:     "trail",
 			count:          2,
-			approximate:    false,
+			truncated:    false,
 			fetchFilter:    nil,
 			wantContains:   "CloudTrail Trails (2)",
 			mustNotContain: []string{"CloudTrail Trails (2+)"},
@@ -264,17 +264,17 @@ func TestRightColumn_RenderCountSuffix_Matrix(t *testing.T) {
 				t.Skip("right column not visible at width=140; cannot exercise suffix rendering")
 			}
 
-			d = injectSuffixResult(d, tc.targetType, tc.count, tc.approximate, tc.fetchFilter)
+			d = injectSuffixResult(d, tc.targetType, tc.count, tc.truncated, tc.fetchFilter)
 			plain := stripAnsi(d.View())
 
 			if !strings.Contains(plain, tc.wantContains) {
-				t.Errorf("rendered RELATED panel missing %q (count=%d approximate=%v); got:\n%s",
-					tc.wantContains, tc.count, tc.approximate, plain)
+				t.Errorf("rendered RELATED panel missing %q (count=%d truncated=%v); got:\n%s",
+					tc.wantContains, tc.count, tc.truncated, plain)
 			}
 			for _, banned := range tc.mustNotContain {
 				if strings.Contains(plain, banned) {
-					t.Errorf("rendered RELATED panel must not contain %q (count=%d approximate=%v); got:\n%s",
-						banned, tc.count, tc.approximate, plain)
+					t.Errorf("rendered RELATED panel must not contain %q (count=%d truncated=%v); got:\n%s",
+						banned, tc.count, tc.truncated, plain)
 				}
 			}
 		})

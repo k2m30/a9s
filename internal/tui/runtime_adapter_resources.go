@@ -37,7 +37,7 @@ import (
 //     old updateActiveView path where RL.Update wrote back via
 //     cacheTopLevelResourceList.
 //  2. Re-apply any active checker against the freshly-loaded page (for
-//     related-navigation lists with approximate ID sets).
+//     related-navigation lists with truncated ID sets).
 //  3. Delegate the cross-view cache write (Branch 2 in the original body),
 //     the partial-success flash, and the enrichment-rerun probe dispatch
 //     to Core.HandleResourcesLoaded.
@@ -180,7 +180,7 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 		msg.Result.Count,
 		false,
 		errMsg,
-		msg.Result.Approximate,
+		msg.Result.Truncated,
 		msg.Result.ResourceIDs,
 		msg.Result.FetchFilter,
 	)

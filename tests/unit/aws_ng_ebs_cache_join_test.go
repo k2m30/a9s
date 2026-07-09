@@ -261,15 +261,15 @@ func TestRelated_NG_EBS_CacheJoin_TruncatedNoMatch_ApproximateZero(t *testing.T)
 	checker := ngCheckerByTarget(t, "ebs")
 	result := checker(context.Background(), nil, source, cache)
 
-	want := resource.ApproximateZero("ebs")
+	want := resource.RelatedCheckResult{TargetType: "ebs", Truncated: true}
 	if result.TargetType != want.TargetType {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, want.TargetType)
 	}
 	if result.Count != want.Count {
 		t.Errorf("Count = %d, want %d", result.Count, want.Count)
 	}
-	if result.Approximate != want.Approximate {
-		t.Errorf("Approximate = %v, want %v", result.Approximate, want.Approximate)
+	if result.Truncated != want.Truncated {
+		t.Errorf("Truncated = %v, want %v", result.Truncated, want.Truncated)
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error: %v", result.Err)

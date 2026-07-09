@@ -79,10 +79,7 @@ func checkLambdaAlarms(ctx context.Context, clients any, res resource.Resource, 
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkLambdaLogs searches the logs cache for the CloudWatch log group for this function.
@@ -117,10 +114,7 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }
 
 // checkLambdaSG extracts security group IDs from the Lambda FunctionConfiguration's
@@ -263,10 +257,7 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // checkLambdaECR resolves the ECR repository for container-image Lambda
@@ -390,8 +381,5 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 	if aggErr := AggregateFailures("lambda-related: ListTargetsByRule", failures, len(ruleList)); aggErr != nil {
 		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: len(ids), ResourceIDs: ids, Err: aggErr}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eb-rule")
-	}
-	return relatedResult("eb-rule", ids)
+	return relatedResultTrunc("eb-rule", ids, truncated)
 }

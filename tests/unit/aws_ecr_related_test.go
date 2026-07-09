@@ -791,7 +791,7 @@ func TestRelated_ECR_ECSTask_Match(t *testing.T) {
 }
 
 // TestRelated_ECR_ECSTask_Match_Truncated verifies that a match in a truncated
-// cache propagates Approximate=true.
+// cache propagates Truncated=true.
 func TestRelated_ECR_ECSTask_Match_Truncated(t *testing.T) {
 	const repoName = "acme/worker"
 	const account = "123456789012"
@@ -818,8 +818,8 @@ func TestRelated_ECR_ECSTask_Match_Truncated(t *testing.T) {
 	if result.Count < 1 {
 		t.Errorf("Count = %d, want >= 1", result.Count)
 	}
-	if !result.Approximate {
-		t.Error("Approximate = false, want true (IsTruncated=true)")
+	if !result.Truncated {
+		t.Error("Truncated = false, want true (IsTruncated=true)")
 	}
 }
 

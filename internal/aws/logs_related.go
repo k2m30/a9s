@@ -45,10 +45,7 @@ func checkLogsLambda(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, lambdaRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("lambda")
-	}
-	return relatedResult("lambda", ids)
+	return relatedResultTrunc("lambda", ids, truncated)
 }
 
 // checkLogsAlarms searches the alarm cache for alarms with a "LogGroupName" dimension
@@ -80,10 +77,7 @@ func checkLogsAlarms(ctx context.Context, clients any, res resource.Resource, ca
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkLogsKMS extracts the KMS key ID from the CloudWatch Log Group's KmsKeyId
@@ -129,10 +123,7 @@ func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, api.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("apigw")
-	}
-	return relatedResult("apigw", ids)
+	return relatedResultTrunc("apigw", ids, truncated)
 }
 
 // checkLogsECSTask matches log groups named /ecs/{task-family}. The family is
@@ -175,10 +166,7 @@ func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, c
 			ids = append(ids, taskRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ecs-task")
-	}
-	return relatedResult("ecs-task", ids)
+	return relatedResultTrunc("ecs-task", ids, truncated)
 }
 
 // logsSubscriptionFilters fetches the log group's subscription filters via a

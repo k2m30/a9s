@@ -127,7 +127,7 @@ func fetchECSTasksPageWithJoin(
 			// Skipped gracefully when describeTaskDefAPI is nil. A join
 			// failure is recorded as a per-task
 			// Fields["task_def_join_error"]="true" so reverse-scan checkers
-			// (e.g. checkEFSECSTask) can report Approximate without the
+			// (e.g. checkEFSECSTask) can report Truncated without the
 			// fetcher lying about pagination truncation (which would
 			// misleadingly surface "m: load more").
 			taskDefJoin, joinErr := ecsJoinTaskDefinition(ctx, task, seenTaskDefs, describeTaskDefAPI)
@@ -212,7 +212,7 @@ type taskDefJoinFields struct {
 // ContainerDefinitions[].Secrets[]. Returns a zero-value taskDefJoinFields and
 // an error when DescribeTaskDefinition failed. The caller surfaces the error
 // as pagination truncation so downstream reverse-scan checkers (e.g.
-// checkEFSECSTask) report Approximate rather than a silently-wrong definite
+// checkEFSECSTask) report Truncated rather than a silently-wrong definite
 // zero.
 func ecsJoinTaskDefinition(
 	ctx context.Context,
@@ -242,7 +242,7 @@ func ecsJoinTaskDefinition(
 			// truncation — no volumes = no EFS IDs. Every other error
 			// (access denied, throttled, transient) is propagated so the
 			// fetcher marks Pagination.IsTruncated and reverse-scan
-			// checkers report Approximate.
+			// checkers report Truncated.
 			var apiErr smithy.APIError
 			if errors.As(err, &apiErr) && apiErr.ErrorCode() == "ClientException" {
 				return taskDefJoinFields{}, nil

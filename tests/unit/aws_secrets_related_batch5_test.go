@@ -204,7 +204,7 @@ func TestRelated_Secrets_EB_MatchByResolveReference(t *testing.T) {
 }
 
 // TestRelated_Secrets_EB_MatchApproximate verifies that checkSecretsEB propagates
-// Approximate=true when cache is truncated.
+// Truncated=true when cache is truncated.
 func TestRelated_Secrets_EB_MatchApproximate(t *testing.T) {
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password"
 
@@ -242,8 +242,8 @@ func TestRelated_Secrets_EB_MatchApproximate(t *testing.T) {
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1 (matching env)", result.Count)
 	}
-	if !result.Approximate {
-		t.Errorf("Approximate = false, want true (cache is truncated)")
+	if !result.Truncated {
+		t.Errorf("Truncated = false, want true (cache is truncated)")
 	}
 }
 
@@ -356,7 +356,7 @@ func TestRelated_Secrets_ECSTask_MatchBySecretsValueFrom(t *testing.T) {
 
 
 // TestRelated_Secrets_ECSTask_Truncated verifies that checkSecretsECSTask
-// propagates Approximate=true when the ecs-task cache is truncated.
+// propagates Truncated=true when the ecs-task cache is truncated.
 func TestRelated_Secrets_ECSTask_Truncated(t *testing.T) {
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password"
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:7"
@@ -397,8 +397,8 @@ func TestRelated_Secrets_ECSTask_Truncated(t *testing.T) {
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1", result.Count)
 	}
-	if !result.Approximate {
-		t.Errorf("Approximate = false, want true (cache is truncated)")
+	if !result.Truncated {
+		t.Errorf("Truncated = false, want true (cache is truncated)")
 	}
 }
 

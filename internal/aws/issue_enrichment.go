@@ -65,7 +65,7 @@ const EnrichmentParallelism = 8
 
 // PerParentPageCap limits per-parent pagination walks in enrichers to avoid
 // runaway enumeration on huge tenants. When hit, the emitted count is marked
-// with a "+" suffix to signal approximate.
+// with a "+" suffix to signal truncated.
 const PerParentPageCap = 10
 
 // isInstanceARN returns true when the RDS ARN targets a DB instance

@@ -128,9 +128,9 @@ type RelatedCheckResult struct {
 	ResourceIDs []string // IDs of found related resources
 	Err         error
 	FetchFilter map[string]string
-	// Approximate stays orthogonal to State: it modifies a RelatedResolved
+	// Truncated stays orthogonal to State: it modifies a RelatedResolved
 	// result derived from a truncated cache page ("N+"), never the other states.
-	Approximate bool
+	Truncated bool
 }
 
 // EffectiveState returns the row-disposition state consumers must act on. A

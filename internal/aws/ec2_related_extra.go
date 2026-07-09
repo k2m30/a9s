@@ -99,10 +99,7 @@ func checkEC2KMS(ctx context.Context, clients any, res resource.Resource, cache 
 	for id := range keySet {
 		ids = append(ids, id)
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("kms")
-	}
-	return relatedResult("kms", ids)
+	return relatedResultTrunc("kms", ids, truncated)
 }
 
 // checkEC2Logs searches the logs cache for log groups matching this EC2
@@ -127,10 +124,7 @@ func checkEC2Logs(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }
 
 // checkEC2Backup scans the backup cache for backup plans that cover this
@@ -174,8 +168,5 @@ func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, planRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("backup")
-	}
-	return relatedResult("backup", ids)
+	return relatedResultTrunc("backup", ids, truncated)
 }

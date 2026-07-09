@@ -197,7 +197,7 @@ ecr — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | lambda | Lambda Functions | yes |
 | cb | CodeBuild Projects | yes |

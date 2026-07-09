@@ -88,10 +88,7 @@ func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("rtb")
-	}
-	return relatedResult("rtb", ids)
+	return relatedResultTrunc("rtb", ids, truncated)
 }
 
 // checkTGWRole checks whether the Transit Gateway service-linked role (SLR)

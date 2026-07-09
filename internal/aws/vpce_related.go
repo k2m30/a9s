@@ -116,10 +116,7 @@ func checkVPCEAlarm(ctx context.Context, clients any, res resource.Resource, cac
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkVPCELogs reports CloudWatch Logs groups receiving VPC Flow Logs for

@@ -65,10 +65,7 @@ func checkTGELB(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, elbRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("elb")
-	}
-	return relatedResult("elb", ids)
+	return relatedResultTrunc("elb", ids, truncated)
 }
 
 // checkTGECSSvc searches the ECS service cache for services whose LoadBalancers
@@ -100,10 +97,7 @@ func checkTGECSSvc(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ecs-svc")
-	}
-	return relatedResult("ecs-svc", ids)
+	return relatedResultTrunc("ecs-svc", ids, truncated)
 }
 
 // checkTGASG searches the ASG cache for auto scaling groups whose TargetGroupARNs
@@ -132,10 +126,7 @@ func checkTGASG(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, asgRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("asg")
-	}
-	return relatedResult("asg", ids)
+	return relatedResultTrunc("asg", ids, truncated)
 }
 
 // checkTGAlarm searches the alarm cache for CloudWatch alarms targeting this
@@ -175,10 +166,7 @@ func checkTGAlarm(ctx context.Context, clients any, res resource.Resource, cache
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkTGVPC returns the VPC this target group is scoped to (Pattern F).

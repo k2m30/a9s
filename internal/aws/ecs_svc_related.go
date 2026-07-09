@@ -92,10 +92,7 @@ func checkECSSvcAlarms(ctx context.Context, clients any, res resource.Resource, 
 			ids = append(ids, alarmRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkECSSvcCFN checks the ECS service's tags for aws:cloudformation:stack-name and finds the
@@ -134,10 +131,7 @@ func checkECSSvcCFN(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // checkECSSvcELB finds the load balancers attached to this ECS service via a two-hop
@@ -230,10 +224,7 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, elbRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncatedELB {
-		return resource.ApproximateZero("elb")
-	}
-	return relatedResult("elb", ids)
+	return relatedResultTrunc("elb", ids, truncatedELB)
 }
 
 // checkECSSvcLogs searches the logs cache for log groups matching the ECS service's
@@ -275,10 +266,7 @@ func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }
 
 // checkECSSvcSG extracts security group IDs from the ECS Service's

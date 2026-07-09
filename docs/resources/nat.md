@@ -181,7 +181,7 @@ nat — NETWORKING. Lifecycle key: `state`.
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | vpc | VPCs | yes |
 | subnet | Subnets | yes |

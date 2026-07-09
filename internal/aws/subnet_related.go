@@ -39,10 +39,7 @@ func checkSubnetEC2(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, ec2Res.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ec2")
-	}
-	return relatedResult("ec2", ids)
+	return relatedResultTrunc("ec2", ids, truncated)
 }
 
 // checkSubnetENI searches the eni cache for network interfaces whose SubnetId
@@ -72,10 +69,7 @@ func checkSubnetENI(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, eniRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eni")
-	}
-	return relatedResult("eni", ids)
+	return relatedResultTrunc("eni", ids, truncated)
 }
 
 // checkSubnetNAT searches the nat cache for NAT gateways whose subnet_id field
@@ -100,10 +94,7 @@ func checkSubnetNAT(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, natRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("nat")
-	}
-	return relatedResult("nat", ids)
+	return relatedResultTrunc("nat", ids, truncated)
 }
 
 // checkSubnetELB searches the elb cache for load balancers whose AvailabilityZones
@@ -135,10 +126,7 @@ func checkSubnetELB(ctx context.Context, clients any, res resource.Resource, cac
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("elb")
-	}
-	return relatedResult("elb", ids)
+	return relatedResultTrunc("elb", ids, truncated)
 }
 
 // checkSubnetRTB searches the rtb cache for route tables associated with this
@@ -185,10 +173,7 @@ func checkSubnetRTB(ctx context.Context, clients any, res resource.Resource, cac
 	if !hasExplicit && mainRTBID != "" {
 		ids = append(ids, mainRTBID)
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("rtb")
-	}
-	return relatedResult("rtb", ids)
+	return relatedResultTrunc("rtb", ids, truncated)
 }
 
 // checkSubnetCFN checks the subnet's tags for aws:cloudformation:stack-name.
@@ -244,10 +229,7 @@ func checkSubnetASG(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, asgRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("asg")
-	}
-	return relatedResult("asg", ids)
+	return relatedResultTrunc("asg", ids, truncated)
 }
 
 // checkSubnetEFS reports EFS file systems mounted into this subnet. Pattern
@@ -290,7 +272,7 @@ func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	if len(fsIDSet) == 0 {
 		if eniTruncated {
-			return resource.ApproximateZero("efs")
+			return relatedResultTrunc("efs", nil, true)
 		}
 		return resource.RelatedCheckResult{TargetType: "efs", Count: 0}
 	}
@@ -309,10 +291,7 @@ func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, efsRes.ID)
 		}
 	}
-	if len(ids) == 0 && efsTruncated {
-		return resource.ApproximateZero("efs")
-	}
-	return relatedResult("efs", ids)
+	return relatedResultTrunc("efs", ids, efsTruncated)
 }
 
 // checkSubnetEKS reports EKS clusters whose VpcConfig.SubnetIds includes
@@ -344,10 +323,7 @@ func checkSubnetEKS(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, eksRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eks")
-	}
-	return relatedResult("eks", ids)
+	return relatedResultTrunc("eks", ids, truncated)
 }
 
 // checkSubnetVPCE reports VPC endpoints whose SubnetIds include this subnet
@@ -376,10 +352,7 @@ func checkSubnetVPCE(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, vpceRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("vpce")
-	}
-	return relatedResult("vpce", ids)
+	return relatedResultTrunc("vpce", ids, truncated)
 }
 
 // splitCSV splits a comma-separated list and trims whitespace from each element.

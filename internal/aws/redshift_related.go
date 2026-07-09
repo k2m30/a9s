@@ -41,10 +41,7 @@ func checkRedshiftAlarms(ctx context.Context, clients any, res resource.Resource
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkRedshiftSG extracts security group IDs from the Redshift Cluster's
@@ -151,10 +148,7 @@ func checkRedshiftCFN(ctx context.Context, clients any, res resource.Resource, c
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // checkRedshiftSecrets resolves the admin-credentials secret managed for this
@@ -184,10 +178,7 @@ func checkRedshiftSecrets(ctx context.Context, clients any, res resource.Resourc
 			ids = append(ids, secretRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("secrets")
-	}
-	return relatedResult("secrets", ids)
+	return relatedResultTrunc("secrets", ids, truncated)
 }
 
 // checkRedshiftLogs resolves the cluster's audit-log target via a single

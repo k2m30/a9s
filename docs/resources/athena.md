@@ -172,7 +172,7 @@ athena — DATA & ANALYTICS. Lifecycle key: `state`.
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | s3 | S3 Buckets (results) | no |
 | kms | KMS Keys | no |

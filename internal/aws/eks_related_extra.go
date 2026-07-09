@@ -71,10 +71,7 @@ func checkEKSASG(ctx context.Context, clients any, res resource.Resource, cache 
 	for id := range seen {
 		ids = append(ids, id)
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("asg")
-	}
-	return relatedResult("asg", ids)
+	return relatedResultTrunc("asg", ids, truncated)
 }
 
 // checkEKSCTEvents scans ct-events for events involving this cluster.
@@ -103,10 +100,7 @@ func checkEKSCTEvents(ctx context.Context, clients any, res resource.Resource, c
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ct-events")
-	}
-	return relatedResult("ct-events", ids)
+	return relatedResultTrunc("ct-events", ids, truncated)
 }
 
 // checkEKSAMI resolves the AMI(s) used by all node groups in this EKS cluster.

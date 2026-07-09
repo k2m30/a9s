@@ -70,7 +70,7 @@ func checkSecretsCodeArtifact(_ context.Context, _ any, res resource.Resource, _
 // Iterates cache["eb"]; for each EB environment, calls
 // elasticbeanstalk:DescribeConfigurationSettings and scans OptionSettings[].Value
 // for {{resolve:secretsmanager:<parent ARN> pattern.
-// NeedsTargetCache: true; sets Approximate and FetchFilter.
+// NeedsTargetCache: true; sets Truncated and FetchFilter.
 func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	// Validate source RawStruct — must be a SecretListEntry.
 	if res.RawStruct == nil {
@@ -140,7 +140,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 	}
 
 	result := relatedResult("eb", ids)
-	result.Approximate = entry.IsTruncated
+	result.Truncated = entry.IsTruncated
 	result.Err = AggregateFailures("secrets-related: DescribeConfigurationSettings", failures, total)
 	return result
 }
@@ -149,7 +149,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 // Iterates cache["ecs-task"]; for each task, calls ecs:DescribeTaskDefinition and checks
 // ContainerDefinitions[].Secrets[].ValueFrom == parent ARN or
 // RepositoryCredentials.CredentialsParameter == parent ARN.
-// NeedsTargetCache: true; sets Approximate.
+// NeedsTargetCache: true; sets Truncated.
 func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	// Validate source RawStruct — must be a SecretListEntry.
 	if res.RawStruct == nil {
@@ -225,7 +225,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 	}
 
 	result := relatedResult("ecs-task", ids)
-	result.Approximate = entry.IsTruncated
+	result.Truncated = entry.IsTruncated
 	result.Err = AggregateFailures("secrets-related: DescribeTaskDefinition", failures, total)
 	return result
 }

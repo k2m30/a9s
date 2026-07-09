@@ -189,7 +189,7 @@ ses — MESSAGING. Lifecycle key: `status`.
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | r53 | Route 53 (DNS) | yes |
 | eb-rule | EventBridge Rules | yes |

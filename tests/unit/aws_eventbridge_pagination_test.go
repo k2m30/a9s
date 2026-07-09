@@ -257,7 +257,7 @@ func TestEnrichEventBridgeRule_CappedAtPerParentPageCap(t *testing.T) {
 	}
 	tc := updates["target_count"]
 	if !strings.HasSuffix(tc, "+") {
-		t.Errorf("target_count = %q, want suffix \"+\" (approximate)", tc)
+		t.Errorf("target_count = %q, want suffix \"+\" (truncated)", tc)
 	}
 	wantPrefix := fmt.Sprintf("%d+", awsclient.PerParentPageCap*100)
 	if tc != wantPrefix {

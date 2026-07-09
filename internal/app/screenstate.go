@@ -142,7 +142,7 @@ type DetailRelatedRow struct {
 	Count       int                    `json:"count"` // authoritative only when State == RelatedResolved
 	Loading     bool                   `json:"loading,omitempty"`
 	Err         string                 `json:"err,omitempty"`
-	Approximate bool                   `json:"approximate,omitempty"`
+	Truncated bool                   `json:"truncated,omitempty"`
 	ResourceIDs []string               `json:"resource_ids,omitempty"`
 	FetchFilter map[string]string      `json:"fetch_filter,omitempty"`
 }

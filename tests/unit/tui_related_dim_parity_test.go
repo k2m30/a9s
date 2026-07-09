@@ -1,14 +1,14 @@
 // tui_related_dim_parity_test.go — pins the user-visible defect where an
-// approximate-zero related row (checker resolved Count=0, Approximate=true —
+// truncated-zero related row (checker resolved Count=0, Truncated=true —
 // e.g. resource.ApproximateZero() results like trail/glue/backup on an S3
 // bucket) renders BRIGHT "(0)" in the live TUI detail RELATED panel while an
 // exact-zero row renders dim, even though both are dead-end pivots per
-// resource.IsRelatedActionable (any RelatedResolved zero, approximate or not,
+// resource.IsRelatedActionable (any RelatedResolved zero, truncated or not,
 // is never actionable — related.go:290-306).
 //
 // Root cause: renderDetailRelatedFromBody (internal/tui/views/detail_helpers.go,
 // the LIVE renderer invoked by DetailModel.RenderDetail) carries an inline
-// style switch with its own `case blk.Count == 0 && blk.Approximate` branch
+// style switch with its own `case blk.Count == 0 && blk.Truncated` branch
 // that assigns styles.RowNormal (bright), diverging from the controller's
 // already-correct RelatedBlock.Actionable field (set via
 // isActionableDetailRow -> resource.IsRelatedActionable by
@@ -136,11 +136,11 @@ func extractRelatedLine(t *testing.T, rendered, needle string) string {
 }
 
 // ---------------------------------------------------------------------------
-// Pin 1: approximate-zero renders with the SAME dim style as exact-zero.
+// Pin 1: truncated-zero renders with the SAME dim style as exact-zero.
 // ---------------------------------------------------------------------------
 
 // TestRelatedDim_ApproximateZero_BrightAndActionable pins the correct contract:
-// an approximate lower bound ("0+", from a truncated target scan where more may
+// an truncated lower bound ("0+", from a truncated target scan where more may
 // exist on later pages) renders BRIGHT and actionable with a "(0+)" badge — the
 // user can drill in — while only a PROVEN exact zero renders dim "(0)" as a
 // dead end. The two must therefore render DIFFERENTLY.
@@ -154,7 +154,7 @@ func TestRelatedDim_ApproximateZero_BrightAndActionable(t *testing.T) {
 				Name:         "Trail Events",
 				State:        domain.RelatedResolved,
 				Count:        0,
-				Approximate:  true,
+				Truncated:  true,
 				TargetType:   "ct-events",
 				Actionable:   resource.IsRelatedActionable(domain.RelatedResolved, 0, true),
 				CountDisplay: resource.FormatRelatedCount(domain.RelatedResolved, 0, true),
@@ -163,7 +163,7 @@ func TestRelatedDim_ApproximateZero_BrightAndActionable(t *testing.T) {
 				Name:         "Backup Plans",
 				State:        domain.RelatedResolved,
 				Count:        0,
-				Approximate:  false,
+				Truncated:  false,
 				TargetType:   "backup",
 				Actionable:   resource.IsRelatedActionable(domain.RelatedResolved, 0, false),
 				CountDisplay: resource.FormatRelatedCount(domain.RelatedResolved, 0, false),
@@ -181,19 +181,19 @@ func TestRelatedDim_ApproximateZero_BrightAndActionable(t *testing.T) {
 			approxLine := extractRelatedLine(t, rendered, "Trail Events")
 			exactLine := extractRelatedLine(t, rendered, "Backup Plans")
 
-			// Approximate row: BRIGHT with a "(0+)" badge.
+			// Truncated row: BRIGHT with a "(0+)" badge.
 			wantApproxStyled := styles.RowNormal.Render("  Trail Events (0+)")
 			// Exact zero: DIM with a plain "(0)" badge.
 			wantExactStyled := styles.DimText.Render("  Backup Plans (0)")
 
 			if approxLine != wantApproxStyled {
-				t.Errorf("[%s] approximate-zero row not rendered BRIGHT with \"(0+)\" badge.\n  got:  %q\n  want: %q", tc.shortName, approxLine, wantApproxStyled)
+				t.Errorf("[%s] truncated-zero row not rendered BRIGHT with \"(0+)\" badge.\n  got:  %q\n  want: %q", tc.shortName, approxLine, wantApproxStyled)
 			}
 			if exactLine != wantExactStyled {
 				t.Errorf("[%s] exact-zero row not rendered DIM with \"(0)\" badge.\n  got:  %q\n  want: %q", tc.shortName, exactLine, wantExactStyled)
 			}
 			if approxLine == exactLine {
-				t.Errorf("[%s] approximate-zero and exact-zero rows render identically — a drillable lower bound must be visually distinct from a proven dead-end zero", tc.shortName)
+				t.Errorf("[%s] truncated-zero and exact-zero rows render identically — a drillable lower bound must be visually distinct from a proven dead-end zero", tc.shortName)
 			}
 		})
 	}
@@ -212,7 +212,7 @@ type relatedDimParityCase struct {
 
 // relatedDimParitySweepCases builds one RelatedBlock per state combination
 // named in the dispatch: loading / err / resolved-unknown with+without filter
-// (deferred) / 0 exact / 0 approximate / N>0. Actionable and CountDisplay are
+// (deferred) / 0 exact / 0 truncated / N>0. Actionable and CountDisplay are
 // computed via the same shared helpers the controller uses, so this table is
 // itself a pin on resource.IsRelatedActionable / resource.FormatRelatedCount
 // wiring, not just the renderer.
@@ -226,7 +226,7 @@ type relatedDimParityCase struct {
 // Count is normalized to 0 for every non-Resolved state, mirroring those
 // constructors.
 func relatedDimParitySweepCases() []relatedDimParityCase {
-	mk := func(name string, count int, approximate, hasFilter, loading, hasErr bool) relatedDimParityCase {
+	mk := func(name string, count int, truncated, hasFilter, loading, hasErr bool) relatedDimParityCase {
 		var filter map[string]string
 		if hasFilter {
 			filter = map[string]string{"instance-id": "i-0abc123def456789a"}
@@ -245,12 +245,12 @@ func relatedDimParitySweepCases() []relatedDimParityCase {
 		if state != domain.RelatedResolved {
 			count = 0
 		}
-		actionable := resource.IsRelatedActionable(state, count, approximate)
+		actionable := resource.IsRelatedActionable(state, count, truncated)
 		blk := app.RelatedBlock{
 			Name:        name,
 			State:       state,
 			Count:       count,
-			Approximate: approximate,
+			Truncated: truncated,
 			FetchFilter: filter,
 			Loading:     loading,
 			Err:         hasErr,
@@ -258,7 +258,7 @@ func relatedDimParitySweepCases() []relatedDimParityCase {
 			Actionable:  actionable,
 		}
 		if !loading && !hasErr {
-			blk.CountDisplay = resource.FormatRelatedCount(state, count, approximate)
+			blk.CountDisplay = resource.FormatRelatedCount(state, count, truncated)
 		}
 		return relatedDimParityCase{name: name, block: blk, wantActionable: actionable}
 	}
@@ -287,7 +287,7 @@ func expectedRelatedRowText(c relatedDimParityCase) string {
 	case blk.Err:
 		return "  " + blk.Name + "  —"
 	default:
-		display := resource.FormatRelatedCount(blk.State, blk.Count, blk.Approximate)
+		display := resource.FormatRelatedCount(blk.State, blk.Count, blk.Truncated)
 		if display == "" {
 			return "  " + blk.Name
 		}
@@ -302,7 +302,7 @@ func expectedRelatedRowText(c relatedDimParityCase) string {
 // styles.DimText otherwise. This is RED at HEAD for the ApproxZero and
 // PositiveApprox cases only if the renderer's inline switch diverges from
 // blk.Actionable; it is the general contract the coder's fix must satisfy
-// for every state, not just the approximate-zero one named in the report.
+// for every state, not just the truncated-zero one named in the report.
 func TestRelatedDim_PropertySweep_BrightIffActionable(t *testing.T) {
 	for _, tc := range relatedDimParityTypes() {
 		tc := tc
@@ -367,41 +367,41 @@ func TestRelatedDim_PropertySweep_TableDrivenSanity(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Pin 3: cursor parity — approximate-zero row is still skipped.
+// Pin 3: cursor parity — truncated-zero row is still skipped.
 // ---------------------------------------------------------------------------
 //
 // This extends the existing app_related_cursor_skip_test.go harness
 // (newRelatedSkipController / relatedCursorAndActionable, same package) with
-// one additional case: an approximate-zero row must be skipped by cursor
+// one additional case: an truncated-zero row must be skipped by cursor
 // movement exactly like an exact-zero row, so a future fix to the renderer's
 // brightness cannot silently diverge from the cursor's skip predicate (both
 // already delegate to isActionableDetailRow / resource.IsRelatedActionable,
 // so this is a regression guard tying the three surfaces — render style,
 // cursor skip, Enter/click gating — to the single shared predicate).
 
-// relatedRowApprox builds a DetailRelatedRow with an explicit Approximate
-// flag, extending relatedRow (which always passes approximate=false) for the
+// relatedRowApprox builds a DetailRelatedRow with an explicit Truncated
+// flag, extending relatedRow (which always passes truncated=false) for the
 // one case this suite adds.
-func relatedRowApprox(targetType string, count int, approximate bool) app.DetailRelatedRow {
+func relatedRowApprox(targetType string, count int, truncated bool) app.DetailRelatedRow {
 	return app.DetailRelatedRow{
 		TargetType:  targetType,
 		DisplayName: targetType,
 		Count:       count,
-		Approximate: approximate,
+		Truncated: truncated,
 	}
 }
 
 // TestRelatedCursor_MoveDown_LandsOnApproximateZeroRow verifies that moving
-// down from an actionable row LANDS ON an approximate-zero row (Count=0,
-// Approximate=true — an ApproximateZero() result), because a "0+" lower bound
+// down from an actionable row LANDS ON an truncated-zero row (Count=0,
+// Truncated=true — an ApproximateZero() result), because a "0+" lower bound
 // is drillable (more may exist on later pages). The cursor skip predicate,
 // render brightness, and Enter/click gating all delegate to the single shared
-// resource.IsRelatedActionable, so an approximate-zero row is a valid landing
+// resource.IsRelatedActionable, so an truncated-zero row is a valid landing
 // row exactly like any other actionable row.
 func TestRelatedCursor_MoveDown_LandsOnApproximateZeroRow(t *testing.T) {
 	rows := []app.DetailRelatedRow{
 		relatedRow("sg", 3),                    // index 0: actionable, cursor starts here
-		relatedRowApprox("ct-events", 0, true), // index 1: approximate-zero, actionable (0+ drillable)
+		relatedRowApprox("ct-events", 0, true), // index 1: truncated-zero, actionable (0+ drillable)
 		relatedRow("eni", 2),                   // index 2: actionable
 	}
 	c := newRelatedSkipController(t, rows)
@@ -410,13 +410,13 @@ func TestRelatedCursor_MoveDown_LandsOnApproximateZeroRow(t *testing.T) {
 
 	cursor, actionable := relatedCursorAndActionable(t, vs)
 	if cursor != 1 {
-		t.Errorf("RelatedCursor after MoveDown = %d, want 1 (approximate-zero row is actionable and must NOT be skipped)", cursor)
+		t.Errorf("RelatedCursor after MoveDown = %d, want 1 (truncated-zero row is actionable and must NOT be skipped)", cursor)
 	}
 	if !actionable {
-		t.Errorf("row at RelatedCursor=%d is dimmed (Actionable=false), want the actionable approximate-zero landing row", cursor)
+		t.Errorf("row at RelatedCursor=%d is dimmed (Actionable=false), want the actionable truncated-zero landing row", cursor)
 	}
-	// Sanity: an approximate-zero row is actionable per the shared predicate.
+	// Sanity: an truncated-zero row is actionable per the shared predicate.
 	if got := resource.IsRelatedActionable(domain.RelatedResolved, 0, true); !got {
-		t.Fatalf("test setup: resource.IsRelatedActionable(RelatedResolved, 0, approximate=true) = %v, want true — a 0+ lower bound must be drillable", got)
+		t.Fatalf("test setup: resource.IsRelatedActionable(RelatedResolved, 0, truncated=true) = %v, want true — a 0+ lower bound must be drillable", got)
 	}
 }

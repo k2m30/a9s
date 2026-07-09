@@ -25,12 +25,12 @@
 //
 // Dim predicate for the related panel (internal/app/detail_cursor.go:217,
 // isActionableDetailRow) delegates to the single shared predicate
-// resource.IsRelatedActionable(state, count, approximate) — the SAME
+// resource.IsRelatedActionable(state, count, truncated) — the SAME
 // predicate buildDetailRelatedBlocks uses to set RelatedBlock.Actionable
 // (internal/app/detail_body.go:435). A row is dimmed (non-actionable) when:
 // State is RelatedLoading or RelatedError, or State is RelatedResolved with
 // Count==0. It is actionable when State is RelatedDeferred or RelatedUnknown,
-// or State is RelatedResolved with Count>0 (or Approximate with Count>0).
+// or State is RelatedResolved with Count>0 (or Truncated with Count>0).
 //
 // detail_cursor.go's ActionMoveUp/Down/Top/Bottom for the related-focused
 // branch (RelatedFocus==true) currently have NO skip logic at all — they

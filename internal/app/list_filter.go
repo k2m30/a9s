@@ -258,7 +258,7 @@ func listToFloat(v reflect.Value) (float64, bool) {
 }
 
 // reapplyCheckerEntry holds the per-type reapply checker + source resource for
-// approximate-pivot navigations. Keyed by resource type short name.
+// truncated-pivot navigations. Keyed by resource type short name.
 type reapplyCheckerEntry struct {
 	checker resource.RelatedChecker
 	source  resource.Resource

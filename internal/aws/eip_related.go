@@ -77,10 +77,7 @@ func checkEIPNAT(ctx context.Context, clients any, res resource.Resource, cache 
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("nat")
-	}
-	return relatedResult("nat", ids)
+	return relatedResultTrunc("nat", ids, truncated)
 }
 
 // checkEIPCFN returns the CloudFormation stack that owns this EIP via
@@ -241,7 +238,7 @@ func checkEIPECSTask(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	if taskRes.ID == "" {
 		if truncated {
-			return resource.ApproximateZero("ecs-task")
+			return relatedResultTrunc("ecs-task", nil, true)
 		}
 		return resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0}
 	}
@@ -262,7 +259,7 @@ func checkEIPECSSvc(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	if taskRes.ID == "" {
 		if truncated {
-			return resource.ApproximateZero("ecs-svc")
+			return relatedResultTrunc("ecs-svc", nil, true)
 		}
 		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
 	}
@@ -291,7 +288,7 @@ func checkEIPECS(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	if taskRes.ID == "" {
 		if truncated {
-			return resource.ApproximateZero("ecs")
+			return relatedResultTrunc("ecs", nil, true)
 		}
 		return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
 	}

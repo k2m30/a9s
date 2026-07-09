@@ -65,10 +65,7 @@ func checkASGAlarm(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkASGNG searches the node group cache for EKS node groups whose AutoScalingGroups
@@ -104,10 +101,7 @@ func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache r
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ng")
-	}
-	return relatedResult("ng", ids)
+	return relatedResultTrunc("ng", ids, truncated)
 }
 
 // checkASGAMI resolves the AMI used by the ASG's launch configuration or launch template.

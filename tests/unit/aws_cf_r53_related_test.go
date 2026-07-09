@@ -10,7 +10,7 @@ package unit_test
 //   - Subdomain suffix match: alias ends with "."+zone.Name → Count=1
 //   - Multiple aliases across multiple zones → Count=len(matched zones)
 //   - No-match: different domain → Count=0
-//   - Truncated cache with no matches → Approximate=true
+//   - Truncated cache with no matches → Truncated=true
 //   - No aliases → Count=0
 //   - Trailing dot normalisation: zone "example.com." matches alias "example.com"
 
@@ -102,8 +102,8 @@ func TestCheckCfR53_MatchesExactZoneName(t *testing.T) {
 	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != zone.ID {
 		t.Errorf("ResourceIDs = %v, want [%q]", result.ResourceIDs, zone.ID)
 	}
-	if result.Approximate {
-		t.Error("Approximate must be false when cache is not truncated")
+	if result.Truncated {
+		t.Error("Truncated must be false when cache is not truncated")
 	}
 }
 
@@ -186,8 +186,8 @@ func TestCheckCfR53_NoMatchDifferentDomain(t *testing.T) {
 	if len(result.ResourceIDs) != 0 {
 		t.Errorf("ResourceIDs = %v, want empty (no match)", result.ResourceIDs)
 	}
-	if result.Approximate {
-		t.Error("Approximate must be false when cache is complete and no match found")
+	if result.Truncated {
+		t.Error("Truncated must be false when cache is complete and no match found")
 	}
 }
 
@@ -196,7 +196,7 @@ func TestCheckCfR53_NoMatchDifferentDomain(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestCheckCfR53_TruncatedEmptyCacheReturnsApproximate: when r53 cache is
-// truncated and contains no matching zones, the result must be Approximate=true
+// truncated and contains no matching zones, the result must be Truncated=true
 // (not a hard zero — more zones may exist beyond the cache window).
 func TestCheckCfR53_TruncatedEmptyCacheReturnsApproximate(t *testing.T) {
 	checker := cfR53Checker(t)
@@ -213,8 +213,8 @@ func TestCheckCfR53_TruncatedEmptyCacheReturnsApproximate(t *testing.T) {
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 for truncated-cache miss", result.Count)
 	}
-	if !result.Approximate {
-		t.Error("Approximate must be true when cache is truncated and no match found — more zones may exist")
+	if !result.Truncated {
+		t.Error("Truncated must be true when cache is truncated and no match found — more zones may exist")
 	}
 }
 

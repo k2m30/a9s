@@ -74,7 +74,7 @@ func checkLambdaEFS(_ context.Context, _ any, res resource.Resource, _ resource.
 // checkLambdaAPIGW scans the apigw cache for HTTP/REST APIs that integrate
 // with this Lambda function. apigatewayv2.Api struct does not embed
 // integrations, so without a GetIntegrations API call this is undeterminable.
-// We approximate by searching for the function name in the api's Name or
+// We truncated by searching for the function name in the api's Name or
 // Tags — a weak signal, but better than Count:0 when a real match exists.
 func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
@@ -104,10 +104,7 @@ func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, c
 			ids = append(ids, apiRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("apigw")
-	}
-	return relatedResult("apigw", ids)
+	return relatedResultTrunc("apigw", ids, truncated)
 }
 
 // checkLambdaCF scans the cloudfront cache for Lambda@Edge distributions that
@@ -146,10 +143,7 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cf")
-	}
-	return relatedResult("cf", ids)
+	return relatedResultTrunc("cf", ids, truncated)
 }
 
 // checkLambdaDDB scans this Lambda's event source mappings for DynamoDB
@@ -304,10 +298,7 @@ func checkLambdaCTEvents(ctx context.Context, clients any, res resource.Resource
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ct-events")
-	}
-	return relatedResult("ct-events", ids)
+	return relatedResultTrunc("ct-events", ids, truncated)
 }
 
 // --- Reverse lookups that require fields not in the cached struct ---
@@ -350,7 +341,7 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	if len(lambdaTGs) == 0 {
 		if truncated {
-			return resource.ApproximateZero("tg")
+			return relatedResultTrunc("tg", nil, true)
 		}
 		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
 	}
@@ -397,7 +388,7 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	result := relatedResult("tg", ids)
 	if len(ids) == 0 && truncated {
-		result = resource.ApproximateZero("tg")
+		result = relatedResultTrunc("tg", nil, true)
 	}
 	result.Err = AggregateFailures("lambda-related: DescribeTargetHealth", failures, len(lambdaTGs))
 	return result
@@ -442,10 +433,7 @@ func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cac
 	for t := range topicSet {
 		ids = append(ids, t)
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("sns")
-	}
-	return relatedResult("sns", ids)
+	return relatedResultTrunc("sns", ids, truncated)
 }
 
 // checkLambdaSNSSub scans the sns-sub cache for subscriptions where this
@@ -477,10 +465,7 @@ func checkLambdaSNSSub(ctx context.Context, clients any, res resource.Resource, 
 			ids = append(ids, subRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("sns-sub")
-	}
-	return relatedResult("sns-sub", ids)
+	return relatedResultTrunc("sns-sub", ids, truncated)
 }
 
 // checkLambdaS3 scans the s3 cache for buckets that have a notification
@@ -513,10 +498,7 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, bRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("s3")
-	}
-	return relatedResult("s3", ids)
+	return relatedResultTrunc("s3", ids, truncated)
 }
 
 // checkLambdaENI scans the eni cache for ENIs attached to this Lambda's
@@ -550,10 +532,7 @@ func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cac
 		}
 		ids = append(ids, eniRes.ID)
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eni")
-	}
-	return relatedResult("eni", ids)
+	return relatedResultTrunc("eni", ids, truncated)
 }
 
 // checkLambdaSecrets scans this Lambda's environment-variable values for
@@ -595,10 +574,7 @@ func checkLambdaSecrets(ctx context.Context, clients any, res resource.Resource,
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("secrets")
-	}
-	return relatedResult("secrets", ids)
+	return relatedResultTrunc("secrets", ids, truncated)
 }
 
 // checkLambdaSSM scans Lambda's environment-variable values for SSM parameter
@@ -638,10 +614,7 @@ func checkLambdaSSM(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, pRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ssm")
-	}
-	return relatedResult("ssm", ids)
+	return relatedResultTrunc("ssm", ids, truncated)
 }
 
 // Ensure cwtypes stays imported for future alarm-related extensions.

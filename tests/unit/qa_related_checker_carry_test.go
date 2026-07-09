@@ -8,7 +8,7 @@ package unit
 // ResourcesLoadedMsg re-runs the checker against the delta, and newly
 // matched IDs merge into the filter set.
 //
-// This is universal behavior across all approximate pivots — (0+) / (10+) /
+// This is universal behavior across all truncated pivots — (0+) / (10+) /
 // (25+) only differ in the initial match count, not in how m-loads-more
 // should extend it.
 
@@ -47,13 +47,13 @@ func testReapplyChecker(_ context.Context, _ any, src resource.Resource, cache r
 }
 
 // TestSpec_RelatedCheckerCarry_ApproxZero_GrowsOnLoadMore verifies that a
-// pivot that opened with `(0+)` (approximate zero) picks up matches as
+// pivot that opened with `(0+)` (truncated zero) picks up matches as
 // additional pages of the target type load in via m-loads-more.
 func TestSpec_RelatedCheckerCarry_ApproxZero_GrowsOnLoadMore(t *testing.T) {
 	src := resource.Resource{ID: "bucket-X", Name: "bucket-X"}
 	typeDef := resource.ResourceTypeDef{ShortName: "role", Name: "IAM Roles"}
 
-	// Initial state: zero known IDs, approximate=true (reverse-scan cache
+	// Initial state: zero known IDs, truncated=true (reverse-scan cache
 	// was truncated; more pages pending).
 	m := views.NewResourceListFromCache(
 		typeDef, nil, keys.Default(),
@@ -100,10 +100,10 @@ func TestSpec_RelatedCheckerCarry_ApproxZero_GrowsOnLoadMore(t *testing.T) {
 }
 
 // TestSpec_RelatedCheckerCarry_NonApprox_StillExtends verifies that even a
-// non-approximate pivot (e.g. (25)) keeps extending on load-more — the
+// non-truncated pivot (e.g. (25)) keeps extending on load-more — the
 // initial "25 IDs" set is just a starting point; new pages can reveal more
 // matches the original cache didn't hold. The behavior is identical to
-// approximate pivots, per user spec ("no difference between 0+/10+/25+").
+// truncated pivots, per user spec ("no difference between 0+/10+/25+").
 func TestSpec_RelatedCheckerCarry_NonApprox_StillExtends(t *testing.T) {
 	src := resource.Resource{ID: "bucket-Y", Name: "bucket-Y"}
 	typeDef := resource.ResourceTypeDef{ShortName: "role", Name: "IAM Roles"}

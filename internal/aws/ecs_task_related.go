@@ -96,10 +96,7 @@ func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, c
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }
 
 // ecsTaskRelatedResources returns the resource list for target from cache or by fetching the first page.
@@ -166,8 +163,5 @@ func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, c
 			ids = append(ids, roleRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("role")
-	}
-	return relatedResult("role", ids)
+	return relatedResultTrunc("role", ids, truncated)
 }

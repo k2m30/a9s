@@ -41,10 +41,7 @@ func checkEFSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkEFSENI scans eni cache for mount-target ENIs (description contains fs-id).
@@ -70,10 +67,7 @@ func checkEFSENI(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, eniRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("eni")
-	}
-	return relatedResult("eni", ids)
+	return relatedResultTrunc("eni", ids, truncated)
 }
 
 // checkEFSVPC derives the VPC via mount-target ENIs → subnet → VPC lookup.
@@ -106,10 +100,7 @@ func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache 
 	for id := range vpcSet {
 		ids = append(ids, id)
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("vpc")
-	}
-	return relatedResult("vpc", ids)
+	return relatedResultTrunc("vpc", ids, truncated)
 }
 
 // checkEFSBackup resolves AWS Backup PLANS that protect this EFS file system.
@@ -143,10 +134,7 @@ func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, plan.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("backup")
-	}
-	return relatedResult("backup", ids)
+	return relatedResultTrunc("backup", ids, truncated)
 }
 
 // keep lambdatypes imported (used by checkEFSLambda in efs_related.go).

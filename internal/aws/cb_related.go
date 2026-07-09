@@ -79,10 +79,7 @@ func checkCbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, logRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("logs")
-	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, truncated)
 }
 
 // checkCbSG extracts security group IDs from the CodeBuild Project's VpcConfig.
@@ -179,10 +176,7 @@ func checkCbAlarm(ctx context.Context, clients any, res resource.Resource, cache
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkCbECR maps the CodeBuild project's build image to an ECR repository when the
@@ -222,10 +216,7 @@ func checkCbECR(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, r.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ecr")
-	}
-	return relatedResult("ecr", ids)
+	return relatedResultTrunc("ecr", ids, truncated)
 }
 
 // cbRepoNameFromImage parses an ECR image URI and returns the repo name.
@@ -297,10 +288,7 @@ func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache re
 			ids = append(ids, b.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("s3")
-	}
-	return relatedResult("s3", ids)
+	return relatedResultTrunc("s3", ids, truncated)
 }
 
 // checkCbSecrets extracts Secrets Manager secret references from project environment

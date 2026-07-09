@@ -59,7 +59,7 @@ func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache 
 
 	if len(topicSet) == 0 {
 		if truncated {
-			return resource.ApproximateZero("sns")
+			return relatedResultTrunc("sns", nil, true)
 		}
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
@@ -109,10 +109,7 @@ func checkSQSSNSSub(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, subRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("sns-sub")
-	}
-	return relatedResult("sns-sub", ids)
+	return relatedResultTrunc("sns-sub", ids, truncated)
 }
 
 // checkSQSAlarm searches the alarm cache for CloudWatch alarms in the AWS/SQS
@@ -149,10 +146,7 @@ func checkSQSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // sqsRedriveTarget extracts the deadLetterTargetArn from a RedrivePolicy JSON string.
@@ -231,10 +225,7 @@ func checkSQSSQS(ctx context.Context, clients any, res resource.Resource, cache 
 	for id := range idSet {
 		ids = append(ids, id)
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("sqs")
-	}
-	return relatedResult("sqs", ids)
+	return relatedResultTrunc("sqs", ids, truncated)
 }
 
 // sqsRelatedResources returns the cached resource list for the given target type,

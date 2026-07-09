@@ -47,7 +47,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ami`, `asg
 ### `ebs`
 
 - **Why related**: root and data volumes attached to worker nodes — capacity, IOPS, encryption posture. Operators pivot here when disk-pressure evictions or storage-full issues appear on the cluster.
-- **How discovered**: zero-call cache join — cached EC2 instances tagged `eks:nodegroup-name` (with the `eks:cluster-name` guard, same match as the `ec2` pivot) → `Instance.BlockDeviceMappings[].Ebs.VolumeId`, deduplicated. Cold or missing EC2 cache → `?`; truncated cache with no match → approximate zero.
+- **How discovered**: zero-call cache join — cached EC2 instances tagged `eks:nodegroup-name` (with the `eks:cluster-name` guard, same match as the `ec2` pivot) → `Instance.BlockDeviceMappings[].Ebs.VolumeId`, deduplicated. Cold or missing EC2 cache → `?`; truncated cache with no match → truncated zero.
 - **Count shown**: yes (sum across all worker-node instances).
 
 ### `ec2`
@@ -208,7 +208,7 @@ ng — CONTAINERS. Lifecycle key: `status`.
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | eks | EKS Clusters | yes |
 | role | IAM Roles | yes |

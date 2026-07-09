@@ -201,7 +201,7 @@ opensearch — DATABASES & STORAGE. Lifecycle key: none (the list API returns no
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | alarm | CW Alarms | yes |
 | logs | Log Groups | no |

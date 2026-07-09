@@ -872,20 +872,20 @@ func TestSESActiveReceiptRuleSet_RetriesAfterTransientError(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Pin 1 (SES mirror) — Truncated cache-scan sets Approximate=true with matches
+// Pin 1 (SES mirror) — Truncated cache-scan sets Truncated=true with matches
 //
 // Mirrors the DDB pin for SES checkers that do cache-scanning with truncation
 // tracking: checkSESR53 and checkSESEbRule.
 // Pre-fix: truncatedResultSES was NOT called on truncated+matches — relatedResult
-// was used instead, yielding Approximate=false.
-// Post-fix: truncated+matches → Approximate=true.
+// was used instead, yielding Truncated=false.
+// Post-fix: truncated+matches → Truncated=true.
 // ---------------------------------------------------------------------------
 
 // TestCheckSESR53_TruncatedCacheWithMatches_ReturnsApproximate pins the
 // truncated+matches path of checkSESR53. The r53 cache has IsTruncated=true
 // and a zone whose name matches the identity domain.
-// Pre-fix: result.Approximate==false.
-// Post-fix: result.Approximate==true AND Count==1.
+// Pre-fix: result.Truncated==false.
+// Post-fix: result.Truncated==true AND Count==1.
 func TestCheckSESR53_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) {
 	// DOMAIN identity: domain is used as-is.
 	src := resource.Resource{
@@ -912,9 +912,9 @@ func TestCheckSESR53_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) 
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1 (one matching zone in truncated r53 cache)", result.Count)
 	}
-	// Truncated+matches → must be Approximate=true so UI renders "(1+)" not "(1)".
-	if !result.Approximate {
-		t.Errorf("Approximate = false, want true — truncated r53 cache with matches must be approximate")
+	// Truncated+matches → must be Truncated=true so UI renders "(1+)" not "(1)".
+	if !result.Truncated {
+		t.Errorf("Truncated = false, want true — truncated r53 cache with matches must be truncated")
 	}
 	found := false
 	for _, id := range result.ResourceIDs {
@@ -929,7 +929,7 @@ func TestCheckSESR53_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) 
 
 // TestCheckSESR53_TruncatedCacheNoMatches_ReturnsApproximateZero pins the
 // truncated+no-matches path of checkSESR53. No zone matches the domain; the
-// result must be Count==0 AND Approximate==true.
+// result must be Count==0 AND Truncated==true.
 func TestCheckSESR53_TruncatedCacheNoMatches_ReturnsApproximateZero(t *testing.T) {
 	src := resource.Resource{
 		ID:   "acme-corp.com",
@@ -955,16 +955,16 @@ func TestCheckSESR53_TruncatedCacheNoMatches_ReturnsApproximateZero(t *testing.T
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (no zone matches in visible page)", result.Count)
 	}
-	if !result.Approximate {
-		t.Errorf("Approximate = false, want true — truncated cache with zero visible matches must be approximate")
+	if !result.Truncated {
+		t.Errorf("Truncated = false, want true — truncated cache with zero visible matches must be truncated")
 	}
 }
 
 // TestCheckSESEbRule_TruncatedCacheWithMatches_ReturnsApproximate pins the
 // truncated+matches path of checkSESEbRule. The eb-rule cache has IsTruncated=true
 // and a rule on the expected bus name.
-// Pre-fix: result.Approximate==false.
-// Post-fix: result.Approximate==true AND Count==1.
+// Pre-fix: result.Truncated==false.
+// Post-fix: result.Truncated==true AND Count==1.
 func TestCheckSESEbRule_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) {
 	clients := sesFixtureClients()
 	src := sesFixtureSrcIdentity(fixtures.SESGraphRootIdentity)
@@ -985,8 +985,8 @@ func TestCheckSESEbRule_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1 (one matching eb-rule in truncated cache)", result.Count)
 	}
-	if !result.Approximate {
-		t.Errorf("Approximate = false, want true — truncated eb-rule cache with matches must be approximate")
+	if !result.Truncated {
+		t.Errorf("Truncated = false, want true — truncated eb-rule cache with matches must be truncated")
 	}
 }
 
@@ -1012,7 +1012,7 @@ func TestCheckSESEbRule_TruncatedCacheNoMatches_ReturnsApproximateZero(t *testin
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (no eb-rule on the expected bus in visible page)", result.Count)
 	}
-	if !result.Approximate {
-		t.Errorf("Approximate = false, want true — truncated eb-rule cache with zero visible matches must be approximate")
+	if !result.Truncated {
+		t.Errorf("Truncated = false, want true — truncated eb-rule cache with zero visible matches must be truncated")
 	}
 }

@@ -51,10 +51,7 @@ func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, kmsRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("kms")
-	}
-	return relatedResult("kms", ids)
+	return relatedResultTrunc("kms", ids, truncated)
 }
 
 // checkSecretsLambda returns the Lambda rotation function associated with this
@@ -90,10 +87,7 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 			ids = append(ids, lambdaRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("lambda")
-	}
-	return relatedResult("lambda", ids)
+	return relatedResultTrunc("lambda", ids, truncated)
 }
 
 // checkSecretsCFN checks the secret's Tags for aws:cloudformation:stack-name
@@ -123,10 +117,7 @@ func checkSecretsCFN(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, cfnRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cfn")
-	}
-	return relatedResult("cfn", ids)
+	return relatedResultTrunc("cfn", ids, truncated)
 }
 
 // secretsCFNStackName extracts the aws:cloudformation:stack-name tag value from
@@ -179,10 +170,7 @@ func checkSecretsDBI(ctx context.Context, clients any, res resource.Resource, ca
 			ids = append(ids, dbRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("dbi")
-	}
-	return relatedResult("dbi", ids)
+	return relatedResultTrunc("dbi", ids, truncated)
 }
 
 // secretsRelatedResources returns the resource list for target from cache or by
@@ -255,8 +243,5 @@ func checkSecretsCB(ctx context.Context, clients any, res resource.Resource, cac
 			}
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("cb")
-	}
-	return relatedResult("cb", ids)
+	return relatedResultTrunc("cb", ids, truncated)
 }

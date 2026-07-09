@@ -62,10 +62,7 @@ func checkSNSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, alarmRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("alarm")
-	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkSNSSub searches the sns-sub cache for subscriptions whose topic_arn
@@ -96,10 +93,7 @@ func checkSNSSub(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, subRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("sns-sub")
-	}
-	return relatedResult("sns-sub", ids)
+	return relatedResultTrunc("sns-sub", ids, truncated)
 }
 
 // checkSNSKMS resolves the KMS key used for at-rest encryption of this SNS topic

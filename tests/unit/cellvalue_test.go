@@ -86,7 +86,7 @@ func TestFormatApproximate_NotSameAsExact(t *testing.T) {
 		approx := resource.FormatApproximate(n)
 		exact := resource.FormatExact(n)
 		if approx == exact {
-			t.Errorf("FormatApproximate(%d) == FormatExact(%d) == %q; approximate must differ from exact for non-zero n", n, n, exact)
+			t.Errorf("FormatApproximate(%d) == FormatExact(%d) == %q; truncated must differ from exact for non-zero n", n, n, exact)
 		}
 	}
 }

@@ -169,8 +169,8 @@ func TestChecker_RetryOnThrottle_WrapsCall(t *testing.T) {
 // T112 — TestChecker_Approximate_PropagatedFromCache
 //
 // For 2 reverse-scan checkers, call the checker twice:
-//   1. cache has matching resource, IsTruncated=false → Approximate must be false
-//   2. same cache entry but IsTruncated=true → Approximate must be true
+//   1. cache has matching resource, IsTruncated=false → Truncated must be false
+//   2. same cache entry but IsTruncated=true → Truncated must be true
 //
 // Both calls must return Count > 0 (real match in cache).
 //
@@ -225,8 +225,8 @@ func TestChecker_Approximate_PropagatedFromCache(t *testing.T) {
 		if gotExact.Count < 1 {
 			t.Errorf("exact cache: Count = %d, want >= 1", gotExact.Count)
 		}
-		if gotExact.Approximate {
-			t.Error("exact cache: Approximate = true, want false (IsTruncated=false)")
+		if gotExact.Truncated {
+			t.Error("exact cache: Truncated = true, want false (IsTruncated=false)")
 		}
 
 		// Second call: truncated cache (IsTruncated=true)
@@ -240,8 +240,8 @@ func TestChecker_Approximate_PropagatedFromCache(t *testing.T) {
 		if gotTruncated.Count < 1 {
 			t.Errorf("truncated cache: Count = %d, want >= 1", gotTruncated.Count)
 		}
-		if !gotTruncated.Approximate {
-			t.Error("truncated cache: Approximate = false, want true (IsTruncated=true)")
+		if !gotTruncated.Truncated {
+			t.Error("truncated cache: Truncated = false, want true (IsTruncated=true)")
 		}
 	})
 
@@ -283,8 +283,8 @@ func TestChecker_Approximate_PropagatedFromCache(t *testing.T) {
 		if gotExact.Count < 1 {
 			t.Errorf("exact cache: Count = %d, want >= 1", gotExact.Count)
 		}
-		if gotExact.Approximate {
-			t.Error("exact cache: Approximate = true, want false (IsTruncated=false)")
+		if gotExact.Truncated {
+			t.Error("exact cache: Truncated = true, want false (IsTruncated=false)")
 		}
 
 		// Second call: truncated cache (IsTruncated=true)
@@ -298,8 +298,8 @@ func TestChecker_Approximate_PropagatedFromCache(t *testing.T) {
 		if gotTruncated.Count < 1 {
 			t.Errorf("truncated cache: Count = %d, want >= 1", gotTruncated.Count)
 		}
-		if !gotTruncated.Approximate {
-			t.Error("truncated cache: Approximate = false, want true (IsTruncated=true)")
+		if !gotTruncated.Truncated {
+			t.Error("truncated cache: Truncated = false, want true (IsTruncated=true)")
 		}
 	})
 }

@@ -40,7 +40,7 @@ func FormatExact(n int) string {
 // prefix of the set.
 //
 // Never concatenate "+" manually onto a numeric string — use this helper so
-// the guard test in tests/unit/ can verify nothing else mints approximate
+// the guard test in tests/unit/ can verify nothing else mints truncated
 // cells.
 func FormatApproximate(n int) string {
 	return strconv.Itoa(n) + "+"

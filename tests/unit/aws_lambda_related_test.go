@@ -811,8 +811,8 @@ func TestRelated_Lambda_Alarms_TruncatedCacheNoMatch(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, src, cache)
-	if !result.Approximate {
-		t.Errorf("Approximate = false, want true (truncated cache, no match)")
+	if !result.Truncated {
+		t.Errorf("Truncated = false, want true (truncated cache, no match)")
 	}
 }
 

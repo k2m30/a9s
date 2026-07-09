@@ -30,10 +30,7 @@ func checkSNSSubTopic(ctx context.Context, clients any, res resource.Resource, c
 			ids = append(ids, snsRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("sns")
-	}
-	return relatedResult("sns", ids)
+	return relatedResultTrunc("sns", ids, truncated)
 }
 
 // checkSNSSubLambda checks the lambda cache for the function this subscription invokes.
@@ -69,10 +66,7 @@ func checkSNSSubLambda(ctx context.Context, clients any, res resource.Resource, 
 			ids = append(ids, lambdaRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("lambda")
-	}
-	return relatedResult("lambda", ids)
+	return relatedResultTrunc("lambda", ids, truncated)
 }
 
 // checkSNSSubSQS checks the sqs cache for the queue this subscription delivers to.
@@ -108,10 +102,7 @@ func checkSNSSubSQS(ctx context.Context, clients any, res resource.Resource, cac
 			ids = append(ids, sqsRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("sqs")
-	}
-	return relatedResult("sqs", ids)
+	return relatedResultTrunc("sqs", ids, truncated)
 }
 
 // snsSubRelatedResources returns the cached resource list for the given target type,

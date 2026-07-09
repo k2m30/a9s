@@ -187,7 +187,7 @@ cfn — CI/CD. Lifecycle key: `status`.
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | role | IAM Roles | yes |
 | cfn | Related Stacks | yes |

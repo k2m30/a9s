@@ -298,9 +298,9 @@ func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 	})
 
 	// Verify the new entry exists and is marked IsTruncated=true by running a
-	// checker cycle. The ecs-task checker sets result.Approximate = entry.IsTruncated.
-	// If the entry was created with IsTruncated=true, the checker will set Approximate=true.
-	// If IsTruncated was false (bug), Approximate will be false.
+	// checker cycle. The ecs-task checker sets result.Truncated = entry.IsTruncated.
+	// If the entry was created with IsTruncated=true, the checker will set Truncated=true.
+	// If IsTruncated was false (bug), Truncated will be false.
 	checker := efsCheckerByTarget(t, "ecs-task")
 	cache := resource.ResourceCache{
 		"ecs-task": {
@@ -310,12 +310,12 @@ func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 	}
 	result := checker(context.Background(), nil, efsSource, cache)
 
-	// The task matches efsSource.ID, so Count=1 and Approximate=true (IsTruncated).
+	// The task matches efsSource.ID, so Count=1 and Truncated=true (IsTruncated).
 	if result.Count != 1 {
 		t.Errorf("LazyAdd no-entry: want Count=1, got Count=%d", result.Count)
 	}
-	if !result.Approximate {
-		t.Errorf("LazyAdd no-entry: new entry must be IsTruncated=true so checker returns Approximate=true; got Approximate=false")
+	if !result.Truncated {
+		t.Errorf("LazyAdd no-entry: new entry must be IsTruncated=true so checker returns Truncated=true; got Truncated=false")
 	}
 
 	// Now verify indirectly that the model-internal cache created the entry by
@@ -341,7 +341,7 @@ func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 	// Now run a checker cycle that sources from the model — if the LazyAdd entry
 	// existed, CachedPages will not overwrite it, and the model still has task-lazy-only-001.
 	// If LazyAdd did NOT create the entry, CachedPages would insert differentTask and
-	// the checker would see only differentTask (still Count=1 but IsTruncated=false → Approximate=false).
+	// the checker would see only differentTask (still Count=1 but IsTruncated=false → Truncated=false).
 	//
 	// We verify this by checking the ecs-task result from the execRelatedCheckerResult path.
 	got, found := execRelatedCheckerResult(t, m, "efs", efsSource, "ecs-task")
@@ -431,7 +431,7 @@ func TestCachedPages_DoesNotOverwriteExistingEntry(t *testing.T) {
 	// the IsTruncated flag: the original entry has IsTruncated=false (complete),
 	// but if we now dispatch CachedPages AGAIN with IsTruncated=true for "tg",
 	// it should still be a no-op (existing entry preserved → IsTruncated=false →
-	// checker returns Approximate=false).
+	// checker returns Truncated=false).
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
@@ -439,7 +439,7 @@ func TestCachedPages_DoesNotOverwriteExistingEntry(t *testing.T) {
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			"tg": {
 				Resources:   []resource.Resource{},
-				IsTruncated: true, // if this were inserted, checker would return Approximate=true
+				IsTruncated: true, // if this were inserted, checker would return Truncated=true
 			},
 		},
 	})
@@ -450,12 +450,12 @@ func TestCachedPages_DoesNotOverwriteExistingEntry(t *testing.T) {
 	}
 
 	// If CachedPages correctly preserved the first entry (IsTruncated=false),
-	// the checker must return Approximate=false (definitive, not approximate).
-	if got.Approximate {
+	// the checker must return Truncated=false (definitive, not truncated).
+	if got.Truncated {
 		t.Errorf("CachedPages must not overwrite existing cache entry. " +
-			"Got Approximate=true, which means the IsTruncated=true entry was inserted " +
+			"Got Truncated=true, which means the IsTruncated=true entry was inserted " +
 			"(overwriting the original IsTruncated=false entry). " +
-			"Expected Approximate=false (original entry preserved).")
+			"Expected Truncated=false (original entry preserved).")
 	}
 }
 

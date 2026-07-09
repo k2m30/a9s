@@ -141,7 +141,7 @@ sns-sub — MESSAGING. Lifecycle key: none (the list API returns no lifecycle fi
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
-| Target Type | Display Name | Approximate? |
+| Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | sns | SNS Topic | yes |
 | lambda | Lambda Function | yes |
