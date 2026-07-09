@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/session"
@@ -271,5 +272,67 @@ func TestRelatedFocusEntry_Tab_AllRowsBareFromReplay_DoesNotTrapFocus(t *testing
 	vs, _ = c.Apply(app.Action{Kind: app.ActionToggleFocus})
 	if vs.Body.Detail.RelatedFocused {
 		t.Fatal("second Tab did not release RelatedFocus on an all-bare related panel — focus is trapped")
+	}
+}
+
+// =============================================================================
+// 6. Tab prefers a drillable pivot over a leading deferred "(?)" row.
+// =============================================================================
+//
+// The live ec2 defect: the panel leads with a deferred "(?)" pivot (alarm/
+// ebs-snap/backup — RelatedUnknown, count 0, no IDs) that is actionable (Enter
+// re-dispatches it in place) but NOT drillable, sitting before the first
+// resolved pivot carrying IDs (Elastic IPs). Tab landed on the "(?)" and Enter
+// only re-dispatched it → a silent no-op. The landing must skip the deferred
+// "(?)" and settle on the first row Enter would actually navigate from.
+
+// TestRelatedFocusEntry_Tab_PrefersDrillableOverDeferredUnknown is RED before
+// detailSkipToDrillable: Tab lands on the deferred alarm "(?)" at index 1.
+func TestRelatedFocusEntry_Tab_PrefersDrillableOverDeferredUnknown(t *testing.T) {
+	rows := []app.DetailRelatedRow{
+		relatedRow("tg", 0), // index 0: resolved (0) dead-end
+		{ // index 1: deferred "(?)" — actionable (re-dispatch) but NOT drillable
+			TargetType: "alarm", DisplayName: "alarm",
+			State: domain.RelatedUnknown, Count: 0,
+		},
+		{ // index 2: drillable — Enter navigates (carries IDs)
+			TargetType: "eip", DisplayName: "eip",
+			State: domain.RelatedResolved, Count: 1, ResourceIDs: []string{"eipalloc-0abc"},
+		},
+	}
+	c := newRelatedFocusEntryController(t, rows)
+
+	vs, _ := c.Apply(app.Action{Kind: app.ActionToggleFocus})
+	if !vs.Body.Detail.RelatedFocused {
+		t.Fatal("ActionToggleFocus did not grant RelatedFocus")
+	}
+	if vs.Body.Detail.RelatedCursor != 2 {
+		t.Errorf("RelatedCursor after Tab = %d, want 2 (the drillable eip pivot) — Tab must skip the deferred alarm '(?)' at index 1 that only re-dispatches on Enter, so Tab+Enter drills a resource instead of no-op'ing", vs.Body.Detail.RelatedCursor)
+	}
+	// The drill read must return the drillable eip row, not the deferred alarm.
+	drill, ok := c.SelectedRelatedRow()
+	if !ok || drill.TargetType != "eip" {
+		t.Errorf("SelectedRelatedRow() = %+v ok=%v, want the eip pivot (Enter navigates), not the deferred alarm '(?)'", drill, ok)
+	}
+}
+
+// TestRelatedFocusEntry_Tab_DeferredOnly_FallsBackToActionable verifies the
+// fallback: when the panel holds ONLY deferred "(?)" rows (no drillable pivot),
+// Tab still lands on the first actionable "(?)" so it stays reachable and Enter
+// can resolve it in place — detailSkipToDrillable must not strand focus at 0.
+func TestRelatedFocusEntry_Tab_DeferredOnly_FallsBackToActionable(t *testing.T) {
+	rows := []app.DetailRelatedRow{
+		relatedRow("tg", 0), // index 0: dead-end
+		{ // index 1: deferred "(?)" — the only actionable row
+			TargetType: "alarm", DisplayName: "alarm",
+			State: domain.RelatedUnknown, Count: 0,
+		},
+	}
+	c := newRelatedFocusEntryController(t, rows)
+
+	vs, _ := c.Apply(app.Action{Kind: app.ActionToggleFocus})
+	cursor, actionable := relatedCursorAndActionable(t, vs)
+	if cursor != 1 || !actionable {
+		t.Errorf("RelatedCursor=%d actionable=%v, want cursor=1 actionable=true (fall back to the first actionable deferred row when nothing is drillable)", cursor, actionable)
 	}
 }

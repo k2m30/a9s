@@ -187,12 +187,14 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 		if ds.RelatedVisible {
 			ds.RelatedFocus = !ds.RelatedFocus
 			if ds.RelatedFocus {
-				// Entering the related column lands on row 0 like MoveTop, then
-				// applies the same skip-unselectable stepping so a dimmed
-				// dead-end row is never the initial selection.
+				// Entering the related column lands on the first DRILLABLE pivot,
+				// skipping both dimmed dead-ends and deferred "(?)" rows that would
+				// only re-dispatch on Enter — so Tab+Enter opens a resource rather
+				// than a silent no-op. Falls back to the first actionable row (then
+				// cursor 0) when nothing is drillable yet.
 				ds.RelatedCursor = 0
 				ds.RelatedScroll = 0
-				detailSkipUnselectableRelated(ds, +1)
+				detailSkipToDrillable(ds, +1)
 			}
 		}
 		return c.snapshot(), nil, true
@@ -308,6 +310,39 @@ func detailSkipUnselectableRelated(ds *DetailState, direction int) {
 		row := visibleRelatedRowAt(ds, i)
 		return row == nil || !isActionableDetailRow(*row)
 	})
+}
+
+// isDrillableRelatedRow reports whether pressing Enter on this row NAVIGATES to
+// a target (it carries per-resource IDs or a server-side FetchFilter), as
+// opposed to an actionable-but-deferred "(?)" pivot (RelatedUnknown/Deferred
+// with no IDs) whose Enter only re-dispatches its own check in place
+// (app_stack.go's related-Enter handler). Every drillable row is actionable,
+// but not vice versa.
+func isDrillableRelatedRow(row DetailRelatedRow) bool {
+	return isActionableDetailRow(row) && (len(row.ResourceIDs) > 0 || len(row.FetchFilter) > 0)
+}
+
+// detailSkipToDrillable positions the focused related cursor on the first row
+// Enter would navigate FROM, skipping both dead-end (0) rows and deferred "(?)"
+// pivots that would only re-dispatch in place — so Tab+Enter lands on a real
+// resource instead of a silent no-op. Falls back to detailSkipUnselectableRelated
+// (first actionable row, else the deliberate cursor-0 fallback) when the panel
+// holds no drillable pivot yet, keeping deferred "(?)" rows reachable via
+// Up/Down and the all-dimmed fallback intact.
+func detailSkipToDrillable(ds *DetailState, direction int) {
+	visCount := visibleRelatedRowCount(ds)
+	if visCount == 0 {
+		return
+	}
+	idx := stepToSelectable(ds.RelatedCursor, visCount, direction, func(i int) bool {
+		row := visibleRelatedRowAt(ds, i)
+		return row == nil || !isDrillableRelatedRow(*row)
+	})
+	if row := visibleRelatedRowAt(ds, idx); row != nil && isDrillableRelatedRow(*row) {
+		ds.RelatedCursor = idx
+		return
+	}
+	detailSkipUnselectableRelated(ds, direction)
 }
 
 // focusedRelatedRow returns the related row under RelatedCursor honoring the
