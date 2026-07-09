@@ -223,33 +223,16 @@ func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 // checkDbiDBC returns the Aurora/RDS cluster this DB instance belongs to, if
 // any. DBInstance.DBClusterIdentifier is non-nil only for Aurora/RDS cluster
 // members. We match that identifier against the dbc cache by ID/Name.
-func checkDbiDBC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkDbiDBC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		// Parent isn't a DBInstance — cannot read DBClusterIdentifier.
-		// Returning -1 drops the honest lower bound; 0 is correct because
-		// without DBClusterIdentifier there are no cluster memberships to find.
 		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
 	}
 	if db.DBClusterIdentifier == nil || *db.DBClusterIdentifier == "" {
 		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
 	}
-	clusterID := *db.DBClusterIdentifier
-
-	dbcList, truncated, err := dbiRelatedResources(ctx, clients, cache, "dbc")
-	if err != nil {
-		return resource.ErrorRelated("dbc", err)
-	}
-	if dbcList == nil {
-		return relatedResultTrunc("dbc", nil, true)
-	}
-	var ids []string
-	for _, dbcRes := range dbcList {
-		if dbcRes.ID == clusterID || dbcRes.Name == clusterID {
-			ids = append(ids, dbcRes.ID)
-		}
-	}
-	return relatedResultTrunc("dbc", ids, truncated)
+	// In-body: DBClusterIdentifier IS the cluster's resource id (dbc keyed by identifier).
+	return relatedResult("dbc", []string{*db.DBClusterIdentifier})
 }
 
 // checkDbiRole extracts IAM role ARNs from the DBInstance's AssociatedRoles

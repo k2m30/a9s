@@ -325,7 +325,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDBILogs, NeedsTargetCache: true},
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbiVPC},
 			{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbiSecrets, NeedsTargetCache: true},
-			{TargetType: "dbc", DisplayName: "RDS Clusters", Checker: checkDbiDBC, NeedsTargetCache: true},
+			{TargetType: "dbc", DisplayName: "RDS Clusters", Checker: checkDbiDBC},
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkDbiRole},
 			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkDbiENI},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDbiCTEvents, NeedsTargetCache: true},
