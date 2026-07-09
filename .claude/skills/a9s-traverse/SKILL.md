@@ -65,7 +65,30 @@ tmux kill-session -t $S
 - **Errors (step 5)** — `grep -lE 'FetchByIDs failed|panic|AccessDenied|not authoriz|unresolved reference|map\[' /tmp/trav_*.txt`. Any hit is a defect; quote the line.
 - **Counts (step 2)** — extract each list title (`sed -n '2p'`) and compare its `(count) !N` to the settled menu's `(count) issues:N`. **They must match.** A menu that undercounts (or a list that over-counts) is a bug — the badge aggregates Wave-1 issue-colored rows + Wave-2 `!`-severity findings only; `~` warnings do NOT bump (docs/attention-signals.md S1).
 - **Details (step 3)** — every detail capture has `detail --` in its title, a `RELATED` block, and zero `(?)`.
-- **Drills (step 4)** — for the key types (and any this session changed), `Tab` then `Enter` (no `Down`) and assert the landing is the target detail, not the source. `Tab` lands on the first **drillable** pivot (a resolved row carrying IDs), skipping deferred `(?)` pivots (alarm/ebs-snap/backup/ct-events) that only re-dispatch on Enter.
+- **Drills (step 4) — exhaustive.** "Follow ALL related resources" means drill
+  **every** actionable pivot, not a sample. `Esc` back from a drill preserves the
+  related focus and cursor, so you can walk the whole panel in place:
+
+  ```sh
+  # per type, in its detail:
+  tmux send-keys -t $S d; sleep 6; tmux capture-pane -t $S -p > detail.txt
+  K=$(awk '/RELATED/{f=1} f' detail.txt | grep -coE '\([1-9][0-9]*\+?\)|\(\?\)')  # actionable rows
+  tmux send-keys -t $S Tab; sleep 2                # lands on the first DRILLABLE pivot
+  i=1; while [ "$i" -le "$K" ]; do
+    tmux send-keys -t $S Enter; sleep 4
+    tmux capture-pane -t $S -p > drill_${i}.txt     # classify the landing
+    tmux send-keys -t $S Escape; sleep 2            # back to the same detail, cursor preserved
+    tmux send-keys -t $S Down; sleep 1              # next actionable pivot
+    i=$((i + 1)); done
+  ```
+
+  Classify each landing: a `detail -- <target>` or `type(N)` list frame = the
+  pivot navigated (a count-1 drill lands on the target detail; count-N on a list
+  of N — verify N matches the badge); staying on the source detail = a deferred
+  `(?)` pivot re-dispatching (expected, not a dead-end). Any `FetchByIDs failed`
+  or a `(0)`-count row that navigated is a defect. `Tab` lands on the first
+  **drillable** pivot, skipping deferred `(?)` rows (alarm/ebs-snap/backup/
+  ct-events) that only re-dispatch on Enter.
 
 ## Gotchas learned the hard way
 
