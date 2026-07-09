@@ -387,6 +387,15 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 					}
 				}
 			}
+			// Cache miss: the runtime resolved NavigationKindDetail from its own
+			// snapshot, but the target isn't in the adapter's caches (e.g. a
+			// lazily-added related target such as an IAM role named by a
+			// CloudTrail event). Fall back to a by-ID fetch that navigates
+			// straight to the detail rather than silently no-op'ing.
+			if targetID != "" && resource.GetFetchByIDs(msg.TargetType) != nil {
+				fetchCmd := m.fetchByIDDetail(msg.TargetType, targetID)
+				return m, fetchCmd
+			}
 			return m, nil
 		}
 

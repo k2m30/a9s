@@ -126,12 +126,23 @@ func addKindedPrincipal(v any, kindMarker string, seen map[string]struct{}) {
 }
 
 // roleNameFromARN extracts the role name from a role ARN or returns the input as-is
-// if it's not an ARN. Works for both:
+// if it's not an ARN. Works for role ARNs (last path segment) and STS
+// assumed-role ARNs (the role segment, NOT the trailing session name):
 //
 //	"arn:aws:iam::123456789012:role/service-role/my-role" → "my-role"
 //	"arn:aws:iam::123456789012:role/my-role" → "my-role"
+//	"arn:aws:sts::123456789012:assumed-role/my-role/session-abc" → "my-role"
 //	"my-role" → "my-role"
 func roleNameFromARN(s string) string {
+	// STS assumed-role ARN: ".../assumed-role/<role>/<session>". CloudTrail
+	// records this form on AssumeRole* events; a plain last-segment trim would
+	// yield the session name, which is not a GetRole-resolvable role.
+	if _, rest, ok := strings.Cut(s, ":assumed-role/"); ok {
+		if role, _, ok := strings.Cut(rest, "/"); ok {
+			return role
+		}
+		return rest
+	}
 	if idx := strings.LastIndex(s, "/"); idx >= 0 && idx < len(s)-1 {
 		return s[idx+1:]
 	}

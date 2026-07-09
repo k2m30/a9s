@@ -51,9 +51,6 @@ func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, 
 	if err != nil {
 		return resource.ErrorRelated("role", err)
 	}
-	if roleList == nil {
-		return resource.UnknownRelated("role")
-	}
 
 	var ids []string
 	for _, roleRes := range roleList {
@@ -61,8 +58,13 @@ func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, 
 			ids = append(ids, roleRes.ID)
 		}
 	}
-	if len(ids) == 0 && truncated {
-		ids = []string{roleName} // event names this exact role; truncated cache missed it → resolve by identity
+	// The event names this exact role. When the cache can't disprove it — a
+	// truncated page or a cold/nil cache — resolve by identity so the row is a
+	// navigable (1), never a scoreless Unknown that renders actionable but
+	// dead-ends on Enter. A complete (non-nil, non-truncated) cache with no
+	// match stays (0): the role genuinely isn't one of ours.
+	if len(ids) == 0 && (truncated || roleList == nil) {
+		ids = []string{roleName}
 	}
 	return relatedResult("role", ids)
 }
@@ -74,15 +76,24 @@ func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, 
 // events encode the role as "AWSServiceRole/RoleName".
 func ctEventsExtractRoleName(res resource.Resource) string {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
+	// Authoritative for AssumeRole* events: requestParameters.roleArn is the
+	// TARGET role being assumed. Prefer it over Resources[]/sessionIssuer, which
+	// carry the assumed-role session ARN (trailing session name) or the CALLER's
+	// role — neither is the pivot target.
+	if ok {
+		if parsed := parseCTEventJSON(event.CloudTrailEvent); parsed != nil {
+			if req, _ := parsed["requestParameters"].(map[string]any); req != nil {
+				if arn, _ := req["roleArn"].(string); arn != "" {
+					return roleNameFromARN(arn)
+				}
+			}
+		}
+	}
 	if ok {
 		for _, r := range event.Resources {
 			if r.ResourceType != nil && strings.Contains(*r.ResourceType, "Role") {
 				if r.ResourceName != nil && *r.ResourceName != "" {
-					name := *r.ResourceName
-					if idx := strings.LastIndex(name, "/"); idx >= 0 && idx < len(name)-1 {
-						return name[idx+1:]
-					}
-					return name
+					return roleNameFromARN(*r.ResourceName)
 				}
 			}
 		}

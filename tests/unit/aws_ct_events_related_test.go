@@ -859,6 +859,60 @@ func TestRelated_CtEvents_CFN_TruncatedResolvesStackNameNotUUID(t *testing.T) {
 	}
 }
 
+func TestRelated_CtEvents_Role_ExtractsTargetFromRequestRoleArn(t *testing.T) {
+	cache := resource.ResourceCache{
+		"role": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{{ID: "other-role", Name: "other-role"}},
+			IsTruncated: true,
+		},
+	}
+	// AssumeRole event: requestParameters.roleArn is the TARGET role; the
+	// roleSessionName must NOT leak through as the resolved id.
+	cte := `{"eventName":"AssumeRole","requestParameters":{"roleArn":"arn:aws:iam::123456789012:role/target-role","roleSessionName":"some-session-name"}}`
+	res := resource.Resource{
+		ID:        "evt-assume-role-arn-001",
+		Fields:    map[string]string{},
+		RawStruct: cloudtrailtypes.Event{CloudTrailEvent: aws.String(cte)},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "role")
+	result := checker(context.Background(), nil, res, cache)
+
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "target-role" {
+		t.Errorf("ResourceIDs = %v, want [target-role] (target roleArn, not the session name)", result.ResourceIDs)
+	}
+}
+
+func TestRelated_CtEvents_Role_AssumedRoleARNResolvesRoleNotSession(t *testing.T) {
+	cache := resource.ResourceCache{
+		"role": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{{ID: "other-role", Name: "other-role"}},
+			IsTruncated: true,
+		},
+	}
+	// No requestParameters; the role identity is an STS assumed-role ARN in
+	// Resources[]. The role name is the middle segment, NOT the trailing session.
+	res := resource.Resource{
+		ID:     "evt-assumed-role-arn-002",
+		Fields: map[string]string{},
+		RawStruct: cloudtrailtypes.Event{
+			Resources: []cloudtrailtypes.Resource{
+				{
+					ResourceType: aws.String("AWS::STS::AssumedRole"),
+					ResourceName: aws.String("arn:aws:sts::123456789012:assumed-role/my-role/session-abc123"),
+				},
+			},
+		},
+	}
+
+	checker := ctEventsCheckerByTarget(t, "role")
+	result := checker(context.Background(), nil, res, cache)
+
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-role" {
+		t.Errorf("ResourceIDs = %v, want [my-role] (role segment of the assumed-role ARN, not the session name)", result.ResourceIDs)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // §7b.10 completeness: all 13 typed RelatedDef entries must be registered
 // ---------------------------------------------------------------------------
