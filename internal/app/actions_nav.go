@@ -247,12 +247,12 @@ func (c *Controller) handleActionSelect(a Action) (ViewState, []runtime.TaskRequ
 	if ds := c.topDetailState(); ds != nil && ds.RelatedFocus {
 		focusedRow := ds.focusedRelatedRow()
 		if focusedRow != nil && isActionableDetailRow(*focusedRow) {
-			// A row with nothing to scope by — no ResourceIDs and no server-side
-			// FetchFilter (a blank RelatedUnknown row, or a truncated "(0+)" that
-			// found nothing) — resolves IN PLACE rather than falling through to
-			// the target type's plain unfiltered list. Mirrors the mouse
-			// ActionRelatedSelect path so keyboard/web Enter behaves identically.
-			if len(focusedRow.ResourceIDs) == 0 && len(focusedRow.FetchFilter) == 0 {
+			// Only a blank RelatedUnknown row (no count, no IDs, no filter)
+			// resolves IN PLACE — re-dispatching the source's checks. A truncated
+			// "(0+)" is RelatedResolved and navigates to a scoped list exactly like
+			// "(N+)"; resource.RelatedEnter is the single arbiter so keyboard, mouse
+			// and TUI Enter can never diverge on the zero lower bound.
+			if resource.RelatedEnter(focusedRow.State, focusedRow.Count, focusedRow.Truncated) == resource.RelatedEnterResolveInPlace {
 				var tasks []runtime.TaskRequest
 				if len(resource.GetRelated(ds.ResourceType)) > 0 {
 					tasks = append(tasks, runtime.TaskRequest{
@@ -426,14 +426,12 @@ func (c *Controller) handleActionRelatedSelect(a Action) (ViewState, []runtime.T
 	ds.RelatedFocus = true
 	ds.RelatedCursor = clickIdx
 
-	// A row with nothing to scope by — no ResourceIDs and no server-side
-	// FetchFilter (a blank RelatedUnknown row, or an truncated "(0+)" that
-	// found nothing) — resolves IN PLACE rather than opening the target type's
-	// plain unfiltered list, which is not a related view. Re-dispatch this
-	// resource's related checks (same shape as handleActionBack's recompute) so
-	// the row firms up to its real count without a jarring navigation to the
-	// full target list.
-	if len(targetRow.ResourceIDs) == 0 && len(targetRow.FetchFilter) == 0 {
+	// Only a blank RelatedUnknown row (no count, no IDs, no filter) resolves IN
+	// PLACE — re-dispatching this resource's related checks (same shape as
+	// handleActionBack's recompute). A truncated "(0+)" is RelatedResolved and
+	// navigates to a scoped list exactly like "(N+)"; resource.RelatedEnter is
+	// the single arbiter shared with the keyboard and TUI Enter paths.
+	if resource.RelatedEnter(targetRow.State, targetRow.Count, targetRow.Truncated) == resource.RelatedEnterResolveInPlace {
 		var tasks []runtime.TaskRequest
 		if len(resource.GetRelated(ds.ResourceType)) > 0 {
 			tasks = append(tasks, runtime.TaskRequest{

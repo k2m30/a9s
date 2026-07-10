@@ -364,13 +364,13 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 			if !ok || !resource.IsRelatedActionable(row.State, row.Count, row.Truncated) {
 				return m, nil
 			}
-			// A row with nothing to scope by — no ResourceIDs and no server-side
-			// FetchFilter (a blank RelatedUnknown row, or an truncated "(0+)"
-			// that found nothing) — resolves IN PLACE rather than opening the
-			// target type's plain unfiltered list, which is not a related view.
-			// Re-dispatch this resource's related checks so the row firms up to
-			// its real count without a jarring navigation to the full list.
-			if len(row.ResourceIDs) == 0 && len(row.FetchFilter) == 0 {
+			// Only a blank RelatedUnknown row (no count, no IDs, no filter)
+			// resolves IN PLACE — re-dispatching this resource's related checks.
+			// A truncated "(0+)" is RelatedResolved and navigates to a scoped list
+			// exactly like "(N+)"; resource.RelatedEnter is the single arbiter
+			// shared with the headless keyboard/mouse Enter paths, so the zero
+			// lower bound can never be special-cased into this no-op again.
+			if resource.RelatedEnter(row.State, row.Count, row.Truncated) == resource.RelatedEnterResolveInPlace {
 				res := m.ctrl.GetDetailResource()
 				rt := rs.resourceType
 				return m, func() tea.Msg {

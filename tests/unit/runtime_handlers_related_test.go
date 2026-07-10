@@ -253,24 +253,22 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_FullyCached_NoFetch(t *testing
 	}
 }
 
-// Case J — no IDs, no filter, no targetID → ResourceList with a single
-// KindFetchResources task.
-func TestHandleRelatedNavigate_NoIDsNoFilter_ResourceList(t *testing.T) {
+// Case J — no IDs, no filter, no targetID (a truncated "(0+)" that found none
+// yet) → a SCOPED FilteredList with zero rows and no fetch task, NOT the plain
+// unfiltered ResourceList. This is the identical path "(N+)" takes; the zero
+// lower bound is never special-cased into a "goes to all" list.
+func TestHandleRelatedNavigate_NoIDsNoFilter_ScopedEmptyList(t *testing.T) {
 	c, _ := newRuntimeCore(t)
 
 	result, tasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
 		TargetType: "ec2",
 	})
 
-	if result.Kind != runtime.NavigationKindResourceList {
-		t.Errorf("Kind = %v, want NavigationKindResourceList", result.Kind)
+	if result.Kind != runtime.NavigationKindFilteredList {
+		t.Errorf("Kind = %v, want NavigationKindFilteredList (scoped, not the full list)", result.Kind)
 	}
-	wantTasks := []runtime.TaskRequest{{
-		Key:   runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "ec2"},
-		Cache: runtime.CacheNone,
-	}}
-	if !reflect.DeepEqual(tasks, wantTasks) {
-		t.Errorf("tasks = %+v, want %+v", tasks, wantTasks)
+	if len(tasks) != 0 {
+		t.Errorf("len(tasks) = %d, want 0 (no IDs to fetch — an empty scoped list)", len(tasks))
 	}
 }
 

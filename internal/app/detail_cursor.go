@@ -313,13 +313,14 @@ func detailSkipUnselectableRelated(ds *DetailState, direction int) {
 }
 
 // isDrillableRelatedRow reports whether pressing Enter on this row NAVIGATES to
-// a target (it carries per-resource IDs or a server-side FetchFilter), as
-// opposed to an actionable-but-deferred "(?)" pivot (RelatedUnknown/Deferred
-// with no IDs) whose Enter only re-dispatches its own check in place
-// (app_stack.go's related-Enter handler). Every drillable row is actionable,
-// but not vice versa.
+// a scoped target, as opposed to a blank RelatedUnknown row whose Enter only
+// re-dispatches its own check in place. It defers entirely to resource.RelatedEnter
+// so it can never diverge from the Enter handlers — in particular a truncated
+// "(0+)" is RelatedResolved and navigates exactly like "(N+)" (both drillable),
+// never a special-cased dead end. Every drillable row is actionable, but not
+// vice versa (a blank Unknown row is actionable-but-resolve-in-place).
 func isDrillableRelatedRow(row DetailRelatedRow) bool {
-	return isActionableDetailRow(row) && (len(row.ResourceIDs) > 0 || len(row.FetchFilter) > 0)
+	return resource.RelatedEnter(row.State, row.Count, row.Truncated) == resource.RelatedEnterNavigate
 }
 
 // detailSkipToDrillable positions the focused related cursor on the first row

@@ -282,6 +282,48 @@ func IsRelatedActionable(state domain.RelatedRowState, count int, truncated bool
 	}
 }
 
+// RelatedEnterAction classifies what pressing Enter on a related row does. It is
+// derived from the SAME (state, count, truncated) inputs as IsRelatedActionable /
+// FormatRelatedCount, so every Enter path (live TUI app_stack, headless
+// keyboard/click actions) and the Tab drillable-cursor predicate share one rule
+// and can never drift. Critically, a truncated lower bound is ALWAYS
+// RelatedResolved (ValidateRelatedResult enforces it), so "(0+)" and "(N+)"
+// produce the IDENTICAL action — there is no count-based special case for the
+// zero lower bound.
+type RelatedEnterAction int
+
+const (
+	// RelatedEnterDeadEnd — not actionable (proven "(0)", error, loading). No-op.
+	RelatedEnterDeadEnd RelatedEnterAction = iota
+	// RelatedEnterResolveInPlace — an actionable but scope-less row: the blank
+	// RelatedUnknown state, which has no count, no IDs, and no server-side
+	// filter. Enter re-dispatches the source's related checks so the row firms
+	// up in place (it does NOT open the target type's plain unfiltered list).
+	RelatedEnterResolveInPlace
+	// RelatedEnterNavigate — open the scoped destination: a filtered list of the
+	// found IDs (one ID → its detail), a Deferred server-side filtered fetch, or
+	// — for a truncated scan with zero IDs found so far ("(0+)") — a scoped list
+	// with zero rows and a "more" affordance, exactly like "(N+)".
+	RelatedEnterNavigate
+)
+
+// RelatedEnter is the single source of truth for a related row's Enter action.
+// "(0+)" and "(N+)" are both RelatedResolved+Truncated, so they map to the same
+// RelatedEnterNavigate — no site may branch on the count to decide navigate vs
+// resolve-in-place.
+func RelatedEnter(state domain.RelatedRowState, count int, truncated bool) RelatedEnterAction {
+	if !IsRelatedActionable(state, count, truncated) {
+		return RelatedEnterDeadEnd
+	}
+	if state == domain.RelatedUnknown {
+		// The only actionable row with nothing to scope by (no count, no IDs,
+		// no filter). A truncated "(0+)" is RelatedResolved, not Unknown, so it
+		// falls through to Navigate alongside "(N+)".
+		return RelatedEnterResolveInPlace
+	}
+	return RelatedEnterNavigate
+}
+
 // FormatRelatedCount is the single source of truth for the count BADGE text on a
 // related-resource row. It is consumed by the TUI right column and — via
 // RelatedBlock.CountDisplay computed in the controller — the web template, so

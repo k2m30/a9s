@@ -306,19 +306,15 @@ func ResolveRelatedNavigate(ev RelatedNavigateEvent, cache map[string][]resource
 		}
 	}
 
-	// Multiple RelatedIDs (or single miss with no FetchFilter) → filtered list.
-	if len(ev.RelatedIDs) > 0 {
-		return NavigationResult{
-			Kind:       NavigationKindFilteredList,
-			TargetType: ev.TargetType,
-			RelatedIDs: ev.RelatedIDs,
-		}
-	}
-
-	// Default — fresh unfiltered list.
+	// A resolved scan result → a filtered list scoped to the found IDs. This is
+	// the SAME path for "(N+)" (some found) and "(0+)" (none found yet): the
+	// latter renders a scoped list with zero rows, never the plain unfiltered
+	// "goes to all" list. A related pivot is always scoped — there is no
+	// count-based branch to the full list, so "(0+)" and "(N+)" are identical.
 	return NavigationResult{
-		Kind:       NavigationKindResourceList,
+		Kind:       NavigationKindFilteredList,
 		TargetType: ev.TargetType,
+		RelatedIDs: ev.RelatedIDs,
 	}
 }
 

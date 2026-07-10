@@ -302,6 +302,21 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			return m, tea.Batch(initCmd, fetchCmd)
 		}
 
+		// Truncated "(0+)" — a scan that found none yet (no RelatedIDs, no
+		// FetchFilter, no TargetID). Open an EMPTY scoped related-nav list that
+		// carries the reapply-checker, so pressing "m" (more) keeps scanning the
+		// target population exactly like an "(N+)" that found some. newRelatedList
+		// sets EscPops, protecting the top-level cache. There is no count-based
+		// branch: this is the zero-found tail of the same FilteredList path.
+		initCmd := m.newRelatedList(*rt, msg.SourceResource, relatedListOpts{
+			reapplyChecker: msg.Checker,
+		})
+		// Fetch the target population's first page so the reapply-checker can
+		// scope it (zero rows for a no-match "(0+)") and "m" can load more —
+		// a 0-ID FilteredList carries no fetch task of its own.
+		fetchCmd := m.fetchResources(msg.TargetType, m.core.AvailabilityGen())
+		return m, tea.Batch(initCmd, fetchCmd)
+
 	case runtime.NavigationKindDetail:
 		rt := resource.FindResourceType(msg.TargetType)
 		if rt == nil {

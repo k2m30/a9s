@@ -66,19 +66,27 @@ shows `(0+)` — same path).
 
 ## 3. Navigation — one rule
 
-Enter on a clickable row:
+Enter's action is decided ONLY by the row's state, via the single arbiter
+`resource.RelatedEnter(state, count, truncated)`. Every Enter path (live TUI
+`app_stack.go`, headless keyboard/mouse `actions_nav.go`) and the Tab
+drillable-cursor predicate call it, so a row's behaviour can never diverge
+between renderers — and, critically, **`(0+)` is byte-for-byte identical to
+`(N+)`**: both are `RelatedResolved`+`Truncated`, so the count never routes the
+decision.
 
-1. the row has **ResourceIDs** → a list filtered to exactly those targets
-   (`N == 1` → straight to the target's detail); else
-2. the row has a **FetchFilter** → a server-side filtered fetch; else
-3. **neither** (a scoreless row — a blank Unknown row, or a `(0+)` that found
-   nothing) → **resolve in place**: it re-dispatches the source resource's
-   related checks so the row firms up to its real count on the detail, WITHOUT
-   opening the plain unfiltered target list ("goes to all"). Both the headless
-   controller (`handleActionRelatedSelect`) and the live TUI Enter path
-   (`app_stack.go`) do this.
-
-`(0)`, error, and still-checking rows are not clickable — the cursor skips them.
+1. **Navigate** — a `RelatedResolved` row (exact `(N)`, or a truncated
+   `(N+)`/`(0+)`) or a `RelatedDeferred` row → open the SCOPED destination:
+   a list filtered to the found IDs (`N == 1` → straight to the detail), a
+   server-side `FetchFilter` fetch, or — for a truncated scan with none found
+   yet — a **scoped list with zero rows** carrying the reapply-checker so `m`
+   (more) keeps scanning the target population. Never the plain unfiltered
+   "goes to all" list. `(0+)` opens the same scoped list as `(N+)`; only the
+   number of rows differs.
+2. **Resolve in place** — a blank `RelatedUnknown` row (no count, no IDs, no
+   filter, NOT truncated) → re-dispatch the source's related checks so the row
+   firms up on the detail. This is the ONLY re-dispatch case.
+3. **Dead end** — a proven `(0)` (exact, not truncated), an error, or a
+   still-checking row → not clickable; the cursor skips them.
 
 ---
 

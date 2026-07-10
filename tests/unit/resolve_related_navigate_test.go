@@ -89,11 +89,14 @@ func TestResolveRelatedNavigate(t *testing.T) {
 			},
 		},
 		{
-			name:  "no IDs no filter → NavigationKindResourceList",
+			// A truncated "(0+)" that found none yet → a SCOPED FilteredList with
+			// zero rows, the identical path "(N+)" takes. Never the plain
+			// unfiltered ResourceList ("goes to all").
+			name:  "no IDs no filter → NavigationKindFilteredList (scoped, empty)",
 			ev:    runtime.RelatedNavigateEvent{TargetType: "ec2"},
 			cache: map[string][]resource.Resource{},
 			want: runtime.NavigationResult{
-				Kind:       runtime.NavigationKindResourceList,
+				Kind:       runtime.NavigationKindFilteredList,
 				TargetType: "ec2",
 			},
 		},

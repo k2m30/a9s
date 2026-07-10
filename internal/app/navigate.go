@@ -449,13 +449,14 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 					Payload: runtime.FetchFilteredPayload{Filter: res.FetchFilter},
 				}}
 			}
-			if len(res.RelatedIDs) > 0 {
-				// Multi-ID related nav with no server-side filter (e.g. an EC2
-				// instance → its several security groups): prefilter the list to
-				// just the related subset, mirroring the TUI related-list path.
-				// Without this the list shows every resource of the target type
-				// instead of the related ones. We're already under c.mu, so seed
-				// ls directly — PatchListRelatedIDSet would re-lock and deadlock.
+			if res.TargetID == "" {
+				// Prefilter the list to the related subset, mirroring the TUI
+				// related-list path. A non-nil set (even EMPTY) filters to exactly
+				// those IDs, so a truncated "(0+)" that found none renders a scoped
+				// list with zero rows — never the full target list ("goes to all").
+				// "(0+)" and "(N+)" take this identical path; only the set size
+				// differs. We're already under c.mu, so seed ls directly —
+				// PatchListRelatedIDSet would re-lock and deadlock.
 				set := make(map[string]struct{}, len(res.RelatedIDs))
 				for _, id := range res.RelatedIDs {
 					if id != "" {
