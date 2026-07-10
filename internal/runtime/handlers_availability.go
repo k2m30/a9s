@@ -704,28 +704,26 @@ func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceT
 	if td.ExcludeFromIssueBadge {
 		return 0
 	}
-	knownIDs := make(map[string]struct{}, len(wave1Resources))
-	for _, r := range wave1Resources {
-		knownIDs[r.ID] = struct{}{}
-	}
-	ids := make(map[string]struct{})
+	// Count per resource, not per ID: two DISTINCT resources that share an ID
+	// (e.g. two ACM certs for one domain — ACM keys on the domain name) must
+	// each bump the badge, matching the list title (listIssueCount counts per
+	// row). A resource issue-colored by Wave-1 is counted and `continue`d so a
+	// Wave-2 finding on the same resource never double-counts it.
+	count := 0
 	for _, r := range wave1Resources {
 		if td.ResolveColor(Wave1Only(r)).IsIssue() {
-			ids[r.ID] = struct{}{}
-		}
-	}
-	for id, fs := range findings {
-		if _, ok := knownIDs[id]; !ok {
+			count++
 			continue
 		}
-		for _, finding := range fs {
+		// A Wave-2 "!"-severity finding bumps the badge; "~" (SevWarn) never does.
+		for _, finding := range findings[r.ID] {
 			if finding.Severity == domain.SevBroken {
-				ids[id] = struct{}{}
+				count++
 				break
 			}
 		}
 	}
-	return len(ids)
+	return count
 }
 
 // Wave1Only returns a copy of r with every Wave-2-sourced Finding
