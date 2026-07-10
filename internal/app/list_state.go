@@ -241,19 +241,13 @@ func (c *Controller) patchListReapplyChecker(checker resource.RelatedChecker, sr
 	if ls == nil {
 		return
 	}
-	top := c.stack[len(c.stack)-1]
-	typeName := top.Ctx.ResourceType
-	if typeName == "" {
-		return
-	}
-	if c.reapplyCheckers == nil {
-		c.reapplyCheckers = make(map[string]reapplyCheckerEntry)
-	}
 	if checker == nil {
-		delete(c.reapplyCheckers, typeName)
+		ls.reapplyChecker = nil
+		ls.reapplySource = resource.Resource{}
 		return
 	}
-	c.reapplyCheckers[typeName] = reapplyCheckerEntry{checker: checker, source: src}
+	ls.reapplyChecker = checker
+	ls.reapplySource = src
 	// Mirror SetReapplyChecker: activate filter with empty set so zero-match
 	// navigations hide all rows immediately rather than showing an unfiltered list.
 	if ls.RelatedIDSet == nil {

@@ -54,6 +54,16 @@ type ListState struct {
 	HasPagination  bool                `json:"has_pagination,omitempty"`
 	AutoOpenSingle bool                `json:"auto_open_single,omitempty"`
 	RelatedIDSet   map[string]struct{} `json:"related_id_set,omitempty"`
+
+	// reapplyChecker + reapplySource belong to THIS related-list screen: for a
+	// truncated reverse-scan pivot, each loaded page is re-run through the checker
+	// to extend RelatedIDSet with newly matched IDs. Held per-screen (not in a
+	// controller type-keyed map) so popping the related list drops the checker —
+	// a later normal list of the same type can never inherit it. In-memory only
+	// (a func is not serialisable); the web renderer runs the checker controller-
+	// side and never needs it in the JSON snapshot.
+	reapplyChecker resource.RelatedChecker
+	reapplySource  resource.Resource
 	FetchFilter    map[string]string   `json:"fetch_filter,omitempty"`
 	ParentContext  map[string]string   `json:"parent_context,omitempty"`
 	DisplayName    string              `json:"display_name,omitempty"`

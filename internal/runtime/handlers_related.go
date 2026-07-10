@@ -285,6 +285,21 @@ func ResolveRelatedNavigate(ev RelatedNavigateEvent, cache map[string][]resource
 		}
 	}
 
+	// Truncated reverse scan ("(0+)"/"(N+)") always opens the scan list, never a
+	// single detail — even a "(1+)" whose one found id is already cached, and even
+	// when the caller also set TargetID. Later pages may hold more matches, so the
+	// population fetch + reapply must run. Checked before the TargetID and
+	// single-RelatedID cache-hit fast paths, which would otherwise short-circuit a
+	// truncated single-match pivot to one detail.
+	if ev.Truncated {
+		return NavigationResult{
+			Kind:       NavigationKindFilteredList,
+			TargetType: ev.TargetType,
+			RelatedIDs: ev.RelatedIDs,
+			Truncated:  true,
+		}
+	}
+
 	// Exact drill-in, TargetID cache hit → NavigationKindDetail.
 	if ev.TargetID != "" && relatedCacheHit(cache, ev.TargetType, ev.TargetID) {
 		return NavigationResult{
@@ -322,17 +337,13 @@ func ResolveRelatedNavigate(ev RelatedNavigateEvent, cache map[string][]resource
 		}
 	}
 
-	// A scan result with a scope → a filtered list. Either it found some IDs, or
-	// it is a truncated lower bound ("(0+)"/"(N+)") whose found set is a seed the
-	// reapply-checker extends as later pages load. Both counts take this SAME
-	// scoped path — "(0+)" is "(N+)" with an empty seed, never the plain "goes to
-	// all" list and never a count-based branch.
-	if len(ev.RelatedIDs) > 0 || ev.Truncated {
+	// Exact (non-truncated) scan result with found IDs → a filtered list scoped
+	// to them. The truncated lower bound ("(0+)"/"(N+)") returned earlier.
+	if len(ev.RelatedIDs) > 0 {
 		return NavigationResult{
 			Kind:       NavigationKindFilteredList,
 			TargetType: ev.TargetType,
 			RelatedIDs: ev.RelatedIDs,
-			Truncated:  ev.Truncated,
 		}
 	}
 

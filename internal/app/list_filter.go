@@ -257,27 +257,20 @@ func listToFloat(v reflect.Value) (float64, bool) {
 	}
 }
 
-// reapplyCheckerEntry holds the per-type reapply checker + source resource for
-// truncated-pivot navigations. Keyed by resource type short name.
-type reapplyCheckerEntry struct {
-	checker resource.RelatedChecker
-	source  resource.Resource
-}
-
-// reapplyCheckerAgainst re-runs the stored checker for typeName against newPage
-// and merges returned IDs into ls.RelatedIDSet. Mirrors ReapplyCheckerAgainst.
+// reapplyCheckerAgainst re-runs THIS list screen's own reapply checker against
+// newPage and merges returned IDs into ls.RelatedIDSet. The checker lives on the
+// ListState (set by patchListReapplyChecker), so a screen with no checker — a
+// normal, non-related list — is a no-op and can never be filtered by a stale
+// checker left over from a popped related list. typeName only keys the synthetic
+// cache the checker scans.
 func (c *Controller) reapplyCheckerAgainst(ls *ListState, typeName string, newPage []resource.Resource) {
-	if c.reapplyCheckers == nil {
-		return
-	}
-	entry, ok := c.reapplyCheckers[typeName]
-	if !ok || entry.checker == nil || len(newPage) == 0 {
+	if ls == nil || ls.reapplyChecker == nil || len(newPage) == 0 {
 		return
 	}
 	synth := resource.ResourceCache{
 		typeName: resource.ResourceCacheEntry{Resources: newPage},
 	}
-	result := entry.checker(context.Background(), nil, entry.source, synth)
+	result := ls.reapplyChecker(context.Background(), nil, ls.reapplySource, synth)
 	if len(result.ResourceIDs) == 0 {
 		return
 	}

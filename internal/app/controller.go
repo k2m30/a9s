@@ -54,10 +54,6 @@ type Controller struct {
 	// ApplyEnrichmentState, parallel to enrichmentStore.
 	enrichmentTruncated map[string]bool
 
-	// reapplyCheckers stores per-type reapply checker + source resource for
-	// truncated-pivot navigations. Populated by PatchListReapplyChecker.
-	reapplyCheckers map[string]reapplyCheckerEntry
-
 	// viewConfig is the per-session view configuration used by resolveListColumns
 	// to pick the correct column set for each resource type. When nil, the built-in
 	// defaults are used. Set by SetViewConfig after construction.
