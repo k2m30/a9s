@@ -285,6 +285,7 @@ func (c *Controller) handleActionSelect(a Action) (ViewState, []runtime.TaskRequ
 				TargetID:       targetID,
 				RelatedIDs:     focusedRow.ResourceIDs,
 				FetchFilter:    focusedRow.FetchFilter,
+				Truncated:      focusedRow.Truncated,
 				Checker:        checker,
 			}
 			tasks := c.dispatchRelatedNavigate(ev)
@@ -462,6 +463,7 @@ func (c *Controller) handleActionRelatedSelect(a Action) (ViewState, []runtime.T
 		TargetID:       targetID,
 		RelatedIDs:     targetRow.ResourceIDs,
 		FetchFilter:    targetRow.FetchFilter,
+		Truncated:      targetRow.Truncated,
 		Checker:        checker,
 	}
 	tasks := c.dispatchRelatedNavigate(ev)

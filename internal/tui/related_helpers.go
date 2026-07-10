@@ -32,11 +32,23 @@ func (m *Model) newRelatedList(rt resource.ResourceTypeDef, src resource.Resourc
 	if opts.pendingFilter != "" {
 		rl.SetPendingFilter(opts.pendingFilter)
 	}
-	if len(opts.relatedIDs) > 0 {
-		rl.SetRelatedIDFilter(opts.relatedIDs)
-	}
+	covered := false
 	if opts.reapplyChecker != nil {
+		// Reverse-scan seed (truncated "(0+)"/"(N+)"): a NON-nil set (empty for
+		// "(0+)") scopes to the found IDs so it renders ZERO rows, never "all",
+		// until the reapply-checker extends it as later pages load. The population
+		// fetch always follows, so there is no cache seed here.
+		ids := opts.relatedIDs
+		if ids == nil {
+			ids = []string{}
+		}
+		rl.SetRelatedIDFilter(ids)
 		rl.SetReapplyChecker(opts.reapplyChecker, src)
+	} else if len(opts.relatedIDs) > 0 {
+		// Exact-ID list: seed the found rows from the any-lane cache (Partial lane
+		// included) so a hit renders with no fetch. Shared with the web renderer
+		// via SeedRelatedExactRows — the two cannot diverge.
+		covered = m.ctrl.SeedRelatedExactRows(rt.ShortName, opts.relatedIDs)
 	}
 	if opts.autoOpenSingleDetail {
 		rl.SetAutoOpenSingleDetail(true)
@@ -44,6 +56,12 @@ func (m *Model) newRelatedList(rt resource.ResourceTypeDef, src resource.Resourc
 	rl.SetEscPops(true)
 	rl.SetSize(m.innerSize())
 	_, initCmd := rl.Init()
+	if covered {
+		// Fully cache-covered: rows are seeded and Loading is cleared, so nothing
+		// fetches and nothing spins — drop the spinner tick so a pure cache hit
+		// dispatches no command.
+		initCmd = nil
+	}
 	rs := newListRS(rt.ShortName)
 	w, h := m.innerSize()
 	rs.width, rs.height = w, h

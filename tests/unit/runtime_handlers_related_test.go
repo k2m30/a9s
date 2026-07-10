@@ -253,22 +253,39 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_FullyCached_NoFetch(t *testing
 	}
 }
 
-// Case J — no IDs, no filter, no targetID (a truncated "(0+)" that found none
-// yet) → a SCOPED FilteredList with zero rows and no fetch task, NOT the plain
-// unfiltered ResourceList. This is the identical path "(N+)" takes; the zero
-// lower bound is never special-cased into a "goes to all" list.
-func TestHandleRelatedNavigate_NoIDsNoFilter_ScopedEmptyList(t *testing.T) {
+// Case J — a truncated "(0+)" that found none yet (Truncated, no IDs) → a SCOPED
+// FilteredList seeded empty, WITH a KindFetchResources task so the reapply-checker
+// can populate and scope it. This is the identical path "(N+)" takes; the zero
+// lower bound is never special-cased into a "goes to all" list, and never left
+// without a fetch (which would strand the list empty). A NON-truncated no-scope
+// event is the defensive ResourceList fallback instead — see the internal/runtime
+// package test TestHandleRelatedNavigate_ResourceList_EmitsFetchResources.
+func TestHandleRelatedNavigate_TruncatedZero_ScopedListWithFetch(t *testing.T) {
 	c, _ := newRuntimeCore(t)
 
-	result, tasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
+	zeroPlus, zeroTasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
 		TargetType: "ec2",
+		Truncated:  true,
+	})
+	nPlus, nTasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
+		TargetType: "ec2",
+		RelatedIDs: []string{"i-1", "i-2"},
+		Truncated:  true,
 	})
 
-	if result.Kind != runtime.NavigationKindFilteredList {
-		t.Errorf("Kind = %v, want NavigationKindFilteredList (scoped, not the full list)", result.Kind)
+	// (0+) and (N+) take the identical shape — Kind + task — differing only in
+	// the seed IDs carried through as data.
+	if zeroPlus.Kind != runtime.NavigationKindFilteredList || nPlus.Kind != runtime.NavigationKindFilteredList {
+		t.Errorf("Kind (0+)=%v (N+)=%v, want both NavigationKindFilteredList", zeroPlus.Kind, nPlus.Kind)
 	}
-	if len(tasks) != 0 {
-		t.Errorf("len(tasks) = %d, want 0 (no IDs to fetch — an empty scoped list)", len(tasks))
+	fetchOnly := func(tasks []runtime.TaskRequest) bool {
+		return len(tasks) == 1 && tasks[0].Key.Kind == runtime.KindFetchResources
+	}
+	if !fetchOnly(zeroTasks) {
+		t.Errorf("(0+) tasks = %v, want one KindFetchResources task (populate + reapply)", zeroTasks)
+	}
+	if !fetchOnly(nTasks) {
+		t.Errorf("(N+) tasks = %v, want one KindFetchResources task — identical to (0+)", nTasks)
 	}
 }
 

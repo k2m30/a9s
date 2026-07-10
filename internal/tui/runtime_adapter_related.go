@@ -47,6 +47,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 		TargetID:       msg.TargetID,
 		RelatedIDs:     msg.RelatedIDs,
 		FetchFilter:    msg.FetchFilter,
+		Truncated:      msg.Truncated,
 		Checker:        msg.Checker,
 	}
 	result, tasks := m.core.HandleRelatedNavigate(ev)
@@ -141,180 +142,22 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			return m, tea.Batch(initCmd, fetchCmd)
 		}
 
-		// RelatedIDs-based filtered list (multi or single cache miss).
-		if len(result.RelatedIDs) > 0 {
-			if entry, ok := m.core.AnyOriginResourceCache(msg.TargetType); ok && entry != nil {
-				idSet := make(map[string]bool, len(result.RelatedIDs))
-				for _, id := range result.RelatedIDs {
-					idSet[id] = true
-				}
-				var filtered []resource.Resource
-				for _, r := range entry.Resources {
-					if idSet[r.ID] {
-						filtered = append(filtered, r)
-					}
-				}
-				// Augment with lazy-cached resources. Prefer ResourceCache on ID collision.
-				if lazyRows, hasLazy := m.core.LazyResourceCache(msg.TargetType); hasLazy {
-					found := make(map[string]struct{}, len(filtered))
-					for _, r := range filtered {
-						found[r.ID] = struct{}{}
-					}
-					for _, r := range lazyRows {
-						if idSet[r.ID] {
-							if _, dup := found[r.ID]; !dup {
-								found[r.ID] = struct{}{}
-								filtered = append(filtered, r)
-							}
-						}
-					}
-				}
-				// If some IDs are missing and cache may have more pages, fetch the rest.
-				// Pre-populate with already-cached filtered rows so they remain visible when
-				// subsequent pages arrive via Append:true ResourcesLoadedMsg.
-				if len(filtered) < len(result.RelatedIDs) && entry.Pagination != nil && entry.Pagination.IsTruncated {
-					m.ctrl.PushChildListScreen(rt.ShortName)
-					rl := views.NewResourceListFromCache(
-						*rt, m.viewConfig, m.keys,
-						filtered, entry.Pagination,
-						"",
-						entry.SortColIdx, entry.SortAsc,
-						0, 0,
-						false,
-						m.ctrl,
-					)
-					rl.SetTitleSuffix(runtime.RelatedTitleSuffix(msg.SourceResource))
-					rl.SetRelatedIDFilter(result.RelatedIDs)
-					if msg.Checker != nil {
-						rl.SetReapplyChecker(msg.Checker, msg.SourceResource)
-					}
-					rl.SetEscPops(true)
-					rl.SetSize(m.innerSize())
-					rs := newListRS(rt.ShortName)
-					w, h := m.innerSize()
-					rs.width, rs.height = w, h
-					m.pushRS(rs)
-					fetchCmd := relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
-					return m, fetchCmd
-				}
-				// Coverage check: distinguish "all RelatedIDs matched" (true cache
-				// hit, drop pagination footer + return nil) from "partial coverage,
-				// not truncated" (cache exhausted but some IDs still missing —
-				// runtime emits KindFetchResources, adapter must honor it). The
-				// view is pre-populated with the cached rows in either case so
-				// they remain visible while any fetch is in flight.
-				fullyCovered := len(filtered) == len(result.RelatedIDs)
-				paginationForView := entry.Pagination
-				if fullyCovered && paginationForView != nil && paginationForView.IsTruncated {
-					// Fully resolved exact-ID filter — strip IsTruncated so the
-					// view doesn't show a misleading "load more" footer.
-					clone := *paginationForView
-					clone.IsTruncated = false
-					clone.NextToken = ""
-					paginationForView = &clone
-				}
-				m.ctrl.PushChildListScreen(rt.ShortName)
-				rl := views.NewResourceListFromCache(
-					*rt, m.viewConfig, m.keys,
-					filtered, paginationForView,
-					"",
-					entry.SortColIdx, entry.SortAsc,
-					0, 0,
-					false,
-					m.ctrl,
-				)
-				rl.SetTitleSuffix(runtime.RelatedTitleSuffix(msg.SourceResource))
-				rl.SetRelatedIDFilter(result.RelatedIDs)
-				if msg.Checker != nil {
-					rl.SetReapplyChecker(msg.Checker, msg.SourceResource)
-				}
-				rl.SetEscPops(true)
-				rl.SetSize(m.innerSize())
-				rs2 := newListRS(rt.ShortName)
-				w2, h2 := m.innerSize()
-				rs2.width, rs2.height = w2, h2
-				m.pushRS(rs2)
-				if fullyCovered {
-					return m, nil
-				}
-				// Partial coverage + not truncated: the runtime emitted a
-				// KindFetchResources task (see relatedFetchTasks in
-				// internal/runtime/handlers_related.go and its test
-				// TestRelatedFetchTasks_PartialCoverage_NotTruncated_FetchAll).
-				// Honor it so missing IDs the existing fetcher hasn't seen yet
-				// are retrieved instead of silently surfacing an incomplete list.
-				return m, relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
-			}
-			// ResourceCache miss: check LazyResourceCache before triggering a fetch.
-			// When all RelatedIDs are in the lazy cache, runtime.relatedFetchTasks
-			// already returns nil tasks for full-coverage cases, so dropping `tasks`
-			// here is consistent with the runtime decision rather than a divergence.
-			if lazyRows, hasLazy := m.core.LazyResourceCache(msg.TargetType); hasLazy {
-				idSet := make(map[string]bool, len(result.RelatedIDs))
-				for _, id := range result.RelatedIDs {
-					idSet[id] = true
-				}
-				var filtered []resource.Resource
-				for _, r := range lazyRows {
-					if idSet[r.ID] {
-						filtered = append(filtered, r)
-					}
-				}
-				if len(filtered) > 0 && len(filtered) == len(result.RelatedIDs) {
-					m.ctrl.PushChildListScreen(rt.ShortName)
-					rl := views.NewResourceListFromCache(
-						*rt, m.viewConfig, m.keys,
-						filtered, nil,
-						"",
-						0, true,
-						0, 0,
-						false,
-						m.ctrl,
-					)
-					rl.SetTitleSuffix(runtime.RelatedTitleSuffix(msg.SourceResource))
-					rl.SetRelatedIDFilter(result.RelatedIDs)
-					if msg.Checker != nil {
-						rl.SetReapplyChecker(msg.Checker, msg.SourceResource)
-					}
-					rl.SetEscPops(true)
-					rl.SetSize(m.innerSize())
-					rs3 := newListRS(rt.ShortName)
-					w3, h3 := m.innerSize()
-					rs3.width, rs3.height = w3, h3
-					m.pushRS(rs3)
-					return m, nil
-				}
-			}
-			// Full cache miss: fetch and preserve exact-ID filtering.
-			var opts relatedListOpts
-			if len(result.RelatedIDs) == 1 {
-				opts = relatedListOpts{
-					pendingFilter:        result.RelatedIDs[0],
-					relatedIDs:           result.RelatedIDs,
-					autoOpenSingleDetail: true,
-					reapplyChecker:       msg.Checker,
-				}
-			} else {
-				opts = relatedListOpts{relatedIDs: result.RelatedIDs, reapplyChecker: msg.Checker}
-			}
-			initCmd := m.newRelatedList(*rt, msg.SourceResource, opts)
-			fetchCmd := relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
-			return m, tea.Batch(initCmd, fetchCmd)
+		// Exact-ID or truncated filtered list. Build the lean shell — a related
+		// list that renders from the controller snapshot — and run the runtime's
+		// coverage-aware tasks verbatim (nil on a full cache hit, fetch-more on a
+		// partial page, fetch-all on a miss). Exact IDs seed their rows from cache
+		// inside newRelatedList so a hit needs no fetch; a truncated "(0+)"/"(N+)"
+		// carries the reapply-checker and fetches the population. A lone exact miss
+		// auto-opens its detail once the fetch lands.
+		opts := relatedListOpts{relatedIDs: result.RelatedIDs}
+		if result.Truncated {
+			opts.reapplyChecker = msg.Checker
+		} else if len(result.RelatedIDs) == 1 {
+			opts.pendingFilter = result.RelatedIDs[0]
+			opts.autoOpenSingleDetail = true
 		}
-
-		// Truncated "(0+)" — a scan that found none yet (no RelatedIDs, no
-		// FetchFilter, no TargetID). Open an EMPTY scoped related-nav list that
-		// carries the reapply-checker, so pressing "m" (more) keeps scanning the
-		// target population exactly like an "(N+)" that found some. newRelatedList
-		// sets EscPops, protecting the top-level cache. There is no count-based
-		// branch: this is the zero-found tail of the same FilteredList path.
-		initCmd := m.newRelatedList(*rt, msg.SourceResource, relatedListOpts{
-			reapplyChecker: msg.Checker,
-		})
-		// Fetch the target population's first page so the reapply-checker can
-		// scope it (zero rows for a no-match "(0+)") and "m" can load more —
-		// a 0-ID FilteredList carries no fetch task of its own.
-		fetchCmd := m.fetchResources(msg.TargetType, m.core.AvailabilityGen())
+		initCmd := m.newRelatedList(*rt, msg.SourceResource, opts)
+		fetchCmd := relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
 		return m, tea.Batch(initCmd, fetchCmd)
 
 	case runtime.NavigationKindDetail:

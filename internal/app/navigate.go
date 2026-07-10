@@ -354,6 +354,17 @@ func (c *Controller) seedFilteredListFromCache(targetType string, filter map[str
 func (c *Controller) dispatchRelatedNavigate(ev runtime.RelatedNavigateEvent) []runtime.TaskRequest {
 	navRes, tasks := c.core.HandleRelatedNavigate(ev)
 	extraTasks := c.applyRelatedNavResult(navRes)
+	// Truncated reverse-scan ("(0+)"/"(N+)"): register the reapply-checker so
+	// every loaded page re-runs the source predicate and extends the scoped
+	// RelatedIDSet — the same reapply the TUI list receives. applyRelatedNavResult
+	// already seeded the RelatedIDSet (empty for "(0+)", N for "(N+)"); the fetch
+	// task came from HandleRelatedNavigate (KindFetchResources). One path for both
+	// counts — the empty-seed "(0+)" is not special-cased.
+	if ev.Truncated && ev.Checker != nil {
+		// dispatchRelatedNavigate runs under Apply's c.mu; use the lock-free core
+		// (the exported PatchListReapplyChecker would re-lock and self-deadlock).
+		c.patchListReapplyChecker(ev.Checker, ev.SourceResource)
+	}
 	if len(extraTasks) == 0 {
 		return tasks
 	}
@@ -450,20 +461,25 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 				}}
 			}
 			if res.TargetID == "" {
-				// Prefilter the list to the related subset, mirroring the TUI
-				// related-list path. A non-nil set (even EMPTY) filters to exactly
-				// those IDs, so a truncated "(0+)" that found none renders a scoped
-				// list with zero rows — never the full target list ("goes to all").
-				// "(0+)" and "(N+)" take this identical path; only the set size
-				// differs. We're already under c.mu, so seed ls directly —
-				// PatchListRelatedIDSet would re-lock and deadlock.
-				set := make(map[string]struct{}, len(res.RelatedIDs))
-				for _, id := range res.RelatedIDs {
-					if id != "" {
-						set[id] = struct{}{}
+				if !res.Truncated && len(res.RelatedIDs) > 0 {
+					// Exact-ID list: seed rows from the any-lane cache (Partial lane
+					// included) so a hit renders without a fetch, and clear Loading.
+					// Shared with the TUI via seedRelatedExactRows so the two
+					// renderers cannot diverge. Already under c.mu.
+					c.seedRelatedExactRows(ls, res.TargetType, res.RelatedIDs)
+				} else {
+					// Truncated "(0+)"/"(N+)": a non-nil (even EMPTY) set filters to
+					// the found IDs, so "(0+)" renders a scoped list with zero rows —
+					// never the full target list. The population fetch + reapply-
+					// checker extend the set as later pages load.
+					set := make(map[string]struct{}, len(res.RelatedIDs))
+					for _, id := range res.RelatedIDs {
+						if id != "" {
+							set[id] = struct{}{}
+						}
 					}
+					ls.RelatedIDSet = set
 				}
-				ls.RelatedIDSet = set
 			}
 			// By-ID single-target drill (web/headless): when the target type has a
 			// FetchByIDs helper, HandleRelatedNavigate returns a KindFetchByIDDetail

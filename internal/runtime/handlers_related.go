@@ -42,6 +42,10 @@ type NavigationResult struct {
 	FilterText   string
 	FlashMessage string
 	FlashIsError bool
+	// Truncated marks a reverse scan in progress ("(0+)"/"(N+)"): RelatedIDs is a
+	// lower bound the reapply-checker extends as later pages load, so navigation
+	// seeds the list with them and fetches the population. "(0+)" is not special.
+	Truncated bool
 }
 
 // RelatedNavigateEvent is the runtime-side event for related-resource navigation.
@@ -55,6 +59,9 @@ type RelatedNavigateEvent struct {
 	RelatedIDs     []string
 	FetchFilter    map[string]string
 	Checker        resource.RelatedChecker
+	// Truncated is the source row's truncation flag, routing "(0+)"/"(N+)" to the
+	// reverse-scan scoped path.
+	Truncated bool
 }
 
 // TaskKind constants for fetch operations emitted by HandleRelatedNavigate.
@@ -140,6 +147,15 @@ func (c *Core) HandleRelatedNavigate(ev RelatedNavigateEvent) (NavigationResult,
 					Payload: FetchByIDDetailPayload{TargetType: ev.TargetType, ID: result.TargetID},
 				}}
 			}
+			return result, []TaskRequest{{
+				Key:   TaskKey{Kind: KindFetchResources, Scope: ev.TargetType},
+				Cache: CacheNone,
+			}}
+		}
+		if result.Truncated {
+			// Reverse scan in progress ("(0+)"/"(N+)"): fetch the whole target
+			// population so the reapply-checker scopes each page. Distinct from an
+			// exact result (below), which found all its targets and fetches by ID.
 			return result, []TaskRequest{{
 				Key:   TaskKey{Kind: KindFetchResources, Scope: ev.TargetType},
 				Cache: CacheNone,
@@ -306,15 +322,26 @@ func ResolveRelatedNavigate(ev RelatedNavigateEvent, cache map[string][]resource
 		}
 	}
 
-	// A resolved scan result → a filtered list scoped to the found IDs. This is
-	// the SAME path for "(N+)" (some found) and "(0+)" (none found yet): the
-	// latter renders a scoped list with zero rows, never the plain unfiltered
-	// "goes to all" list. A related pivot is always scoped — there is no
-	// count-based branch to the full list, so "(0+)" and "(N+)" are identical.
+	// A scan result with a scope → a filtered list. Either it found some IDs, or
+	// it is a truncated lower bound ("(0+)"/"(N+)") whose found set is a seed the
+	// reapply-checker extends as later pages load. Both counts take this SAME
+	// scoped path — "(0+)" is "(N+)" with an empty seed, never the plain "goes to
+	// all" list and never a count-based branch.
+	if len(ev.RelatedIDs) > 0 || ev.Truncated {
+		return NavigationResult{
+			Kind:       NavigationKindFilteredList,
+			TargetType: ev.TargetType,
+			RelatedIDs: ev.RelatedIDs,
+			Truncated:  ev.Truncated,
+		}
+	}
+
+	// No scope at all (no IDs, no filter, no target, not truncated) — a defensive
+	// fallback that the real Enter flow never produces (a non-truncated 0 row is a
+	// dead end, not a navigation). Open the plain target list.
 	return NavigationResult{
-		Kind:       NavigationKindFilteredList,
+		Kind:       NavigationKindResourceList,
 		TargetType: ev.TargetType,
-		RelatedIDs: ev.RelatedIDs,
 	}
 }
 

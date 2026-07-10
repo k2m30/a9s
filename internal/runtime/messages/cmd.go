@@ -119,6 +119,10 @@ type RelatedNavigate struct {
 	TargetID       string            // specific ID for navigable field case (e.g., "vpc-0abc")
 	RelatedIDs     []string          // IDs from checker for right-column case
 	FetchFilter    map[string]string
+	// Truncated is the source row's truncation flag — true for both "(0+)" and
+	// "(N+)". Carried so the adapter routes them through the identical scoped
+	// reverse-scan path; the zero count is never special-cased.
+	Truncated bool
 	// Checker is the originating RelatedDef.Checker. Carried forward so
 	// each subsequent page of the target type (m-loads-more) can re-run
 	// the predicate and extend the visible ID set — essential for

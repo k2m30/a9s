@@ -398,6 +398,7 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 				TargetID:       targetID,
 				RelatedIDs:     row.ResourceIDs,
 				FetchFilter:    row.FetchFilter,
+				Truncated:      row.Truncated,
 				Checker:        checker,
 			}
 			return m, func() tea.Msg { return nav }

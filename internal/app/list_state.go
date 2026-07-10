@@ -175,12 +175,68 @@ func (c *Controller) PatchListRelatedIDSet(ids []string) {
 	ls.RelatedIDSet = set
 }
 
+// seedRelatedExactRows sets the exact-ID related filter on ls and seeds its rows
+// from the any-lane RowStore subset matching those IDs, so a cache-hit exact
+// filtered list renders immediately — no fetch, no spinner. Returns whether the
+// cache fully covers the requested IDs. Shared by both renderers (web
+// applyRelatedNavResult directly, TUI newRelatedList via SeedRelatedExactRows)
+// so the exact-filtered seed cannot diverge — the single fix for the Partial
+// (lazy) lane that render-time pull would otherwise miss. Callers hold c.mu.
+func (c *Controller) seedRelatedExactRows(ls *ListState, targetType string, ids []string) bool {
+	set := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		if id != "" {
+			set[id] = struct{}{}
+		}
+	}
+	ls.RelatedIDSet = set
+	seen := make(map[string]struct{}, len(set))
+	var seeded []resource.Resource
+	for _, r := range c.core.AnyLaneResources(targetType) {
+		if _, want := set[r.ID]; !want {
+			continue
+		}
+		if _, dup := seen[r.ID]; dup {
+			continue
+		}
+		seen[r.ID] = struct{}{}
+		seeded = append(seeded, r)
+	}
+	if len(seeded) > 0 {
+		ls.Rows = seeded
+		ls.Loading = false
+	}
+	return len(seen) == len(set)
+}
+
+// SeedRelatedExactRows applies seedRelatedExactRows to the top list screen and
+// reports whether the cache fully covers ids. The TUI adapter calls it after
+// pushing a related list; the web path reaches the lock-free core directly under
+// Apply's already-held lock.
+func (c *Controller) SeedRelatedExactRows(targetType string, ids []string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ls := c.topListState()
+	if ls == nil {
+		return false
+	}
+	return c.seedRelatedExactRows(ls, targetType, ids)
+}
+
 // PatchListReapplyChecker registers a RelatedChecker + source resource for the
 // top list screen's resource type. When non-nil, subsequent applyResourcesLoaded
 // calls re-run the checker to extend RelatedIDSet with newly matched IDs.
 func (c *Controller) PatchListReapplyChecker(checker resource.RelatedChecker, src resource.Resource) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.patchListReapplyChecker(checker, src)
+}
+
+// patchListReapplyChecker is the lock-free core of PatchListReapplyChecker.
+// Callers MUST already hold c.mu — e.g. dispatchRelatedNavigate, which runs
+// under Apply's lock; calling the exported wrapper there would re-lock the
+// non-reentrant RWMutex and self-deadlock. Mirrors the listIssueCount split.
+func (c *Controller) patchListReapplyChecker(checker resource.RelatedChecker, src resource.Resource) {
 	ls := c.topListState()
 	if ls == nil {
 		return

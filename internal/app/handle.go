@@ -50,6 +50,15 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// re-check staleness with the same predicate before mutating the controller.
 	if msg, ok := ev.(messages.ResourcesLoaded); ok && !messages.IsStale(msg, c.core) {
 		c.handleResourcesLoadedEvent(msg)
+		// Reverse-scan reapply, mirroring the TUI (runtime_adapter_resources.go):
+		// re-run the source predicate against each loaded page so a truncated
+		// "(0+)"/"(N+)" list discovers matches on later pages. Handle already holds
+		// c.mu (line 25), so call the lock-free core directly — the exported
+		// ApplyReapplyCheckerAgainst would re-lock the non-reentrant RWMutex and
+		// self-deadlock. No-op when no reapply-checker is registered for the type.
+		if ls := c.topListState(); ls != nil && len(c.stack) > 0 {
+			c.reapplyCheckerAgainst(ls, c.stack[len(c.stack)-1].Ctx.ResourceType, msg.Resources)
+		}
 		// Web/headless by-ID drill: replace a flagged placeholder list with the
 		// target's detail once its single row loads. TUI-safe — Handle is the
 		// headless/web entry point; the TUI routes ResourcesLoaded through the

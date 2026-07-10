@@ -1,10 +1,10 @@
-// keyboard_scoreless_resolve_test.go — regression pin for Codex review #4.
-//
-// The mouse ActionRelatedSelect path resolves a scoreless related row IN PLACE
-// (re-dispatch the source's related checks) rather than opening the target
-// type's plain unfiltered list. The keyboard/web ActionSelect path must behave
-// identically; before the fix it fell through to ResolveRelatedNavigate, which
-// with no IDs/filter produced an unfiltered target list ("goes to all").
+// keyboard_scoreless_resolve_test.go — regression pin: a truncated "(0+)"
+// related row navigates to a SCOPED list exactly like "(N+)". It is a lower
+// bound, not a dead end: pressing Enter opens the target list seeded with the
+// found IDs (empty for 0+) and fetches the population so the reapply-checker can
+// discover matches on later pages. It must NEVER resolve-in-place (no-op) and
+// never open the unfiltered "goes to all" list. The zero count is not
+// special-cased — it is "(N+)" with an empty seed.
 package app_test
 
 import (
@@ -14,12 +14,11 @@ import (
 	"github.com/k2m30/a9s/v3/internal/runtime"
 )
 
-func TestActionSelect_ScorelessRelatedRow_ResolvesInPlace(t *testing.T) {
+func TestActionSelect_TruncatedZeroRelatedRow_NavigatesToScopedList(t *testing.T) {
 	res := fakeEC2Resources()[0]
 	c := newControllerAtDetail(t, res, "ec2")
 
-	// A truncated "(0+)" row: actionable (truncated), but nothing to scope by —
-	// no ResourceIDs, no FetchFilter.
+	// A truncated "(0+)" row: actionable, found none yet — a lower bound.
 	c.ApplyDetailRelated([]app.DetailRelatedRow{
 		{
 			TargetType:  "sg",
@@ -39,20 +38,24 @@ func TestActionSelect_ScorelessRelatedRow_ResolvesInPlace(t *testing.T) {
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionSelect})
 
-	foundRecheck := false
+	// It must NAVIGATE away from the detail (into the scoped target list), not
+	// resolve in place.
+	if got := c.Snapshot().Body.Kind; got == app.BodyKindDetail {
+		t.Errorf("after ActionSelect on a truncated (0+) row, Body.Kind is still the detail — it must navigate to the scoped list like (N+)")
+	}
+	var recheck, fetch bool
 	for _, tk := range tasks {
-		if tk.Key.Kind == runtime.KindRelatedCheck {
-			foundRecheck = true
+		switch tk.Key.Kind {
+		case runtime.KindRelatedCheck:
+			recheck = true
+		case runtime.KindFetchResources:
+			fetch = true
 		}
 	}
-	if !foundRecheck {
-		t.Errorf("keyboard ActionSelect on a scoreless (0+) related row did not emit a "+
-			"KindRelatedCheck resolve-in-place task; tasks=%v — it must not fall through to the "+
-			"unfiltered target list", tasks)
+	if recheck {
+		t.Errorf("truncated (0+) must NOT resolve in place; got a KindRelatedCheck task: %v", tasks)
 	}
-
-	// The screen must remain the detail — no navigation to a list occurred.
-	if got := c.Snapshot().Body.Kind; got != app.BodyKindDetail {
-		t.Errorf("after ActionSelect on a scoreless row, Body.Kind = %q, want the detail (no navigation)", got)
+	if !fetch {
+		t.Errorf("truncated (0+) navigation must emit a KindFetchResources task (populate + reapply); tasks=%v", tasks)
 	}
 }
