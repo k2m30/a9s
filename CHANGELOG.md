@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.47.0] - 2026-07-10
+
+### Added
+
+- Wave-2 enrichers emit a slice of findings per resource; each problem is its
+  own Attention entry (OpenSearch surfaces "update forced" and "encryption at
+  rest off" separately), keyed by finding code.
+- Child views join the findings-color doctrine — unhealthy targets color
+  themselves and name the cause in lowercase; web child lists match the TUI and
+  Enter opens child views from the browser.
+- The menu issue badge shows `+` when the count is truncated.
+- Demo mode gained dozens of witnesses (ecs-task/MSK/API Gateway/CloudFormation
+  lifecycles, execution-history failures, 34+ finding codes) so every color
+  bucket and most related-panel pivots have a live demo witness.
+
+### Changed
+
+- Related navigation resolves through one shared path for the TUI and web
+  renderers — the same rows and the same fetch on both surfaces.
+- CloudTrail-event, networking, RDS instance→cluster, and five forward
+  IAM-role pivots resolve their counts from event data with no extra list
+  fetch.
+- The related-panel four-state row contract (`(N)` / `(N+)`·`(0+)` / `(0)` /
+  blank drill-in) is enforced everywhere; the ambiguous `(?)` row is gone.
+
+### Fixed
+
+- Truncated related rows (`(N+)`/`(0+)`) are navigable — Enter opens the scoped
+  list and keeps discovering matches as pages load; `(0+)` behaves identically
+  to `(N+)`.
+- A truncated single-match pivot opens the scoped scan list, not one detail.
+- A cache-hit filtered related list renders lazily-fetched (by-ID) rows instead
+  of appearing empty; the web no longer navigates a related row into an empty,
+  stuck list.
+- A popped related list no longer leaks its scan filter onto later lists of the
+  same type.
+- ACM certificates are keyed by ARN — multiple certificates sharing one domain
+  no longer collide in the related panel.
+- CloudTrail-event pivots resolve named targets by identity (never a scoreless
+  `(0+)`) and drill into the correct target; blackhole route targets are
+  skipped; secrets/ECR role pivots emit role names, not ARNs; IAM policy
+  lazy-add resolves by name.
+- Issue counts are consistent — a list title counts issues like the menu badge
+  (per resource); `~`-only enrichers no longer lower-bound the badge; failed
+  batches surface a per-row `?` or error.
+- Detail: Tab focus lands on the first drillable pivot; the viewport follows
+  the field cursor; nested CloudTrail REQUEST/RESPONSE render as compact JSON.
+- The availability sweep waits for AWS client readiness; a profile/region
+  switch can no longer race the availability save loop.
+
 ## [3.46.0] - 2026-07-07
 
 ### Changed
