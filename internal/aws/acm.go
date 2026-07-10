@@ -87,8 +87,18 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 			certARN = *cert.CertificateArn
 		}
 
+		// ID is the certificate ARN, not the domain name: two certs can share a
+		// domain (an expired cert and its active renewal), and a domain-name ID
+		// collides in the related-panel cache (keyed type:id) and detail nav —
+		// the second same-domain cert would replay the first's related panel.
+		// Name stays the domain for display. Fall back only if the ARN is absent.
+		id := certARN
+		if id == "" {
+			id = domainName
+		}
+
 		r := resource.Resource{
-			ID:   domainName,
+			ID:   id,
 			Name: domainName,
 			Fields: map[string]string{
 				"domain_name":     domainName,

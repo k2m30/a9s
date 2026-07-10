@@ -53,9 +53,10 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
 		r := resources[i]
-		// DescribeCertificate requires the certificate ARN. The acm fetcher
-		// (acm.go) sets ID = domain name and stores the ARN in
-		// Fields["certificate_arn"]. Passing r.ID errors with ValidationError.
+		// DescribeCertificate requires the certificate ARN, read from
+		// Fields["certificate_arn"] — the acm fetcher's stable source. (r.ID is
+		// also the ARN since the domain-name-ID collision fix, but Fields is what
+		// this checker has always used.)
 		certARN := r.Fields["certificate_arn"]
 		if certARN == "" {
 			return
