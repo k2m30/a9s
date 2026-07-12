@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -197,7 +198,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		w, h := m.innerSize()
 		rs.width, rs.height = w, h
 		m.pushRS(rs)
-		fetchCmd := navigateTasksToCmd(m, msg, result, tasks)
+		fetchCmd := navigateTasksToCmd(m, tasks)
 		return m, tea.Batch(initCmd, fetchCmd)
 
 	case runtime.NavigateKindPushDetail:
@@ -340,6 +341,13 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		if rs := m.activeRS(); rs.kind == rsKindList {
 			activeShortName = rs.resourceType
 		}
+		// Every sibling NavigateKindPush* case pushes the matching controller
+		// screen before its rendererState (see PushRegion/PushTheme/PushCosts
+		// immediately below) — this one didn't, which desynced m.stack from
+		// m.ctrl's screen stack the moment Help was opened via this Navigate
+		// path (as opposed to the direct '?' key handler in app_input.go,
+		// which already pushes both).
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenHelp}})
 		helpRS := newHelpRS(ctx, activeShortName)
 		w, h := m.innerSize()
 		helpRS.width, helpRS.height = w, h
@@ -355,7 +363,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		return m, navigateTasksToCmd(m, msg, result, tasks)
+		return m, navigateTasksToCmd(m, tasks)
 
 	case runtime.NavigateKindPushRegion:
 		if m.core.PreSuppliedClients() != nil {
@@ -417,7 +425,20 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case runtime.NavigateKindFetchReveal:
-		return m, navigateTasksToCmd(m, msg, result, tasks)
+		return m, navigateTasksToCmd(m, tasks)
+
+	case runtime.NavigateKindPushCosts:
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
+		m.ctrl.EnsureCostsState(time.Now())
+		// SC-002: HandleNavigate itself never fetches unconditionally —
+		// EnsureCostsFetch is the sole cache-first decision point, so a
+		// warm cache opens with zero CE calls.
+		tasks = append(tasks, m.ctrl.EnsureCostsFetch()...)
+		costsRS := newCostsRS()
+		w, h := m.innerSize()
+		costsRS.width, costsRS.height = w, h
+		m.pushRS(costsRS)
+		return m, navigateTasksToCmd(m, tasks)
 	}
 	return m, nil
 }
@@ -448,6 +469,8 @@ func translateNavigateTarget(t messages.ViewTarget) runtime.NavigateTarget {
 		return runtime.NavigateTargetTheme
 	case messages.TargetHelp:
 		return runtime.NavigateTargetHelp
+	case messages.TargetCosts:
+		return runtime.NavigateTargetCosts
 	}
 	return runtime.NavigateTargetUnknown
 }
@@ -455,7 +478,7 @@ func translateNavigateTarget(t messages.ViewTarget) runtime.NavigateTarget {
 // navigateTasksToCmd translates TaskRequests from HandleNavigate into a
 // Bubble Tea command. Unknown TaskKind values are dropped for forward-
 // compatibility with newer runtime builds.
-func navigateTasksToCmd(m Model, msg messages.Navigate, result runtime.NavigateResult, tasks []runtime.TaskRequest) tea.Cmd {
+func navigateTasksToCmd(m Model, tasks []runtime.TaskRequest) tea.Cmd {
 	if len(tasks) == 0 {
 		return nil
 	}
@@ -465,8 +488,8 @@ func navigateTasksToCmd(m Model, msg messages.Navigate, result runtime.NavigateR
 		case runtime.KindFetchResources:
 			// The runtime stamps the canonical (alias-resolved) ShortName onto
 			// req.Key.Scope when it builds the task, so ExecuteTask uses the same
-			// value that the former fetchResources(fetchRT, ...) call used.
-			// result.ResolvedType / msg.ResourceType fallback is no longer needed.
+			// value that the former fetchResources(fetchRT, ...) call used —
+			// no navigation-result fallback is needed.
 			cmds = append(cmds, m.executeTaskCmd(t))
 
 		case runtime.KindFetchProfiles:
@@ -475,6 +498,9 @@ func navigateTasksToCmd(m Model, msg messages.Navigate, result runtime.NavigateR
 
 		case runtime.KindFetchReveal:
 			// Route through ExecuteTask; fall back to adapter if needed.
+			cmds = append(cmds, m.executeTaskCmd(t))
+
+		case runtime.KindFetchCosts:
 			cmds = append(cmds, m.executeTaskCmd(t))
 		}
 	}
@@ -648,6 +674,21 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 	}
 
+	if rs.kind == rsKindCosts {
+		// Controller.handleActionRefresh's own topCostsState branch owns the
+		// force-refetch-open-period logic now (FR-012) — routed generically
+		// through Apply so this transport carries no costs-specific logic.
+		_, tasks := m.ctrl.Apply(app.Action{Kind: app.ActionRefresh})
+		if len(tasks) == 0 {
+			return m, nil
+		}
+		cmds := make([]tea.Cmd, len(tasks))
+		for i, t := range tasks {
+			cmds[i] = m.executeTaskCmd(t)
+		}
+		return m, tea.Batch(cmds...)
+	}
+
 	if rs.kind != rsKindList {
 		return m, nil
 	}
@@ -707,7 +748,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			// glyphs stay at their last-known value until the rerun's
 			// EnrichmentChecked overwrites c.enrichmentStore[rt] with the
 			// fresh findings, so nothing renders blank in between.
-			cmd := m.refreshActiveListWithEnrichmentRerun(rt, tok)
+			cmd := m.refreshActiveListWithEnrichmentRerun(tok)
 			return m, cmd
 		}
 	}
@@ -739,7 +780,7 @@ func (m Model) refreshActiveList() tea.Cmd {
 // enrichment-rerun token stamp — mirrors refreshResourceListWithEnrichmentRerun
 // in probe_adapter.go but reads config from the controller rather than a
 // stored ResourceListModel.
-func (m Model) refreshActiveListWithEnrichmentRerun(rt string, tok domain.Gen) tea.Cmd {
+func (m Model) refreshActiveListWithEnrichmentRerun(tok domain.Gen) tea.Cmd {
 	inner := m.refreshActiveList()
 	return func() tea.Msg {
 		msg := inner()

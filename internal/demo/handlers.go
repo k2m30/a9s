@@ -7,9 +7,14 @@ import (
 )
 
 // registerAllHandlers registers all demo handlers onto t.
-// Only STS remains; all other services are covered by typed fakes.
+// STS and Cost Explorer are the only services still routed through the HTTP
+// transport; every other service is covered by typed fakes
+// (internal/demo/fakes). Cost Explorer has no typed-fake path — costs.Store/
+// Query are shaped around SDK JSON responses, not a Go client interface —
+// so it is served here like STS (see internal/demo/costs_handlers.go).
 func registerAllHandlers(t *Transport) {
 	registerSTSHandlers(t)
+	registerCostExplorerHandlers(t)
 }
 
 // ---------------------------------------------------------------------------

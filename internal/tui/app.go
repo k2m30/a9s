@@ -276,6 +276,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case messages.Flash:
 		return m.handleFlash(msg)
+	case messages.ByIDFetchFailed:
+		// The by-id fetch wrapper's own failure IS this typed message — the
+		// only mechanism that can pop a stranded by-ID placeholder (costs
+		// drill or generic related-navigate), pops only when TargetType AND
+		// ID both match the pending target. The Reason still reaches the
+		// user through the ordinary flash path.
+		if rs := m.activeRS(); rs.kind == rsKindList && rs.resourceType == msg.TargetType {
+			m.popStrandedByIDPlaceholder(msg.ID)
+		}
+		return m.handleFlash(messages.Flash{Text: msg.Reason, IsError: true})
 	case messages.ClearFlash:
 		return m.handleClearFlash(msg)
 	case messages.InitConnect:
@@ -340,6 +350,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRelatedCheckResult(msg)
 	case messages.RelatedNavigate:
 		return m.handleRelatedNavigate(msg)
+	case messages.CostsLoaded:
+		_, tasks := m.ctrl.Handle(msg)
+		return m, m.dispatchTaskRequests(tasks)
 	}
 	// Route unmatched messages to cmdInput when in filter/command mode.
 	// This handles textinput-internal clipboard messages (e.g., pasteMsg returned

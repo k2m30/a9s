@@ -37,6 +37,25 @@
 | `w` | Toggle line wrap (in YAML, JSON, detail, and reveal views) |
 | `Tab` | Autocomplete (in command mode) / Switch focus (in detail view with related panel) |
 
+### Cost Explorer (`:costs`)
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Drill into the selected cell (service → usage type → resources → resource detail) |
+| `Esc` | Back out one drill level, then back to the menu |
+| `+` / `=` | Zoom in (year → month → week → day, anchored at the cursor) |
+| `-` / `_` | Zoom out |
+| `b` | Cycle cost metric (invoice → unblended → amortized → net amortized → blended) |
+| `1`-`6` | Pivot rows: service, region, account, usage type, purchase option, charge category |
+| `0` | Reset to the default view |
+| `Ctrl+R` | Force-refresh the open period |
+
+Rows sort by total spend across the visible window, largest absolute value
+first. Scrolling left past the oldest loaded column fetches older history
+(up to the Cost Explorer 13-month horizon). Resource-level drilling covers
+the last 14 days and, per AWS, EC2 only — other services explain the
+limitation in the footer.
+
 ### Related Resources (Detail View)
 
 | Key | Action |

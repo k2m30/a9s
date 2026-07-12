@@ -155,8 +155,16 @@ func TestHandleRelatedNavigate_FetchFilter_RegisteredFetcher_FilteredList(t *tes
 	}
 }
 
-// Case F — TargetID cache miss (no filtered fetcher, no cache entry) →
-// FilteredList with FilterText==TargetID and a single KindFetchResources task.
+// Case F — TargetID cache miss (no filtered fetcher, no cache entry) on a
+// by-ID-capable type → FilteredList with FilterText==TargetID and a single
+// KindFetchByIDDetail task.
+//
+// "ec2" now registers FetchByIDs (internal/aws/catalog_compute.go — the
+// costs resource-row navigation jump added it), so this case moved from the
+// KindFetchResources else-branch to the KindFetchByIDDetail branch. The
+// KindFetchResources-else-branch behavior itself is still pinned, just
+// against "lambda" now — see
+// TestHandleRelatedNavigate_NonByIDType_CacheMiss_EmitsFetchResources.
 func TestHandleRelatedNavigate_TargetIDCacheMiss_FilteredList(t *testing.T) {
 	c, _ := newRuntimeCore(t)
 
@@ -175,8 +183,9 @@ func TestHandleRelatedNavigate_TargetIDCacheMiss_FilteredList(t *testing.T) {
 		t.Errorf("TargetID = %q, want %q", result.TargetID, "i-missing")
 	}
 	wantTasks := []runtime.TaskRequest{{
-		Key:   runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "ec2"},
-		Cache: runtime.CacheNone,
+		Key:     runtime.TaskKey{Kind: runtime.KindFetchByIDDetail, Scope: "ec2"},
+		Cache:   runtime.CacheNone,
+		Payload: runtime.FetchByIDDetailPayload{TargetType: "ec2", ID: "i-missing"},
 	}}
 	if !reflect.DeepEqual(tasks, wantTasks) {
 		t.Errorf("tasks = %+v, want %+v", tasks, wantTasks)
@@ -368,14 +377,17 @@ func TestHandleRelatedNavigate_ByIDCapableType_CacheMiss_EmitsFetchByIDDetail(t 
 // cannot accidentally route all cache-miss TargetID drills through the
 // by-ID path.
 func TestHandleRelatedNavigate_NonByIDType_CacheMiss_EmitsFetchResources(t *testing.T) {
-	// "ec2" has no FetchByIDs helper registered in tests/unit (no internal/aws
-	// init side-effects). If that ever changes this test will catch the
-	// regression in the opposite direction.
+	// "lambda" has no FetchByIDs helper registered in internal/aws/
+	// catalog_compute.go (unlike "ec2", "ebs-snap", "ami" — confirmed
+	// directly against that file). If that ever changes this test will
+	// catch the regression in the opposite direction. "ec2" itself moved to
+	// the by-ID branch once it registered FetchByIDs — see
+	// TestHandleRelatedNavigate_TargetIDCacheMiss_FilteredList.
 	c, _ := newRuntimeCore(t)
 
 	result, tasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
-		TargetType: "ec2",
-		TargetID:   "i-nofetchbyid",
+		TargetType: "lambda",
+		TargetID:   "arn:aws:lambda:us-east-1:123456789012:function:nofetchbyid",
 	})
 
 	if result.Kind != runtime.NavigationKindFilteredList {
@@ -387,11 +399,11 @@ func TestHandleRelatedNavigate_NonByIDType_CacheMiss_EmitsFetchResources(t *test
 	if tasks[0].Key.Kind != runtime.KindFetchResources {
 		t.Errorf("tasks[0].Key.Kind = %q, want %q (not KindFetchByIDDetail)", tasks[0].Key.Kind, runtime.KindFetchResources)
 	}
-	if tasks[0].Key.Scope != "ec2" {
-		t.Errorf("tasks[0].Key.Scope = %q, want %q", tasks[0].Key.Scope, "ec2")
+	if tasks[0].Key.Scope != "lambda" {
+		t.Errorf("tasks[0].Key.Scope = %q, want %q", tasks[0].Key.Scope, "lambda")
 	}
 	if _, isDetail := tasks[0].Payload.(runtime.FetchByIDDetailPayload); isDetail {
-		t.Error("Payload is FetchByIDDetailPayload, want none — by-ID path must not fire for ec2 (no FetchByIDs registered)")
+		t.Error("Payload is FetchByIDDetailPayload, want none — by-ID path must not fire for lambda (no FetchByIDs registered)")
 	}
 }
 

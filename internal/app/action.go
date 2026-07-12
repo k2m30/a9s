@@ -109,6 +109,15 @@ const (
 	// Mirrors the TUI's '!' key (keys.ErrorLog). Emits a flash when no errors
 	// have been recorded this session.
 	ActionOpenErrorLog ActionKind = "open-error-log"
+
+	// Cost Explorer screen actions. Cursor movement reuses ActionMoveUp/Down
+	// (row axis) and ActionScrollLeft/Right (time-column axis); Enter/Esc
+	// reuse ActionSelect/ActionBack (data-model.md).
+	ActionCostZoomIn  ActionKind = "cost-zoom-in"  // +/=
+	ActionCostZoomOut ActionKind = "cost-zoom-out" // -/_
+	ActionCostMetric  ActionKind = "cost-metric"   // b — cycle display metric
+	// ActionCostPivot carries the pressed digit (0-9) in Action.N.
+	ActionCostPivot ActionKind = "cost-pivot"
 )
 
 // Action is a single semantic input from a renderer to the controller.

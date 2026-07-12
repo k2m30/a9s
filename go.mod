@@ -7,7 +7,7 @@ require (
 	charm.land/bubbletea/v2 v2.0.6
 	charm.land/lipgloss/v2 v2.0.3
 	github.com/atotto/clipboard v0.1.4
-	github.com/aws/aws-sdk-go-v2 v1.41.8
+	github.com/aws/aws-sdk-go-v2 v1.42.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.19
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.18
 	github.com/aws/aws-sdk-go-v2/service/acm v1.39.1
@@ -24,6 +24,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/codeartifact v1.39.1
 	github.com/aws/aws-sdk-go-v2/service/codebuild v1.68.17
 	github.com/aws/aws-sdk-go-v2/service/codepipeline v1.46.24
+	github.com/aws/aws-sdk-go-v2/service/costexplorer v1.66.0
 	github.com/aws/aws-sdk-go-v2/service/docdb v1.48.16
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.57.5
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.304.1
@@ -55,7 +56,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.68.7
 	github.com/aws/aws-sdk-go-v2/service/sts v1.42.2
 	github.com/aws/aws-sdk-go-v2/service/wafv2 v1.71.6
-	github.com/aws/smithy-go v1.25.1
+	github.com/aws/smithy-go v1.27.3
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sync v0.20.0
@@ -66,8 +67,8 @@ require (
 require (
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.10 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.24 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.24 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.24 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.30 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.30 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.25 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.9 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.17 // indirect

@@ -16,6 +16,7 @@ import (
 	"fmt"
 
 	"github.com/k2m30/a9s/v3/internal/cache"
+	"github.com/k2m30/a9s/v3/internal/costs"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -37,6 +38,7 @@ const (
 	NavigateTargetRegion
 	NavigateTargetTheme
 	NavigateTargetHelp
+	NavigateTargetCosts
 )
 
 // NavigateEvent is the runtime-side event for unified navigation.
@@ -68,19 +70,20 @@ const (
 	NavigateKindPushTheme                           // adapter constructs the theme view
 	NavigateKindFetchProfiles                       // adapter starts the profile fetch task
 	NavigateKindFetchReveal                         // ResolvedType + Resource populated; adapter starts reveal task
+	NavigateKindPushCosts                           // adapter pushes ScreenCosts + seeds CostsState via EnsureCostsState
 )
 
 // NavigateResult is the pure-function output of HandleNavigate. Fields are
 // conditionally populated depending on Kind.
 type NavigateResult struct {
 	Kind            NavigateKind
-	ResolvedType    string                      // canonical short name
-	DisplayAlias    string                      // empty when same as ResolvedType
-	ReplaceCurrent  bool                        // mirrors NavigateEvent.ReplaceCurrent
-	Resource        *resource.Resource          // for Push{Detail,YAML,JSON} and FetchReveal
-	CachedEntry     *domain.ListViewCacheEntry  // for PushResourceListCached
-	DispatchEnrich  bool                        // for Push{Detail,YAML,JSON}
-	DispatchRelated bool                        // for PushDetail
+	ResolvedType    string                     // canonical short name
+	DisplayAlias    string                     // empty when same as ResolvedType
+	ReplaceCurrent  bool                       // mirrors NavigateEvent.ReplaceCurrent
+	Resource        *resource.Resource         // for Push{Detail,YAML,JSON} and FetchReveal
+	CachedEntry     *domain.ListViewCacheEntry // for PushResourceListCached
+	DispatchEnrich  bool                       // for Push{Detail,YAML,JSON}
+	DispatchRelated bool                       // for PushDetail
 	FlashMessage    string
 	FlashIsError    bool
 }
@@ -95,6 +98,10 @@ const (
 	// KindFetchReveal asks the adapter to call the registered reveal fetcher
 	// for the resource named by FetchRevealPayload.
 	KindFetchReveal TaskKind = "fetch-reveal"
+
+	// KindFetchCosts asks the adapter to run a Cost Explorer GetCostAndUsage
+	// fetch for the costs.Query carried by FetchCostsPayload.
+	KindFetchCosts TaskKind = "fetch-costs"
 )
 
 // FetchRevealPayload carries the typed inputs for KindFetchReveal.
@@ -105,6 +112,32 @@ type FetchRevealPayload struct {
 
 // isTaskPayload satisfies the TaskPayload marker interface.
 func (FetchRevealPayload) isTaskPayload() {}
+
+// FetchCostsPayload carries the costs.Query the adapter must fetch for
+// KindFetchCosts, plus the exact visible-window periods that Query.Range
+// spans (Window) — the executor threads Window through onto the resulting
+// messages.CostsLoaded event so ApplyCostsLoaded can stamp Store.MergeCoverage
+// for precisely what was requested, independent of which periods CE actually
+// returned records for (R2: a period with zero returned groups is a real,
+// cacheable answer, not a gap).
+type FetchCostsPayload struct {
+	Query  costs.Query
+	Window []costs.Period
+	// SkipAnomalies tells the executor to skip the GetAnomalies call
+	// riding alongside the main cost-and-usage fetch — set by
+	// ensureCostsShapeFetched when the store's cached anomaly snapshot
+	// (Store.Anomalies) is still within its TTL, so a shape-miss on the
+	// main data never forces a redundant anomaly refetch too.
+	SkipAnomalies bool
+	// SkipGrid tells the executor to skip the GetCostAndUsage(WithResources)
+	// call: the grid shape is already fully covered (screen.FetchPlan.Grid
+	// false) and only the anomaly slot is absent/expired — an
+	// anomalies-only dispatch (X3), never billed for cost data the store
+	// already has.
+	SkipGrid bool
+}
+
+func (FetchCostsPayload) isTaskPayload() {}
 
 // HandleNavigate resolves the navigation kind for ev, mutating session
 // state the runtime owns (EnrichGen / EnrichResKey bumps for detail
@@ -328,6 +361,14 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 				Cache:   CacheNone,
 				Payload: FetchRevealPayload{ResourceType: ev.ResourceType, ResourceID: ev.Resource.ID},
 			}}
+
+	case NavigateTargetCosts:
+		// No unconditional fetch here (SC-002): the adapter's PushCosts
+		// handling seeds CostsState via EnsureCostsState, then the shared
+		// ensureCostsShapeFetched decides — a warm cache opens with zero CE
+		// calls, a cold one fetches. See internal/app/navigate.go and
+		// internal/tui/runtime_adapter_navigate.go's NavigateKindPushCosts cases.
+		return NavigateResult{Kind: NavigateKindPushCosts}, nil
 	}
 	return NavigateResult{Kind: NavigateKindNoop}, nil
 }

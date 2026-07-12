@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -422,6 +423,13 @@ func buildLocalPolicies(ctx context.Context, api IAMListPoliciesAPI, store iamPo
 // in RetryOnThrottle. Per-group ListGroupPolicies failures are collected and
 // returned as a composite error alongside any partial results — callers must
 // check both return values.
+// iamInlineGroupSweepParallelism bounds the per-group ListGroupPolicies
+// fan-out fetchInlineGroupPolicies runs, distinct from the general
+// EnrichmentParallelism: IAM's global per-account API rate limit is shared
+// across every IAM call the whole session makes, not just this sweep, so it
+// stays capped lower than a typical per-resource enrichment fan-out.
+const iamInlineGroupSweepParallelism = 5
+
 func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resource, error) {
 	groupsOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListGroupsOutput, error) {
 		return api.ListGroups(ctx, &iam.ListGroupsInput{})
@@ -430,22 +438,51 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 		return nil, fmt.Errorf("listing IAM groups for inline policies: %w", err)
 	}
 
-	var resources []resource.Resource
+	n := len(groupsOut.Groups)
+	// perGroup keeps each group's inline resources at its own index — the
+	// bounded fan-out below writes concurrently, so a single shared slice
+	// (mutex or not) would need its own ordering discipline; indexing by
+	// group position instead makes the final flatten below deterministic
+	// regardless of completion order.
+	perGroup := make([][]resource.Resource, n)
+	visited := make([]bool, n)
+	var mu sync.Mutex
 	var groupFailures []string
-	for _, group := range groupsOut.Groups {
+
+	// Bounded fan-out (ForEachParallel, internal/aws/parallel.go — the same
+	// mechanism issue-enrichment fetchers use): sequential per-group calls
+	// cannot finish a wide account (49+ groups) inside any shared deadline
+	// (the probe's 10s budget, or a real list-open's own timeout); unbounded
+	// fan-out risks IAM throttling instead. RetryOnThrottle still wraps each
+	// individual ListGroupPolicies call. sweepErr is ForEachParallel's own
+	// return value (a ctx error when the sweep's deadline expired before
+	// every group was even scheduled) — captured, not discarded: a group
+	// whose turn never comes contributes nothing to groupFailures (only a
+	// group's OWN ListGroupPolicies call actually failing does), so without
+	// this the sweep would silently return a partial result with a nil
+	// error whenever the deadline expires before any single group's call
+	// has failed on its own.
+	sweepErr := ForEachParallel(ctx, n, iamInlineGroupSweepParallelism, func(i int) {
+		group := groupsOut.Groups[i]
 		if group.GroupName == nil {
-			continue
+			return
 		}
 		groupName := *group.GroupName
+		mu.Lock()
+		visited[i] = true
+		mu.Unlock()
 		out, gpErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListGroupPoliciesOutput, error) {
 			return api.ListGroupPolicies(ctx, &iam.ListGroupPoliciesInput{GroupName: &groupName})
 		})
 		if gpErr != nil {
+			mu.Lock()
 			groupFailures = append(groupFailures, fmt.Sprintf("%s: %v", groupName, gpErr))
-			continue
+			mu.Unlock()
+			return
 		}
+		names := make([]resource.Resource, 0, len(out.PolicyNames))
 		for _, name := range out.PolicyNames {
-			resources = append(resources, resource.Resource{
+			names = append(names, resource.Resource{
 				ID:   name,
 				Name: name,
 				Fields: map[string]string{
@@ -457,7 +494,35 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 				},
 			})
 		}
+		mu.Lock()
+		perGroup[i] = names
+		mu.Unlock()
+	})
+
+	var resources []resource.Resource
+	for _, rs := range perGroup {
+		resources = append(resources, rs...)
 	}
 
-	return resources, AggregateFailures("ListGroupPolicies", groupFailures, len(groupsOut.Groups))
+	if sweepErr != nil {
+		unvisited := 0
+		for _, v := range visited {
+			if !v {
+				unvisited++
+			}
+		}
+		if unvisited > 0 {
+			// Prepended, not appended: AggregateFailures enumerates only the
+			// first aggregateFailuresCap entries verbatim before summarizing
+			// the rest — appending this summary last would let a wide
+			// per-group failure set (as here) push it past the cap and
+			// silently drop the one entry that names the truly UNSWEPT
+			// remainder (never even attempted), the whole point of this
+			// check.
+			groupFailures = append([]string{fmt.Sprintf(
+				"%d of %d groups never visited before the sweep's context ended: %v", unvisited, n, sweepErr)}, groupFailures...)
+		}
+	}
+
+	return resources, AggregateFailures("ListGroupPolicies", groupFailures, n)
 }

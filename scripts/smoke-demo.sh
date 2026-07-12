@@ -114,8 +114,11 @@ forbid() {
 	fi
 }
 
-# Menu: full catalog present.
-expect menu.txt "resource-types(66)" "menu shows the full catalog"
+# Menu: full catalog present. 66 registered resource types
+# (resource.AllResourceTypes()) plus the synthetic Cost Explorer pseudo-entry
+# (internal/app/menu.go's menuAllItems() appends costsMenuTypeDef, which is
+# deliberately excluded from AllResourceTypes() itself).
+expect menu.txt "resource-types(67)" "menu shows the full catalog"
 
 # Security groups: owner-worded risk phrases, no raw classifier tokens.
 expect sg.txt "all ports open" "sg wide-open row uses the owner wording"

@@ -21,6 +21,31 @@ type availabilitySavePayload struct {
 	issueKnown  map[string]bool
 }
 
+// CostsMenuShortName is the synthetic main-menu entry for the Cost Explorer
+// screen. It is spliced into menuAllItems() for cursor/filter/selection
+// purposes only — it is never added to resource.AllResourceTypes() itself,
+// so it never reaches a probe/enrichment loop or the issue-badge sync.
+// Exported so every renderer (TUI, web) that inspects a MenuSelected/MenuEntry
+// ShortName to detect the synthetic row compares against this one symbol
+// instead of a duplicated "costs" literal.
+const CostsMenuShortName = "costs"
+
+var costsMenuTypeDef = resource.ResourceTypeDef{
+	ShortName: CostsMenuShortName,
+	Name:      "Cost Explorer",
+	Category:  "Cost",
+}
+
+// menuAllItems returns the full main-menu item list: every registered
+// resource type plus the synthetic Cost Explorer entry appended last. This
+// is the single source buildMenuBody/MenuSelected/the menu ActionSelect
+// branch must use for visibility, cursor movement, and selection so the
+// synthetic entry participates in filter/cursor logic identically to a real
+// type.
+func menuAllItems() []resource.ResourceTypeDef {
+	return append(resource.AllResourceTypes(), costsMenuTypeDef)
+}
+
 // topMenuState returns the MenuState of the top-of-stack screen if it is
 // ScreenMenu, or nil otherwise.
 func (c *Controller) topMenuState() *MenuState {
@@ -467,8 +492,7 @@ func (c *Controller) menuRefreshing() bool {
 // renderer-agnostic data. mainmenu.go View() delegates to this via the
 // controller snapshot.
 func buildMenuBody(ms *MenuState) *MenuBody {
-	all := resource.AllResourceTypes()
-	visible := menuVisibleItems(ms, all)
+	visible := menuVisibleItems(ms, menuAllItems())
 
 	cursor := ms.Cursor
 	if cursor >= len(visible) && len(visible) > 0 {
@@ -533,7 +557,7 @@ func buildMenuBody(ms *MenuState) *MenuBody {
 // menuFrameTitle returns the frame-border title string for the main-menu screen.
 // mainmenu.go FrameTitle() delegates to this via the controller.
 func menuFrameTitle(ms *MenuState) string {
-	all := resource.AllResourceTypes()
+	all := menuAllItems()
 	total := len(all)
 	visible := menuVisibleItems(ms, all)
 	filtered := len(visible)
@@ -629,8 +653,7 @@ func (c *Controller) MenuSelected() (resource.ResourceTypeDef, bool) {
 	if ms == nil {
 		return resource.ResourceTypeDef{}, false
 	}
-	all := resource.AllResourceTypes()
-	visible := menuVisibleItems(ms, all)
+	visible := menuVisibleItems(ms, menuAllItems())
 	if len(visible) == 0 {
 		return resource.ResourceTypeDef{}, false
 	}

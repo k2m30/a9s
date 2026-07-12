@@ -10,6 +10,13 @@ import (
 
 // handleActionBack handles ActionBack.
 func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskRequest) {
+	// Costs screen: Esc pops one drill frame while drilled; only once back
+	// at the root frame does it fall through to the generic screen-pop below
+	// (leaving the Cost Explorer entirely).
+	if cs := c.topCostsState(); cs != nil && c.applyCostsBack(cs) {
+		return c.snapshot(), nil
+	}
+
 	// Pop a single screen, mirroring the TUI's m.popView() — NOT a full
 	// collapse (root-collapse is the "root" Command). Per-view Esc semantics
 	// (clear filter/search before popping) are handled in the per-screen
@@ -43,6 +50,10 @@ func (c *Controller) handleActionMoveUp(a Action) (ViewState, []runtime.TaskRequ
 	if vs, tasks, handled := c.applyDetailActions(a); handled {
 		return vs, tasks
 	}
+	if cs := c.topCostsState(); cs != nil {
+		c.applyCostsMoveRow(cs, -1)
+		return c.snapshot(), nil
+	}
 	if ts := c.topTextState(); ts != nil {
 		if ts.ScrollY > 0 {
 			ts.ScrollY--
@@ -54,7 +65,7 @@ func (c *Controller) handleActionMoveUp(a Action) (ViewState, []runtime.TaskRequ
 		}
 		_ = visible
 	} else if ms := c.topMenuState(); ms != nil {
-		all := resource.AllResourceTypes()
+		all := menuAllItems()
 		visible := menuVisibleItems(ms, all)
 		if ms.Cursor > 0 {
 			ms.Cursor--
@@ -75,6 +86,10 @@ func (c *Controller) handleActionMoveDown(a Action) (ViewState, []runtime.TaskRe
 	if vs, tasks, handled := c.applyDetailActions(a); handled {
 		return vs, tasks
 	}
+	if cs := c.topCostsState(); cs != nil {
+		c.applyCostsMoveRow(cs, 1)
+		return c.snapshot(), nil
+	}
 	if ts := c.topTextState(); ts != nil {
 		ts.ScrollY++
 	} else if ls := c.topListState(); ls != nil {
@@ -83,7 +98,7 @@ func (c *Controller) handleActionMoveDown(a Action) (ViewState, []runtime.TaskRe
 			ls.SelectedRow++
 		}
 	} else if ms := c.topMenuState(); ms != nil {
-		all := resource.AllResourceTypes()
+		all := menuAllItems()
 		visible := menuVisibleItems(ms, all)
 		if ms.Cursor < len(visible)-1 {
 			ms.Cursor++
@@ -109,7 +124,7 @@ func (c *Controller) handleActionMoveTop(a Action) (ViewState, []runtime.TaskReq
 		ls.SelectedRow = 0
 	} else if ms := c.topMenuState(); ms != nil {
 		ms.Cursor = 0
-		all := resource.AllResourceTypes()
+		all := menuAllItems()
 		visible := menuVisibleItems(ms, all)
 		menuSkipUnavailable(ms, visible, +1)
 	} else if ss := c.topSelectorState(); ss != nil {
@@ -133,7 +148,7 @@ func (c *Controller) handleActionMoveBottom(a Action) (ViewState, []runtime.Task
 			ls.SelectedRow = visible - 1
 		}
 	} else if ms := c.topMenuState(); ms != nil {
-		all := resource.AllResourceTypes()
+		all := menuAllItems()
 		visible := menuVisibleItems(ms, all)
 		if len(visible) > 0 {
 			ms.Cursor = len(visible) - 1
@@ -165,7 +180,7 @@ func (c *Controller) handleActionPageUp(a Action) (ViewState, []runtime.TaskRequ
 			ls.SelectedRow = 0
 		}
 	} else if ms := c.topMenuState(); ms != nil {
-		all := resource.AllResourceTypes()
+		all := menuAllItems()
 		visible := menuVisibleItems(ms, all)
 		ms.Cursor -= menuPageSizeFor(a)
 		if ms.Cursor < 0 {
@@ -197,7 +212,7 @@ func (c *Controller) handleActionPageDown(a Action) (ViewState, []runtime.TaskRe
 			ls.SelectedRow = max(n-1, 0)
 		}
 	} else if ms := c.topMenuState(); ms != nil {
-		all := resource.AllResourceTypes()
+		all := menuAllItems()
 		visible := menuVisibleItems(ms, all)
 		ms.Cursor += menuPageSizeFor(a)
 		if n := len(visible); ms.Cursor >= n {
@@ -217,6 +232,11 @@ func (c *Controller) handleActionPageDown(a Action) (ViewState, []runtime.TaskRe
 
 // handleActionScrollLeft handles ActionScrollLeft.
 func (c *Controller) handleActionScrollLeft(_ Action) (ViewState, []runtime.TaskRequest) {
+	if vs, tasks, ok := c.handleCostsScreenAction(func(cs *CostsState) *runtime.TaskRequest {
+		return c.applyCostsMoveCol(cs, -1)
+	}); ok {
+		return vs, tasks
+	}
 	if ls := c.topListState(); ls != nil {
 		if ls.ScrollX > 0 {
 			ls.ScrollX--
@@ -227,6 +247,11 @@ func (c *Controller) handleActionScrollLeft(_ Action) (ViewState, []runtime.Task
 
 // handleActionScrollRight handles ActionScrollRight.
 func (c *Controller) handleActionScrollRight(_ Action) (ViewState, []runtime.TaskRequest) {
+	if vs, tasks, ok := c.handleCostsScreenAction(func(cs *CostsState) *runtime.TaskRequest {
+		return c.applyCostsMoveCol(cs, 1)
+	}); ok {
+		return vs, tasks
+	}
 	if ls := c.topListState(); ls != nil {
 		ls.ScrollX++
 	}
@@ -234,7 +259,12 @@ func (c *Controller) handleActionScrollRight(_ Action) (ViewState, []runtime.Tas
 }
 
 // handleActionSelect handles ActionSelect.
-func (c *Controller) handleActionSelect(a Action) (ViewState, []runtime.TaskRequest) {
+func (c *Controller) handleActionSelect(_ Action) (ViewState, []runtime.TaskRequest) {
+	// Costs screen: Enter drills into the cursor's cell (FR-006).
+	if vs, tasks, ok := c.handleCostsScreenAction(c.applyCostsSelect); ok {
+		return vs, tasks
+	}
+
 	// Resource/child list: open the detail of the currently-selected row,
 	// identical to ActionOpenDetail. Enter and row-clicks in the web UI both
 	// send ActionSelect; the TUI uses ActionOpenDetail from its key handler.
@@ -295,10 +325,14 @@ func (c *Controller) handleActionSelect(a Action) (ViewState, []runtime.TaskRequ
 	}
 
 	if ms := c.topMenuState(); ms != nil {
-		all := resource.AllResourceTypes()
-		visible := menuVisibleItems(ms, all)
+		visible := menuVisibleItems(ms, menuAllItems())
 		if len(visible) > 0 && ms.Cursor < len(visible) {
 			selected := visible[ms.Cursor]
+			if selected.ShortName == CostsMenuShortName {
+				res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetCosts})
+				tasks = append(tasks, c.applyNavResult(res)...)
+				return c.snapshot(), tasks
+			}
 			// Block navigation to confirmed-empty types (count known, zero, not
 			// truncated). Availability may be stored under an alias key, so resolve
 			// it via menuActiveKey — matching MenuSelected (the TUI Enter path).
@@ -320,6 +354,66 @@ func (c *Controller) handleActionSelect(a Action) (ViewState, []runtime.TaskRequ
 	return c.snapshot(), nil
 }
 
+// handleActionCostZoomIn handles ActionCostZoomIn.
+func (c *Controller) handleActionCostZoomIn(_ Action) (ViewState, []runtime.TaskRequest) {
+	vs, tasks, _ := c.handleCostsScreenAction(func(cs *CostsState) *runtime.TaskRequest {
+		return c.applyCostZoom(cs, true)
+	})
+	return vs, tasks
+}
+
+// handleActionCostZoomOut handles ActionCostZoomOut.
+func (c *Controller) handleActionCostZoomOut(_ Action) (ViewState, []runtime.TaskRequest) {
+	vs, tasks, _ := c.handleCostsScreenAction(func(cs *CostsState) *runtime.TaskRequest {
+		return c.applyCostZoom(cs, false)
+	})
+	return vs, tasks
+}
+
+// handleActionCostMetric handles ActionCostMetric.
+func (c *Controller) handleActionCostMetric(_ Action) (ViewState, []runtime.TaskRequest) {
+	vs, tasks, _ := c.handleCostsScreenAction(c.applyCostMetricCycle)
+	return vs, tasks
+}
+
+// handleActionCostPivot handles ActionCostPivot. a.N carries the pressed digit.
+func (c *Controller) handleActionCostPivot(a Action) (ViewState, []runtime.TaskRequest) {
+	vs, tasks, _ := c.handleCostsScreenAction(func(cs *CostsState) *runtime.TaskRequest {
+		return c.applyCostPivot(cs, a.N)
+	})
+	return vs, tasks
+}
+
+// handleCostsScreenAction runs apply against the top costs screen's
+// CostsState and wraps the result for Apply callers — the
+// topCostsState-guard, apply, snapshot, task-wrap shape every cost action
+// handler shares. matched is false (and vs/tasks are zero) when the top
+// screen is not costs; ScrollLeft/ScrollRight/Select's costs branch checks
+// it before falling through to their own non-costs handling, and the four
+// dedicated CostZoom*/Metric/Pivot handlers — which have no fallback at all
+// — return it directly.
+func (c *Controller) handleCostsScreenAction(apply func(cs *CostsState) *runtime.TaskRequest) (vs ViewState, tasks []runtime.TaskRequest, matched bool) {
+	cs := c.topCostsState()
+	if cs == nil {
+		return c.snapshot(), nil, false
+	}
+	// apply must run — and finish mutating cs — before snapshot() reads the
+	// controller's state: Go evaluates a return statement's operands
+	// left-to-right, so inlining apply(cs) directly into snapshot()'s
+	// argument list would capture the PRE-mutation state.
+	task := apply(cs)
+	return c.snapshot(), costsTaskSlice(task), true
+}
+
+// costsTaskSlice wraps an ensureCostsShapeFetched result (nil on a cache
+// hit or no-op) into the []runtime.TaskRequest shape Apply callers expect.
+func costsTaskSlice(t *runtime.TaskRequest) []runtime.TaskRequest {
+	if t == nil {
+		return nil
+	}
+	return []runtime.TaskRequest{*t}
+}
+
 // handleActionSelectIndex handles ActionSelectIndex: sets the cursor of the
 // current screen (resource/child list, main menu, or selector) to the
 // visible index carried in a.N, clamped to the visible range, then performs
@@ -337,35 +431,21 @@ func (c *Controller) handleActionSelect(a Action) (ViewState, []runtime.TaskRequ
 func (c *Controller) handleActionSelectIndex(a Action) (ViewState, []runtime.TaskRequest) {
 	if ls := c.topListState(); ls != nil {
 		visible := c.listVisibleCount(ls)
-		ls.SelectedRow = clampIndex(a.N, visible)
+		ls.SelectedRow = clampInt(a.N, 0, visible-1)
 		return c.handleActionSelect(a)
 	}
 	if ms := c.topMenuState(); ms != nil {
-		all := resource.AllResourceTypes()
+		all := menuAllItems()
 		visible := menuVisibleItems(ms, all)
-		ms.Cursor = clampIndex(a.N, len(visible))
+		ms.Cursor = clampInt(a.N, 0, len(visible)-1)
 		return c.handleActionSelect(a)
 	}
 	if ss := c.topSelectorState(); ss != nil {
 		visible := selectorVisibleItems(ss)
-		ss.Cursor = clampIndex(a.N, len(visible))
+		ss.Cursor = clampInt(a.N, 0, len(visible)-1)
 		return c.handleActionSelect(a)
 	}
 	return c.snapshot(), nil
-}
-
-// clampIndex clamps idx into [0, n-1]. Returns 0 when n <= 0.
-func clampIndex(idx, n int) int {
-	if n <= 0 {
-		return 0
-	}
-	if idx < 0 {
-		return 0
-	}
-	if idx >= n {
-		return n - 1
-	}
-	return idx
 }
 
 // stepToSelectable advances cur in the given direction (+1/-1) over a list of

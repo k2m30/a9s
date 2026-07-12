@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -90,6 +91,16 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 
 	case runtime.NavigateKindPushTheme:
 		c.applyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenTheme}})
+
+	case runtime.NavigateKindPushCosts:
+		c.applyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
+		c.ensureCostsState(time.Now())
+		// HandleNavigate no longer fetches unconditionally (SC-002) —
+		// ensureCostsShapeFetched is the sole decider: a warm cache opens
+		// with zero CE calls, a cold one gets exactly the one task it needs.
+		if cs := c.topCostsState(); cs != nil {
+			return costsTaskSlice(c.ensureCostsShapeFetched(cs))
+		}
 
 	case runtime.NavigateKindFetchProfiles:
 		// No stack change — the adapter starts the fetch task; when the result

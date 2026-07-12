@@ -24,15 +24,16 @@ This document outlines the planned direction for a9s. Priorities may shift based
 - **Help view** -- `?` for context-sensitive keybinding reference
 - **Horizontal scrolling** -- `h`/`l` to scroll wide tables
 - **Pagination** -- `M` to load more for large result sets (demo mode showcases this)
-- **22,900+ unit tests**
+- **Issues shown in UI** -- background health checks surface findings as `!`/`~` row markers, `issues:N` menu badges, and a unified Attention section in detail views; `Ctrl+Z` filters to affected resources
+- **Cost Explorer** -- `:costs` opens a spend grid that matches the AWS invoice: pivot by service/region/account/usage type/purchase option/charge category, zoom years to days, drill any cell down to usage types, individual EC2 instances, and their detail views; anomaly markers with dollar impact; closed months cached on disk and rendered offline
+- **23,300+ unit tests**
 
 ## Short-Term
 
-- **Issues shown in UI** -- highlight potential issues to narrow down incidents
+- **Cost overlay in resource lists** -- show each resource's monthly cost as a column, powered by the Cost Explorer data already cached
 
 ## Medium-Term
 
-- **Cost overlay** -- show estimated monthly cost per resource (via Cost Explorer API)
 - **Live tail** -- stream CloudWatch Logs in a split pane
 
 ## Long-Term
@@ -47,4 +48,4 @@ This document outlines the planned direction for a9s. Priorities may shift based
 - **Plugin system** -- adds complexity without clear value; new resource types are easy to add via PR
 - **Terraform/IaC integration** -- a9s is a viewer, not a provisioning tool
 - **Telemetry or analytics** -- a9s will never phone home
-- **Web UI** -- terminal-first, always
+- **Web-first development** -- the terminal is the primary interface, always; the built-in `--web` server mirrors the same read-only views for sharing a screen, never replaces them

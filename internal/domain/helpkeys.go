@@ -19,6 +19,7 @@ const (
 	HelpFromReveal
 	HelpFromResourceListPaginated
 	HelpFromSecretsListPaginated
+	HelpFromCosts
 )
 
 // HelpHint is one key/description pair.
@@ -83,6 +84,8 @@ func HelpGroupsFor(ctx HelpContext, toggleAttentionKey string) []HelpSection {
 		return selectorSections()
 	case HelpFromReveal:
 		return revealSections()
+	case HelpFromCosts:
+		return costsSections()
 	default:
 		return mainMenuSections()
 	}
@@ -336,6 +339,34 @@ func selectorSections() []HelpSection {
 		{
 			Title: "OTHER",
 			Hints: []HelpHint{
+				{"i", "identity"},
+				{"!", "error log"},
+				{"?", "help"},
+			},
+		},
+		commandsSection(),
+	}
+}
+
+func costsSections() []HelpSection {
+	return []HelpSection{
+		{
+			Title: "COST EXPLORER",
+			Hints: []HelpHint{
+				{"b", "metric"},
+				{"+/-", "zoom"},
+				{"0-9", "pivot"},
+				{"enter", "drill"},
+				{"h/l", "scroll cols"},
+				{"j/k", "move row"},
+				{"sort", "rows sort by total spend across the visible window, largest absolute first"},
+			},
+		},
+		{
+			Title: "OTHER",
+			Hints: []HelpHint{
+				{"ctrl+r", "refresh"},
+				{"esc", "back"},
 				{"i", "identity"},
 				{"!", "error log"},
 				{"?", "help"},

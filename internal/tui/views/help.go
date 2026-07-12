@@ -27,6 +27,7 @@ const (
 	HelpFromReveal                                   // reveal view
 	HelpFromResourceListPaginated                    // paginated resource list (includes M)
 	HelpFromSecretsListPaginated                     // paginated secrets list (includes M and x)
+	HelpFromCosts                                    // cost explorer view
 )
 
 // Aliases: reveal-list help contexts (resource types with reveal fetchers).
@@ -100,6 +101,8 @@ func (c HelpContext) domainContext() domain.HelpContext {
 		return domain.HelpFromSelector
 	case HelpFromReveal:
 		return domain.HelpFromReveal
+	case HelpFromCosts:
+		return domain.HelpFromCosts
 	default:
 		return domain.HelpFromMainMenu
 	}
@@ -116,10 +119,15 @@ func (m HelpModel) View() string {
 		// important help words in narrow layouts.
 		return hkStyle.Render(text.PadOrTrunc(k, 9)) + descStyle.Render(d)
 	}
+	// padCell always appends at least a two-space gap, even when s already
+	// meets or exceeds w — without it, a cell whose content is as wide as
+	// or wider than its column budget (e.g. "page down" abutting the next
+	// column's "ctrl+c") fuses directly into the next column with zero
+	// separation.
 	padCell := func(s string, w int) string {
 		visible := lipgloss.Width(s)
 		if visible >= w {
-			return s
+			return s + "  "
 		}
 		return s + strings.Repeat(" ", w-visible)
 	}

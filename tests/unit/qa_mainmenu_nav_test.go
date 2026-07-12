@@ -817,7 +817,9 @@ func TestQA_MainMenu_FrameTitle(t *testing.T) {
 	m := newRootSizedModel()
 
 	plain := stripANSI(rootViewContent(m))
-	expectedTitle := fmt.Sprintf("resource-types(%d)", len(resource.AllResourceTypes()))
+	// +1: the permanent synthetic "costs" (Cost Explorer) main-menu entry is
+	// not in resource.AllResourceTypes() but always appears in MenuBody.Entries.
+	expectedTitle := fmt.Sprintf("resource-types(%d)", len(resource.AllResourceTypes())+1)
 	if !strings.Contains(plain, expectedTitle) {
 		t.Errorf("frame title should be %q, got:\n%s", expectedTitle, plain)
 	}
@@ -1080,8 +1082,12 @@ func TestQA_MainMenu_SelectionPersistsAcrossGAndShiftG(t *testing.T) {
 	}
 	msg := cmd()
 	nav := msg.(messages.Navigate)
-	if nav.ResourceType != "backup" {
-		t.Errorf("after G, g, G, should be on backup, got %q", nav.ResourceType)
+	// The synthetic "costs" (Cost Explorer) entry is now the permanent
+	// bottom-most main-menu row; Enter on it emits Target=TargetCosts with
+	// an empty ResourceType (it is not a resource.ResourceTypeDef list),
+	// so the bottom-of-menu assertion checks Target instead of ResourceType.
+	if nav.Target != messages.TargetCosts {
+		t.Errorf("after G, g, G, should be on costs, got Target=%v ResourceType=%q", nav.Target, nav.ResourceType)
 	}
 }
 
@@ -1129,7 +1135,9 @@ func TestQA_MainMenu_WindowResizeMaintainsState(t *testing.T) {
 
 	// Verify all 10 resources still visible and we can navigate
 	plain := stripANSI(rootViewContent(m))
-	expectedTitle := fmt.Sprintf("resource-types(%d)", len(resource.AllResourceTypes()))
+	// +1: the permanent synthetic "costs" (Cost Explorer) main-menu entry is
+	// not in resource.AllResourceTypes() but always appears in MenuBody.Entries.
+	expectedTitle := fmt.Sprintf("resource-types(%d)", len(resource.AllResourceTypes())+1)
 	if !strings.Contains(plain, expectedTitle) {
 		t.Errorf("after resize, frame title should still show %q", expectedTitle)
 	}

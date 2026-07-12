@@ -32,7 +32,9 @@ import (
 
 func TestMainMenuFrameTitle_CtrlZShowsFilteredCount(t *testing.T) {
 	m := views.NewMainMenu(keys.Default())
-	total := len(resource.AllResourceTypes())
+	// +1: the permanent synthetic "costs" (Cost Explorer) main-menu entry is
+	// not in resource.AllResourceTypes() but always appears in MenuBody.Entries.
+	total := len(resource.AllResourceTypes()) + 1
 
 	// Mark ec2 and rds as having issues, everything else as zero
 	m.SetIssues("ec2", 1, false)

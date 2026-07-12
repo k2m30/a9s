@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/costs"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
@@ -64,6 +65,23 @@ type Controller struct {
 	// buildListBody (for columns) and GetListIssueCount (for Color func) consult
 	// this map when FindResourceType returns nil. Populated by RegisterFallbackTypeDef.
 	fallbackTypeDefs map[string]resource.ResourceTypeDef
+
+	// lastCostsNow is the clock most recently injected into a CostsState by
+	// ensureCostsState, retained after the costs screen itself is popped —
+	// ApplyCostsLoaded's fully-popped fallback (no CostsState survives to
+	// own an injected Now) uses this instead of a raw wall-clock read, so a
+	// late delivery's Store.Merge timestamp stays consistent with whatever
+	// clock the rest of the session was using. Zero value (never seeded)
+	// falls back to time.Now() at the one call site that reads it.
+	lastCostsNow time.Time
+
+	// costsDirtyStore is set by ApplyCostsLoaded (under c.mu) in place of
+	// calling Store.Save() synchronously — the yaml.Marshal+os.WriteFile it
+	// performs must not run while c.mu is held, since that would block every
+	// other action against the controller for the duration of a disk write.
+	// Handle() reads and clears this field under lock, then flushes it after
+	// unlocking. nil means nothing is pending.
+	costsDirtyStore *costs.Store
 
 	// identityResult holds the resolved caller identity received via
 	// messages.IdentityLoaded so snapshot can build IdentityBody without
@@ -422,6 +440,14 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.handleActionLoadMore(a)
 	case ActionRefresh:
 		return c.handleActionRefresh(a)
+	case ActionCostZoomIn:
+		return c.handleActionCostZoomIn(a)
+	case ActionCostZoomOut:
+		return c.handleActionCostZoomOut(a)
+	case ActionCostMetric:
+		return c.handleActionCostMetric(a)
+	case ActionCostPivot:
+		return c.handleActionCostPivot(a)
 	case ActionCopy:
 		// Copy is renderer-only (clipboard access is a renderer concern).
 		// The controller has no clipboard; the web/TUI renderer handles this

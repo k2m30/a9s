@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -49,127 +50,7 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, contin
 	var resources []resource.Resource
 	for _, reservation := range output.Reservations {
 		for _, inst := range reservation.Instances {
-			// Extract instance ID
-			instanceID := ""
-			if inst.InstanceId != nil {
-				instanceID = *inst.InstanceId
-			}
-
-			// Extract Name tag
-			name := ""
-			for _, tag := range inst.Tags {
-				if tag.Key != nil && *tag.Key == "Name" {
-					if tag.Value != nil {
-						name = *tag.Value
-					}
-					break
-				}
-			}
-
-			// Extract state
-			state := string(inst.State.Name)
-
-			// Extract instance type
-			instanceType := string(inst.InstanceType)
-
-			// Extract private IP
-			privateIP := ""
-			if inst.PrivateIpAddress != nil {
-				privateIP = *inst.PrivateIpAddress
-			}
-
-			// Extract public IP (may be nil)
-			publicIP := ""
-			if inst.PublicIpAddress != nil {
-				publicIP = *inst.PublicIpAddress
-			}
-
-			// Format launch time
-			launchTime := ""
-			if inst.LaunchTime != nil {
-				launchTime = inst.LaunchTime.Format("2006-01-02 15:04")
-			}
-
-			// Extract lifecycle (on-demand if empty)
-			lifecycle := "on-demand"
-			if inst.InstanceLifecycle != "" {
-				lifecycle = string(inst.InstanceLifecycle)
-			}
-
-			imageID := ""
-			if inst.ImageId != nil {
-				imageID = *inst.ImageId
-			}
-			vpcID := ""
-			if inst.VpcId != nil {
-				vpcID = *inst.VpcId
-			}
-
-			// Read state_reason_code from the SDK Instance struct.
-			stateReasonCode := ""
-			if inst.StateReason != nil && inst.StateReason.Code != nil {
-				stateReasonCode = *inst.StateReason.Code
-			}
-
-			r := resource.Resource{
-				ID:   instanceID,
-				Name: name,
-				Type: "ec2",
-				// Status intentionally unset — lifecycle state is emitted as a Finding.
-				Fields: map[string]string{
-					"instance_id":       instanceID,
-					"name":              name,
-					"state":             state,
-					"type":              instanceType,
-					"private_ip":        privateIP,
-					"public_ip":         publicIP,
-					"launch_time":       launchTime,
-					"lifecycle":         lifecycle,
-					"image_id":          imageID,
-					"vpc_id":            vpcID,
-					"state_reason_code": stateReasonCode,
-				},
-				RawStruct: inst,
-			}
-
-			// emit canonical Findings for every non-healthy lifecycle state.
-			// Healthy ("running") has no Finding.
-			switch state {
-			case "pending":
-				r.Findings = []domain.Finding{{
-					Code: CodeEC2StatePending, Phrase: "pending",
-					Severity: domain.SevWarn, Source: "wave1",
-				}}
-			case "shutting-down":
-				r.Findings = []domain.Finding{{
-					Code: CodeEC2StateShuttingDown, Phrase: "shutting down",
-					Severity: domain.SevWarn, Source: "wave1",
-				}}
-			case "stopping":
-				r.Findings = []domain.Finding{{
-					Code: CodeEC2StateStopping, Phrase: "stopping",
-					Severity: domain.SevWarn, Source: "wave1",
-				}}
-			case "stopped":
-				if strings.HasPrefix(stateReasonCode, "Server.") {
-					r.Findings = []domain.Finding{{
-						Code: CodeEC2StateStoppedServer, Phrase: "stopped",
-						Severity: domain.SevBroken, Source: "wave1",
-					}}
-				} else {
-					r.Findings = []domain.Finding{{
-						Code: CodeEC2StateStopped, Phrase: "stopped",
-						Severity: domain.SevWarn, Source: "wave1",
-					}}
-				}
-			case "terminated":
-				r.Findings = []domain.Finding{{
-					Code: CodeEC2StateTerminated, Phrase: "terminated",
-					Severity: domain.SevDim, Source: "wave1",
-				}}
-			}
-
-			resources = append(resources, r)
+			resources = append(resources, ec2InstanceToResource(inst))
 		}
 	}
 
@@ -200,6 +81,128 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, contin
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// ec2InstanceToResource builds the canonical EC2 instance Resource (same
+// Fields keys, Findings rules) from one SDK Instance — shared by
+// FetchEC2InstancesPage and FetchEC2InstancesByIDs so the two paths can
+// never drift in shape (mirrors ami.go's imageResource /
+// FetchAMIsPage+FetchAMIsByIDs convention).
+func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
+	instanceID := ""
+	if inst.InstanceId != nil {
+		instanceID = *inst.InstanceId
+	}
+
+	name := ""
+	for _, tag := range inst.Tags {
+		if tag.Key != nil && *tag.Key == "Name" {
+			if tag.Value != nil {
+				name = *tag.Value
+			}
+			break
+		}
+	}
+
+	state := ""
+	if inst.State != nil {
+		state = string(inst.State.Name)
+	}
+	instanceType := string(inst.InstanceType)
+
+	privateIP := ""
+	if inst.PrivateIpAddress != nil {
+		privateIP = *inst.PrivateIpAddress
+	}
+
+	publicIP := ""
+	if inst.PublicIpAddress != nil {
+		publicIP = *inst.PublicIpAddress
+	}
+
+	launchTime := ""
+	if inst.LaunchTime != nil {
+		launchTime = inst.LaunchTime.Format("2006-01-02 15:04")
+	}
+
+	lifecycle := "on-demand"
+	if inst.InstanceLifecycle != "" {
+		lifecycle = string(inst.InstanceLifecycle)
+	}
+
+	imageID := ""
+	if inst.ImageId != nil {
+		imageID = *inst.ImageId
+	}
+	vpcID := ""
+	if inst.VpcId != nil {
+		vpcID = *inst.VpcId
+	}
+
+	stateReasonCode := ""
+	if inst.StateReason != nil && inst.StateReason.Code != nil {
+		stateReasonCode = *inst.StateReason.Code
+	}
+
+	r := resource.Resource{
+		ID:   instanceID,
+		Name: name,
+		Type: "ec2",
+		// Status intentionally unset — lifecycle state is emitted as a Finding.
+		Fields: map[string]string{
+			"instance_id":       instanceID,
+			"name":              name,
+			"state":             state,
+			"type":              instanceType,
+			"private_ip":        privateIP,
+			"public_ip":         publicIP,
+			"launch_time":       launchTime,
+			"lifecycle":         lifecycle,
+			"image_id":          imageID,
+			"vpc_id":            vpcID,
+			"state_reason_code": stateReasonCode,
+		},
+		RawStruct: inst,
+	}
+
+	// emit canonical Findings for every non-healthy lifecycle state.
+	// Healthy ("running") has no Finding.
+	switch state {
+	case "pending":
+		r.Findings = []domain.Finding{{
+			Code: CodeEC2StatePending, Phrase: "pending",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	case "shutting-down":
+		r.Findings = []domain.Finding{{
+			Code: CodeEC2StateShuttingDown, Phrase: "shutting down",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	case "stopping":
+		r.Findings = []domain.Finding{{
+			Code: CodeEC2StateStopping, Phrase: "stopping",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	case "stopped":
+		if strings.HasPrefix(stateReasonCode, "Server.") {
+			r.Findings = []domain.Finding{{
+				Code: CodeEC2StateStoppedServer, Phrase: "stopped",
+				Severity: domain.SevBroken, Source: "wave1",
+			}}
+		} else {
+			r.Findings = []domain.Finding{{
+				Code: CodeEC2StateStopped, Phrase: "stopped",
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
+		}
+	case "terminated":
+		r.Findings = []domain.Finding{{
+			Code: CodeEC2StateTerminated, Phrase: "terminated",
+			Severity: domain.SevDim, Source: "wave1",
+		}}
+	}
+
+	return r
 }
 
 // enrichEC2StatusChecks calls DescribeInstanceStatus for the page's resources

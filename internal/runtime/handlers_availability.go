@@ -178,13 +178,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 	// earlier (e.g. alongside TaskKindLoadAvailCache) would race the seed,
 	// since the adapter runs task cmds concurrently via tea.Batch.
 	if c.session.CommandArmed {
-		tasks = append(tasks, TaskRequest{
-			Key: TaskKey{Kind: TaskKindEmitNavigate},
-			Payload: EmitNavigatePayload{
-				Target:       NavigateTargetResourceList,
-				ResourceType: c.session.PendingCommand,
-			},
-		})
+		tasks = append(tasks, emitNavigateForCommand(c.session.PendingCommand))
 		c.session.CommandArmed = false
 		c.session.PendingCommand = ""
 	}

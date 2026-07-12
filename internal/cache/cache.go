@@ -102,22 +102,19 @@ type TypeFile struct {
 // sanitation from the previous single-file layout (replace path separators
 // and spaces with underscores).
 func Dir(profile, region string) string {
-	root := cacheRoot()
+	root := Root()
 	if root == "" {
 		return ""
 	}
-	safe := func(s string) string {
-		s = strings.ReplaceAll(s, "/", "_")
-		s = strings.ReplaceAll(s, "\\", "_")
-		s = strings.ReplaceAll(s, " ", "_")
-		return s
-	}
-	return filepath.Join(root, safe(profile)+"--"+safe(region))
+	return filepath.Join(root, SanitizePathElem(profile)+"--"+SanitizePathElem(region))
 }
 
-// cacheRoot returns the cache root directory (~/.a9s/cache/), honoring the
-// A9S_CONFIG_FOLDER override used by tests.
-func cacheRoot() string {
+// Root returns the cache root directory (~/.a9s/cache/), honoring the
+// A9S_CONFIG_FOLDER override used by tests. Exported so other on-disk cache
+// layouts sharing this root (e.g. internal/costs' per-profile cost cache)
+// derive it from the same single source instead of duplicating the
+// A9S_CONFIG_FOLDER/UserHomeDir resolution.
+func Root() string {
 	if folder := os.Getenv("A9S_CONFIG_FOLDER"); folder != "" {
 		return filepath.Join(folder, "cache")
 	}
@@ -125,6 +122,16 @@ func cacheRoot() string {
 		return filepath.Join(home, ".a9s", "cache")
 	}
 	return ""
+}
+
+// SanitizePathElem replaces path separators and spaces with underscores so s
+// is safe to use as one path element (e.g. a profile or region name) in a
+// cache file/directory name.
+func SanitizePathElem(s string) string {
+	s = strings.ReplaceAll(s, "/", "_")
+	s = strings.ReplaceAll(s, "\\", "_")
+	s = strings.ReplaceAll(s, " ", "_")
+	return s
 }
 
 // Store holds the in-memory, loaded state of every resource type's TypeFile

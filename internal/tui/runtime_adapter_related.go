@@ -311,44 +311,31 @@ func (m Model) handleRelatedNavigateChild(msg messages.RelatedNavigate) (tea.Mod
 }
 
 // relatedNavigateTasksToCmd translates TaskRequests from HandleRelatedNavigate
-// into Bubble Tea commands. Unknown TaskKind values are dropped for
-// forward-compatibility.
+// into Bubble Tea commands. KindFetchFiltered is resolved here — the only
+// case that needs targetType/result, unavailable to the shared dispatcher —
+// every other kind (KindFetchResources, KindFetchMore, KindFetchByIDDetail,
+// and any future addition) delegates to m.dispatchTaskRequests, the single
+// switch every screen's adapter shares.
 func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.NavigationResult, tasks []runtime.TaskRequest) tea.Cmd {
 	if len(tasks) == 0 {
 		return nil
 	}
 	var cmds []tea.Cmd
+	rest := make([]runtime.TaskRequest, 0, len(tasks))
 	for _, t := range tasks {
-		switch t.Key.Kind {
-		case runtime.KindFetchResources:
-			// ExecuteTask reads req.Key.Scope as the resource type; the runtime
-			// stamps targetType there when building this task.
-			cmds = append(cmds, m.executeTaskCmd(t))
-
-		case runtime.KindFetchFiltered:
+		if t.Key.Kind == runtime.KindFetchFiltered {
 			// The related handler does not set a fetchFilteredPayload on the
-			// task — the filter lives in result.FetchFilter. ExecuteTask would
-			// fail with "missing fetchFilteredPayload", so keep adapter-local.
+			// task — the filter lives in result.FetchFilter. ExecuteTask
+			// would fail with "missing fetchFilteredPayload", so this one
+			// case stays adapter-local instead of going through the shared
+			// dispatcher.
 			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter, m.core.AvailabilityGen()))
-
-		case runtime.KindFetchMore:
-			// FetchMorePayload is set by the runtime — ExecuteTask can execute it.
-			// A missing or wrong-typed payload is a runtime bug; drop the task.
-			if _, ok := t.Payload.(runtime.FetchMorePayload); !ok {
-				continue
-			}
-			cmds = append(cmds, m.executeTaskCmd(t))
-
-		case runtime.KindFetchByIDDetail:
-			// ExecuteTask returns ResourcesLoaded for this kind, but the adapter
-			// must also navigate to the detail view. Keep adapter-local so the
-			// navigation side-effect is preserved.
-			payload, ok := t.Payload.(runtime.FetchByIDDetailPayload)
-			if !ok {
-				continue
-			}
-			cmds = append(cmds, m.fetchByIDDetail(payload.TargetType, payload.ID))
+			continue
 		}
+		rest = append(rest, t)
+	}
+	if tc := m.dispatchTaskRequests(rest); tc != nil {
+		cmds = append(cmds, tc)
 	}
 	switch len(cmds) {
 	case 0:

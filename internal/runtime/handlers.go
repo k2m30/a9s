@@ -85,19 +85,23 @@ type APIErrorEvent struct {
 // is kept as any so this file stays free of any tui-only dependency on the
 // message type.
 //
-// StackDepth and HasActiveRL are renderer-shape inputs the adapter computes
-// from its view stack. StackDepth == 1 means only the main menu is on
-// screen; HasActiveRL is true when the active view is a ResourceListModel.
-// The runtime uses these to decide whether to emit the one-shot -c
-// navigation and the post-switch refresh.
+// StackDepth, HasActiveRL, and HasActiveCosts are renderer-shape inputs the
+// adapter computes from its view stack. StackDepth == 1 means only the main
+// menu is on screen; HasActiveRL is true when the active view is a
+// ResourceListModel; HasActiveCosts is true when an active or
+// overlay-beneath costs screen exists (P5's own retry gate — the costs
+// screen keeps no ResourceListModel, so it needs its own signal alongside
+// HasActiveRL, never folded into it). The runtime uses these to decide
+// whether to emit the one-shot -c navigation and the post-switch refresh.
 type ClientsReadyEvent struct {
-	Clients     any
-	Err         error
-	Region      string
-	Gen         domain.Gen
-	StackDepth  int
-	HasActiveRL bool
-	NewGen      domain.Gen
+	Clients        any
+	Err            error
+	Region         string
+	Gen            domain.Gen
+	StackDepth     int
+	HasActiveRL    bool
+	HasActiveCosts bool
+	NewGen         domain.Gen
 }
 
 // ProfileSelectedEvent / RegionSelectedEvent mirror the corresponding
@@ -333,13 +337,7 @@ func (c *Core) handleClientsReadySuccess(ev ClientsReadyEvent) ([]UIIntent, []Ta
 	// can be emitted directly here without racing any seed.
 	if s.NoCache {
 		if commandEligible {
-			tasks = append(tasks, TaskRequest{
-				Key: TaskKey{Kind: TaskKindEmitNavigate},
-				Payload: EmitNavigatePayload{
-					Target:       NavigateTargetResourceList,
-					ResourceType: pendingCommand,
-				},
-			})
+			tasks = append(tasks, emitNavigateForCommand(pendingCommand))
 		}
 		tasks = append(tasks, TaskRequest{
 			Key:     TaskKey{Kind: TaskKindDemoPrefetchCounts},
@@ -384,16 +382,41 @@ func (c *Core) handleClientsReadySuccess(ev ClientsReadyEvent) ([]UIIntent, []Ta
 	return intents, tasks
 }
 
+// emitNavigateForCommand builds the one-shot TaskKindEmitNavigate task for a
+// resolved -c/--command startup command: the Cost Explorer pseudo-command
+// routes to NavigateTargetCosts, everything else opens a resource list — the
+// single resolution point the demo/no-cache and live ClientsReady paths
+// both share (no dual truth with the colon-command dispatch's own
+// resource.IsCostsCommand check).
+func emitNavigateForCommand(cmd string) TaskRequest {
+	if resource.IsCostsCommand(cmd) {
+		return TaskRequest{
+			Key:     TaskKey{Kind: TaskKindEmitNavigate},
+			Payload: EmitNavigatePayload{Target: NavigateTargetCosts},
+		}
+	}
+	return TaskRequest{
+		Key: TaskKey{Kind: TaskKindEmitNavigate},
+		Payload: EmitNavigatePayload{
+			Target:       NavigateTargetResourceList,
+			ResourceType: cmd,
+		},
+	}
+}
+
 // maybeRefreshIntents returns the refresh intents + flash when a pending
 // post-switch refresh should fire (PendingRefresh is set AND an active
-// resource list exists). Clears PendingRefresh so it does not re-fire on
-// the next ClientsReadyMsg.
+// resource list OR an active/beneath costs screen exists — P5: a costs
+// fetch dispatched before AWS finished connecting fails with "no client
+// configured for this session" and must recover once ClientsReady lands,
+// exactly like a pre-connect list navigation's own replay). Clears
+// PendingRefresh so it does not re-fire on the next ClientsReadyMsg.
 func (c *Core) maybeRefreshIntents(ev ClientsReadyEvent) ([]UIIntent, []TaskRequest) {
 	if !c.session.PendingRefresh {
 		return nil, nil
 	}
 	c.session.PendingRefresh = false
-	if !ev.HasActiveRL {
+	if !ev.HasActiveRL && !ev.HasActiveCosts {
 		return nil, nil
 	}
 	return []UIIntent{

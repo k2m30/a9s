@@ -17,6 +17,12 @@ import (
 	"strings"
 )
 
+// aggregateFailuresCap is the maximum number of per-ID failures
+// AggregateFailures enumerates verbatim before summarizing the remainder —
+// a wide partial-failure set (e.g. an IAM sweep failing on 36 of 49 groups)
+// must not grow one flash/log line without bound.
+const aggregateFailuresCap = 5
+
 // AggregateFailures builds the canonical composite error for a partial-batch
 // operation. opName is the operation label (e.g. "kms FetchByIDs",
 // "policy FetchByIDs", "ecs-task ListTargets"). failures is a slice of
@@ -27,15 +33,26 @@ import (
 //
 //	return resources, AggregateFailures(op, failures, total)
 //
-// without an extra conditional. Composite shape:
+// without an extra conditional. Composite shape, at or below the cap:
 //
 //	"<op> failed for N of M IDs: <f1>; <f2>; ..."
+//
+// Above aggregateFailuresCap, only the first cap failures are named
+// verbatim and the rest are summarized:
+//
+//	"<op> failed for N of M IDs: <f1>; <f2>; <f3>; <f4>; <f5>; and N-5 more"
 func AggregateFailures(opName string, failures []string, total int) error {
 	if len(failures) == 0 {
 		return nil
 	}
-	return fmt.Errorf("%s failed for %d of %d IDs: %s",
-		opName, len(failures), total, strings.Join(failures, "; "))
+	shown := failures
+	suffix := ""
+	if len(failures) > aggregateFailuresCap {
+		shown = failures[:aggregateFailuresCap]
+		suffix = fmt.Sprintf("; and %d more", len(failures)-aggregateFailuresCap)
+	}
+	return fmt.Errorf("%s failed for %d of %d IDs: %s%s",
+		opName, len(failures), total, strings.Join(shown, "; "), suffix)
 }
 
 // AggregateMissing is the narrower variant used when the operation is a

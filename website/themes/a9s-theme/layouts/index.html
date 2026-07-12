@@ -4,6 +4,7 @@
   <p class="tagline">Terminal UI for AWS — like k9s, but for your cloud</p>
   <p>Browse, inspect, and manage 66 AWS resource types from your terminal. Read-only by design. No telemetry.</p>
   <ul class="use-cases">
+    <li><strong>"Why am I spending that much?"</strong> — cost spike → usage type → the exact EC2 instance, three keypresses</li>
     <li><strong>"Why is this target unhealthy?"</strong> — drill LB → TG → Health in seconds</li>
     <li><strong>"Is my deployment stuck?"</strong> — ECS events, tasks, logs in one flow</li>
     <li><strong>"Which security groups are wide open?"</strong> — spot 0.0.0.0/0 instantly</li>
@@ -13,7 +14,7 @@
   <div class="stats">
     <div class="stat"><div class="number">66</div><div class="label">AWS Resource Types</div></div>
     <div class="stat"><div class="number">12</div><div class="label">Service Categories</div></div>
-    <div class="stat"><div class="number">13,000+</div><div class="label">Unit Tests</div></div>
+    <div class="stat"><div class="number">23,300+</div><div class="label">Unit Tests</div></div>
   </div>
 </div>
 <div class="container">
@@ -21,6 +22,10 @@
     <img src="{{ "demo.gif" | relURL }}" alt="a9s demo — browsing EC2 instances, filtering, viewing details and YAML" loading="lazy" style="width: 100%; border-radius: 8px;" />
   </div>
   <div class="features">
+    <div class="feature">
+      <h3>Cost Explorer</h3>
+      <p>Your spend as a grid that matches the invoice. Pivot, zoom years to days, and drill a cost spike down to the exact instance behind it.</p>
+    </div>
     <div class="feature">
       <h3>Read-Only by Design</h3>
       <p>a9s never makes write calls to AWS. Safe to use in production environments. Enforced by CI.</p>
@@ -45,6 +50,10 @@
       <h3>No Credential Access</h3>
       <p>Never reads ~/.aws/credentials. Authentication delegated to AWS SDK. Try with --demo, no AWS account needed.</p>
     </div>
+  </div>
+  <div class="demo" style="margin-top: 2rem;">
+    <h3 style="text-align: center;">Cost Explorer — why am I spending that much?</h3>
+    <img src="{{ "costs.gif" | relURL }}" alt="a9s Cost Explorer — spend grid with anomaly markers, drilling from a cost spike to the EC2 instance behind it" loading="lazy" style="width: 100%; border-radius: 8px;" />
   </div>
   <div class="cta">
     <a href="{{ "install/" | relURL }}" class="btn">Install a9s</a>

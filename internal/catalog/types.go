@@ -34,6 +34,12 @@ type ResourceTypeDef struct {
 	// event id). When true the detail title renders "detail -- <Name>"
 	// instead of "detail -- <ID> (<Name>)".
 	TitleOmitsID bool
+	// CostExplorerServiceName is the exact Cost Explorer SERVICE dimension
+	// value (e.g. "Amazon Elastic Compute Cloud - Compute") this type's
+	// billed usage is reported under. Empty means Cost Explorer's per-service
+	// cost grid has no RESOURCE_ID drill-down mapped to this type — its rows
+	// get an "unsupported" note instead of a detail-view jump.
+	CostExplorerServiceName string
 
 	// ─── Display ───────────────────────────────────────────────────────────
 
@@ -57,6 +63,15 @@ type ResourceTypeDef struct {
 
 	// Fetcher is the Wave 1 paginated fetcher for this resource type.
 	Fetcher domain.PaginatedFetcher
+	// AvailabilityFetcher is an optional, cheaper alternative to Fetcher used
+	// ONLY by the availability/count probe (internal/runtime/probes.go's
+	// Core.ProbeResourceAvailability). nil means the probe falls back to
+	// Fetcher unchanged. Exists for types whose real list content is
+	// materially more expensive to resolve than a mere availability/count
+	// signal needs (e.g. "policy": managed policies alone suffice for a
+	// count badge, without IAM's expensive per-group inline-policy sweep the
+	// real list-open path also resolves).
+	AvailabilityFetcher domain.PaginatedFetcher
 	// Wave2 is the Wave 2 issue-enricher. nil means no Wave 2 signal.
 	// Concrete type is aws.IssueEnricher (value type); stored as any to
 	// avoid import cycle. A zero IssueEnricher with Fn == nil behaves

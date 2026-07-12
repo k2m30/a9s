@@ -27,8 +27,15 @@ Sleep 2s
 Down@300ms 3
 Sleep 3s
 
+# ── Act 1b: Issues at a glance ──
+# t≈5.9
+Ctrl+Z
+Sleep 3s
+Ctrl+Z
+Sleep 1.5s
+
 # ── Act 2: EC2 List ──
-# t≈6
+# t≈10.5
 Up@300ms 3
 Enter
 Sleep 2.5s

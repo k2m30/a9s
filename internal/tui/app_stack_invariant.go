@@ -60,6 +60,8 @@ func screenIDMatchesRSKind(kind rsKind, id runtime.ScreenID) bool {
 		return id == runtime.ScreenHelp
 	case rsKindIdentity:
 		return id == runtime.ScreenIdentity
+	case rsKindCosts:
+		return id == runtime.ScreenCosts
 	default:
 		return false
 	}

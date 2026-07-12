@@ -576,11 +576,19 @@ func TestQA_Availability_BottomSkipsEmpty(t *testing.T) {
 	// Press Bottom (G).
 	m, _ = m.Update(menuKeyBottom())
 
+	// The permanent synthetic "costs" (Cost Explorer) entry sits after every
+	// resource.AllResourceTypes() entry and has no availability concept, so
+	// it is never confirmed-empty — it is now the true, unconditional bottom
+	// row regardless of the dim pattern above it. Bottom (G) must still skip
+	// both confirmed-empty catalog entries on its way there (never land on
+	// either), and it must land specifically on "costs", not merely on
+	// whatever the last dimmed/undimmed catalog entry happens to be.
 	selected := m.SelectedItem()
-	expectedIdx := lastIdx - 2
-	if selected.ShortName != allTypes[expectedIdx].ShortName {
-		t.Errorf("Bottom should land on last non-empty item (%s at index %d), got %s",
-			allTypes[expectedIdx].ShortName, expectedIdx, selected.ShortName)
+	if selected.ShortName == allTypes[lastIdx].ShortName || selected.ShortName == allTypes[lastIdx-1].ShortName {
+		t.Errorf("Bottom landed on a confirmed-empty item (%s) — skip-empty is broken", selected.ShortName)
+	}
+	if selected.ShortName != "costs" {
+		t.Errorf("Bottom should land on the permanent costs entry (last non-empty row), got %s", selected.ShortName)
 	}
 }
 

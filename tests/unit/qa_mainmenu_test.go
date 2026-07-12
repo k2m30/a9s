@@ -261,8 +261,8 @@ func TestQA_MainMenu_CursorStopsAtBottom(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "backup" {
-		t.Errorf("j at bottom should stay on backup, got %q", nav.ResourceType)
+	if nav.Target != messages.TargetCosts {
+		t.Errorf("j at bottom should stay on costs, got Target=%v ResourceType=%q", nav.Target, nav.ResourceType)
 	}
 }
 
@@ -326,8 +326,8 @@ func TestQA_MainMenu_PageDownClampsAtBottom(t *testing.T) {
 	}
 	msg := cmd()
 	nav := msg.(messages.Navigate)
-	if nav.ResourceType != "backup" {
-		t.Errorf("repeated PageDown should end on backup, got %q", nav.ResourceType)
+	if nav.Target != messages.TargetCosts {
+		t.Errorf("repeated PageDown should end on costs, got Target=%v ResourceType=%q", nav.Target, nav.ResourceType)
 	}
 }
 
@@ -454,8 +454,12 @@ func TestQA_MainMenu_JumpToBottomWithShiftG(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "backup" {
-		t.Errorf("after G, should be at bottom (backup), got %q", nav.ResourceType)
+	// The synthetic "costs" (Cost Explorer) entry is now the permanent
+	// bottom-most main-menu row; Enter on it emits Target=TargetCosts with
+	// an empty ResourceType (it is not a resource.ResourceTypeDef list),
+	// so the bottom-of-menu assertion checks Target instead of ResourceType.
+	if nav.Target != messages.TargetCosts {
+		t.Errorf("after G, should be at bottom (costs), got Target=%v ResourceType=%q", nav.Target, nav.ResourceType)
 	}
 }
 
@@ -496,8 +500,8 @@ func TestQA_MainMenu_ShiftGOnLastRowIsNoop(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "backup" {
-		t.Errorf("G on last row should stay on backup, got %q", nav.ResourceType)
+	if nav.Target != messages.TargetCosts {
+		t.Errorf("G on last row should stay on costs, got Target=%v ResourceType=%q", nav.Target, nav.ResourceType)
 	}
 }
 
@@ -656,10 +660,11 @@ func TestMainMenu_Viewport_ScrolledDown_EnterSelectsCorrectItem(t *testing.T) {
 	}
 	msg := cmd()
 	nav := msg.(messages.Navigate)
-	allTypes := resource.AllResourceTypes()
-	expected := allTypes[len(allTypes)-1].ShortName
-	if nav.ResourceType != expected {
-		t.Errorf("expected %q after G+Enter, got %q", expected, nav.ResourceType)
+	// The synthetic "costs" (Cost Explorer) entry is now the permanent
+	// bottom-most main-menu row (after every resource.AllResourceTypes()
+	// entry), so G lands there rather than on the last real resource type.
+	if nav.Target != messages.TargetCosts {
+		t.Errorf("expected Target=TargetCosts after G+Enter, got Target=%v ResourceType=%q", nav.Target, nav.ResourceType)
 	}
 }
 

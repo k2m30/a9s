@@ -61,6 +61,24 @@ func MenuFooterHintsFor(mode string) []KeyHint {
 	}
 }
 
+// CostsFooterHintsFor is the SINGLE source of the Cost Explorer screen's
+// footer key hints, consumed by both renderers via ViewState.Footer — mirrors
+// MenuFooterHintsFor's mode-keying contract (web swaps ctrl+r for R).
+func CostsFooterHintsFor(mode string) []KeyHint {
+	refresh := KeyHint{Key: "ctrl+r", Help: "Refresh"}
+	if mode == "web" {
+		refresh = KeyHint{Key: "R", Help: "Refresh"}
+	}
+	return []KeyHint{
+		{Key: "b", Help: "Metric"},
+		{Key: "+/-", Help: "Zoom"},
+		{Key: "0-9", Help: "Pivot"},
+		{Key: "Enter", Help: "Drill"},
+		{Key: "Esc", Help: "Back"},
+		refresh,
+	}
+}
+
 // BodyKind is the discriminator that identifies which Body pointer field
 // is populated. It matches the screen kind, not the ScreenID, so renderers
 // can switch on it without knowing every registered ScreenID.
@@ -74,6 +92,7 @@ const (
 	BodyKindSelector BodyKind = "selector"
 	BodyKindHelp     BodyKind = "help"
 	BodyKindIdentity BodyKind = "identity"
+	BodyKindCosts    BodyKind = "costs"
 	BodyKindUnknown  BodyKind = "unknown"
 )
 
@@ -88,6 +107,7 @@ type Body struct {
 	Selector *SelectorBody `json:"selector,omitempty"`
 	Help     *HelpBody     `json:"help,omitempty"`
 	Identity *IdentityBody `json:"identity,omitempty"`
+	Costs    *CostsBody    `json:"costs,omitempty"`
 }
 
 // ColumnDef describes one column in a list or child-list view.
@@ -231,7 +251,7 @@ type RelatedBlock struct {
 	Items       []FieldRow             `json:"items,omitempty"`
 	Loading     bool                   `json:"loading,omitempty"`
 	Err         bool                   `json:"err,omitempty"`
-	Truncated bool                   `json:"truncated,omitempty"`
+	Truncated   bool                   `json:"truncated,omitempty"`
 	FetchFilter map[string]string      `json:"fetch_filter,omitempty"`
 	// TargetType is the canonical short name of the target resource type.
 	TargetType string `json:"target_type,omitempty"`
@@ -396,4 +416,64 @@ type IdentityBody struct {
 	// the identity fetch is in progress or has failed.
 	Loading  bool   `json:"loading,omitempty"`
 	ErrorMsg string `json:"error_msg,omitempty"`
+}
+
+// CostColumn is one time-period column header in the Cost Explorer grid.
+// Open marks the current (partial) period — rendered with a "*" suffix
+// (wireframe.md: "Jul'26*").
+type CostColumn struct {
+	Label string `json:"label"`
+	Open  bool   `json:"open,omitempty"`
+}
+
+// CostRow is one pivot-dimension row in the Cost Explorer grid, index-
+// aligned with CostsBody.Columns.
+type CostRow struct {
+	Label string     `json:"label"`
+	Cells []CostCell `json:"cells,omitempty"`
+}
+
+// CostCell is one pre-resolved (row x column) grid cell. Amount is already
+// formatted ("1,204.1"); DeltaTag is the color-bucket name ("growth",
+// "drop", "neutral", or "" with no baseline) — RenderCosts consumes both
+// verbatim, never recomputing (same contract as ListRow.Color).
+type CostCell struct {
+	Amount    string `json:"amount"`
+	DeltaTag  string `json:"delta_tag,omitempty"`
+	Anomaly   bool   `json:"anomaly,omitempty"`
+	Estimated bool   `json:"estimated,omitempty"`
+	Negative  bool   `json:"negative,omitempty"`
+	// Mixed is true only on a Totals cell whose contributing rows spanned
+	// more than one currency this column (X8) — Amount carries no
+	// meaningful numeric value; renderers must show it as suppressed
+	// ("—") rather than a naive cross-currency sum.
+	Mixed bool `json:"mixed,omitempty"`
+}
+
+// CostsBody is the body of the Cost Explorer screen (ScreenCosts).
+type CostsBody struct {
+	Pivot       string       `json:"pivot"`
+	Metric      string       `json:"metric"`
+	Granularity string       `json:"granularity"`
+	Breadcrumb  []string     `json:"breadcrumb,omitempty"`
+	Columns     []CostColumn `json:"columns,omitempty"`
+	Rows        []CostRow    `json:"rows,omitempty"`
+	Totals      []CostCell   `json:"totals,omitempty"`
+	CursorRow   int          `json:"cursor_row"`
+	CursorCol   int          `json:"cursor_col"`
+	ScrollX     int          `json:"scroll_x"`
+	Loading     bool         `json:"loading,omitempty"`
+	// ErrorMsg is set on a classified fetch failure (FR-017): the renderer
+	// must show this explicit message instead of an empty grid.
+	ErrorMsg string `json:"error_msg,omitempty"`
+	// FooterNote is the cursor cell's anomaly root cause, or its
+	// period-over-period delta when not flagged, or "" with no baseline.
+	FooterNote  string `json:"footer_note,omitempty"`
+	APICalls    int    `json:"api_calls"`
+	APICostUSD  string `json:"api_cost_usd"`
+	DataThrough string `json:"data_through,omitempty"`
+	// Currency is Grid.Currency verbatim: the ISO code when every cell
+	// shares one currency, "" when the grid mixes currencies (ambiguous —
+	// never silently pick one).
+	Currency string `json:"currency,omitempty"`
 }

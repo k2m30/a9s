@@ -40,6 +40,12 @@ func (m Model) View() tea.View {
 	}
 
 	rs := m.activeRS()
+	if rs.kind == rsKindCosts {
+		if cols := views.CostsViewportCols(rs.width); cols != rs.costsViewportCols {
+			m.ctrl.SetCostsViewportCols(cols)
+			rs.costsViewportCols = cols
+		}
+	}
 	snap := m.ctrl.Snapshot()
 
 	headerProfile := m.core.Profile()
@@ -75,6 +81,8 @@ func (m Model) View() tea.View {
 		content = renderHelp(rs)
 	case rsKindIdentity:
 		content = renderIdentity(rs, m.core.Profile(), m.core.Region())
+	case rsKindCosts:
+		content = renderCosts(snap.Body.Costs, rs)
 	}
 
 	rightContent := m.headerRight()
@@ -106,7 +114,7 @@ func (m Model) View() tea.View {
 	// Footer hints: controller owns hints for ctrl-backed screens.
 	var hints []layout.KeyHint
 	switch rs.kind {
-	case rsKindMenu, rsKindList, rsKindDetail:
+	case rsKindMenu, rsKindList, rsKindDetail, rsKindCosts:
 		if ctrlHints := snap.Footer; len(ctrlHints) > 0 {
 			hints = make([]layout.KeyHint, len(ctrlHints))
 			for i, kh := range ctrlHints {
@@ -185,6 +193,11 @@ func (m Model) frameTitle(rs *rendererState, snap app.ViewState) string {
 		return "help"
 	case rsKindIdentity:
 		return "identity"
+	case rsKindCosts:
+		// Snapshot() already builds this exact state line (pivot · metric ·
+		// granularity + drill breadcrumb) as vs.FrameTitle — the single
+		// source both the TUI and the web renderer consume verbatim.
+		return snap.FrameTitle
 	}
 	return ""
 }

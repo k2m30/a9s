@@ -628,15 +628,19 @@ func TestMenuSnapshot_AllRegisteredTypesVisibleByDefault(t *testing.T) {
 	menu := requireMenuBody(t, c)
 	allTypes := resource.AllResourceTypes()
 
-	if len(menu.Entries) != len(allTypes) {
-		t.Errorf("MenuBody.Entries count: got %d want %d (all resource types)", len(menu.Entries), len(allTypes))
+	// +1: the permanent synthetic "costs" (Cost Explorer) entry is not in
+	// resource.AllResourceTypes() but always appears in MenuBody.Entries.
+	wantCount := len(allTypes) + 1
+	if len(menu.Entries) != wantCount {
+		t.Errorf("MenuBody.Entries count: got %d want %d (all resource types + costs)", len(menu.Entries), wantCount)
 	}
 
-	// Build a set of expected short names.
-	expectedSet := make(map[string]bool, len(allTypes))
+	// Build a set of expected short names, plus the one synthetic entry.
+	expectedSet := make(map[string]bool, len(allTypes)+1)
 	for _, rt := range allTypes {
 		expectedSet[rt.ShortName] = true
 	}
+	expectedSet["costs"] = true
 	for _, e := range menu.Entries {
 		if !expectedSet[e.ShortName] {
 			t.Errorf("unexpected entry %q in MenuBody.Entries", e.ShortName)
@@ -677,10 +681,12 @@ func TestMenuSnapshot_AttentionOnly_ColdStart_AllExceptExcluded(t *testing.T) {
 	}
 
 	// Cold-start: no issue counts seeded.
-	// All types visible EXCEPT ExcludeFromIssueBadge ones.
-	want := len(allTypes) - excludedCount
+	// All types visible EXCEPT ExcludeFromIssueBadge ones, PLUS the permanent
+	// synthetic "costs" entry, which has no issue-badge concept and is never
+	// hidden by the attention-only filter.
+	want := len(allTypes) - excludedCount + 1
 	if len(menu.Entries) != want {
-		t.Errorf("cold-start attention-only: got %d entries want %d (all except %d excluded types)", len(menu.Entries), want, excludedCount)
+		t.Errorf("cold-start attention-only: got %d entries want %d (all except %d excluded types, +costs)", len(menu.Entries), want, excludedCount)
 	}
 
 	// The excluded type (e.g. ct-events) must be absent.
@@ -949,6 +955,13 @@ func TestMenuSnapshot_EntryDisplayNameMatchesCatalog(t *testing.T) {
 	}
 
 	for _, e := range menu.Entries {
+		// The permanent synthetic "costs" (Cost Explorer) entry has no
+		// backing resource.ResourceTypeDef — it is not fetchable resource
+		// data — so it is deliberately excluded from this catalog-parity
+		// check rather than failing it.
+		if e.ShortName == "costs" {
+			continue
+		}
 		rt, ok := typesByShortName[e.ShortName]
 		if !ok {
 			t.Errorf("entry %q not found in AllResourceTypes()", e.ShortName)
@@ -971,8 +984,11 @@ func TestMenuSnapshot_Filter_ClearedByEmptyString(t *testing.T) {
 	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: ""})
 
 	menu := requireMenuBody(t, c)
-	if len(menu.Entries) != len(allTypes) {
-		t.Errorf("after clearing filter: got %d entries want %d", len(menu.Entries), len(allTypes))
+	// +1: the permanent synthetic "costs" (Cost Explorer) entry is not in
+	// resource.AllResourceTypes() but always appears in MenuBody.Entries.
+	wantCount := len(allTypes) + 1
+	if len(menu.Entries) != wantCount {
+		t.Errorf("after clearing filter: got %d entries want %d", len(menu.Entries), wantCount)
 	}
 	if menu.Filter != "" {
 		t.Errorf("MenuBody.Filter after clear: got %q want %q", menu.Filter, "")

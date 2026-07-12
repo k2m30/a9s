@@ -152,18 +152,19 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 // isScreenRenderable reports whether vs's active body already has SOMETHING
-// to show a caller besides an empty screen — either a list with rows already
-// on it (cache-seeded or otherwise) or an explicit Loading shell. Used to
-// bind DEF-1/C4's IsBackgroundFetchTask classifier to the post-Apply snapshot
-// so a warm (already-renderable) list open defers its KindFetchResources task
-// to the background, while a genuinely cold open (no rows, no Loading shell)
-// keeps it blocking so the response carries the shell itself.
+// to show a caller besides an empty screen: a list or costs body with rows
+// already on it, or an explicit Loading shell. Used to bind DEF-1/C4's
+// IsBackgroundFetchTask classifier to the post-Apply snapshot so a renderable
+// fetch screen defers its fetch task to the background, while a genuinely cold
+// open keeps it blocking so the response carries the shell itself.
 func isScreenRenderable(vs app.ViewState) bool {
-	lb := vs.Body.List
-	if lb == nil {
-		return false
+	if lb := vs.Body.List; lb != nil {
+		return lb.Loading || len(lb.Rows) > 0
 	}
-	return lb.Loading || len(lb.Rows) > 0
+	if cb := vs.Body.Costs; cb != nil {
+		return cb.Loading || len(cb.Rows) > 0
+	}
+	return false
 }
 
 // handleAction decodes a semantic Action from the request body (JSON or form),

@@ -634,7 +634,16 @@ func (c *Core) ProbeResourceAvailability(ctx context.Context, clients *awsclient
 			Err:          fmt.Errorf("AWS clients not initialized"),
 		}
 	}
-	pf := resource.GetPaginatedFetcher(shortName)
+	// A registered AvailabilityFetcher (internal/resource.GetAvailabilityFetcher)
+	// is a cheaper probe-only alternative for types whose real list content
+	// is materially more expensive to resolve than an availability/count
+	// signal needs (e.g. "policy" skips IAM's per-group inline-policy
+	// sweep) — every other type falls back to its ordinary paginated
+	// fetcher, unchanged.
+	pf := resource.GetAvailabilityFetcher(shortName)
+	if pf == nil {
+		pf = resource.GetPaginatedFetcher(shortName)
+	}
 	if pf == nil {
 		return ProbeAvailabilityResult{
 			ResourceType: shortName,

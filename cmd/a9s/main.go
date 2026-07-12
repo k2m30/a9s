@@ -153,20 +153,26 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Validate -c/--command flag: resolve to a canonical resource short name early
-	// so invalid input fails fast before the TUI starts.
+	// Validate -c/--command flag: resolve to a canonical resource short name
+	// (or the Cost Explorer pseudo-command) early so invalid input fails
+	// fast before the TUI starts.
 	var resolvedCommand string
 	if command != "" {
-		rt := resource.FindResourceType(command)
-		if rt == nil {
-			if newName, renamed := renameHints[command]; renamed {
-				fmt.Fprintf(os.Stderr, "Error: %q was renamed to %q (see CHANGELOG.md). Try: -c %s\n", command, newName, newName)
-			} else {
-				fmt.Fprintf(os.Stderr, "Error: unknown resource type: %s\n", command)
+		switch {
+		case resource.IsCostsCommand(command):
+			resolvedCommand = "costs"
+		default:
+			rt := resource.FindResourceType(command)
+			if rt == nil {
+				if newName, renamed := renameHints[command]; renamed {
+					fmt.Fprintf(os.Stderr, "Error: %q was renamed to %q (see CHANGELOG.md). Try: -c %s\n", command, newName, newName)
+				} else {
+					fmt.Fprintf(os.Stderr, "Error: unknown resource type: %s\n", command)
+				}
+				os.Exit(1)
 			}
-			os.Exit(1)
+			resolvedCommand = rt.ShortName
 		}
-		resolvedCommand = rt.ShortName
 	}
 
 	// Ensure config dir exists (non-fatal on failure)

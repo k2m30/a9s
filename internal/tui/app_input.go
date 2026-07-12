@@ -304,6 +304,9 @@ func commandMatches(prefix string) []string {
 	for _, cmd := range []string{"q", "quit", "ctx", "profile", "region", "theme", "help", "root", "main"} {
 		add(cmd)
 	}
+	for _, cmd := range resource.CostsCommandNames {
+		add(cmd)
+	}
 	for _, rt := range resource.AllResourceTypes() {
 		add(rt.ShortName)
 		for _, alias := range rt.Aliases {
@@ -318,6 +321,12 @@ func (m Model) executeCommand(cmd string) (tea.Model, tea.Cmd) {
 	cmd = strings.TrimSpace(cmd)
 	if cmd == "" {
 		return m, nil
+	}
+
+	if resource.IsCostsCommand(cmd) {
+		return m, func() tea.Msg {
+			return messages.Navigate{Target: messages.TargetCosts}
+		}
 	}
 
 	switch cmd {

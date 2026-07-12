@@ -1,0 +1,33 @@
+{{define "costs.html"}}
+{{if .ErrorMsg}}
+<div class="list-error">{{.ErrorMsg}}</div>
+{{else}}
+{{if .Breadcrumb}}<div class="costs-breadcrumb">{{range $i, $b := .Breadcrumb}}{{if $i}} › {{end}}{{$b}}{{end}}</div>{{end}}
+{{if .Loading}}<div class="list-loading">Loading…</div>{{end}}
+<table class="costs-table">
+  <thead>
+    <tr>
+      <th>{{.Pivot}}</th>
+      {{range .Columns}}<th class="costs-col{{if .Open}} costs-col-open{{end}}">{{.Label}}{{if .Open}}*{{end}}</th>{{end}}
+    </tr>
+  </thead>
+  <tbody>
+    {{range $ri, $row := .Rows}}
+    <tr class="{{if eq $ri $.CursorRow}}selected{{end}}">
+      <td>{{$row.Label}}</td>
+      {{range $ci, $cell := $row.Cells}}<td class="costs-cell{{if $cell.Negative}} costs-negative{{end}}{{if eq $cell.DeltaTag "growth-soft"}} costs-growth-soft{{else if eq $cell.DeltaTag "growth-strong"}} costs-growth-strong{{else if eq $cell.DeltaTag "drop-soft"}} costs-drop-soft{{else if eq $cell.DeltaTag "drop-strong"}} costs-drop-strong{{end}}{{if $cell.Estimated}} costs-estimated{{end}}{{if and (eq $ri $.CursorRow) (eq $ci $.CursorCol)}} costs-cursor{{end}}">{{$cell.Amount}}{{if $cell.Anomaly}} ▲{{end}}</td>{{end}}
+    </tr>
+    {{end}}
+  </tbody>
+  <tfoot>
+    <tr class="costs-total">
+      <td>TOTAL</td>
+      {{range .Totals}}<td class="costs-cell">{{.Amount}}</td>{{end}}
+    </tr>
+  </tfoot>
+</table>
+{{if .FooterNote}}<div class="costs-footnote">{{.FooterNote}}</div>{{end}}
+{{if .Currency}}<div class="costs-currency">{{.Currency}}</div>{{end}}
+{{if .DataThrough}}<div class="costs-datethrough">data through {{.DataThrough}}</div>{{end}}
+{{end}}
+{{end}}

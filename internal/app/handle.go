@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
@@ -23,7 +25,6 @@ import (
 // when it is not currently on top.
 func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	intents, tasks := c.core.HandleEvent(ev)
 	c.applyIntents(intents)
@@ -66,6 +67,16 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 		tasks = append(tasks, c.autoOpenSingleDetail()...)
 	}
 
+	// A by-ID placeholder list's own fetch can also resolve as
+	// messages.ByIDFetchFailed (executor.go's KindFetchByIDDetail case)
+	// rather than a ResourcesLoaded — this typed outcome is Core.HandleEvent's
+	// default nil,nil path (orchestrator.go), so nothing else pops this
+	// placeholder; it would otherwise strand the user on a permanently empty
+	// list. Never a stranded empty list.
+	if msg, ok := ev.(messages.ByIDFetchFailed); ok {
+		c.popAutoOpenSinglePlaceholderOnNotFound(msg)
+	}
+
 	// messages.ClientsReady is explicitly excluded from HandleEvent
 	// (orchestrator.go documents it as TUI-shim-only: the TUI's
 	// handleClientsReady computes StackDepth/HasActiveRL from its own view
@@ -76,11 +87,12 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// pre-connect-navigation replay never fires on this lane.
 	if msg, ok := ev.(messages.ClientsReady); ok && msg.Err == nil {
 		crIntents, crTasks := c.core.HandleClientsReady(runtime.ClientsReadyEvent{
-			Clients:     msg.Clients,
-			Region:      msg.Region,
-			Gen:         msg.Gen,
-			StackDepth:  len(c.stack),
-			HasActiveRL: c.topListState() != nil,
+			Clients:        msg.Clients,
+			Region:         msg.Region,
+			Gen:            msg.Gen,
+			StackDepth:     len(c.stack),
+			HasActiveRL:    c.topListState() != nil,
+			HasActiveCosts: c.costsStateBeneathOverlay() != nil,
 		})
 		c.applyIntents(crIntents)
 		tasks = append(tasks, crTasks...)
@@ -130,7 +142,40 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 		c.identityErrMsg = msg.Err
 	}
 
-	return c.snapshot(), tasks
+	// messages.CostsLoaded is not wired into runtime.Core.HandleEvent: the
+	// merge target (CostsState) lives on the controller's screen stack, not
+	// on session state Core owns. Controller.Handle is already the shared
+	// headless/web/TUI entry point (see the package doc above), so handling
+	// it directly here — mirroring the ValueRevealed guard immediately
+	// above — reaches every lane without a runtime-side detour. IsStale
+	// drops a fetch dispatched under a profile/region since superseded by a
+	// later Rotate — the merge must never land in the new session's Store.
+	if msg, ok := ev.(messages.CostsLoaded); ok && !messages.IsStale(msg, c.core) {
+		if t := c.ApplyCostsLoaded(msg); t != nil {
+			tasks = append(tasks, *t)
+		}
+	}
+
+	vs := c.snapshot()
+	dirtyStore := c.costsDirtyStore
+	c.costsDirtyStore = nil
+	c.mu.Unlock()
+
+	// The yaml.Marshal+os.WriteFile Store.Save performs must not run under
+	// c.mu — it would block every other action against the controller for
+	// the duration of a disk write. ApplyCostsLoaded marks the store dirty
+	// instead of saving synchronously; this flushes it now that the lock is
+	// released, re-locking only briefly to surface a write failure as a
+	// flash (never a panic, never silently dropped data).
+	if dirtyStore != nil {
+		if err := dirtyStore.Save(); err != nil {
+			c.mu.Lock()
+			c.flash = Flash{Text: fmt.Sprintf("costs cache save: %v", err), IsError: true}
+			c.mu.Unlock()
+		}
+	}
+
+	return vs, tasks
 }
 
 // handleResourcesLoadedEvent routes a ResourcesLoaded event to the matching
@@ -292,6 +337,47 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 	issues := c.listIssueCount(ls, canon)
 	exact := !ls.HasPagination
 	_ = c.core.SaveTypeRows(canon, ls.Rows, len(ls.Rows), exact, issues, issuesKnown, ls.HasPagination, false)
+}
+
+// popAutoOpenSinglePlaceholderOnNotFound pops a lane-neutral by-ID auto-open
+// placeholder list when its single-target fetch resolves as
+// messages.ByIDFetchFailed instead of ResourcesLoaded — the fetch genuinely
+// ran and found nothing (e.g. a Cost Explorer resource-drill's ID lives in
+// another account/region; CE's resource rows are account/region-wide while a
+// session's own fetch is scoped to one region), never a stranded empty list.
+// Pops only when msg's TargetType+ID exactly match the placeholder's own
+// pending target (the same single-entry RelatedIDSet match
+// GetListExactRelatedTargetID uses, inlined here since that exported helper
+// takes c.mu itself and this runs while the caller already holds it) — an
+// unrelated failure for some other fetch must never pop a placeholder that
+// isn't waiting on it. Surfaces the caveat on whatever costs screen is
+// revealed beneath, when one exists — the only lane-neutral auto-open origin
+// this caveat currently applies to. Caller must hold c.mu (write).
+func (c *Controller) popAutoOpenSinglePlaceholderOnNotFound(msg messages.ByIDFetchFailed) {
+	if len(c.stack) == 0 {
+		return
+	}
+	top := &c.stack[len(c.stack)-1]
+	if top.ID != runtime.ScreenResourceList && top.ID != runtime.ScreenChildList {
+		return
+	}
+	if top.Ctx.ResourceType != msg.TargetType {
+		return
+	}
+	ls := top.State.List
+	if ls == nil || len(ls.RelatedIDSet) != 1 {
+		return
+	}
+	if _, ok := ls.RelatedIDSet[msg.ID]; !ok {
+		return
+	}
+	c.applyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+	if cs := c.topCostsState(); cs != nil {
+		cs.ResourceRowNote = fmt.Sprintf(
+			"%s — Cost Explorer resource rows are account/region-wide; this session queries one region/account",
+			msg.Reason,
+		)
+	}
 }
 
 // autoOpenSingleDetail replaces a web/headless by-ID placeholder list with the
@@ -456,7 +542,7 @@ func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, stat
 		Count:       count,
 		Loading:     loading,
 		Err:         errMsg,
-		Truncated: truncated,
+		Truncated:   truncated,
 		ResourceIDs: resourceIDs,
 		FetchFilter: fetchFilter,
 	})

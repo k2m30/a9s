@@ -21,6 +21,9 @@
 {{else if eq $k "identity"}}{{if .Identity}}
   {{template "identity.html" .Identity}}
 {{end}}
+{{else if eq $k "costs"}}{{if .Costs}}
+  {{template "costs.html" .Costs}}
+{{end}}
 {{else}}
   <div style="color:var(--dim);font-style:italic;">Loading…</div>
 {{end}}

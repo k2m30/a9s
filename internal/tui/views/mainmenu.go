@@ -75,6 +75,11 @@ func (m MainMenuModel) Update(msg tea.Msg) (MainMenuModel, tea.Cmd) {
 			if !navigable {
 				return m, nil
 			}
+			if selected.ShortName == app.CostsMenuShortName {
+				return m, func() tea.Msg {
+					return messages.Navigate{Target: messages.TargetCosts}
+				}
+			}
 			return m, func() tea.Msg {
 				return messages.Navigate{
 					Target:       messages.TargetResourceList,

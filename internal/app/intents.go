@@ -335,14 +335,18 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 }
 
 // refreshTasksForIntents scans intents for RefreshActiveListIntent and, when
-// present, returns the active-list refresh tasks (C10: a navigation issued
-// before AWS connect completes must replay once connected). Shared by Handle
-// and BootstrapLive so the scan is not duplicated across the TUI-independent
-// ClientsReady seams. Callers must hold c.mu.
+// present, returns the active-list (or, P5, active costs screen) refresh
+// tasks (C10: a navigation/fetch issued before AWS connect completes must
+// replay once connected). Shared by Handle and BootstrapLive so the scan is
+// not duplicated across the TUI-independent ClientsReady seams. Callers must
+// hold c.mu.
 func (c *Controller) refreshTasksForIntents(intents []runtime.UIIntent) []runtime.TaskRequest {
 	for _, intent := range intents {
 		if _, ok := intent.(runtime.RefreshActiveListIntent); ok {
-			return c.activeListRefreshTasks()
+			if tasks := c.activeListRefreshTasks(); tasks != nil {
+				return tasks
+			}
+			return c.costsRefreshTasks()
 		}
 	}
 	return nil

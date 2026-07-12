@@ -317,14 +317,22 @@ func ec2StatusCheckTier(status string) string {
 	}
 }
 
+// CostExplorerServiceNameEC2 is the exact Cost Explorer SERVICE dimension
+// value EC2's billed usage is reported under. Exported so the demo fixture
+// dataset (internal/demo/fixtures/costs.go's CostsResourceRowsByService) can
+// key off the same symbol as the catalog entry below, instead of a
+// duplicated string literal that could silently drift.
+const CostExplorerServiceNameEC2 = "Amazon Elastic Compute Cloud - Compute"
+
 // computeTypes is the declarative catalog for all COMPUTE category resource types.
 var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:          "EC2 Instances",
-		ShortName:     "ec2",
-		Aliases:       []string{"ec2", "instances"},
-		Category:      "COMPUTE",
-		CloudTrailKey: "ResourceName:ID",
+		Name:                    "EC2 Instances",
+		ShortName:               "ec2",
+		Aliases:                 []string{"ec2", "instances"},
+		Category:                "COMPUTE",
+		CloudTrailKey:           "ResourceName:ID",
+		CostExplorerServiceName: CostExplorerServiceNameEC2,
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28, Sortable: true},
 			{Key: "state", Title: "Status", Width: 12, Sortable: true},
@@ -359,6 +367,13 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 			}
 			return FetchEC2InstancesPage(ctx, c.EC2, continuationToken)
+		},
+		FetchByIDs: func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return nil, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchEC2InstancesByIDs(ctx, c.EC2, ids)
 		},
 		Wave2: IssueEnricher{Fn: EnrichEC2InstanceStatus, Priority: 100},
 		FieldKeys: []string{

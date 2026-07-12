@@ -123,6 +123,18 @@ func (c *Controller) handleActionCommand(a Action) (ViewState, []runtime.TaskReq
 		return c.snapshot(), tasks
 
 	default:
+		// resource.IsCostsCommand is THE single command resolver for the Cost
+		// Explorer pseudo-command — the same one cmd/a9s/main.go's -c/--command
+		// flag validation and the TUI's own colon-mode dispatch
+		// (internal/tui/app_input.go's executeCommand) already call, so
+		// ":costs"/":ce" resolve identically at every door instead of this
+		// switch falling through to resource.FindResourceType(a.Arg), which
+		// correctly returns nil for the synthetic "costs" entry.
+		if resource.IsCostsCommand(a.Arg) {
+			res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetCosts})
+			tasks = append(tasks, c.applyNavResult(res)...)
+			return c.snapshot(), tasks
+		}
 		// Resource short-name or alias (e.g. "ec2", "s3", "dbi").
 		if rt := resource.FindResourceType(a.Arg); rt != nil {
 			res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{

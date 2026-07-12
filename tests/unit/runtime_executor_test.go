@@ -522,22 +522,27 @@ func TestExecuteTask_FetchReveal_ReturnsValueRevealed(t *testing.T) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// KindFetchByIDDetail → messages.Flash (unknown type has no by-id fetcher)
+// KindFetchByIDDetail → messages.ByIDFetchFailed (unknown type has no by-id
+// fetcher) — the typed outcome, not a messages.Flash a separate case has to
+// text-match against the pending target.
 // ────────────────────────────────────────────────────────────────────────────
 
-func TestExecuteTask_FetchByIDDetail_NoFetcher_ReturnsFlash(t *testing.T) {
+func TestExecuteTask_FetchByIDDetail_NoFetcher_ReturnsByIDFetchFailed(t *testing.T) {
 	c := newExecutorCore(t)
 	p := runtime.FetchByIDDetailPayload{TargetType: "nonexistent-type-000", ID: "some-id-000000000000"}
 	ev, err := c.ExecuteTask(context.Background(), reqP(runtime.KindFetchByIDDetail, "nonexistent-type-000", p))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	got, ok := ev.(messages.Flash)
+	got, ok := ev.(messages.ByIDFetchFailed)
 	if !ok {
-		t.Fatalf("expected messages.Flash for no-fetcher path, got %T", ev)
+		t.Fatalf("expected messages.ByIDFetchFailed for no-fetcher path, got %T", ev)
 	}
-	if !got.IsError {
-		t.Error("Flash.IsError must be true when no by-id fetcher is registered")
+	if got.TargetType != p.TargetType || got.ID != p.ID {
+		t.Errorf("ByIDFetchFailed{TargetType:%q, ID:%q}, want {TargetType:%q, ID:%q}", got.TargetType, got.ID, p.TargetType, p.ID)
+	}
+	if got.Reason == "" {
+		t.Error("ByIDFetchFailed.Reason must be non-empty when no by-id fetcher is registered")
 	}
 }
 

@@ -1,4 +1,4 @@
-.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security coverage verify-readonly verify-zero-init demo readme check-readme mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live check-no-real-data install-hooks ready-to-push ready-to-release generate
+.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security coverage verify-readonly verify-zero-init demo readme check-readme mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live smoke-costs check-no-real-data install-hooks ready-to-push ready-to-release generate
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -179,6 +179,16 @@ smoke-live:
 smoke-related:
 	./scripts/smoke-related-demo.sh
 
+# smoke-costs drives the Cost Explorer end to end over the demo fixtures:
+# open-at-current-month grid, month→week→day zoom with data, zoom-out past
+# year without a CE validation error, metric cycle, account pivot, the
+# planted growth-story drill to usage types, the 14-day resource boundary
+# message, synthetic resource rows, help section, and `-c costs` startup.
+# Fixtures anchor to the current month, so assertions stay evergreen. ~60s.
+# Requires tmux. Part of ready-to-push alongside `make smoke`.
+smoke-costs:
+	./scripts/smoke-costs-demo.sh
+
 # smoke-related-live drives the same RELATED-panel walk against a real
 # *readonly* AWS profile with data-independent assertions (a settled counted
 # badge, a count-1/N drill landing on a detail or list frame, a surviving
@@ -203,7 +213,7 @@ install-hooks:
 
 # Stage 6 — Pre-push gate. The single command every PR must pass before push.
 # See docs/development-process.md.
-ready-to-push: check-no-real-data test-race lint security gofix verify-readonly verify-zero-init check-readme snapshot mdlint smoke smoke-related
+ready-to-push: check-no-real-data test-race lint security gofix verify-readonly verify-zero-init check-readme snapshot mdlint smoke smoke-related smoke-costs
 	@echo "PASS: ready-to-push gate green"
 
 # Stage 7 — Pre-release gate. Run before tagging a release. Subsumes ready-to-push

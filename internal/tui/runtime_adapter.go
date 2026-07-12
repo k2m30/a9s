@@ -279,6 +279,8 @@ func emitNavigateCmd(p runtime.EmitNavigatePayload) tea.Cmd {
 	switch p.Target {
 	case runtime.NavigateTargetResourceList:
 		target = messages.TargetResourceList
+	case runtime.NavigateTargetCosts:
+		target = messages.TargetCosts
 	default:
 		target = messages.TargetMainMenu
 	}

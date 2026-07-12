@@ -315,6 +315,19 @@ func TestRelatedCursor_MenuParity_SameDimNonDimPatternSameLandingSequence(t *tes
 			},
 		})
 	}
+	// The permanent synthetic "costs" (Cost Explorer) entry sits after every
+	// resource.AllResourceTypes() entry and is not itself in `all`, so it is
+	// untouched by the loop above. Dim it too so MoveBottom's backward scan
+	// keeps skipping past it into the catalog tail instead of stopping
+	// immediately on it — preserving the bounded 5-entry comparison window
+	// this test relies on.
+	menuCtrl.ApplyIntents([]runtime.UIIntent{
+		runtime.PatchMenuAvailability{
+			ResourceType: "costs",
+			Count:        0,
+			Truncated:    false,
+		},
+	})
 
 	menuLanding := func(vs app.ViewState) int { return vs.Body.Menu.Selected }
 	menuActionable := func(vs app.ViewState, idx int) bool {

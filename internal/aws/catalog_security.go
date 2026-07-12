@@ -152,7 +152,13 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			}
 			// Inline group policies are not paginated by AWS — fetch once on the
 			// first page only. Appending on every continuation token would
-			// duplicate the same inline rows across pages.
+			// duplicate the same inline rows across pages. fetchInlineGroupPolicies
+			// itself fans the per-group ListGroupPolicies sweep out with bounded
+			// concurrency (internal/aws/iam_policies.go) so this stays well inside
+			// any real list-open caller's deadline. The availability/count probe
+			// never reaches this sweep at all — see AvailabilityFetcher below,
+			// registered specifically to keep the probe on the cheap managed-only
+			// path (internal/runtime/probes.go's ProbeResourceAvailability).
 			if continuationToken != "" {
 				return result, nil
 			}
@@ -167,6 +173,31 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 				result.Pagination.PageSize = len(result.Resources)
 			}
 			return result, inlineErr
+		},
+		// AvailabilityFetcher is the cheap, managed-only probe path
+		// (internal/runtime/probes.go's ProbeResourceAvailability, via
+		// resource.GetAvailabilityFetcher): managed policies alone are
+		// sufficient for an availability/count signal, so this never reaches
+		// fetchInlineGroupPolicies's per-group IAM sweep — the live symptom
+		// this registration exists to prevent ("availability policy:
+		// ListGroupPolicies failed for N of M IDs" on a wide-group account).
+		// IsTruncated is forced true regardless of what ListPolicies itself
+		// reports: this probe deliberately never checks group-inline
+		// policies, so it can never confirm a true zero/exact total — an
+		// inline-only account (zero managed policies, many inline ones on
+		// groups) would otherwise report a confirmed-empty "0" instead of
+		// the honest lower-bound "N+", making it look unnavigable.
+		AvailabilityFetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			result, err := FetchIAMPoliciesPage(ctx, c.IAM, continuationToken)
+			if result.Pagination == nil {
+				result.Pagination = &resource.PaginationMeta{}
+			}
+			result.Pagination.IsTruncated = true
+			return result, err
 		},
 		Wave2: IssueEnricher{Fn: EnrichIAMPolicy, Priority: 100},
 		FieldKeys: []string{

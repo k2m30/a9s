@@ -58,6 +58,11 @@ const (
 	// presses '!' and at least one error has been recorded this session.
 	// Its body is a TextBody with one line per error entry (newest-first).
 	ScreenErrorLog ScreenID = "error-log"
+
+	// ScreenCosts is the Cost Explorer grid screen pushed by
+	// NavigateKindPushCosts. CostsState (internal/app) holds the drill
+	// stack, pivot, metric, and session API-call counter.
+	ScreenCosts ScreenID = "costs"
 )
 
 // ScreenContext is the input handed to an adapter when the runtime asks

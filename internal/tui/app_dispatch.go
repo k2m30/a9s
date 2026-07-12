@@ -1,5 +1,5 @@
 // app_dispatch.go — TUI-side runtime intent + task dispatchers (applyIntents,
-// pushScreen, applyTheme, tasksToCmd, coreUpdate).
+// pushScreen, applyTheme, tasksToCmd, dispatchTaskRequests, coreUpdate).
 //
 // applyIntents forwards every intent to the headless controller
 // (m.ctrl.ApplyIntents) first — see internal/app/intents.go for the
@@ -260,6 +260,65 @@ func (m Model) executeTaskCmd(req runtime.TaskRequest) tea.Cmd {
 			return nil
 		}
 		return ev
+	}
+}
+
+// dispatchTaskRequests is the single shared task->tea.Cmd translation switch
+// every screen's adapter routes through, so a task kind's translation rule
+// lives in exactly one place — a future kind added here works from every
+// caller, not just the one that happened to need it first. Consolidates the
+// former per-screen switches in runtime_adapter_related.go
+// (relatedNavigateTasksToCmd) and app_costs.go (handleCostsKeyMsg), which
+// independently reimplemented the same KindFetchByIDDetail navigation
+// special case and generic executeTaskCmd passthrough.
+//
+// KindFetchFiltered is deliberately absent: HandleRelatedNavigate never
+// attaches a payload to that task — the filter clause travels out-of-band on
+// its own NavigationResult, not on the TaskRequest — so it cannot be
+// resolved from tasks alone. relatedNavigateTasksToCmd, the only producer of
+// that kind, resolves it locally before delegating the rest here.
+func (m Model) dispatchTaskRequests(tasks []runtime.TaskRequest) tea.Cmd {
+	if len(tasks) == 0 {
+		return nil
+	}
+	var cmds []tea.Cmd
+	for _, t := range tasks {
+		switch t.Key.Kind {
+		case runtime.KindFetchByIDDetail:
+			// ExecuteTask returns ResourcesLoaded for this kind, but the
+			// caller must also navigate to the detail view — an
+			// adapter-only side effect ExecuteTask cannot perform, so this
+			// stays a dedicated case rather than falling through to
+			// executeTaskCmd.
+			payload, ok := t.Payload.(runtime.FetchByIDDetailPayload)
+			if !ok {
+				continue
+			}
+			cmds = append(cmds, m.fetchByIDDetail(payload.TargetType, payload.ID))
+
+		case runtime.KindFetchMore:
+			// FetchMorePayload is set by the runtime — ExecuteTask can
+			// execute it. A missing or wrong-typed payload is a runtime
+			// bug; drop the task.
+			if _, ok := t.Payload.(runtime.FetchMorePayload); !ok {
+				continue
+			}
+			cmds = append(cmds, m.executeTaskCmd(t))
+
+		default:
+			// Every other kind (KindFetchResources, KindFetchCosts, and any
+			// future addition with no adapter-only side effect) is a plain
+			// ExecuteTask passthrough.
+			cmds = append(cmds, m.executeTaskCmd(t))
+		}
+	}
+	switch len(cmds) {
+	case 0:
+		return nil
+	case 1:
+		return cmds[0]
+	default:
+		return tea.Batch(cmds...)
 	}
 }
 

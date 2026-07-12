@@ -10,50 +10,54 @@
 #   2.0  Down×3 @300ms → ends 2.9
 #   2.9  Sleep 3s → ends 5.9
 #
+# Act 1b: Issues at a glance
+#   5.9  Ctrl+Z → Sleep 3s → ends 8.95
+#   8.95 Ctrl+Z → Sleep 1.5s → ends 10.5
+#
 # Act 2: EC2 List
-#   5.9  Up×3 @300ms → ends 6.8
-#   6.8  Enter → Sleep 2.5s → ends 9.3
-#   9.3  Down×2 @300ms → ends 9.9
-#   9.9  Sleep 1s → ends 10.9
-#  10.9  Type@300ms "/web" (4×300ms=1.2s) → ends 12.1
-#  12.1  Sleep 3s → ends 15.1
-#  15.1  Escape → Sleep 3s → ends 18.1
+#  10.5  Up×3 @300ms → ends 11.4
+#  11.4  Enter → Sleep 2.5s → ends 13.9
+#  13.9  Down×2 @300ms → ends 14.5
+#  14.5  Sleep 1s → ends 15.5
+#  15.5  Type@300ms "/web" (4×300ms=1.2s) → ends 16.7
+#  16.7  Sleep 3s → ends 19.7
+#  19.7  Escape → Sleep 3s → ends 22.7
 #
 # Act 3: Detail + YAML
-#  18.1  Type "d" → Sleep 3s → ends 21.15
-#  21.15 Down×3 @200ms → ends 21.75
-#  21.75 Sleep 1s → ends 22.75
-#  22.75 Type "y" → Sleep 3s → ends 25.8
-#  25.8  Escape×3 @500ms → ends 27.3
-#  27.3  Sleep 3s → ends 30.3
+#  22.7  Type "d" → Sleep 3s → ends 25.75
+#  25.75 Down×3 @200ms → ends 26.35
+#  26.35 Sleep 1s → ends 27.35
+#  27.35 Type "y" → Sleep 3s → ends 30.4
+#  30.4  Escape×3 @500ms → ends 31.9
+#  31.9  Sleep 3s → ends 34.9
 #
 # Act 4: Related Views (panel auto-shows on detail)
-#  30.3  Enter → Sleep 2s → ends 32.3
-#  32.3  Down → Sleep 300ms → ends 32.6
-#  32.6  Type "d" → Sleep 3s → ends 35.65
-#  35.65 Tab → Sleep 1s → ends 36.65
-#  36.65 Down×3 @400ms → ends 37.85
-#  37.85 Sleep 2s → ends 39.85
-#  39.85 Enter → Sleep 3s → ends 42.85
-#  42.85 Escape×3 @500ms → ends 44.35
-#  44.35 Sleep 3s → ends 47.35
+#  34.9  Enter → Sleep 2s → ends 36.9
+#  36.9  Down → Sleep 300ms → ends 37.2
+#  37.2  Type "d" → Sleep 3s → ends 40.25
+#  40.25 Tab → Sleep 1s → ends 41.25
+#  41.25 Down×3 @400ms → ends 42.45
+#  42.45 Sleep 2s → ends 44.45
+#  44.45 Enter → Sleep 3s → ends 47.45
+#  47.45 Escape×3 @500ms → ends 48.95
+#  48.95 Sleep 3s → ends 51.95
 #
 # Act 5: S3 Drill-Down
-#  47.35 Type@200ms ":s3" (3×200ms=0.6s) → ends 47.95
-#  47.95 Sleep 1s → ends 48.95
-#  48.95 Enter → Sleep 2.5s → ends 51.45
-#  51.45 Enter → Sleep 2.5s → ends 53.95
-#  53.95 Escape×2 @500ms → ends 54.95
-#  54.95 Sleep 3s → ends 57.95
+#  51.95 Type@200ms ":s3" (3×200ms=0.6s) → ends 52.55
+#  52.55 Sleep 1s → ends 53.55
+#  53.55 Enter → Sleep 2.5s → ends 56.05
+#  56.05 Enter → Sleep 2.5s → ends 58.55
+#  58.55 Escape×2 @500ms → ends 59.55
+#  59.55 Sleep 3s → ends 62.55
 #
 # Act 6: Quick Tour
-#  57.95 Type@200ms ":lambda" (7×200ms=1.4s) → ends 59.35
-#  59.35 Sleep 1s → ends 60.35
-#  60.35 Enter → Sleep 3s → ends 63.35
-#  63.35 Type@200ms ":rds" (4×200ms=0.8s) → ends 64.15
-#  64.15 Sleep 1s → ends 65.15
-#  65.15 Enter → Sleep 3s → ends 68.15
-#  68.15 Escape → Sleep 3s → ends 71.15
+#  62.55 Type@200ms ":lambda" (7×200ms=1.4s) → ends 63.95
+#  63.95 Sleep 1s → ends 64.95
+#  64.95 Enter → Sleep 3s → ends 67.95
+#  67.95 Type@200ms ":rds" (4×200ms=0.8s) → ends 68.75
+#  68.75 Sleep 1s → ends 69.75
+#  69.75 Enter → Sleep 3s → ends 72.75
+#  72.75 Escape → Sleep 3s → ends 75.75
 
 INPUT="docs/demos/demo-raw.gif"
 OUTPUT="/tmp/demo-annotated.gif"
@@ -70,35 +74,38 @@ OVERLAYS="\
 drawtext=text='66 AWS resource types':${STYLE}:${Y_DESC}:enable='between(t,0.5,5.5)',\
 drawtext=text='Up / Down  navigate':${STYLE_KEY}:${Y_KEY}:enable='between(t,0.5,5.5)',\
 \
-drawtext=text='EC2 Instances':${STYLE}:${Y_DESC}:enable='between(t,7,10.5)',\
-drawtext=text='Enter  open resource list':${STYLE_KEY}:${Y_KEY}:enable='between(t,7,10.5)',\
+drawtext=text='Spot issues instantly':${STYLE}:${Y_DESC}:enable='between(t,6.2,8.8)',\
+drawtext=text='Ctrl+Z  show only resources with findings':${STYLE_KEY}:${Y_KEY}:enable='between(t,6.2,8.8)',\
 \
-drawtext=text='Filter resources instantly':${STYLE}:${Y_DESC}:enable='between(t,11,17.5)',\
-drawtext=text='/  search  |  Esc  clear':${STYLE_KEY}:${Y_KEY}:enable='between(t,11,17.5)',\
+drawtext=text='EC2 Instances':${STYLE}:${Y_DESC}:enable='between(t,11.6,15.1)',\
+drawtext=text='Enter  open resource list':${STYLE_KEY}:${Y_KEY}:enable='between(t,11.6,15.1)',\
 \
-drawtext=text='Detail View -- all fields':${STYLE}:${Y_DESC}:enable='between(t,18.5,22.5)',\
-drawtext=text='d  detail  |  Down  scroll':${STYLE_KEY}:${Y_KEY}:enable='between(t,18.5,22.5)',\
+drawtext=text='Filter resources instantly':${STYLE}:${Y_DESC}:enable='between(t,15.6,22.1)',\
+drawtext=text='/  search  |  Esc  clear':${STYLE_KEY}:${Y_KEY}:enable='between(t,15.6,22.1)',\
 \
-drawtext=text='Full YAML -- raw AWS API response':${STYLE}:${Y_DESC}:enable='between(t,23,27)',\
-drawtext=text='y  yaml view':${STYLE_KEY}:${Y_KEY}:enable='between(t,23,27)',\
+drawtext=text='Detail View -- all fields':${STYLE}:${Y_DESC}:enable='between(t,23.1,27.1)',\
+drawtext=text='d  detail  |  Down  scroll':${STYLE_KEY}:${Y_KEY}:enable='between(t,23.1,27.1)',\
 \
-drawtext=text='Related Resources':${STYLE}:${Y_DESC}:enable='between(t,33,39.5)',\
-drawtext=text='Tab  focus  |  Down  browse':${STYLE_KEY}:${Y_KEY}:enable='between(t,33,39.5)',\
+drawtext=text='Full YAML -- raw AWS API response':${STYLE}:${Y_DESC}:enable='between(t,27.6,31.6)',\
+drawtext=text='y  yaml view':${STYLE_KEY}:${Y_KEY}:enable='between(t,27.6,31.6)',\
 \
-drawtext=text='Navigate to related resource':${STYLE}:${Y_DESC}:enable='between(t,40,44)',\
-drawtext=text='Enter  jump to resource':${STYLE_KEY}:${Y_KEY}:enable='between(t,40,44)',\
+drawtext=text='Related Resources':${STYLE}:${Y_DESC}:enable='between(t,37.6,44.1)',\
+drawtext=text='Tab  focus  |  Down  browse':${STYLE_KEY}:${Y_KEY}:enable='between(t,37.6,44.1)',\
 \
-drawtext=text='S3 Buckets':${STYLE}:${Y_DESC}:enable='between(t,48,51)',\
-drawtext=text='\:s3  jump to any service':${STYLE_KEY}:${Y_KEY}:enable='between(t,48,51)',\
+drawtext=text='Navigate to related resource':${STYLE}:${Y_DESC}:enable='between(t,44.6,48.6)',\
+drawtext=text='Enter  jump to resource':${STYLE_KEY}:${Y_KEY}:enable='between(t,44.6,48.6)',\
 \
-drawtext=text='Drill into bucket objects':${STYLE}:${Y_DESC}:enable='between(t,51.5,54.5)',\
-drawtext=text='Enter  child view':${STYLE_KEY}:${Y_KEY}:enable='between(t,51.5,54.5)',\
+drawtext=text='S3 Buckets':${STYLE}:${Y_DESC}:enable='between(t,52.6,55.6)',\
+drawtext=text='\:s3  jump to any service':${STYLE_KEY}:${Y_KEY}:enable='between(t,52.6,55.6)',\
 \
-drawtext=text='Lambda Functions':${STYLE}:${Y_DESC}:enable='between(t,58,63)',\
-drawtext=text='\:lambda  jump to service':${STYLE_KEY}:${Y_KEY}:enable='between(t,58,63)',\
+drawtext=text='Drill into bucket objects':${STYLE}:${Y_DESC}:enable='between(t,56.1,59.1)',\
+drawtext=text='Enter  child view':${STYLE_KEY}:${Y_KEY}:enable='between(t,56.1,59.1)',\
 \
-drawtext=text='RDS Databases':${STYLE}:${Y_DESC}:enable='between(t,63.5,68)',\
-drawtext=text='\:rds  jump to service':${STYLE_KEY}:${Y_KEY}:enable='between(t,63.5,68)'"
+drawtext=text='Lambda Functions':${STYLE}:${Y_DESC}:enable='between(t,62.6,67.6)',\
+drawtext=text='\:lambda  jump to service':${STYLE_KEY}:${Y_KEY}:enable='between(t,62.6,67.6)',\
+\
+drawtext=text='RDS Databases':${STYLE}:${Y_DESC}:enable='between(t,68.1,72.6)',\
+drawtext=text='\:rds  jump to service':${STYLE_KEY}:${Y_KEY}:enable='between(t,68.1,72.6)'"
 
 # Two-pass GIF encoding
 $FFMPEG -y -i "$INPUT" -vf "${OVERLAYS},fps=10,palettegen=stats_mode=diff" /tmp/demo_palette.png

@@ -54,11 +54,12 @@ func (c *Controller) BootstrapLive(profile, region string) []runtime.TaskRequest
 	// replay to be dropped on the web/headless lane).
 	c.mu.Lock()
 	intents, tasks := c.core.HandleClientsReady(runtime.ClientsReadyEvent{
-		Clients:     cr.Clients,
-		Region:      cr.Region,
-		Gen:         cr.Gen,
-		StackDepth:  len(c.stack),
-		HasActiveRL: c.topListState() != nil,
+		Clients:        cr.Clients,
+		Region:         cr.Region,
+		Gen:            cr.Gen,
+		StackDepth:     len(c.stack),
+		HasActiveRL:    c.topListState() != nil,
+		HasActiveCosts: c.costsStateBeneathOverlay() != nil,
 	})
 	c.applyIntents(intents)
 	tasks = append(tasks, c.refreshTasksForIntents(intents)...)

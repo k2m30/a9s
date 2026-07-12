@@ -77,19 +77,30 @@ func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]st
 // KindFetchByIDDetail for any by-ID-capable type on a cache-miss exact-ID drill.
 func (m *Model) fetchByIDDetail(targetType, id string) tea.Cmd {
 	ctx, clients := m.appCtx, m.core.Clients()
+	if clients == nil {
+		// Clients() is nil until the Init()/ClientsReady round trip installs
+		// it (handleClientsReadySuccess's own PreSuppliedClients fallback,
+		// internal/runtime/handlers.go) — a real key press can only reach
+		// this adapter after that has settled, but a directly-driven Update
+		// sequence (a scripted key-chain, or a harness that skips Init())
+		// can call this before it has. PreSuppliedClients is already sitting
+		// there unused in that case, so fall back to it rather than fail a
+		// resource lookup that has everything it needs.
+		clients = m.core.PreSuppliedClients()
+	}
 	fn := resource.GetFetchByIDs(targetType)
 	if fn == nil {
 		return func() tea.Msg {
-			return messages.Flash{Text: fmt.Sprintf("no by-id fetcher for %s", targetType), IsError: true}
+			return messages.ByIDFetchFailed{TargetType: targetType, ID: id, Reason: fmt.Sprintf("no by-id fetcher for %s", targetType)}
 		}
 	}
 	return func() tea.Msg {
 		res, err := fn(ctx, clients, []string{id})
 		if err != nil {
-			return messages.Flash{Text: err.Error(), IsError: true}
+			return messages.ByIDFetchFailed{TargetType: targetType, ID: id, Reason: err.Error()}
 		}
 		if len(res) == 0 {
-			return messages.Flash{Text: fmt.Sprintf("%s %s not found", targetType, id), IsError: true}
+			return messages.ByIDFetchFailed{TargetType: targetType, ID: id, Reason: fmt.Sprintf("%s %s not found", targetType, id)}
 		}
 		r := res[0]
 		return messages.Navigate{Target: messages.TargetDetail, ResourceType: targetType, Resource: &r}

@@ -33,6 +33,17 @@ var (
 	StatusCheckWarn   lipgloss.Style // "~" glyph — YELLOW (initializing)
 	StatusCheckOk     lipgloss.Style // GREEN (ok values in detail view)
 
+	// CostGrowthSoft/CostGrowthStrong/CostDropSoft/CostDropStrong are the
+	// Cost Explorer grid's 4-tier delta coloring (costs.DeltaTag
+	// "growth-soft"/"growth-strong"/"drop-soft"/"drop-strong"): each pair
+	// shares one theme color (red for growth, green for drop) and differs
+	// only by intensity — soft is faint, strong is bold — never a second,
+	// separately-configured shade.
+	CostGrowthSoft   lipgloss.Style
+	CostGrowthStrong lipgloss.Style
+	CostDropSoft     lipgloss.Style
+	CostDropStrong   lipgloss.Style
+
 	// FindingSection styles for enrichment section headers in the detail view.
 	FindingSectionStopped lipgloss.Style // bold + red — used for "!" tier sections
 	FindingSectionPending lipgloss.Style // bold + yellow — used for "~" tier sections
@@ -142,6 +153,10 @@ func initStyles() {
 	StatusCheckFailed = lipgloss.Style{}
 	StatusCheckWarn = lipgloss.Style{}
 	StatusCheckOk = lipgloss.Style{}
+	CostGrowthSoft = lipgloss.Style{}
+	CostGrowthStrong = lipgloss.Style{}
+	CostDropSoft = lipgloss.Style{}
+	CostDropStrong = lipgloss.Style{}
 	FindingSectionStopped = lipgloss.Style{}
 	FindingSectionPending = lipgloss.Style{}
 	FindingSectionDefault = lipgloss.Style{}
@@ -203,6 +218,10 @@ func initStyles() {
 	StatusCheckFailed = lipgloss.NewStyle().Foreground(ColStopped).Bold(true)
 	StatusCheckWarn = lipgloss.NewStyle().Foreground(ColPending)
 	StatusCheckOk = lipgloss.NewStyle().Foreground(ColRunning)
+	CostGrowthSoft = lipgloss.NewStyle().Foreground(ColStopped).Faint(true)
+	CostGrowthStrong = lipgloss.NewStyle().Foreground(ColStopped).Bold(true)
+	CostDropSoft = lipgloss.NewStyle().Foreground(ColRunning).Faint(true)
+	CostDropStrong = lipgloss.NewStyle().Foreground(ColRunning).Bold(true)
 	FindingSectionStopped = lipgloss.NewStyle().Bold(true).Foreground(ColStopped)
 	FindingSectionPending = lipgloss.NewStyle().Bold(true).Foreground(ColPending)
 	FindingSectionDefault = lipgloss.NewStyle().Bold(true)

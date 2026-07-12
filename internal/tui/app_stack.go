@@ -60,6 +60,13 @@ func (m *Model) popRSOnly() bool {
 // relies on. When ctrlPop is false, the controller stack is left untouched
 // because the caller already popped it (or intends to leave it alone).
 //
+// ActionBack does not always pop a controller screen: a screen can absorb
+// Esc in place (e.g. the costs screen popping one drill frame while
+// drilled — internal/app/actions_nav.go's handleActionBack). The
+// controller's own screen-stack depth is compared before/after ActionBack
+// so the TUI's rendererState stack only pops when the controller's did —
+// generic by construction, no per-screen-kind special case here.
+//
 // The returned tea.Cmd surfaces the TaskRequests ActionBack itself returns
 // (today, only ever a KindRelatedCheck re-dispatch — owner decision #38, see
 // handleActionBack in internal/app/actions_nav.go) translated into the TUI's
@@ -83,8 +90,12 @@ func (m *Model) popRSWithCtrlPop(ctrlPop bool) (bool, tea.Cmd) {
 	// pushed). Help, identity-overlay, and error-log overlay are NOT ctrl-backed.
 	var cmd tea.Cmd
 	if ctrlPop && m.activeRS().ctrlBacked {
+		depthBefore := len(m.ctrl.ScreenIDs())
 		_, tasks := m.ctrl.Apply(app.Action{Kind: app.ActionBack})
 		cmd = relatedCheckStartedCmdFromTasks(tasks)
+		if len(m.ctrl.ScreenIDs()) == depthBefore {
+			return false, cmd
+		}
 	}
 	m.stack = m.stack[:len(m.stack)-1]
 	return true, cmd
@@ -297,6 +308,10 @@ func (m Model) updateActiveRS(msg tea.Msg) (tea.Model, tea.Cmd) {
 		h.SetSize(rs.width, rs.height)
 		_, cmd := h.Update(msg)
 		return m, cmd
+	case rsKindCosts:
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			return m.handleCostsKeyMsg(keyMsg, rs)
+		}
 	}
 	return m, nil
 }

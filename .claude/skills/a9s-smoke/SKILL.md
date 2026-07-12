@@ -47,6 +47,21 @@ circular drill (bucket -> trail -> bucket) re-showing cached counts with the
 depth badge intact, Esc unwinding back to the same detail, and the ec2 IAM
 Role pivot.
 
+Cost Explorer, demo (deterministic, asserted, part of `make ready-to-push`):
+
+```
+make smoke-costs          # scripts/smoke-costs-demo.sh, ~60s
+```
+
+Grid opens at the current month (open-period marker, stripped vendor
+prefixes, no fold/no counter/no negative zero, key-hint bar), month → week
+→ day zoom carries data, zoom-out past year without a CE validation error,
+metric cycle (unblended drops Tax), account pivot, the planted growth-story
+drill to usage types, the 14-day resource-boundary message on old cells,
+synthetic resource rows on the current month, the Cost Explorer help
+section, Esc back to the menu, and `-c costs` startup. The cost fixtures
+anchor to the current month at process start, so assertions never rot.
+
 Live (data-independent patterns, credentials required, not in the gate):
 
 ```

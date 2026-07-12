@@ -24,6 +24,8 @@ Browse, inspect, and manage 66 AWS resource types from your terminal. a9s gives 
 ## Features
 
 - **66 AWS resource types** across 12 service categories
+- **Cost Explorer** — a spend grid that matches your AWS invoice, with pivots, zoom, anomaly markers, and drill-down to the resources behind the numbers (see below)
+- **Issue detection** — background health checks mark broken/degraded resources with `!`/`~` and per-type issue counts; `Ctrl+Z` filters to what needs attention
 - Real-time resource browsing with vim-style keyboard navigation
 - YAML detail view for any resource (full AWS API response)
 - Auto-detect and pretty-print JSON in detail and reveal views
@@ -39,7 +41,28 @@ Browse, inspect, and manage 66 AWS resource types from your terminal. a9s gives 
 - Pagination and lazy-loading for large result sets — press `M` to load more (demo mode showcases this)
 - Session error log with `!` key — timestamped, scrollable, searchable
 - Command mode (`:`) with profile/region switching, navigation, and tab completion
-- 22,900+ unit tests
+- 23,300+ unit tests
+
+## Cost Explorer
+
+**"Why am I spending that much?"** — answered in three keypresses.
+
+![a9s Cost Explorer](docs/demos/costs.gif)
+
+`:costs` opens your spend as a grid — services in rows, months in columns, cells
+matching the AWS invoice to the cent. Cells color by period-over-period change
+(spikes stand out, noise stays quiet) and cost anomalies carry their root cause
+and dollar impact in the footer. From any cell, `Enter` drills down: service →
+usage type → (for EC2, last 14 days) the individual instances — and one more
+`Enter` opens the standard resource detail view of the machine behind the
+number.
+
+- Pivot rows by service, region, linked account, usage type, purchase option, or charge category (`1`-`6`)
+- Zoom the time axis from years to months, weeks, and days (`+`/`-`), anchored at the cursor
+- Cycle cost metrics — invoice, unblended, amortized, net amortized, blended (`b`)
+- Closed months are fetched once and cached on disk per profile: instant on restart, works offline
+- Scroll left past the oldest column to load older history, up to the Cost Explorer 13-month horizon
+- Works in demo mode (`a9s --demo`, then `:costs`) with a planted cost-spike story you can trace end to end
 
 ## Installation
 

@@ -8,6 +8,7 @@ Press `:` to enter command mode, then type a command:
 | `:theme` | Switch color theme |
 | `:help` | Show help |
 | `:root` / `:main` | Go to main menu |
+| `:costs` / `:ce` | Open the Cost Explorer |
 | `:<resource>` | Jump to resource type (e.g., `:ec2`, `:s3`, `:lambda`) |
 
 All resource short names work as commands.

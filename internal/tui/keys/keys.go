@@ -68,6 +68,12 @@ type Map struct {
 
 	// Error log
 	ErrorLog key.Binding
+
+	// Cost Explorer screen
+	CostZoomIn  key.Binding
+	CostZoomOut key.Binding
+	CostMetric  key.Binding
+	CostPivot   [10]key.Binding // 1-9,0 → pivot dimension / reset
 }
 
 // Default returns the canonical key bindings.
@@ -134,5 +140,22 @@ func Default() Map {
 		SearchPrev: key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "prev match")),
 
 		ErrorLog: key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "error log")),
+
+		CostZoomIn:  key.NewBinding(key.WithKeys("+", "="), key.WithHelp("+/=", "zoom in")),
+		CostZoomOut: key.NewBinding(key.WithKeys("-", "_"), key.WithHelp("-/_", "zoom out")),
+		CostMetric:  key.NewBinding(key.WithKeys("b"), key.WithHelp("b", "metric")),
+
+		CostPivot: [10]key.Binding{
+			key.NewBinding(key.WithKeys("1"), key.WithHelp("1", "pivot service")),
+			key.NewBinding(key.WithKeys("2"), key.WithHelp("2", "pivot region")),
+			key.NewBinding(key.WithKeys("3"), key.WithHelp("3", "pivot account")),
+			key.NewBinding(key.WithKeys("4"), key.WithHelp("4", "pivot usage type")),
+			key.NewBinding(key.WithKeys("5"), key.WithHelp("5", "pivot purchase type")),
+			key.NewBinding(key.WithKeys("6"), key.WithHelp("6", "pivot record type")),
+			key.NewBinding(key.WithKeys("7"), key.WithHelp("7", "reserved")),
+			key.NewBinding(key.WithKeys("8"), key.WithHelp("8", "reserved")),
+			key.NewBinding(key.WithKeys("9"), key.WithHelp("9", "reserved")),
+			key.NewBinding(key.WithKeys("0"), key.WithHelp("0", "reset to default view")),
+		},
 	}
 }

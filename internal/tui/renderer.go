@@ -41,6 +41,7 @@ const (
 	rsKindSelector        // profile / region / theme selector
 	rsKindHelp            // help overlay
 	rsKindIdentity        // identity overlay
+	rsKindCosts           // Cost Explorer grid
 )
 
 // rendererState is per-stack-entry renderer state. One rendererState is pushed
@@ -103,6 +104,13 @@ type rendererState struct {
 	// every rsKind pushes a matching controller screen (help/identity/error-log
 	// included) — see docs/architecture.md "the controller stack is authoritative".
 	ctrlBacked bool
+
+	// costsViewportCols is the value View() last passed to
+	// Controller.SetCostsViewportCols for a rsKindCosts screen — zero means
+	// never set. Compared before every call so an unchanged terminal width
+	// (the overwhelming majority of renders) skips the controller's write
+	// lock entirely instead of taking it just to write back the same value.
+	costsViewportCols int
 }
 
 // newMenuRS returns a fresh rendererState for the main-menu screen.
@@ -166,6 +174,13 @@ func newSelectorRS(onSelect func(string) tea.Msg) *rendererState {
 // Snapshot-derived context cannot distinguish from ScreenID alone.
 func newHelpRS(ctx views.HelpContext, shortName string) *rendererState {
 	return &rendererState{kind: rsKindHelp, helpContext: ctx, helpShortName: shortName, ctrlBacked: true}
+}
+
+// newCostsRS returns a fresh rendererState for the Cost Explorer screen.
+// ctrlBacked=true: the caller pushes runtime.ScreenCosts onto the
+// controller and seeds it via m.ctrl.EnsureCostsState before calling this.
+func newCostsRS() *rendererState {
+	return &rendererState{kind: rsKindCosts, ctrlBacked: true, helpContext: views.HelpFromCosts}
 }
 
 // newIdentityRS returns a fresh rendererState for the identity overlay.
@@ -292,6 +307,14 @@ func renderHelp(rs *rendererState) string {
 	m := views.NewHelpWithResource(keys.Default(), rs.helpContext, rs.helpShortName)
 	m.SetSize(rs.width, rs.height)
 	return m.View()
+}
+
+// renderCosts renders the Cost Explorer screen from the controller CostsBody.
+func renderCosts(body *app.CostsBody, rs *rendererState) string {
+	if body == nil {
+		return ""
+	}
+	return views.RenderCosts(*body, rs.width, rs.height)
 }
 
 // renderIdentity renders the identity overlay from adapter-owned rs fields.

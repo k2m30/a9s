@@ -296,6 +296,53 @@ func CleanupPaginatedForTest(shortName string) {
 	delete(paginatedRegistry, shortName)
 }
 
+// AvailabilityFetcher is a cheap, probe-only alternative to a resource
+// type's full PaginatedFetcher — same shape, used by
+// Core.ProbeResourceAvailability when a type's availability/count signal is
+// materially cheaper to compute than its real list content. Types with no
+// registered AvailabilityFetcher fall back to their ordinary
+// PaginatedFetcher, unchanged.
+type AvailabilityFetcher = PaginatedFetcher
+
+// availabilityRegistry maps resource short names to their TEST-ONLY
+// availability-fetcher overrides. Deliberately separate from
+// catalog.ResourceTypeDef.AvailabilityFetcher (the permanent production
+// registration) — a flat single map would let CleanupAvailabilityFetcherForTest
+// delete a real production registration a test never set, the same
+// legacy-first split GetPaginatedFetcher/paginatedRegistry already uses for
+// exactly this reason.
+var availabilityRegistry = map[string]AvailabilityFetcher{}
+
+// SetAvailabilityFetcherForTest registers f as the availability fetcher for
+// shortName, for the duration of a test only.
+func SetAvailabilityFetcherForTest(shortName string, f AvailabilityFetcher) {
+	availabilityRegistry[shortName] = f
+}
+
+// GetAvailabilityFetcher returns the availability fetcher for shortName, or
+// nil when none is registered — callers (Core.ProbeResourceAvailability)
+// fall back to GetPaginatedFetcher in that case. Legacy-first: the runtime
+// test-override map wins so SetAvailabilityFetcherForTest takes effect;
+// catalog.ResourceTypeDef.AvailabilityFetcher (the permanent production
+// registration, e.g. internal/aws/catalog_security.go's "policy" entry) is
+// the read-only fallback.
+func GetAvailabilityFetcher(shortName string) AvailabilityFetcher {
+	if fn, ok := availabilityRegistry[shortName]; ok {
+		return fn
+	}
+	if ct := catalog.Find(shortName); ct != nil && ct.AvailabilityFetcher != nil {
+		return ct.AvailabilityFetcher
+	}
+	return nil
+}
+
+// CleanupAvailabilityFetcherForTest removes a TEST-ONLY availability
+// fetcher override. Used only in tests for cleanup — never touches a
+// permanent catalog.ResourceTypeDef.AvailabilityFetcher registration.
+func CleanupAvailabilityFetcherForTest(shortName string) {
+	delete(availabilityRegistry, shortName)
+}
+
 // SetPaginatedChildForTest adds a paginated child fetcher for the given short name.
 // Called from init() in each aws/*.go file for child resources that support pagination.
 func SetPaginatedChildForTest(shortName string, f PaginatedChildFetcher) {

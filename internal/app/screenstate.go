@@ -23,6 +23,7 @@ type ScreenState struct {
 	Text     *TextState     `json:"text,omitempty"`
 	Menu     *MenuState     `json:"menu,omitempty"`
 	Selector *SelectorState `json:"selector,omitempty"`
+	Costs    *CostsState    `json:"costs,omitempty"`
 }
 
 // ListState holds the mutable display state for a resource-list screen.

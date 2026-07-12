@@ -255,6 +255,92 @@ var namedExtras = map[string]instExtras{
 			{GroupId: aws.String(fixtStagingDefaultSGID), GroupName: aws.String("staging-default-sg")},
 		},
 	},
+	// ASG-owned instances (asg.go's asg-underprovisioned/-suspended/
+	// -unhealthy-instance/-scaling-failed Instances[] lists) — required for
+	// the ec2->asg related-panel pivot (checkEC2ASG matches by InstanceId
+	// against each ASG's own Instances[] list, so the graph edge is real
+	// once these instances exist) and for qa_demo_related_ids_resolve_test.go's
+	// asg:ec2 witness resolution. AZ/subnet mirror the owning ASG's own
+	// VPCZoneIdentifier (asgSubnetA==fixtProdPublicSubnetA/us-east-1a,
+	// asgSubnetB==fixtProdPublicSubnetB/us-east-1b); AMI/keypair/SG mirror
+	// the same acme-prod profile every other prod worker instance in this
+	// file uses.
+	"i-0aaa111111111111a": { // asg-underprovisioned, api-worker-01
+		imageID: fixtProdAMIID1, keyName: "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String(fixtProdAPIInternalSGID), GroupName: aws.String("acme-web-app-sg")},
+		},
+	},
+	"i-0bbb222222222222b": { // asg-underprovisioned, api-worker-02
+		imageID: fixtProdAMIID1, keyName: "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1b",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String(fixtProdAPIInternalSGID), GroupName: aws.String("acme-web-app-sg")},
+		},
+	},
+	"i-0ccc333333333333c": { // asg-suspended, batch-processor-01
+		imageID: fixtProdAMIID1, keyName: "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String(fixtProdRDSSGID), GroupName: aws.String("acme-worker-sg")},
+		},
+	},
+	"i-0ddd444444444444d": { // asg-suspended, batch-processor-02
+		imageID: fixtProdAMIID1, keyName: "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String(fixtProdRDSSGID), GroupName: aws.String("acme-worker-sg")},
+		},
+	},
+	"i-0eee555555555555e": { // asg-unhealthy-instance, web-worker-01 (Healthy)
+		imageID: fixtProdAMIID1, keyName: "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String(fixtProdWebALBSGID), GroupName: aws.String("acme-web-alb-sg")},
+		},
+	},
+	"i-0fff666666666666f": { // asg-unhealthy-instance, web-worker-02 (Healthy)
+		imageID: fixtProdAMIID1, keyName: "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1b",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String(fixtProdWebALBSGID), GroupName: aws.String("acme-web-alb-sg")},
+		},
+	},
+	"i-0aaa777777777777a": { // asg-unhealthy-instance, web-worker-03 (Unhealthy — failed health check, still running)
+		imageID: fixtProdAMIID1, keyName: "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String(fixtProdWebALBSGID), GroupName: aws.String("acme-web-alb-sg")},
+		},
+	},
+	"i-0bbb888888888888b": { // asg-scaling-failed, payments-worker-01
+		imageID: fixtProdAMIID1, keyName: "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String(fixtProdRDSSGID), GroupName: aws.String("acme-worker-sg")},
+		},
+	},
+	"i-0ccc999999999999c": { // asg-scaling-failed, payments-worker-02
+		imageID: fixtProdAMIID1, keyName: "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1b",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String(fixtProdRDSSGID), GroupName: aws.String("acme-worker-sg")},
+		},
+	},
+	// ECS EC2-launch-type container host — ecs.go's acme-batch cluster's
+	// batch-etl-runner task carries this exact ContainerInstanceArn suffix
+	// as its surfaced ecs-task->ec2 link (checkECSTaskEC2's own doc comment:
+	// "the backing EC2 instance ID is not in this ARN... return the
+	// container-instance UUID as a surfaced link" — mirrors the real API's
+	// own limitation, not a fixture bug).
+	"e1f2a3b4c5d6e1f2a3b4c5d6": { // acme-batch cluster, batch-etl-host-01
+		imageID: fixtProdAMIID1, keyName: "acme-prod-keypair",
+		architecture: ec2types.ArchitectureValuesX8664, az: "us-east-1a",
+		securityGroups: []ec2types.GroupIdentifier{
+			{GroupId: aws.String(fixtProdRDSSGID), GroupName: aws.String("acme-worker-sg")},
+		},
+	},
 }
 
 func defaultExtras(instanceID string) instExtras {
@@ -437,6 +523,14 @@ func makeInstance(
 			Message: aws.String("Server.SpotInstanceShutdown: The instance was stopped because the Spot Instance was interrupted."),
 		}
 	}
+	// aws:ecs:cluster-name tag — this is the acme-batch cluster's own
+	// EC2-launch-type container host (ecs.go's batch-etl-runner task
+	// carries this exact instance ID as its ContainerInstanceArn suffix).
+	if instanceID == "e1f2a3b4c5d6e1f2a3b4c5d6" {
+		inst.Tags = append(inst.Tags,
+			ec2types.Tag{Key: aws.String("aws:ecs:cluster-name"), Value: aws.String("acme-batch")},
+		)
+	}
 	if publicIP != "" {
 		inst.PublicIpAddress = aws.String(publicIP)
 	}
@@ -483,8 +577,33 @@ func buildReservations() []ec2types.Reservation {
 		{"i-0a1b2c3d4e5f60008", "ml-trainer-gpu", "stopping", ec2types.InstanceTypeG4dnXlarge, "10.0.5.30", "", fixtProdVPCID, fixtStagingSubnetA, time.Date(2026, 2, 14, 22, 0, 0, 0, time.UTC), ec2types.InstanceLifecycleTypeSpot},
 		{"i-0a1b2c3d4e5f60009", "temp-load-test", "shutting-down", ec2types.InstanceTypeC5Large, "10.0.3.55", "", fixtProdVPCID, fixtProdPrivateSubnetA, time.Date(2026, 3, 20, 16, 30, 0, 0, time.UTC), ""},
 		{"i-0a1b2c3d4e5f60010", "old-migration-worker", "terminated", ec2types.InstanceTypeT3Small, "", "", fixtProdVPCID, fixtProdPublicSubnetB, time.Date(2025, 8, 1, 12, 0, 0, 0, time.UTC), ""},
+		// ASG-owned instances (see the matching namedExtras block above for
+		// the graph-connection rationale) — AZ/subnet mirror the owning
+		// ASG's VPCZoneIdentifier, launch time follows shortly after the
+		// ASG's own CreatedTime, state/lifecycle mirror the ASG's
+		// HealthStatus/LifecycleState (all InService -> "running").
+		{"i-0aaa111111111111a", "api-worker-01", "running", ec2types.InstanceTypeM5Large, "10.0.10.10", "", fixtProdVPCID, fixtProdPublicSubnetA, time.Date(2025, 6, 1, 10, 5, 0, 0, time.UTC), ""},
+		{"i-0bbb222222222222b", "api-worker-02", "running", ec2types.InstanceTypeM5Large, "10.0.10.11", "", fixtProdVPCID, fixtProdPublicSubnetB, time.Date(2025, 6, 1, 10, 6, 0, 0, time.UTC), ""},
+		{"i-0ccc333333333333c", "batch-processor-01", "running", ec2types.InstanceTypeC5Large, "10.0.10.20", "", fixtProdVPCID, fixtProdPublicSubnetA, time.Date(2025, 4, 20, 8, 5, 0, 0, time.UTC), ""},
+		{"i-0ddd444444444444d", "batch-processor-02", "running", ec2types.InstanceTypeC5Large, "10.0.10.21", "", fixtProdVPCID, fixtProdPublicSubnetA, time.Date(2025, 4, 20, 8, 6, 0, 0, time.UTC), ""},
+		{"i-0eee555555555555e", "web-worker-01", "running", ec2types.InstanceTypeT3Large, "10.0.10.30", "", fixtProdVPCID, fixtProdPublicSubnetA, time.Date(2025, 5, 12, 8, 5, 0, 0, time.UTC), ""},
+		{"i-0fff666666666666f", "web-worker-02", "running", ec2types.InstanceTypeT3Large, "10.0.10.31", "", fixtProdVPCID, fixtProdPublicSubnetB, time.Date(2025, 5, 12, 8, 6, 0, 0, time.UTC), ""},
+		{"i-0aaa777777777777a", "web-worker-03", "running", ec2types.InstanceTypeT3Large, "10.0.10.32", "", fixtProdVPCID, fixtProdPublicSubnetA, time.Date(2025, 5, 12, 8, 7, 0, 0, time.UTC), ""},
+		{"i-0bbb888888888888b", "payments-worker-01", "running", ec2types.InstanceTypeC5Xlarge, "10.0.10.40", "", fixtProdVPCID, fixtProdPublicSubnetA, time.Date(2025, 7, 1, 8, 5, 0, 0, time.UTC), ""},
+		{"i-0ccc999999999999c", "payments-worker-02", "running", ec2types.InstanceTypeC5Xlarge, "10.0.10.41", "", fixtProdVPCID, fixtProdPublicSubnetB, time.Date(2025, 7, 1, 8, 6, 0, 0, time.UTC), ""},
+		// ECS EC2-launch-type container host (acme-batch cluster) — see the
+		// matching namedExtras entry above for the ContainerInstanceArn
+		// graph-connection rationale.
+		{"e1f2a3b4c5d6e1f2a3b4c5d6", "batch-etl-host-01", "running", ec2types.InstanceTypeM5Large, "10.0.10.50", "", fixtProdVPCID, fixtProdPrivateSubnetA, time.Date(2026, 3, 15, 6, 0, 0, 0, time.UTC), ""},
 		{"i-0a1b2c3d4e5f60030", "dev-sandbox-01", "stopped", ec2types.InstanceTypeT3Medium, "10.1.0.20", "", fixtStagingVPCID, fixtStagingSubnetA, time.Date(2025, 10, 12, 7, 0, 0, 0, time.UTC), ""},
 		{"i-0a1b2c3d4e5f60031", "dev-sandbox-02", "stopped", ec2types.InstanceTypeT3Small, "10.1.0.21", "", fixtStagingVPCID, fixtStagingSubnetB, time.Date(2025, 10, 12, 7, 5, 0, 0, time.UTC), ""},
+		// GPU inference fleet — the Cost Explorer growth story's resource-drill
+		// target (costs.go's CostsGrowthService/CostsGrowthUsageType,
+		// CostsResourceRowsByService): a g5.xlarge fleet scaled up around
+		// CostsGrowthMonth and stayed running.
+		{"i-0a1b2c3d4e5f60040", "ml-inference-01", "running", ec2types.InstanceTypeG5Xlarge, "10.0.6.10", "", fixtProdVPCID, fixtProdPrivateSubnetA, time.Date(2026, 1, 10, 9, 0, 0, 0, time.UTC), ""},
+		{"i-0a1b2c3d4e5f60041", "ml-inference-02", "running", ec2types.InstanceTypeG5Xlarge, "10.0.6.11", "", fixtProdVPCID, fixtProdPrivateSubnetA, time.Date(2026, 1, 12, 9, 0, 0, 0, time.UTC), ""},
+		{"i-0a1b2c3d4e5f60042", "ml-inference-03", "running", ec2types.InstanceTypeG5Xlarge, "10.0.6.12", "", fixtProdVPCID, fixtProdPrivateSubnetA, time.Date(2026, 2, 1, 9, 0, 0, 0, time.UTC), ""},
 	}
 
 	var reservations []ec2types.Reservation

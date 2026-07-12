@@ -142,6 +142,23 @@
     // Page scroll
     { key: "PageUp",     action: { kind: "page-up",   n: 20 } },
     { key: "PageDown",   action: { kind: "page-down", n: 20 } },
+
+    // Cost Explorer
+    { key: "b",          action: { kind: "cost-metric" } },
+    { key: "+",          action: { kind: "cost-zoom-in" } },
+    { key: "=",          action: { kind: "cost-zoom-in" } },
+    { key: "-",          action: { kind: "cost-zoom-out" } },
+    { key: "_",          action: { kind: "cost-zoom-out" } },
+    { key: "0",          action: { kind: "cost-pivot", n: 0 } },
+    { key: "1",          action: { kind: "cost-pivot", n: 1 } },
+    { key: "2",          action: { kind: "cost-pivot", n: 2 } },
+    { key: "3",          action: { kind: "cost-pivot", n: 3 } },
+    { key: "4",          action: { kind: "cost-pivot", n: 4 } },
+    { key: "5",          action: { kind: "cost-pivot", n: 5 } },
+    { key: "6",          action: { kind: "cost-pivot", n: 6 } },
+    { key: "7",          action: { kind: "cost-pivot", n: 7 } },
+    { key: "8",          action: { kind: "cost-pivot", n: 8 } },
+    { key: "9",          action: { kind: "cost-pivot", n: 9 } },
   ];
 
   // filterInput holds state for the / filter input.

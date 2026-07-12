@@ -165,6 +165,12 @@ func (c *Controller) handleActionLoadMore(_ Action) (ViewState, []runtime.TaskRe
 
 // handleActionRefresh handles ActionRefresh.
 func (c *Controller) handleActionRefresh(_ Action) (ViewState, []runtime.TaskRequest) {
+	// Cost Explorer: force-refetch only the active shape's open period;
+	// closed periods are refetched only if genuinely absent from the store.
+	if cs := c.topCostsState(); cs != nil {
+		tasks := c.forceRefreshCostsLocked()
+		return c.snapshot(), tasks
+	}
 	// Detail view: re-dispatch enrich + related.
 	if ds := c.topDetailState(); ds != nil {
 		rt := ds.ResourceType
@@ -198,7 +204,8 @@ func (c *Controller) handleActionRefresh(_ Action) (ViewState, []runtime.TaskReq
 			ls.Rows = nil
 		}
 		ls.LastFetchError = ""
-		return c.snapshot(), c.activeListRefreshTasks()
+		tasks := c.activeListRefreshTasks()
+		return c.snapshot(), tasks
 	}
 	return c.snapshot(), nil
 }

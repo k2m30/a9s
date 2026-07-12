@@ -16,6 +16,7 @@ const (
 	TargetRegion
 	TargetTheme
 	TargetHelp
+	TargetCosts
 )
 
 // Navigate requests a view transition. The adapter handles push/pop.

@@ -66,6 +66,11 @@ func (c *Controller) snapshot() ViewState {
 	if top.ID == runtime.ScreenIdentity {
 		vs.Body.Identity = c.buildIdentityBody()
 	}
+	if top.State.Costs != nil {
+		vs.Body.Costs = buildCostsBody(top.State.Costs)
+		vs.FrameTitle = costsFrameTitle(vs.Body.Costs)
+		vs.Footer = CostsFooterHintsFor(c.uiMode)
+	}
 	return vs
 }
 
@@ -104,6 +109,8 @@ func bodyKindForScreen(s Screen) BodyKind {
 		return BodyKindHelp
 	case runtime.ScreenIdentity:
 		return BodyKindIdentity
+	case runtime.ScreenCosts:
+		return BodyKindCosts
 	default:
 		// Capability screens and future IDs not yet enumerated here.
 		return BodyKindUnknown
@@ -129,6 +136,8 @@ func helpContextName(ctx domain.HelpContext) string {
 		return "selector"
 	case domain.HelpFromReveal:
 		return "reveal"
+	case domain.HelpFromCosts:
+		return "costs"
 	default:
 		return "main-menu"
 	}
@@ -153,6 +162,8 @@ func helpContextForScreen(id runtime.ScreenID) domain.HelpContext {
 		return domain.HelpFromSelector
 	case runtime.ScreenReveal:
 		return domain.HelpFromReveal
+	case runtime.ScreenCosts:
+		return domain.HelpFromCosts
 	default:
 		return domain.HelpFromMainMenu
 	}

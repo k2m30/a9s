@@ -23,9 +23,12 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
+	"sync"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/cache"
+	"github.com/k2m30/a9s/v3/internal/costs"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -421,20 +424,103 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		fn := resource.GetFetchByIDs(p.TargetType)
 		if fn == nil {
-			return messages.Flash{Text: fmt.Sprintf("no by-id fetcher for %s", p.TargetType), IsError: true}, nil
+			return messages.ByIDFetchFailed{TargetType: p.TargetType, ID: p.ID, Reason: fmt.Sprintf("no by-id fetcher for %s", p.TargetType)}, nil
 		}
 		res, err := fn(ctx, snap.Clients, []string{p.ID})
 		if err != nil {
-			return messages.Flash{Text: err.Error(), IsError: true}, nil
+			return messages.ByIDFetchFailed{TargetType: p.TargetType, ID: p.ID, Reason: err.Error()}, nil
 		}
 		if len(res) == 0 {
-			return messages.Flash{Text: fmt.Sprintf("%s %s not found", p.TargetType, p.ID), IsError: true}, nil
+			return messages.ByIDFetchFailed{TargetType: p.TargetType, ID: p.ID, Reason: fmt.Sprintf("%s %s not found", p.TargetType, p.ID)}, nil
 		}
 		gen := snap.AvailabilityGen
 		return messages.ResourcesLoaded{
 			ResourceType: p.TargetType,
 			Resources:    res,
 			Gen:          gen,
+		}, nil
+
+	// --- fetch costs (Cost Explorer) ---
+	case KindFetchCosts:
+		p, ok := req.Payload.(FetchCostsPayload)
+		if !ok {
+			return nil, fmt.Errorf("ExecuteTask %s: missing FetchCostsPayload", req.Key.Kind)
+		}
+		if snap.Clients == nil || snap.Clients.CostExplorer == nil {
+			return messages.CostsLoaded{
+				Query:  p.Query,
+				Window: p.Window,
+				Err:    fmt.Errorf("cost explorer: no client configured for this session"),
+				Gen:    snap.ConnectGen,
+			}, nil
+		}
+		// The grid query and the anomaly overlay (FR-014) depend only on the
+		// payload, never on each other's result — they run concurrently
+		// rather than back to back. Joined below: the grid's own error wins
+		// (Err), an anomaly-fetch failure degrades to no marks rather than
+		// failing the grid data it accompanies. Each half is independently
+		// skippable — SkipAnomalies when the store's cached anomaly snapshot
+		// is still within its TTL, SkipGrid when the grid shape is already
+		// fully covered and only the anomaly slot needs refreshing (X3,
+		// screen.FetchPlan's two independent booleans) — so neither a
+		// grid-only nor an anomalies-only dispatch ever bills for the half
+		// it doesn't need. Each half's own request count folds into
+		// Requests: a separate billed CE call, not free.
+		var (
+			result          awsclient.CostFetchResult
+			err             error
+			anomalies       []costs.AnomalyMark
+			anomalyRequests int
+			wg              sync.WaitGroup
+		)
+		if !p.SkipGrid {
+			wg.Go(func() {
+				if slices.Contains(p.Query.GroupBy, costs.DimensionResourceID) {
+					// GetCostAndUsageWithResources requires the query to isolate
+					// exactly one SERVICE — the drill query that reaches
+					// RESOURCE_ID always pins it (costs.ResourceDrillAllowed
+					// gates the drill before this dispatch exists), so a
+					// missing pin here means the gate was bypassed: fail loud
+					// rather than silently falling back to the plain,
+					// unfiltered call.
+					if len(p.Query.Filter.Equals[costs.DimensionService]) != 1 {
+						err = awsclient.ErrCostsResourceDrillMissingServiceFilter
+					} else {
+						result, err = awsclient.FetchCostAndUsageWithResources(ctx, snap.Clients.CostExplorer, p.Query)
+					}
+				} else {
+					result, err = awsclient.FetchCostAndUsage(ctx, snap.Clients.CostExplorer, p.Query)
+				}
+			})
+		}
+		if !p.SkipAnomalies {
+			wg.Go(func() {
+				marks, n, aErr := awsclient.FetchCostAnomaliesCounted(ctx, snap.Clients.CostExplorer, p.Query.Range)
+				anomalyRequests = n
+				if aErr == nil {
+					// A genuinely successful fetch that found zero anomalies
+					// still returns a NON-NIL slice — messages.CostsLoaded's
+					// Anomalies field carries no separate "was this actually
+					// requested" flag, so ApplyCostsLoaded's own discriminator
+					// (ev.Anomalies != nil) must never see the same nil value
+					// a skipped/errored fetch also leaves it at.
+					if marks == nil {
+						marks = []costs.AnomalyMark{}
+					}
+					anomalies = marks
+				}
+			})
+		}
+		wg.Wait()
+		return messages.CostsLoaded{
+			Query:     p.Query,
+			Window:    p.Window,
+			Grid:      costs.GridResult{Fetched: !p.SkipGrid, Records: result.Records, Err: err},
+			Attrs:     result.Attrs,
+			Anomalies: anomalies,
+			Requests:  result.RequestCount + anomalyRequests,
+			Err:       err,
+			Gen:       snap.ConnectGen,
 		}, nil
 
 	// --- adapter-only kinds ---

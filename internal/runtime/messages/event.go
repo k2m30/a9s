@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"github.com/k2m30/a9s/v3/internal/costs"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -60,6 +61,21 @@ type Flash struct {
 }
 
 func (Flash) isEvent() {}
+
+// ByIDFetchFailed is the typed outcome of a by-ID resource fetch (the TUI's
+// fetchByIDDetail adapter) that found nothing or errored — TargetType/ID
+// name exactly which fetch failed, so a consumer holding a placeholder for
+// that same (TargetType, ID) can act on it unambiguously, never by sniffing
+// an unrelated error Flash that happens to arrive while a placeholder is on
+// screen (S3: the msg.IsError + GetListAutoOpenSingle heuristic it replaces
+// could not tell "my own fetch failed" from "something else failed").
+type ByIDFetchFailed struct {
+	TargetType string
+	ID         string
+	Reason     string
+}
+
+func (ByIDFetchFailed) isEvent() {}
 
 // ClearFlash is sent after the flash auto-clear timer expires.
 type ClearFlash struct {
@@ -320,6 +336,43 @@ func (EnrichDetailResult) isEvent()               {}
 func (m EnrichDetailResult) GenStamp() domain.Gen { return m.Generation }
 func (EnrichDetailResult) GenAspect() Aspect      { return AspectEnrichDetail }
 func (EnrichDetailResult) AcceptZeroGen() bool    { return true }
+
+// CostsLoaded delivers one Cost Explorer fetch result: the query shape that
+// was fetched, the mapped grid/attrs/anomalies, and the request count for
+// the session $-counter (FR-013 — counted even when Err is set).
+type CostsLoaded struct {
+	Query costs.Query
+	// Grid carries the grid (GetCostAndUsage[WithResources]) fetch's own
+	// outcome — Fetched/Records/Err — the ONE home for grid data on this
+	// event; ApplyCostsLoaded reads Grid.Fetched/Grid.Records exclusively,
+	// never a bare top-level Records field whose nil-ness alone cannot
+	// distinguish "skipped" from "CE confirmed zero groups" (symmetric with
+	// Anomalies below via AnomalyResult's own Requested convention).
+	Grid  costs.GridResult
+	Attrs map[string]string
+	// Window is the exact visible-window periods Query.Range was built to
+	// cover (FetchCostsPayload.Window, threaded through unchanged) —
+	// ApplyCostsLoaded stamps Store.MergeCoverage against this, not against
+	// whichever periods Grid.Records happens to mention, so a period CE
+	// genuinely returned zero groups for (R2) is remembered as covered.
+	Window    []costs.Period
+	Anomalies []costs.AnomalyMark
+	Requests  int
+	Err       error
+	// Gen is the session ConnectGen captured at dispatch time. A stale
+	// CostsLoaded (a fetch dispatched under a prior profile/region) is
+	// dropped by the same IsStale guard every other ConnectGen-stamped
+	// event uses — CostsState is per-screen but the Store it merges into
+	// is loaded per-profile, so an in-flight fetch surviving a profile
+	// switch must never merge into the new profile's cache. Zero is never
+	// stale (AcceptZeroGen=true).
+	Gen domain.Gen
+}
+
+func (CostsLoaded) isEvent()               {}
+func (m CostsLoaded) GenStamp() domain.Gen { return m.Gen }
+func (CostsLoaded) GenAspect() Aspect      { return AspectConnect }
+func (CostsLoaded) AcceptZeroGen() bool    { return true }
 
 // ThemeFileRead delivers the bytes of a theme YAML file read from disk
 // in response to a TaskKindReadThemeFile dispatch. Theme is the theme

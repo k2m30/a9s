@@ -5,6 +5,60 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.48.0] - 2026-07-12
+
+### Added
+
+- Cost Explorer (`:costs` / `:ce`, `-c costs`, or the main-menu entry): a
+  spend grid — services (or region / account / usage type / purchase option /
+  charge category pivots via `1`-`6`) in rows, periods in columns, the
+  invoice-mode amount in cells so column totals match the AWS invoice.
+  `+`/`-` zoom between years, months, weeks, and days anchored at the
+  cursor; `b` cycles cost metrics; Enter drills a cell down to usage types
+  and (last 14 days, EC2) individual instances, and once more into the
+  standard resource detail view. Cost anomalies mark their cells with the
+  root cause and dollar impact in the footer; cells color by
+  period-over-period change with a neutral band so spikes stand out from
+  noise. Closed months are fetched once and cached on disk per profile
+  (surviving restarts and rendering offline); only the current month
+  refreshes, and `Ctrl+R` forces it. Available in the web UI with the same
+  keys. Demo mode ships a planted growth story end to end.
+- EC2 instances resolve by ID (`FetchByIDs`), so exact-ID drills from the
+  related panel and the Cost Explorer land on the instance detail directly.
+- IAM policy availability probes on group-heavy accounts no longer time out:
+  the probe counts managed policies only, the inline group-policy sweep runs
+  with bounded parallelism, and partial-failure logs summarize instead of
+  enumerating every group.
+
+### Changed
+
+- Cost-screen decisions live in an explicit domain state machine
+  (`internal/costs/screen`): fetch planning, drill transitions, window
+  construction, and the computed view are pure functions with typed
+  outcomes; fetch results carry their own authority (a skipped fetch can
+  never masquerade as authoritative data), and money keeps its currency
+  unit until a total is proven single-currency — mixed-currency grids
+  suppress the total with an explanation instead of summing units.
+- Failed by-ID drills travel as one typed message in both the terminal
+  and web lanes; the placeholder pops only on an exact target match
+  (previously any error while an empty list was on top could navigate
+  the user away).
+- Region-less charges ("NoRegion") drill correctly: Cost Explorer
+  filters them by empty string while reporting them as "NoRegion" — the
+  translation now happens at one seam, and a drill whose finer
+  granularity has no records falls back once to the parent granularity
+  instead of rendering silent zeros.
+
+### Fixed
+
+- A cost delivery landing during a background cache save could crash the
+  process (concurrent map access) — the store now owns its own lock.
+- `--no-cache` and demo sessions keep the cost cache in memory only.
+- Cost rows rank by the visible window; day-level drills cover exactly
+  the selected day; year drills cover the selected year's months;
+  drilling before AWS connect completes recovers automatically when
+  clients arrive.
+
 ## [3.47.0] - 2026-07-10
 
 ### Added
