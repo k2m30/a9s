@@ -103,8 +103,8 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 			Fields: map[string]string{
 				"domain_name":     domainName,
 				"certificate_arn": certARN,
-				"status":          status,
-				"type":            certType,
+				"status":          domain.HumanizeStatusPhrase(status),
+				"type":            domain.HumanizeStatusPhrase(certType),
 				"not_after":       notAfter,
 				"in_use":          inUse,
 				"days_left":       daysLeft,

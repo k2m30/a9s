@@ -11,6 +11,7 @@ list:
   Type:
     path: Type
     width: 14
+    humanize: true
   Expires:
     path: NotAfter
     width: 22

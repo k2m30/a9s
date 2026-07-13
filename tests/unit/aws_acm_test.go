@@ -11,6 +11,7 @@ import (
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -78,23 +79,52 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	if r0.Name != "api.example.com" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "api.example.com", r0.Name)
 	}
-	if r0.Fields["status"] != "ISSUED" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "ISSUED", r0.Fields["status"])
+	// status/type are rendered raw in the acm list's cells — both must go
+	// through the shared humanize seam (domain.HumanizeStatusPhrase) into a
+	// lowercase phrase, matching how the status field is already humanized
+	// elsewhere; the humanize doctrine forbids a raw UPPER_SNAKE enum in any
+	// rendered cell (live smoke caught "AMAZON_ISSUED" leaking through the
+	// unhumanized type field).
+	if r0.Fields["status"] != "issued" {
+		t.Errorf("resource[0].Status: expected %q, got %q", "issued", r0.Fields["status"])
 	}
 	if r0.Fields["domain_name"] != "api.example.com" {
 		t.Errorf("resource[0].Fields[\"domain_name\"]: expected %q, got %q", "api.example.com", r0.Fields["domain_name"])
 	}
-	if r0.Fields["status"] != "ISSUED" {
-		t.Errorf("resource[0].Fields[\"status\"]: expected %q, got %q", "ISSUED", r0.Fields["status"])
+	if r0.Fields["status"] != "issued" {
+		t.Errorf("resource[0].Fields[\"status\"]: expected %q, got %q", "issued", r0.Fields["status"])
 	}
-	if r0.Fields["type"] != "AMAZON_ISSUED" {
-		t.Errorf("resource[0].Fields[\"type\"]: expected %q, got %q", "AMAZON_ISSUED", r0.Fields["type"])
+	if r0.Fields["type"] != "amazon issued" {
+		t.Errorf("resource[0].Fields[\"type\"]: expected %q, got %q", "amazon issued", r0.Fields["type"])
 	}
 	if r0.Fields["not_after"] == "" {
 		t.Error("resource[0].Fields[\"not_after\"] should not be empty")
 	}
 	if r0.Fields["in_use"] != "true" {
 		t.Errorf("resource[0].Fields[\"in_use\"]: expected %q, got %q", "true", r0.Fields["in_use"])
+	}
+	// ISSUED carries no wave1 Finding (EnrichACMCertificate's wave2 findings
+	// own its expiry/orphan signal instead, acm.go:151's own doc comment) —
+	// pin that humanizing Fields["status"] never causes a stray Finding.
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: expected none for ISSUED, got %v", r0.Findings)
+	}
+	// acmColor reads Fields["status"] directly for the ISSUED case (the only
+	// status with no Finding to short-circuit through colorFromAnyFinding) —
+	// humanizing the stamped field must not break that fallback. This
+	// fixture's notAfter (2026-06-15) is already in the past, so a correctly
+	// reconciled acmColor must still reach the ISSUED branch's "expired"
+	// sub-case (ColorBroken) — an unreconciled colorer that no longer
+	// matches the humanized "issued" value falls through to its unmatched-
+	// status default, which is ALSO ColorHealthy-shaped for other cases but
+	// diverges from ColorBroken here, so this assertion actually
+	// discriminates instead of accidentally passing either way.
+	acmType := resource.FindResourceType("acm")
+	if acmType == nil {
+		t.Fatal("acm type not registered")
+	}
+	if got := acmType.Color(r0); got != resource.ColorBroken {
+		t.Errorf("acm type.Color(resource[0]) = %v, want %v (issued, expired)", got, resource.ColorBroken)
 	}
 
 	// Verify second certificate
@@ -105,14 +135,28 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	if r1.Name != "staging.example.com" {
 		t.Errorf("resource[1].Name: expected %q, got %q", "staging.example.com", r1.Name)
 	}
-	if r1.Fields["status"] != "PENDING_VALIDATION" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "PENDING_VALIDATION", r1.Fields["status"])
+	if r1.Fields["status"] != "pending validation" {
+		t.Errorf("resource[1].Status: expected %q, got %q", "pending validation", r1.Fields["status"])
 	}
-	if r1.Fields["type"] != "IMPORTED" {
-		t.Errorf("resource[1].Fields[\"type\"]: expected %q, got %q", "IMPORTED", r1.Fields["type"])
+	if r1.Fields["type"] != "imported" {
+		t.Errorf("resource[1].Fields[\"type\"]: expected %q, got %q", "imported", r1.Fields["type"])
 	}
 	if r1.Fields["in_use"] != "false" {
 		t.Errorf("resource[1].Fields[\"in_use\"]: expected %q, got %q", "false", r1.Fields["in_use"])
+	}
+	// acmStatusFindings (acm.go:151) switches on the certificate's RAW status
+	// before Fields["status"] is humanized for display — pin that PENDING_
+	// VALIDATION still emits its wave1 Finding (and hence its ColorWarning
+	// via colorFromAnyFinding) even though the rendered field is now "pending
+	// validation", not "PENDING_VALIDATION".
+	if len(r1.Findings) != 1 {
+		t.Fatalf("resource[1].Findings: expected 1 finding for PENDING_VALIDATION, got %d: %v", len(r1.Findings), r1.Findings)
+	}
+	if r1.Findings[0].Phrase != "pending validation" {
+		t.Errorf("resource[1].Findings[0].Phrase: expected %q, got %q", "pending validation", r1.Findings[0].Phrase)
+	}
+	if got := acmType.Color(r1); got != resource.ColorWarning {
+		t.Errorf("acm type.Color(resource[1]) = %v, want %v (pending validation)", got, resource.ColorWarning)
 	}
 }
 

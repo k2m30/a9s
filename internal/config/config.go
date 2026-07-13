@@ -108,6 +108,10 @@ type ListColumn struct {
 	Width    int    `yaml:"width"`
 	SortKey  string `yaml:"sort_key"`  // optional: Fields key for sorting (when display value differs from sort value)
 	SortPath string `yaml:"sort_path"` // optional: RawStruct path for raw numeric/time sort comparison
+	// Humanize marks a Path-based column whose raw RawStruct-extracted enum
+	// value must be routed through domain.HumanizeStatusPhrase before
+	// rendering. See app.ColumnDef.Humanize for the consuming logic.
+	Humanize bool `yaml:"humanize,omitempty"`
 }
 
 // UnmarshalYAML implements custom unmarshaling for ViewDef to preserve

@@ -94,7 +94,8 @@ forbid() {
 }
 
 # Menu: sweep produced issue badges in-session (not only cached counts).
-expect menu.txt 'resource-types\(66\)' "menu shows the full catalog"
+# 67 = 66 resource types + the Cost Explorer entry.
+expect menu.txt 'resource-types\(67\)' "menu shows the full catalog"
 expect menu.txt 'issues:[0-9]+' "sweep produced at least one issue badge"
 
 # Whole-cell raw enums must not survive rendering anywhere we look.
@@ -109,10 +110,16 @@ if grep -qE '\) !\d' "$CAPDIR/lambda.txt" 2>/dev/null || grep -qE '\) ![0-9]' "$
 	expect lambda.txt ' [a-z][a-z-]+( [a-z0-9./-]+)+ ' "lambda issue rows carry a cause phrase"
 fi
 
-# EC2 detail renders the related panel with settled checks.
-expect ec2_detail.txt 'RELATED' "ec2 detail renders the related panel"
-expect ec2_detail.txt '\([0-9]+\)' "ec2 related checks settled to counts"
-forbid ec2_detail.txt 'FetchByIDs failed|cannot be found' "no fetch errors on the detail"
+# EC2 detail renders the related panel with settled checks. An account with
+# no instances has no detail to open — skip honestly rather than fail the
+# gate on fleet size (the demo smoke pins the detail path deterministically).
+if grep -qE 'ec2\(0\)' "$CAPDIR/ec2.txt"; then
+	echo "SKIP  ec2 detail checks — live account has no EC2 instances"
+else
+	expect ec2_detail.txt 'RELATED' "ec2 detail renders the related panel"
+	expect ec2_detail.txt '\([0-9]+\)' "ec2 related checks settled to counts"
+	forbid ec2_detail.txt 'FetchByIDs failed|cannot be found' "no fetch errors on the detail"
+fi
 
 # Full-catalog sweep: every resource type the menu shows with a non-zero
 # count gets its own list capture and the same two forbids the targeted

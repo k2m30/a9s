@@ -48,8 +48,8 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -87,8 +87,8 @@ func TestQA_ListRawStruct_EC2(t *testing.T) {
 
 	inst := realisticEC2Instance()
 	res := resource.Resource{
-		ID:     "i-0abcdef1234567890",
-		Name:   "web-server-prod",
+		ID:   "i-0abcdef1234567890",
+		Name: "web-server-prod",
 		Fields: map[string]string{
 			"instance_id": "i-0abcdef1234567890",
 			"name":        "web-server-prod",
@@ -134,8 +134,8 @@ func TestQA_ListRawStruct_RDS(t *testing.T) {
 
 	db := realisticRDSInstance()
 	res := resource.Resource{
-		ID:     "prod-db-01",
-		Name:   "prod-db-01",
+		ID:   "prod-db-01",
+		Name: "prod-db-01",
 		Fields: map[string]string{
 			"db_identifier":  "prod-db-01",
 			"engine":         "mysql",
@@ -174,8 +174,8 @@ func TestQA_ListRawStruct_Redis(t *testing.T) {
 
 	rg := realisticRedisReplicationGroup()
 	res := resource.Resource{
-		ID:     "redis-prod-001",
-		Name:   "redis-prod-001",
+		ID:   "redis-prod-001",
+		Name: "redis-prod-001",
 		Fields: map[string]string{
 			"cluster_id": "redis-prod-001",
 			"node_type":  "cache.r6g.large",
@@ -212,8 +212,8 @@ func TestQA_ListRawStruct_DocDB(t *testing.T) {
 
 	cluster := realisticDocDBCluster()
 	res := resource.Resource{
-		ID:     "docdb-prod-cluster",
-		Name:   "docdb-prod-cluster",
+		ID:   "docdb-prod-cluster",
+		Name: "docdb-prod-cluster",
 		Fields: map[string]string{
 			"cluster_id":     "docdb-prod-cluster",
 			"engine_version": "5.0.0",
@@ -250,8 +250,8 @@ func TestQA_ListRawStruct_EKS(t *testing.T) {
 
 	cluster := realisticEKSCluster()
 	res := resource.Resource{
-		ID:     "prod-cluster",
-		Name:   "prod-cluster",
+		ID:   "prod-cluster",
+		Name: "prod-cluster",
 		Fields: map[string]string{
 			"cluster_name":     "prod-cluster",
 			"version":          "1.28",
@@ -288,8 +288,8 @@ func TestQA_ListRawStruct_Secrets(t *testing.T) {
 
 	secret := realisticSecretListEntry()
 	res := resource.Resource{
-		ID:     "prod/database/password",
-		Name:   "prod/database/password",
+		ID:   "prod/database/password",
+		Name: "prod/database/password",
 		Fields: map[string]string{
 			"secret_name":      "prod/database/password",
 			"description":      "old-desc",
@@ -326,8 +326,8 @@ func TestQA_ListRawStruct_S3(t *testing.T) {
 
 	bucket := realisticS3Bucket()
 	res := resource.Resource{
-		ID:     "my-production-bucket",
-		Name:   "my-production-bucket",
+		ID:   "my-production-bucket",
+		Name: "my-production-bucket",
 		Fields: map[string]string{
 			"name":          "my-production-bucket",
 			"bucket_name":   "my-production-bucket",
@@ -727,6 +727,55 @@ func TestQA_ListRawStruct_S3_RawStructOverridesFields(t *testing.T) {
 	}
 }
 
+// TestQA_ListRawStruct_ACM_TypeColumnMustBeHumanized pins the live-smoke
+// regression: FetchACMCertificatesPage already stamps a correctly humanized
+// Fields["type"] ("amazon issued", not "AMAZON_ISSUED") and the Status
+// column already routes through the shared humanize chokepoint — but the
+// Type column (.a9s/views/acm.yaml: Key-less, Path:"Type") is not a status
+// column, so listExtractCellValue's non-status cascade (internal/app/
+// list_columns.go) resolves it via the Path-based RawStruct fallback BEFORE
+// the Fields lookup ever runs, same precedence TestQA_ListRawStruct_*_
+// RawStructOverridesFields pins for identity columns like EC2's InstanceType
+// — except here RawStruct's own value is a raw AWS enum, not a natural
+// display string, so the raw "AMAZON_ISSUED" reaches the cell unhumanized.
+// The humanize doctrine (domain.HumanizeStatusPhrase) forbids a raw
+// UPPER_SNAKE enum in ANY rendered cell, not just Status.
+func TestQA_ListRawStruct_ACM_TypeColumnMustBeHumanized(t *testing.T) {
+	ensureNoColor(t)
+	cfg := configForType("acm")
+
+	cert := acmtypes.CertificateSummary{
+		DomainName:     new("example.com"),
+		CertificateArn: new("arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"),
+		Status:         acmtypes.CertificateStatusIssued,
+		Type:           acmtypes.CertificateTypeAmazonIssued,
+	}
+
+	// Fields mirrors exactly what FetchACMCertificatesPage now stamps for
+	// this same certificate (already reconciled — see aws_acm_test.go) —
+	// this Resource is a fetcher-produced shape, not a hand-picked mismatch.
+	res := resource.Resource{
+		ID:   "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012",
+		Name: "example.com",
+		Fields: map[string]string{
+			"domain_name": "example.com",
+			"status":      "issued",
+			"type":        "amazon issued",
+			"in_use":      "true",
+		},
+		RawStruct: cert,
+	}
+
+	view := newListModel(t, "acm", cfg, []resource.Resource{res})
+
+	if strings.Contains(view, "AMAZON_ISSUED") {
+		t.Errorf("acm list Type column must never render the raw SDK enum \"AMAZON_ISSUED\" — the humanize doctrine forbids it in any rendered cell, got:\n%s", view)
+	}
+	if !strings.Contains(view, "amazon issued") {
+		t.Errorf("acm list Type column should render the humanized phrase \"amazon issued\" (matching the already-correct Fields[\"type\"]), got:\n%s", view)
+	}
+}
+
 // ===========================================================================
 // Test with production views.yaml config file
 // ===========================================================================
@@ -983,7 +1032,13 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		// ddb: Fields["status"] carries the §4 phrase (blank for Healthy/ACTIVE) —
 		// the raw AWS enum no longer surfaces in the list view. Spec: docs/resources/ddb.md §4.
 		{"ddb", realisticDDBTable(), []string{"users-table"}},
-		{"acm", realisticACMCertificate(), []string{"example.com", "ISSUED"}},
+		// acm: Status column already humanizes RawStruct.Status ("ISSUED" →
+		// "issued") through the same chokepoint as the alarm/ecs/cfn rows
+		// above. Type column must too ("AMAZON_ISSUED" -> "amazon issued") —
+		// the humanize doctrine forbids a raw UPPER_SNAKE enum in ANY
+		// rendered cell, not just Status (live smoke caught the raw form
+		// still leaking through the unhumanized Type column).
+		{"acm", realisticACMCertificate(), []string{"example.com", "issued", "amazon issued"}},
 		{"asg", realisticASG(), []string{"my-app-asg"}},
 		{"vpc", realisticVPC(), []string{"vpc-0abc1234def56789a", "10.0.0.0/16", "available"}},
 		{"sg", realisticSecurityGroup(), []string{"sg-0abc1234def56789a", "web-sg", "vpc-0abc1234"}},
@@ -1331,8 +1386,8 @@ func TestQA_ListRawStruct_EBSVolume(t *testing.T) {
 
 	vol := realisticVolume()
 	res := resource.Resource{
-		ID:     "vol-111aabbcc",
-		Name:   "prod-data-vol",
+		ID:   "vol-111aabbcc",
+		Name: "prod-data-vol",
 		Fields: map[string]string{
 			"volume_id":   "vol-111aabbcc",
 			"name":        "prod-data-vol",
@@ -1374,8 +1429,8 @@ func TestQA_ListRawStruct_EBSSnapshot(t *testing.T) {
 
 	snap := realisticSnapshot()
 	res := resource.Resource{
-		ID:     "snap-0aabb11cc",
-		Name:   "prod-snap-daily",
+		ID:   "snap-0aabb11cc",
+		Name: "prod-snap-daily",
 		Fields: map[string]string{
 			"snapshot_id": "snap-0aabb11cc",
 			"name":        "prod-snap-daily",
@@ -1416,8 +1471,8 @@ func TestQA_ListRawStruct_AMI(t *testing.T) {
 
 	img := realisticImage()
 	res := resource.Resource{
-		ID:     "ami-0abc111222333444a",
-		Name:   "my-web-server-ami",
+		ID:   "ami-0abc111222333444a",
+		Name: "my-web-server-ami",
 		Fields: map[string]string{
 			"image_id":         "ami-0abc111222333444a",
 			"name":             "my-web-server-ami",
@@ -1461,8 +1516,8 @@ func TestQA_ListRawStruct_CloudTrailEvent(t *testing.T) {
 	// Default columns: GLYPH(_ct.verb) | TIME(event_time) | ACTOR(_ct.actor) | ORIGIN(_ct.origin) | EVENT(EventName via RawStruct) | TARGET(_ct.target) | OUTCOME(_ct.outcome).
 	// SOURCE column no longer exists in defaults; ec2.amazonaws.com is in Fields["source"] (compat) but not rendered.
 	res := resource.Resource{
-		ID:     "evt-0001-abcd-1234-5678-abcdef012345",
-		Name:   "RunInstances",
+		ID:   "evt-0001-abcd-1234-5678-abcdef012345",
+		Name: "RunInstances",
 		Fields: map[string]string{
 			"event_name":    "RunInstances",
 			"time":          "2025-03-15 12:00:00",

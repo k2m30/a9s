@@ -121,8 +121,8 @@ func acmColor(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c
 	}
-	switch r.Fields["status"] {
-	case "ISSUED":
+	switch domain.HumanizeStatusPhrase(r.Fields["status"]) {
+	case "issued":
 		dl := r.Fields["days_left"]
 		if dl == "expired" {
 			return domain.ColorBroken
@@ -142,11 +142,11 @@ func acmColor(r domain.Resource) domain.Color {
 			return domain.ColorWarning
 		}
 		return domain.ColorHealthy
-	case "PENDING_VALIDATION":
+	case "pending validation":
 		return domain.ColorWarning
-	case "EXPIRED", "REVOKED", "FAILED", "VALIDATION_TIMED_OUT":
+	case "expired", "revoked", "failed", "validation timed out":
 		return domain.ColorBroken
-	case "INACTIVE":
+	case "inactive":
 		return domain.ColorDim
 	}
 	return domain.ColorHealthy

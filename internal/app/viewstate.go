@@ -116,6 +116,13 @@ type ColumnDef struct {
 	Title string `json:"title"`
 	Width int    `json:"width"`
 	Path  string `json:"path,omitempty"`
+	// Humanize marks a non-status Path/RawStruct column whose extracted raw
+	// AWS enum value must be routed through domain.HumanizeStatusPhrase
+	// before rendering (e.g. acm's Type column: "AMAZON_ISSUED" -> "amazon
+	// issued"). Consulted only in listExtractCellValue's non-status Path
+	// fallback — the isStatusCol branch and identity-column RawStruct
+	// precedence (e.g. EC2 InstanceType) are unaffected.
+	Humanize bool `json:"humanize,omitempty"`
 }
 
 // RowDecorator is a short tag that renderers use to apply per-row

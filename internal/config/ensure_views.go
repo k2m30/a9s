@@ -27,6 +27,9 @@ func GenerateViewYAML(v ViewDef) []byte {
 				fmt.Fprintf(&b, "    key: %s\n", col.Key)
 			}
 			fmt.Fprintf(&b, "    width: %d\n", col.Width)
+			if col.Humanize {
+				b.WriteString("    humanize: true\n")
+			}
 		}
 	}
 

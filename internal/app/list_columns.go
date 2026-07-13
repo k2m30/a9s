@@ -79,7 +79,7 @@ func resolveListColumnsForBuild(vc *config.ViewsConfig, typeName string, td *res
 		if len(vd.List) > 0 {
 			cols := make([]ColumnDef, len(vd.List))
 			for i, lc := range vd.List {
-				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path}
+				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
 			}
 			return cols
 		}
@@ -94,7 +94,7 @@ func resolveListColumnsForBuild(vc *config.ViewsConfig, typeName string, td *res
 		if firstMatch {
 			cols := make([]ColumnDef, len(defaultVD.List))
 			for i, lc := range defaultVD.List {
-				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path}
+				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
 			}
 			return cols
 		}
@@ -109,8 +109,11 @@ func resolveListColumnsForBuild(vc *config.ViewsConfig, typeName string, td *res
 		cols := make([]ColumnDef, len(td.Columns))
 		for i, c := range td.Columns {
 			cd := ColumnDef{Key: c.Key, Title: c.Title, Width: c.Width}
-			if def, ok := defaultByTitle[c.Title]; ok && cd.Path == "" {
-				cd.Path = def.Path
+			if def, ok := defaultByTitle[c.Title]; ok {
+				if cd.Path == "" {
+					cd.Path = def.Path
+				}
+				cd.Humanize = def.Humanize
 			}
 			cols[i] = cd
 		}
@@ -144,10 +147,11 @@ func resolveListColumnsWithConfig(vc *config.ViewsConfig, typeName string) []Col
 			cols := make([]ColumnDef, len(vd.List))
 			for i, lc := range vd.List {
 				cols[i] = ColumnDef{
-					Key:   lc.Key,
-					Title: lc.Title,
-					Width: lc.Width,
-					Path:  lc.Path,
+					Key:      lc.Key,
+					Title:    lc.Title,
+					Width:    lc.Width,
+					Path:     lc.Path,
+					Humanize: lc.Humanize,
 				}
 			}
 			return cols
@@ -165,10 +169,11 @@ func resolveListColumnsWithConfig(vc *config.ViewsConfig, typeName string) []Col
 			cols := make([]ColumnDef, len(defaultVD.List))
 			for i, lc := range defaultVD.List {
 				cols[i] = ColumnDef{
-					Key:   lc.Key,
-					Title: lc.Title,
-					Width: lc.Width,
-					Path:  lc.Path,
+					Key:      lc.Key,
+					Title:    lc.Title,
+					Width:    lc.Width,
+					Path:     lc.Path,
+					Humanize: lc.Humanize,
 				}
 			}
 			return cols
@@ -188,8 +193,11 @@ func resolveListColumnsWithConfig(vc *config.ViewsConfig, typeName string) []Col
 				Title: c.Title,
 				Width: c.Width,
 			}
-			if def, ok := defaultByTitle[c.Title]; ok && cd.Path == "" {
-				cd.Path = def.Path
+			if def, ok := defaultByTitle[c.Title]; ok {
+				if cd.Path == "" {
+					cd.Path = def.Path
+				}
+				cd.Humanize = def.Humanize
 			}
 			cols[i] = cd
 		}
@@ -201,10 +209,11 @@ func resolveListColumnsWithConfig(vc *config.ViewsConfig, typeName string) []Col
 		cols := make([]ColumnDef, len(defaultVD.List))
 		for i, lc := range defaultVD.List {
 			cols[i] = ColumnDef{
-				Key:   lc.Key,
-				Title: lc.Title,
-				Width: lc.Width,
-				Path:  lc.Path,
+				Key:      lc.Key,
+				Title:    lc.Title,
+				Width:    lc.Width,
+				Path:     lc.Path,
+				Humanize: lc.Humanize,
 			}
 		}
 		return cols
@@ -343,9 +352,16 @@ func listExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resourc
 		}
 	}
 
-	// Path-based fallback via fieldpath.ExtractScalar.
+	// Path-based fallback via fieldpath.ExtractScalar. col.Humanize opts a
+	// non-status enum column (e.g. acm's Type: "AMAZON_ISSUED") into the same
+	// HumanizeStatusPhrase chokepoint the isStatusCol branch above uses,
+	// without touching identity-column RawStruct-over-Fields precedence
+	// (e.g. EC2 InstanceType, which never sets Humanize).
 	if col.Path != "" && r.RawStruct != nil {
 		if val := fieldpath.ExtractScalar(r.RawStruct, col.Path); val != "" {
+			if col.Humanize {
+				return domain.HumanizeStatusPhrase(val)
+			}
 			return val
 		}
 	}
@@ -563,7 +579,7 @@ func (c *Controller) ResolveColumnsForType(typeName string) []ColumnDef {
 		if len(vd.List) > 0 {
 			cols := make([]ColumnDef, len(vd.List))
 			for i, lc := range vd.List {
-				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path}
+				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
 			}
 			return cols
 		}
@@ -590,7 +606,7 @@ func (c *Controller) ResolveColumnsForType(typeName string) []ColumnDef {
 		if firstMatch {
 			cols := make([]ColumnDef, len(defaultVD.List))
 			for i, lc := range defaultVD.List {
-				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path}
+				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
 			}
 			return cols
 		}
