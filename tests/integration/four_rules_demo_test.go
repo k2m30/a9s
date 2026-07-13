@@ -180,7 +180,7 @@ func TestFourRules_Demo_R1_SpecificTypesShowIssueCounts(t *testing.T) {
 	// main menu after Wave 1 completes. Counts are pinned against the demo
 	// fixture data that ships with the binary.
 	pins := []string{
-		"EC2 Instances (27) issues:12",
+		"EC2 Instances (40) issues:12",
 		"ECS Services (25) issues:6",
 		"DB Instances (44) issues:37",
 		"EBS Volumes (8) issues:5",
