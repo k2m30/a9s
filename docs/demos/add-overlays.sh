@@ -71,7 +71,7 @@ Y_DESC="y=h-100"
 Y_KEY="y=h-48"
 
 OVERLAYS="\
-drawtext=text='66 AWS resource types':${STYLE}:${Y_DESC}:enable='between(t,0.5,5.5)',\
+drawtext=text='66 resource types + Cost Explorer':${STYLE}:${Y_DESC}:enable='between(t,0.5,5.5)',\
 drawtext=text='Up / Down  navigate':${STYLE_KEY}:${Y_KEY}:enable='between(t,0.5,5.5)',\
 \
 drawtext=text='Spot issues instantly':${STYLE}:${Y_DESC}:enable='between(t,6.2,8.8)',\
@@ -92,8 +92,8 @@ drawtext=text='y  yaml view':${STYLE_KEY}:${Y_KEY}:enable='between(t,27.6,31.6)'
 drawtext=text='Related Resources':${STYLE}:${Y_DESC}:enable='between(t,37.6,44.1)',\
 drawtext=text='Tab  focus  |  Down  browse':${STYLE_KEY}:${Y_KEY}:enable='between(t,37.6,44.1)',\
 \
-drawtext=text='Navigate to related resource':${STYLE}:${Y_DESC}:enable='between(t,44.6,48.6)',\
-drawtext=text='Enter  jump to resource':${STYLE_KEY}:${Y_KEY}:enable='between(t,44.6,48.6)',\
+drawtext=text='Navigate to related resource':${STYLE}:${Y_DESC}:enable='between(t,44.6,47.3)',\
+drawtext=text='Enter  jump to resource':${STYLE_KEY}:${Y_KEY}:enable='between(t,44.6,47.3)',\
 \
 drawtext=text='S3 Buckets':${STYLE}:${Y_DESC}:enable='between(t,52.6,55.6)',\
 drawtext=text='\:s3  jump to any service':${STYLE_KEY}:${Y_KEY}:enable='between(t,52.6,55.6)',\
