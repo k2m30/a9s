@@ -4,7 +4,7 @@ This document outlines the planned direction for a9s. Priorities may shift based
 
 ## Already Implemented
 
-- **66 AWS resource types** across 12 categories
+- **67 AWS resource types** across 12 categories
 - **Search and filter** -- `/` to filter resource lists; `/` to search within YAML, detail, and JSON views with `n`/`N` for next/prev match
 - **Column sorting** -- `1`-`0` keys to sort by any column position
 - **Customizable columns** -- `~/.a9s/views/` overrides which fields are displayed per resource type
@@ -25,16 +25,20 @@ This document outlines the planned direction for a9s. Priorities may shift based
 - **Horizontal scrolling** -- `h`/`l` to scroll wide tables
 - **Pagination** -- `M` to load more for large result sets (demo mode showcases this)
 - **Issues shown in UI** -- background health checks surface findings as `!`/`~` row markers, `issues:N` menu badges, and a unified Attention section in detail views; `Ctrl+Z` filters to affected resources
+- **Honest degradation** -- when an IAM role allows listing but denies describe calls, resources stay visible with a `details denied` finding instead of fake zeros; region gaps and partial failures land in the error log, not error banners
 - **Cost Explorer** -- `:costs` opens a spend grid that matches the AWS invoice: pivot by service/region/account/usage type/purchase option/charge category, zoom years to days, drill any cell down to usage types, individual EC2 instances, and their detail views; anomaly markers with dollar impact; closed months cached on disk and rendered offline
 - **20,300+ unit tests**
 
 ## Short-Term
 
-- **Cost overlay in resource lists** -- show each resource's monthly cost as a column, powered by the Cost Explorer data already cached
+- **New resource types from real production accounts** -- shipped one per minor release: Managed Airflow (`mwaa`, done in v3.50.0), Transfer Family with an agreements child view (`transfer`, in progress), EC2 Launch Templates (`lt`), VPC Peering (`vpc-peer`)
+- **Cost overlay in resource lists** -- show each resource's monthly cost as a column, powered by the Cost Explorer data already cached ([#73](https://github.com/k2m30/a9s/issues/73))
+- **Richer detail views** -- extend the enrichment pattern to more resource types ([#261](https://github.com/k2m30/a9s/issues/261))
 
 ## Medium-Term
 
 - **Live tail** -- stream CloudWatch Logs in a split pane
+- **CloudTrail search/debug view** -- purpose-built incident-investigation view over CloudTrail events ([#112](https://github.com/k2m30/a9s/issues/112))
 
 ## Long-Term
 
