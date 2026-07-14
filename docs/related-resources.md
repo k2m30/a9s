@@ -107,6 +107,7 @@
 | `lambda` | [API_FunctionConfiguration](https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html) | `alarm`, `apigw`, `cf`, `cfn`, `ct-events`, `ddb`, `eb-rule`, `ecr`, `efs`, `eni`, `kinesis`, `kms`, `logs`, `msk`, `role`, `s3`, `secrets`, `sg`, `sns`, `sns-sub`, `sqs`, `ssm`, `subnet`, `tg`, `vpc` |
 | `logs` | [API_LogGroup](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_LogGroup.html) | `alarm`, `apigw`, `ct-events`, `ecs-task`, `kinesis`, `kms`, `lambda`, `s3` |
 | `msk` | [v1-clusters](https://docs.aws.amazon.com/msk/1.0/apireference/v1-clusters.html) | `alarm`, `cfn`, `ct-events`, `kms`, `lambda`, `logs`, `s3`, `secrets`, `sg`, `subnet`, `vpc` |
+| `mwaa` | [API_Environment](https://docs.aws.amazon.com/mwaa/latest/API/API_Environment.html) | `alarm`, `ct-events`, `kms`, `logs`, `role`, `s3`, `sg`, `subnet` |
 | `nat` | [API_NatGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.html) | `alarm`, `ct-events`, `eip`, `eni`, `rtb`, `subnet`, `vpc` |
 | `ng` | [API_Nodegroup](https://docs.aws.amazon.com/eks/latest/APIReference/API_Nodegroup.html) | `ami`, `asg`, `ct-events`, `ebs`, `ec2`, `eks`, `role`, `sg`, `subnet` |
 | `opensearch` | [API_DomainStatus](https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DomainStatus.html) | `acm`, `alarm`, `cfn`, `ct-events`, `kms`, `logs`, `sg`, `subnet`, `vpc` |
@@ -709,6 +710,25 @@ AWS API: <https://docs.aws.amazon.com/msk/1.0/apireference/v1-clusters.html>
 - **`subnet`** — BrokerNodeGroupInfo.ClientSubnets — broker subnets.
 <!-- amended by a9s-resource-spec during msk gen: SDK BrokerNodeGroupInfo has no `ClientVpcIpAddresses` field; the VPC is derived from the ClientSubnets by cross-referencing the loaded `subnet` list (Subnet.VpcId). -->
 - **`vpc`** — derived from BrokerNodeGroupInfo.ClientSubnets → cross-reference subnet list → Subnet.VpcId.
+
+### `mwaa`
+
+AWS API: <https://docs.aws.amazon.com/mwaa/latest/API/API_Environment.html>
+
+- **`alarm`** — CloudWatch alarms in the `AWS/MWAA` namespace carry the `EnvironmentName` dimension; first triage stop during an incident (workflow pivot — join key is the environment name, no ARN field).
+- **`ct-events`** — Audit trail for environment changes ("who ran UpdateEnvironment").
+- **`kms`** — `KmsKey` — encrypts the metadata database, logs, and queue.
+- **`logs`** — `LoggingConfiguration.{DagProcessingLogs,SchedulerLogs,WebserverLogs,WorkerLogs,TaskLogs}.CloudWatchLogGroupArn` — five per-component log groups; a failed DAG run sends the operator straight to TaskLogs/SchedulerLogs.
+- **`role`** — `ExecutionRoleArn` — the role Airflow tasks assume for AWS access ("why can't my DAG write to S3").
+- **`s3`** — `SourceBucketArn` — holds DAGs, requirements.txt, and plugins ("why isn't my DAG showing up").
+- **`sg`** — `NetworkConfiguration.SecurityGroupIds` ("why can't Airflow reach RDS / my internal API").
+- **`subnet`** — `NetworkConfiguration.SubnetIds` — where the environment's ENIs live; AZ and routing debugging.
+
+Explicitly excluded:
+
+- **`vpc`** — no direct field on `Environment`; reachable one hop via the subnet pivot's own related panel.
+- **`sqs`** — `CeleryExecutorQueue` names a queue in an AWS-owned service account; a pivot dead-ends in AccessDenied. Detail-view fact only.
+- **`vpce`** — `WebserverVpcEndpointService`/`DatabaseVpcEndpointService` are endpoint-service names, not the customer's `vpce-*` IDs, even when `EndpointManagement == CUSTOMER`. Detail text only.
 
 ### `nat`
 

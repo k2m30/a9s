@@ -96,6 +96,8 @@ github.com/aws/aws-sdk-go-v2/service/kms v1.52.1 h1:qBc+5ZvMjb+Y+Ho+0wwyBYBITH1W
 github.com/aws/aws-sdk-go-v2/service/kms v1.52.1/go.mod h1:bWSG4E0FxeeDdfXseEnPfkFv4MqTY/6fDFGUHu/Wkb0=
 github.com/aws/aws-sdk-go-v2/service/lambda v1.90.2 h1:dBiVUhd21cs5C3RUiAKTMc4Cw+5kvTBhM/GGlYTXrpo=
 github.com/aws/aws-sdk-go-v2/service/lambda v1.90.2/go.mod h1:gFmCYh+m/TwFPR3o30V83jaNVIzN5ozPrf7eC29mBJU=
+github.com/aws/aws-sdk-go-v2/service/mwaa v1.42.1 h1:SbG2JFdI6wDIsj/byH2gsv/PEIzbRanyTtRykExC0h8=
+github.com/aws/aws-sdk-go-v2/service/mwaa v1.42.1/go.mod h1:QGxtdTS/3lgJj97BbQyD3htWPmw3B2G+Xsnxsygp/80=
 github.com/aws/aws-sdk-go-v2/service/opensearch v1.70.1 h1:bvmcxzp/PGDLScBLcJHG5WSoChkALP20Xhem54dUaKc=
 github.com/aws/aws-sdk-go-v2/service/opensearch v1.70.1/go.mod h1:VKcO88AHkSJsp7pQeHNr5VVcs1t/0snyD+e0ppd4oE0=
 github.com/aws/aws-sdk-go-v2/service/rds v1.118.3 h1:Q6o5SuzC3+T1WjA6y/+vxPkFRFXPiGilPCdhdQZ4qp8=
