@@ -4,6 +4,7 @@ package fakes
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -16,11 +17,12 @@ import (
 // EC2Fake implements aws.EC2API against fixture data loaded at construction time.
 type EC2Fake struct {
 	fix *fixtures.EC2Fixtures
+	lt  *fixtures.LTFixtures
 }
 
 // NewEC2 constructs an EC2Fake backed by fixture data from the fixtures package.
 func NewEC2() *EC2Fake {
-	return &EC2Fake{fix: fixtures.NewEC2Fixtures()}
+	return &EC2Fake{fix: fixtures.NewEC2Fixtures(), lt: fixtures.NewLTFixtures()}
 }
 
 func (f *EC2Fake) DescribeInstances(_ context.Context, _ *ec2.DescribeInstancesInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error) {
@@ -232,24 +234,50 @@ func (f *EC2Fake) DescribeTransitGatewayRouteTables(_ context.Context, _ *ec2.De
 	return &ec2.DescribeTransitGatewayRouteTablesOutput{}, nil
 }
 
-// DescribeLaunchTemplateVersions returns launch template version data for known demo LTs.
-// The EKS prod nodegroup references lt-0eks111111111111a with a pinned AMI.
+// DescribeLaunchTemplates returns the lt.go fixture list, filtered by
+// LaunchTemplateIds/LaunchTemplateNames when the caller supplies either
+// (mirrors DescribeImages's filter-or-all-on-empty convention).
+func (f *EC2Fake) DescribeLaunchTemplates(_ context.Context, input *ec2.DescribeLaunchTemplatesInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplatesOutput, error) {
+	if input == nil || (len(input.LaunchTemplateIds) == 0 && len(input.LaunchTemplateNames) == 0) {
+		return &ec2.DescribeLaunchTemplatesOutput{LaunchTemplates: f.lt.LaunchTemplates}, nil
+	}
+	idSet := toSet(input.LaunchTemplateIds)
+	nameSet := toSet(input.LaunchTemplateNames)
+	var out []ec2types.LaunchTemplate
+	for _, tpl := range f.lt.LaunchTemplates {
+		if tpl.LaunchTemplateId != nil && idSet[*tpl.LaunchTemplateId] {
+			out = append(out, tpl)
+			continue
+		}
+		if tpl.LaunchTemplateName != nil && nameSet[*tpl.LaunchTemplateName] {
+			out = append(out, tpl)
+		}
+	}
+	return &ec2.DescribeLaunchTemplatesOutput{LaunchTemplates: out}, nil
+}
+
+// DescribeLaunchTemplateVersions returns the "$Default" version fixture for
+// the requested LaunchTemplateId (lt.go's DefaultVersions map), or denies the
+// call with AccessDeniedException for lt.go's DeniedIDs (warn-lt-denied's
+// rich-degradation witness). Unknown ids return an empty result, matching
+// DescribeImages's not-found-is-empty convention.
 func (f *EC2Fake) DescribeLaunchTemplateVersions(_ context.Context, input *ec2.DescribeLaunchTemplateVersionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
-	if input.LaunchTemplateId == nil || *input.LaunchTemplateId != "lt-0eks111111111111a" {
+	if input == nil || input.LaunchTemplateId == nil {
+		return &ec2.DescribeLaunchTemplateVersionsOutput{}, nil
+	}
+	id := *input.LaunchTemplateId
+	if slices.Contains(f.lt.DeniedIDs, id) {
+		return nil, &smithy.GenericAPIError{
+			Code:    "AccessDenied",
+			Message: "User is not authorized to perform: ec2:DescribeLaunchTemplateVersions",
+		}
+	}
+	version, ok := f.lt.DefaultVersions[id]
+	if !ok {
 		return &ec2.DescribeLaunchTemplateVersionsOutput{}, nil
 	}
 	return &ec2.DescribeLaunchTemplateVersionsOutput{
-		LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{
-			{
-				LaunchTemplateId: input.LaunchTemplateId,
-				VersionNumber:    aws.Int64(1),
-				LaunchTemplateData: &ec2types.ResponseLaunchTemplateData{
-					ImageId:          aws.String("ami-0eks111111111111a"),
-					InstanceType:     ec2types.InstanceTypeM5Large,
-					SecurityGroupIds: []string{"sg-0eks111111111111e"},
-				},
-			},
-		},
+		LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{version},
 	}, nil
 }
 

@@ -120,6 +120,16 @@ func buildASGGroups() []asgtypes.AutoScalingGroup {
 			HealthCheckGracePeriod: aws.Int32(60),
 			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
 			CreatedTime:            aws.Time(mustTime("2025-02-01T08:00:00Z")),
+			// MixedInstancesPolicy — required for the lt->asg related-panel
+			// pivot (mixed-instances path). References prod-web-lt (lt.go).
+			MixedInstancesPolicy: &asgtypes.MixedInstancesPolicy{
+				LaunchTemplate: &asgtypes.LaunchTemplate{
+					LaunchTemplateSpecification: &asgtypes.LaunchTemplateSpecification{
+						LaunchTemplateId: aws.String(ProdWebLTID),
+						Version:          aws.String("$Default"),
+					},
+				},
+			},
 			// AmazonECSManaged — required for ecs→asg related-panel pivot.
 			// Marks this ASG as owned by an ECS cluster capacity provider.
 			Tags: []asgtypes.TagDescription{
@@ -138,6 +148,12 @@ func buildASGGroups() []asgtypes.AutoScalingGroup {
 			HealthCheckGracePeriod: aws.Int32(120),
 			VPCZoneIdentifier:      aws.String(asgSubnetA),
 			CreatedTime:            aws.Time(mustTime("2025-03-10T12:00:00Z")),
+			// LaunchTemplate — required for the lt->asg related-panel pivot
+			// (plain single-template path). References prod-web-lt (lt.go).
+			LaunchTemplate: &asgtypes.LaunchTemplateSpecification{
+				LaunchTemplateId: aws.String(ProdWebLTID),
+				Version:          aws.String("$Default"),
+			},
 			Tags: []asgtypes.TagDescription{
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
 			},

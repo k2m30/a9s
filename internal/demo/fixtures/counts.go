@@ -35,6 +35,7 @@ func ExpectedTopLevelCounts() map[string]int {
 		"ami":          len(ec2.Images),
 		"eks":          len(eks.Clusters),
 		"ng":           countEKSNodegroups(eks),
+		"lt":           len(NewLTFixtures().LaunchTemplates),
 		"elb":          len(elb.LoadBalancers),
 		"tg":           len(elb.TargetGroups),
 		"sg":           len(ec2.SecurityGroups),

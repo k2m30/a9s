@@ -224,8 +224,12 @@ func buildEKSNodegroups() map[string][]ekstypes.Nodegroup {
 					},
 					RemoteAccessSecurityGroup: aws.String("sg-0eks111111111111e"),
 				},
+				// LaunchTemplate.Id — required for the lt->ng related-panel
+				// pivot. References eks-node-lt (lt.go); the id is the same
+				// symbol the EC2 fake's DescribeLaunchTemplateVersions
+				// resolves to acme-eks-worker's pinned AMI.
 				LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
-					Id:      aws.String("lt-0eks111111111111a"),
+					Id:      aws.String(EKSNodeLTID),
 					Version: aws.String("1"),
 				},
 				CreatedAt:      aws.Time(mustTime("2025-03-05T12:00:00Z")),

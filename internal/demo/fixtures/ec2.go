@@ -531,6 +531,14 @@ func makeInstance(
 			ec2types.Tag{Key: aws.String("aws:ecs:cluster-name"), Value: aws.String("acme-batch")},
 		)
 	}
+	// aws:ec2launchtemplate:id auto-tag — required for the lt->ec2 related-panel
+	// pivot (checkLTEC2 cross-references the ec2 cache by this exact tag key).
+	// Both instances launched from prod-web-lt (lt.go).
+	if instanceID == "i-0a1b2c3d4e5f60006" || instanceID == "i-0a1b2c3d4e5f60007" {
+		inst.Tags = append(inst.Tags,
+			ec2types.Tag{Key: aws.String("aws:ec2launchtemplate:id"), Value: aws.String(ProdWebLTID)},
+		)
+	}
 	if publicIP != "" {
 		inst.PublicIpAddress = aws.String(publicIP)
 	}
