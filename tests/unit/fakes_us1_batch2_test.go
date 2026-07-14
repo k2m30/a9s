@@ -191,6 +191,10 @@ func (f *fakeEC2Batch2) DescribeLaunchTemplates(_ context.Context, _ *ec2.Descri
 	return &ec2.DescribeLaunchTemplatesOutput{}, nil
 }
 
+func (f *fakeEC2Batch2) DescribeVpcPeeringConnections(_ context.Context, _ *ec2.DescribeVpcPeeringConnectionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcPeeringConnectionsOutput, error) {
+	return &ec2.DescribeVpcPeeringConnectionsOutput{}, nil
+}
+
 // newFakeEC2WithSubnets returns a fakeEC2Batch2 whose DescribeSubnets returns
 // the supplied subnets.
 func newFakeEC2WithSubnets(subnets []ec2types.Subnet) *fakeEC2Batch2 {

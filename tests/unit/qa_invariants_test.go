@@ -93,6 +93,13 @@ var noNavFieldsAllowList = map[string]string{
 	"vpc": "VPC list entry has no navigable cross-resource ARN fields (subnets/RTBs reference VPC by ID, not vice versa)",
 	// Networking — Transit Gateways have no navigable ARN cross-references in list entry
 	"tgw": "Transit Gateway list entry has no navigable ARN cross-reference fields",
+	// Networking — VPC Peering: the only structural ARN-shaped fields are
+	// RequesterVpcInfo.VpcId/AccepterVpcInfo.VpcId, and the remote side is
+	// frequently a cross-account VPC absent from the local cache — a
+	// drill-through would land on an empty view. The vpc related-panel pivot
+	// (checkVpcPeerVPC) already applies the honest cache-membership gate
+	// instead (docs/resources/vpc-peer-impl-plan.md §0).
+	"vpc-peer": "VPC Peering: the only structural ARN fields are Requester/AccepterVpcInfo.VpcId, and the remote side is frequently a cross-account VPC absent from the local cache — a drill-through would land on an empty view; the vpc related-panel pivot applies the honest cache-membership gate instead",
 	// Compute — Elastic Beanstalk environment list entry has no navigable ARN fields
 	"eb": "Elastic Beanstalk environment has no navigable cross-resource ARN fields",
 	// IAM — role, policy, user, group have no navigable ARN fields in list entry

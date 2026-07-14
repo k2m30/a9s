@@ -187,6 +187,17 @@ func colorENI(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
+// colorVpcPeer prefers colorFromAnyFinding — docs/resources/vpc-peer.md §4:
+// every Wave-1 state/CIDR-overlap signal is color-bearing; the two Wave-2
+// cache-scan signals (EnrichVpcPeerRoutes) mirror the lt deprecated-AMI `~`
+// treatment (colorLT precedent) rather than introducing a separate path.
+func colorVpcPeer(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
+
 var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "Load Balancers",
@@ -753,6 +764,52 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: transferCodeLegacyPolicy, Phrase: "legacy security policy", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: transferCodeNoLogging, Phrase: "no activity logging", Severity: domain.SevWarn, Source: "wave1"},
 			DetailsDeniedFindingDef("transfer"),
+		},
+	},
+	{
+		Name:          "VPC Peering",
+		ShortName:     "vpc-peer",
+		Aliases:       []string{"vpc-peer", "pcx", "peering"},
+		Category:      "NETWORKING",
+		CloudTrailKey: "ResourceName:ID",
+		Columns: []domain.Column{
+			{Key: "pcx_id", Title: "Pcx Id", Width: 24, Sortable: true},
+			{Key: "status", Title: "Status", Width: 34, Sortable: true},
+			{Key: "requester_vpc", Title: "Requester VPC", Width: 22, Sortable: true},
+			{Key: "requester_owner", Title: "Requester Owner", Width: 14, Sortable: true},
+			{Key: "accepter_vpc", Title: "Accepter VPC", Width: 22, Sortable: true},
+			{Key: "accepter_owner", Title: "Accepter Owner", Width: 14, Sortable: true},
+			{Key: "expires", Title: "Expires", Width: 17, Sortable: true},
+		},
+		Color: colorVpcPeer,
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
+			return FetchVpcPeeringConnectionsPage(ctx, c.EC2, continuationToken)
+		}),
+		Wave2:     IssueEnricher{Fn: EnrichVpcPeerRoutes, Priority: 100},
+		FieldKeys: []string{"pcx_id", "status", "requester_vpc", "requester_owner", "accepter_vpc", "accepter_owner", "expires"},
+		Related: []domain.RelatedDef{
+			{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkVpcPeerRTB, NeedsTargetCache: true},
+			{TargetType: "vpc", DisplayName: "VPC", Checker: checkVpcPeerVPC, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("vpc-peer")},
+		},
+		// No Navigable fields: the only structural ARN-shaped values are
+		// RequesterVpcInfo.VpcId / AccepterVpcInfo.VpcId, and the remote side
+		// is frequently a cross-account VPC absent from the local cache — a
+		// drill-through would land on an empty view. The vpc related-panel
+		// pivot (checkVpcPeerVPC) already applies the honest
+		// cache-membership gate; see docs/resources/vpc-peer-impl-plan.md §0.
+		Findings: []catalog.FindingDef{
+			{Code: vpcPeerCodeProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: vpcPeerCodeInitiating, Phrase: "initiating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: vpcPeerCodePendingAcceptance, Phrase: "pending acceptance: expires in <N>d", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: vpcPeerCodeExpired, Phrase: "expired: never accepted", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: vpcPeerCodeRejected, Phrase: "rejected", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: vpcPeerCodeFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: vpcPeerCodeDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: vpcPeerCodeDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
+			{Code: vpcPeerCodeCidrOverlap, Phrase: "CIDR overlap with peer", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: vpcPeerCodeNoLocalRoute, Phrase: "no local route to peer", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: vpcPeerCodeRouteBlackholed, Phrase: "route to peer blackholed", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 }

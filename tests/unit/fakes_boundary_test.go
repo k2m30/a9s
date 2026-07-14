@@ -119,6 +119,9 @@ func (f fakeEC2BoundaryAccessDenied) DescribeLaunchTemplateVersions(_ context.Co
 func (f fakeEC2BoundaryAccessDenied) DescribeLaunchTemplates(_ context.Context, _ *ec2.DescribeLaunchTemplatesInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplatesOutput, error) {
 	return &ec2.DescribeLaunchTemplatesOutput{}, nil
 }
+func (f fakeEC2BoundaryAccessDenied) DescribeVpcPeeringConnections(_ context.Context, _ *ec2.DescribeVpcPeeringConnectionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcPeeringConnectionsOutput, error) {
+	return &ec2.DescribeVpcPeeringConnectionsOutput{}, nil
+}
 
 // ---------------------------------------------------------------------------
 // fakeEC2BoundaryThrottle — EC2 fake whose DescribeSubnets returns a throttle
@@ -205,6 +208,9 @@ func (f *fakeEC2BoundaryThrottle) DescribeLaunchTemplateVersions(_ context.Conte
 }
 func (f *fakeEC2BoundaryThrottle) DescribeLaunchTemplates(_ context.Context, _ *ec2.DescribeLaunchTemplatesInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplatesOutput, error) {
 	return &ec2.DescribeLaunchTemplatesOutput{}, nil
+}
+func (f *fakeEC2BoundaryThrottle) DescribeVpcPeeringConnections(_ context.Context, _ *ec2.DescribeVpcPeeringConnectionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcPeeringConnectionsOutput, error) {
+	return &ec2.DescribeVpcPeeringConnectionsOutput{}, nil
 }
 
 // ---------------------------------------------------------------------------

@@ -31,6 +31,10 @@ const (
 	// Two existing rtb fixtures (ec2.go) gain routes to it, backing the rtb
 	// pivot's ≥2 witness.
 	ProdPeerSharedID = "pcx-0prodpeershared1a"
+	// WarnPeerProvisioningID is being provisioned.
+	WarnPeerProvisioningID = "pcx-0warnprovision1a"
+	// WarnPeerInitiatingID is initiating the peering request.
+	WarnPeerInitiatingID = "pcx-0warninitiating1a"
 	// WarnPeerPendingID has not been accepted; ExpirationTime is evergreen
 	// (now+3d) so the "pending acceptance: expires in 3d" phrase never rots.
 	WarnPeerPendingID = "pcx-0warnpending1111a"
@@ -117,6 +121,18 @@ func buildVpcPeerConnections() []ec2types.VpcPeeringConnection {
 				info.PeeringOptions = &ec2types.VpcPeeringConnectionOptionsDescription{AllowDnsResolutionFromRemoteVpc: aws.Bool(false)}
 				return info
 			}(),
+		},
+		{
+			VpcPeeringConnectionId: aws.String(WarnPeerProvisioningID),
+			Status:                 vpcPeerStatus(ec2types.VpcPeeringConnectionStateReasonCodeProvisioning, ""),
+			RequesterVpcInfo:       vpcPeerInfo(fixtProdVPCID, "123456789012"),
+			AccepterVpcInfo:        vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID),
+		},
+		{
+			VpcPeeringConnectionId: aws.String(WarnPeerInitiatingID),
+			Status:                 vpcPeerStatus(ec2types.VpcPeeringConnectionStateReasonCodeInitiatingRequest, ""),
+			RequesterVpcInfo:       vpcPeerInfo(fixtProdVPCID, "123456789012"),
+			AccepterVpcInfo:        vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID),
 		},
 		{
 			VpcPeeringConnectionId: aws.String(WarnPeerPendingID),

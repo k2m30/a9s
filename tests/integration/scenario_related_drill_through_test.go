@@ -96,6 +96,7 @@ var drillThroughFixtures = []struct {
 	// eks-node-lt. Union semantics cover the full §2 contract.
 	{"lt/prod-web-lt", "lt", demofixtures.ProdWebLTID},
 	{"lt/eks-node-lt", "lt", demofixtures.EKSNodeLTID},
+	{"vpc-peer/prod-peer-shared", "vpc-peer", demofixtures.ProdPeerSharedID},
 }
 
 // drillThroughGroups collapses the flat fixture list into groups sharing a

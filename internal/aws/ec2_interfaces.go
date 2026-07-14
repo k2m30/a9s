@@ -123,6 +123,15 @@ type EC2DescribeLaunchTemplateVersionsAPI interface {
 	DescribeLaunchTemplateVersions(ctx context.Context, params *ec2.DescribeLaunchTemplateVersionsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplateVersionsOutput, error)
 }
 
+// EC2DescribeVpcPeeringConnectionsAPI defines the interface for the EC2
+// DescribeVpcPeeringConnections operation — the single list call that
+// carries full detail (Status, ExpirationTime, both VpcInfo sides) for VPC
+// Peering Connections; no per-connection describe exists
+// (docs/resources/vpc-peer.md §1).
+type EC2DescribeVpcPeeringConnectionsAPI interface {
+	DescribeVpcPeeringConnections(ctx context.Context, params *ec2.DescribeVpcPeeringConnectionsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcPeeringConnectionsOutput, error)
+}
+
 // EC2API is the aggregate interface covering all EC2 operations used by a9s fetchers.
 // *ec2.Client structurally satisfies this interface.
 type EC2API interface {
@@ -148,4 +157,5 @@ type EC2API interface {
 	EC2DescribeFlowLogsAPI               // Wave 2 enrichment
 	EC2DescribeLaunchTemplateVersionsAPI // asg→ami, asg→role, asg→sg
 	EC2DescribeLaunchTemplatesAPI        // lt list call (lt_interfaces.go)
+	EC2DescribeVpcPeeringConnectionsAPI  // vpc-peer list call (vpcpeer.go)
 }

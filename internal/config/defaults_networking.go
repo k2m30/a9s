@@ -211,6 +211,21 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Path: "As2ServiceManagedEgressIpAddresses"},
 			},
 		},
+		"vpc-peer": {
+			List: []ListColumn{
+				{Title: "Pcx Id", Path: "VpcPeeringConnectionId", Width: 24},
+				{Title: "Status", Key: "status", Width: 34},
+				{Title: "Requester VPC", Path: "RequesterVpcInfo.VpcId", Width: 22},
+				{Title: "Requester Owner", Path: "RequesterVpcInfo.OwnerId", Width: 14},
+				{Title: "Accepter VPC", Path: "AccepterVpcInfo.VpcId", Width: 22},
+				{Title: "Accepter Owner", Path: "AccepterVpcInfo.OwnerId", Width: 14},
+				{Title: "Expires", Key: "expires", Width: 17},
+			},
+			Detail: []DetailField{
+				{Path: "VpcPeeringConnectionId"}, {Path: "Status"}, {Path: "ExpirationTime"},
+				{Path: "RequesterVpcInfo"}, {Path: "AccepterVpcInfo"}, {Path: "Tags"},
+			},
+		},
 		// Child views for networking resources
 		"elb_listeners": {
 			List: []ListColumn{

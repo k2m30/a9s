@@ -309,6 +309,7 @@ var navigableContracts = []navContract{
 	{shortName: "sns", apiDoc: "https://docs.aws.amazon.com/sns/latest/api/API_Topic.html", fieldPath: "", targetType: "", reasoning: "Topic summary has only TopicArn; attributes (KmsMasterKeyId) are fetched via GetTopicAttributes, out of list scope."},
 	{shortName: "sqs", apiDoc: "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_GetQueueAttributes.html", fieldPath: "", targetType: "", reasoning: "Queue attributes are fetched separately; KmsMasterKeyId is one but a9s doesn't surface it on the list today."},
 	{shortName: "vpc", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html", fieldPath: "", targetType: "", reasoning: "VPC has no cross-resource IDs on DescribeVpcs (associations are separate)."},
+	{shortName: "vpc-peer", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcPeeringConnection.html", fieldPath: "", targetType: "", reasoning: "VpcPeeringConnection's only structural ARN-shaped fields are Requester/AccepterVpcInfo.VpcId, and the remote side is frequently a cross-account VPC absent from the local cache — a drill-through would land on an empty view; the vpc related-panel pivot (checkVpcPeerVPC) applies the honest cache-membership gate instead (docs/resources/vpc-peer-impl-plan.md §0)."},
 	{shortName: "waf", apiDoc: "https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACLSummary.html", fieldPath: "", targetType: "", reasoning: "WebACL summary has no cross-resource IDs."},
 }
 

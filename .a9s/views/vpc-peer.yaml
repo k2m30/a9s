@@ -1,0 +1,30 @@
+list:
+  Pcx Id:
+    path: VpcPeeringConnectionId
+    width: 24
+  Status:
+    key: status
+    width: 34
+  Requester VPC:
+    path: RequesterVpcInfo.VpcId
+    width: 22
+  Requester Owner:
+    path: RequesterVpcInfo.OwnerId
+    width: 14
+  Accepter VPC:
+    path: AccepterVpcInfo.VpcId
+    width: 22
+  Accepter Owner:
+    path: AccepterVpcInfo.OwnerId
+    width: 14
+  Expires:
+    key: expires
+    width: 17
+
+detail:
+  - VpcPeeringConnectionId
+  - Status
+  - ExpirationTime
+  - RequesterVpcInfo
+  - AccepterVpcInfo
+  - Tags

@@ -794,6 +794,9 @@ func (f *fakeEC2VPCELogsFlowLogs) DescribeLaunchTemplateVersions(_ context.Conte
 func (f *fakeEC2VPCELogsFlowLogs) DescribeLaunchTemplates(_ context.Context, _ *ec2.DescribeLaunchTemplatesInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplatesOutput, error) {
 	return &ec2.DescribeLaunchTemplatesOutput{}, nil
 }
+func (f *fakeEC2VPCELogsFlowLogs) DescribeVpcPeeringConnections(_ context.Context, _ *ec2.DescribeVpcPeeringConnectionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcPeeringConnectionsOutput, error) {
+	return &ec2.DescribeVpcPeeringConnectionsOutput{}, nil
+}
 
 // fakeEC2VPCELogsError is a minimal EC2API fake whose DescribeFlowLogs always
 // fails, for exercising checkVPCELogs's error-propagation branch.
