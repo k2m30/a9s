@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.52.0] - 2026-07-15
+
+### Added
+
+- New resource type: **EC2 Launch Templates (`lt`, aliases `launch-template`,
+  `launchtemplate`, `launch-templates`, `lts`)** — the 69th type (main menu
+  70). One extra call per template reads the `$Default` version — what ASGs,
+  node groups and instances actually resolve at launch — funding every pivot
+  and every warning. Two security warnings a fleet owner actually chases:
+  `IMDSv1 allowed` (HttpTokens not `required` — and unset DEFAULTS to
+  optional; templates with the metadata endpoint explicitly disabled are
+  exempt) and `EBS encryption disabled` (explicit `Encrypted=false` only —
+  nil is unknown in default-encryption accounts, never flagged). A `~`
+  background check marks templates whose default version references a
+  deprecated AMI, cross-referenced against the already-loaded AMI list with
+  zero extra API calls.
+- **Blast-radius related panel for templates**: which Auto Scaling Groups
+  (plain, mixed-instances policy, and per-Overrides), which EKS node groups,
+  and which running instances (via the `aws:ec2launchtemplate:id` auto-tag)
+  launch from this template — plus the template's own AMI, KMS key, security
+  groups (ids ∪ per-ENI groups) and pinned subnets. Truncated sibling lists
+  answer `?`, never a fake zero. A template whose `$Default` version is
+  denied keeps every listed field plus `details denied`.
+
+### Fixed
+
+- Transfer agreement details now show the RESOLVED AS2 IDs for both trading
+  partners (previously the bare profile ids), and certificate findings —
+  expired AND expiring — all reach the Attention section (previously at
+  most one survived the fold). Detail enrichment now carries every finding
+  for all types.
+- OpenSearch domains listed by a role denied `es:DescribeDomains` degrade
+  to `details denied` rows instead of vanishing with a hard error.
+- Humanize-flagged columns render humanized on warm-cache rows too — a
+  cached list no longer shows raw enums (`AMAZON_ISSUED`) where the live
+  render shows `Amazon Issued`.
+- Zooming out on a resource-level Cost Explorer drill no longer fires a
+  multi-month resource query past the 14-day retention (which replaced the
+  grid with a validation error) — the zoom stops at the retention boundary.
+
+### Changed
+
+- `make ready-to-release` is additive on top of `make ready-to-push`
+  (integration + live read-only smokes only) instead of re-running the
+  whole push gate.
+
 ## [3.51.0] - 2026-07-14
 
 ### Added
