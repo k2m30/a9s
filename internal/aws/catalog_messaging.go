@@ -361,7 +361,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:          "EventBridge Rules",
 		ShortName:     "eb-rule",
-		Aliases:       []string{"eb-rule", "eventbridge", "events"},
+		Aliases:       []string{"eb-rule", "eventbridge"},
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:ID",
 		Columns: []domain.Column{

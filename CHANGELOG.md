@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.49.1] - 2026-07-14
+
+### Fixed
+
+- `-c events` / `:events` no longer relies on registration order to resolve:
+  the alias was registered on both CloudTrail events and EventBridge rules.
+  It now belongs to CloudTrail events only (the documented behavior);
+  EventBridge rules keep `eb-rule` and `eventbridge`. A catalog-wide gate now
+  asserts every command name — alias or short name — maps to exactly one
+  resource type.
+
 ## [3.49.0] - 2026-07-14
 
 ### Fixed
