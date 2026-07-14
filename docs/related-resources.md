@@ -106,6 +106,7 @@
 | `kms` | [API_KeyMetadata](https://docs.aws.amazon.com/kms/latest/APIReference/API_KeyMetadata.html) | `ct-events`, `dbi`, `ebs`, `role`, `secrets` |
 | `lambda` | [API_FunctionConfiguration](https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html) | `alarm`, `apigw`, `cf`, `cfn`, `ct-events`, `ddb`, `eb-rule`, `ecr`, `efs`, `eni`, `kinesis`, `kms`, `logs`, `msk`, `role`, `s3`, `secrets`, `sg`, `sns`, `sns-sub`, `sqs`, `ssm`, `subnet`, `tg`, `vpc` |
 | `logs` | [API_LogGroup](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_LogGroup.html) | `alarm`, `apigw`, `ct-events`, `ecs-task`, `kinesis`, `kms`, `lambda`, `s3` |
+| `lt` | [API_ResponseLaunchTemplateData](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_ResponseLaunchTemplateData.html) | `ami`, `asg`, `ct-events`, `ec2`, `kms`, `ng`, `sg`, `subnet` |
 | `msk` | [v1-clusters](https://docs.aws.amazon.com/msk/1.0/apireference/v1-clusters.html) | `alarm`, `cfn`, `ct-events`, `kms`, `lambda`, `logs`, `s3`, `secrets`, `sg`, `subnet`, `vpc` |
 | `mwaa` | [API_Environment](https://docs.aws.amazon.com/mwaa/latest/API/API_Environment.html) | `alarm`, `ct-events`, `kms`, `logs`, `role`, `s3`, `sg`, `subnet` |
 | `nat` | [API_NatGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.html) | `alarm`, `ct-events`, `eip`, `eni`, `rtb`, `subnet`, `vpc` |
@@ -693,6 +694,26 @@ AWS API: <https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 - **`kms`** — LogGroup.KmsKeyId.
 - **`lambda`** — Lambdas whose logs land here OR subscription-filter consumers.
 - **`s3`** — Export tasks to S3.
+
+### `lt`
+
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_ResponseLaunchTemplateData.html>
+
+One-call budget: `DescribeLaunchTemplates` carries no `LaunchTemplateData` at all — every pivot field below comes from the fetcher's single `DescribeLaunchTemplateVersions(Versions=["$Default"])` call per template. `$Default` (not `$Latest`) is what `asg`/`ng`/`ec2` actually resolve at launch; `$Latest` is staging.
+
+- **`ami`** — `LaunchTemplateData.ImageId` when it matches `ami-` (a `resolve:ssm:` reference is a display fact, not a pivot).
+- **`asg`** — loaded-cache cross-ref: `AutoScalingGroup.LaunchTemplate.LaunchTemplateId`, `MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification`, and per-`Overrides[]` specifications — "which fleets launch from this template".
+- **`ct-events`** — audit trail: who bumped the default version.
+- **`ec2`** — loaded-cache cross-ref by the auto-tag `aws:ec2launchtemplate:id` (catches direct, ASG, and NG launches); degrades to unknown when the ec2 cache is truncated — never a fake 0.
+- **`kms`** — `BlockDeviceMappings[].Ebs.KmsKeyId` in key-id/ARN form only (alias forms are detail-only; zero counts expected on most templates).
+- **`ng`** — loaded-cache cross-ref: `Nodegroup.LaunchTemplate.Id`/`Name`.
+- **`sg`** — union of `LaunchTemplateData.SecurityGroupIds` ∪ `NetworkInterfaces[].Groups` (mutually exclusive by API design); `SecurityGroups` (names, EC2-Classic legacy) are detail-only.
+- **`subnet`** — `NetworkInterfaces[].SubnetId` — usually empty by design (the subnet normally comes from the ASG/NG side); rendered only when non-empty.
+
+Explicitly excluded:
+
+- **`role`** — `IamInstanceProfile` is a PROFILE, not a role; resolving profile→role needs `iam:GetInstanceProfile` (a second API call per template), and a name-equality heuristic is dishonest. Detail field only.
+- **`eks`** — the cluster reference lives on the node group; pivot via `ng`.
 
 ### `msk`
 
