@@ -135,6 +135,7 @@
 | `trail` | [API_Trail](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Trail.html) | `ct-events`, `kms`, `logs`, `role`, `s3`, `sns` |
 | `transfer` | [API_DescribedServer](https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html) | `acm`, `ct-events`, `eip`, `lambda`, `logs`, `role`, `subnet`, `vpc`, `vpce` |
 | `vpc` | [API_Vpc](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html) | `cfn`, `ct-events`, `ec2`, `elb`, `eni`, `igw`, `nat`, `rtb`, `sg`, `subnet`, `tgw`, `vpce` |
+| `vpc-peer` | [API_VpcPeeringConnection](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcPeeringConnection.html) | `ct-events`, `rtb`, `vpc` |
 | `vpce` | [API_VpcEndpoint](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html) | `alarm`, `ct-events`, `eni`, `logs`, `r53`, `rtb`, `sg`, `subnet`, `vpc` |
 | `waf` | [API_WebACL](https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html) | `alarm`, `apigw`, `cf`, `ct-events`, `elb`, `logs` |
 
@@ -1107,6 +1108,20 @@ AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html>
 - **`subnet`** — Subnets in this VPC.
 - **`tgw`** — VPC attachments to TGWs.
 - **`vpce`** — VPC endpoints in this VPC.
+
+### `vpc-peer`
+
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcPeeringConnection.html>
+
+Load-bearing SDK fact: `CidrBlock`/`CidrBlockSet` on `RequesterVpcInfo`/`AccepterVpcInfo` are returned ONLY for `active` connections — nil in every other state (SDK doc comment states this verbatim). Nil-safe rendering is mandatory; the CIDR-overlap check is active-only.
+
+- **`rtb`** — scan the loaded `rtb` cache for `Routes[].VpcPeeringConnectionId == <pcx-id>` — "who actually routes to this peer"; zero API calls. The pivot that makes the type worth adding.
+- **`vpc`** — symmetric CACHE-MEMBERSHIP GATE: pivot only for whichever side's `VpcId` is present in the loaded local `vpc` cache (a cross-account remote side is never in the cache → rendered as a plain fact `VpcId + OwnerId + Region`, not a pivot). Never hardcode requester-is-local.
+- **`ct-events`** — audit trail: Create/Accept/Reject/Delete/ModifyVpcPeeringConnection*. Universal pivot.
+
+Explicitly excluded:
+
+- **`sg`** — no declared link exists; a fuzzy CIDR/referenced-SG scan is noise, and cross-region peers cannot reference SGs at all. Wave 3.
 
 ### `vpce`
 
