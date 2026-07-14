@@ -213,6 +213,21 @@ func (c *Controller) clearDetailFindingsForType(resourceType string) {
 func (c *Controller) ApplyDetailEnrichmentForResource(resourceType, resourceID string, enriched resource.Resource, f *domain.Finding, ad *domain.AttentionDetail) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	// Universal rule 7 / S5: every issue-severity finding the enricher found
+	// must reach ds.Findings, not just the caller-folded (f, ad) pair —
+	// primaryWave2Finding (internal/tui/app_enrich_fold.go) only recognizes
+	// "wave2:"-sourced findings and folds them to a single worst-severity
+	// one, so a wave1-sourced finding set an on-demand DetailEnrich computes
+	// (e.g. transfer_children.go's cert-expiry checks) would otherwise never
+	// reach an already-open detail. applyFindingToState already re-tags every
+	// non-"wave2:" finding as "wave2:controller" before appending, and sorts
+	// Broken before Warning when the Attention block renders — both reused
+	// unchanged here.
+	fallbackFindings := singleFindingSlice(f)
+	attentionDetails := singleAttentionDetailMap(f, ad)
+	if len(enriched.AttentionDetails) > 0 {
+		attentionDetails = enriched.AttentionDetails
+	}
 	for i := range c.stack {
 		if c.stack[i].ID != runtime.ScreenDetail {
 			continue
@@ -221,9 +236,40 @@ func (c *Controller) ApplyDetailEnrichmentForResource(resourceType, resourceID s
 		if ds == nil || ds.Resource.ID != resourceID || ds.ResourceType != resourceType {
 			continue
 		}
+		findings := fallbackFindings
+		if len(enriched.Findings) > 0 {
+			// Some DetailEnrichers (enrichPolicy/enrichRolePolicy) pass the
+			// resource's own wave1 Findings through unchanged in
+			// enriched.Findings — filter those back out, or the
+			// strip-then-append cycle below would re-append and retag a
+			// duplicate of an already-seeded finding on every enrichment
+			// cycle (e.g. a policy's orphan/unattached finding, re-opened
+			// each time the detail re-enriches).
+			findings = newlyReportedFindings(ds.Findings, enriched.Findings)
+		}
 		ds.Resource = enriched
-		c.applyFindingToState(ds, singleFindingSlice(f), singleAttentionDetailMap(f, ad))
+		c.applyFindingToState(ds, findings, attentionDetails)
 	}
+}
+
+// newlyReportedFindings returns the subset of candidates whose Code is not
+// already present among current's non-"wave2:"-tagged ("seed") entries — the
+// pre-enrichment resource's own wave1 findings, which applyFindingToState's
+// strip-then-append cycle always keeps untouched across repeated calls.
+func newlyReportedFindings(current, candidates []domain.Finding) []domain.Finding {
+	seedCodes := make(map[domain.FindingCode]bool, len(current))
+	for _, fi := range current {
+		if !strings.HasPrefix(string(fi.Source), "wave2:") {
+			seedCodes[fi.Code] = true
+		}
+	}
+	out := make([]domain.Finding, 0, len(candidates))
+	for _, fi := range candidates {
+		if !seedCodes[fi.Code] {
+			out = append(out, fi)
+		}
+	}
+	return out
 }
 
 // applyFindingToState merges (or clears, when findings is empty) wave-2

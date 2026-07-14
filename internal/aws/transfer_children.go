@@ -166,11 +166,19 @@ func enrichTransferAgreement(ctx context.Context, clients any, res resource.Reso
 	enriched := res
 	enriched.Fields = make(map[string]string, len(res.Fields))
 	maps.Copy(enriched.Fields, res.Fields)
+	// fieldpath.ExtractFieldList resolves {Path: "LocalProfileId"} /
+	// {Path: "PartnerProfileId"} via its designed override lookup —
+	// Fields[ToSnakeCase(path)] — BEFORE falling back to RawStruct, so the
+	// "_id"-suffixed keys below (not the list-column "local_profile" /
+	// "partner_profile" keys above) are what the rendered detail actually
+	// picks up.
 	if localAs2ID != "" {
 		enriched.Fields["local_profile"] = localAs2ID
+		enriched.Fields["local_profile_id"] = localAs2ID
 	}
 	if partnerAs2ID != "" {
 		enriched.Fields["partner_profile"] = partnerAs2ID
+		enriched.Fields["partner_profile_id"] = partnerAs2ID
 	}
 
 	var findings []domain.Finding

@@ -26,11 +26,16 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/transfer"
 	transfertypes "github.com/aws/aws-sdk-go-v2/service/transfer/types"
 
+	"github.com/k2m30/a9s/v3/internal/app"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
+	"github.com/k2m30/a9s/v3/internal/semantics/projection"
+	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // ---------------------------------------------------------------------------
@@ -678,5 +683,186 @@ func TestTransferAgreementDetailEnrich_CertExpiry(t *testing.T) {
 	}
 	if expiringFinding.Severity != domain.SevWarn {
 		t.Errorf("expiring-cert Severity = %v, want SevWarn", expiringFinding.Severity)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Agreement detail — the resolved As2Id must be visible through the SAME
+// config-driven render path DetailModel.buildFieldList actually uses
+// (the generic projector + fieldpath.ExtractFieldList), not merely present
+// somewhere on the enricher's return value. defaults_networking.go's
+// transfer_agreements Detail declares {Path: "LocalProfileId"} /
+// {Path: "PartnerProfileId"} (docs/resources/transfer.md §2.1).
+// ---------------------------------------------------------------------------
+
+// TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail verifies that
+// enrichTransferAgreement's resolved As2Id values actually reach the rendered
+// detail content, not just Resource.Fields.
+//
+// BUG: enrichTransferAgreement writes the resolved As2Id into
+// Fields["local_profile"]/Fields["partner_profile"] (the same keys
+// buildTransferAgreementResource's list-column uses), but the Detail config
+// path is "LocalProfileId"/"PartnerProfileId". fieldpath.ExtractFieldList
+// (the function projection.GenericWithConfig — and so DetailModel.
+// buildFieldList — actually calls) looks up a Fields-map hit by case-
+// insensitive exact match first, then by fieldpath.ToSnakeCase(path): for
+// "LocalProfileId" that is "local_profile_id" (WITH a trailing "_id"), which
+// never matches the enricher's "local_profile" key. So the Fields-map lookup
+// misses, ExtractFieldList falls back to reflecting RawStruct.LocalProfileId
+// directly — the ORIGINAL, unresolved bare profile id ("lp-1") — and the
+// resolved As2Id ("ACME-LOCAL") the enricher computed is never shown.
+func TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail(t *testing.T) {
+	childShortName := transferAgreementsChildShortName(t)
+	enrich := resource.GetDetailEnricher(childShortName)
+	if enrich == nil {
+		t.Fatalf("no DetailEnricher registered for transfer agreements child type %q", childShortName)
+	}
+
+	agreements := fetchTransferAgreementsForServer(t, fixtures.ProdAS2GatewayID)
+	agreement := mustFindTransferResource(t, agreements, fixtures.AgreementProdPartnerID)
+
+	clients := &awsclient.ServiceClients{Transfer: fakes.NewTransfer()}
+	enriched, err := enrich(context.Background(), clients, agreement)
+	if err != nil {
+		t.Fatalf("DetailEnrich returned error: %v", err)
+	}
+
+	// buildFieldList (internal/tui/views/detail_fields.go) sets r.Type =
+	// m.resourceType before invoking the projector whenever the resource
+	// itself carries no Type — mirror that exactly so this test exercises
+	// the real config-driven render path rather than a synthetic shortcut.
+	enriched.Type = childShortName
+
+	sections := projection.GenericWithConfig(config.DefaultConfig())(enriched)
+	if len(sections) == 0 {
+		t.Fatal("projector returned zero sections for the enriched agreement resource")
+	}
+
+	rendered := make(map[string]string, 8)
+	for _, sec := range sections {
+		for _, item := range sec.Items {
+			if item.Path != "" {
+				rendered[item.Path] = item.Value
+			}
+		}
+	}
+
+	if got, want := rendered["LocalProfileId"], "ACME-LOCAL"; got != want {
+		t.Errorf("rendered LocalProfileId = %q, want resolved As2Id %q — enriched.Fields[\"local_profile\"]=%q IS set correctly by enrichTransferAgreement but never reaches the detail render path (see test doc comment)", got, want, enriched.Fields["local_profile"])
+	}
+	if got, want := rendered["PartnerProfileId"], "PARTNER-CO"; got != want {
+		t.Errorf("rendered PartnerProfileId = %q, want resolved As2Id %q — same fieldpath.ExtractFieldList snake_case mismatch as LocalProfileId (enriched.Fields[\"partner_profile\"]=%q)", got, want, enriched.Fields["partner_profile"])
+	}
+}
+
+// newTestController builds a hermetic *app.Controller paired with
+// t.TempDir()/t.Cleanup(c.Close) in the correct LIFO order — this package's
+// own copy of app_controller_test.go's helper of the same name (that one
+// lives in the separate package unit_test and is not visible here).
+// Required by TestControllerConstructionDisciplineGate
+// (qa_controller_construction_discipline_test.go): a direct app.New(...)
+// call is only exempt from that gate's ratchet when its enclosing function
+// is one of the blessed helper names, because only those helpers are known
+// to close the async-availability-cache-save TempDir-leak race (see that
+// gate's file-level doc comment).
+func newTestController(t *testing.T) *app.Controller {
+	t.Helper()
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	s := session.New()
+	s.Profile = "demo"
+	s.Region = "us-east-1"
+	core := runtime.New(s, nil)
+	c := app.New(core)
+	t.Cleanup(c.Close)
+	return c
+}
+
+// ---------------------------------------------------------------------------
+// Agreement detail — BOTH independently-evaluated cert findings (Broken
+// "expired" + Warning "expires in <N>d") must reach an ALREADY-OPEN detail's
+// Attention block, Broken first, not just the enricher's own return value
+// (universal rule 7 / S5: no finding silently disappears).
+// ---------------------------------------------------------------------------
+
+// TestTransferAgreementDetailEnrich_BothCertFindingsReachOpenDetailAttention
+// reproduces the production on-demand detail-enrichment sequence exactly:
+// EnsureDetailState opens a detail for the pre-enrichment agreement (zero
+// findings, since an ACTIVE agreement carries none), then
+// Controller.ApplyDetailEnrichmentForResource is called the same way
+// internal/tui/runtime_adapter_resources.go's handleEnrichDetailResult calls
+// it: `ef, ad := primaryWave2Finding(msg.EnrichedRes)` followed by
+// `ApplyDetailEnrichmentForResource(msg.ResourceType, msg.ResourceID,
+// msg.EnrichedRes, ef, ad)`.
+//
+// BUG: primaryWave2Finding (internal/tui/app_enrich_fold.go) only recognizes
+// findings whose Source has the "wave2:" prefix, and folds to the single
+// WORST one. The agreement's cert findings are Source "wave1"
+// (transfer_children.go's transferCertificateFinding), so
+// primaryWave2Finding(enriched) computes (nil, nil) for this exact resource —
+// reproduced verbatim below. ApplyDetailEnrichmentForResource then wraps that
+// nil pair via singleFindingSlice/singleAttentionDetailMap into empty
+// slices/maps, so NEITHER cert finding — not even the Broken "expired" one —
+// ever reaches ds.Findings, even though enriched.Findings already holds both.
+func TestTransferAgreementDetailEnrich_BothCertFindingsReachOpenDetailAttention(t *testing.T) {
+	childShortName := transferAgreementsChildShortName(t)
+	enrich := resource.GetDetailEnricher(childShortName)
+	if enrich == nil {
+		t.Fatalf("no DetailEnricher registered for transfer agreements child type %q", childShortName)
+	}
+
+	agreements := fetchTransferAgreementsForServer(t, fixtures.ProdAS2GatewayID)
+	agreement := mustFindTransferResource(t, agreements, fixtures.AgreementProdPartnerID)
+	if len(agreement.Findings) != 0 {
+		t.Fatalf("precondition: ACTIVE agreement should start with 0 findings, got %+v", agreement.Findings)
+	}
+
+	clients := &awsclient.ServiceClients{Transfer: fakes.NewTransfer()}
+	enriched, err := enrich(context.Background(), clients, agreement)
+	if err != nil {
+		t.Fatalf("DetailEnrich returned error: %v", err)
+	}
+	if len(enriched.Findings) != 2 {
+		t.Fatalf("precondition: enriched agreement should carry 2 cert findings (Broken expired + Warn expiring), got %+v", enriched.Findings)
+	}
+
+	ctrl := newTestController(t)
+
+	ctrl.ApplyIntents([]runtime.UIIntent{
+		runtime.PushScreen{
+			ID:      runtime.ScreenDetail,
+			Context: runtime.ScreenContext{ResourceType: childShortName, ResourceID: agreement.ID},
+		},
+	})
+	ctrl.EnsureDetailState(agreement, childShortName)
+
+	// Reproduce handleEnrichDetailResult's exact production call: for this
+	// exact enriched resource, primaryWave2Finding computes (nil, nil) today
+	// (see doc comment above) — passed through verbatim.
+	ctrl.ApplyDetailEnrichmentForResource(childShortName, agreement.ID, enriched, nil, nil)
+
+	snap := ctrl.Snapshot()
+	if snap.Body.Detail == nil {
+		t.Fatal("Body.Detail is nil after ApplyDetailEnrichmentForResource")
+	}
+
+	var attentionText []string
+	for _, f := range snap.Body.Detail.Fields {
+		if f.Path == "Attention" {
+			attentionText = append(attentionText, f.Value)
+		}
+	}
+	joined := strings.ToLower(strings.Join(attentionText, " | "))
+
+	idxExpired := strings.Index(joined, "expired")
+	idxExpiring := strings.Index(joined, "expires in")
+
+	if idxExpired == -1 {
+		t.Errorf("BUG: open agreement detail's Attention block is missing the Broken %q finding for cert %q (got rows: %v) — see test doc comment for root cause", "expired", fixtures.CertExpiredID, attentionText)
+	}
+	if idxExpiring == -1 {
+		t.Errorf("BUG: open agreement detail's Attention block is missing the Warning %q finding for cert %q (got rows: %v) — same root cause as the expired-cert failure above", "expires in <N>d", fixtures.CertExpiringID, attentionText)
+	}
+	if idxExpired != -1 && idxExpiring != -1 && idxExpired > idxExpiring {
+		t.Errorf("Attention block must list the Broken finding before the Warning finding; got rows: %v", attentionText)
 	}
 }

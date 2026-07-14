@@ -8,6 +8,7 @@ package unit
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	ostypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	domainpkg "github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // ---------------------------------------------------------------------------
@@ -630,5 +632,65 @@ func TestOpenSearch_Fetch_Wave3ClusterHealthIsOutOfScope(t *testing.T) {
 		if f.Phrase == "cluster_health" || f.Phrase == "cluster health red" {
 			t.Errorf("Findings contains %q — Wave 3 signals must not surface in fetcher", f.Phrase)
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// E5 partial success — DescribeDomains ITSELF errors (e.g. es:DescribeDomains
+// denied). ListDomainNames succeeded, so every domain it named is a real,
+// listed domain; a batch-level DescribeDomains failure must not make them all
+// vanish. FetchOpenSearchDomainsAt already has a per-name degraded-row pass
+// for domains individually missing from a (successful) DescribeDomains
+// response (opensearch.go's "described[name]" loop) — this pins the sibling
+// case where the DescribeDomains call fails outright, which today short-
+// circuits via an early `return nil, err` before that pass ever runs.
+// ---------------------------------------------------------------------------
+
+func TestOpenSearch_Fetch_DescribeDomainsBatchError_KeepsListedDomainsAsDegradedRows(t *testing.T) {
+	listMock := &mockOSListDomainNamesAPI{
+		output: &opensearch.ListDomainNamesOutput{
+			DomainNames: []ostypes.DomainInfo{
+				{DomainName: aws.String("prod-search-a")},
+				{DomainName: aws.String("prod-search-b")},
+			},
+		},
+	}
+	describeMock := &mockOSDescribeDomainsAPI{
+		err: errors.New("AccessDeniedException: User is not authorized to perform: es:DescribeDomains"),
+	}
+
+	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	if err == nil {
+		t.Fatal("expected a non-nil composite error when the DescribeDomains batch call itself fails, got nil")
+	}
+
+	if len(resources) != 2 {
+		t.Fatalf("BUG: DescribeDomains batch error loses every listed domain instead of degrading each to a details-denied row — got %d resources, want 2 (opensearch.go's `if err != nil { return nil, fmt.Errorf(...) }` on the DescribeDomains call returns before the existing per-name degraded-row pass ever runs, so an es:DescribeDomains denial makes the whole account's OpenSearch list vanish instead of showing degraded rows)", len(resources))
+	}
+
+	wantIDs := map[string]bool{"prod-search-a": true, "prod-search-b": true}
+	for _, r := range resources {
+		if !wantIDs[r.ID] {
+			t.Errorf("unexpected resource ID %q in degraded result, want one of %v", r.ID, []string{"prod-search-a", "prod-search-b"})
+			continue
+		}
+		delete(wantIDs, r.ID)
+
+		if r.Fields["status"] != "details denied" {
+			t.Errorf("domain %q: Fields[\"status\"] = %q, want %q", r.ID, r.Fields["status"], "details denied")
+		}
+		if len(r.Findings) != 1 {
+			t.Fatalf("domain %q: Findings = %+v, want exactly 1 details-denied finding", r.ID, r.Findings)
+		}
+		wantCode := awsclient.DetailsDeniedCode("opensearch")
+		if r.Findings[0].Code != wantCode {
+			t.Errorf("domain %q: Findings[0].Code = %q, want %q", r.ID, r.Findings[0].Code, wantCode)
+		}
+		if r.Findings[0].Severity != domainpkg.SevWarn {
+			t.Errorf("domain %q: Findings[0].Severity = %v, want SevWarn", r.ID, r.Findings[0].Severity)
+		}
+	}
+	if len(wantIDs) != 0 {
+		t.Errorf("missing degraded rows for listed domains: %v", wantIDs)
 	}
 }

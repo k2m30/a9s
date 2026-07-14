@@ -154,7 +154,17 @@ func FetchOpenSearchDomainsAt(
 		})
 	})
 	if err != nil {
-		return nil, fmt.Errorf("describing OpenSearch domains: %w", err)
+		// The DescribeDomains batch call itself failing (e.g. an es:DescribeDomains
+		// IAM denial) must not drop every listed domain — mirrors the
+		// missing-from-response degraded pass below: a listed domain never vanishes.
+		rows := make([]resource.Resource, 0, len(domainNames))
+		var failures []string
+		for _, name := range domainNames {
+			nameCopy := name
+			failures = append(failures, fmt.Sprintf("%s: %s", name, err.Error()))
+			rows = append(rows, DegradedDetailsDenied("opensearch", name, opensearchtypes.DomainStatus{DomainName: &nameCopy}))
+		}
+		return rows, AggregateFailures("opensearch: DescribeDomains", failures, len(domainNames))
 	}
 
 	var resources []resource.Resource
