@@ -53,7 +53,7 @@ Read these first:
 
 - `AGENTS.md`
 - `docs/design/qa-user-stories-related-views-ec2.md`
-- `docs/design/related-resources.md`
+- `docs/related-resources.md` (golden contract) + `docs/related-resources-engine.md`
 - `docs/design/child-views`
 - `docs/design/resource-to-cloudtrail-preview`
 - any other directly relevant design or QA docs for the flow under test
@@ -136,7 +136,8 @@ After finding a mismatch, inspect relevant code to explain it.
 Typical files:
 - `internal/aws/ec2.go`
 - `internal/aws/ami.go`
-- `internal/tui/app_handlers.go`
+- `internal/tui/app_dispatch.go` / `internal/tui/runtime_adapter_*.go` (adapter handlers)
+- `internal/app/` + `internal/runtime/` (shared controller / core logic)
 - `internal/tui/views/detail.go`
 - `internal/tui/views/rightcolumn.go`
 - `internal/tui/views/help.go`

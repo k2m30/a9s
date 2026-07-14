@@ -8,10 +8,10 @@ description: Shared rules for all a9s agents — shell rules, package access, bu
 ## Package Access Rules
 
 - `internal/aws/` — ADD new fetcher files. Do NOT modify existing fetchers.
-- `internal/resource/types.go` — ADD new ResourceTypeDef entries only. Do NOT modify existing entries.
-- `internal/config/defaults.go` — ADD new default view definitions only. Do NOT modify existing entries.
+- `internal/aws/catalog_<category>.go` — ADD new `catalog.ResourceTypeDef` entries to the category slice only. Do NOT modify existing entries.
+- `internal/config/defaults_<category>.go` — ADD new default view definitions only. Do NOT modify existing entries.
 - `internal/fieldpath/` — FROZEN. Never modify.
-- `internal/tui/` — Modify views, styles, layout, keys, messages as needed.
+- `internal/tui/` — Modify views, styles, layout, keys as needed; message types live in `internal/runtime/messages/`.
 
 ## CI Path Filtering
 

@@ -145,7 +145,7 @@ When adding tests for new resource types, the architect provides:
 - Append points in existing files (grep pattern or function name)
 - Type signatures needed (SDK types, interface names)
 
-Follow the spec exactly. Use `/a9s-add-resource` skill for the test steps (8-12 only — skip implementation steps 1-7).
+Follow the spec exactly. The `a9s-implement-resource` skill (run by the main session) defines the test-file scope; write only the tests it hands you.
 
 ## Running Tests
 

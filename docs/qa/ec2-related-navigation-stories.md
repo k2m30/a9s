@@ -2,7 +2,7 @@
 
 Issue: #140 (EC2 related views)
 Feature spec: `specs/008-fix-ec2-detail-nav/spec.md`
-Design spec: `docs/design/related-resources.md` v4.3
+Design spec: `docs/historical/design/related-resources.md` v4.3 (archived; contract now in `docs/related-resources.md`)
 Depends on: `docs/qa/related-resources-stories.md` (Tier 1 common stories)
 
 ---

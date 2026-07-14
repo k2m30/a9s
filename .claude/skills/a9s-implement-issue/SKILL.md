@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 End-to-end pipeline for taking a GitHub issue from open to released. Covers analysis, QA stories, design, scoped task generation, implementation, verification, docs, and release prep.
 
-**Not for:** Issues tagged `new-resource` or `child-view` — use `a9s-add-resource` or `a9s-add-child-view` skills instead.
+**Not for:** Issues tagged `new-resource` or `child-view` — use `a9s-resource-spec` (spec) + `a9s-implement-resource` (implementation) instead.
 
 ## Phase Overview
 
@@ -297,7 +297,7 @@ Determine which shared docs need updates based on what changed:
 | What changed | Update |
 |-------------|--------|
 | Key bindings added/removed | `docs/shared/keybindings.md` |
-| Child views added/removed | `docs/shared/childviews.md` |
+| Child views added/removed | `docs/shared/keybindings.md` (child-view trigger keys) + `docs/design/child-views/` |
 | Commands added/removed | `docs/shared/commands.md` |
 | CLI flags changed | `docs/shared/quickstart.md` |
 | Config options changed | `docs/shared/config.md` |

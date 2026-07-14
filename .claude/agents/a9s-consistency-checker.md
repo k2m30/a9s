@@ -25,7 +25,7 @@ You produce a structured report. You do NOT fix anything — only report finding
 
 ### 1. Resource Types (code → README → website → tests)
 
-**Source of truth:** `internal/resource/types.go` — the `resourceTypes` slice.
+**Source of truth:** the catalog — per-category `catalog.ResourceTypeDef` slices in `internal/aws/catalog_*.go`, enumerated via `resource.AllResourceTypes()` / `catalog.All()`.
 
 Extract all entries and verify:
 - **README.md** "Supported AWS Services" table has the same types, same categories, same count
@@ -44,7 +44,7 @@ Extract all `key.NewBinding` definitions and verify:
 
 ### 3. Commands (code → README → website)
 
-**Source of truth:** `internal/tui/app.go` — the command handling in `handleCommand` or similar
+**Source of truth:** `internal/runtime/handlers.go` (`emitNavigateForCommand`) for command dispatch, plus catalog `Aliases` resolved by `resource.FindResourceType`
 
 Extract all `:command` handlers and verify:
 - **README.md** Commands table matches

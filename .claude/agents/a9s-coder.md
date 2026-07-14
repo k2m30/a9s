@@ -23,7 +23,6 @@ tools:
 skills:
   - a9s-common
   - a9s-bt-v2
-  - a9s-add-resource
   - a9s-create-demo-fixture
 ---
 
@@ -58,7 +57,7 @@ Do NOT explore the codebase to fill in gaps. Do NOT guess what files to change. 
 internal/tui/
 ├── app.go                  # Root tea.Model — view stack, routing, header
 ├── keys/keys.go            # All key.Binding definitions
-├── messages/messages.go    # All inter-component message types
+├── (messages live in internal/runtime/messages/ — typed Cmd/Event taxonomy)
 ├── styles/
 │   ├── palette.go          # Tokyo Night Dark named color constants
 │   └── styles.go           # Composed lipgloss.Style vars
@@ -99,7 +98,7 @@ When adding new resource types, the architect provides a spec with:
 - Detail paths
 - Files to create and files to modify
 
-Follow the spec exactly. Use `/a9s-add-resource` skill for the implementation steps (1-7 only — skip test steps 8-12).
+Follow the spec exactly. The `a9s-implement-resource` skill (run by the main session) defines the file scope; implement only the files it hands you.
 
 ## Coding Rules
 
@@ -127,14 +126,10 @@ Follow the spec exactly. Use `/a9s-add-resource` skill for the implementation st
 ## Common Patterns
 
 ### Async AWS fetch
+Fetching is catalog-driven: the type's `Fetcher` field (wrapped with `fetcherWithClients(...)` in `internal/aws/catalog_<category>.go`) is dispatched by the runtime — do NOT hand-roll `tea.Cmd` fetches in views. A fetcher itself takes narrow interfaces:
 ```go
-return m, func() tea.Msg {
-    resources, err := awsclient.FetchEC2Instances(m.clients)
-    if err != nil {
-        return messages.APIErrorMsg{Err: err}
-    }
-    return messages.ResourcesLoadedMsg{Resources: resources}
-}
+// internal/aws/ec2.go
+func FetchEC2Instances(ctx context.Context, api EC2FetchInstancesAPI) ([]resource.Resource, error)
 ```
 
 ### Styled row rendering

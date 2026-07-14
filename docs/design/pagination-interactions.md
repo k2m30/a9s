@@ -504,9 +504,9 @@ Changes needed to implement this spec:
 
 - [ ] **`resourcelist.go` View()**: Change load-more hint to include filter context
       hint when `m.filterText != ""` and `showLoadMore`
-- [ ] **`app_handlers.go` handleRefresh()**: Clear active filter before dispatching
+- [ ] **`handleRefresh()` (`internal/tui/runtime_adapter_navigate.go`)**: Clear active filter before dispatching
       fetch (add `SetFilter("")` call)
-- [ ] **`app_handlers.go` handleAPIError()**: Clear `loadingMore` on the active
+- [ ] **`handleAPIError()` (`internal/tui/app_flash.go`)**: Clear `loadingMore` on the active
       ResourceListModel when an API error arrives during pagination
 
 ### Nice to Have (polish)

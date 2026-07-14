@@ -84,7 +84,7 @@ The renderer already wires all five UI surfaces:
 - **S2** — `typeDef.ResolveColor(r)` reads `r.Fields["status"]` (and falls back to `r.Status` / other keys per the Color function); the Wave-2 enricher writes `FieldUpdates["status"]` which merges into `Fields`.
 - **S3** — `table_render.go` prefixes glyphs onto green rows based on finding severity.
 - **S4** — Status column reads `Fields["status"]` (fetcher seeds; enricher may overwrite via `FieldUpdates`). The `Resource.Status` field is the fetcher's initial value only — downstream Wave-2 updates land in Fields. Color functions that pattern-match on the Status phrase MUST read with the fallback `status := r.Status; if status == "" { status = r.Fields["status"] }` (the `Fields` fallback is what makes Wave-2 phrases like `"account SHUTDOWN"` reachable from a Healthy row).
-- **S5** — unified Attention section (`injectAttentionSection`) renders `Resource.Issues` (Wave-1) + `EnrichmentFinding` (Wave-2) together.
+- **S5** — unified Attention section (`injectAttentionSection`) renders every issue-severity entry of `Resource.Findings` (Wave-1 and Wave-2 alike) together.
 
 The universal rules below govern every per-resource run — they are the same for every resource type and asserted by phase 8's scenario test.
 
@@ -115,10 +115,10 @@ These rules are invariant across all resource types. They are enforced by phase 
 
    - **Navigable fields** route through the central `resource.NavIDFromValue` registry in `internal/resource/related.go`. Target types `kms`, `role`, `ecs`, `logs`, `s3`, `iam-user` already have extractors; add new target types there — NOT per-field.
    - **Related-pivot checkers** extract inline (the checker has full control over what it returns). The canonical pattern is `lambdaARNToName` in `internal/aws/ses_related.go` — split by `:function:`, strip any version suffix. Return bare names/UUIDs that match the target resource's `Resource.ID`. If the registered path does not resolve against the fetcher's RawStruct at all (structurally invalid — e.g. docdb DBCluster.DBSubnetGroup is `*string`, not a struct), REMOVE the registration and route navigation through the related-panel checker instead.
-6. **Detail view (S5) renders findings through the unified `Attention (N)` section** — one section, at the top of the detail view, with a count in the header. There are NO per-type section names (`Pending Maintenance`, `Latest Build`, `Target Health`, etc. — those existed before 2026-04-22 and were collapsed into the single Attention section). Every Wave-1 phrase from `Resource.Issues` and the Wave-2 `EnrichmentFinding` render as entries inside it. The renderer (`injectAttentionSection` in `internal/tui/views/detail_fields.go`) handles this universally — no per-resource code required. Entry presentation: each primary entry is `<glyph> <phrase>` with the first letter capitalized for readability (data stays canonical lowercase; the capitalization is purely visual via `capitalizeFirst`). Rows render indented beneath the primary entry as `Label: Value` pairs.
+6. **Detail view (S5) renders findings through the unified `Attention (N)` section** — one section, at the top of the detail view, with a count in the header. There are NO per-type section names (`Pending Maintenance`, `Latest Build`, `Target Health`, etc. — those existed before 2026-04-22 and were collapsed into the single Attention section). Every issue-severity entry of `Resource.Findings` (Wave-1 and Wave-2 alike) renders inside it. The renderer (`injectAttentionSection` in `internal/tui/views/detail_fields.go`) handles this universally — no per-resource code required. Entry presentation: each primary entry is `<glyph> <phrase>` with the first letter capitalized for readability (data stays canonical lowercase; the capitalization is purely visual via `capitalizeFirst`). Rows render indented beneath the primary entry as `Label: Value` pairs.
 7. **Multiple findings on the same instance remain individually visible across S2–S5.** S1 and S3 aggregate to one per instance (one count, one glyph — `!` beats `~`, color picks worst severity). But no finding may silently disappear. When an instance carries more than one finding:
    - **S4** renders the highest-precedence phrase plus a `(+N)` suffix when others exist on the same row — e.g. `storage-full (+2)`. The operator sees there is more to open for.
-   - **S5** Attention section lists every finding — one entry per Wave-1 phrase from `Resource.Issues`, one entry for the Wave-2 `EnrichmentFinding` (with its `Rows` as context lines), sorted `!` first then `~`. No entry is collapsed or summarised away.
+   - **S5** Attention section lists every finding — one entry per issue-severity `Finding` in `Resource.Findings` (Wave-1 and Wave-2 alike, with `AttentionDetails` rows as context lines), sorted `!` first then `~`. No entry is collapsed or summarised away.
    **Precedence is severity-first, wave-second.** Order for picking the top finding on a row:
    1. **Severity bucket** — Broken > Warning > Dim > Healthy-with-finding. The worst severity wins S2 (color), S3 (glyph, Healthy-only), S4 (phrase).
    2. **Within the same severity** — Wave 2 beats Wave 1 (Wave 2 findings carry richer cause text). Within Wave 2, `!` beats `~`.
@@ -128,14 +128,14 @@ These rules are invariant across all resource types. They are enforced by phase 
 
 ## Wave 2 enricher output contract
 
-Every Wave 2 enricher emits `resource.EnrichmentFinding` objects whose shape must obey this contract. The contract is codified in `internal/resource/enrichment.go`; the skill restates it here because violating it produces visible duplication in the Attention section.
+Every Wave 2 enricher returns an `IssueEnricherResult` whose `Findings` map carries `domain.Finding` entries per resource ID. The contract is codified in the doc comment on `IssueEnricherResult` in `internal/aws/issue_enrichment.go` (finding shape: `internal/domain/finding.go`); the skill restates it here because violating it produces visible duplication in the Attention section.
 
-- **Summary is the short S5 phrase.** Lowercase, ≈1–4 words, matching a §4-style phrase (e.g. `"pending maintenance"`, `"unhealthy targets 2/5"`, `"latest build failed"`). This is what renders beside the glyph on the Attention primary entry row, and it is also what may be promoted verbatim into the S4 Status column via `FieldUpdates["status"]` (so it has to fit there).
-- **Rows are the structured facts that support Summary.** Concrete values — the specific Action, Description, Earliest Target, failing-target names, failure timestamp — go in Rows as `Label: Value` pairs. Rows render beneath the primary entry as indented context.
-- **Never embed Row content in Summary.** Every fact lives in exactly ONE place. If the enricher sets `Summary = fmt.Sprintf("pending maintenance: %s (%s)", action, description)` while also emitting `Action` and `Description` as Rows, that's the anti-pattern — the Attention section will render both and the duplication is visible to the user. The test `TestDBI_Enrich_MaintenancePending_HealthyRow` asserts Summary does not contain any Row value as a substring; copy that shape for every new enricher.
-- **Summary is stable across instances of the same finding type.** It should not mutate based on the specific facts of one instance (that's what Rows are for). dbi's "pending maintenance" is the same phrase for every instance regardless of which action is pending; the Action row carries the per-instance detail.
+- **`Finding.Phrase` is the short S4 phrase.** Lowercase, ≈1–4 words, matching a §4-style phrase (e.g. `"pending maintenance"`, `"unhealthy targets 2/5"`, `"latest build failed"`). This is what renders in the S4 Status cell and beside the glyph on the Attention primary entry row. `Finding.Detail` is the optional full S5 operator sentence for the detail view; empty ⇒ callers fall back to Phrase.
+- **`AttentionDetails` rows are the structured facts that support Phrase.** Concrete values — the specific Action, Description, Earliest Target, failing-target names, failure timestamp — go in `AttentionDetails[id][code].Rows` as `Label: Value` pairs. Rows render beneath the primary entry as indented context.
+- **Never embed Row content in Phrase.** Every fact lives in exactly ONE place. If the enricher sets `Phrase = fmt.Sprintf("pending maintenance: %s (%s)", action, description)` while also emitting `Action` and `Description` as Rows, that's the anti-pattern — the Attention section will render both and the duplication is visible to the user. The test `TestDBI_Enrich_MaintenancePending_HealthyRow` asserts the phrase does not contain any Row value as a substring; copy that shape for every new enricher.
+- **Phrase is stable across instances of the same finding type.** It should not mutate based on the specific facts of one instance (that's what Rows are for). dbi's "pending maintenance" is the same phrase for every instance regardless of which action is pending; the Action row carries the per-instance detail.
 
-Phase 6b QA must include a test per enricher that asserts both `Summary == <short-phrase>` AND `!strings.Contains(Summary, rowValue)` for every Row value the enricher emits. Phase 7 coder rejects tasks that build Summary from concatenation of Row fields.
+Phase 6b QA must include a test per enricher that asserts both `Phrase == <short-phrase>` AND `!strings.Contains(Phrase, rowValue)` for every Row value the enricher emits. Phase 7 coder rejects tasks that build Phrase from concatenation of Row fields.
 
 ## Error handling and throttle rules (apply to every AWS call)
 
@@ -199,7 +199,7 @@ Different function categories surface errors through different channels. All cha
 | Category | Signature | Error field | Where FlashMsg fires |
 |----------|-----------|-------------|----------------------|
 | **Paginated top-level fetcher** | `func(ctx, clients, token) (FetchResult, error)` | Top-level `error` return | `app.go` `ResourcesLoadedMsg` handler → `FlashMsg{IsError:true}` |
-| **FetchByIDs (lazy-add)** | `func(ctx, clients, ids) ([]Resource, error)` | Top-level `error` return (composite per E3) | `app_related.go` `handleRelatedCheckStarted` sets `RelatedCheckResultMsg.LazyAddError`; `app.go` converts to FlashMsg |
+| **FetchByIDs (lazy-add)** | `func(ctx, clients, ids) ([]Resource, error)` | Top-level `error` return (composite per E3) | `(*Core).HandleRelatedCheckStarted` (`internal/runtime/related.go`) sets the lazy-add error; the TUI adapter (`internal/tui/runtime_adapter_related.go` `handleRelatedCheckStarted`) converts to a flash |
 | **Related checker** | `func(ctx, clients, src, cache) RelatedCheckResult` | `Result.Err` field on `RelatedCheckResult` | rightcolumn / app.go surfaces `Result.Err` as FlashMsg |
 | **Wave-2 issue enricher** | `func(ctx, clients, res) (IssueEnricherResult, error)` | **BOTH** `IssueEnricherResult.Truncated` + `IssueEnricherResult.TruncatedIDs[id]` (per-row `?` marker) **AND** the top-level `error` return (composite via `AggregateFailures`) | `EnrichmentCheckedMsg.Err` → `handleEnrichmentChecked` → FlashMsg |
 | **Detail enricher** | per-type signature | `DetailEnrichmentResult.Err` | app.go detail-enrichment handler → FlashMsg |
@@ -266,13 +266,13 @@ Phase 3's "one case per signal" is NECESSARY but NOT SUFFICIENT. Rule 7 (`(+N)` 
 | **U7b** | **Wave-1 + Wave-2 stack: bumps suffix** | **1 fixture with Wave-1 Warning AND a Wave-2 finding** | **`ExpectRowStatusEquals(id, "<w1phrase> (+1)")`** |
 | **U7c** | **S5 lists every Wave-2 finding in full** | **same fixture as U7b** | **`ExpectViewContains(<w2 cause>)` on detail** |
 | U7d | `!` beats `~` in multi-finding precedence | 1 fixture with both ! and ~ (if spec has both) | `ExpectRowNamePrefix("! ")` on Healthy stack |
-| **U7e** | **S5 lists every Wave-1 phrase as well — `Resource.Issues` surfaces in detail, not just in the Status column** | **multi-W1 fixture (`warn-<short>-multi`)** | **`ExpectViewContains(<phrase>)` on detail for each entry in `Resource.Issues` (with first letter capitalized — Attention applies `capitalizeFirst` at render time); the bare `<top phrase>` must appear without its `(+N)` suffix because the detail enumerates the entries, not the rolled-up Status string** |
-| **U7f** | **`Resource.Issues` carries fetcher-local Wave-1 phrases only — populated by the fetcher in §4 precedence order, one entry per active fetcher-detectable signal. Cross-ref Wave-1 phrases (which require sibling-cache access — orphan-style or retention-style signals) live ONLY in `EnrichmentFinding.Summary` + `Rows`, NOT in Resource.Issues.** | **every `warn-*` and `broken-*` fixture for fetcher-local signals; cross-ref signals tested via U7f'** | **unit test: `got.Issues` deep-equals the expected ordered slice for fetcher-local phrases; cross-ref phrases are absent from this slice** |
-| **U7f'** | **Cross-ref Wave-1 phrases (e.g. orphan, past-retention) are emitted by the issue enricher via `IssueEnricherResult.Findings[id]` with `Severity:"!"`, `Summary:"<§4 phrase>"`, and `Rows` for context. The enricher also emits `FieldUpdates[id]["status"]` so the list S4 column reflects the merged phrase. The result is idempotent across re-runs (Findings is map-keyed, FieldUpdates is map-keyed; both overwrite per resource ID).** | **1 fixture per cross-ref signal** | **unit test: `result.Findings[id].Summary == "<§4 phrase>"` AND `result.FieldUpdates[id]["status"] == "<merged §4 phrase>"`; running the enricher twice with the same inputs produces byte-identical outputs (no append, no double-suffix).** |
+| **U7e** | **S5 lists every Wave-1 phrase as well — each `Resource.Findings` entry surfaces in detail, not just in the Status column** | **multi-W1 fixture (`warn-<short>-multi`)** | **`ExpectViewContains(<phrase>)` on detail for each Finding's Phrase (with first letter capitalized — Attention applies `capitalizeFirst` at render time); the bare `<top phrase>` must appear without its `(+N)` suffix because the detail enumerates the entries, not the rolled-up Status string** |
+| **U7f** | **Fetcher-written `Resource.Findings` carries fetcher-local Wave-1 findings only — populated in §4 precedence order, one entry per active fetcher-detectable signal, `Source: "wave1"`. Cross-ref Wave-1 phrases (which require sibling-cache access — orphan-style or retention-style signals) arrive ONLY via the enricher's `IssueEnricherResult.Findings` channel, NOT from the fetcher.** | **every `warn-*` and `broken-*` fixture for fetcher-local signals; cross-ref signals tested via U7f'** | **unit test: the ordered Phrase slice of `got.Findings` deep-equals the expected fetcher-local phrases; cross-ref phrases are absent from this slice** |
+| **U7f'** | **Cross-ref Wave-1 phrases (e.g. orphan, past-retention) are emitted by the issue enricher via `IssueEnricherResult.Findings[id]` (`Phrase:"<§4 phrase>"`, issue severity) with `AttentionDetails` rows for context. NO `FieldUpdates["status"]` — the S4 cell derives from the merged Findings at render time. The result is idempotent across re-runs (Findings is map-keyed; overwrites per resource ID).** | **1 fixture per cross-ref signal** | **unit test: `result.Findings[id][0].Phrase == "<§4 phrase>"`; running the enricher twice with the same inputs produces byte-identical outputs (no append, no double-suffix).** |
 | U8 | Broken severity > Warning > `~` | fixture with Wave-1 Warning + Wave-2 Broken (if spec has it) | phrase precedence test |
 | U9 | Related pivot counts (`count shown: yes`) | 1 graph-root fixture | `ExpectRelatedRowCountAtLeast` per pivot |
 | U10 | No jargon columns | all fixtures | `ExpectViewNotContains("CIS", "Flags", …)` |
-| **U11** | **Summary ≠ Rows content (EnrichmentFinding contract)** | **every fixture with a Wave-2 finding that has Rows** | **unit test: `finding.Summary == <short-phrase>` AND `!strings.Contains(finding.Summary, row.Value)` for every Row** |
+| **U11** | **Phrase ≠ Rows content (Wave-2 enricher output contract)** | **every fixture with a Wave-2 finding that has AttentionDetails rows** | **unit test: `finding.Phrase == <short-phrase>` AND `!strings.Contains(finding.Phrase, row.Value)` for every Row** |
 | **U12** | **Partial AWS failure surfaces a FlashMsg with `IsError=true`** | **1 fixture: N items total; describe/get call errors on 2 of them (AccessDenied / NotFound)** | **scenario test: (a) list renders N−2 rows, (b) `FlashMsg` with `IsError=true` was emitted, (c) `errorHistory` contains a composite error naming the 2 failed IDs and reasons** |
 | **U13** | **Every SDK call is wrapped in `RetryOnThrottle`** | **n/a — static audit** | **phase-5 + phase-7.5 grep: zero matches of unwrapped `api.Describe*` / `api.Get*` / `api.List*` in new code** |
 | **U14** | **No enricher / related checker passes `r.ID` as an ARN-typed param when the fetcher emits `ID = bare name`** | **1 fixture in real fetcher shape** | **unit test: `qa_<short>_uses_arn_from_fields_test.go` with a strict fake that rejects non-ARN input; PLUS `TestNoIDAsARN_StaticGuard` must stay green after adding the enricher/checker** |
@@ -360,14 +360,14 @@ THEN:  rendered detail contains the Wave-2 finding's Action/Description rows
 TEST: detail_view_surfaces_every_wave1_phrase   (covers U7e)
 GIVEN: the multi-W1 fixture (`warn-<short>-multi`) with N≥2 coexisting §3.1 warnings
 WHEN:  OpenDetailResource on it
-THEN:  rendered detail contains EACH entry of `Resource.Issues` verbatim
+THEN:  rendered detail contains EACH `Resource.Findings` Phrase verbatim
        — the list Status shows "<top> (+N-1)", the detail enumerates
          every phrase so the operator never has to infer hidden warnings.
 
 TEST: fetcher_populates_resource_issues   (covers U7f)
 GIVEN: each §3 fixture (Healthy, single warning, multi warning, transitional, broken)
 WHEN:  FetchXxxPage runs on the fixture
-THEN:  got.Issues deep-equals the expected ordered slice
+THEN:  the ordered Phrase slice of got.Findings deep-equals the expected phrases
        — Healthy → nil / empty
        — N warnings → N phrases in §4 precedence order
        — broken / transitional → single-entry slice matching the §4 phrase
@@ -532,7 +532,7 @@ in the test file — the demo fixture never carries these because they corrupt t
 - docs/resources/<shortName>-impl-plan.md
 - internal/demo/fixtures/<shortName>.go (symbols and state coverage)
 - internal/aws/<shortName>_interfaces.go (mock signatures)
-- internal/resource/resource.go, internal/resource/enrichment.go
+- internal/resource/resource.go, internal/domain/finding.go, internal/aws/issue_enrichment.go (IssueEnricherResult doc comment)
 ```
 
 QA replies `SCORE: <N> — <rationale>`. Accept or rework. On accept, re-dispatch same scope with `Mode: execute` and `Confirmed score: <N>`.
@@ -566,45 +566,29 @@ Parallelization: parallel-safe with 6b QA (both run after 6a)
 - Fetcher maps AWS fields to resource.Resource per §2 Identity section.
 - Status/S4 column carries the exact text in the §4 "List text" column, never a bare state keyword.
 - Row color follows state bucket from §3.1.
-- Wave 2 enricher populates resource.EnrichmentFinding with the exact Summary from §4 "Detail text" column.
+- Wave 2 enricher emits `domain.Finding` entries whose `Phrase` is the exact §4 "List text" and whose `Detail` is the §4 "Detail text" sentence.
 - No invented UI. No row `·` dot. No `⚠ Background Check` header. No derived banner. See spec §"Allowed visualization surfaces".
 
-### Rule-7 implementation (multi-finding `(+N)` suffix) — MANDATORY:
+### Rule-7 implementation (multi-finding `(+N)` suffix) — framework-derived:
 
-Rule 7 is NOT wired by any universal infrastructure; each resource emits the `(+N)` suffix itself through its fetcher + enricher pair. Missing this is the most common implementation bug — verified against dbi on 2026-04-22.
+Rule 7 IS wired by universal infrastructure: `listPhraseFromFindings` (`internal/app/list_columns.go`) derives the S4 cell from the row's merged `Findings` slice — one finding → `"<phrase>"`, N≥2 → `"<top phrase> (+N-1)"`. NOBODY hand-appends `(+N)`; a fetcher or enricher that writes the suffix itself double-stacks it. The per-resource work is feeding the Findings slice correctly:
 
-1. **Fetcher — multi-W1 suffix**: when the resource has multiple §3.1 warnings that can coexist (e.g. `available` + `BackupRetentionPeriod=0` + `PubliclyAccessible=true`), collect ALL applicable warnings in §4 precedence order, then emit:
-   - 0 warnings → `""` (Healthy silence).
-   - 1 warning → `"<phrase>"` (single, no suffix).
-   - N≥2 → `"<top phrase> (+N-1)"`.
-   The top phrase is the first-in-precedence (per §4), the suffix is `(+<count of hidden warnings>)`. Never collapse silently to just the top phrase when >1 warning exists.
+1. **Fetcher — emit ALL coexisting Wave-1 findings**: when the resource has multiple §3.1 conditions that can coexist (e.g. `available` + `BackupRetentionPeriod=0` + `PubliclyAccessible=true`), populate `Resource.Findings` with one `domain.Finding` per active condition (`Source: "wave1"`), in §4 precedence order:
+   - 0 conditions → empty slice (Healthy silence, blank S4).
+   - N conditions → N entries; the first-in-precedence renders as the top phrase, the rest count into the `(+N-1)` suffix.
+   Never collapse silently to just the top finding when >1 condition exists — the framework needs the full list to render the count and to surface each entry in the detail Attention section. The common pattern is a `<shortName>StatusFindings(raw) []domain.Finding` helper beside the fetcher (see `acmStatusFindings` in `internal/aws/acm.go`).
 
-2. **Enricher — W1+W2 suffix bumping**: when a Wave-2 finding lands on a row whose fetcher-produced `Resource.Status` is non-empty, the enricher MUST bump the `(+N)` suffix in `FieldUpdates[id]["status"]` — NOT overwrite with the Wave-2 phrase (Wave-1 wins severity precedence), NOT leave Status alone (the operator loses the finding-count signal). Use the shared package helper — do NOT reinvent:
-   ```go
-   import "github.com/k2m30/a9s/v3/internal/resource"
-   // "publicly accessible"        → "publicly accessible (+1)"
-   // "publicly accessible (+1)"   → "publicly accessible (+2)"
-   newStatus := resource.BumpFindingSuffix(existing)
-   ```
-   On Healthy rows (Status == ""), set the spec's Wave-2 short cause verbatim (e.g. `"maintenance scheduled"`) — no suffix, single finding.
+2. **Enricher — emit Findings, never touch the suffix**: each Wave-2 condition is one `domain.Finding` (Source `"wave2:<short>"`) in `IssueEnricherResult.Findings[id]`. The framework merges it into the row's slice and re-derives the S4 cell; severity precedence is handled by the shared reducer `domain.WorstSeverityFinding`. Do NOT write a `(+N)` suffix into `FieldUpdates["status"]` — `FieldUpdates` is only for Wave-2-derived field values that list columns or Color funcs need.
 
-3. **Color function (`internal/resource/types_<service>.go`) — MUST strip `(+N)` before matching**: use the shared `resource.StripFindingSuffix` (defined in `internal/resource/finding_suffix.go`) — do NOT reinvent. Every per-type Color func that pattern-matches on `Resource.Fields["status"]` MUST strip the suffix first, OR match phrase prefix. Failing this, `"publicly accessible (+1)"` falls through all Warning switches and color-buckets Healthy — a spec-§4 violation.
+3. **Color function (`internal/aws/catalog_<category>.go`) — MUST strip `(+N)` before matching**: use the package-local `stripFindingSuffix` helper or the shared `colorFromWave1` / `colorFromAnyFinding` helpers (`internal/aws/catalog_color_helpers.go`) — do NOT reinvent. Every per-type Color func that pattern-matches on `Resource.Fields["status"]` MUST strip the suffix first, OR match phrase prefix. Failing this, `"publicly accessible (+1)"` falls through all Warning switches and color-buckets Healthy — a spec-§4 violation.
 
 4. **Wave-2 short-cause phrase must NOT be in the Warning color switch**: a Wave-2 `~` finding renders on a HEALTHY (green) row. If the Color func lists `"maintenance scheduled"` among Warning phrases, the row turns yellow and the glyph is suppressed — spec rule 3 violation. The enricher sets the Status phrase; the Color func must treat it as Healthy (the row color is driven by the Wave-1 bucket, not by the Wave-2 phrase).
 
-5. **Fetcher MUST populate `Resource.Issues` for fetcher-local Wave-1 phrases** — an ordered slice of every active WAVE-1 §4 phrase the fetcher can derive from the row alone (in precedence order). The common pattern is to split `computeXxxStatus` into `computeXxxStatusAndIssues(raw) (topPhrase string, allIssues []string)`, then:
-   - Healthy → empty slice.
-   - Single warning → one entry matching the top phrase.
-   - N≥2 warnings → N entries; the first is the top, the rest are the ones hidden behind the `(+N-1)` suffix.
-   - Broken / transitional → a single entry with the §4 phrase.
+5. **Cross-ref Wave-1 phrases go through the enricher's Findings channel too** — signals that need sibling-cache access (orphan-style or retention-style) are emitted by the IssueEnricher as `domain.Finding` entries in `IssueEnricherResult.Findings[id]`, exactly like Wave-2 conditions. Routing through Findings is idempotent on re-runs and automatically visible to S4 and S5. **The canonical cross-ref-enricher pattern is the parameterized helper at `internal/aws/snapshot_cross_ref.go`** (`EnrichSnapshotCrossRef(SnapshotCrossRefConfig{...})`) — `dbi-snap` and `dbc-snap` are both ~60-line config wrappers around it. When adding a new cross-ref enricher, prefer extending or instantiating this helper over copying the body.
 
-   **Issues is FETCHER-LOCAL Wave-1 ONLY.** Two things explicitly do NOT live here:
-   - **Wave-2 cause** lives in `EnrichmentFinding.Summary` + `Rows`. The Attention renderer merges both at display time. An enricher that appends Wave-2 phrases to `Resource.Issues` produces double entries — anti-pattern.
-   - **Cross-ref Wave-1 phrases** (signals that need sibling-cache access — orphan-style or retention-style) ALSO go through the `Findings` channel, not `Resource.Issues`. The IssueEnricher emits them via `Findings[id].Summary` (with `Severity:"!"` and `Rows`) plus `FieldUpdates[id]["status"]` for the merged S4 phrase. The reason: the dispatcher's IssueAppends path was non-idempotent on re-runs (would duplicate Issues entries) AND the detail view already reads Findings via `m.enrichmentFindings[type][id]` at view-open time, so routing through Findings is both idempotent and visible to S5. **The canonical cross-ref-enricher pattern is the parameterized helper at `internal/aws/snapshot_cross_ref.go`** (`EnrichSnapshotCrossRef(SnapshotCrossRefConfig{...})`) — `dbi-snap` and `dbc-snap` are both ~60-line config wrappers around it. When adding a new cross-ref enricher (e.g. ebs-snap), prefer extending or instantiating this helper over copying the body.
+   Dropping fetcher-local Findings population leaves `Resource.Findings` empty; the row renders Healthy, the S4 cell falls back to the raw lifecycle field, and the detail view hides every warning. This is the bug class that leaked through on 2026-04-22 — spec rule 7 violation revealed when the user opened a row that listed `(+3)` on the list but showed no individual issues in detail. The integration test `TestScenario_DBIVisual_DetailSurfacesAllIssues` is the regression pin for fetcher-local; `TestScenario_DBISnapVisual_DetailSurfacesAllIssues` is the pin for cross-ref-via-Findings.
 
-   Dropping fetcher-local Issues population leaves `Resource.Issues == nil`; the detail view silently hides every hidden warning; universal rule U7e fails for fetcher-local signals. This is the bug that leaked through on 2026-04-22 — spec rule 7 violation revealed when the user opened a row that listed `(+3)` on the list but showed no individual issues in detail. The integration test `TestScenario_DBIVisual_DetailSurfacesAllIssues` is the regression pin for fetcher-local; `TestScenario_DBISnapVisual_DetailSurfacesAllIssues` is the pin for cross-ref-via-Findings.
-
-6. **Detail view universally renders via `injectAttentionSection`** (in `internal/tui/views/detail_fields.go` — no per-resource work needed). The Attention section appears at the top of the detail view whenever `len(Resource.Issues) > 0 OR EnrichmentFinding != nil`. A future resource that forgets to populate `Resource.Issues` will see its detail view silently hide every Wave-1 phrase — the U7e/U7f QA unit tests are the only upstream check. **Do NOT add a per-type `injectXxxSection` function**; that pattern was collapsed on 2026-04-22 into the single unified section and re-introducing it is a regression.
+6. **Detail view universally renders via `injectAttentionSection`** (in `internal/tui/views/detail_fields.go` — no per-resource work needed). The Attention section appears at the top of the detail view whenever `Resource.Findings` contains issue-severity entries, with per-entry rows read from `Resource.AttentionDetails` keyed by `Finding.Code`. A resource that forgets to populate Findings will see its detail view silently hide every Wave-1 phrase — the U7e/U7f QA unit tests are the only upstream check. **Do NOT add a per-type `injectXxxSection` function**; that pattern was collapsed on 2026-04-22 into the single unified section and re-introducing it is a regression.
 
 ### Forbidden inputs:
 - Do not read tests/** — you write against contract, not test machinery.
@@ -620,7 +604,7 @@ Delete every stub, commented-out block, or "pretend-to-work" fallback related to
 - docs/resources/<shortName>.md — the contract
 - docs/resources/<shortName>-impl-plan.md — pseudocode + fixtures + contract-surface gap analysis
 - internal/aws/<shortName>_interfaces.go — current mock surface
-- internal/resource/resource.go — Resource struct and EnrichmentFinding
+- internal/domain/resource.go + internal/domain/finding.go — Resource struct, Finding, AttentionDetail
 - AWS SDK Go v2 types via `go doc github.com/aws/aws-sdk-go-v2/service/<svc>/types.<Shape>`
 ```
 
@@ -653,7 +637,7 @@ Coder must clean up and report back. Only proceed to phase 8 after the diff is c
 
 ### Phase 8 — Scenario-harness visual render gate
 
-Unit tests assert on `Resource.Status` and `EnrichmentFinding`. They do NOT verify that the rendered list view matches the spec — a fetcher can return the right `Status` while the view misreads it, or a `.a9s/views/<shortName>.yaml` can declare a jargon column. Phase 8 closes that gap by asserting on the actual rendered output via the scripted scenario harness (`tests/integration/SCENARIO_HARNESS.md`).
+Unit tests assert on `Resource.Fields["status"]` and `Resource.Findings`. They do NOT verify that the rendered list view matches the spec — a fetcher can return the right `Status` while the view misreads it, or a `.a9s/views/<shortName>.yaml` can declare a jargon column. Phase 8 closes that gap by asserting on the actual rendered output via the scripted scenario harness (`tests/integration/SCENARIO_HARNESS.md`).
 
 #### 8.1 Scenario-harness test file
 
@@ -678,7 +662,7 @@ The test drives the real `tui.Model.Update()` loop via `fullIntegrationNewDemoSc
 10. **Healthy + ~ glyph (U3)**: `scenario.ExpectRowNamePrefix(<healthy+w2 id>, "~ ")`.
 11. **Non-green rows no glyph (rule 3)**: `scenario.ExpectRowNoGlyphPrefix(<w1+w2 id>)` — the row has a Wave-2 finding but is Warning-colored; the color is the signal, no glyph.
 12. **S5 Wave-2 finding-row visibility (U7c)**: `scenario.OpenDetailResource(<shortName>, <w1+w2 fixture>)`; then `scenario.ExpectViewContains(<w2 finding Action or Description string>)`. Verifies no Wave-2 finding silently disappears when Status shows the Wave-1 phrase.
-13. **S5 every-Wave-1-phrase visibility (U7e)**: on the multi-W1 fixture, open detail and assert every entry of `Resource.Issues` appears — BUT with first letter capitalized, because `injectAttentionSection` applies `capitalizeFirst` to every entry at render time. Data (`Resource.Issues`) stays canonical lowercase (`"publicly accessible"`); the rendered frame has `"Publicly accessible"`. Use a helper or pin the expected strings explicitly:
+13. **S5 every-Wave-1-phrase visibility (U7e)**: on the multi-W1 fixture, open detail and assert every `Resource.Findings` Phrase appears — BUT with first letter capitalized, because `injectAttentionSection` applies `capitalizeFirst` to every entry at render time. Data (`Finding.Phrase`) stays canonical lowercase (`"publicly accessible"`); the rendered frame has `"Publicly accessible"`. Use a helper or pin the expected strings explicitly:
     ```go
     multi := selectXxxByID(t, scenario, <multiW1 id>)
     scenario.OpenDetailResource("<short>", multi)
@@ -729,7 +713,7 @@ If `scenario.ExpectRowStatusBlank` / `ExpectRowNamePrefix` / `ExpectMenuIssueCou
 - rule-7 U7c (S5 all findings): <fixture-id> detail contains <w2 cause> OK
 - rule-7 U7d (! beats ~):        <skipped because no ! signals in spec | OK>
 - rule-7 U7e (S5 every Wave-1 phrase): <fixture> → all <N> entries verbatim in detail OK
-- rule-7 U7f (Resource.Issues population): <N> fixtures, <N> deep-equals OK
+- rule-7 U7f (Resource.Findings population): <N> fixtures, <N> deep-equals OK
 - Wave-2 native in demo:         yes (enrichment chain drains end-to-end)
 - unit tests: <N> passing, 0 failing
 - stubs: 0 / TBDs resolved: <N> / deferred: <N> / out-of-scope: <N>
@@ -838,8 +822,8 @@ FAIL if navigable fields are registered and `TestScenario_NavigableFieldDrillThr
 
 The unified `Attention (N)` section in the detail view must render every finding carried by the selected resource:
 
-- Every Wave-1 phrase from `Resource.Issues`, first letter capitalized, `!`/`~` prefixed per severity.
-- Every Wave-2 `EnrichmentFinding` — Summary line plus Rows beneath as indented `Label: Value` context.
+- Every Wave-1 finding's Phrase, first letter capitalized, `!`/`~` prefixed per severity.
+- Every Wave-2 finding — Phrase line (Detail sentence when set) plus `AttentionDetails` rows beneath as indented `Label: Value` context.
 
 This must be asserted by a phase-8 scenario test that opens the multi-issue fixture's detail view and calls `ExpectViewContains(...)` for every expected phrase / row value. The test must target a fixture with ≥2 findings so the test proves no finding silently disappears (the 2026-04-22 regression class).
 

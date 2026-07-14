@@ -36,8 +36,8 @@ Is the value already on the SDK list-API response (RawStruct path)?
          ├─ YES → Tier B-enricher:
          │        ├─ Edit/add Wave-2 enricher to populate
          │        │  IssueEnricherResult.FieldUpdates[resourceID][<key>]
-         │        ├─ Register via registerIssueEnricher(...) in the owning
-         │        │  <short>_issue_enrichment.go init() block
+         │        ├─ Wire via the catalog literal's Wave2 + IssueEnricherFieldKeys
+         │        │  fields in internal/aws/catalog_<category>.go
          │        └─ Add column with Key: in defaults_*.go
          └─ Multi-line text body? → Tier C: detail-only via DetailField{Key: ..., Label: ...}
 ```
@@ -96,7 +96,7 @@ Fields: map[string]string{
 },
 ```
 
-Update `RegisterFieldKeys` to include `<key>`.
+Add `<key>` to the type's `FieldKeys` slice on its catalog literal (`internal/aws/catalog_<category>.go`).
 
 ### Then defaults_*.go and viewsgen as Tier A.
 
@@ -117,21 +117,22 @@ Don't test the trivial round-trip; test the logic.
 
 ### File: `internal/aws/<short>_issue_enrichment.go`
 
-Every registered short name already has an `_issue_enrichment.go` file. Open it and replace the `NoOpIssueEnricher` registration (if currently a stub) with a real enricher, or edit the existing enricher body if one is already there.
+Types with Wave 2 signals have an `_issue_enrichment.go` file; a type with no Wave 2 signal simply omits the `Wave2` field on its catalog literal — create the file if it's missing.
 
-Mirror the existing `EnrichDynamoDBPITR` / `EnrichKMSRotation` / `EnrichRedisReplicationGroup` pattern:
+Mirror the existing `EnrichDynamoDBPITR` / `EnrichKMSRotation` / `EnrichRedisReplicationGroup` pattern. Wiring is declarative on the catalog literal in `internal/aws/catalog_<category>.go` (no `init()`, no `register*` calls):
+
+```go
+// internal/aws/catalog_<category>.go — on the type's ResourceTypeDef literal:
+Wave2:                  IssueEnricher{Fn: Enrich<Name>, Priority: 100},
+IssueEnricherFieldKeys: []string{"<key>"},
+```
 
 ```go
 // <short>_issue_enrichment.go
 package aws
 
-func init() {
-    registerIssueEnricher("<short>", Enrich<Name>, 100)
-    resource.RegisterIssueEnricherFieldKeys("<short>", []string{"<key>"})
-}
-
-func Enrich<Name>(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
-    findings := make(map[string]resource.EnrichmentFinding)
+func Enrich<Name>(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
+    findings := make(map[string][]domain.Finding)
     fieldUpdates := make(map[string]map[string]string)
     if clients.<Service> == nil {
         return IssueEnricherResult{Findings: findings}, nil
@@ -161,9 +162,9 @@ func Enrich<Name>(ctx context.Context, clients *ServiceClients, resources []reso
 
 If the enricher walks paginated results (e.g. ListPackages, ListSubscriptionsByTopic), follow `NextToken` to the end. **Don't `len(out.Page)` — that under-counts.**
 
-### Register via init()
+### Wire via the catalog literal
 
-The `init()` in the same file calls `registerIssueEnricher(<short>, <fn>, <priority>)`. `registerIssueEnricher` panics on empty name, nil fn, duplicate short name, or non-positive priority. If the short name was previously a `NoOpIssueEnricher` stub, delete the stub's registration before adding the real one — two calls with the same short name will panic at package init.
+Set `Wave2: IssueEnricher{Fn: <fn>, Priority: <priority>}` on the type's `ResourceTypeDef` literal in `internal/aws/catalog_<category>.go`. Exactly one `Wave2` per type — the field is the registration; there is no `init()`/`register*` path. `Wave2EnricherFor(shortName)` (internal/aws/wave2.go) resolves it; `tests/unit/architecture_conformance_test.go` pins that every declared Wave2 resolves.
 
 ### Then defaults_*.go and viewsgen as Tier A.
 
