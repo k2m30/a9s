@@ -83,7 +83,7 @@ Transcribed from `docs/attention-signals.md`.
 
 No Wave 1 signals — the list API does not return fields usable for attention.
 
-Deliberately not Wave-1 signals (a9s-devops 2026-07-14): `DefaultVersionNumber != LatestVersionNumber` is DISPLAY ONLY (live-witnessed as the healthy steady state — a pending-rollout latest version is normal working practice; flagging it is alarm fatigue). The references count (`asg` ∪ `ng` ∪ `ec2` cache cross-ref) is an informational column that renders `—` when any sibling cache is truncated — never 0-as-fact — and an unreferenced template is NOT flagged (templates are free and inert). `CreatedBy`/`CreateTime` are plain columns.
+Deliberately not Wave-1 signals (a9s-devops 2026-07-14): `DefaultVersionNumber != LatestVersionNumber` is DISPLAY ONLY (live-witnessed as the healthy steady state — a pending-rollout latest version is normal working practice; flagging it is alarm fatigue). "Who references this template" is answered by the related panel (`asg`/`ng`/`ec2` pivot counts, one detail keypress) — NOT a list column: a cross-cache computed column has no existing mechanism and an unreferenced template is not a problem worth flagging (templates are free and inert). `CreatedBy`/`CreateTime` are plain columns.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -153,7 +153,8 @@ Every problem row names its cause in the Status column (`IMDSv1 allowed`, `EBS e
 - Encryption signal — `AWS SDK Go v2 — ec2/types.LaunchTemplateEbsBlockDevice § Encrypted, § KmsKeyId`; nil-is-unknown rule — `a9s-devops (2026-07-14): possible=yes, worth=yes. Default-encryption accounts make nil legitimate; flagging nil is a false positive.`
 - Deprecated-AMI signal — `docs/attention-signals.md` § Compute row `ami` (`DeprecationTime < now()` → Warning) cross-referenced from the loaded cache; `a9s-devops (2026-07-14): possible=yes, worth=yes. Not-in-cache ≠ deregistered — public/marketplace AMIs legitimately absent.`
 - `$Default`-not-`$Latest` read — `a9s-devops (2026-07-14): $Default is what asg/ng/ec2 resolve at launch; $Latest is staging.`
-- default≠latest display-only, refs-count `—`-degradation, no unused-flag — `a9s-devops (2026-07-14): possible=yes, worth=no. Healthy steady state; alarm fatigue; templates free+inert.`
+- default≠latest display-only, no unused-flag — `a9s-devops (2026-07-14): possible=yes, worth=no. Healthy steady state; alarm fatigue; templates free+inert.`
+- references answered by the related panel, not a list column — `user (2026-07-14): reuse common techniques fit to current infrastructure, no resource-specific machinery. A cross-cache computed list column has no house mechanism; the asg/ng/ec2 pivots already carry the counts.`
 - sg union discovery — `AWS SDK Go v2 — ec2/types.ResponseLaunchTemplateData § SecurityGroupIds, § SecurityGroups, § NetworkInterfaces` (ids vs legacy names vs per-ENI groups).
 - ec2 cross-ref by auto-tag — `a9s-devops (2026-07-14): aws:ec2launchtemplate:id auto-tag catches direct+ASG+NG launches; degrade to unknown on truncated cache, never fake 0.`
 - role exclusion — `a9s-devops (2026-07-14): IamInstanceProfile is a profile, not a role; second call or dishonest heuristic required.`
