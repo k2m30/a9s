@@ -204,7 +204,7 @@ func listExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resourc
 	// Fields map (key-based) takes priority.
 	if col.Key != "" {
 		if v, ok := r.Fields[col.Key]; ok && v != "" {
-			return v
+			return humanizeListCell(col, v)
 		}
 	}
 
@@ -215,17 +215,14 @@ func listExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resourc
 	// (e.g. EC2 InstanceType, which never sets Humanize).
 	if col.Path != "" && r.RawStruct != nil {
 		if val := fieldpath.ExtractScalar(r.RawStruct, col.Path); val != "" {
-			if col.Humanize {
-				return domain.HumanizeStatusPhrase(val)
-			}
-			return val
+			return humanizeListCell(col, val)
 		}
 	}
 
 	// Second-pass: accept explicit empty-string values stored in Fields.
 	if col.Key != "" {
 		if v, ok := r.Fields[col.Key]; ok {
-			return v
+			return humanizeListCell(col, v)
 		}
 	}
 
@@ -235,7 +232,7 @@ func listExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resourc
 	for k, v := range r.Fields {
 		kl := strings.ToLower(k)
 		if kl == titleLower || kl == titleUnder {
-			return v
+			return humanizeListCell(col, v)
 		}
 	}
 
@@ -248,6 +245,18 @@ func listExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resourc
 	}
 
 	return ""
+}
+
+// humanizeListCell applies domain.HumanizeStatusPhrase when col.Humanize is
+// set, so a warm-cache row (RawStruct stripped, value materialized in
+// r.Fields) renders the same humanized phrase a live row gets via the
+// RawStruct+Humanize branch — the RawStruct/Fields cascade must never change
+// what the cell shows, only where the raw value came from.
+func humanizeListCell(col ColumnDef, v string) string {
+	if col.Humanize {
+		return domain.HumanizeStatusPhrase(v)
+	}
+	return v
 }
 
 // listPhraseFromFindings mirrors phraseFromFindings in table_render.go, with

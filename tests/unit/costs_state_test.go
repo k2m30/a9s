@@ -211,6 +211,102 @@ func TestCostsState_Zoom_WalksGranularityChain_WithBoundaryNoops(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Zoom on a RESOURCE_ID frame must stay within the 14-day CE resource-level
+// retention window — the same bound PushDrill enforces via
+// costs.ClampResourceDrillWindow (screen.go's Select) the moment a RESOURCE_ID
+// frame is first pushed. applyCostZoom has no RESOURCE_ID branch: zooming out
+// either re-anchors on the cursor's current period (week/day) or rebuilds the
+// ordinary trailing month/year window (costs.BuildWindow(g, cs.Now)) with no
+// clamp at all — a follow-up GetCostAndUsageWithResources fetch over that
+// window would span far more than 14 days and CE would reject it.
+// ---------------------------------------------------------------------------
+
+func TestCostsState_Zoom_ResourceIDFrame_ZoomOut_StaysWithinRetentionWindow(t *testing.T) {
+	const demoEC2InstanceID = "i-0a1b2c3d4e5f60001"
+	c := round5DrillToResourceRow(t, "Amazon Elastic Compute Cloud - Compute", demoEC2InstanceID)
+
+	if got := topDrill(t, c).RowDim; got != costs.DimensionResourceID {
+		t.Fatalf("precondition: expected a RESOURCE_ID top frame, got RowDim=%q", got)
+	}
+	if got := topDrill(t, c).Granularity; got != costs.GranularityDay {
+		t.Fatalf("precondition: expected the RESOURCE_ID frame to start at day granularity, got %q", got)
+	}
+
+	_, tasks := c.Apply(app.Action{Kind: app.ActionCostZoomOut})
+
+	top := topDrill(t, c)
+	if top.RowDim != costs.DimensionResourceID {
+		t.Fatalf("zoom must mutate the top frame in place — RowDim changed to %q", top.RowDim)
+	}
+	if depth := len(c.GetCostsDrillStack()); depth != 3 {
+		t.Fatalf("zoom must mutate the top frame in place, not push/pop — DrillStack depth got %d want 3", depth)
+	}
+	if len(top.Window) == 0 {
+		t.Fatal("zoom-out on a RESOURCE_ID frame left an empty Window")
+	}
+
+	start, err := costs.ParseDate(top.Window[0].Start)
+	if err != nil {
+		t.Fatalf("Window[0].Start = %q, ParseDate: %v", top.Window[0].Start, err)
+	}
+	end, err := costs.ParseDate(top.Window[len(top.Window)-1].End)
+	if err != nil {
+		t.Fatalf("Window[-1].End = %q, ParseDate: %v", top.Window[len(top.Window)-1].End, err)
+	}
+	// 14 days — the same CE GetCostAndUsageWithResources retention bound
+	// costs.ClampResourceDrillWindow enforces (internal/costs/drill.go's
+	// resourceDrillWindowDays) when a RESOURCE_ID frame is first pushed.
+	const resourceDrillWindowDays = 14
+	if span := end.Sub(start).Hours() / 24; span > resourceDrillWindowDays {
+		t.Errorf("RESOURCE_ID frame zoom-out produced a %.0f-day window %s..%s — exceeds the %d-day CE resource-level retention bound the push path enforces",
+			span, top.Window[0].Start, top.Window[len(top.Window)-1].End, resourceDrillWindowDays)
+	}
+
+	if payload, found := findFetchCostsTask(tasks); found {
+		if len(payload.Window) == 0 {
+			t.Fatal("dispatched fetch task carries an empty Window")
+		}
+		pStart, errS := costs.ParseDate(payload.Window[0].Start)
+		pEnd, errE := costs.ParseDate(payload.Window[len(payload.Window)-1].End)
+		if errS != nil || errE != nil {
+			t.Fatalf("fetch task Window bounds unparseable: start err=%v end err=%v", errS, errE)
+		}
+		if span := pEnd.Sub(pStart).Hours() / 24; span > resourceDrillWindowDays {
+			t.Errorf("dispatched fetch task Window spans %.0f days — a GetCostAndUsageWithResources call over %d days is invalid against CE", span, resourceDrillWindowDays)
+		}
+	}
+}
+
+// TestCostsState_Zoom_NonResourceFrame_ZoomOut_KeepsTrailingWindowShape pins
+// the sibling case a RESOURCE_ID-specific fix must not disturb: a
+// SERVICE-pivoted (non-RESOURCE_ID) root frame's zoom-out keeps building the
+// ordinary trailing window byte-for-byte — the 14-day resource retention
+// clamp applies only to RESOURCE_ID frames.
+func TestCostsState_Zoom_NonResourceFrame_ZoomOut_KeepsTrailingWindowShape(t *testing.T) {
+	c := newCostsController(t, fixedCostsNow)
+
+	if got := topDrill(t, c).RowDim; got != costs.DimensionService {
+		t.Fatalf("precondition: expected the default root frame to be SERVICE-pivoted, got RowDim=%q", got)
+	}
+
+	c.Apply(app.Action{Kind: app.ActionCostZoomOut}) // month -> year
+
+	top := topDrill(t, c)
+	if top.Granularity != costs.GranularityYear {
+		t.Fatalf("expected month->year zoom-out, got Granularity=%q", top.Granularity)
+	}
+	want := costs.BuildWindow(costs.GranularityYear, fixedCostsNow)
+	if len(top.Window) != len(want) {
+		t.Fatalf("non-resource frame zoom-out Window length = %d, want %d (costs.BuildWindow(year, now) unchanged)", len(top.Window), len(want))
+	}
+	for i := range want {
+		if top.Window[i] != want[i] {
+			t.Errorf("non-resource frame zoom-out Window[%d] = %+v, want %+v", i, top.Window[i], want[i])
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Metric cycles the five display metrics
 // ---------------------------------------------------------------------------
 

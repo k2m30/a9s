@@ -281,6 +281,60 @@ func TestFetchLaunchTemplatesPage_UnencryptedNilSilent(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// imdsv1_endpoint_disabled — HttpEndpoint == disabled means the metadata
+// service is unreachable entirely; HttpTokens is moot and must NOT fire the
+// imdsv1 finding regardless of its value (docs/resources/lt.md §3.2). No
+// shared demo fixture disables the endpoint, so this is an isolated
+// adversarial case (mirrors TestFetchLaunchTemplatesPage_UnencryptedNilSilent's
+// ltEC2Fake pattern).
+// ---------------------------------------------------------------------------
+
+func TestFetchLaunchTemplatesPage_IMDSv1_EndpointDisabled_NoFinding(t *testing.T) {
+	const id = "lt-0endpointdisabled01"
+	fake := &ltEC2Fake{
+		listOut: &ec2.DescribeLaunchTemplatesOutput{
+			LaunchTemplates: []ec2types.LaunchTemplate{
+				{
+					LaunchTemplateId:     aws.String(id),
+					LaunchTemplateName:   aws.String("endpoint-disabled-witness"),
+					DefaultVersionNumber: aws.Int64(1),
+					LatestVersionNumber:  aws.Int64(1),
+				},
+			},
+		},
+		versions: map[string]*ec2.DescribeLaunchTemplateVersionsOutput{
+			id: {
+				LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{
+					{
+						LaunchTemplateId: aws.String(id),
+						VersionNumber:    aws.Int64(1),
+						DefaultVersion:   aws.Bool(true),
+						LaunchTemplateData: &ec2types.ResponseLaunchTemplateData{
+							MetadataOptions: &ec2types.LaunchTemplateInstanceMetadataOptions{
+								// HttpTokens is deliberately the value that WOULD fire
+								// imdsv1 on its own (optional, not required) — the only
+								// thing suppressing the finding must be HttpEndpoint
+								// being disabled.
+								HttpTokens:   ec2types.LaunchTemplateHttpTokensStateOptional,
+								HttpEndpoint: ec2types.LaunchTemplateInstanceMetadataEndpointStateDisabled,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	result, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fake, "")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	r := mustFindLTResource(t, result.Resources, id)
+	if len(r.Findings) != 0 {
+		t.Errorf("HttpEndpoint=disabled (metadata service unreachable) must suppress the imdsv1 finding regardless of HttpTokens=optional, got Findings: %+v", r.Findings)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // multi_stack — IMDSv1 + unencrypted stack on one template → ordered
 // Findings + "IMDSv1 allowed (+1)" per §4 precedence.
 // ---------------------------------------------------------------------------

@@ -105,14 +105,14 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 // group's name via "eks:nodegroup-name" and optionally "eks:cluster-name".
 // Pattern C: tag-based cache scan, reading the cache directly — a cold or
 // missing "ec2" cache entry must never trigger a live fetch (see
-// checkNGEBS/ngCachedEC2Instances for the shared contract).
+// checkNGEBS/cachedTypedRows for the shared contract).
 func checkNGEC2(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	nodegroupName, clusterName := ngIdentity(res)
 	if nodegroupName == "" {
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
 	}
 
-	ec2List, truncated, ok := ngCachedEC2Instances(cache)
+	ec2List, truncated, ok := cachedTypedRows[ec2types.Instance](cache, "ec2")
 	if !ok {
 		return resource.UnknownRelated("ec2")
 	}
@@ -251,7 +251,7 @@ func checkNGEBS(_ context.Context, _ any, res resource.Resource, cache resource.
 		return resource.RelatedCheckResult{TargetType: "ebs", Count: 0}
 	}
 
-	ec2List, truncated, ok := ngCachedEC2Instances(cache)
+	ec2List, truncated, ok := cachedTypedRows[ec2types.Instance](cache, "ec2")
 	if !ok {
 		return resource.UnknownRelated("ebs")
 	}
@@ -291,36 +291,4 @@ func checkNGSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 	}
 	return relatedResult("subnet", ids)
-}
-
-// ngCachedEC2Instances reads the "ec2" entry directly from cache — it never
-// fetches. checkNGEC2 and checkNGEBS both join against the EC2 cache purely
-// as a tag scan (Pattern C), so a cold or missing cache must surface as
-// unknown (RelatedUnknown, "?") rather than trigger a live DescribeInstances call.
-//
-// ok is false (unknown) when:
-//   - no "ec2" entry exists in cache at all, or
-//   - the entry exists but holds at least one row and NONE of them assert to
-//     ec2types.Instance — a disk-seeded cache entry carries rows without
-//     RawStruct, so the tag-matching scan below would silently match nothing
-//     and be indistinguishable from a genuine zero. An empty (len==0) entry
-//     is a legitimate exact-zero source list and is NOT treated as unknown.
-func ngCachedEC2Instances(cache resource.ResourceCache) (rows []resource.Resource, truncated bool, ok bool) {
-	entry, present := cache["ec2"]
-	if !present {
-		return nil, false, false
-	}
-	if len(entry.Resources) > 0 {
-		structOK := false
-		for _, r := range entry.Resources {
-			if _, asserted := assertStruct[ec2types.Instance](r.RawStruct); asserted {
-				structOK = true
-				break
-			}
-		}
-		if !structOK {
-			return nil, false, false
-		}
-	}
-	return entry.Resources, entry.IsTruncated, true
 }

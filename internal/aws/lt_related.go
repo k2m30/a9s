@@ -8,11 +8,11 @@
 //
 // Three checkers (asg, ng, ec2) are the reverse direction — "who references
 // this template" — and read the SIBLING resource cache directly rather than
-// RawStruct, mirroring ng_related.go's ngCachedEC2Instances tri-state
-// contract: cache absent → unknown ("?"), cache present with rows that don't
-// assert to the expected type (disk-seeded, no RawStruct) → unknown, cache
-// present and typed → scan. Never a live AWS call, never a fake zero.
-// docs/resources/lt.md §2.
+// RawStruct, via the shared cachedTypedRows tri-state helper
+// (related_common.go): cache absent → unknown ("?"), cache present with rows
+// that don't assert to the expected type (disk-seeded, no RawStruct) →
+// unknown, cache present and typed → scan. Never a live AWS call, never a
+// fake zero. docs/resources/lt.md §2.
 package aws
 
 import (
@@ -102,35 +102,13 @@ func checkLTSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 	return relatedResult("subnet", ids)
 }
 
-// ltCachedASGs reads the "asg" entry directly from cache — it never fetches,
-// mirroring ngCachedEC2Instances's tri-state contract exactly (see ng_related.go).
-func ltCachedASGs(cache resource.ResourceCache) (rows []resource.Resource, truncated bool, ok bool) {
-	entry, present := cache["asg"]
-	if !present {
-		return nil, false, false
-	}
-	if len(entry.Resources) > 0 {
-		structOK := false
-		for _, r := range entry.Resources {
-			if _, asserted := assertStruct[asgtypes.AutoScalingGroup](r.RawStruct); asserted {
-				structOK = true
-				break
-			}
-		}
-		if !structOK {
-			return nil, false, false
-		}
-	}
-	return entry.Resources, entry.IsTruncated, true
-}
-
 // checkLTASG scans the already-loaded "asg" cache for groups referencing
 // this template by id, via LaunchTemplate.LaunchTemplateId,
 // MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification, or any
 // per-Overrides[] LaunchTemplateSpecification (docs/resources/lt.md §2 asg
 // bullet). Zero extra API calls.
 func checkLTASG(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	asgList, truncated, ok := ltCachedASGs(cache)
+	asgList, truncated, ok := cachedTypedRows[asgtypes.AutoScalingGroup](cache, "asg")
 	if !ok {
 		return resource.UnknownRelated("asg")
 	}
@@ -169,33 +147,11 @@ func ltReferencedByASG(asg asgtypes.AutoScalingGroup, ltID string) bool {
 	return false
 }
 
-// ltCachedNodegroups reads the "ng" entry directly from cache — it never
-// fetches, mirroring ngCachedEC2Instances's tri-state contract.
-func ltCachedNodegroups(cache resource.ResourceCache) (rows []resource.Resource, truncated bool, ok bool) {
-	entry, present := cache["ng"]
-	if !present {
-		return nil, false, false
-	}
-	if len(entry.Resources) > 0 {
-		structOK := false
-		for _, r := range entry.Resources {
-			if _, asserted := assertStruct[ekstypes.Nodegroup](r.RawStruct); asserted {
-				structOK = true
-				break
-			}
-		}
-		if !structOK {
-			return nil, false, false
-		}
-	}
-	return entry.Resources, entry.IsTruncated, true
-}
-
 // checkLTNG scans the already-loaded "ng" cache for node groups pinning this
 // template via Nodegroup.LaunchTemplate.Id or .Name
 // (docs/resources/lt.md §2 ng bullet). Zero extra API calls.
 func checkLTNG(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	ngList, truncated, ok := ltCachedNodegroups(cache)
+	ngList, truncated, ok := cachedTypedRows[ekstypes.Nodegroup](cache, "ng")
 	if !ok {
 		return resource.UnknownRelated("ng")
 	}
@@ -213,34 +169,12 @@ func checkLTNG(_ context.Context, _ any, res resource.Resource, cache resource.R
 	return relatedResultTrunc("ng", ids, truncated)
 }
 
-// ltCachedEC2Instances reads the "ec2" entry directly from cache — it never
-// fetches, mirroring ngCachedEC2Instances's tri-state contract verbatim.
-func ltCachedEC2Instances(cache resource.ResourceCache) (rows []resource.Resource, truncated bool, ok bool) {
-	entry, present := cache["ec2"]
-	if !present {
-		return nil, false, false
-	}
-	if len(entry.Resources) > 0 {
-		structOK := false
-		for _, r := range entry.Resources {
-			if _, asserted := assertStruct[ec2types.Instance](r.RawStruct); asserted {
-				structOK = true
-				break
-			}
-		}
-		if !structOK {
-			return nil, false, false
-		}
-	}
-	return entry.Resources, entry.IsTruncated, true
-}
-
 // checkLTEC2 scans the already-loaded "ec2" cache for instances tagged with
 // this template's id via the AWS auto-tag "aws:ec2launchtemplate:id" —
 // catches direct, ASG-launched, and NG-launched instances alike
 // (docs/resources/lt.md §2 ec2 bullet). Zero extra API calls.
 func checkLTEC2(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	ec2List, truncated, ok := ltCachedEC2Instances(cache)
+	ec2List, truncated, ok := cachedTypedRows[ec2types.Instance](cache, "ec2")
 	if !ok {
 		return resource.UnknownRelated("ec2")
 	}

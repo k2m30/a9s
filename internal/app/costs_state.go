@@ -536,6 +536,21 @@ func (c *Controller) applyCostZoom(cs *CostsState, in bool) *runtime.TaskRequest
 		newWindow = costs.BuildWindow(newGran, anchor)
 	}
 
+	// A RESOURCE_ID top frame's zoom-out is a boundary no-op — same shape as
+	// the idx<=0 check above — once the candidate coarser window would run
+	// past the CE GetCostAndUsageWithResources retention bound
+	// (costs.ClampResourceDrillWindow/costs.ResourceDrillAllowed enforce the
+	// same bound at push time): Week/Month/Year all tile a full calendar
+	// bucket anchored on the current period regardless of the RESOURCE_ID
+	// frame's own narrow window, so the candidate routinely reaches days
+	// with no retained resource-level cost data (and, since BuildWindow's
+	// week/day branches never clamp forward, can reach days that haven't
+	// happened yet). Nothing is mutated on this path — top.Window stays the
+	// one the push path already clamped into the retention bound.
+	if !in && top.RowDim == costs.DimensionResourceID && resourceDrillWindowExceedsRetention(newWindow) {
+		return nil
+	}
+
 	top.Granularity = newGran
 	top.Window = newWindow
 	// FR-002 "open at today": zooming back out to a trailing-anchored
@@ -553,6 +568,34 @@ func (c *Controller) applyCostZoom(cs *CostsState, in bool) *runtime.TaskRequest
 	top.ScrollX = 0
 	reconcileCostsScrollToCursor(top, cs.ViewportCols)
 	return c.ensureCostsShapeFetched(cs)
+}
+
+// resourceDrillWindowRetentionDays mirrors internal/costs/drill.go's
+// unexported resourceDrillWindowDays — the CE GetCostAndUsageWithResources
+// hard 14-day retention limit costs.ClampResourceDrillWindow enforces at
+// push time. The value can't be imported across packages (it's
+// deliberately unexported there, same as tests/unit/costs_state_test.go's
+// own local copy), so this file mirrors it rather than inventing a
+// different number.
+const resourceDrillWindowRetentionDays = 14
+
+// resourceDrillWindowExceedsRetention reports whether window's overall span
+// (its first period's Start to its last period's End) is wider than the CE
+// resource-level retention bound. costs.ClampResourceDrillWindow only drops
+// periods whose Start predates the cutoff — it cannot by itself flag a
+// window like a RESOURCE_ID zoom-out's full-month Week tiling, whose Start
+// can legitimately sit exactly at the cutoff while its End still runs many
+// days past it (into days with no retained cost data, or into the future).
+func resourceDrillWindowExceedsRetention(window []costs.Period) bool {
+	if len(window) == 0 {
+		return false
+	}
+	start, errS := costs.ParseDate(window[0].Start)
+	end, errE := costs.ParseDate(window[len(window)-1].End)
+	if errS != nil || errE != nil {
+		return false
+	}
+	return end.Sub(start).Hours()/24 > resourceDrillWindowRetentionDays
 }
 
 func granChainIndex(g costs.Granularity) int {

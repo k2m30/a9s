@@ -125,6 +125,30 @@ func relatedResultTrunc(target string, ids []string, truncated bool) resource.Re
 	return r
 }
 
+// cachedTypedRows reads the shortName entry directly from cache — it never
+// fetches. Tri-state contract (the ng_related.go original): cache absent →
+// (nil, false, false) = unknown; entry present but rows don't assert to T
+// (disk-seeded, no RawStruct) → unknown; entry present and typed → rows.
+func cachedTypedRows[T any](cache resource.ResourceCache, shortName string) (rows []resource.Resource, truncated bool, ok bool) {
+	entry, present := cache[shortName]
+	if !present {
+		return nil, false, false
+	}
+	if len(entry.Resources) > 0 {
+		structOK := false
+		for _, r := range entry.Resources {
+			if _, asserted := assertStruct[T](r.RawStruct); asserted {
+				structOK = true
+				break
+			}
+		}
+		if !structOK {
+			return nil, false, false
+		}
+	}
+	return entry.Resources, entry.IsTruncated, true
+}
+
 // lambdaEventSourceMappingLambdaCheck is shared by checkKinesisLambda and
 // checkMSKLambda. Both pivots need the same mechanism: a stream/cluster ARN
 // is the Lambda event source, and lambda:ListEventSourceMappings filtered by

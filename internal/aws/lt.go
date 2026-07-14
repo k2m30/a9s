@@ -165,9 +165,14 @@ func computeLTFindings(ver ec2types.LaunchTemplateVersion) []domain.Finding {
 
 	var findings []domain.Finding
 
+	// HttpEndpoint == disabled means the metadata service is unreachable
+	// entirely; HttpTokens is moot and produces no signal regardless of its
+	// value (docs/resources/lt.md §3.2).
+	endpointDisabled := data.MetadataOptions != nil && data.MetadataOptions.HttpEndpoint == ec2types.LaunchTemplateInstanceMetadataEndpointStateDisabled
+
 	// Unset defaults to optional (SDK-confirmed) — absence of
 	// MetadataOptions IS the signal, not its negation.
-	if data.MetadataOptions == nil || data.MetadataOptions.HttpTokens != ec2types.LaunchTemplateHttpTokensStateRequired {
+	if !endpointDisabled && (data.MetadataOptions == nil || data.MetadataOptions.HttpTokens != ec2types.LaunchTemplateHttpTokensStateRequired) {
 		findings = append(findings, domain.Finding{
 			Code:     ltCodeIMDSv1,
 			Phrase:   "IMDSv1 allowed",

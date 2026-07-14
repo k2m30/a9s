@@ -492,6 +492,56 @@ func TestWave3ListRawStruct_FieldsFallbackWhenNoRawStruct(t *testing.T) {
 }
 
 // ===========================================================================
+// 4a. TestWave3ListRawStruct_HumanizeColumn_FieldsFallbackWhenNoRawStruct —
+// a Humanize:true, Path-only (Key-less) column must still route through
+// domain.HumanizeStatusPhrase when RawStruct is nil and the raw AWS enum is
+// only reachable via the title-match Fields fallback (a cache-warm row:
+// RawStruct stripped, value materialized into Fields). "transfer"'s Endpoint/
+// Identity Provider columns (internal/config/defaults_networking.go) are
+// real, registered Key-less/Path-based Humanize:true columns — the title-
+// match loop (list_columns.go's listExtractCellValue) looks them up by their
+// OWN title-derived key ("endpoint", "identity_provider"), which is what a
+// Fields-only (RawStruct-stripped) row must carry for that fallback to find
+// them at all — exactly the shape listExtractCellValue's RawStruct-gated
+// Humanize branch currently only reaches when RawStruct != nil. Domain also
+// pins the non-Humanize sibling column ("Domain", Path-only, no Humanize)
+// stays completely raw either way — the fix must not humanize every Path
+// column, only the ones explicitly flagged.
+// ===========================================================================
+
+func TestWave3ListRawStruct_HumanizeColumn_FieldsFallbackWhenNoRawStruct(t *testing.T) {
+	c := wave3ListControllerWithConfig(t, "transfer", configForType("transfer"))
+	res := resource.Resource{
+		ID:   "s-0abc1234def56789a",
+		Name: "s-0abc1234def56789a",
+		Fields: map[string]string{
+			"status":            "ONLINE",
+			"domain":            "EFS",
+			"endpoint":          "VPC_ENDPOINT",
+			"identity_provider": "SERVICE_MANAGED",
+		},
+	}
+	joined := wave3RowCellsJoined(t, c, "transfer", []resource.Resource{res})
+
+	if !strings.Contains(joined, "vpc endpoint") {
+		t.Errorf(`transfer row cells (RawStruct nil, Fields-only) should humanize the Endpoint column (Humanize:true, Path:"EndpointType") to "vpc endpoint", got: %q — a warm-cache row must render identically to a live one`, joined)
+	}
+	if strings.Contains(joined, "VPC_ENDPOINT") {
+		t.Errorf(`transfer row cells should NOT show the raw enum "VPC_ENDPOINT" when RawStruct is nil, got: %q`, joined)
+	}
+	if !strings.Contains(joined, "service managed") {
+		t.Errorf(`transfer row cells (RawStruct nil, Fields-only) should humanize the Identity Provider column (Humanize:true, Path:"IdentityProviderType") to "service managed", got: %q`, joined)
+	}
+	if strings.Contains(joined, "SERVICE_MANAGED") {
+		t.Errorf(`transfer row cells should NOT show the raw enum "SERVICE_MANAGED" when RawStruct is nil, got: %q`, joined)
+	}
+
+	if !strings.Contains(joined, "EFS") {
+		t.Errorf(`transfer row cells should still show the raw "EFS" for the Domain column (no Humanize flag), got: %q`, joined)
+	}
+}
+
+// ===========================================================================
 // 5. Standalone top-level types NOT covered by the AllTypes table: SQS
 // (string RawStruct), EBS volume/snapshot, AMI, CloudTrail events.
 // ===========================================================================
