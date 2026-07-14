@@ -48,4 +48,4 @@ This document outlines the planned direction for a9s. Priorities may shift based
 - **Plugin system** -- adds complexity without clear value; new resource types are easy to add via PR
 - **Terraform/IaC integration** -- a9s is a viewer, not a provisioning tool
 - **Telemetry or analytics** -- a9s will never phone home
-- **Web-first development** -- the terminal is the primary interface, always; the built-in `--web` server mirrors the same read-only views for sharing a screen, never replaces them
+- **Web-first development** -- the terminal is the primary interface, always
