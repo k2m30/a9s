@@ -42,6 +42,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kinesis v1.43.8
 	github.com/aws/aws-sdk-go-v2/service/kms v1.52.1
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.90.2
+	github.com/aws/aws-sdk-go-v2/service/mwaa v1.42.1
 	github.com/aws/aws-sdk-go-v2/service/opensearch v1.70.1
 	github.com/aws/aws-sdk-go-v2/service/rds v1.118.3
 	github.com/aws/aws-sdk-go-v2/service/redshift v1.62.9
@@ -55,6 +56,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.42.28
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.68.7
 	github.com/aws/aws-sdk-go-v2/service/sts v1.42.2
+	github.com/aws/aws-sdk-go-v2/service/transfer v1.74.1
 	github.com/aws/aws-sdk-go-v2/service/wafv2 v1.71.6
 	github.com/aws/smithy-go v1.27.3
 	github.com/charmbracelet/x/ansi v0.11.7
@@ -73,11 +75,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.12.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.24 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.24 // indirect
-	github.com/aws/aws-sdk-go-v2/service/mwaa v1.42.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.1.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.30.18 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.36.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/transfer v1.74.1 // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20260416155717-489999b90468 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect

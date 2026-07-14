@@ -2474,6 +2474,24 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 				{Key: aws.String("Name"), Value: aws.String("prod-logs-endpoint-partial")},
 			},
 		},
+		// prod-as2-gateway's auto-created VPC endpoint (transfer.go graph
+		// root) — required for the transfer→vpce related-panel pivot to
+		// drill through to a real row.
+		{
+			VpcEndpointId:       aws.String(ProdAS2GatewayVpcEndpointID),
+			ServiceName:         aws.String("com.amazonaws.us-east-1.transfer.server"),
+			VpcEndpointType:     ec2types.VpcEndpointTypeInterface,
+			State:               ec2types.StateAvailable,
+			VpcId:               aws.String(fixtProdVPCID),
+			SubnetIds:           []string{fixtProdPublicSubnetA, fixtProdPublicSubnetB, fixtProdPrivateSubnetA},
+			NetworkInterfaceIds: []string{"eni-0transfer1111111a", "eni-0transfer1111111b", "eni-0transfer1111111c"},
+			PrivateDnsEnabled:   aws.Bool(false),
+			OwnerId:             aws.String("123456789012"),
+			CreationTimestamp:   aws.Time(time.Date(2025, 10, 1, 9, 0, 0, 0, time.UTC)),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("prod-as2-gateway-transfer-endpoint")},
+			},
+		},
 	}
 }
 

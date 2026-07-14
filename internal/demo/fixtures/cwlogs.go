@@ -357,6 +357,23 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(30),
 			CreationTime:    aws.Int64(1756704000000),
 		},
+		// prod-as2-gateway's two structured-log destinations (transfer.go
+		// graph root) — required for the transfer→logs related-panel pivot
+		// (count ≥2).
+		{
+			LogGroupName:    aws.String(transferLogGroupPrimaryName),
+			Arn:             aws.String(transferLogGroupArn(transferLogGroupPrimaryName)),
+			StoredBytes:     aws.Int64(10485760),
+			RetentionInDays: aws.Int32(90),
+			CreationTime:    aws.Int64(1727740800000),
+		},
+		{
+			LogGroupName:    aws.String(transferLogGroupPartnerAuditName),
+			Arn:             aws.String(transferLogGroupArn(transferLogGroupPartnerAuditName)),
+			StoredBytes:     aws.Int64(5242880),
+			RetentionInDays: aws.Int32(90),
+			CreationTime:    aws.Int64(1727740800000),
+		},
 	}
 
 	logStreams := map[string][]cwlogstypes.LogStream{
@@ -420,6 +437,8 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		"/aws/lambda/a9s-demo-s3-notifier": minimalLogStreams("lambda-s3-notifier"),
 		"/aws/lambda/acme-inbound-parser":  minimalLogStreams("lambda-inbound-parser"),
 		"/aws/lambda/orders-projector":     minimalLogStreams("lambda-orders-projector"),
+		transferLogGroupPrimaryName:        minimalLogStreams("transfer-as2-gateway"),
+		transferLogGroupPartnerAuditName:   minimalLogStreams("transfer-partner-audit"),
 	}
 
 	logEvents := map[string][]cwlogstypes.OutputLogEvent{

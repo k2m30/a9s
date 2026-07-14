@@ -53,6 +53,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/aws-sdk-go-v2/service/transfer"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -139,6 +140,7 @@ type ServiceClients struct {
 	MSK              MSKAPI
 	Backup           BackupAPI
 	MWAA             MWAAAPI
+	Transfer         TransferAPI
 	// CostExplorer is account-scoped, not region-scoped (data-model.md) —
 	// callers never partition it by the session's selected region.
 	CostExplorer CostsAPI
@@ -212,6 +214,7 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 		MSK:              kafka.NewFromConfig(cfg),
 		Backup:           backup.NewFromConfig(cfg),
 		MWAA:             mwaa.NewFromConfig(cfg),
+		Transfer:         transfer.NewFromConfig(cfg),
 		CostExplorer:     costexplorer.NewFromConfig(cfg),
 		STS:              sts.NewFromConfig(cfg),
 	}
