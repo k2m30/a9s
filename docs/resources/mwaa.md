@@ -105,13 +105,18 @@ All signals come from `GetEnvironment` per environment (N+1; accounts run 1–5 
   - **State bucket**: Dim.
   - **API call**: `GetEnvironment`, one per environment.
   - **Cost shape**: per-resource.
-- **Signal**: `LastUpdate.Status == FAILED` on an `AVAILABLE` environment — the last update silently failed while the environment keeps serving the previous configuration ("my change didn't take"). Surface `LastUpdate.Error.ErrorMessage` (and `ErrorCode`) as the cause.
-  - **State bucket**: Healthy (background finding; row stays green).
+- **Signal**: `LastUpdate.Status == FAILED` on an `AVAILABLE` environment — the last update silently failed while the environment keeps serving the previous configuration ("my change didn't take"). Surface `LastUpdate.Error.ErrorMessage` (and a humanized `ErrorCode`) as the cause.
+  - **State bucket**: Warning.
   - **API call**: `GetEnvironment`, one per environment (same call as above).
   - **Cost shape**: per-resource.
 - **Signal**: `WebserverAccessMode` in `PUBLIC_ONLY` / `PUBLIC_AND_PRIVATE` — the Airflow webserver is reachable from the internet (still IAM-authed, but exposed; analogous to `dbi` `PubliclyAccessible`).
-  - **State bucket**: Healthy (background finding; row stays green).
+  - **State bucket**: Warning.
   - **API call**: `GetEnvironment`, one per environment (same call as above).
+  - **Cost shape**: per-resource.
+
+- **Signal**: `airflow:GetEnvironment` denied for a listed environment name — the row is KEPT with the name only ("you can't see it" ≠ "it isn't there"; live witness 2026-07-14: a readonly role allowed `ListEnvironments` but denied `GetEnvironment`, which must not fake an empty list). The per-name failures also aggregate into the fetch error (flash + `!` log).
+  - **State bucket**: Warning.
+  - **API call**: `GetEnvironment`, one per environment (the denial IS the response).
   - **Cost shape**: per-resource.
 
 Deliberately not signals (a9s-devops 2026-07-14): any `LoggingConfiguration` component disabled (logging is opt-in per component and cost-driven; a warning would fire on most environments — noise, not signal; detail-view fact only) and `AirflowVersion` EOL (no stable AWS source for the deprecation schedule; a hardcoded table goes stale and lies; fact only).
@@ -146,28 +151,30 @@ One row per signal from §3. All mwaa signals are Wave 2 because `ListEnvironmen
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | `Status == CREATING` | 2 | Warning | n/a | S2, S4 | `creating` | `Environment is being provisioned; Airflow is not yet reachable.` |
-| `Status == CREATING_SNAPSHOT` | 2 | Warning | n/a | S2, S4 | `creating snapshot` | `MWAA is snapshotting the metadata database before an update or upgrade.` |
+| `Status == CREATING_SNAPSHOT` | 2 | Warning | n/a | S2, S4 | `creating snapshot` | `The environment is snapshotting its metadata database before an update or upgrade.` |
 | `Status == PENDING` | 2 | Warning | n/a | S2, S4 | `pending: awaiting VPC endpoints` | `Creation is paused until the required VPC endpoints exist in your VPC.` |
 | `Status == UPDATING` | 2 | Warning | n/a | S2, S4 | `updating` | `Environment update in progress; workers may be replaced.` |
-| `Status == ROLLING_BACK` | 2 | Warning | n/a | S2, S4 | `rolling back: update failed` | `Update or upgrade failed; MWAA is restoring the latest metadata snapshot.` |
+| `Status == ROLLING_BACK` | 2 | Warning | n/a | S2, S4 | `rolling back: update failed` | `Update or upgrade failed; the environment is restoring the latest metadata snapshot.` |
 | `Status == MAINTENANCE` | 2 | Warning | n/a | S2, S4 | `maintenance in progress` | `Scheduled maintenance is running; the environment may be briefly unavailable.` |
 | `Status == CREATE_FAILED` | 2 | Broken | n/a | S2, S4 | `create failed` | `Environment creation failed and the environment was not created.` |
 | `Status == UPDATE_FAILED` | 2 | Broken | n/a | S2, S4, S5 | `update failed: rolled back` | `Update failed; environment was restored to its previous state and is usable.` |
 | `Status == UNAVAILABLE` | 2 | Broken | n/a | S2, S4 | `unavailable: not stable` | `Environment failed and did not return to a stable state; contact AWS support.` |
 | `Status == DELETING` | 2 | Dim | n/a | S2, S4 | `deleting` | `Environment is being deleted.` |
 | `Status == DELETED` | 2 | Dim | n/a | S2, S4 | `deleted` | `Environment has been deleted.` |
-| `LastUpdate.Status == FAILED` on `AVAILABLE` | 2 | Healthy | `~` | S3, S4, S5 | `last update failed` | `Last update failed: <LastUpdate.Error.ErrorMessage>. Still on previous config.` |
-| `WebserverAccessMode` public | 2 | Healthy | `~` | S3, S4, S5 | `webserver public` | `Airflow webserver is reachable from the internet (<WebserverAccessMode>).` |
+| `LastUpdate.Status == FAILED` on `AVAILABLE` | 2 | Warning | n/a | S2, S4, S5 | `last update failed` | `Last update failed: <LastUpdate.Error.ErrorMessage>. Still on previous config.` |
+| `WebserverAccessMode` public | 2 | Warning | n/a | S2, S4, S5 | `webserver public` | `Airflow webserver is reachable from the internet (access mode: <humanized mode>).` |
+| `GetEnvironment` denied | 2 | Warning | n/a | S2, S4, S5 | `details denied` | `Access to environment details was denied; only the name is visible.` |
 
 Notes:
 
-- No `!`-on-green case exists for mwaa: both background findings are informational (`~`), so S1 is driven by Broken rows (`CREATE_FAILED`/`UPDATE_FAILED`/`UNAVAILABLE`) under the standard "red rows bump the menu count" rule.
-- When `LastUpdate.Status == FAILED` coincides with a non-green row (e.g. `ROLLING_BACK`), S3 is suppressed and S4 keeps the state cause; the failed-update sentence still appears in S5.
+- No glyph case exists for mwaa: every signal moves the row off green (the color is the signal; per the color-findings conformance contract, any issue-severity finding is color-bearing). S1 is driven by all issue-colored rows under the standard aggregation.
+- When `LastUpdate.Status == FAILED` coincides with another signal row (e.g. `ROLLING_BACK`), S4 keeps the state cause with the `(+N)` suffix; the failed-update sentence still appears in S5.
+- No raw AWS enum ever reaches a rendered surface — `ErrorCode` and `WebserverAccessMode` values are humanized (`INCORRECT_CONFIGURATION` → `Incorrect configuration`) per the issue-text style gate.
 - AccessDenied on `mwaa:ListEnvironments`: the main-menu row carries the error state, never `0` — "you can't see it" must be distinguishable from "it isn't there".
 
 ## 4.1 UX review (two sentences)
 
-At 3am every problem row names its cause in the Status column — `pending: awaiting VPC endpoints`, `rolling back: update failed`, `unavailable: not stable` — so the operator can triage without opening detail. The one nuance that needs the detail view is the failed-update error message itself (`LastUpdate.Error.ErrorMessage`), which is too long for the list and lives in S5.
+At 3am every problem row names its cause in the Status column — `pending: awaiting VPC endpoints`, `rolling back: update failed`, `last update failed`, `webserver public` — so the operator can triage without opening detail. The one nuance that needs the detail view is the failed-update error message itself (`LastUpdate.Error.ErrorMessage`), which is too long for the list and lives in S5.
 
 ## 5. Out of Scope
 

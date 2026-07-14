@@ -11,6 +11,7 @@ import (
 // than from registered app fetchers.
 func ExpectedTopLevelCounts() map[string]int {
 	ec2 := NewEC2Fixtures()
+	mwaaFix := NewMWAAFixtures()
 	ecs := NewECSFixtures()
 	eks := NewEKSFixtures()
 	rds := NewRDSFixtures()
@@ -49,8 +50,8 @@ func ExpectedTopLevelCounts() map[string]int {
 		"s3":           len(s3.Buckets),
 		"redis":        countRedisEngineReplicationGroups(NewRedisFixtures()),
 		"dbc":          len(docdb.DBClusters) + len(rds.DBClusters),
-		"ddb":          len(NewDDBFixtures().Tables),
-		"opensearch":   len(NewOpenSearchFixtures().Domains),
+		"ddb":          len(NewDDBFixtures().Tables) + len(NewDDBFixtures().DeniedNames),
+		"opensearch":   len(NewOpenSearchFixtures().Domains) + len(NewOpenSearchFixtures().DeniedNames),
 		"redshift":     len(NewRedshiftFixtures().Clusters),
 		"efs":          len(NewEFSFixtures().FileSystems),
 		"dbi-snap":     len(rds.DBSnapshots),
@@ -85,6 +86,7 @@ func ExpectedTopLevelCounts() map[string]int {
 		"codeartifact": len(NewCodeArtifactFixtures().Repositories),
 		"glue":         len(NewGlueFixtures().Jobs),
 		"athena":       len(NewAthenaFixtures().WorkGroups),
+		"mwaa":         len(mwaaFix.Environments) + len(mwaaFix.DeniedNames),
 		"backup":       len(NewBackupFixtures().Plans),
 		"ses":          len(NewSESFixtures().Identities),
 	}

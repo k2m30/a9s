@@ -1,0 +1,96 @@
+package unit
+
+// aws_endpoint_not_found_test.go — region-gap classification (live witness
+// 2026-07-14: CodeArtifact does not exist in eu-central-2; its endpoint DNS
+// does not resolve). The classifier must be narrow — only DNS not-found
+// qualifies — and the availability handler must render the plain-language
+// "service not available in region" line in the `!` error log with NO
+// blocking banner.
+
+import (
+	"errors"
+	"fmt"
+	"net"
+	"net/url"
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
+)
+
+// sdkStyleDNSNotFound mirrors the error chain the AWS SDK produces for a
+// missing regional endpoint: operation error wraps *url.Error wraps
+// *net.DNSError with IsNotFound.
+func sdkStyleDNSNotFound() error {
+	dnsErr := &net.DNSError{
+		Err:        "no such host",
+		Name:       "codeartifact.eu-central-2.amazonaws.com",
+		IsNotFound: true,
+	}
+	urlErr := &url.Error{Op: "Post", URL: "https://codeartifact.eu-central-2.amazonaws.com/v1/repositories", Err: dnsErr}
+	return fmt.Errorf("operation error codeartifact: ListRepositories, request send failed, %w", urlErr)
+}
+
+func TestIsEndpointNotFound_Classification(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"sdk-style DNS not-found chain", sdkStyleDNSNotFound(), true},
+		{"bare DNSError not-found", &net.DNSError{Err: "no such host", IsNotFound: true}, true},
+		{"DNSError without IsNotFound (flaky DNS)", &net.DNSError{Err: "server misbehaving", IsTemporary: true}, false},
+		{"generic error", errors.New("AccessDeniedException: not authorized"), false},
+		{"nil", nil, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := awsclient.IsEndpointNotFound(tc.err); got != tc.want {
+				t.Errorf("IsEndpointNotFound(%v) = %v, want %v", tc.err, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestHandleAvailabilityChecked_RegionGapLogsPlainLanguage drives the live
+// per-type availability handler with a row-less DNS-not-found failure and
+// asserts: no error flash banner, and the `!` error log carries the
+// plain-language region-gap line instead of transport jargon.
+func TestHandleAvailabilityChecked_RegionGapLogsPlainLanguage(t *testing.T) {
+	tui.Version = "test"
+	m := newRootSizedModel()
+
+	m, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
+		ResourceType: "codeartifact",
+		Err:          sdkStyleDNSNotFound(),
+		HasResources: false,
+		Count:        0,
+		Gen:          m.Core().Session().AvailabilityGen,
+	})
+
+	if cmd != nil {
+		for _, raw := range drainAllMessages(cmd) {
+			if fm, ok := raw.(messages.Flash); ok && fm.IsError {
+				t.Errorf("region gap must be error-log-only; got error FlashMsg %q", fm.Text)
+			}
+		}
+	}
+
+	logModel, logCmd := rootApplyMsg(m, tea.KeyPressMsg{Code: '!'})
+	if logCmd != nil {
+		if raw := logCmd(); raw != nil {
+			logModel, _ = rootApplyMsg(logModel, raw)
+		}
+	}
+	logView := stripANSI(rootViewContent(logModel))
+	if !strings.Contains(logView, "service not available in region") {
+		t.Errorf("`!` error log must carry the plain-language region-gap line; got view:\n%s", logView)
+	}
+	if strings.Contains(logView, "no such host") {
+		t.Errorf("`!` error log must not carry raw DNS jargon for a region gap; got view:\n%s", logView)
+	}
+}

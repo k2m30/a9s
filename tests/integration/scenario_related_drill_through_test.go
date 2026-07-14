@@ -87,6 +87,7 @@ var drillThroughFixtures = []struct {
 	// non-Aurora case.
 	{"dbc-snap/aurora", "dbc-snap", demofixtures.ProdDBCSnapAuroraID},
 	{"dbc-snap/docdb", "dbc-snap", demofixtures.ProdDBCSnapDocDBID},
+	{"mwaa/prod-airflow-etl", "mwaa", demofixtures.ProdAirflowEtlID},
 }
 
 // drillThroughGroups collapses the flat fixture list into groups sharing a

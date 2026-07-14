@@ -23,6 +23,7 @@ package unit
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -267,9 +268,9 @@ func TestDDB_Fetch_IssuesPopulated_EveryTableStatus(t *testing.T) {
 // falls back to stock phrase "archived: kms key lost" without panicking.
 func TestDDB_Fetch_ArchivedNilArchivalSummary(t *testing.T) {
 	table := &ddbtypes.TableDescription{
-		TableName:      aws.String("inline-archived-nil-summary"),
-		TableArn:       aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/inline-archived-nil-summary"),
-		TableStatus:    ddbtypes.TableStatusArchived,
+		TableName:       aws.String("inline-archived-nil-summary"),
+		TableArn:        aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/inline-archived-nil-summary"),
+		TableStatus:     ddbtypes.TableStatusArchived,
 		ArchivalSummary: nil, // adversarial: no ArchivalSummary
 	}
 	status, issues, _ := fetchDDBSingle(t, table)
@@ -293,14 +294,18 @@ func TestDDB_Fetch_NilTable_SkipDoNotCrash(t *testing.T) {
 		"ghost-table": nil,
 	}}
 
-	// Should not panic; ghost-table will be skipped because table is nil
+	// Should not panic; ghost-table is KEPT as a name-only degraded row
+	// (a listed table must never vanish) and the failure aggregates into
+	// the composite error.
 	result, err := awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "ghost-table") {
+		t.Fatalf("composite error must name ghost-table, got: %v", err)
 	}
-	// nil table → skip (0 resources)
-	if len(result.Resources) != 0 {
-		t.Errorf("expected 0 resources for nil table, got %d", len(result.Resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 degraded name-only row for nil table, got %d", len(result.Resources))
+	}
+	if got := result.Resources[0].Fields["status"]; got != "details denied" {
+		t.Errorf("degraded row status = %q, want %q", got, "details denied")
 	}
 }
 

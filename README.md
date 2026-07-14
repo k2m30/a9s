@@ -11,7 +11,7 @@
 
 ![a9s demo](docs/demos/demo.gif)
 
-Browse, inspect, and manage 66 AWS resource types from your terminal. a9s gives you a real-time, keyboard-driven interface to your AWS infrastructure -- no clicking through the console, no memorizing CLI flags.
+Browse, inspect, and manage 67 AWS resource types from your terminal. a9s gives you a real-time, keyboard-driven interface to your AWS infrastructure -- no clicking through the console, no memorizing CLI flags.
 
 **Read-only by design.** a9s never makes write calls to AWS. Safe to use in production. Write operations are on the [roadmap](ROADMAP.md) only after the project has proven itself as a trusted tool (10k+ stars).
 
@@ -23,7 +23,7 @@ Browse, inspect, and manage 66 AWS resource types from your terminal. a9s gives 
 
 ## Features
 
-- **66 AWS resource types** across 12 service categories
+- **67 AWS resource types** across 12 service categories
 - **Cost Explorer** — a spend grid that matches your AWS invoice, with pivots, zoom, anomaly markers, and drill-down to the resources behind the numbers (see below)
 - **Issue detection** — background health checks mark broken/degraded resources with `!`/`~` and per-type issue counts; `Ctrl+Z` filters to what needs attention
 - Real-time resource browsing with vim-style keyboard navigation
@@ -168,7 +168,7 @@ a9s --reset-themes        # delete theme files and regenerate defaults
 | **DNS & CDN** | Route 53 Hosted Zones, CloudFront Distributions, ACM Certificates, API Gateways |
 | **Security & IAM** | IAM Roles, IAM Policies, IAM Users, IAM Groups, WAF Web ACLs |
 | **CI/CD** | CloudFormation Stacks, CodePipelines, CodeBuild Projects, ECR Repositories, CodeArtifact Repos |
-| **Data & Analytics** | Glue Jobs, Athena Workgroups |
+| **Data & Analytics** | Glue Jobs, Athena Workgroups, Managed Airflow |
 | **Backup** | Backup Plans |
 
 ## Key Bindings
@@ -205,7 +205,7 @@ a9s stores view configuration in `~/.a9s/views/` and theme configuration in `~/.
 
 ## AWS Permissions
 
-a9s claims to be read-only — but a dedicated IAM role with an explicit allow-list lets AWS enforce that guarantee rather than relying on the code. The **[Minimal IAM Profile](https://github.com/k2m30/a9s/wiki/Minimal-IAM-Profile)** wiki page has the full policy JSON covering all 66 resource types, CLI setup steps, and a Terraform module.
+a9s claims to be read-only — but a dedicated IAM role with an explicit allow-list lets AWS enforce that guarantee rather than relying on the code. The **[Minimal IAM Profile](https://github.com/k2m30/a9s/wiki/Minimal-IAM-Profile)** wiki page has the full policy JSON covering all 67 resource types, CLI setup steps, and a Terraform module.
 
 ## Environment Variables
 

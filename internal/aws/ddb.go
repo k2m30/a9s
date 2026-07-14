@@ -61,14 +61,17 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 			})
 		})
 		if err != nil {
-			// Surface per-table failures to the error log so operators see
-			// permission/throttle issues instead of a silently short list.
+			// Surface per-table failures to the error log AND keep the row —
+			// a listed table must never vanish behind a describe denial.
 			failures = append(failures, fmt.Sprintf("%s: %v", tableName, err))
+			resources = append(resources, DegradedDetailsDenied("ddb", tableName, &ddbtypes.TableDescription{TableName: aws.String(tableName)}))
 			continue
 		}
 
 		table := descOutput.Table
 		if table == nil {
+			failures = append(failures, fmt.Sprintf("%s: nil table in response", tableName))
+			resources = append(resources, DegradedDetailsDenied("ddb", tableName, &ddbtypes.TableDescription{TableName: aws.String(tableName)}))
 			continue
 		}
 

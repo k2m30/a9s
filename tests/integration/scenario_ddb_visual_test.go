@@ -68,12 +68,13 @@ func TestScenario_DDBVisual(t *testing.T) {
 	// S1 menu badge — assert BEFORE OpenList while the main menu is
 	// still the current view.
 	//
-	// Expected: 6 = the `!`-severity Wave-2 fixtures only. Per universal
-	// rule 4, `~` severity findings never bump the badge, so
+	// Expected: 7 = the `!`-severity Wave-2 fixtures plus the
+	// listed-but-denied witness (warn-ddb-details-denied), whose degraded
+	// name-only row is Warning-colored and therefore issue-counted. Per
+	// universal rule 4, `~` severity findings never bump the badge, so
 	// `audit-pitr-off` (Healthy + `~`) does not contribute.
-	// `unifiedIssueCount` filters by `!` severity.
 	// ---------------------------------------------------------------
-	scenario.ExpectMenuIssueCount("ddb", 6)
+	scenario.ExpectMenuIssueCount("ddb", 7)
 
 	scenario.OpenList("ddb")
 

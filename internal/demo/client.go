@@ -63,6 +63,7 @@ func NewServiceClients() *awsclient.ServiceClients {
 	clients.KMS = fakes.NewKMS()
 	clients.MSK = fakes.NewMSK()
 	clients.Backup = fakes.NewBackup()
+	clients.MWAA = fakes.NewMWAA()
 	clients.SetIAMPolicies(session.NewPolicyStore())
 	clients.SetIdentityStore(session.NewIdentityStore())
 	clients.SetRuleSets(session.NewRuleSetStore())

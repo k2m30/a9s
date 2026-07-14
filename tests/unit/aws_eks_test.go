@@ -11,6 +11,7 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -235,14 +236,26 @@ func TestFetchEKSClusters_DescribeFailureSurfacesError(t *testing.T) {
 		t.Errorf("composite error must contain the failing cluster name \"cluster-bad\", got: %q", errStr)
 	}
 
-	// The successful cluster must still appear in partial results.
-	if len(result.Resources) != 1 {
-		t.Errorf(
-			"FetchEKSClustersPage must return partial results — got %d rows, want 1 (cluster-ok only)",
+	// Both clusters appear: the successful one in full, the denied one as a
+	// name-only degraded row (a listed cluster must never vanish).
+	if len(result.Resources) != 2 {
+		t.Fatalf(
+			"FetchEKSClustersPage must keep the denied cluster as a degraded row — got %d rows, want 2",
 			len(result.Resources),
 		)
 	}
-	if len(result.Resources) == 1 && result.Resources[0].ID != "cluster-ok" {
-		t.Errorf("partial result must contain \"cluster-ok\", got ID %q", result.Resources[0].ID)
+	byID := map[string]resource.Resource{}
+	for _, r := range result.Resources {
+		byID[r.ID] = r
+	}
+	if _, ok := byID["cluster-ok"]; !ok {
+		t.Errorf("partial result must contain \"cluster-ok\", got %v", result.Resources)
+	}
+	bad, ok := byID["cluster-bad"]
+	if !ok {
+		t.Fatalf("denied cluster \"cluster-bad\" must remain as a degraded row, got %v", result.Resources)
+	}
+	if got := bad.Fields["status"]; got != "details denied" {
+		t.Errorf("degraded row status = %q, want %q", got, "details denied")
 	}
 }

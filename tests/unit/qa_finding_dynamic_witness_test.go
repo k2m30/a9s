@@ -82,6 +82,13 @@ var knownUnwitnessedFindings = map[string]bool{
 	"ses:ses.account-shutdown":  true,
 	"ses:ses.account-probation": true,
 	"ses:ses.quota-high":        true,
+	// Fire in production (shared DegradedDetailsDenied degraded-row path,
+	// unit-tested with inline stubs) but a demo witness would leak into
+	// every cluster-enumerating / DescribeNodegroup-fanning related checker
+	// and flash an error on each detail open — see knownStateCoverageGaps
+	// for the full reason.
+	"ng:ng.warn.details_denied":   true,
+	"eks:eks.warn.details_denied": true,
 }
 
 // TestFindingDynamicWitness_EveryRegisteredCodeFiresOnDemoFixtures is the

@@ -94,8 +94,8 @@ forbid() {
 }
 
 # Menu: sweep produced issue badges in-session (not only cached counts).
-# 67 = 66 resource types + the Cost Explorer entry.
-expect menu.txt 'resource-types\(67\)' "menu shows the full catalog"
+# 68 = 67 resource types + the Cost Explorer entry.
+expect menu.txt 'resource-types\(68\)' "menu shows the full catalog"
 expect menu.txt 'issues:[0-9]+' "sweep produced at least one issue badge"
 
 # Whole-cell raw enums must not survive rendering anywhere we look.
@@ -143,6 +143,36 @@ while IFS= read -r line; do
 	forbid "$cap" ' (Attention|Danger|Warning|Issue|Problem) ' "no vacuous whole-word status in $shortname list"
 done < "$CAPDIR/menu.txt"
 echo "smoke-readonly: full-catalog sweep covered $catalog_line menu line(s)"
+
+# The error log is the sweep's blind spot: a type whose fetch ERRORS renders
+# no (N) count in the menu, so the count-driven loop above silently skips it
+# — a brand-new broken type would sail through (live regression 2026-07-14:
+# mwaa's ListEnvironments ValidationException was invisible to this walk).
+# Capture the `!` log, always print it, and gate on it: request-level errors
+# (ValidationException, serialization, 4xx/5xx plumbing) FAIL the smoke;
+# pure IAM denials are printed as WARN — a partially-denied readonly role is
+# a legitimate account state, but it must be seen, never silent.
+tmux send-keys -t "$SESSION" "!"
+sleep 2
+tmux capture-pane -t "$SESSION" -p > "$CAPDIR/errorlog.txt"
+tmux send-keys -t "$SESSION" Escape
+errlines=$(grep -E 'availability |fetch|operation error|Exception|error:' "$CAPDIR/errorlog.txt" | grep -vE '^\s*$' || true)
+if [ -n "$errlines" ]; then
+	echo "smoke-readonly: error log after full walk:"
+	printf '%s\n' "$errlines" | sed 's/^/    /'
+	# StatusCode: 403 counts as a denial: the pane truncates long log lines
+	# at the frame border, so the trailing "AccessDeniedException: … not
+	# authorized" tail may be cut off while the HTTP status survives.
+	nondenial=$(printf '%s\n' "$errlines" | grep -vE 'AccessDenied|not authorized|UnauthorizedOperation|AuthorizationError|StatusCode: 403' || true)
+	if [ -n "$nondenial" ]; then
+		echo "FAIL  error log carries non-denial errors after the walk"
+		FAILURES=$((FAILURES + 1))
+	else
+		echo "WARN  error log carries IAM denials only (partially-denied readonly role) — review above"
+	fi
+else
+	echo "PASS  error log is empty after the full walk"
+fi
 
 if [ "$FAILURES" -gt 0 ]; then
 	echo "smoke-readonly: $FAILURES failure(s); captures kept in $CAPDIR"

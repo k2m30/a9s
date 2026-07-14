@@ -490,10 +490,10 @@ Record the exact exported symbol list the coder emits — 6b needs it.
 
 Dispatch `Agent(a9s-qa)`. Two dispatch modes are valid, pick one explicitly:
 
-- **`Mode: score`** (default for this phase) — QA replies with `SCORE: <N> — <rationale>`. Accept or rework the scope, then re-dispatch with `Mode: execute` and `Confirmed score: <N>`. Use this when the scope is complex or you want QA to critique the coverage before writing.
-- **`Mode: write`** — QA writes the tests immediately, no scoring dance. Use this when the scope is well-trodden (e.g. the per-resource template in this phase) and an extra round would be pure ceremony.
+- **`Mode: score`** (first dispatch) — QA replies with `SCORE: <N> — <rationale>`. Accept or rework the scope, then re-dispatch with `Mode: execute` and `Confirmed score: <N>`.
+- **`Mode: execute`** + `Confirmed score: <N>` — QA writes the tests. Only valid after a score round on the same task.
 
-ALWAYS include a `Mode:` line — omitting it leads QA to pick score-mode by default and return a critique when you wanted tests, burning a dispatch round.
+The a9s-qa agent's VALUE SCORE GATE accepts ONLY these two modes — there is no `Mode: write`; any other mode string is rejected and burns a dispatch round. When continuing the SAME agent (SendMessage), the score→execute pair can ride one conversation.
 
 QA task shape:
 

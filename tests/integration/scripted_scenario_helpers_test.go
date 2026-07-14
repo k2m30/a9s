@@ -17,8 +17,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 type fullIntegrationScenario struct {
@@ -193,7 +193,10 @@ func fullIntegrationMustFindResource(t *testing.T, clients *awsclient.ServiceCli
 		} else {
 			result, err = paginatedFetcher(ctx, clients, token)
 		}
-		if err != nil {
+		if err != nil && len(result.Resources) == 0 {
+			// Rows + composite error together are the designed E5 partial-
+			// success outcome (e.g. mwaa's details-denied demo witness);
+			// only a row-less error is a harness failure.
 			t.Fatalf("find resource %s page %d failed: %v", resourceType, page, err)
 		}
 		for _, res := range result.Resources {
@@ -546,12 +549,19 @@ func (s *fullIntegrationScenario) currentView() string {
 	return fullIntegrationStripANSI(fullIntegrationViewContent(s.model))
 }
 
-// findRow returns the first rendered line that contains the given resource ID as
-// a standalone token. Returns empty string if no such line is present.
+// findRow returns the first rendered TABLE line that contains the given
+// resource ID as a standalone token. Only lines inside the frame borders
+// ("│…│") qualify — the header flash banner can quote a resource ID inside an
+// error message (e.g. a composite fetch error naming a denied environment)
+// and must never be mistaken for the row. Returns "" if no such line exists.
 func (s *fullIntegrationScenario) findRow(resourceID string) string {
 	s.t.Helper()
 	for _, line := range strings.Split(s.currentView(), "\n") {
 		if !strings.Contains(line, resourceID) {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "│") {
 			continue
 		}
 		return line

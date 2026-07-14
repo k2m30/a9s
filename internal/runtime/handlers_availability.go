@@ -18,7 +18,9 @@ package runtime
 import (
 	"fmt"
 	"maps"
+	"time"
 
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -256,6 +258,15 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 			IsError: true,
 		})
 	}
+	// Partial failures (rows present) go to the `!` error log only — the
+	// rows already render with their degraded-state findings; a blocking
+	// banner would double-shout what the list is honestly showing.
+	if msg.PrefetchSoftErr != nil {
+		intents = append(intents, AppendErrorHistoryIntent{
+			Time:    time.Now(),
+			Message: "availability: " + msg.PrefetchSoftErr.Error(),
+		})
+	}
 
 	return intents, enrichTasks
 }
@@ -311,12 +322,33 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		c.ObserveRows(canonType, freshResources, &resource.PaginationMeta{IsTruncated: msg.Truncated}, session.OriginProbe, false)
 	}
 
-	// Surface partial-success failures as flash errors.
+	// Surface probe failures. Partial success (rows arrived alongside a
+	// composite per-item error — the E5 contract, e.g. a role that can list
+	// but not describe some resources) records into the `!` error log
+	// without a blocking banner: the rows are already on screen carrying
+	// their degraded-state findings. A region gap (the service endpoint's
+	// DNS does not resolve — the service is not offered in this region)
+	// logs a plain-language one-liner instead of transport jargon. Any
+	// other row-less failure banners as before.
 	if msg.Err != nil {
-		intents = append(intents, FlashIntent{
-			Text:    fmt.Sprintf("availability %s: %v", msg.ResourceType, msg.Err),
-			IsError: true,
-		})
+		switch {
+		case len(msg.Resources) > 0:
+			intents = append(intents, AppendErrorHistoryIntent{
+				Time:    time.Now(),
+				Message: fmt.Sprintf("availability %s: %v", msg.ResourceType, msg.Err),
+			})
+		case awsclient.IsEndpointNotFound(msg.Err):
+			_, region := c.session.CurrentPair()
+			intents = append(intents, AppendErrorHistoryIntent{
+				Time:    time.Now(),
+				Message: fmt.Sprintf("%s: service not available in region %s", msg.ResourceType, region),
+			})
+		default:
+			intents = append(intents, FlashIntent{
+				Text:    fmt.Sprintf("availability %s: %v", msg.ResourceType, msg.Err),
+				IsError: true,
+			})
+		}
 	}
 
 	intents = append(intents, PatchMenuCheckProgress{

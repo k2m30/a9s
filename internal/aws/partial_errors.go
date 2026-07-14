@@ -13,9 +13,24 @@
 package aws
 
 import (
+	"errors"
 	"fmt"
+	"net"
 	"strings"
 )
+
+// IsEndpointNotFound reports whether err is a DNS resolution failure for a
+// service endpoint host — the signature of a service that is not offered in
+// the selected region (e.g. CodeArtifact in eu-central-2: dial tcp lookup
+// codeartifact.eu-central-2.amazonaws.com: no such host). Callers use this to
+// render "service not available in region <r>" instead of raw transport
+// jargon, and to log-only rather than banner. Deliberately narrow: only
+// *net.DNSError with IsNotFound qualifies — offline networks and flaky DNS
+// fail differently and must stay loud.
+func IsEndpointNotFound(err error) bool {
+	var dnsErr *net.DNSError
+	return errors.As(err, &dnsErr) && dnsErr.IsNotFound
+}
 
 // aggregateFailuresCap is the maximum number of per-ID failures
 // AggregateFailures enumerates verbatim before summarizing the remainder —

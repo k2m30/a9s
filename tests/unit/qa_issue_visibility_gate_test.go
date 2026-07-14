@@ -114,7 +114,10 @@ func drainVisibilityFixtures(t *testing.T, td resource.ResourceTypeDef, clients 
 	token := ""
 	for page := range demoVisibilityMaxFetchPages {
 		result, err := td.Fetcher(ctx, clients, token)
-		if err != nil {
+		if err != nil && len(result.Resources) == 0 {
+			// Rows + composite error together are the designed E5
+			// partial-success outcome (e.g. mwaa's details-denied demo
+			// witness); only a row-less error is a harness failure.
 			t.Fatalf("%s: Fetcher page %d returned error: %v", td.ShortName, page, err)
 		}
 		all = append(all, result.Resources...)

@@ -595,6 +595,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDDBDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDDBArchiving, Phrase: "archiving", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: ddbCodePITROff, Phrase: "point-in-time recovery disabled", Severity: domain.SevWarn, Source: "wave2"},
+			DetailsDeniedFindingDef("ddb"),
 		},
 	},
 	{
@@ -612,14 +613,16 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Color: colorOpenSearch,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
+			// E5 partial success: degraded name-only rows may arrive alongside
+			// a composite error — return both, never drop the rows.
 			resources, err := FetchOpenSearchDomains(ctx, c.OpenSearch, c.OpenSearch)
-			if err != nil {
+			if err != nil && len(resources) == 0 {
 				return resource.FetchResult{}, err
 			}
 			return resource.FetchResult{
 				Resources:  resources,
 				Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
-			}, nil
+			}, err
 		}),
 		Wave2: IssueEnricher{Fn: EnrichOpenSearchDomains, Priority: 100},
 		FieldKeys: []string{
@@ -652,6 +655,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeOpenSearchProcessing, Phrase: "processing: config change in flight", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: opensearchCodeUpdateForced, Phrase: "software update forced soon", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: opensearchCodeEncryptionOff, Phrase: "encryption at rest off", Severity: domain.SevWarn, Source: "wave2"},
+			DetailsDeniedFindingDef("opensearch"),
 		},
 	},
 	{

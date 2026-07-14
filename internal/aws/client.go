@@ -39,6 +39,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	"github.com/aws/aws-sdk-go-v2/service/mwaa"
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
@@ -137,6 +138,7 @@ type ServiceClients struct {
 	KMS              KMSAPI
 	MSK              MSKAPI
 	Backup           BackupAPI
+	MWAA             MWAAAPI
 	// CostExplorer is account-scoped, not region-scoped (data-model.md) —
 	// callers never partition it by the session's selected region.
 	CostExplorer CostsAPI
@@ -209,6 +211,7 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 		KMS:              kms.NewFromConfig(cfg),
 		MSK:              kafka.NewFromConfig(cfg),
 		Backup:           backup.NewFromConfig(cfg),
+		MWAA:             mwaa.NewFromConfig(cfg),
 		CostExplorer:     costexplorer.NewFromConfig(cfg),
 		STS:              sts.NewFromConfig(cfg),
 	}

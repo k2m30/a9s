@@ -417,7 +417,11 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 			if def.NeedsTargetCache {
 				if _, inMainCache := mainCacheKeys[def.TargetType]; !inMainCache {
 					if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
-						if fr, err := pf(ctx, clients, ""); err == nil {
+						// E5 partial success: seed whatever rows came even
+						// alongside a composite error (listed-but-denied
+						// resources) — a partially-visible target cache
+						// beats an unknown "?" row.
+						if fr, err := pf(ctx, clients, ""); err == nil || len(fr.Resources) > 0 {
 							isTrunc := fr.Pagination != nil && fr.Pagination.IsTruncated
 							if prev, hasPrev := localCache[def.TargetType]; hasPrev && prev.IsTruncated {
 								isTrunc = true

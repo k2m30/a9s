@@ -38,6 +38,19 @@ func colorAthena(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
+// colorMWAA prefers colorFromAnyFinding so every Finding (state-bucket or
+// background) is color-bearing — docs/resources/mwaa.md §4: no
+// glyph-on-green case exists for mwaa; every signal moves the row off green,
+// including last-update-failed and webserver-public. Real fetched resources
+// always carry a Finding when off-Healthy, so there is no raw-field
+// fallback to keep.
+func colorMWAA(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
+
 var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "Glue Jobs",
@@ -111,6 +124,67 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Findings: []catalog.FindingDef{
 			{Code: athenaCodeWorkgroupDisabled, Phrase: "disabled", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: athenaCodeGovernanceMisconfigured, Phrase: "EnforceWorkGroupConfiguration (<N> findings)", Severity: domain.SevWarn, Source: "wave2"},
+		},
+	},
+	{
+		Name:          "Managed Airflow",
+		ShortName:     "mwaa",
+		Aliases:       []string{"mwaa", "airflow"},
+		Category:      "DATA & ANALYTICS",
+		CloudTrailKey: "ResourceName:ID",
+		Columns: []domain.Column{
+			{Key: "name", Title: "Name", Width: 32, Sortable: true},
+			{Key: "status", Title: "Status", Width: 32, Sortable: true},
+			{Key: "airflow_version", Title: "Airflow", Width: 10, Sortable: true},
+			{Key: "environment_class", Title: "Class", Width: 14, Sortable: true},
+			{Key: "max_workers", Title: "Workers", Width: 9, Sortable: true},
+			{Key: "schedulers", Title: "Schedulers", Width: 10, Sortable: true},
+			{Key: "webserver_access_mode", Title: "Access", Width: 16, Sortable: true},
+			{Key: "created_at", Title: "Created", Width: 22, Sortable: true},
+		},
+		Color:   colorMWAA,
+		Fetcher: fetcherWithClients(FetchMWAAEnvironmentsPage),
+		FieldKeys: []string{
+			"name", "status", "airflow_version", "environment_class",
+			"min_workers", "max_workers", "schedulers", "min_webservers", "max_webservers",
+			"webserver_access_mode", "endpoint_management", "weekly_maintenance_window",
+			"webserver_url", "arn", "source_bucket_arn", "dag_s3_path", "kms_key",
+			"execution_role_arn", "service_role_arn", "celery_executor_queue",
+			"security_group_ids", "subnet_ids",
+			"dag_processing_log_group", "scheduler_log_group", "webserver_log_group",
+			"worker_log_group", "task_log_group",
+			"created_at", "last_update_status", "last_update_error",
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkMWAAAlarms, NeedsTargetCache: true},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkMWAAKMS},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkMWAALogs},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkMWAARole},
+			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkMWAAS3},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkMWAASG},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkMWAASubnet},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("mwaa")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "ExecutionRoleArn", TargetType: "role"},
+			{FieldPath: "KmsKey", TargetType: "kms"},
+			{FieldPath: "SourceBucketArn", TargetType: "s3"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: mwaaCodeCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: mwaaCodeCreatingSnapshot, Phrase: "creating snapshot", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: mwaaCodePending, Phrase: "pending: awaiting VPC endpoints", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: mwaaCodeUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: mwaaCodeRollingBack, Phrase: "rolling back: update failed", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: mwaaCodeMaintenance, Phrase: "maintenance in progress", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: mwaaCodeCreateFailed, Phrase: "create failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: mwaaCodeUpdateFailed, Phrase: "update failed: rolled back", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: mwaaCodeUnavailable, Phrase: "unavailable: not stable", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: mwaaCodeDeleting, Phrase: "deleting", Severity: domain.SevDim, Source: "wave1"},
+			{Code: mwaaCodeDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
+			{Code: mwaaCodeLastUpdateFailed, Phrase: "last update failed", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: mwaaCodeWebserverPublic, Phrase: "webserver public", Severity: domain.SevWarn, Source: "wave1"},
+			DetailsDeniedFindingDef("mwaa"),
 		},
 	},
 }

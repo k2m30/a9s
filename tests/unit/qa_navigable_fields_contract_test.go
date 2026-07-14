@@ -195,6 +195,11 @@ var navigableContracts = []navContract{
 	// msk — MSK Clusters
 	{shortName: "msk", apiDoc: "https://docs.aws.amazon.com/msk/1.0/apireference/v1-clusters.html", fieldPath: "Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId", targetType: "kms", reasoning: "Cluster.Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId — KMS key for broker data-volume encryption."},
 
+	// mwaa — Managed Airflow
+	{shortName: "mwaa", apiDoc: "https://docs.aws.amazon.com/mwaa/latest/API/API_Environment.html", fieldPath: "ExecutionRoleArn", targetType: "role", reasoning: "Environment.ExecutionRoleArn is the IAM role Airflow tasks assume for AWS access."},
+	{shortName: "mwaa", apiDoc: "https://docs.aws.amazon.com/mwaa/latest/API/API_Environment.html", fieldPath: "KmsKey", targetType: "kms", reasoning: "Environment.KmsKey encrypts the metadata database, logs, and queue."},
+	{shortName: "mwaa", apiDoc: "https://docs.aws.amazon.com/mwaa/latest/API/API_Environment.html", fieldPath: "SourceBucketArn", targetType: "s3", reasoning: "Environment.SourceBucketArn holds the DAGs, requirements.txt, and plugins."},
+
 	// nat — NAT Gateways
 	{shortName: "nat", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.html", fieldPath: "VpcId", targetType: "vpc", reasoning: "NatGateway.VpcId — VPC the NAT is in."},
 	{shortName: "nat", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.html", fieldPath: "SubnetId", targetType: "subnet", reasoning: "NatGateway.SubnetId — subnet the NAT lives in (must be public)."},
