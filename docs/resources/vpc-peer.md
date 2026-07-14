@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `rtb`, `vpc
 ### `rtb`
 
 - **Why related**: "who actually routes to this peer" — a peering connection without a route is dead weight; the route tables ARE the traffic path.
-- **How discovered**: cross-reference the already-loaded `rtb` list for `Routes[].VpcPeeringConnectionId == <pcx-id>`. Zero extra API calls. Unknown (`?`) when the rtb cache is absent or truncated — never a fake 0.
+- **How discovered**: cross-reference the already-loaded `rtb` list for `Routes[].VpcPeeringConnectionId == <pcx-id>`. Zero extra API calls. Unknown (`?`) when the rtb cache is absent; a truncated cache renders the count as an honest lower bound (`N+`, the fleet cache-scan convention shared with lt/ng) — never a fake exact 0.
 - **Count shown**: yes.
 
 ### `vpc`
