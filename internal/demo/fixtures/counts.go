@@ -44,6 +44,7 @@ func ExpectedTopLevelCounts() map[string]int {
 		"rtb":          len(ec2.RouteTables),
 		"nat":          len(ec2.NatGateways),
 		"igw":          len(ec2.InternetGateways),
+		"vpc-peer":     len(NewVpcPeerFixtures().Connections),
 		"eip":          len(ec2.Addresses),
 		"vpce":         len(ec2.VpcEndpoints),
 		"tgw":          len(ec2.TransitGateways),

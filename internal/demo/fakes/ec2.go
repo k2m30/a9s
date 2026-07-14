@@ -16,13 +16,14 @@ import (
 
 // EC2Fake implements aws.EC2API against fixture data loaded at construction time.
 type EC2Fake struct {
-	fix *fixtures.EC2Fixtures
-	lt  *fixtures.LTFixtures
+	fix     *fixtures.EC2Fixtures
+	lt      *fixtures.LTFixtures
+	vpcPeer *fixtures.VpcPeerFixtures
 }
 
 // NewEC2 constructs an EC2Fake backed by fixture data from the fixtures package.
 func NewEC2() *EC2Fake {
-	return &EC2Fake{fix: fixtures.NewEC2Fixtures(), lt: fixtures.NewLTFixtures()}
+	return &EC2Fake{fix: fixtures.NewEC2Fixtures(), lt: fixtures.NewLTFixtures(), vpcPeer: fixtures.NewVpcPeerFixtures()}
 }
 
 func (f *EC2Fake) DescribeInstances(_ context.Context, _ *ec2.DescribeInstancesInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error) {
@@ -63,6 +64,10 @@ func (f *EC2Fake) DescribeSubnets(_ context.Context, _ *ec2.DescribeSubnetsInput
 
 func (f *EC2Fake) DescribeRouteTables(_ context.Context, _ *ec2.DescribeRouteTablesInput, _ ...func(*ec2.Options)) (*ec2.DescribeRouteTablesOutput, error) {
 	return &ec2.DescribeRouteTablesOutput{RouteTables: f.fix.RouteTables}, nil
+}
+
+func (f *EC2Fake) DescribeVpcPeeringConnections(_ context.Context, _ *ec2.DescribeVpcPeeringConnectionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeVpcPeeringConnectionsOutput, error) {
+	return &ec2.DescribeVpcPeeringConnectionsOutput{VpcPeeringConnections: f.vpcPeer.Connections}, nil
 }
 
 func (f *EC2Fake) DescribeNatGateways(_ context.Context, _ *ec2.DescribeNatGatewaysInput, _ ...func(*ec2.Options)) (*ec2.DescribeNatGatewaysOutput, error) {

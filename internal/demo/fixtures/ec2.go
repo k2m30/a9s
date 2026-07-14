@@ -1730,6 +1730,9 @@ func buildRouteTables() []ec2types.RouteTable {
 			Routes: []ec2types.Route{
 				{DestinationCidrBlock: aws.String("10.0.0.0/16"), GatewayId: aws.String("local"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRouteTable},
 				{DestinationCidrBlock: aws.String("0.0.0.0/0"), NatGatewayId: aws.String("nat-0aaa111111111111a"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
+				// required for rtb→vpc-peer related-panel pivot (one of the
+				// two rtb fixtures routing into ProdPeerSharedID, vpcpeer.go).
+				{DestinationCidrBlock: aws.String("192.168.0.0/16"), VpcPeeringConnectionId: aws.String(ProdPeerSharedID), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
 			},
 			Associations: []ec2types.RouteTableAssociation{
 				{Main: aws.Bool(true), RouteTableAssociationId: aws.String("rtbassoc-0aaa111111111111a"), RouteTableId: aws.String("rtb-0aaa111111111111a")},
@@ -1775,6 +1778,10 @@ func buildRouteTables() []ec2types.RouteTable {
 			Routes: []ec2types.Route{
 				{DestinationCidrBlock: aws.String("10.0.0.0/16"), GatewayId: aws.String("local"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRouteTable},
 				{DestinationCidrBlock: aws.String("0.0.0.0/0"), NatGatewayId: aws.String("nat-0aaa111111111111a"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
+				// required for rtb→vpc-peer related-panel pivot (second of
+				// the two rtb fixtures routing into ProdPeerSharedID,
+				// vpcpeer.go — the rtb pivot's ≥2 witness).
+				{DestinationCidrBlock: aws.String("192.168.0.0/16"), VpcPeeringConnectionId: aws.String(ProdPeerSharedID), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
 			},
 			Associations: []ec2types.RouteTableAssociation{
 				{Main: aws.Bool(false), RouteTableAssociationId: aws.String("rtbassoc-0ddd444444444444d"), RouteTableId: aws.String("rtb-0ccc333333333333c"), SubnetId: aws.String(fixtProdPrivateSubnetA)},
@@ -1793,6 +1800,11 @@ func buildRouteTables() []ec2types.RouteTable {
 				{DestinationCidrBlock: aws.String("10.2.0.0/16"), GatewayId: aws.String("local"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRouteTable},
 				{DestinationCidrBlock: aws.String("0.0.0.0/0"), GatewayId: aws.String("igw-0bbb222222222222b"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
 				{DestinationCidrBlock: aws.String("10.2.0.0/16"), NatGatewayId: aws.String("nat-0ccc333333333333c"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
+				// required for rtb→vpc-peer related-panel pivot: the route to
+				// WarnPeerBlackholeID (vpcpeer.go) is blackholed even though
+				// the peering connection itself is Status.Code=active — the
+				// "route to peer blackholed" cache-scan witness.
+				{DestinationCidrBlock: aws.String("10.30.0.0/16"), VpcPeeringConnectionId: aws.String(WarnPeerBlackholeID), State: ec2types.RouteStateBlackhole, Origin: ec2types.RouteOriginCreateRoute},
 			},
 			Associations: []ec2types.RouteTableAssociation{
 				{Main: aws.Bool(true), RouteTableAssociationId: aws.String("rtbassoc-0fff666666666666f"), RouteTableId: aws.String("rtb-0ddd444444444444d")},

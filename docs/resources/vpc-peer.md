@@ -104,14 +104,14 @@ Surfaces S1–S5 per `docs/attention-signals.md` §Visualization Surfaces; wave�
 | deleted | 1 | Dim | n/a | S2, S4 | `deleted` | `AWS keeps deleted connections listed for a window.` |
 | CIDR overlap (active) | 1 | Warning | n/a | S2, S4, S5 | `CIDR overlap with peer` | `Requester and accepter CIDR ranges overlap: <ranges>; overlapping subsets blackhole.` |
 | no local route (active) | 2 | Healthy + background check | `~` | S3, S4, S5 | `no local route to peer` | `No loaded route table routes to this peering connection.` |
-| route blackholed | 2 | Warning | n/a | S2, S4, S5 | `route to peer blackholed` | `A route references this connection but its state is blackhole.` |
+| route blackholed | 2 | Healthy + background check | `~` | S3, S4, S5 | `route to peer blackholed` | `A route references this connection but its state is blackhole.` |
 
 Notes:
 
 - No raw AWS enum reaches a rendered surface.
 - Multiple findings stack with the framework `(+N)` suffix; S5 enumerates each.
 - pending-acceptance escalation: wording carries the countdown; under 48h the S4 phrase stays the same with the smaller `<N>` — the number IS the escalation.
-- blackholed is color-bearing Warning (an actively broken path), while missing-route is `~` (nothing broken yet — the tunnel is simply unused); severity split deliberate.
+- Both derived route checks ship as `~` background checks (the lt deprecated-AMI treatment): the cache-scan enrichment layer annotates green rows, it does not recolor them — the S4 phrase plus the S5 sentence carry the cause. Amended 2026-07-15 from an earlier color-bearing plan for blackholed, matching the fold's actual capability.
 
 ## 4.1 UX review (two sentences)
 
