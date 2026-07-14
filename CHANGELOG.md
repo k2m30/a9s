@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.50.0] - 2026-07-14
+
+### Added
+
+- New resource type: **Managed Airflow (`mwaa`, alias `airflow`)** — the 67th
+  type (main menu 68). Lists environments and describes each one in the same
+  pass (the API returns names only), with status phrases per state, warnings
+  for a silently failed last update and an internet-reachable webserver, and
+  related pivots to CloudWatch alarms (by `EnvironmentName` dimension), KMS,
+  the five per-component log groups, the execution role, the DAG source
+  bucket, security groups, subnets, and CloudTrail events. 17 demo fixtures
+  including a fully connected showroom environment.
+
+### Changed
+
+- **Honest degradation is now a fleet-wide contract.** A resource the list
+  API names but the per-item describe cannot deliver (an IAM denial, a nil
+  body) is KEPT as a name-only row with a `details denied` warning instead of
+  silently vanishing — adopted by mwaa, EKS clusters, node groups, DynamoDB
+  tables, and OpenSearch domains, with a single shared implementation so the
+  behavior cannot diverge per type.
+- Partial fetch success (rows plus a per-item composite error) no longer
+  raises a blocking startup banner: the rows render with their degraded-state
+  findings and the detail goes to the `!` error log. A row-less failure still
+  banners. Related-panel target caches keep partially fetched rows instead of
+  answering `?`.
+- A service endpoint that does not resolve in the selected region (e.g.
+  CodeArtifact in eu-central-2) now logs `service not available in region X`
+  instead of raw DNS transport jargon.
+- MWAA list pagination respects the API's `MaxResults` cap of 25 (the shared
+  default of 50 was rejected with a ValidationException).
+- The live smoke reads the `!` error log after its full walk: request-level
+  errors fail the smoke, IAM denials print as loud warnings — previously a
+  type whose fetch errored rendered no count and was silently skipped by the
+  sweep.
+
 ## [3.49.1] - 2026-07-14
 
 ### Fixed
