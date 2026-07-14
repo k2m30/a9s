@@ -1,0 +1,38 @@
+list:
+  Server Id:
+    path: ServerId
+    width: 32
+  Status:
+    key: status
+    width: 32
+  Domain:
+    path: Domain
+    width: 10
+  Endpoint:
+    path: EndpointType
+    width: 14
+    humanize: true
+  Identity Provider:
+    path: IdentityProviderType
+    width: 20
+    humanize: true
+  Users:
+    path: UserCount
+    width: 8
+
+detail:
+  - ServerId
+  - Arn
+  - Domain
+  - EndpointType
+  - IdentityProviderType
+  - IdentityProviderDetails
+  - UserCount
+  - SecurityPolicyName
+  - Protocols
+  - Certificate
+  - LoggingRole
+  - StructuredLogDestinations
+  - EndpointDetails
+  - HostKeyFingerprint
+  - As2ServiceManagedEgressIpAddresses

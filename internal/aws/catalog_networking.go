@@ -158,6 +158,17 @@ func colorTGW(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
+// colorTransfer prefers colorFromAnyFinding — docs/resources/transfer.md
+// §4: every signal is color-bearing, no glyph-on-green case exists for
+// transfer. Real fetched resources always carry a Finding when off-Healthy,
+// so there is no raw-field fallback to keep.
+func colorTransfer(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
+
 func colorENI(r domain.Resource) domain.Color {
 	if c, ok := colorFromWave1(r); ok {
 		return c
@@ -687,6 +698,58 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeENIStateAvailable, Phrase: "available", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
+	{
+		Name:          "Transfer Family",
+		ShortName:     "transfer",
+		Aliases:       []string{"transfer", "sftp", "as2", "ftps"},
+		Category:      "NETWORKING",
+		CloudTrailKey: "ResourceName:ID",
+		Columns: []domain.Column{
+			{Key: "server_id", Title: "Server Id", Width: 24, Sortable: true},
+			{Key: "status", Title: "Status", Width: 32, Sortable: true},
+			{Key: "domain", Title: "Domain", Width: 10, Sortable: true},
+			{Key: "endpoint_type", Title: "Endpoint", Width: 14, Sortable: true},
+			{Key: "identity_provider_type", Title: "Identity Provider", Width: 20, Sortable: true},
+			{Key: "user_count", Title: "Users", Width: 8, Sortable: true},
+		},
+		Children: []domain.ChildViewDef{{
+			ChildType:      "transfer_agreements",
+			Key:            "e",
+			ContextKeys:    map[string]string{"server_id": "ID"},
+			DisplayNameKey: "server_id",
+		}},
+		Color:   colorTransfer,
+		Fetcher: fetcherWithClients(FetchTransferServersPage),
+		FieldKeys: []string{
+			"server_id", "status", "domain", "endpoint_type",
+			"identity_provider_type", "user_count", "arn",
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkTransferACM},
+			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkTransferLambda},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTransferLogs},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkTransferRole},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkTransferSubnet},
+			{TargetType: "vpc", DisplayName: "VPC", Checker: checkTransferVPC},
+			{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkTransferVPCE},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("transfer")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "LoggingRole", TargetType: "role"},
+			{FieldPath: "Certificate", TargetType: "acm"},
+			{FieldPath: "EndpointDetails.VpcId", TargetType: "vpc"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: transferCodeOffline, Phrase: "offline: not accepting transfers", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: transferCodeStarting, Phrase: "starting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: transferCodeStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: transferCodeStartFailed, Phrase: "start failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: transferCodeStopFailed, Phrase: "stop failed", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: transferCodeLegacyPolicy, Phrase: "legacy security policy", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: transferCodeNoLogging, Phrase: "no activity logging", Severity: domain.SevWarn, Source: "wave1"},
+			DetailsDeniedFindingDef("transfer"),
+		},
+	},
 }
 
 var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
@@ -734,5 +797,30 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchTargetHealth(ctx, c.ELBv2, parentCtx["target_group_arn"], continuationToken)
 		}),
+	},
+	{
+		Name:      "Agreements",
+		ShortName: "transfer_agreements",
+		Columns: []domain.Column{
+			{Key: "agreement_id", Title: "Agreement Id", Width: 24, Sortable: true},
+			{Key: "description", Title: "Description", Width: 32, Sortable: false},
+			{Key: "status", Title: "Status", Width: 24, Sortable: true},
+			{Key: "local_profile", Title: "Local Profile", Width: 16, Sortable: true},
+			{Key: "partner_profile", Title: "Partner Profile", Width: 16, Sortable: true},
+			{Key: "base_directory", Title: "Base Directory", Width: 30, Sortable: false},
+		},
+		Color: colorWave1OrHealthy,
+		FieldKeys: []string{
+			"agreement_id", "description", "status", "local_profile", "partner_profile", "base_directory",
+		},
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			return FetchTransferAgreements(ctx, c.Transfer, parentCtx["server_id"], continuationToken)
+		}),
+		DetailEnrich: enrichTransferAgreement,
+		Findings: []catalog.FindingDef{
+			{Code: transferCodeAgreementInactive, Phrase: "inactive: partner traffic rejected", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: transferCodeCertExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: transferCodeCertExpiring, Phrase: "expires in <N>d", Severity: domain.SevWarn, Source: "wave1"},
+		},
 	},
 }

@@ -262,6 +262,11 @@ var navigableContracts = []navContract{
 	{shortName: "trail", apiDoc: "https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Trail.html", fieldPath: "CloudWatchLogsLogGroupArn", targetType: "logs", reasoning: "Trail.CloudWatchLogsLogGroupArn — log group the trail streams to."},
 	{shortName: "trail", apiDoc: "https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Trail.html", fieldPath: "CloudWatchLogsRoleArn", targetType: "role", reasoning: "Trail.CloudWatchLogsRoleArn — IAM role trail assumes to write to CloudWatch Logs."},
 
+	// transfer — Transfer Family
+	{shortName: "transfer", apiDoc: "https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html", fieldPath: "LoggingRole", targetType: "role", reasoning: "DescribedServer.LoggingRole — the CloudWatch logging role; first stop for 'why are there no logs'."},
+	{shortName: "transfer", apiDoc: "https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html", fieldPath: "Certificate", targetType: "acm", reasoning: "DescribedServer.Certificate — the FTPS identity certificate ACM ARN."},
+	{shortName: "transfer", apiDoc: "https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html", fieldPath: "EndpointDetails.VpcId", targetType: "vpc", reasoning: "DescribedServer.EndpointDetails.VpcId — top of the partner-reachability chain."},
+
 	// vpce — VPC Endpoints  (the user's screenshot bug class)
 	{shortName: "vpce", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html", fieldPath: "VpcId", targetType: "vpc", reasoning: "VpcEndpoint.VpcId — VPC the endpoint lives in."},
 	{shortName: "vpce", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html", fieldPath: "SubnetIds", targetType: "subnet", reasoning: "VpcEndpoint.SubnetIds — subnets the interface endpoint's ENIs are placed in. Shown in the user's screenshot but not registered — MISSING."},

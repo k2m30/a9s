@@ -193,6 +193,24 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Path: "Association"}, {Path: "TagSet"},
 			},
 		},
+		"transfer": {
+			List: []ListColumn{
+				{Title: "Server Id", Path: "ServerId", Width: 32},
+				{Title: "Status", Key: "status", Width: 32},
+				{Title: "Domain", Path: "Domain", Width: 10},
+				{Title: "Endpoint", Path: "EndpointType", Width: 14, Humanize: true},
+				{Title: "Identity Provider", Path: "IdentityProviderType", Width: 20, Humanize: true},
+				{Title: "Users", Path: "UserCount", Width: 8},
+			},
+			Detail: []DetailField{
+				{Path: "ServerId"}, {Path: "Arn"}, {Path: "Domain"}, {Path: "EndpointType"},
+				{Path: "IdentityProviderType"}, {Path: "IdentityProviderDetails"},
+				{Path: "UserCount"}, {Path: "SecurityPolicyName"}, {Path: "Protocols"},
+				{Path: "Certificate"}, {Path: "LoggingRole"}, {Path: "StructuredLogDestinations"},
+				{Path: "EndpointDetails"}, {Path: "HostKeyFingerprint"},
+				{Path: "As2ServiceManagedEgressIpAddresses"},
+			},
+		},
 		// Child views for networking resources
 		"elb_listeners": {
 			List: []ListColumn{
@@ -232,6 +250,21 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Path: "Target.Id"}, {Path: "Target.Port"}, {Path: "Target.AvailabilityZone"},
 				{Path: "TargetHealth.State"}, {Path: "TargetHealth.Reason"}, {Path: "TargetHealth.Description"},
 				{Path: "HealthCheckPort"}, {Path: "AnomalyDetection"},
+			},
+		},
+		"transfer_agreements": {
+			List: []ListColumn{
+				{Title: "Agreement Id", Key: "agreement_id", Width: 24},
+				{Title: "Description", Key: "description", Width: 32},
+				{Title: "Status", Key: "status", Width: 24},
+				{Title: "Local Profile", Key: "local_profile", Width: 16},
+				{Title: "Partner Profile", Key: "partner_profile", Width: 16},
+				{Title: "Base Directory", Key: "base_directory", Width: 30},
+			},
+			Detail: []DetailField{
+				{Path: "AgreementId"}, {Path: "ServerId"}, {Path: "Description"}, {Path: "Status"},
+				{Path: "LocalProfileId"}, {Path: "PartnerProfileId"}, {Path: "BaseDirectory"},
+				{Path: "AccessRole"}, {Path: "EnforceMessageSigning"}, {Path: "PreserveFilename"},
 			},
 		},
 	}

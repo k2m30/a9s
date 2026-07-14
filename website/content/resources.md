@@ -3,7 +3,7 @@ title: "Resource Types"
 type: resources
 ---
 
-a9s supports **67 AWS resource types** across **12 service categories**. All API calls are read-only.
+a9s supports **68 AWS resource types** across **12 service categories**. All API calls are read-only.
 
 ## Compute
 
@@ -43,6 +43,7 @@ a9s supports **67 AWS resource types** across **12 service categories**. All API
 | VPC Endpoints | `vpce` |
 | Transit Gateways | `tgw` |
 | Network Interfaces | `eni` |
+| Transfer Family | `transfer` |
 
 ## Databases & Storage
 

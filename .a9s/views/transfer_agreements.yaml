@@ -1,0 +1,31 @@
+list:
+  Agreement Id:
+    key: agreement_id
+    width: 24
+  Description:
+    key: description
+    width: 32
+  Status:
+    key: status
+    width: 24
+  Local Profile:
+    key: local_profile
+    width: 16
+  Partner Profile:
+    key: partner_profile
+    width: 16
+  Base Directory:
+    key: base_directory
+    width: 30
+
+detail:
+  - AgreementId
+  - ServerId
+  - Description
+  - Status
+  - LocalProfileId
+  - PartnerProfileId
+  - BaseDirectory
+  - AccessRole
+  - EnforceMessageSigning
+  - PreserveFilename

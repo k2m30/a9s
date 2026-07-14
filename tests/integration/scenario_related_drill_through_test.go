@@ -46,6 +46,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	demofixtures "github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
@@ -88,6 +89,8 @@ var drillThroughFixtures = []struct {
 	{"dbc-snap/aurora", "dbc-snap", demofixtures.ProdDBCSnapAuroraID},
 	{"dbc-snap/docdb", "dbc-snap", demofixtures.ProdDBCSnapDocDBID},
 	{"mwaa/prod-airflow-etl", "mwaa", demofixtures.ProdAirflowEtlID},
+	{"transfer/prod-as2-gateway", "transfer", demofixtures.ProdAS2GatewayID},
+	{"transfer/sftp-lambda-auth", "transfer", demofixtures.SftpLambdaAuthID},
 }
 
 // drillThroughGroups collapses the flat fixture list into groups sharing a
@@ -451,6 +454,13 @@ func TestScenario_RelatedDrillNavigationLands_All(t *testing.T) {
 // (including fieldpath extraction, NavIDFromValue ARN stripping, and target
 // list resolution) IS the thing under test.
 func TestScenario_NavigableFieldDrillThrough_All(t *testing.T) {
+	// Union semantics across graph roots of the same type, mirroring the
+	// related-pivot walk above: a conditional field (e.g. transfer's
+	// FTPS-only Certificate) absent on one root skips there, but every
+	// registered navigable field must land on at least one root of its type.
+	required := map[string]bool{}
+	witnessed := map[string]bool{}
+
 	for _, tc := range drillThroughFixtures {
 		tc := tc
 		t.Run(tc.label, func(t *testing.T) {
@@ -468,6 +478,17 @@ func TestScenario_NavigableFieldDrillThrough_All(t *testing.T) {
 			root := fullIntegrationMustFindResourceByID(t, scenario.clients, tc.shortName, tc.graphRoot)
 
 			for _, nf := range navFields {
+				key := tc.shortName + "/" + nf.FieldPath
+				required[key] = true
+				// Presence probe: scalar paths first, then scalar-on-list
+				// paths (e.g. "VpcSecurityGroups.VpcSecurityGroupId") which
+				// ExtractScalar reports as "" by design.
+				if fieldpath.ExtractScalar(root.RawStruct, nf.FieldPath) == "" &&
+					fieldpath.ExtractFirstListScalar(root.RawStruct, nf.FieldPath) == "" {
+					t.Logf("[%s] navigable field %q absent on this root (conditional field) — union check applies",
+						tc.label, nf.FieldPath)
+					continue
+				}
 				// Open detail fresh before each navigable-field follow so the
 				// resource's RawStruct is present and the stack is at detail level.
 				scenario.OpenDetailResource(tc.shortName, root)
@@ -479,11 +500,18 @@ func TestScenario_NavigableFieldDrillThrough_All(t *testing.T) {
 					scenario.Press("esc")
 					continue
 				}
+				witnessed[key] = true
 				t.Logf("[%s] FollowNavigableField(%q → %s): landed on %q",
 					tc.label, nf.FieldPath, nf.TargetType, landed.ID)
 				scenario.Press("esc")
 			}
 		})
+	}
+
+	for key := range required {
+		if !witnessed[key] {
+			t.Errorf("navigable field %s landed on no graph root — add a root fixture that witnesses it", key)
+		}
 	}
 }
 

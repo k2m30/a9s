@@ -50,6 +50,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/transfer"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 
 	tea "charm.land/bubbletea/v2"
@@ -434,6 +435,7 @@ func buildMockClients(t *testing.T) *awsclient.ServiceClients {
 		MSK:              kafka.NewFromConfig(cfg),
 		Backup:           backup.NewFromConfig(cfg),
 		MWAA:             mwaa.NewFromConfig(cfg),
+		Transfer:         transfer.NewFromConfig(cfg),
 	}
 }
 

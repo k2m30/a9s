@@ -12,6 +12,7 @@ import (
 func ExpectedTopLevelCounts() map[string]int {
 	ec2 := NewEC2Fixtures()
 	mwaaFix := NewMWAAFixtures()
+	transferFix := NewTransferFixtures()
 	ecs := NewECSFixtures()
 	eks := NewEKSFixtures()
 	rds := NewRDSFixtures()
@@ -87,6 +88,7 @@ func ExpectedTopLevelCounts() map[string]int {
 		"glue":         len(NewGlueFixtures().Jobs),
 		"athena":       len(NewAthenaFixtures().WorkGroups),
 		"mwaa":         len(mwaaFix.Environments) + len(mwaaFix.DeniedNames),
+		"transfer":     len(transferFix.ListedServers),
 		"backup":       len(NewBackupFixtures().Plans),
 		"ses":          len(NewSESFixtures().Identities),
 	}

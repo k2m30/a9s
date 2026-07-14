@@ -180,8 +180,9 @@ var knownStateCoverageGaps = map[string]bool{
 	"ssm:dim":    true,
 	"subnet:dim": true,
 	"tg:dim":     true, "tg:warning": true,
-	"trail:dim":  true,
-	"vpc:broken": true, "vpc:dim": true,
+	"trail:dim":    true,
+	"transfer:dim": true, // colorTransfer (internal/aws/catalog_networking.go) is colorFromAnyFinding-only, and no registered FindingDef carries SevDim — structurally, AWS Transfer Family's DescribeServer State enum (OFFLINE|ONLINE|STARTING|STOPPING|START_FAILED|STOP_FAILED per docs.aws.amazon.com/transfer/latest/APIReference/API_DescribeServer.html) has no deleted/terminal value at all, so no fixture of any shape could ever witness a Dim row for this type.
+	"vpc:broken":   true, "vpc:dim": true,
 	"waf:broken": true, "waf:dim": true,
 
 	// ct-events:healthy — colorCTEvents (internal/aws/catalog_monitoring.go)

@@ -94,8 +94,8 @@ forbid() {
 }
 
 # Menu: sweep produced issue badges in-session (not only cached counts).
-# 68 = 67 resource types + the Cost Explorer entry.
-expect menu.txt 'resource-types\(68\)' "menu shows the full catalog"
+# 69 = 68 resource types + the Cost Explorer entry.
+expect menu.txt 'resource-types\(69\)' "menu shows the full catalog"
 expect menu.txt 'issues:[0-9]+' "sweep produced at least one issue badge"
 
 # Whole-cell raw enums must not survive rendering anywhere we look.
