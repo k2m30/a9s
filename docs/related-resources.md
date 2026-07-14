@@ -132,6 +132,7 @@
 | `tg` | [API_TargetGroup](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_TargetGroup.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs-svc`, `elb`, `lambda`, `vpc` |
 | `tgw` | [API_TransitGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html) | `ct-events`, `role`, `rtb`, `subnet`, `vpc` |
 | `trail` | [API_Trail](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Trail.html) | `ct-events`, `kms`, `logs`, `role`, `s3`, `sns` |
+| `transfer` | [API_DescribedServer](https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html) | `acm`, `ct-events`, `lambda`, `logs`, `role`, `subnet`, `vpc`, `vpce` |
 | `vpc` | [API_Vpc](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html) | `cfn`, `ct-events`, `ec2`, `elb`, `eni`, `igw`, `nat`, `rtb`, `sg`, `subnet`, `tgw`, `vpce` |
 | `vpce` | [API_VpcEndpoint](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html) | `alarm`, `ct-events`, `eni`, `logs`, `r53`, `rtb`, `sg`, `subnet`, `vpc` |
 | `waf` | [API_WebACL](https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html) | `alarm`, `apigw`, `cf`, `ct-events`, `elb`, `logs` |
@@ -1048,6 +1049,25 @@ AWS API: <https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Trai
 - **`role`** — CloudWatchLogsRoleArn / org-trail role.
 - **`s3`** — Trail.S3BucketName — destination bucket.
 - **`sns`** — Trail.SnsTopicARN — delivery notifications.
+
+### `transfer`
+
+AWS API: <https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html>
+
+- **`acm`** — `DescribedServer.Certificate` (ACM ARN, present for FTPS servers only — the server identity cert; AS2 certificates are transfer-managed, not ACM).
+- **`ct-events`** — Audit trail for server changes ("who stopped this server").
+- **`lambda`** — `IdentityProviderDetails.Function` when `IdentityProviderType == AWS_LAMBDA` — "why is auth rejecting this user" jumps to the authorizer.
+- **`logs`** — `StructuredLogDestinations` (log-group ARNs) — where a failed-transfer investigation actually goes.
+- **`role`** — `LoggingRole` — first stop for "why are there no logs".
+- **`subnet`** — `EndpointDetails.SubnetIds` — endpoint ENIs; partner-reachability debugging.
+- **`vpc`** — `EndpointDetails.VpcId` (set when `EndpointType == VPC`) — top of the reachability chain.
+- **`vpce`** — `EndpointDetails.VpcEndpointId` — the hop that carries the security groups (live-witnessed populated for the auto-created endpoint).
+
+Explicitly excluded:
+
+- **`sg`** — `EndpointDetails.SecurityGroupIds` is documented but NEVER populated in DescribeServer responses (SDK doc: use EC2 DescribeVpcEndpoints with the VpcEndpointId) — a direct pivot would render an empty panel always; reach sg via the `vpce` pivot.
+- **`apigw`** — `IdentityProviderDetails.Url` is a free-form URL, not an API id; parsing the execute-api subdomain is fragile. Copyable detail field only.
+- **`s3` / `efs`** — `Domain` is an enum only; no bucket/filesystem field exists on the server (the bucket appears as a path inside agreement `BaseDirectory`).
 
 ### `vpc`
 
