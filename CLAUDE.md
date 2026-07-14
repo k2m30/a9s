@@ -17,37 +17,45 @@ Quick reference:
 
 ## Active Technologies
 
-- Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2 (autoscaling, codeartifact, codebuild, codepipeline, dynamodb, ec2, ecr, ecs, efs, elasticbeanstalk, elbv2, events, iam, kms, lambda, rds, secretsmanager, ses, sesv2, sfn, sns, ssm, eventbridge, backup), yaml.v3, clipboard (020-architecture-refactor)
-- YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`); YAML cache on disk (`~/.a9s/cache/<profile>--<region>.yaml`); session-scoped in-memory state owned by `internal/session.Session` after Phase 02 (020-architecture-refactor)
-
-- Go 1.26+, Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
-- YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`)
-- YAML cache on disk (`~/.a9s/cache/<profile>--<region>.yaml`), in-memory maps
-- In-process demo fixture store (per resource type, loaded at startup)
-- In-memory session-scoped maps on root `Model` (findings cleared on profile/region switch; no disk persistence for findings themselves — cache format unchanged)
-- Go 1.26+ (CLAUDE.md) + AWS SDK Go v2 (service clients for autoscaling, codeartifact, codebuild, codepipeline, dynamodb, ec2, ecr, ecs, efs, elasticbeanstalk, elbv2, events, iam, kms, lambda, rds, secretsmanager, ses, sesv2, sfn, sns, ssm, events/eventbridge, backup), Bubble Tea v2.0.2, Lipgloss v2.0.2, yaml.v3 (019-related-panel-checkers)
-- In-memory `resource.ResourceCache` (`map[string]ResourceCacheEntry`, each with `Resources []Resource` + `IsTruncated bool`) built by the background fetcher pool; no on-disk state changes in this feature (019-related-panel-checkers)
+- Go 1.26+, Bubble Tea v2.0.6, Lipgloss v2.0.3, Bubbles v2.1.0 (all under `charm.land/*/v2`), AWS SDK Go v2 (one service module per supported AWS service), yaml.v3, clipboard
+- YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`); YAML cache on disk (`~/.a9s/cache/<profile>--<region>.yaml`)
+- Session-scoped in-memory state owned by `internal/session.Session` (RowStore, capability stores, generation counters; cleared on profile/region `Rotate()`)
+- In-process demo fixture store (per resource type, typed fakes in `internal/demo/fixtures/` + `fakes/`, loaded at startup)
 
 ## Project Structure
 
 ```text
 cmd/
-  a9s/           # main binary
+  a9s/           # main binary (TUI, --demo, --web)
   readmegen/     # README.md generator from docs/README.tmpl.md + docs/shared/
   refgen/        # views_reference.yaml generator
+  viewsgen/      # .a9s/views/*.yaml generator from internal/config defaults
+  preview/       # static TUI design mockups (no AWS)
+  catalogen/     # catalog codegen
+  snapshot/      # web-e2e snapshot collector
+  checklist/     # web-e2e checklist oracle
 internal/
-  aws/           # AWS service clients & resource fetchers (top-level + child)
+  app/           # headless controller — shared list/detail/menu/cost state+render for tui/ and web/
+  aws/           # AWS service clients, fetchers, related checkers, enrichers, catalog_<category>.go type defs
   buildinfo/     # version resolution from ldflags / go install
-  config/        # YAML config loading
-  demo/          # synthetic fixture data for demo mode
-  fieldpath/     # struct field extraction via reflection
-  resource/      # generic resource model, registry, child-view definitions
-  tui/           # root Bubble Tea app model
+  cache/         # on-disk availability cache with TTL
+  catalog/       # canonical resource catalog (ResourceTypeDef, installed via aws.Install)
+  config/        # YAML config loading, per-category view defaults (defaults_<category>.go)
+  costs/         # Cost Explorer domain state machine
+  demo/          # synthetic data for demo mode (fixtures/ + fakes/)
+  domain/        # leaf types: Resource, Finding, AttentionDetail, Severity, Color
+  fieldpath/     # struct field extraction via reflection (frozen)
+  jsonyaml/      # renderer-free JSON→YAML helpers
+  resource/      # backward-compat alias layer over domain/ + catalog/
+  runtime/       # platform-agnostic app core (Core) + messages/ Cmd/Event taxonomy
+  semantics/     # projection, ctevent, selector helpers
+  session/       # session.Session — session-scoped state, RowStore, Rotate()
+  tui/           # Bubble Tea adapter shell
     keys/        # key bindings (including child-view triggers: e, L, r, s)
     layout/      # frame rendering
-    messages/    # inter-view message types (NavigateMsg, EnterChildViewMsg, etc.)
-    styles/      # Tokyo Night Dark palette
+    styles/      # Tokyo Night Dark palette + themes/*.yaml
     views/       # view models (menu, list, detail, yaml, help, etc.)
+  web/           # web mode HTTP server (internal-only)
 tests/
   unit/          # unit tests
   integration/   # integration tests
@@ -90,7 +98,7 @@ specs/           # feature specifications
 
 > **Full architecture guide**: [`docs/architecture.md`](docs/architecture.md) — covers all concepts, patterns, caching layers, key handling, test philosophy, and design decisions. Read it first when onboarding.
 >
-> ⚠️ **Related-resource panel is governed by [`docs/related-resources.md`](docs/related-resources.md) — SINGLE SOURCE OF TRUTH, DO NOT EDIT AD-HOC.** Every `RegisterRelated` call must match that contract. Adding/removing pivots requires an AWS API field citation or a documented DevOps workflow reason in the same PR that touches the registration.
+> ⚠️ **Related-resource panel is governed by [`docs/related-resources.md`](docs/related-resources.md) — SINGLE SOURCE OF TRUTH, DO NOT EDIT AD-HOC.** Every `Related` entry on a catalog literal must match that contract. Adding/removing pivots requires an AWS API field citation or a documented DevOps workflow reason in the same PR that touches the registration.
 
 - **Read-only by design** — a9s never makes write calls to AWS
 - **Bubble Tea v2** — all I/O in `tea.Cmd` closures, views are pure functions
@@ -107,9 +115,7 @@ specs/           # feature specifications
 |-------|-------|-------|
 | `a9s-common` | All work | Shell rules, package access rules, build/test commands |
 | `a9s-bt-v2` | TUI-touching work | Bubble Tea v2 / Lipgloss v2 / Bubbles v2 API patterns |
-| `a9s-add-resource` | impl + tests | Split blueprint: `a9s-coder`=implementation, `a9s-qa`=tests |
-| `a9s-add-child-view` | impl + tests | Split blueprint: scope, then `a9s-qa` tests, `a9s-coder` implements |
-| `a9s-add-related-view` | impl + tests | Split blueprint: add related-resource views per resource type |
+| `a9s-add-attention-column` | impl + tests | Add a list-view attention column (Tier A/B decision tree) |
 | `a9s-implement-issue` | Orchestrator | End-to-end: analyze → QA stories → design → scope → implement → verify → docs → release |
 | `a9s-resource-spec` | Main session | Generate `docs/resources/<shortName>.md` implementation-blind from the four golden docs |
 | `a9s-implement-resource` | Main session (orchestrator) | Implement resource from its spec: TBDs → impl-plan → fixtures → QA + coder handoff |
@@ -122,7 +128,6 @@ specs/           # feature specifications
 | `a9s-coder` | Implementation only — no tests | `internal/`, `cmd/`, `.a9s/` | Exact file scope |
 | `a9s-qa` | Tests only — no production code | `tests/unit/` | Exact file scope |
 | `a9s-qa-stories` | Given/when/then stories from design spec (no source code) | Nothing (read-only) | N/A |
-| `a9s-fixtures` | Test fixtures from dev-account via AWS MCP | `internal/demo/` | N/A |
 | `a9s-devops` | AWS practitioner — resource priorities, feature advice | All | N/A |
 | `a9s-consistency-checker` | Verifies consistency across code, tests, README, website, config | Nothing (read-only) | N/A |
 | `tui-designer` | TUI wireframes, color schemes, preview mockups | Design artifacts | N/A |
@@ -139,13 +144,13 @@ Agents MUST use targeted file access — never broad globs on large directories.
 - `Grep("mock.*{InterfaceName}", "tests/unit/mocks_test.go")` — find a specific mock
 - `Glob("internal/demo/fixtures/*.go")` — find a per-service fixture file
 - `Glob("internal/demo/fakes/*.go")` — find a typed-fake implementation
-- `Grep("func Test.*{Resource}", "tests/unit/qa_detail_child_views_test.go")` — find append point
+- `Grep("func Test.*{Resource}", "tests/unit/qa_yaml_child_views_test.go")` — find append point
 
 ### DON'T
 
-- `Glob("tests/unit/*.go")` — returns 710 files, most irrelevant
-- `Glob("internal/aws/*.go")` — returns 357 files, most irrelevant
-- `Glob("internal/demo/*.go")` — only 3 files remain (client.go, handlers.go, transport.go)
+- `Glob("tests/unit/*.go")` — returns 800 files, most irrelevant
+- `Glob("internal/aws/*.go")` — returns 377 files, most irrelevant
+- `Glob("internal/demo/*.go")` — only 4 files remain (client.go, handlers.go, costs_handlers.go, transport.go)
 - Reading entire cross-cutting files (mocks_test.go, qa_detail_test.go) — grep for the section first
 
 ### Delegate to Explore for broad investigations
@@ -176,7 +181,7 @@ When a single task would require reading 5+ files totaling >500 lines, OR when y
 
 When code changes affect any of the following, update the shared source and regenerate:
 - Key bindings added/removed/changed → `docs/shared/keybindings.md`
-- Child views added/removed → `docs/shared/childviews.md`
+- Child views added/removed → `docs/shared/keybindings.md` (child-view trigger keys) + `docs/design/child-views/`
 - Commands added/removed/changed → `docs/shared/commands.md`
 - CLI flags changed → `docs/shared/quickstart.md`
 - Install methods changed → `docs/shared/install.md`
@@ -185,7 +190,7 @@ When code changes affect any of the following, update the shared source and rege
 
 ## Recent Changes
 
-- 020-architecture-refactor: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2 (autoscaling, codeartifact, codebuild, codepipeline, dynamodb, ec2, ecr, ecs, efs, elasticbeanstalk, elbv2, events, iam, kms, lambda, rds, secretsmanager, ses, sesv2, sfn, sns, ssm, eventbridge, backup), yaml.v3, clipboard
+- 020-architecture-refactor: declarative catalog (`internal/catalog` + `internal/aws/catalog_*.go`), headless controller (`internal/app`), runtime core (`internal/runtime`), session state (`internal/session`), web mode (`internal/web`)
 
 ## graphify
 

@@ -75,10 +75,10 @@ Resources that exist but are usually managed through IaC or other abstractions.
 ## What You Know About a9s
 
 Read the current resource types and features from the codebase when asked. You know:
-- Current resources: S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups
+- 66 top-level resource types across 12 service categories (catalog slices in `internal/aws/catalog_*.go`; browse the README services table for the list)
 - The app is read-only (browse + copy, no mutations)
-- It uses views.yaml for column/detail field configuration
-- Adding a resource follows Pattern A/B/C (simple / client reuse / multi-step)
+- Per-resource view config lives in `.a9s/views/<shortName>.yaml`, generated from `internal/config/defaults_<category>.go`
+- Adding a resource follows the spec-first pipeline: `a9s-resource-spec` → `a9s-implement-resource`
 
 ## Output Format
 
@@ -91,7 +91,6 @@ When recommending resources or features, structure as:
 **Effort:** S (1 resource) | M (2-3 resources) | L (batch of 5+)
 **Why:** {1-2 sentences grounded in real workflow}
 **Real scenario:** {concrete example of when an engineer needs this}
-**Pattern:** A | B | C (for resource additions)
 **Depends on:** {other resources that should exist first, if any}
 ```
 

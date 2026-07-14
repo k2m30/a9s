@@ -226,14 +226,15 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		gen := snap.AvailabilityGen
 		r := c.DemoPrefetchCounts(ctx, snap.Clients)
 		return messages.AvailabilityPrefetched{
-			Entries:        r.Entries,
-			Truncated:      r.Truncated,
-			IssueCounts:    r.IssueCounts,
-			IssueTruncated: r.IssueTruncated,
-			Resources:      r.Resources,
-			Pagination:     r.Pagination,
-			Gen:            gen,
-			PrefetchErr:    r.PrefetchErr,
+			Entries:         r.Entries,
+			Truncated:       r.Truncated,
+			IssueCounts:     r.IssueCounts,
+			IssueTruncated:  r.IssueTruncated,
+			Resources:       r.Resources,
+			Pagination:      r.Pagination,
+			Gen:             gen,
+			PrefetchErr:     r.PrefetchErr,
+			PrefetchSoftErr: r.PrefetchSoftErr,
 		}, nil
 
 	// --- related-check fan-out ---
@@ -730,7 +731,11 @@ func (c *Core) runRelatedCheckers(
 		if def.NeedsTargetCache {
 			if _, inMain := mainCacheKeys[def.TargetType]; !inMain {
 				if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
-					if fr, err := pf(ctx, c.session.Clients, ""); err == nil {
+					// E5 partial success: rows may arrive alongside a
+					// composite error (listed-but-denied resources). Seed
+					// whatever rows came — a partially-visible target cache
+					// beats an unknown "?" row.
+					if fr, err := pf(ctx, c.session.Clients, ""); err == nil || len(fr.Resources) > 0 {
 						enriched := make(map[string][]resource.Resource, len(localSnap)+1)
 						maps.Copy(enriched, localSnap)
 						enriched[def.TargetType] = fr.Resources

@@ -85,7 +85,15 @@ const (
 // OpenSearchFixtures holds typed fixture data for OpenSearch.
 type OpenSearchFixtures struct {
 	Domains []ostypes.DomainStatus
+	// DeniedNames are returned by ListDomainNames but OMITTED from the
+	// batched DescribeDomains response (the IAM-denial shape for the batch
+	// API) — the fetcher keeps a name-only `details denied` row (finding
+	// opensearch.warn.details_denied).
+	DeniedNames []string
 }
+
+// WarnOpenSearchDetailsDeniedID is the listed-but-denied coverage-gate witness.
+const WarnOpenSearchDetailsDeniedID = "warn-os-details-denied"
 
 // NewOpenSearchFixtures constructs OpenSearchFixtures from the canonical demo data.
 // Fixture order matches the spec §2.1 list exactly:
@@ -105,6 +113,7 @@ var sharedOpenSearchFixtures = sync.OnceValue(func() *OpenSearchFixtures {
 			osIsolatedBroken(),
 			osDeletingDim(),
 		},
+		DeniedNames: []string{WarnOpenSearchDetailsDeniedID},
 	}
 })
 
@@ -118,15 +127,15 @@ func NewOpenSearchFixtures() *OpenSearchFixtures {
 
 func osBaseDomain(name, domainID, arn, engineVersion, endpoint string) ostypes.DomainStatus {
 	return ostypes.DomainStatus{
-		ARN:            aws.String(arn),
-		DomainId:       aws.String(domainID),
-		DomainName:     aws.String(name),
-		EngineVersion:  aws.String(engineVersion),
-		Endpoint:       aws.String(endpoint),
-		Created:        aws.Bool(true),
-		Deleted:        aws.Bool(false),
-		Processing:     aws.Bool(false),
-		UpgradeProcessing: aws.Bool(false),
+		ARN:                    aws.String(arn),
+		DomainId:               aws.String(domainID),
+		DomainName:             aws.String(name),
+		EngineVersion:          aws.String(engineVersion),
+		Endpoint:               aws.String(endpoint),
+		Created:                aws.Bool(true),
+		Deleted:                aws.Bool(false),
+		Processing:             aws.Bool(false),
+		UpgradeProcessing:      aws.Bool(false),
 		DomainProcessingStatus: ostypes.DomainProcessingStatusTypeActive,
 		ClusterConfig: &ostypes.ClusterConfig{
 			InstanceType:  ostypes.OpenSearchPartitionInstanceTypeR6gLargeSearch,
@@ -192,7 +201,7 @@ func osGraphRoot() ostypes.DomainStatus {
 
 	// Custom endpoint (ACM cert wired via DescribeDomainConfig).
 	d.DomainEndpointOptions = &ostypes.DomainEndpointOptions{
-		EnforceHTTPS:         aws.Bool(true),
+		EnforceHTTPS:          aws.Bool(true),
 		CustomEndpointEnabled: aws.Bool(true),
 		CustomEndpoint:        aws.String("acme-logs.internal.com"),
 	}

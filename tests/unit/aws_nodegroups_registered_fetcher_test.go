@@ -11,6 +11,7 @@ package unit
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -313,3 +314,57 @@ func TestRegisteredNGFetcher_ImageIDEmptyWhenLaunchTemplateResolveFails(t *testi
 // errNGTestLTNotFound is a sentinel error used in TestRegisteredNGFetcher_ImageIDEmptyWhenLaunchTemplateResolveFails.
 // Defined at package level to avoid repetition.
 var errNGTestLTNotFound = fmt.Errorf("EC2 API error: launch template not found")
+
+// TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow pins the shared
+// degraded-row contract (DegradedDetailsDenied) on the registered "ng"
+// fetcher: a node group the list names but the describe cannot deliver (nil
+// body here; an AccessDeniedException behaves identically) is KEPT as a
+// name-only `details denied` row and the failure aggregates into the
+// composite error. There is deliberately NO demo witness for
+// ng.warn.details_denied (see knownUnwitnessedFindings) — this test is its
+// coverage.
+func TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow(t *testing.T) {
+	pf := resource.GetPaginatedFetcher("ng")
+	if pf == nil {
+		t.Fatal("paginated fetcher for 'ng' not registered — ensure internal/aws package is imported")
+	}
+
+	eksFake := &ngTestEKSFake{
+		clusters: []string{"prod"},
+		nodegroups: map[string][]string{
+			"prod": {"ng-ok", "ng-ghost"},
+		},
+		nodegroupDetails: map[string]*ekstypes.Nodegroup{
+			"prod/ng-ok": {
+				NodegroupName: aws.String("ng-ok"),
+				ClusterName:   aws.String("prod"),
+				Status:        ekstypes.NodegroupStatusActive,
+			},
+			// "prod/ng-ghost" absent → DescribeNodegroup returns nil body.
+		},
+	}
+	sc := newNGTestClients(eksFake, &ngTestEC2Fake{EC2Fake: fakes.NewEC2()})
+
+	result, err := pf(context.Background(), sc, "")
+	if err == nil || !strings.Contains(err.Error(), "ng-ghost") {
+		t.Fatalf("composite error must name ng-ghost, got: %v", err)
+	}
+	if len(result.Resources) != 2 {
+		t.Fatalf("expected 2 rows (1 full + 1 degraded), got %d", len(result.Resources))
+	}
+	var ghost *resource.Resource
+	for i := range result.Resources {
+		if result.Resources[i].ID == "ng-ghost" {
+			ghost = &result.Resources[i]
+		}
+	}
+	if ghost == nil {
+		t.Fatalf("degraded row ng-ghost must remain, got %v", result.Resources)
+	}
+	if ghost.Fields["status"] != "details denied" {
+		t.Errorf("degraded row status = %q, want %q", ghost.Fields["status"], "details denied")
+	}
+	if len(ghost.Findings) != 1 || ghost.Findings[0].Code != awsclient.DetailsDeniedCode("ng") {
+		t.Errorf("degraded row must carry the ng details-denied finding, got %+v", ghost.Findings)
+	}
+}

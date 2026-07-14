@@ -5,6 +5,7 @@ package fakes
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -24,15 +25,19 @@ func NewDynamoDB() *DynamoDBFake {
 }
 
 func (f *DynamoDBFake) ListTables(_ context.Context, _ *dynamodb.ListTablesInput, _ ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error) {
-	names := make([]string, 0, len(f.fix.Tables))
+	names := make([]string, 0, len(f.fix.Tables)+len(f.fix.DeniedNames))
 	for _, t := range f.fix.Tables {
 		names = append(names, aws.ToString(t.TableName))
 	}
+	names = append(names, f.fix.DeniedNames...)
 	return &dynamodb.ListTablesOutput{TableNames: names}, nil
 }
 
 func (f *DynamoDBFake) DescribeTable(_ context.Context, input *dynamodb.DescribeTableInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
 	name := aws.ToString(input.TableName)
+	if slices.Contains(f.fix.DeniedNames, name) {
+		return nil, fmt.Errorf("AccessDeniedException: not authorized to perform: dynamodb:DescribeTable on resource: %s", name)
+	}
 	for _, t := range f.fix.Tables {
 		if aws.ToString(t.TableName) == name {
 			return &dynamodb.DescribeTableOutput{Table: t}, nil

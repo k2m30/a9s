@@ -21,11 +21,19 @@ func NewOpenSearch() *OpenSearchFake {
 }
 
 func (f *OpenSearchFake) ListDomainNames(_ context.Context, _ *opensearch.ListDomainNamesInput, _ ...func(*opensearch.Options)) (*opensearch.ListDomainNamesOutput, error) {
-	domainNames := make([]ostypes.DomainInfo, 0, len(f.fix.Domains))
+	domainNames := make([]ostypes.DomainInfo, 0, len(f.fix.Domains)+len(f.fix.DeniedNames))
 	for i := range f.fix.Domains {
 		d := &f.fix.Domains[i]
 		domainNames = append(domainNames, ostypes.DomainInfo{
 			DomainName: d.DomainName,
+			EngineType: ostypes.EngineTypeOpenSearch,
+		})
+	}
+	// Denied witnesses are listed but omitted from DescribeDomains — the
+	// batched API's IAM-denial shape.
+	for i := range f.fix.DeniedNames {
+		domainNames = append(domainNames, ostypes.DomainInfo{
+			DomainName: &f.fix.DeniedNames[i],
 			EngineType: ostypes.EngineTypeOpenSearch,
 		})
 	}
@@ -80,9 +88,9 @@ func (f *OpenSearchFake) DescribeDomainConfig(_ context.Context, in *opensearch.
 				DomainEndpointOptions: &ostypes.DomainEndpointOptionsStatus{
 					Options: &ostypes.DomainEndpointOptions{
 						EnforceHTTPS:                 aws.Bool(true),
-						CustomEndpointEnabled:         aws.Bool(true),
-						CustomEndpoint:                aws.String("acme-logs.internal.com"),
-						CustomEndpointCertificateArn:  aws.String(fixtures.OpenSearchACMCertARN),
+						CustomEndpointEnabled:        aws.Bool(true),
+						CustomEndpoint:               aws.String("acme-logs.internal.com"),
+						CustomEndpointCertificateArn: aws.String(fixtures.OpenSearchACMCertARN),
 					},
 				},
 			},

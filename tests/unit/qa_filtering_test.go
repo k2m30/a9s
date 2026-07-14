@@ -7,8 +7,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -96,10 +96,10 @@ func TestQA_Filter_11_02_MainMenu_FilterEC2ShowsOnlyEC2(t *testing.T) {
 	if !strings.Contains(plain, "/ec2") {
 		t.Error("header should show /ec2")
 	}
-	// Frame title should show resource-types(1/67) — +1 for the permanent
+	// Frame title should show resource-types(1/68) — +1 for the permanent
 	// synthetic "costs" entry alongside resource.AllResourceTypes().
-	if !strings.Contains(plain, "resource-types(1/67)") {
-		t.Errorf("frame title should show resource-types(1/67), got: %s", plain)
+	if !strings.Contains(plain, "resource-types(1/68)") {
+		t.Errorf("frame title should show resource-types(1/68), got: %s", plain)
 	}
 }
 
@@ -115,8 +115,8 @@ func TestQA_Filter_11_03_MainMenu_FilterS3ShowsOnlyS3(t *testing.T) {
 	if !strings.Contains(plain, "S3 Buckets") {
 		t.Error("filter 's3' should show S3 Buckets")
 	}
-	if !strings.Contains(plain, "resource-types(1/67)") {
-		t.Errorf("frame title should show resource-types(1/67), got: %s", plain)
+	if !strings.Contains(plain, "resource-types(1/68)") {
+		t.Errorf("frame title should show resource-types(1/68), got: %s", plain)
 	}
 }
 
@@ -135,9 +135,9 @@ func TestQA_Filter_11_04_MainMenu_FilterNoMatch(t *testing.T) {
 			t.Errorf("filter 'xxx' should NOT show %s", name)
 		}
 	}
-	// Frame title should show resource-types(0/67)
-	if !strings.Contains(plain, "resource-types(0/67)") {
-		t.Errorf("frame title should show resource-types(0/67), got: %s", plain)
+	// Frame title should show resource-types(0/68)
+	if !strings.Contains(plain, "resource-types(0/68)") {
+		t.Errorf("frame title should show resource-types(0/68), got: %s", plain)
 	}
 }
 
@@ -163,8 +163,8 @@ func TestQA_Filter_11_06_MainMenu_Backspace(t *testing.T) {
 
 	m = typeFilter(m, "ec2")
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "resource-types(1/67)") {
-		t.Fatalf("precondition: filter 'ec2' should show 1/67, got: %s", plain)
+	if !strings.Contains(plain, "resource-types(1/68)") {
+		t.Fatalf("precondition: filter 'ec2' should show 1/68, got: %s", plain)
 	}
 
 	// Press backspace to remove '2' -> filter is "ec"
@@ -178,9 +178,9 @@ func TestQA_Filter_11_06_MainMenu_Backspace(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
 	plain = stripANSI(rootViewContent(m))
-	// All 67 items should be back (66 resource types + the synthetic costs entry)
-	if !strings.Contains(plain, "resource-types(67)") {
-		t.Errorf("after clearing filter, frame should show resource-types(67), got: %s", plain)
+	// All 68 items should be back (67 resource types + the synthetic costs entry)
+	if !strings.Contains(plain, "resource-types(68)") {
+		t.Errorf("after clearing filter, frame should show resource-types(68), got: %s", plain)
 	}
 }
 
@@ -194,9 +194,9 @@ func TestQA_Filter_11_07_MainMenu_FrameTitleCount(t *testing.T) {
 	m = typeFilter(m, "e")
 	plain := stripANSI(rootViewContent(m))
 
-	// Must have format resource-types(N/67) where N < 10
-	if !strings.Contains(plain, "/67)") {
-		t.Errorf("filtered frame title should contain /67) showing filtered count, got: %s", plain)
+	// Must have format resource-types(N/68) where N < 10
+	if !strings.Contains(plain, "/68)") {
+		t.Errorf("filtered frame title should contain /68) showing filtered count, got: %s", plain)
 	}
 }
 
@@ -212,8 +212,8 @@ func TestQA_Filter_11_08_MainMenu_EscClearsFilter(t *testing.T) {
 	plain := stripANSI(rootViewContent(m))
 
 	// All items should reappear
-	if !strings.Contains(plain, "resource-types(67)") {
-		t.Errorf("after Esc, frame title should be resource-types(67), got: %s", plain)
+	if !strings.Contains(plain, "resource-types(68)") {
+		t.Errorf("after Esc, frame title should be resource-types(68), got: %s", plain)
 	}
 	// Header should show ? for help
 	if !strings.Contains(plain, "? for help") {
@@ -715,8 +715,8 @@ func TestQA_Filter_11_24c_EscClearsConfirmedFilterOnMainMenu(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	plain = stripANSI(rootViewContent(m))
 
-	if !strings.Contains(plain, "resource-types(67)") {
-		t.Errorf("Esc should clear confirmed filter, showing all 67 types, got: %s", plain)
+	if !strings.Contains(plain, "resource-types(68)") {
+		t.Errorf("Esc should clear confirmed filter, showing all 68 types, got: %s", plain)
 	}
 }
 

@@ -20,7 +20,14 @@ type DDBFixtures struct {
 	ContinuousBackups map[string]*ddbtypes.ContinuousBackupsDescription
 	// KinesisDestinations maps table name → []KinesisDataStreamDestination.
 	KinesisDestinations map[string][]ddbtypes.KinesisDataStreamDestination
+	// DeniedNames are listed by ListTables but DescribeTable is denied for
+	// them — the fetcher keeps a name-only `details denied` row (finding
+	// ddb.warn.details_denied).
+	DeniedNames []string
 }
+
+// WarnDDBDetailsDeniedID is the listed-but-denied coverage-gate witness.
+const WarnDDBDetailsDeniedID = "warn-ddb-details-denied"
 
 // Stable IDs and ARNs — imported by sibling fixture files and tests.
 const (
@@ -70,7 +77,6 @@ const (
 	// audit-pitr-off — ACTIVE + PITR DISABLED (~-severity finding only).
 	AuditPITROffID  = "audit-pitr-off"
 	AuditPITROffARN = "arn:aws:dynamodb:us-east-1:123456789012:table/audit-pitr-off"
-
 )
 
 // NewDDBFixtures returns a fully-populated DDBFixtures for demo and tests.
@@ -79,6 +85,7 @@ var sharedDDBFixtures = sync.OnceValue(func() *DDBFixtures {
 		Tables:              buildDDBTables(),
 		ContinuousBackups:   buildDDBContinuousBackups(),
 		KinesisDestinations: buildDDBKinesisDestinations(),
+		DeniedNames:         []string{WarnDDBDetailsDeniedID},
 	}
 })
 
@@ -91,7 +98,7 @@ func pitrEnabled() *ddbtypes.ContinuousBackupsDescription {
 	return &ddbtypes.ContinuousBackupsDescription{
 		ContinuousBackupsStatus: ddbtypes.ContinuousBackupsStatusEnabled,
 		PointInTimeRecoveryDescription: &ddbtypes.PointInTimeRecoveryDescription{
-			PointInTimeRecoveryStatus: ddbtypes.PointInTimeRecoveryStatusEnabled,
+			PointInTimeRecoveryStatus:  ddbtypes.PointInTimeRecoveryStatusEnabled,
 			EarliestRestorableDateTime: aws.Time(time.Date(2025, 12, 1, 0, 0, 0, 0, time.UTC)),
 			LatestRestorableDateTime:   aws.Time(time.Now().UTC()),
 		},
@@ -112,12 +119,12 @@ func pitrDisabled() *ddbtypes.ContinuousBackupsDescription {
 // Tables not in this map are PITR ENABLED (healthy default — not emitted as findings).
 func buildDDBContinuousBackups() map[string]*ddbtypes.ContinuousBackupsDescription {
 	return map[string]*ddbtypes.ContinuousBackupsDescription{
-		OrdersProdID:      pitrEnabled(),
-		SessionsCreatingID: pitrEnabled(),
-		SessionsUpdatingID: pitrEnabled(),
+		OrdersProdID:        pitrEnabled(),
+		SessionsCreatingID:  pitrEnabled(),
+		SessionsUpdatingID:  pitrEnabled(),
 		AnalyticsDeletingID: pitrEnabled(),
-		LegacyArchivingID:  pitrEnabled(),
-		LegacyKMSLostID:    pitrEnabled(),
+		LegacyArchivingID:   pitrEnabled(),
+		LegacyKMSLostID:     pitrEnabled(),
 		// legacy-archived: PITR DISABLED to exercise multi-W2 stacking (+1 suffix).
 		LegacyArchivedID: pitrDisabled(),
 		// audit-pitr-off: PITR DISABLED to exercise the ~ glyph on a Healthy row.
@@ -131,8 +138,8 @@ func buildDDBKinesisDestinations() map[string][]ddbtypes.KinesisDataStreamDestin
 	return map[string][]ddbtypes.KinesisDataStreamDestination{
 		OrdersProdID: {
 			{
-				StreamArn:         aws.String(OrdersProdKinesisStreamARN),
-				DestinationStatus: ddbtypes.DestinationStatusActive,
+				StreamArn:                    aws.String(OrdersProdKinesisStreamARN),
+				DestinationStatus:            ddbtypes.DestinationStatusActive,
 				DestinationStatusDescription: aws.String("Stream is active"),
 			},
 		},
@@ -145,12 +152,12 @@ func buildDDBTables() []*ddbtypes.TableDescription {
 		// orders-prod — graph-root, Healthy, all pivots wired.
 		// -----------------------------------------------------------------------
 		{
-			TableName:   aws.String(OrdersProdID),
-			TableArn:    aws.String(OrdersProdARN),
-			TableId:     aws.String("d0b1c2d3-0001-0001-0001-000000000001"),
-			TableStatus: ddbtypes.TableStatusActive,
-			ItemCount:   aws.Int64(12_345_678),
-			TableSizeBytes: aws.Int64(4_294_967_296), // 4 GiB
+			TableName:        aws.String(OrdersProdID),
+			TableArn:         aws.String(OrdersProdARN),
+			TableId:          aws.String("d0b1c2d3-0001-0001-0001-000000000001"),
+			TableStatus:      ddbtypes.TableStatusActive,
+			ItemCount:        aws.Int64(12_345_678),
+			TableSizeBytes:   aws.Int64(4_294_967_296), // 4 GiB
 			CreationDateTime: aws.Time(time.Date(2025, 1, 10, 9, 0, 0, 0, time.UTC)),
 			BillingModeSummary: &ddbtypes.BillingModeSummary{
 				BillingMode: ddbtypes.BillingModePayPerRequest,

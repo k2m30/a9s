@@ -1,7 +1,7 @@
 # Related Resources: QA User Stories
 
-Design spec: `docs/design/related-resources.md` v4.3
-Architecture: `docs/design/related-views-architecture.md` v2.1
+Design spec: `docs/historical/design/related-resources.md` v4.3 (archived; contract now in `docs/related-resources.md`)
+Architecture: `docs/historical/design/related-views-architecture.md` v2.1 (archived; engine now in `docs/related-resources-engine.md`)
 Issue: #64
 
 ---

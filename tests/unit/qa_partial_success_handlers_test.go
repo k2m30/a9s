@@ -7,10 +7,12 @@ package unit
 //   File: internal/tui/app_handlers_navigate.go:633-692
 //   Bug today: `if msg.Err == nil { ... }` at line ~643 skips the menu update
 //   and probeResources retention block when Err != nil.
-//   Contract after fix:
+//   Contract:
 //   - When Err != nil AND Resources non-empty: menu count is set,
-//     probeResources is retained, AND FlashMsg with IsError=true surfaces the error.
-//   - When Err != nil AND Resources empty: existing behavior (no menu update, FlashMsg).
+//     probeResources is retained, AND the error is recorded in the `!` error
+//     log WITHOUT a blocking flash banner (E5 partial success — the rows are
+//     on screen carrying their findings).
+//   - When Err != nil AND Resources empty: no menu update, error FlashMsg banner.
 //
 // Group D — handleEnrichmentChecked applies partial state on Err
 //   File: internal/tui/app_handlers_navigate.go:729-820
@@ -27,10 +29,12 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,13 +44,10 @@ import (
 // TestHandleAvailabilityChecked_PartialErrAppliesState verifies that when
 // AvailabilityCheckedMsg carries both Err != nil and non-empty Resources,
 // handleAvailabilityChecked STILL sets the menu count and retains probeResources,
-// in addition to surfacing the error via FlashMsg.
-//
-// Fails today: the `if msg.Err == nil { ... }` guard at line ~643 skips the
-// state-application block entirely when Err != nil. As a result, the menu
-// shows 0 for a type that had a partial probe result, and Wave 2 enrichment
-// sees an empty probeResources slice for that type.
-// Passes after fix: state is applied AND FlashMsg is emitted.
+// while surfacing the error in the `!` error log WITHOUT a blocking flash
+// banner — rows are on screen carrying their (possibly degraded) findings,
+// so a banner would double-shout the E5 partial-success state. A row-less
+// failure still banners (covered elsewhere).
 func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 	tui.Version = "test"
 
@@ -71,27 +72,25 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 		Gen:          m.Core().Session().AvailabilityGen,
 	})
 
-	// CONTRACT 1: A FlashMsg with IsError=true must be emitted.
-	if cmd == nil {
-		t.Fatal("handleAvailabilityChecked partial-err: must emit a cmd (at least a FlashMsg for the error)")
-	}
-	allMsgs := drainAllMessages(cmd)
-	var flash *messages.Flash
-	for i := range allMsgs {
-		if fm, ok := allMsgs[i].(messages.Flash); ok {
-			flash = &fm
-			break
+	// CONTRACT 1: the composite error lands in the `!` error log, and NO
+	// error flash banner is emitted (partial success renders rows, not a
+	// blocking banner).
+	if cmd != nil {
+		for _, raw := range drainAllMessages(cmd) {
+			if fm, ok := raw.(messages.Flash); ok && fm.IsError {
+				t.Errorf("handleAvailabilityChecked partial-err: unexpected error FlashMsg %q — partial success must be error-log-only", fm.Text)
+			}
 		}
 	}
-	if flash == nil {
-		t.Fatalf("handleAvailabilityChecked partial-err: expected FlashMsg in cmd output; got %d messages of types %T",
-			len(allMsgs), allMsgs)
+	logModel, logCmd := rootApplyMsg(m, tea.KeyPressMsg{Code: '!'})
+	if logCmd != nil {
+		if raw := logCmd(); raw != nil {
+			logModel, _ = rootApplyMsg(logModel, raw)
+		}
 	}
-	if !flash.IsError {
-		t.Errorf("handleAvailabilityChecked partial-err: FlashMsg.IsError = false, want true")
-	}
-	if !strings.Contains(flash.Text, "partial") {
-		t.Errorf("handleAvailabilityChecked partial-err: FlashMsg.Text = %q, want it to contain the original error text", flash.Text)
+	logView := stripANSI(rootViewContent(logModel))
+	if !strings.Contains(logView, "partial") {
+		t.Errorf("handleAvailabilityChecked partial-err: `!` error log must contain the composite error text; got view:\n%s", logView)
 	}
 
 	// CONTRACT 2: probeResources must be seeded so Wave 2 enrichment can run.

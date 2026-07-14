@@ -101,6 +101,20 @@ import (
 //   - a gap NOT present here          -> FAIL unconditionally, a new
 //     regression the allowlist was never told about.
 var knownStateCoverageGaps = map[string]bool{
+	// Reason class: "demo witness would corrupt the showroom" — these
+	// findings fire in production (degraded name-only row on a denied
+	// per-item describe, shared DegradedDetailsDenied contract) and are
+	// unit-tested with inline stubs
+	// (TestFetchEKSClusters_DescribeFailureSurfacesError,
+	// TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow), but a
+	// listed-but-denied cluster/ng in the DEMO leaks into every related
+	// checker that enumerates clusters or fans out DescribeNodegroup
+	// (ec2/asg/ami/eks/subnet/role pivots), flashing an error on each
+	// detail open. mwaa/ddb/opensearch keep real demo witnesses — nothing
+	// fans out to them per-item.
+	"ng:ng.warn.details_denied":   true,
+	"eks:eks.warn.details_denied": true,
+
 	// --- bucket gaps: type never resolves to this domain.Color via td.ResolveColor ---
 	//
 

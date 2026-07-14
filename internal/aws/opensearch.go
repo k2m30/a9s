@@ -158,12 +158,14 @@ func FetchOpenSearchDomainsAt(
 	}
 
 	var resources []resource.Resource
+	described := make(map[string]bool, len(descOutput.DomainStatusList))
 
 	for _, domain := range descOutput.DomainStatusList {
 		domainName := ""
 		if domain.DomainName != nil {
 			domainName = *domain.DomainName
 		}
+		described[domainName] = true
 
 		engineVersion := ""
 		if domain.EngineVersion != nil {
@@ -266,5 +268,18 @@ func FetchOpenSearchDomainsAt(
 		resources = append(resources, r)
 	}
 
-	return resources, nil
+	// Domains the account listed but DescribeDomains did not return (IAM
+	// denial or per-domain fault in the batched call) are KEPT as name-only
+	// degraded rows — a listed domain must never vanish from the list.
+	var failures []string
+	for _, name := range domainNames {
+		if described[name] {
+			continue
+		}
+		nameCopy := name
+		failures = append(failures, fmt.Sprintf("%s: absent from DescribeDomains response", name))
+		resources = append(resources, DegradedDetailsDenied("opensearch", name, opensearchtypes.DomainStatus{DomainName: &nameCopy}))
+	}
+
+	return resources, AggregateFailures("opensearch: DescribeDomains", failures, len(domainNames))
 }

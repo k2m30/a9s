@@ -157,7 +157,7 @@ For each resource type X being covered, dispatch atomic QA tasks in this order. 
 
 ### Layer 1: Golden snapshots (one dispatch per case)
 
-- [ ] For each case, a `TestXDemoGolden_CaseK` function that loads the demo fixture, renders `View()` at a wide terminal (e.g. 180×40), strips ANSI, compares against a committed file under `tests/testdata/golden/x_demo_case_k.txt`
+- [ ] For each case, a `TestXDemoGolden_CaseK` function that loads the demo fixture, renders `View()` at a wide terminal (e.g. 180×40), strips ANSI, compares against a committed file under `tests/testdata/golden/<group>/<case>.golden.txt` (e.g. `tests/testdata/golden/issue140/ec2_020_counts_arrived.golden.txt`)
 - [ ] First run: `UPDATE_GOLDEN=1 go test` to seed, then commit the golden file
 - [ ] Golden files are inspected visually at commit time — don't rubber-stamp
 

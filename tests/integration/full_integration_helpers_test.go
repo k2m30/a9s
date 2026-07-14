@@ -77,7 +77,10 @@ func fullIntegrationExpectedFirstPageCount(t *testing.T, clients *awsclient.Serv
 		t.Fatalf("resource %s (%s) has no paginated fetcher; full integration test cannot show a count", rt.ShortName, rt.Name)
 	}
 	result, err := pf(ctx, clients, "")
-	if err != nil {
+	if err != nil && len(result.Resources) == 0 {
+		// Rows + composite error together are the designed E5 partial-
+		// success outcome (listed-but-denied demo witnesses); only a
+		// row-less error is a harness failure.
 		t.Fatalf("fetcher for %s (%s) failed: %v", rt.ShortName, rt.Name, err)
 	}
 	truncated := result.Pagination != nil && result.Pagination.IsTruncated
@@ -245,7 +248,9 @@ func fullIntegrationExpectedRelatedCounts(t *testing.T, clients *awsclient.Servi
 			continue
 		}
 		result, err := pf(ctx, clients, "")
-		if err != nil {
+		if err != nil && len(result.Resources) == 0 {
+			// E5 partial success (see above): degraded rows may accompany a
+			// composite error; only a row-less error fails the harness.
 			t.Fatalf("related target fetcher for %s -> %s failed: %v", sourceType, def.TargetType, err)
 		}
 		truncated := result.Pagination != nil && result.Pagination.IsTruncated

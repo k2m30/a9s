@@ -1,0 +1,50 @@
+list:
+  Name:
+    path: Name
+    width: 32
+  Status:
+    key: status
+    width: 32
+  Airflow:
+    path: AirflowVersion
+    width: 10
+  Class:
+    path: EnvironmentClass
+    width: 14
+  Workers:
+    path: MaxWorkers
+    width: 9
+  Schedulers:
+    path: Schedulers
+    width: 10
+  Access:
+    path: WebserverAccessMode
+    width: 16
+    humanize: true
+  Created:
+    path: CreatedAt
+    width: 22
+
+detail:
+  - Name
+  - Status
+  - AirflowVersion
+  - EnvironmentClass
+  - Schedulers
+  - MinWorkers
+  - MaxWorkers
+  - MinWebservers
+  - MaxWebservers
+  - WebserverAccessMode
+  - EndpointManagement
+  - WeeklyMaintenanceWindowStart
+  - WebserverUrl
+  - Arn
+  - KmsKey
+  - SourceBucketArn
+  - DagS3Path
+  - ExecutionRoleArn
+  - ServiceRoleArn
+  - CeleryExecutorQueue
+  - CreatedAt
+  - LastUpdate

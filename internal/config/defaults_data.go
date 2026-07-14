@@ -48,5 +48,26 @@ func dataDefaultViews() map[string]ViewDef {
 				{Path: "EngineVersion"}, {Path: "CreationTime"},
 			},
 		},
+		"mwaa": {
+			List: []ListColumn{
+				{Title: "Name", Path: "Name", Width: 32},
+				{Title: "Status", Key: "status", Width: 32},
+				{Title: "Airflow", Path: "AirflowVersion", Width: 10},
+				{Title: "Class", Path: "EnvironmentClass", Width: 14},
+				{Title: "Workers", Path: "MaxWorkers", Width: 9},
+				{Title: "Schedulers", Path: "Schedulers", Width: 10},
+				{Title: "Access", Path: "WebserverAccessMode", Width: 16, Humanize: true},
+				{Title: "Created", Path: "CreatedAt", Width: 22},
+			},
+			Detail: []DetailField{
+				{Path: "Name"}, {Path: "Status"}, {Path: "AirflowVersion"}, {Path: "EnvironmentClass"},
+				{Path: "Schedulers"}, {Path: "MinWorkers"}, {Path: "MaxWorkers"},
+				{Path: "MinWebservers"}, {Path: "MaxWebservers"}, {Path: "WebserverAccessMode"},
+				{Path: "EndpointManagement"}, {Path: "WeeklyMaintenanceWindowStart"}, {Path: "WebserverUrl"},
+				{Path: "Arn"}, {Path: "KmsKey"}, {Path: "SourceBucketArn"}, {Path: "DagS3Path"},
+				{Path: "ExecutionRoleArn"}, {Path: "ServiceRoleArn"}, {Path: "CeleryExecutorQueue"},
+				{Path: "CreatedAt"}, {Path: "LastUpdate"},
+			},
+		},
 	}
 }

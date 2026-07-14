@@ -204,11 +204,17 @@ type AvailabilityPrefetched struct {
 	Resources      map[string][]resource.Resource      // shortName -> retained first-page resources for Wave 2
 	Pagination     map[string]*resource.PaginationMeta // shortName -> full pagination meta (NextToken, etc.) for cache seeding
 	Gen            domain.Gen                          // availabilityGen captured at dispatch — stale if != current
-	// PrefetchErr is the composite error aggregating per-type fetch failures
-	// during the synchronous availability prefetch. Non-nil when any paginated
-	// fetcher errored; the app handler surfaces it as a Flash so operators
-	// see permission/throttle issues rather than silently missing types.
+	// PrefetchErr is the composite error aggregating HARD per-type fetch
+	// failures (the type yielded no rows) during the synchronous availability
+	// prefetch. Non-nil when any paginated fetcher errored row-less; the app
+	// handler surfaces it as a Flash so operators see permission/throttle
+	// issues rather than silently missing types.
 	PrefetchErr error
+	// PrefetchSoftErr aggregates PARTIAL per-type failures (rows arrived
+	// alongside a composite per-item error — the E5 contract). Recorded in
+	// the `!` error log only, never as a blocking banner: the rows already
+	// carry their degraded-state findings on screen.
+	PrefetchSoftErr error
 }
 
 func (AvailabilityPrefetched) isEvent()               {}

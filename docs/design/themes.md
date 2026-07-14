@@ -153,17 +153,9 @@ theme: "~/.a9s/themes/my-theme.yaml"  # path to custom theme file
 
 ### Phase 2: Built-in Theme Definitions
 
-**Goal:** Define 5-6 built-in themes as Go structs.
+**Goal:** Define 5-6 built-in themes.
 
-**Files to create:**
-- `internal/tui/styles/themes/` directory
-- `internal/tui/styles/themes/registry.go` — `BuiltinThemes` map, `Get(name) (Theme, bool)`
-- `internal/tui/styles/themes/tokyo_night.go` (dark + light)
-- `internal/tui/styles/themes/catppuccin.go` (mocha + latte)
-- `internal/tui/styles/themes/dracula.go`
-- `internal/tui/styles/themes/nord.go` (dark + light)
-- `internal/tui/styles/themes/gruvbox.go` (dark + light)
-- `internal/tui/styles/themes/solarized.go` (dark + light)
+**As shipped:** built-in themes are embedded YAML, not Go structs — `internal/tui/styles/themes/*.yaml` (`tokyo-night`, `tokyo-night-light`, `catppuccin-mocha`, `catppuccin-latte`, `dracula`, `nord`, `nord-light`, `gruvbox-dark`, `gruvbox-light`, `solarized-dark`, `solarized-light`), registered via `internal/tui/styles/themes/embed.go` (no `registry.go`).
 
 **Acceptance criteria:**
 - Each theme (11 total) passes palette completeness check (all 33 slots filled)
@@ -216,7 +208,7 @@ theme: "~/.a9s/themes/my-theme.yaml"  # path to custom theme file
 
 **Docs to update:**
 - `README.md` — themes section in configuration
-- `website/content/docs/_index.md` — theme configuration guide
+- website theme configuration guide (`website/content/`)
 - `docs/design/design.md` — note that palette is now theme-driven
 
 ## Architecture Diagram
@@ -230,7 +222,7 @@ theme: "~/.a9s/themes/my-theme.yaml"  # path to custom theme file
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
 │  Built-in       │────▶│  ApplyTheme(t)   │────▶│  palette vars   │
 │  themes/        │     │                  │     │  (33 colors)    │
-│  registry.go    │     └────────┬─────────┘     └────────┬────────┘
+│  embed.go       │     └────────┬─────────┘     └────────┬────────┘
 └─────────────────┘              │                        │
                                  ▼                        ▼
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐

@@ -317,6 +317,46 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(90),
 			CreationTime:    aws.Int64(1750800000000),
 		},
+		// prod-airflow-etl log groups — required for mwaa→logs related-panel
+		// pivot (5 per-component groups). Names/ARNs are built from the same
+		// mwaaLogGroupName/mwaaLogGroupArn helpers (mwaa.go) that populate the
+		// environment's own LoggingConfiguration.*.CloudWatchLogGroupArn, so
+		// the two fixture files can never drift apart.
+		{
+			LogGroupName:    aws.String(mwaaLogGroupName(ProdAirflowEtlID, "DAGProcessing")),
+			Arn:             aws.String(mwaaLogGroupArn(ProdAirflowEtlID, "DAGProcessing")),
+			StoredBytes:     aws.Int64(15728640),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1756704000000),
+		},
+		{
+			LogGroupName:    aws.String(mwaaLogGroupName(ProdAirflowEtlID, "Scheduler")),
+			Arn:             aws.String(mwaaLogGroupArn(ProdAirflowEtlID, "Scheduler")),
+			StoredBytes:     aws.Int64(20971520),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1756704000000),
+		},
+		{
+			LogGroupName:    aws.String(mwaaLogGroupName(ProdAirflowEtlID, "WebServer")),
+			Arn:             aws.String(mwaaLogGroupArn(ProdAirflowEtlID, "WebServer")),
+			StoredBytes:     aws.Int64(10485760),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1756704000000),
+		},
+		{
+			LogGroupName:    aws.String(mwaaLogGroupName(ProdAirflowEtlID, "Worker")),
+			Arn:             aws.String(mwaaLogGroupArn(ProdAirflowEtlID, "Worker")),
+			StoredBytes:     aws.Int64(31457280),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1756704000000),
+		},
+		{
+			LogGroupName:    aws.String(mwaaLogGroupName(ProdAirflowEtlID, "Task")),
+			Arn:             aws.String(mwaaLogGroupArn(ProdAirflowEtlID, "Task")),
+			StoredBytes:     aws.Int64(52428800),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1756704000000),
+		},
 	}
 
 	logStreams := map[string][]cwlogstypes.LogStream{
@@ -363,6 +403,11 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		"/aws/dynamodb/tables/" + OrdersProdID + "/insights/default": minimalLogStreams("ddb-insights"),
 		"/aws/rds/instance/prod-dbi-aurora-1/postgresql":             minimalLogStreams("dbi-aurora-pg"),
 		"/aws/rds/cluster/prod-aurora-cluster/postgresql":            minimalLogStreams("dbc-aurora-pg"),
+		mwaaLogGroupName(ProdAirflowEtlID, "DAGProcessing"):          minimalLogStreams("mwaa-dag-processing"),
+		mwaaLogGroupName(ProdAirflowEtlID, "Scheduler"):              minimalLogStreams("mwaa-scheduler"),
+		mwaaLogGroupName(ProdAirflowEtlID, "WebServer"):              minimalLogStreams("mwaa-webserver"),
+		mwaaLogGroupName(ProdAirflowEtlID, "Worker"):                 minimalLogStreams("mwaa-worker"),
+		mwaaLogGroupName(ProdAirflowEtlID, "Task"):                   minimalLogStreams("mwaa-task"),
 		ProdRedisLogGroup:            minimalLogStreams("redis-slow"),
 		OpenSearchLogGroupAudit:      minimalLogStreams("os-audit"),
 		OpenSearchLogGroupIndexSlow:  minimalLogStreams("os-index-slow"),

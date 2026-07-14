@@ -38,6 +38,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	"github.com/aws/aws-sdk-go-v2/service/mwaa"
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
@@ -55,8 +56,8 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ---------------------------------------------------------------------------
@@ -432,6 +433,7 @@ func buildMockClients(t *testing.T) *awsclient.ServiceClients {
 		KMS:              kms.NewFromConfig(cfg),
 		MSK:              kafka.NewFromConfig(cfg),
 		Backup:           backup.NewFromConfig(cfg),
+		MWAA:             mwaa.NewFromConfig(cfg),
 	}
 }
 

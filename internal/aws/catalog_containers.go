@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
+	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -122,6 +123,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{Code: CodeEKSStateUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeEKSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeEKSHealthIssue, Phrase: "issue: <Issue.Code>", Severity: domain.SevWarn, Source: "wave1"},
+			DetailsDeniedFindingDef("eks"),
 		},
 	},
 	{
@@ -172,6 +174,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{Code: CodeNGStateCreateFailed, Phrase: "create failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeNGStateDegraded, Phrase: "degraded", Severity: domain.SevBroken, Source: "wave1"},
+			DetailsDeniedFindingDef("ng"),
 		},
 	},
 }
@@ -239,10 +242,12 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 			})
 			if descErr != nil {
 				failures = append(failures, fmt.Sprintf("%s/%s: %s", cluster, ngName, descErr.Error()))
+				resources = append(resources, DegradedDetailsDenied("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}))
 				continue
 			}
 			if descOutput.Nodegroup == nil {
 				failures = append(failures, fmt.Sprintf("%s/%s: nil nodegroup in response", cluster, ngName))
+				resources = append(resources, DegradedDetailsDenied("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}))
 				continue
 			}
 			res := buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup)

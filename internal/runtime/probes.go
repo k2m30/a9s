@@ -67,7 +67,14 @@ type DemoPrefetchResult struct {
 	IssueTruncated map[string]bool
 	Resources      map[string][]resource.Resource
 	Pagination     map[string]*resource.PaginationMeta
-	PrefetchErr    error
+	// PrefetchErr aggregates HARD per-type failures (the type yielded no
+	// rows) — surfaced as a blocking flash banner.
+	PrefetchErr error
+	// PrefetchSoftErr aggregates PARTIAL failures (the type still yielded
+	// rows alongside a composite per-item error — the E5 contract, e.g. a
+	// details-denied environment). Recorded in the `!` error log only; the
+	// rows already carry their degraded-state findings on screen.
+	PrefetchSoftErr error
 }
 
 // LoadAvailabilityCache loads (or reuses the already-loaded) per-type disk
@@ -683,6 +690,7 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 	retainedResources := make(map[string][]resource.Resource, len(allNames))
 	pagination := make(map[string]*resource.PaginationMeta, len(allNames))
 	var failures []string
+	var softFailures []string
 	attempted := 0
 
 	for _, shortName := range allNames {
@@ -699,14 +707,24 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 		result, err := pf(perFetchCtx, clients, "")
 		perFetchCancel()
 		// Partial-success: a per-item composite error MAY accompany a non-empty
-		// result. Hard failure (no resources) → skip and record. Soft failure
-		// (some resources) → record the failure AND count the resources so the
-		// main menu badge isn't blanked by a single per-item timeout.
+		// result. Hard failure (no resources) → skip and record for the flash
+		// banner. Soft failure (some resources) → record for the error log AND
+		// count the resources so the main menu badge isn't blanked by a single
+		// per-item failure.
 		if err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", shortName, err))
 			if len(result.Resources) == 0 {
+				if awsclient.IsEndpointNotFound(err) {
+					// Region gap: the service endpoint's DNS does not resolve
+					// — the service is not offered here. Plain language,
+					// log-only (the operator can't fix DNS jargon).
+					_, region := c.session.CurrentPair()
+					softFailures = append(softFailures, fmt.Sprintf("%s: service not available in region %s", shortName, region))
+					continue
+				}
+				failures = append(failures, fmt.Sprintf("%s: %v", shortName, err))
 				continue
 			}
+			softFailures = append(softFailures, fmt.Sprintf("%s: %v", shortName, err))
 		}
 		entries[shortName] = len(result.Resources)
 		// Preserve full pagination meta so the seeded ResourceCache entry's
@@ -734,13 +752,14 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 	}
 
 	return DemoPrefetchResult{
-		Entries:        entries,
-		Truncated:      truncated,
-		IssueCounts:    issueCounts,
-		IssueTruncated: issueTruncated,
-		Resources:      retainedResources,
-		Pagination:     pagination,
-		PrefetchErr:    awsclient.AggregateFailures("availability-prefetch", failures, attempted),
+		Entries:         entries,
+		Truncated:       truncated,
+		IssueCounts:     issueCounts,
+		IssueTruncated:  issueTruncated,
+		Resources:       retainedResources,
+		Pagination:      pagination,
+		PrefetchErr:     awsclient.AggregateFailures("availability-prefetch", failures, attempted),
+		PrefetchSoftErr: awsclient.AggregateFailures("availability-prefetch (partial)", softFailures, attempted),
 	}
 }
 

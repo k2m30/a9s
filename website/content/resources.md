@@ -3,7 +3,7 @@ title: "Resource Types"
 type: resources
 ---
 
-a9s supports **66 AWS resource types** across **12 service categories**. All API calls are read-only.
+a9s supports **67 AWS resource types** across **12 service categories**. All API calls are read-only.
 
 ## Compute
 
@@ -124,6 +124,7 @@ a9s supports **66 AWS resource types** across **12 service categories**. All API
 |----------|-----------|
 | Glue Jobs | `glue` |
 | Athena Workgroups | `athena` |
+| Managed Airflow | `mwaa` |
 
 ## Backup
 
