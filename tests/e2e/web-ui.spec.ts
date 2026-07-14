@@ -285,11 +285,23 @@ test.describe("a9s web UI — menu fidelity + interaction (TUI parity)", () => {
   });
 
   test("'!' shows the error log, not the attention filter", async ({ page }) => {
-    // Bug: '!' was wrongly mapped to toggle-attention; it is the TUI's error-log
-    // key. Demo has no errors -> an info flash, and the menu must NOT be filtered.
+    // '!' is the error-log key (ctrl+z is the attention filter). Since the
+    // honest-degradation witnesses landed (the transfer/lt listed-but-denied
+    // demo fixtures), the demo session ALWAYS records their per-item
+    // composite errors — '!' therefore opens the error-log text screen
+    // (newest-first) instead of the old "No errors this session" flash, and
+    // the menu must NOT be filtered behind it.
     const before = await page.locator(".menu-entry").count();
     await press(page, "!");
-    await expect(page.locator("#flash")).toHaveText("No errors this session");
+    await expect(
+      page.locator(".text-body"),
+      "'!' must open the error-log text screen",
+    ).toBeVisible();
+    await expect(
+      page.locator(".text-body"),
+      "the log carries the demo denied-witness composite errors",
+    ).toContainText("failed for");
+    await press(page, "Escape");
     expect(
       await page.locator(".menu-entry").count(),
       "'!' must not filter the menu (that is ctrl+z)",
