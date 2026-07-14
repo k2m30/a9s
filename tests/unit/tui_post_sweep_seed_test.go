@@ -83,27 +83,6 @@ func seedDiskStoreWithS3Rows(t *testing.T, profile, region string) *cache.Store 
 	return cache.LoadDir(profile, region)
 }
 
-// seedDiskStoreWithS3RowsTruncated is the truncated-count variant: Count(3)
-// exceeds len(Rows)(1) and Exact=false, so the fallback's IsTruncated must
-// read true (mirrors rowsFromCacheRows' "!tf.Exact" contract cited in the
-// dispatch).
-func seedDiskStoreWithS3RowsTruncated(t *testing.T, profile, region string) *cache.Store {
-	t.Helper()
-	store := cache.LoadDir(profile, region)
-	store.Put("s3", cache.TypeFile{
-		HasResources: true,
-		Count:        3,
-		Exact:        false,
-		Rows: []cache.Row{
-			{ID: "arn:aws:s3:::def15-trunc-bucket-1", Name: "def15-trunc-bucket-1", Fields: map[string]string{"region": region}},
-		},
-	})
-	if err := store.SaveType("s3"); err != nil {
-		t.Fatalf("seed fixture SaveType(s3): %v", err)
-	}
-	return cache.LoadDir(profile, region)
-}
-
 // ────────────────────────────────────────────────────────────────────────────
 // Test 1 — runtime level: HandleNavigate post-sweep must seed CachedEntry
 // from RowStore's retained rows (RowStore is never freed post-sweep, task

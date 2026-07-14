@@ -41,7 +41,7 @@ func checkLambdaAlarms(ctx context.Context, clients any, res resource.Resource, 
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -83,7 +83,7 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 		expectedLogGroup = *fn.LoggingConfig.LogGroup
 	}
 
-	logList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "logs")
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
@@ -144,17 +144,6 @@ func checkLambdaKMS(_ context.Context, _ any, res resource.Resource, _ resource.
 	}
 	keyID := kmsKeyIDFromField(*fn.KMSKeyArn, res.Type)
 	return relatedResult("kms", []string{keyID})
-}
-
-// lambdaRelatedResources returns the resource list for target from cache or by fetching the first page.
-func lambdaRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 // checkLambdaSQS finds SQS queues wired to this Lambda as event sources
@@ -227,7 +216,7 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 	if stackName == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
-	cfnList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -326,7 +315,7 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 		// struct that links to Lambda targets — targets come from a separate API.
 		return resource.UnknownRelated("eb-rule")
 	}
-	ruleList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "eb-rule")
+	ruleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eb-rule")
 	if err != nil {
 		return resource.ErrorRelated("eb-rule", err)
 	}
@@ -365,4 +354,10 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: len(ids), ResourceIDs: ids, Err: aggErr}
 	}
 	return relatedResultTrunc("eb-rule", ids, truncated)
+}
+
+// lambdaRelatedResources returns the resource list for target from cache or by
+// fetching the first page via the registered paginated fetcher.
+func lambdaRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+	return relatedResourcesFor(ctx, clients, cache, target)
 }

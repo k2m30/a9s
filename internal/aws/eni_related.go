@@ -174,7 +174,7 @@ func checkENINAT(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "nat", Count: 0}
 	}
 
-	natList, truncated, err := eniRelatedResources(ctx, clients, cache, "nat")
+	natList, truncated, err := relatedResourcesFor(ctx, clients, cache, "nat")
 	if err != nil {
 		return resource.ErrorRelated("nat", err)
 	}
@@ -210,7 +210,7 @@ func checkENIVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
 	}
 
-	vpceList, truncated, err := eniRelatedResources(ctx, clients, cache, "vpce")
+	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")
 	if err != nil {
 		return resource.ErrorRelated("vpce", err)
 	}
@@ -243,16 +243,4 @@ func isLambdaENI(requesterID, description string) bool {
 		return true
 	}
 	return false
-}
-
-// eniRelatedResources returns the resource list for target from cache or fetches
-// the first page via the registered paginated fetcher.
-func eniRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

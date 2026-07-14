@@ -109,7 +109,7 @@ func listFilterResources(query string, resources []resource.Resource) []resource
 // listHasIssueFinding mirrors hasIssueFinding in views.
 func listHasIssueFinding(r resource.Resource) bool {
 	for _, f := range r.Findings {
-		if resource.IsIssueSeverity(f.Severity) {
+		if f.Severity.IsIssue() {
 			return true
 		}
 	}

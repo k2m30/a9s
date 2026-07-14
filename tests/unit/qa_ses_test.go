@@ -9,6 +9,7 @@ import (
 	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -35,7 +36,9 @@ func TestFetchSESIdentities_ParsesMultipleIdentities(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSESIdentities(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSESIdentitiesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -85,7 +88,9 @@ func TestFetchSESIdentities_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSESIdentities(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSESIdentitiesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -100,7 +105,9 @@ func TestFetchSESIdentities_APIError(t *testing.T) {
 		err: &mockAPIError{code: "TooManyRequestsException", message: "throttled"},
 	}
 
-	_, err := awsclient.FetchSESIdentities(context.Background(), mock)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSESIdentitiesPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

@@ -27,7 +27,7 @@ func checkRoleEKS(ctx context.Context, clients any, res resource.Resource, cache
 		roleARN = *raw.Arn
 	}
 
-	eksList, truncated, err := roleRelatedResources(ctx, clients, cache, "eks")
+	eksList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eks")
 	if err != nil {
 		return resource.ErrorRelated("eks", err)
 	}
@@ -198,7 +198,7 @@ func checkRoleLambda(ctx context.Context, clients any, res resource.Resource, ca
 		roleARN = *raw.Arn
 	}
 
-	lambdaList, truncated, err := roleRelatedResources(ctx, clients, cache, "lambda")
+	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
 		return resource.ErrorRelated("lambda", err)
 	}
@@ -229,7 +229,7 @@ func checkRoleLambda(ctx context.Context, clients any, res resource.Resource, ca
 func checkRoleGlue(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	roleName := res.ID
 
-	glueList, truncated, err := roleRelatedResources(ctx, clients, cache, "glue")
+	glueList, truncated, err := relatedResourcesFor(ctx, clients, cache, "glue")
 	if err != nil {
 		return resource.ErrorRelated("glue", err)
 	}
@@ -256,7 +256,7 @@ func checkRoleGlue(ctx context.Context, clients any, res resource.Resource, cach
 func checkRoleNG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	roleName := res.ID
 
-	ngList, truncated, err := roleRelatedResources(ctx, clients, cache, "ng")
+	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
 	if err != nil {
 		return resource.ErrorRelated("ng", err)
 	}
@@ -327,7 +327,7 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
 	}
 
-	ec2List, truncated, err := roleRelatedResources(ctx, clients, cache, "ec2")
+	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
 	if err != nil {
 		return resource.ErrorRelated("ec2", err)
 	}
@@ -350,16 +350,4 @@ func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	return relatedResultTrunc("ec2", ids, truncated)
-}
-
-// roleRelatedResources returns the resource list for target from cache or by
-// fetching the first page via the registered paginated fetcher.
-func roleRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

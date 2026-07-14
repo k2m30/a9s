@@ -30,10 +30,11 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/viewport"
+
 	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -73,14 +74,15 @@ func relatedDimParityTypes() []struct {
 	}
 }
 
-// newRelatedDimParityDetail builds a sized DetailModel for RenderDetail-level
-// assertions, matching detail_render_parity_test.go's pattern (wide width
-// triggers the side-by-side related-panel layout).
-func newRelatedDimParityDetail(shortName string, res resource.Resource) views.DetailModel {
-	k := keys.Default()
-	m := views.NewDetail(res, shortName, nil, k)
-	m.SetSize(160, 30)
-	return m
+// newRelatedDimParityDetail builds a DetailModel via the live
+// NewTransientDetail seam for RenderDetail-level assertions, sized wide
+// enough to trigger the side-by-side related-panel layout. shortName/res are
+// unused by this constructor (RenderDetail reads everything from the body
+// passed to it) but are kept in the signature so callers stay table-driven
+// per relatedDimParityTypes().
+func newRelatedDimParityDetail(_ string, _ resource.Resource) views.DetailModel {
+	vp := viewport.New(viewport.WithWidth(160), viewport.WithHeight(30))
+	return views.NewTransientDetail(160, 30, vp)
 }
 
 // relatedDimParityBody wraps the given blocks in a DetailBody with the

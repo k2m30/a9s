@@ -81,6 +81,21 @@ func (c *Controller) UpdateTextLines(lines []string) {
 	ts.Lines = lines
 }
 
+// SetTextResource sets the Resource on the top text screen's TextState.
+// Called at push time (with the resource being displayed) and again when
+// async detail enrichment lands for that resource, so GetTextResource always
+// resolves against the most recently known copy instead of the row cache.
+// Unlike EnsureTextState this is NOT set-once — it is safe to call repeatedly.
+func (c *Controller) SetTextResource(res resource.Resource) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ts := c.topTextState()
+	if ts == nil {
+		return
+	}
+	ts.Resource = res
+}
+
 // GetTextScreenContext returns the ScreenID and ScreenContext of the top text
 // screen (YAML, JSON, or error-log). Used by the TUI adapter to determine
 // whether the active text view is YAML or JSON before regenerating enriched
@@ -199,10 +214,15 @@ func (c *Controller) HasErrorHistory() bool {
 	return len(c.errorHistory) > 0
 }
 
-// GetTextResource returns the resource for the top text screen (YAML/JSON)
-// by resolving it from the resource cache using the screen's ScreenContext.
-// Returns the zero-value Resource when the top screen is not a text screen
-// or when the resource cannot be resolved from the cache.
+// GetTextResource returns the resource for the top text screen (YAML/JSON).
+// It prefers the TextState's own Resource (set by SetTextResource at push
+// time and refreshed on async enrichment) so a y/J toggle or CloudTrail/
+// Describe jump sees enriched fields even when no Detail screen on the
+// stack has absorbed them into the row cache. Falls back to resolving from
+// the resource cache via the screen's ScreenContext for callers that only
+// ever went through EnsureTextState (no SetTextResource call). Returns the
+// zero-value Resource when the top screen is not a text screen or when the
+// resource cannot be resolved by either path.
 func (c *Controller) GetTextResource() resource.Resource {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -212,6 +232,9 @@ func (c *Controller) GetTextResource() resource.Resource {
 	top := c.stack[len(c.stack)-1]
 	if !isTextScreen(top.ID) {
 		return resource.Resource{}
+	}
+	if ts := top.State.Text; ts != nil && ts.Resource.ID != "" {
+		return ts.Resource
 	}
 	if top.Ctx.ResourceType == "" || top.Ctx.ResourceID == "" {
 		return resource.Resource{}

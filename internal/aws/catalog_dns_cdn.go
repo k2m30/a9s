@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -62,13 +61,9 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			DisplayNameKey: "zone_name",
 		}},
 		Color: r53Color,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchHostedZonesPage(ctx, c.Route53, continuationToken)
-		},
+		}),
 		Wave2:     IssueEnricher{Fn: EnrichRoute53Zone, Priority: 100},
 		FieldKeys: []string{"zone_id", "name", "record_count", "private_zone", "comment", "alias_targets", "s3website_alias_names"},
 		Related: []domain.RelatedDef{
@@ -102,13 +97,9 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Key: "price_class", Title: "Price Class", Width: 16, Sortable: true},
 		},
 		Color: colorCF,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudFrontDistributionsPage(ctx, c.CloudFront, continuationToken)
-		},
+		}),
 		Wave2: IssueEnricher{Fn: EnrichCloudFrontDistribution, Priority: 100},
 		// lambda_function_arns — required for the lambda:cf related-panel
 		// pivot (checkLambdaCF); cache-restored rows have no RawStruct, so
@@ -147,13 +138,9 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Key: "in_use", Title: "In Use", Width: 8, Sortable: true},
 		},
 		Color: acmColor,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchACMCertificatesPage(ctx, c.ACM, continuationToken)
-		},
+		}),
 		Wave2:     IssueEnricher{Fn: EnrichACMCertificate, Priority: 100},
 		FieldKeys: []string{"domain_name", "status", "type", "not_after", "in_use", "days_left"},
 		Related: []domain.RelatedDef{
@@ -182,14 +169,8 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Key: "endpoint", Title: "Endpoint", Width: 50, Sortable: false},
 			{Key: "description", Title: "Description", Width: 30, Sortable: false},
 		},
-		Color: colorAPIGW,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
-			return FetchAPIGatewaysPageMerged(ctx, c, continuationToken)
-		},
+		Color:                  colorAPIGW,
+		Fetcher:                fetcherWithClients(FetchAPIGatewaysPageMerged),
 		Wave2:                  IssueEnricher{Fn: EnrichAPIGatewayStage, Priority: 100},
 		FieldKeys:              []string{"api_id", "name", "protocol", "endpoint", "description"},
 		IssueEnricherFieldKeys: []string{"stages_count"},
@@ -219,12 +200,8 @@ var dnsCdnChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 		ShortName: "r53_records",
 		Columns:   resource.R53RecordColumns(),
 		FieldKeys: []string{"name", "type", "ttl", "values"},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchR53Records(ctx, c.Route53, parentCtx["zone_id"], continuationToken)
-		},
+		}),
 	},
 }

@@ -14,25 +14,6 @@ import (
 // Groups membership is a runtime API relationship (checkUserGroup), not a field on the User struct.
 // PermissionsBoundary.PermissionsBoundaryArn exists but policy ARNs don't match a9s policy IDs.
 
-// FetchIAMUsers calls the IAM ListUsers API and returns all pages of users.
-// Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchIAMUsers(ctx context.Context, api IAMListUsersAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchIAMUsersPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchIAMUsersPage calls the IAM ListUsers API and returns a single page
 // of users. Pass an empty continuationToken for the first page.
 func FetchIAMUsersPage(ctx context.Context, api IAMListUsersAPI, continuationToken string) (resource.FetchResult, error) {

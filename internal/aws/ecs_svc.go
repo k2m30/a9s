@@ -132,33 +132,3 @@ func FetchECSServicesPage(
 		},
 	}, nil
 }
-
-// FetchECSServices performs a three-step fetch:
-// 1. ListClusters to get cluster ARNs
-// 2. ListServices per cluster to get service ARNs
-// 3. DescribeServices per cluster to get full details
-func FetchECSServices(
-	ctx context.Context,
-	listClustersAPI ECSListClustersAPI,
-	listServicesAPI ECSListServicesAPI,
-	describeServicesAPI ECSDescribeServicesAPI,
-) ([]resource.Resource, error) {
-	var allResources []resource.Resource
-	continuationToken := ""
-
-	for {
-		result, err := FetchECSServicesPage(ctx, listClustersAPI, listServicesAPI, describeServicesAPI, continuationToken)
-		if err != nil {
-			return nil, err
-		}
-
-		allResources = append(allResources, result.Resources...)
-
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		continuationToken = result.Pagination.NextToken
-	}
-
-	return allResources, nil
-}

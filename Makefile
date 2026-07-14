@@ -134,12 +134,12 @@ demo:
 	vhs docs/demos/demo.tape
 
 readme:
-	@scripts/generate-readme.sh > README.md
+	@go run ./cmd/readmegen/ > README.md
 	@echo "README.md regenerated from docs/shared/ snippets"
 
 check-readme:
 	@tmpfile="$$(mktemp)"; \
-	scripts/generate-readme.sh > "$$tmpfile"; \
+	go run ./cmd/readmegen/ > "$$tmpfile"; \
 	diff -q README.md "$$tmpfile" > /dev/null 2>&1 || (rm -f "$$tmpfile"; echo "FAIL: README.md is out of sync — run 'make readme'" && exit 1); \
 	rm -f "$$tmpfile"
 	@echo "PASS: README.md is in sync with docs/shared/"

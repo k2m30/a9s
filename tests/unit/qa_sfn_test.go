@@ -11,6 +11,7 @@ import (
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -38,7 +39,9 @@ func TestFetchStepFunctions_ParsesMultiple(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchStepFunctions(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchStepFunctionsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -95,7 +98,9 @@ func TestFetchStepFunctions_RawStructPopulated(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchStepFunctions(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchStepFunctionsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -118,7 +123,9 @@ func TestFetchStepFunctions_ErrorResponse(t *testing.T) {
 		err: fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchStepFunctions(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchStepFunctionsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -134,7 +141,9 @@ func TestFetchStepFunctions_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchStepFunctions(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchStepFunctionsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

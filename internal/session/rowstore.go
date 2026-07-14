@@ -144,26 +144,12 @@ func NewRowStore() *RowStore {
 
 // dedupAgainstExistingRows mirrors internal/app/list_body.go's
 // dedupAgainstExisting: returns the subset of incoming whose ID is not
-// already present in existing, preserving incoming's order. Kept as an
-// independent copy (not an import) per the row-store unification plan — the
-// store must not import internal/app.
+// already present in existing, preserving incoming's order. Delegates to
+// resource.DedupByID, the single-source implementation shared with
+// internal/app (session already imports internal/resource; no new
+// dependency introduced).
 func dedupAgainstExistingRows(existing, incoming []resource.Resource) []resource.Resource {
-	if len(incoming) == 0 {
-		return incoming
-	}
-	seen := make(map[string]struct{}, len(existing))
-	for _, r := range existing {
-		seen[r.ID] = struct{}{}
-	}
-	out := make([]resource.Resource, 0, len(incoming))
-	for _, r := range incoming {
-		if _, dup := seen[r.ID]; dup {
-			continue
-		}
-		seen[r.ID] = struct{}{}
-		out = append(out, r)
-	}
-	return out
+	return resource.DedupByID(existing, incoming)
 }
 
 // rowIDsAreSubsetRows mirrors internal/runtime/probes.go's rowIDsAreSubset:
@@ -233,7 +219,7 @@ func isStaleReplaceRows(existing, incoming []resource.Resource, pagination *reso
 //     existing Fetch-origin (or Probe-origin) entry that already carries
 //     rows — a disk seed race-losing to an already-landed live result must
 //     not regress the session's live knowledge.
-//  1b. Probe-vs-Fetch (append=false only): an OriginProbe replace is
+//     1b. Probe-vs-Fetch (append=false only): an OriginProbe replace is
 //     rejected over an existing Fetch-origin entry that already carries
 //     rows — a (possibly smaller, truncated) availability-probe page must
 //     never regress rows a live top-level fetch already accumulated via

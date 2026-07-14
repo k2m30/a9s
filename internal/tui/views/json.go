@@ -7,17 +7,13 @@ import (
 
 	lipgloss "charm.land/lipgloss/v2"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
-	tea "charm.land/bubbletea/v2"
 
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/layout"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
@@ -33,20 +29,10 @@ type JSONModel struct {
 	resourceType string
 	viewport     viewport.Model
 	ready        bool
-	wrap         bool
 	width        int
 	height       int
 	keys         keys.Map
 	search       SearchModel
-}
-
-// NewJSON creates a JSONModel for the given resource.
-func NewJSON(res resource.Resource, resourceType string, k keys.Map) JSONModel {
-	return JSONModel{
-		res:          res,
-		resourceType: resourceType,
-		keys:         k,
-	}
 }
 
 // NewJSONWithCtrl creates a JSONModel backed by the given controller.
@@ -59,205 +45,6 @@ func NewJSONWithCtrl(res resource.Resource, resourceType string, k keys.Map, ctr
 		resourceType: resourceType,
 		keys:         k,
 	}
-}
-
-// Init implements tea.Model. No async work.
-func (m JSONModel) Init() (JSONModel, tea.Cmd) {
-	return m, nil
-}
-
-// Update delegates scroll to viewport; handles c (copy), esc (back).
-func (m JSONModel) Update(msg tea.Msg) (JSONModel, tea.Cmd) {
-	switch msg := msg.(type) {
-	case messages.EnrichDetailResult:
-		// Accept enriched resource when type and ID match.
-		if msg.ResourceType != m.resourceType || msg.ResourceID != m.res.ID {
-			return m, nil
-		}
-		m.res = msg.EnrichedRes
-		m.refreshViewportContent()
-		// When the controller path is active, replace the TextState Lines with
-		// the re-rendered content from the enriched resource so that
-		// Snapshot().Body.Text reflects the latest data, not the pre-enrichment
-		// snapshot seeded at push time.
-		if m.ctrl != nil {
-			m.ctrl.UpdateTextLines(m.ContentLines())
-		}
-		return m, nil
-	case tea.PasteMsg:
-		if m.search.IsInputMode() {
-			var cmd tea.Cmd
-			m.search, cmd = m.search.Update(msg)
-			if m.ctrl == nil {
-				m.refreshViewportContent()
-			}
-			return m, cmd
-		}
-	case searchPasteMsg:
-		if m.search.IsInputMode() {
-			var cmd tea.Cmd
-			m.search, cmd = m.search.Update(msg)
-			if m.ctrl == nil {
-				m.refreshViewportContent()
-			}
-			return m, cmd
-		}
-	case tea.KeyMsg:
-		// Search input mode captures all keys.
-		if m.search.IsInputMode() {
-			var cmd tea.Cmd
-			m.search, cmd = m.search.Update(msg)
-			if m.ctrl != nil {
-				// SearchModel.Update may have exited input mode (Enter/Esc).
-				if !m.search.IsInputMode() {
-					if m.search.IsActive() {
-						// Enter was pressed — commit query to controller.
-						m.ctrl.Apply(app.Action{Kind: app.ActionSearch, Arg: m.search.Query()})
-					} else {
-						// Esc was pressed — clear controller search.
-						m.ctrl.Apply(app.Action{Kind: app.ActionSearchClear})
-					}
-				}
-			} else {
-				m.refreshViewportContent()
-			}
-			return m, cmd
-		}
-		switch {
-		case key.Matches(msg, m.keys.Search):
-			m.search.Activate()
-			return m, nil
-		case key.Matches(msg, m.keys.SearchNext):
-			if m.search.IsActive() {
-				if m.ctrl != nil {
-					m.ctrl.Apply(app.Action{Kind: app.ActionSearchNext})
-				} else if m.search.MatchCount() > 0 {
-					m.search.NextMatch()
-					m.refreshViewportContent()
-				}
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.SearchPrev):
-			if m.search.IsActive() {
-				if m.ctrl != nil {
-					m.ctrl.Apply(app.Action{Kind: app.ActionSearchPrev})
-				} else if m.search.MatchCount() > 0 {
-					m.search.PrevMatch()
-					m.refreshViewportContent()
-				}
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.Escape):
-			if m.search.IsActive() {
-				m.search.Deactivate()
-				if m.ctrl != nil {
-					m.ctrl.Apply(app.Action{Kind: app.ActionSearchClear})
-				} else {
-					m.refreshViewportContent()
-				}
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.ToggleWrap):
-			if m.ctrl != nil {
-				m.ctrl.Apply(app.Action{Kind: app.ActionToggleWrap})
-			} else {
-				m.wrap = !m.wrap
-				m.viewport.SoftWrap = m.wrap
-				m.refreshViewportContent()
-			}
-			return m, nil
-		case key.Matches(msg, m.keys.Up):
-			if m.ctrl != nil {
-				m.ctrl.Apply(app.Action{Kind: app.ActionMoveUp})
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.Down):
-			if m.ctrl != nil {
-				m.ctrl.Apply(app.Action{Kind: app.ActionMoveDown})
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.Top):
-			if m.ctrl != nil {
-				m.ctrl.Apply(app.Action{Kind: app.ActionMoveTop})
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.Bottom):
-			if m.ctrl != nil {
-				m.ctrl.Apply(app.Action{Kind: app.ActionMoveBottom})
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.PageUp):
-			if m.ctrl != nil {
-				m.ctrl.Apply(app.Action{Kind: app.ActionPageUp, N: max(m.height-1, 1)})
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.PageDown):
-			if m.ctrl != nil {
-				m.ctrl.Apply(app.Action{Kind: app.ActionPageDown, N: max(m.height-1, 1)})
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.CloudTrail):
-			if ff := resource.BuildCloudTrailFilter(m.res, m.resourceType); ff != nil {
-				res := m.res
-				return m, func() tea.Msg {
-					return messages.RelatedNavigate{
-						TargetType:     "ct-events",
-						SourceResource: res,
-						SourceType:     m.resourceType,
-						FetchFilter:    ff,
-					}
-				}
-			}
-			return m, nil
-		case key.Matches(msg, m.keys.Describe):
-			res := m.res
-			return m, func() tea.Msg {
-				return messages.Navigate{
-					Target:         messages.TargetDetail,
-					Resource:       &res,
-					ResourceType:   m.resourceType,
-					ReplaceCurrent: true,
-				}
-			}
-		case key.Matches(msg, m.keys.YAML):
-			res := m.res
-			return m, func() tea.Msg {
-				return messages.Navigate{
-					Target:         messages.TargetYAML,
-					Resource:       &res,
-					ResourceType:   m.resourceType,
-					ReplaceCurrent: true,
-				}
-			}
-		case key.Matches(msg, m.keys.JSON):
-			return m, nil
-		}
-	}
-
-	if m.ready {
-		var cmd tea.Cmd
-		m.viewport, cmd = m.viewport.Update(msg)
-		return m, cmd
-	}
-	return m, nil
-}
-
-// View renders JSON content via viewport.
-// When a controller is wired (TUI navigator path), delegates to
-// RenderText(ctrl.Snapshot().Body.Text) so the headless and TUI renderers
-// share one code path. When ctrl is nil (unit tests, isolated callers),
-// falls back to the direct viewport path.
-func (m JSONModel) View() string {
-	if !m.ready {
-		return "Initializing..."
-	}
-	if m.ctrl != nil {
-		body := m.ctrl.Snapshot().Body.Text
-		if body != nil {
-			return m.RenderText(*body)
-		}
-	}
-	return m.viewport.View()
 }
 
 // SetSize initializes or resizes the viewport.
@@ -290,124 +77,12 @@ func (m *JSONModel) refreshViewportContent() {
 	m.viewport.SetContent(content)
 }
 
-// IsSearchActive returns true when search is active (input mode or confirmed highlights).
-// When the controller is wired, reflects the controller's TextState.
-func (m JSONModel) IsSearchActive() bool {
-	if m.ctrl != nil {
-		body := m.ctrl.Snapshot().Body.Text
-		return m.search.IsInputMode() || (body != nil && body.Search != "")
-	}
-	return m.search.IsActive()
-}
-
-// IsSearchInputMode returns true when the search input is capturing keystrokes.
-// This is always model-local (the controller has no concept of typing mode).
-func (m JSONModel) IsSearchInputMode() bool { return m.search.IsInputMode() }
-
-// SearchInfo returns the search state string for the header.
-// Input mode: "/query" (or "/" when query is empty), Confirmed: "N/M matches", Inactive: "".
-func (m JSONModel) SearchInfo() string {
-	if m.search.IsInputMode() {
-		return "/" + m.search.Query()
-	}
-	if m.ctrl != nil {
-		body := m.ctrl.Snapshot().Body.Text
-		if body == nil || body.Search == "" {
-			return ""
-		}
-		matches := buildTextSearchMatchesForInfo(body.Lines, body.Search)
-		total := len(matches)
-		if total == 0 {
-			return "0/0 matches"
-		}
-		cursor := body.SearchCursor
-		if cursor < 0 || cursor >= total {
-			cursor = 0
-		}
-		return formatSearchInfo(cursor+1, total)
-	}
-	if !m.search.IsActive() {
-		return ""
-	}
-	return m.search.MatchInfo()
-}
-
-// FrameTitle returns e.g. "i-0abc123 json".
-func (m JSONModel) FrameTitle() string {
-	id := m.res.ID
-	if m.res.Name != "" {
-		id = m.res.Name
-	}
-	return id + " json"
-}
-
-// BottomHints implements Hintable for JSONModel.
-// Delegates to the controller snapshot when a controller is wired; falls back
-// to local state for nil-controller (test/preview) paths.
-func (m JSONModel) BottomHints() []layout.KeyHint {
-	if m.ctrl != nil {
-		src := m.ctrl.Snapshot().Footer
-		if len(src) > 0 {
-			hints := make([]layout.KeyHint, len(src))
-			for i, kh := range src {
-				hints[i] = layout.KeyHint{Key: kh.Key, Desc: kh.Help}
-			}
-			return hints
-		}
-	}
-	// Nil-controller path: compute from local model state.
-	hints := []layout.KeyHint{
-		{Key: "w", Desc: "Wrap"},
-		{Key: "c", Desc: "Copy"},
-	}
-	if resource.BuildCloudTrailFilter(m.res, m.resourceType) != nil {
-		hints = append(hints, layout.KeyHint{Key: "t", Desc: "CloudTrail"})
-	}
-	return hints
-}
-
-// CopyContent returns the raw JSON text for clipboard copy.
-func (m JSONModel) CopyContent() (string, string) {
-	content := m.RawContent()
-	if content == "" {
-		return "", ""
-	}
-	return content, "Copied JSON to clipboard"
-}
-
-// GetHelpContext returns HelpFromJSON.
-func (m JSONModel) GetHelpContext() HelpContext {
-	return HelpFromJSON
-}
-
 // ContentLines returns the syntax-colored JSON content as a slice of lines,
 // matching exactly what refreshViewportContent passes to the viewport.
 // Used by the TUI navigator at push time to seed EnsureTextState.
 func (m JSONModel) ContentLines() []string {
 	content := m.renderContent()
 	return strings.Split(content, "\n")
-}
-
-// RawContent returns the uncolored JSON text for clipboard copy.
-func (m JSONModel) RawContent() string {
-	var data []byte
-	var err error
-
-	if m.res.RawStruct != nil {
-		data, err = json.MarshalIndent(m.res.RawStruct, "", "  ")
-	} else if len(m.res.Fields) > 0 {
-		data, err = json.MarshalIndent(m.res.Fields, "", "  ")
-	}
-
-	if err != nil || len(data) == 0 {
-		return ""
-	}
-	return string(data)
-}
-
-// ResourceID returns the resource ID for clipboard copy.
-func (m JSONModel) ResourceID() string {
-	return m.res.ID
 }
 
 // renderContent marshals the resource to JSON and applies syntax coloring.

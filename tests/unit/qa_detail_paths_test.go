@@ -5,10 +5,11 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/viewport"
+
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -18,6 +19,11 @@ import (
 // Uses realistic SDK struct fixtures for all resource types.
 // This catches: wrong field names in views.yaml, nil fields being skipped,
 // and wrong ViewDef being selected.
+//
+// Retargeted (wave3 detail-family cleanup round 4, specs/022-codebase-cleanup)
+// off views.NewDetail(...).View() (dead: DetailModel.View/SetSize) onto the
+// live Controller.Snapshot().Body.Detail + NewTransientDetail.RenderDetail
+// seam — same golden infrastructure as wave3_detail_ports_test.go.
 func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 	styles.Reinit() // ensure styles are initialized
 
@@ -29,80 +35,17 @@ func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 		t.Fatalf(".a9s/views/ directory not found or returned nil config")
 	}
 
-	k := keys.Default()
-
-	// Map resource type to a fixture resource with RawStruct populated.
-	// Each entry uses the realistic SDK struct builder from the _test package.
-	allFixtures := map[string]resource.Resource{
-		"ec2":          buildResource("i-0abcdef1234567890", "web-server-prod", realisticEC2Instance()),
-		"dbi":          buildResource("prod-db-01", "prod-db-01", realisticRDSInstance()),
-		"redis":        buildResource("redis-prod-001", "redis-prod-001", realisticRedisReplicationGroup()),
-		"dbc":          buildResource("docdb-prod-cluster", "docdb-prod-cluster", realisticDocDBCluster()),
-		"eks":          buildResource("prod-cluster", "prod-cluster", realisticEKSCluster()),
-		"secrets":      buildResource("prod/database/password", "prod/database/password", realisticSecretListEntry()),
-		"s3":           buildResource("my-production-bucket", "my-production-bucket", realisticS3Bucket()),
-		"s3_objects":   buildResource("data/report-2025.csv", "data/report-2025.csv", realisticS3ObjectFile()),
-		"lambda":       buildResource("my-api-handler", "my-api-handler", realisticLambdaFunction()),
-		"alarm":        buildResource("HighCPUAlarm", "HighCPUAlarm", realisticAlarm()),
-		"sns":          buildResource("my-notifications", "my-notifications", realisticSNSTopic()),
-		"elb":          buildResource("my-app-alb", "my-app-alb", realisticELB()),
-		"tg":           buildResource("my-app-tg", "my-app-tg", realisticTargetGroup()),
-		"ecs":          buildResource("prod-cluster", "prod-cluster", realisticECSClusterStruct()),
-		"ecs-svc":      buildResource("api-service", "api-service", realisticECSService()),
-		"ecs-task":     buildResource("abc123def456", "abc123def456", realisticECSTask()),
-		"cfn":          buildResource("my-app-stack", "my-app-stack", realisticCFNStack()),
-		"role":         buildResource("lambda-exec-role", "lambda-exec-role", realisticIAMRole()),
-		"logs":         buildResource("/aws/lambda/my-api-handler", "/aws/lambda/my-api-handler", realisticLogGroup()),
-		"ssm":          buildResource("/app/config/db-host", "/app/config/db-host", realisticSSMParameter()),
-		"ddb":          buildResource("users-table", "users-table", realisticDDBTable()),
-		"acm":          buildResource("example.com", "example.com", realisticACMCertificate()),
-		"asg":          buildResource("my-app-asg", "my-app-asg", realisticASG()),
-		"vpc":          buildResource("vpc-0abc1234def56789a", "prod-vpc", realisticVPC()),
-		"sg":           buildResource("sg-0abc1234def56789a", "web-sg", realisticSecurityGroup()),
-		"ng":           buildResource("prod-ng-01", "prod-ng-01", realisticNodeGroup()),
-		"subnet":       buildResource("subnet-0abc1234def56789a", "public-subnet-1a", realisticSubnet()),
-		"rtb":          buildResource("rtb-0abc1234def56789a", "public-rtb", realisticRouteTable()),
-		"nat":          buildResource("nat-0abc1234def56789a", "prod-nat", realisticNATGateway()),
-		"igw":          buildResource("igw-0abc1234def56789a", "prod-igw", realisticInternetGateway()),
-		"eip":          buildResource("eipalloc-0abc1234def56789a", "prod-eip", realisticEIP()),
-		"tgw":          buildResource("tgw-0abc1234def56789a", "prod-tgw", realisticTransitGateway()),
-		"vpce":         buildResource("vpce-0abc1234def56789a", "s3-endpoint", realisticVPCEndpoint()),
-		"eni":          buildResource("eni-0abc1234def56789a", "prod-eni", realisticENI()),
-		"dbi-snap":     buildResource("dbi-snap-prod-20250615", "dbi-snap-prod-20250615", realisticDBISnapshot()),
-		"dbc-snap":   buildResource("dbc-snap-prod-20250615", "dbc-snap-prod-20250615", realisticDBCSnapshot()),
-		"sns-sub":      buildResource("sub-12345", "sub-12345", realisticSNSSubscription()),
-		"policy":       buildResource("ReadOnlyAccess", "ReadOnlyAccess", realisticIAMPolicy()),
-		"iam-user":     buildResource("deploy-user", "deploy-user", realisticIAMUser()),
-		"iam-group":    buildResource("developers", "developers", realisticIAMGroup()),
-		"cf":           buildResource("E1A2B3C4D5E6F7", "E1A2B3C4D5E6F7", realisticCFDistribution()),
-		"r53":          buildResource("/hostedzone/Z1234567890ABC", "example.com.", realisticR53Zone()),
-		"apigw":        buildResource("abc123def4", "prod-api", realisticAPIGW()),
-		"ecr":          buildResource("my-app", "my-app", realisticECR()),
-		"efs":          buildResource("fs-0abc1234def56789a", "prod-efs", realisticEFS()),
-		"eb-rule":      buildResource("daily-backup-rule", "daily-backup-rule", realisticEBRule()),
-		"sfn":          buildResource("order-processing", "order-processing", realisticSFN()),
-		"pipeline":     buildResource("deploy-pipeline", "deploy-pipeline", realisticPipeline()),
-		"kinesis":      buildResource("events-stream", "events-stream", realisticKinesis()),
-		"waf":          buildResource("prod-waf-acl", "prod-waf-acl", realisticWAF()),
-		"glue":         buildResource("etl-daily-job", "etl-daily-job", realisticGlueJob()),
-		"eb":           buildResource("prod-api-env", "prod-api-env", realisticEB()),
-		"ses":          buildResource("example.com", "example.com", realisticSESIdentity()),
-		"redshift":     buildResource("analytics-cluster", "analytics-cluster", realisticRedshift()),
-		"trail":        buildResource("org-trail", "org-trail", realisticTrail()),
-		"athena":       buildResource("analytics-wg", "analytics-wg", realisticAthena()),
-		"codeartifact": buildResource("shared-libs", "shared-libs", realisticCodeArtifact()),
-		"cb":           buildResource("build-project", "build-project", realisticCodeBuild()),
-		"opensearch":   buildResource("search-prod", "search-prod", realisticOpenSearch()),
-		"kms":          buildResource("12345678-1234-1234-1234-123456789012", "prod-key", realisticKMS()),
-		"msk":          buildResource("events-kafka", "events-kafka", realisticMSK()),
-		"backup":       buildResource("daily-backup-plan", "daily-backup-plan", realisticBackup()),
-	}
-
-	// Perf: test 4 representative resource types to keep this test under 25ms.
+	// Perf: test 4 representative resource types to keep this test fast.
 	// Chosen: ec2 (most complex, nested fields), s3 (simple bucket), lambda
 	// (function), redis (ReplicationGroup — pins the post-spec-rewrite RawStruct
 	// shape so a regression back to CacheCluster would surface here).
 	// Full coverage is exercised by individual per-type detail tests in qa_detail_*_test.go.
+	allFixtures := map[string]resource.Resource{
+		"ec2":    buildResource("i-0abcdef1234567890", "web-server-prod", realisticEC2Instance()),
+		"s3":     buildResource("my-production-bucket", "my-production-bucket", realisticS3Bucket()),
+		"lambda": buildResource("my-api-handler", "my-api-handler", realisticLambdaFunction()),
+		"redis":  buildResource("redis-prod-001", "redis-prod-001", realisticRedisReplicationGroup()),
+	}
 	shortNames := []string{"ec2", "s3", "lambda", "redis"}
 
 	for _, shortName := range shortNames {
@@ -125,11 +68,18 @@ func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 				}
 			}
 
-			// Create detail model and render
-			m := views.NewDetail(res, shortName, cfg, k)
-			m.SetSize(120, 40)
-			view := m.View()
-			plain := stripAnsi(view)
+			// Build the detail body through the live controller seam and render it
+			// via the same NewTransientDetail+RenderDetail path production uses.
+			c := newDetailController(t, res, shortName)
+			c.SetViewConfig(cfg)
+			body := c.Snapshot().Body.Detail
+			if body == nil {
+				t.Fatalf("Body.Detail is nil for %s", shortName)
+			}
+
+			vp := viewport.New(viewport.WithWidth(120), viewport.WithHeight(40))
+			m := views.NewTransientDetail(120, 40, vp)
+			plain := stripAnsi(m.RenderDetail(*body))
 
 			// Every configured detail path should appear as a label in the view
 			for _, df := range vd.Detail {

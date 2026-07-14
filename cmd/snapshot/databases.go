@@ -19,15 +19,6 @@ import (
 	smithy "github.com/aws/smithy-go"
 )
 
-// dbFormatTime mirrors formatTime in s3.go under a distinct name to avoid
-// collisions between files in this package.
-func dbFormatTime(t *time.Time) string {
-	if t == nil {
-		return ""
-	}
-	return t.Format("2006-01-02 15:04")
-}
-
 // ---------------------------------------------------------------------------
 // dbi — RDS DB Instances
 // ---------------------------------------------------------------------------
@@ -80,19 +71,15 @@ func captureDBI(ctx context.Context, cfg aws.Config) (any, error) {
 	client := rds.NewFromConfig(cfg)
 
 	var instances []dbiInstance
-	var marker *string
-	for {
-		out, err := client.DescribeDBInstances(ctx, &rds.DescribeDBInstancesInput{Marker: marker})
+	paginator := rds.NewDescribeDBInstancesPaginator(client, &rds.DescribeDBInstancesInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		for _, d := range out.DBInstances {
 			instances = append(instances, dbiInstanceFromSDK(d))
 		}
-		if out.Marker == nil || *out.Marker == "" {
-			break
-		}
-		marker = out.Marker
 	}
 
 	pending, err := captureDBIPendingMaintenance(ctx, client)
@@ -114,7 +101,7 @@ func dbiInstanceFromSDK(d rdstypes.DBInstance) dbiInstance {
 		AllocatedStorage:         aws.ToInt32(d.AllocatedStorage),
 		AvailabilityZone:         aws.ToString(d.AvailabilityZone),
 		MultiAZ:                  aws.ToBool(d.MultiAZ),
-		InstanceCreateTime:       dbFormatTime(d.InstanceCreateTime),
+		InstanceCreateTime:       snapFormatTime(d.InstanceCreateTime),
 		BackupRetentionPeriod:    aws.ToInt32(d.BackupRetentionPeriod),
 		PubliclyAccessible:       aws.ToBool(d.PubliclyAccessible),
 		StorageEncrypted:         aws.ToBool(d.StorageEncrypted),
@@ -145,9 +132,9 @@ func dbiInstanceFromSDK(d rdstypes.DBInstance) dbiInstance {
 
 func captureDBIPendingMaintenance(ctx context.Context, client *rds.Client) ([]dbiPendingMaintenance, error) {
 	var out []dbiPendingMaintenance
-	var marker *string
-	for {
-		resp, err := client.DescribePendingMaintenanceActions(ctx, &rds.DescribePendingMaintenanceActionsInput{Marker: marker})
+	paginator := rds.NewDescribePendingMaintenanceActionsPaginator(client, &rds.DescribePendingMaintenanceActionsInput{})
+	for paginator.HasMorePages() {
+		resp, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -158,16 +145,12 @@ func captureDBIPendingMaintenance(ctx context.Context, client *rds.Client) ([]db
 					ResourceIdentifier:   resourceID,
 					Action:               aws.ToString(action.Action),
 					Description:          aws.ToString(action.Description),
-					ForcedApplyDate:      dbFormatTime(action.ForcedApplyDate),
-					AutoAppliedAfterDate: dbFormatTime(action.AutoAppliedAfterDate),
-					CurrentApplyDate:     dbFormatTime(action.CurrentApplyDate),
+					ForcedApplyDate:      snapFormatTime(action.ForcedApplyDate),
+					AutoAppliedAfterDate: snapFormatTime(action.AutoAppliedAfterDate),
+					CurrentApplyDate:     snapFormatTime(action.CurrentApplyDate),
 				})
 			}
 		}
-		if resp.Marker == nil || *resp.Marker == "" {
-			break
-		}
-		marker = resp.Marker
 	}
 	return out, nil
 }
@@ -212,38 +195,32 @@ func captureDBC(ctx context.Context, cfg aws.Config) (any, error) {
 
 func listDocDBClusters(ctx context.Context, client *docdb.Client) ([]dbcCluster, error) {
 	var clusters []dbcCluster
-	var marker *string
-	for {
-		out, err := client.DescribeDBClusters(ctx, &docdb.DescribeDBClustersInput{Marker: marker})
+	paginator := docdb.NewDescribeDBClustersPaginator(client, &docdb.DescribeDBClustersInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		for _, c := range out.DBClusters {
 			clusters = append(clusters, dbcClusterFromDocDB(c))
 		}
-		if out.Marker == nil || *out.Marker == "" {
-			return clusters, nil
-		}
-		marker = out.Marker
 	}
+	return clusters, nil
 }
 
 func listRDSClusters(ctx context.Context, client *rds.Client) ([]dbcCluster, error) {
 	var clusters []dbcCluster
-	var marker *string
-	for {
-		out, err := client.DescribeDBClusters(ctx, &rds.DescribeDBClustersInput{Marker: marker})
+	paginator := rds.NewDescribeDBClustersPaginator(client, &rds.DescribeDBClustersInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		for _, c := range out.DBClusters {
 			clusters = append(clusters, dbcClusterFromRDS(c))
 		}
-		if out.Marker == nil || *out.Marker == "" {
-			return clusters, nil
-		}
-		marker = out.Marker
 	}
+	return clusters, nil
 }
 
 // combineDBCClusters merges the two DescribeDBClusters sources with docdb-first
@@ -366,9 +343,9 @@ func captureDBISnap(ctx context.Context, cfg aws.Config) (any, error) {
 	client := rds.NewFromConfig(cfg)
 
 	var snaps []dbiSnapshot
-	var marker *string
-	for {
-		out, err := client.DescribeDBSnapshots(ctx, &rds.DescribeDBSnapshotsInput{Marker: marker})
+	paginator := rds.NewDescribeDBSnapshotsPaginator(client, &rds.DescribeDBSnapshotsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -381,14 +358,10 @@ func captureDBISnap(ctx context.Context, cfg aws.Config) (any, error) {
 				SnapshotType:         aws.ToString(s.SnapshotType),
 				Encrypted:            aws.ToBool(s.Encrypted),
 				KmsKeyId:             aws.ToString(s.KmsKeyId),
-				SnapshotCreateTime:   dbFormatTime(s.SnapshotCreateTime),
+				SnapshotCreateTime:   snapFormatTime(s.SnapshotCreateTime),
 				PercentProgress:      aws.ToInt32(s.PercentProgress),
 			})
 		}
-		if out.Marker == nil || *out.Marker == "" {
-			break
-		}
-		marker = out.Marker
 	}
 
 	return dbiSnapData{Snapshots: snaps}, nil
@@ -426,9 +399,9 @@ func captureDBCSnap(ctx context.Context, cfg aws.Config) (any, error) {
 
 func listDocDBClusterSnapshots(ctx context.Context, client *docdb.Client) ([]dbcSnapshot, error) {
 	var snaps []dbcSnapshot
-	var marker *string
-	for {
-		out, err := client.DescribeDBClusterSnapshots(ctx, &docdb.DescribeDBClusterSnapshotsInput{Marker: marker})
+	paginator := docdb.NewDescribeDBClusterSnapshotsPaginator(client, &docdb.DescribeDBClusterSnapshotsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -443,22 +416,19 @@ func listDocDBClusterSnapshots(ctx context.Context, client *docdb.Client) ([]dbc
 				StorageEncrypted:            aws.ToBool(s.StorageEncrypted),
 				KmsKeyId:                    aws.ToString(s.KmsKeyId),
 				VpcId:                       aws.ToString(s.VpcId),
-				SnapshotCreateTime:          dbFormatTime(s.SnapshotCreateTime),
+				SnapshotCreateTime:          snapFormatTime(s.SnapshotCreateTime),
 				PercentProgress:             aws.ToInt32(s.PercentProgress),
 			})
 		}
-		if out.Marker == nil || *out.Marker == "" {
-			return snaps, nil
-		}
-		marker = out.Marker
 	}
+	return snaps, nil
 }
 
 func listRDSClusterSnapshots(ctx context.Context, client *rds.Client) ([]dbcSnapshot, error) {
 	var snaps []dbcSnapshot
-	var marker *string
-	for {
-		out, err := client.DescribeDBClusterSnapshots(ctx, &rds.DescribeDBClusterSnapshotsInput{Marker: marker})
+	paginator := rds.NewDescribeDBClusterSnapshotsPaginator(client, &rds.DescribeDBClusterSnapshotsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -473,15 +443,12 @@ func listRDSClusterSnapshots(ctx context.Context, client *rds.Client) ([]dbcSnap
 				StorageEncrypted:            aws.ToBool(s.StorageEncrypted),
 				KmsKeyId:                    aws.ToString(s.KmsKeyId),
 				VpcId:                       aws.ToString(s.VpcId),
-				SnapshotCreateTime:          dbFormatTime(s.SnapshotCreateTime),
+				SnapshotCreateTime:          snapFormatTime(s.SnapshotCreateTime),
 				PercentProgress:             aws.ToInt32(s.PercentProgress),
 			})
 		}
-		if out.Marker == nil || *out.Marker == "" {
-			return snaps, nil
-		}
-		marker = out.Marker
 	}
+	return snaps, nil
 }
 
 // combineDBCSnapshots — same partial-success contract as combineDBCClusters.
@@ -547,17 +514,13 @@ func captureDDB(ctx context.Context, cfg aws.Config) (any, error) {
 	client := dynamodb.NewFromConfig(cfg)
 
 	var names []string
-	var startTable *string
-	for {
-		out, err := client.ListTables(ctx, &dynamodb.ListTablesInput{ExclusiveStartTableName: startTable})
+	paginator := dynamodb.NewListTablesPaginator(client, &dynamodb.ListTablesInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		names = append(names, out.TableNames...)
-		if out.LastEvaluatedTableName == nil || *out.LastEvaluatedTableName == "" {
-			break
-		}
-		startTable = out.LastEvaluatedTableName
 	}
 
 	tables := make([]ddbTable, 0, len(names))
@@ -574,7 +537,7 @@ func captureDDB(ctx context.Context, cfg aws.Config) (any, error) {
 			if td != nil {
 				t.TableArn = aws.ToString(td.TableArn)
 				t.TableStatus = string(td.TableStatus)
-				t.CreationDateTime = dbFormatTime(td.CreationDateTime)
+				t.CreationDateTime = snapFormatTime(td.CreationDateTime)
 				t.ItemCount = aws.ToInt64(td.ItemCount)
 				t.TableSizeBytes = aws.ToInt64(td.TableSizeBytes)
 				t.LatestStreamArn = aws.ToString(td.LatestStreamArn)
@@ -583,7 +546,7 @@ func captureDDB(ctx context.Context, cfg aws.Config) (any, error) {
 				}
 				if td.ArchivalSummary != nil {
 					t.ArchivalReason = aws.ToString(td.ArchivalSummary.ArchivalReason)
-					t.ArchivalDateTime = dbFormatTime(td.ArchivalSummary.ArchivalDateTime)
+					t.ArchivalDateTime = snapFormatTime(td.ArchivalSummary.ArchivalDateTime)
 					t.ArchivalBackupArn = aws.ToString(td.ArchivalSummary.ArchivalBackupArn)
 				}
 			}
@@ -649,9 +612,9 @@ func captureRedis(ctx context.Context, cfg aws.Config) (any, error) {
 	client := elasticache.NewFromConfig(cfg)
 
 	var groups []redisReplicationGroup
-	var marker *string
-	for {
-		out, err := client.DescribeReplicationGroups(ctx, &elasticache.DescribeReplicationGroupsInput{Marker: marker})
+	paginator := elasticache.NewDescribeReplicationGroupsPaginator(client, &elasticache.DescribeReplicationGroupsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -661,10 +624,6 @@ func captureRedis(ctx context.Context, cfg aws.Config) (any, error) {
 			}
 			groups = append(groups, redisReplicationGroupFromSDK(rg))
 		}
-		if out.Marker == nil || *out.Marker == "" {
-			break
-		}
-		marker = out.Marker
 	}
 
 	return redisData{ReplicationGroups: groups}, nil
@@ -728,10 +687,10 @@ func captureRedshift(ctx context.Context, cfg aws.Config) (any, error) {
 	client := redshift.NewFromConfig(cfg)
 
 	var clusters []redshiftCluster
-	var marker *string
 	now := time.Now()
-	for {
-		out, err := client.DescribeClusters(ctx, &redshift.DescribeClustersInput{Marker: marker})
+	paginator := redshift.NewDescribeClustersPaginator(client, &redshift.DescribeClustersInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -753,7 +712,7 @@ func captureRedshift(ctx context.Context, cfg aws.Config) (any, error) {
 				if w.DeferMaintenanceStartTime != nil && w.DeferMaintenanceEndTime != nil &&
 					!now.Before(*w.DeferMaintenanceStartTime) && !now.After(*w.DeferMaintenanceEndTime) {
 					rc.DeferredMaintenanceActive = true
-					rc.DeferMaintenanceEndTime = dbFormatTime(w.DeferMaintenanceEndTime)
+					rc.DeferMaintenanceEndTime = snapFormatTime(w.DeferMaintenanceEndTime)
 					break
 				}
 			}
@@ -765,10 +724,6 @@ func captureRedshift(ctx context.Context, cfg aws.Config) (any, error) {
 			}
 			clusters = append(clusters, rc)
 		}
-		if out.Marker == nil || *out.Marker == "" {
-			break
-		}
-		marker = out.Marker
 	}
 
 	return redshiftData{Clusters: clusters}, nil
@@ -808,9 +763,9 @@ func captureEFS(ctx context.Context, cfg aws.Config) (any, error) {
 	client := efs.NewFromConfig(cfg)
 
 	var systems []efsFileSystem
-	var marker *string
-	for {
-		out, err := client.DescribeFileSystems(ctx, &efs.DescribeFileSystemsInput{Marker: marker})
+	paginator := efs.NewDescribeFileSystemsPaginator(client, &efs.DescribeFileSystemsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -823,13 +778,9 @@ func captureEFS(ctx context.Context, cfg aws.Config) (any, error) {
 				NumberOfMountTargets: fs.NumberOfMountTargets,
 				Encrypted:            aws.ToBool(fs.Encrypted),
 				KmsKeyId:             aws.ToString(fs.KmsKeyId),
-				CreationTime:         dbFormatTime(fs.CreationTime),
+				CreationTime:         snapFormatTime(fs.CreationTime),
 			})
 		}
-		if out.NextMarker == nil || *out.NextMarker == "" {
-			break
-		}
-		marker = out.NextMarker
 	}
 
 	for i := range systems {
@@ -848,9 +799,9 @@ func captureEFS(ctx context.Context, cfg aws.Config) (any, error) {
 
 func captureEFSMountTargets(ctx context.Context, client *efs.Client, fsID string) ([]efsMountTarget, error) {
 	var mts []efsMountTarget
-	var marker *string
-	for {
-		out, err := client.DescribeMountTargets(ctx, &efs.DescribeMountTargetsInput{FileSystemId: aws.String(fsID), Marker: marker})
+	paginator := efs.NewDescribeMountTargetsPaginator(client, &efs.DescribeMountTargetsInput{FileSystemId: aws.String(fsID)})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -863,10 +814,6 @@ func captureEFSMountTargets(ctx context.Context, client *efs.Client, fsID string
 				NetworkInterfaceId: aws.ToString(mt.NetworkInterfaceId),
 			})
 		}
-		if out.NextMarker == nil || *out.NextMarker == "" {
-			break
-		}
-		marker = out.NextMarker
 	}
 	return mts, nil
 }

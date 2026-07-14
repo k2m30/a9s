@@ -99,17 +99,6 @@ func efsCFNCache() resource.ResourceCache {
 	}
 }
 
-func efsKMSCache() resource.ResourceCache {
-	fix := fixtures.NewKMSFixtures()
-	var rs []resource.Resource
-	for id, k := range fix.Keys {
-		rs = append(rs, resource.Resource{ID: id, Name: id, RawStruct: *k})
-	}
-	return resource.ResourceCache{
-		"kms": resource.ResourceCacheEntry{Resources: rs},
-	}
-}
-
 func efsENICache() resource.ResourceCache {
 	fix := fixtures.NewEC2Fixtures()
 	var rs []resource.Resource

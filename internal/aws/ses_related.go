@@ -36,7 +36,7 @@ func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
 	}
 
-	r53List, truncated, err := sesRelatedResources(ctx, clients, cache, "r53")
+	r53List, truncated, err := relatedResourcesFor(ctx, clients, cache, "r53")
 	if err != nil {
 		return resource.ErrorRelated("r53", err)
 	}
@@ -75,17 +75,6 @@ func sesIdentityDomain(res resource.Resource) string {
 	}
 	// DOMAIN: use as-is
 	return name
-}
-
-// sesRelatedResources returns the resource list for target from cache or by fetching the first page.
-func sesRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 // sesConfigSetName resolves the ConfigurationSetName for the given SES identity by
@@ -202,7 +191,7 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 	}
 
 	// Scan the eb-rule cache for rules on matching buses.
-	ebRules, truncated, cacheErr := sesRelatedResources(ctx, clients, cache, "eb-rule")
+	ebRules, truncated, cacheErr := relatedResourcesFor(ctx, clients, cache, "eb-rule")
 	if cacheErr != nil {
 		return resource.ErrorRelated("eb-rule", cacheErr)
 	}

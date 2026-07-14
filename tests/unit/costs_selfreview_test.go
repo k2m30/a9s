@@ -385,8 +385,6 @@ func selfReviewStructFieldNames(v any) []string {
 // superseded by the narrower settlement-lag boundary; reconciled below).
 // ===========================================================================
 
-const selfReviewSettlementLag = 72 * time.Hour
-
 func TestCostsSelfReview_C5a_DailyBucket_FetchedMorningAfter_StaysRefetchable(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	s := costs.LoadStore("selfreview-c5a")

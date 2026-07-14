@@ -9,6 +9,8 @@ package aws
 
 import (
 	"context"
+	"maps"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
@@ -284,11 +286,7 @@ func arnRoleName(a string) string {
 // mapKeys returns the keys of a map[string]struct{} as a slice (order-independent —
 // relatedResult sorts for stability).
 func mapKeys(m map[string]struct{}) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	return out
+	return slices.Collect(maps.Keys(m))
 }
 
 // checkPipelineEbRule resolves EventBridge rules that target this CodePipeline pipeline.

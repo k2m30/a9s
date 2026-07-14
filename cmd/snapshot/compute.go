@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
@@ -20,15 +19,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	smithy "github.com/aws/smithy-go"
 )
-
-// computeFormatTime mirrors s3.go's formatTime under a distinct name to avoid
-// a duplicate-symbol collision within package main.
-func computeFormatTime(t *time.Time) string {
-	if t == nil {
-		return ""
-	}
-	return t.Format("2006-01-02 15:04")
-}
 
 // ---------------------------------------------------------------------------
 // lambda
@@ -58,9 +48,9 @@ func captureLambda(ctx context.Context, cfg aws.Config) (any, error) {
 	client := lambda.NewFromConfig(cfg)
 
 	var functions []lambdaFunction
-	var marker *string
-	for {
-		out, err := client.ListFunctions(ctx, &lambda.ListFunctionsInput{Marker: marker})
+	paginator := lambda.NewListFunctionsPaginator(client, &lambda.ListFunctionsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -78,10 +68,6 @@ func captureLambda(ctx context.Context, cfg aws.Config) (any, error) {
 				HasDeadLetterConfig:        f.DeadLetterConfig != nil,
 			})
 		}
-		if out.NextMarker == nil || *out.NextMarker == "" {
-			break
-		}
-		marker = out.NextMarker
 	}
 
 	return lambdaData{Functions: functions}, nil
@@ -112,17 +98,13 @@ func captureECS(ctx context.Context, cfg aws.Config) (any, error) {
 	client := ecs.NewFromConfig(cfg)
 
 	var arns []string
-	var nextToken *string
-	for {
-		out, err := client.ListClusters(ctx, &ecs.ListClustersInput{NextToken: nextToken})
+	clusterPaginator := ecs.NewListClustersPaginator(client, &ecs.ListClustersInput{})
+	for clusterPaginator.HasMorePages() {
+		out, err := clusterPaginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		arns = append(arns, out.ClusterArns...)
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	var clusters []ecsCluster
@@ -230,7 +212,7 @@ func captureECSSvc(ctx context.Context, cfg aws.Config) (any, error) {
 				for _, e := range s.Events {
 					svc.Events = append(svc.Events, ecsSvcEvent{
 						Message:   aws.ToString(e.Message),
-						CreatedAt: computeFormatTime(e.CreatedAt),
+						CreatedAt: snapFormatTime(e.CreatedAt),
 					})
 				}
 				services = append(services, svc)
@@ -350,57 +332,43 @@ func fetchEssentialMap(ctx context.Context, client *ecs.Client, taskDefArn strin
 
 func listAllECSClusterArns(ctx context.Context, client *ecs.Client) ([]string, error) {
 	var arns []string
-	var nextToken *string
-	for {
-		out, err := client.ListClusters(ctx, &ecs.ListClustersInput{NextToken: nextToken})
+	paginator := ecs.NewListClustersPaginator(client, &ecs.ListClustersInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		arns = append(arns, out.ClusterArns...)
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 	return arns, nil
 }
 
 func listAllServiceArns(ctx context.Context, client *ecs.Client, clusterArn string) ([]string, error) {
 	var arns []string
-	var nextToken *string
-	for {
-		out, err := client.ListServices(ctx, &ecs.ListServicesInput{
-			Cluster:   aws.String(clusterArn),
-			NextToken: nextToken,
-		})
+	paginator := ecs.NewListServicesPaginator(client, &ecs.ListServicesInput{
+		Cluster: aws.String(clusterArn),
+	})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		arns = append(arns, out.ServiceArns...)
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 	return arns, nil
 }
 
 func listAllTaskArns(ctx context.Context, client *ecs.Client, clusterArn string) ([]string, error) {
 	var arns []string
-	var nextToken *string
-	for {
-		out, err := client.ListTasks(ctx, &ecs.ListTasksInput{
-			Cluster:   aws.String(clusterArn),
-			NextToken: nextToken,
-		})
+	paginator := ecs.NewListTasksPaginator(client, &ecs.ListTasksInput{
+		Cluster: aws.String(clusterArn),
+	})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		arns = append(arns, out.TaskArns...)
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 	return arns, nil
 }
@@ -436,17 +404,13 @@ func captureECR(ctx context.Context, cfg aws.Config) (any, error) {
 	client := ecr.NewFromConfig(cfg)
 
 	var repos []ecrtypes.Repository
-	var nextToken *string
-	for {
-		out, err := client.DescribeRepositories(ctx, &ecr.DescribeRepositoriesInput{NextToken: nextToken})
+	paginator := ecr.NewDescribeRepositoriesPaginator(client, &ecr.DescribeRepositoriesInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		repos = append(repos, out.Repositories...)
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	var repositories []ecrRepository
@@ -468,12 +432,11 @@ func captureECR(ctx context.Context, cfg aws.Config) (any, error) {
 
 func captureLatestECRImage(ctx context.Context, client *ecr.Client, repoName string) ecrLatestImage {
 	var images []ecrtypes.ImageDetail
-	var nextToken *string
-	for {
-		out, err := client.DescribeImages(ctx, &ecr.DescribeImagesInput{
-			RepositoryName: aws.String(repoName),
-			NextToken:      nextToken,
-		})
+	paginator := ecr.NewDescribeImagesPaginator(client, &ecr.DescribeImagesInput{
+		RepositoryName: aws.String(repoName),
+	})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
 				return ecrLatestImage{Outcome: "error", ErrorCode: apiErr.ErrorCode()}
@@ -481,10 +444,6 @@ func captureLatestECRImage(ctx context.Context, client *ecr.Client, repoName str
 			return ecrLatestImage{Outcome: "error", ErrorCode: err.Error()}
 		}
 		images = append(images, out.ImageDetails...)
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	if len(images) == 0 {
@@ -500,7 +459,7 @@ func captureLatestECRImage(ctx context.Context, client *ecr.Client, repoName str
 
 	result := ecrLatestImage{
 		Outcome:       "found",
-		ImagePushedAt: computeFormatTime(latest.ImagePushedAt),
+		ImagePushedAt: snapFormatTime(latest.ImagePushedAt),
 	}
 	if latest.ImageScanFindingsSummary != nil {
 		result.FindingSeverityCounts = latest.ImageScanFindingsSummary.FindingSeverityCounts
@@ -535,17 +494,13 @@ func captureEKS(ctx context.Context, cfg aws.Config) (any, error) {
 	client := eks.NewFromConfig(cfg)
 
 	var names []string
-	var nextToken *string
-	for {
-		out, err := client.ListClusters(ctx, &eks.ListClustersInput{NextToken: nextToken})
+	paginator := eks.NewListClustersPaginator(client, &eks.ListClustersInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		names = append(names, out.Clusters...)
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	var clusters []eksCluster
@@ -604,36 +559,27 @@ func captureNG(ctx context.Context, cfg aws.Config) (any, error) {
 	eksClient := eks.NewFromConfig(cfg)
 
 	var clusterNames []string
-	var nextToken *string
-	for {
-		out, err := eksClient.ListClusters(ctx, &eks.ListClustersInput{NextToken: nextToken})
+	clusterPaginator := eks.NewListClustersPaginator(eksClient, &eks.ListClustersInput{})
+	for clusterPaginator.HasMorePages() {
+		out, err := clusterPaginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		clusterNames = append(clusterNames, out.Clusters...)
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	var nodegroups []ngNodegroup
 	for _, clusterName := range clusterNames {
 		var ngNames []string
-		var ngToken *string
-		for {
-			out, err := eksClient.ListNodegroups(ctx, &eks.ListNodegroupsInput{
-				ClusterName: aws.String(clusterName),
-				NextToken:   ngToken,
-			})
+		ngPaginator := eks.NewListNodegroupsPaginator(eksClient, &eks.ListNodegroupsInput{
+			ClusterName: aws.String(clusterName),
+		})
+		for ngPaginator.HasMorePages() {
+			out, err := ngPaginator.NextPage(ctx)
 			if err != nil {
 				return nil, err
 			}
 			ngNames = append(ngNames, out.Nodegroups...)
-			if out.NextToken == nil || *out.NextToken == "" {
-				break
-			}
-			ngToken = out.NextToken
 		}
 
 		for _, ngName := range ngNames {
@@ -708,17 +654,13 @@ func captureASG(ctx context.Context, cfg aws.Config) (any, error) {
 	client := autoscaling.NewFromConfig(cfg)
 
 	var groups []autoscalingtypes.AutoScalingGroup
-	var nextToken *string
-	for {
-		out, err := client.DescribeAutoScalingGroups(ctx, &autoscaling.DescribeAutoScalingGroupsInput{NextToken: nextToken})
+	paginator := autoscaling.NewDescribeAutoScalingGroupsPaginator(client, &autoscaling.DescribeAutoScalingGroupsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		groups = append(groups, out.AutoScalingGroups...)
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	var result []asgGroup
@@ -792,6 +734,9 @@ type ebEnvironment struct {
 func captureEB(ctx context.Context, cfg aws.Config) (any, error) {
 	client := elasticbeanstalk.NewFromConfig(cfg)
 
+	// No SDK paginator exists for DescribeEnvironments (elasticbeanstalk's
+	// generated paginators cover DescribeEvents/ManagedActionHistory/Platform*
+	// only) — hand-rolled NextToken loop retained.
 	var envs []ebtypes.EnvironmentDescription
 	var nextToken *string
 	for {
@@ -857,17 +802,13 @@ func captureELB(ctx context.Context, cfg aws.Config) (any, error) {
 	client := elasticloadbalancingv2.NewFromConfig(cfg)
 
 	var lbs []elbv2types.LoadBalancer
-	var marker *string
-	for {
-		out, err := client.DescribeLoadBalancers(ctx, &elasticloadbalancingv2.DescribeLoadBalancersInput{Marker: marker})
+	paginator := elasticloadbalancingv2.NewDescribeLoadBalancersPaginator(client, &elasticloadbalancingv2.DescribeLoadBalancersInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		lbs = append(lbs, out.LoadBalancers...)
-		if out.NextMarker == nil || *out.NextMarker == "" {
-			break
-		}
-		marker = out.NextMarker
 	}
 
 	var result []elbLoadBalancer
@@ -917,17 +858,13 @@ func captureTG(ctx context.Context, cfg aws.Config) (any, error) {
 	client := elasticloadbalancingv2.NewFromConfig(cfg)
 
 	var groups []elbv2types.TargetGroup
-	var marker *string
-	for {
-		out, err := client.DescribeTargetGroups(ctx, &elasticloadbalancingv2.DescribeTargetGroupsInput{Marker: marker})
+	paginator := elasticloadbalancingv2.NewDescribeTargetGroupsPaginator(client, &elasticloadbalancingv2.DescribeTargetGroupsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		groups = append(groups, out.TargetGroups...)
-		if out.NextMarker == nil || *out.NextMarker == "" {
-			break
-		}
-		marker = out.NextMarker
 	}
 
 	var result []tgTargetGroup

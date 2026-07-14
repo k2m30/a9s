@@ -110,7 +110,6 @@ func TestCR273_Item18_MenuCtrlZ_NoFalsePositives_AllTypes(t *testing.T) {
 		IssueCounts:    issueCounts,
 		IssueTruncated: issueTruncated,
 		IssueKnown:     issueKnown,
-		Expired:        false,
 	})
 
 	// Wave 2 clean for every enricher-backed type.
@@ -173,7 +172,6 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 		IssueCounts:    issueCounts,
 		IssueTruncated: issueTruncated,
 		IssueKnown:     issueKnown,
-		Expired:        false,
 	})
 
 	// Wave 2: authoritative zero for every enricher-backed type.
@@ -243,7 +241,6 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 		IssueCounts:    issueCounts,
 		IssueTruncated: issueTruncated,
 		IssueKnown:     issueKnown,
-		Expired:        false,
 	})
 
 	// Wave 2: for each enricher-backed type, a sub-call errored → Truncated=true,
@@ -308,7 +305,6 @@ func TestCR273_Item18_MenuCtrlZ_NoFalseNegatives_AllEnricherTypes(t *testing.T) 
 			IssueCounts:    map[string]int{shortName: 2},
 			IssueTruncated: map[string]bool{shortName: false},
 			IssueKnown:     map[string]bool{shortName: true},
-			Expired:        false,
 		})
 		m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'z', Mod: tea.ModCtrl})
 		plain := stripANSI(rootViewContent(m))
@@ -342,7 +338,6 @@ func TestCR273_Item18_MenuCtrlZ_NoFalseNegatives_AllRegisteredTypes(t *testing.T
 			IssueCounts:    map[string]int{td.ShortName: 2},
 			IssueTruncated: map[string]bool{td.ShortName: false},
 			IssueKnown:     map[string]bool{td.ShortName: true},
-			Expired:        false,
 		})
 		m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'z', Mod: tea.ModCtrl})
 		plain := stripANSI(rootViewContent(m))

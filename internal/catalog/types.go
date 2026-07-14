@@ -116,9 +116,6 @@ type ResourceTypeDef struct {
 
 	// ─── Cross-cutting ─────────────────────────────────────────────────────
 
-	// Capabilities declares which cross-cutting capabilities this type supports.
-	// Handlers for each capability live outside internal/catalog.
-	Capabilities []domain.CapabilityID
 	// CloudTrailKey specifies how to build the CloudTrail LookupEvents filter.
 	// Format: "LookupAttr:ValueSource" (e.g., "ResourceName:ID").
 	// LookupAttr is normally a CloudTrail LookupAttributeKey (e.g. "Username",

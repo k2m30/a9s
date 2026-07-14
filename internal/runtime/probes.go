@@ -394,42 +394,14 @@ func (c *Core) materializeListFieldsForSave(shortName string, resources []resour
 	return out
 }
 
-// resolveSaveColumns mirrors app.resolveListColumnsForBuild(nil, shortName,
-// td)'s cascade: prefer the built-in default ViewDef's List when it is a
-// strict superset of the catalog's own Columns (same first-column-title
-// guard), else fall back to the catalog Columns (carrying Path from the
-// defaults by title match when present), else the raw built-in defaults.
+// resolveSaveColumns delegates to the shared resource.ResolveListColumnCascade
+// with vc=nil — this fallback lane never sees the session's SetViewConfig
+// override (see SaveTypeRows' SetSaveColumns comment).
 // Used as SaveTypeRows' fallback when no renderer has called SetSaveColumns
 // (e.g. a bare Core built directly in a runtime-package test).
 func resolveSaveColumns(shortName string) []config.ListColumn {
 	td := resource.FindResourceType(shortName)
-	defaultVD := config.GetViewDef(nil, shortName)
-
-	if td != nil && len(defaultVD.List) > len(td.Columns) {
-		firstMatch := len(td.Columns) == 0 ||
-			(len(defaultVD.List) > 0 && defaultVD.List[0].Title == td.Columns[0].Title)
-		if firstMatch {
-			return defaultVD.List
-		}
-	}
-
-	if td != nil && len(td.Columns) > 0 {
-		defaultByTitle := make(map[string]config.ListColumn, len(defaultVD.List))
-		for _, lc := range defaultVD.List {
-			defaultByTitle[lc.Title] = lc
-		}
-		cols := make([]config.ListColumn, len(td.Columns))
-		for i, c := range td.Columns {
-			cd := config.ListColumn{Key: c.Key, Title: c.Title, Width: c.Width}
-			if def, ok := defaultByTitle[c.Title]; ok {
-				cd.Path = def.Path
-			}
-			cols[i] = cd
-		}
-		return cols
-	}
-
-	return defaultVD.List
+	return resource.ResolveListColumnCascade(nil, shortName, td)
 }
 
 // materializeResourceFields is the single-resource core of

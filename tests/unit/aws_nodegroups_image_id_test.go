@@ -159,15 +159,6 @@ func TestFetchNodeGroups_ImageIDEmptyWhenNoLaunchTemplate(t *testing.T) {
 
 	listClusters, listNGs, describeNG := eksMinimalMocksForNG("dev-cluster", "ng-managed", ng)
 
-	// EC2 fake that should never be called — if it is called, we fail the test
-	ltFake := &fakeEC2DescribeLaunchTemplateVersions{
-		err: fmt.Errorf("DescribeLaunchTemplateVersions should not be called when LaunchTemplate is nil"),
-	}
-	// We pass a no-op fake so the test still compiles once FetchNodeGroups
-	// gains the extra parameter; but if the production code calls it despite
-	// nil LaunchTemplate, the error will propagate (or be ignored with empty image_id).
-	_ = ltFake
-
 	// Use a safe no-op fake that returns empty output without error.
 	noopLTFake := &fakeEC2DescribeLaunchTemplateVersions{}
 

@@ -66,7 +66,7 @@ func checkIAMUserCtEvents(ctx context.Context, clients any, res resource.Resourc
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
 	}
 
-	eventList, truncated, err := iamUserRelatedResources(ctx, clients, cache, "ct-events")
+	eventList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
 		return resource.ErrorRelated("ct-events", err)
 	}
@@ -95,16 +95,4 @@ func checkIAMUserCtEvents(ctx context.Context, clients any, res resource.Resourc
 	result := relatedResult("ct-events", ids)
 	result.FetchFilter = fetchFilter
 	return result
-}
-
-// iamUserRelatedResources returns the resource list for target from cache or by
-// fetching the first page via the registered paginated fetcher.
-func iamUserRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

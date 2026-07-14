@@ -11,25 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchBackupPlans calls the Backup ListBackupPlans API and returns a slice of
-// generic Resource structs.
-func FetchBackupPlans(ctx context.Context, api BackupListBackupPlansAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchBackupPlansPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchBackupPlansPage fetches a single page of Backup plans.
 func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &backup.ListBackupPlansInput{

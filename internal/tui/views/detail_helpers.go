@@ -12,7 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
@@ -265,13 +264,6 @@ func (m DetailModel) FieldCursor() int {
 	return m.fieldCursor
 }
 
-// IsControllerBacked reports whether this DetailModel was constructed with a
-// controller (NewDetailWithCtrl). popView uses this to decide whether to sync
-// the controller stack on pop.
-func (m DetailModel) IsControllerBacked() bool {
-	return m.ctrl != nil
-}
-
 // refreshViewportContent re-renders content and applies search highlights.
 func (m *DetailModel) refreshViewportContent() {
 	if m.fieldList == nil {
@@ -399,52 +391,6 @@ func (m DetailModel) CopyContent() (string, string) {
 	return content, "Copied detail to clipboard"
 }
 
-// GetHelpContext returns HelpFromDetail.
-func (m DetailModel) GetHelpContext() HelpContext {
-	return HelpFromDetail
-}
-
-// IsSearchActive returns true when search is active (input mode or confirmed highlights).
-func (m DetailModel) IsSearchActive() bool {
-	return m.search.IsActive() || m.rightCol.IsFiltering()
-}
-
-// IsSearchInputMode returns true when the search input is capturing keystrokes.
-func (m DetailModel) IsSearchInputMode() bool {
-	return m.search.IsInputMode() || m.rightCol.IsFiltering()
-}
-
-// SearchInfo returns the search state string for the header.
-// Input mode: "/query" (or "/" when query is empty), Confirmed: "N/M matches", Inactive: "".
-func (m DetailModel) SearchInfo() string {
-	if m.rightCol.IsFiltering() {
-		return "/" + m.rightCol.FilterQuery()
-	}
-	if !m.search.IsActive() {
-		return ""
-	}
-	if m.search.IsInputMode() {
-		q := m.search.Query()
-		return "/" + q
-	}
-	return m.search.MatchInfo()
-}
-
-// ResourceID returns the resource ID for clipboard copy.
-func (m DetailModel) ResourceID() string {
-	return m.res.ID
-}
-
-// ResourceType returns the resource type short name.
-func (m DetailModel) ResourceType() string {
-	return m.resourceType
-}
-
-// SourceResource returns the resource being viewed.
-func (m DetailModel) SourceResource() resource.Resource {
-	return m.res
-}
-
 // SetEnrichmentFinding sets (or clears) the wave-2 enrichment finding for this
 // resource. A nil value clears any prior wave-2 entry (recovery case). Setting
 // a new value invalidates the field list and triggers a viewport re-render so
@@ -547,63 +493,6 @@ func (m *DetailModel) SetEnrichmentFinding(f *domain.Finding, ad *domain.Attenti
 // after pushing the detail view to emit RelatedCheckStartedMsg.
 func (m DetailModel) NeedsRelatedCheck() bool {
 	return m.rightColAutoShown
-}
-
-// ApplyRelatedResults injects cached related check result messages into the
-// right column, avoiding re-dispatch of async checkers. Called by root model
-// on detail re-entry.
-//
-// Callers pass the full RelatedCheckResultMsg values (including the per-row
-// DefDisplayName disambiguator) so rows with multiple defs sharing a
-// TargetType — e.g. the four ct-events self-pivot rows ("by AccessKeyId" /
-// "by Username" / "by EventName" / "by SharedEventId") — resolve to the
-// correct row on replay instead of leaving all four stuck in the loading
-// state.
-func (m *DetailModel) ApplyRelatedResults(msgs []messages.RelatedCheckResult) {
-	for _, msg := range msgs {
-		m.rightCol, _ = m.rightCol.Update(msg)
-		if m.ctrl != nil {
-			// Mirror the live RelatedCheckResult handler: cached results must also
-			// land in the controller's DetailState.RelatedRows so the body render
-			// (counts) reflects them immediately on re-entry.
-			errMsg := ""
-			if msg.Result.Err != nil {
-				errMsg = msg.Result.Err.Error()
-			}
-			m.ctrl.ApplyDetailRelatedResultForResource(
-				m.resourceType,
-				m.res.ID,
-				msg.DefDisplayName,
-				msg.Result.TargetType,
-				msg.Result.EffectiveState(),
-				msg.Result.Count,
-				false,
-				errMsg,
-				msg.Result.Truncated,
-				msg.Result.ResourceIDs,
-				msg.Result.FetchFilter,
-			)
-		}
-	}
-}
-
-// ResetRightColumn resets the right column to its initial loading state,
-// discarding any loaded counts. Called by handleRefresh before re-dispatching
-// async checks so stale counts are not shown during reload.
-func (m *DetailModel) ResetRightColumn() {
-	if !m.rightColShowing() {
-		return
-	}
-	defs := resource.GetRelated(m.resourceType)
-	m.rightCol = newRightColumn(defs, m.res, m.resourceType)
-	m.rightCol.keys = m.keys
-	m.rightCol.SetSize(m.currentRightColWidth(), m.height)
-}
-
-// ConsumesEscapeLocally reports whether Escape should be handled inside the
-// detail view instead of by the root view-stack pop logic.
-func (m DetailModel) ConsumesEscapeLocally() bool {
-	return m.rightCol.IsFocused() || m.rightCol.IsFiltering()
 }
 
 // RenderDetail produces the same string that View() would produce, reading

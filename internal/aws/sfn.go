@@ -9,25 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchStepFunctions calls the SFN ListStateMachines API and converts
-// the response into a slice of generic Resource structs.
-func FetchStepFunctions(ctx context.Context, api SFNListStateMachinesAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchStepFunctionsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchStepFunctionsPage fetches a single page of Step Functions state machines.
 func FetchStepFunctionsPage(ctx context.Context, api SFNListStateMachinesAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &sfn.ListStateMachinesInput{

@@ -37,6 +37,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
@@ -158,7 +159,7 @@ func TestCTSort_RFC3339_AcrossMonthBoundary(t *testing.T) {
 
 func TestCTVerb_BatchDeleteAttributes_IsDestructive(t *testing.T) {
 	// Primary regression: BatchDeleteAttributes must be D (delete verb).
-	got := awsclient.ClassifyCTVerb("BatchDeleteAttributes", "", "")
+	got := ctevent.ClassifyCTVerb("BatchDeleteAttributes", "", "")
 	if got != "D" {
 		t.Errorf("ClassifyCTVerb(%q) = %q, want %q — BatchDelete* must be D, not W; "+
 			"bug: \"Batch\" write-prefix matches before destructive prefix table is reached",
@@ -167,7 +168,7 @@ func TestCTVerb_BatchDeleteAttributes_IsDestructive(t *testing.T) {
 }
 
 func TestCTVerb_BatchDeleteImage_IsDestructive(t *testing.T) {
-	got := awsclient.ClassifyCTVerb("BatchDeleteImage", "", "")
+	got := ctevent.ClassifyCTVerb("BatchDeleteImage", "", "")
 	if got != "D" {
 		t.Errorf("ClassifyCTVerb(%q) = %q, want %q — BatchDeleteImage must be D",
 			"BatchDeleteImage", got, "D")
@@ -176,7 +177,7 @@ func TestCTVerb_BatchDeleteImage_IsDestructive(t *testing.T) {
 
 func TestCTVerb_BatchWriteItem_IsWrite_Regression(t *testing.T) {
 	// Regression guard: BatchWriteItem must remain W.
-	got := awsclient.ClassifyCTVerb("BatchWriteItem", "", "")
+	got := ctevent.ClassifyCTVerb("BatchWriteItem", "", "")
 	if got != "W" {
 		t.Errorf("ClassifyCTVerb(%q) = %q, want %q — BatchWriteItem regression: must stay W",
 			"BatchWriteItem", got, "W")
@@ -185,7 +186,7 @@ func TestCTVerb_BatchWriteItem_IsWrite_Regression(t *testing.T) {
 
 func TestCTVerb_BatchGetItem_IsRead_Regression(t *testing.T) {
 	// Regression guard: BatchGetItem must remain R (caught by BatchGet* short-circuit).
-	got := awsclient.ClassifyCTVerb("BatchGetItem", "", "")
+	got := ctevent.ClassifyCTVerb("BatchGetItem", "", "")
 	if got != "R" {
 		t.Errorf("ClassifyCTVerb(%q) = %q, want %q — BatchGetItem regression: must stay R",
 			"BatchGetItem", got, "R")
@@ -344,7 +345,7 @@ func TestFormatCTTarget_EmptyLocalAccount_StripsAccount(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		got := awsclient.FormatCTTarget(c.in, "")
+		got := ctevent.FormatCTTarget(c.in, "")
 		if got != c.want {
 			t.Errorf("FormatCTTarget(%q, \"\") = %q, want %q — "+
 				"when localAccount is empty, ARN account segment must be stripped (not used as cross-account prefix); "+

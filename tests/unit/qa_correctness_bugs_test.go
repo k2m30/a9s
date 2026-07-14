@@ -19,8 +19,8 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -275,7 +275,6 @@ func TestBug192_AvailabilityProbes_NotDoneUntilAllReturn(t *testing.T) {
 	// Start probes
 	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
-		Expired: true,
 	})
 
 	half := len(allNames) / 2
@@ -334,7 +333,6 @@ func TestBug192_AvailabilityProbes_SaveCacheOnlyAfterAllDone(t *testing.T) {
 	// Start probes (gen stays at 0 after this)
 	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
-		Expired: true,
 	})
 
 	// Pre-populate the menu with availability data so saveCache doesn't return nil.

@@ -2,21 +2,11 @@ package main
 
 import (
 	"context"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
-
-// ec2FormatTime formats a *time.Time the same way s3.go's formatTime does,
-// under a distinct name to avoid a symbol collision in this package.
-func ec2FormatTime(t *time.Time) string {
-	if t == nil {
-		return ""
-	}
-	return t.Format("2006-01-02 15:04")
-}
 
 // ---------------------------------------------------------------------------
 // ec2 — DescribeInstances (list) + DescribeInstanceStatus (Wave 2, account-wide)
@@ -86,7 +76,7 @@ func captureEC2(ctx context.Context, cfg aws.Config) (any, error) {
 					ImageId:               aws.ToString(i.ImageId),
 					SubnetId:              aws.ToString(i.SubnetId),
 					VpcId:                 aws.ToString(i.VpcId),
-					LaunchTime:            ec2FormatTime(i.LaunchTime),
+					LaunchTime:            snapFormatTime(i.LaunchTime),
 					StateTransitionReason: aws.ToString(i.StateTransitionReason),
 				}
 				if i.State != nil {
@@ -149,8 +139,8 @@ func captureEC2(ctx context.Context, cfg aws.Config) (any, error) {
 			for _, e := range s.Events {
 				st.Events = append(st.Events, ec2StatusEvent{
 					Code:      string(e.Code),
-					NotBefore: ec2FormatTime(e.NotBefore),
-					NotAfter:  ec2FormatTime(e.NotAfter),
+					NotBefore: snapFormatTime(e.NotBefore),
+					NotAfter:  snapFormatTime(e.NotAfter),
 				})
 			}
 			statuses = append(statuses, st)
@@ -282,7 +272,7 @@ func captureEBS(ctx context.Context, cfg aws.Config) (any, error) {
 				VolumeId:   aws.ToString(v.VolumeId),
 				State:      string(v.State),
 				Encrypted:  aws.ToBool(v.Encrypted),
-				CreateTime: ec2FormatTime(v.CreateTime),
+				CreateTime: snapFormatTime(v.CreateTime),
 				KmsKeyId:   aws.ToString(v.KmsKeyId),
 				Size:       aws.ToInt32(v.Size),
 				VolumeType: string(v.VolumeType),
@@ -319,8 +309,8 @@ func captureEBS(ctx context.Context, cfg aws.Config) (any, error) {
 				vs.Events = append(vs.Events, ebsVolumeEvent{
 					EventType:   aws.ToString(e.EventType),
 					Description: aws.ToString(e.Description),
-					NotBefore:   ec2FormatTime(e.NotBefore),
-					NotAfter:    ec2FormatTime(e.NotAfter),
+					NotBefore:   snapFormatTime(e.NotBefore),
+					NotAfter:    snapFormatTime(e.NotAfter),
 				})
 			}
 			statuses = append(statuses, vs)
@@ -370,7 +360,7 @@ func captureEBSSnap(ctx context.Context, cfg aws.Config) (any, error) {
 				State:        string(s.State),
 				StateMessage: aws.ToString(s.StateMessage),
 				Progress:     aws.ToString(s.Progress),
-				StartTime:    ec2FormatTime(s.StartTime),
+				StartTime:    snapFormatTime(s.StartTime),
 				Encrypted:    aws.ToBool(s.Encrypted),
 				KmsKeyId:     aws.ToString(s.KmsKeyId),
 				Description:  aws.ToString(s.Description),
@@ -867,7 +857,7 @@ func captureNAT(ctx context.Context, cfg aws.Config) (any, error) {
 				FailureMessage: aws.ToString(n.FailureMessage),
 				SubnetId:       aws.ToString(n.SubnetId),
 				VpcId:          aws.ToString(n.VpcId),
-				CreateTime:     ec2FormatTime(n.CreateTime),
+				CreateTime:     snapFormatTime(n.CreateTime),
 			}
 			for _, a := range n.NatGatewayAddresses {
 				nat.NatGatewayAddresses = append(nat.NatGatewayAddresses, natAddress{
@@ -934,7 +924,7 @@ func captureTGW(ctx context.Context, cfg aws.Config) (any, error) {
 			tg := tgwGateway{
 				TransitGatewayId: aws.ToString(t.TransitGatewayId),
 				State:            string(t.State),
-				CreationTime:     ec2FormatTime(t.CreationTime),
+				CreationTime:     snapFormatTime(t.CreationTime),
 			}
 			if len(t.Tags) > 0 {
 				tg.Tags = make(map[string]string, len(t.Tags))
@@ -968,7 +958,7 @@ func captureTGWAttachments(ctx context.Context, client *ec2.Client, transitGatew
 				ResourceType:               string(a.ResourceType),
 				ResourceId:                 aws.ToString(a.ResourceId),
 				State:                      string(a.State),
-				CreationTime:               ec2FormatTime(a.CreationTime),
+				CreationTime:               snapFormatTime(a.CreationTime),
 			})
 		}
 	}

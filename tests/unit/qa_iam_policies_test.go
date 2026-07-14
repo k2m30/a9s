@@ -39,7 +39,9 @@ func TestQA_IAMPolicies_FetchSuccess(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchIAMPolicies(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchIAMPoliciesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,7 +77,9 @@ func TestQA_IAMPolicies_FetchEmpty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchIAMPolicies(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchIAMPoliciesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -89,7 +93,9 @@ func TestQA_IAMPolicies_FetchError(t *testing.T) {
 		err: fmt.Errorf("access denied"),
 	}
 
-	_, err := awsclient.FetchIAMPolicies(context.Background(), mock)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchIAMPoliciesPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

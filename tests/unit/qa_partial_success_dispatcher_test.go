@@ -111,8 +111,7 @@ func TestDispatcher_PartialSuccess_HandlerEmitsFlashMsg(t *testing.T) {
 // fails to compile if the field is removed.
 func TestResourcesLoadedMsg_HasErrField(t *testing.T) {
 	msg := messages.ResourcesLoaded{
-		ResourceType: "x",
-		Err:          errors.New("compile-time pin"),
+		Err: errors.New("compile-time pin"),
 	}
 	if msg.Err == nil {
 		t.Error("ResourcesLoadedMsg must carry an Err field for partial-success surfacing")

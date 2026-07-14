@@ -1,4 +1,4 @@
-package unit
+package unit_test
 
 // projection_subfield_yaml_render_test.go — regression test for PR-01 Bug 1.
 //
@@ -12,14 +12,20 @@ package unit
 //
 //	indent + "" + ": " + "  keyId: arn:..."  →  ":   keyId: arn:..."
 //
-// Fix: domainItemToFieldItem must detect ItemSubfield with empty Label and
-// copy Value into Key (Key == Value), so the renderer takes the plain-line
-// branch instead.
+// Fix: domainItemToFieldItem (and its live-path mirror,
+// domainItemToFieldItemDetail in internal/app/detail_body.go) must detect
+// ItemSubfield with empty Label and copy Value into Key (Key == Value), so
+// the renderer takes the plain-line branch instead.
 //
-// This test constructs a cloudtrailtypes.Event with a nested
+// Retargeted (wave3 detail-family cleanup, specs/022-codebase-cleanup) off
+// views.NewDetail(...).View() onto the live NewTransientDetail+RenderDetail
+// seam, and moved from package unit to unit_test to route construction
+// through the blessed newTestController helper (qa_controller_construction_discipline_test.go):
+// this test constructs a cloudtrailtypes.Event with a nested
 // requestParameters object, calls ctevent.Project() to get []domain.Section,
-// then builds a DetailModel and calls View(). It asserts that NO rendered line
-// in the RAW EVENT section starts with ": " (stray colon prefix).
+// then drives it through a real app.Controller (buildDetailFieldItems ->
+// domainItemToFieldItemDetail -> RenderDetail) and asserts that NO rendered
+// line in the RAW EVENT section starts with ": " (stray colon prefix).
 
 import (
 	"strings"
@@ -28,9 +34,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
+	"charm.land/bubbles/v2/viewport"
+
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -61,6 +70,35 @@ func ctEventWithNestedParams() cloudtrailtypes.Event {
 		EventSource:     aws.String("kms.amazonaws.com"),
 		CloudTrailEvent: aws.String(rawJSON),
 	}
+}
+
+// renderCTEventDetailViaController drives a ct-events resource through a
+// real app.Controller (EnsureDetailState -> buildDetailFieldItems ->
+// buildDetailBody) and renders it via the live NewTransientDetail+
+// RenderDetail seam, mirroring detail_render_parity_test.go's pattern.
+func renderCTEventDetailViaController(t *testing.T, sdkEv cloudtrailtypes.Event) string {
+	t.Helper()
+
+	res := resource.Resource{
+		ID:        "e-d4e5f6a7-test",
+		Name:      "e-d4e5f6a7-test",
+		RawStruct: sdkEv,
+	}
+
+	c := newTestController(t)
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PushScreen{ID: runtime.ScreenDetail},
+	})
+	c.EnsureDetailState(res, "ct-events")
+
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil for a ct-events resource")
+	}
+
+	vp := viewport.New(viewport.WithWidth(120), viewport.WithHeight(40))
+	m := views.NewTransientDetail(120, 40, vp)
+	return m.RenderDetail(*body)
 }
 
 // TestCTEventRawYAMLRender_NoStrayColonPrefix verifies that a CloudTrail event
@@ -109,23 +147,9 @@ func TestCTEventRawYAMLRender_NoStrayColonPrefix(t *testing.T) {
 		t.Fatal("ctevent.Project output has no 'RAW EVENT' section; cannot test rendering")
 	}
 
-	// Now render through the detail view to exercise domainItemToFieldItem.
-	// Use "ct-events" (the registered ShortName) so FindResourceType finds the
-	// entry with Project: ctevent.Project set.
-	k := keys.Default()
-	d := views.NewDetail(
-		domain.Resource{
-			ID:        r.ID,
-			Type:      r.Type,
-			RawStruct: r.RawStruct,
-		},
-		"ct-events",
-		nil, // no view config
-		k,
-	)
-	d.SetSize(120, 40)
-	output := d.View()
-	plain := stripANSI(output)
+	// Now render through the live controller-backed detail path to exercise
+	// domainItemToFieldItemDetail.
+	plain := stripAnsi(renderCTEventDetailViaController(t, sdkEv))
 
 	// Check every line: none may start with ": " (the stray-colon symptom).
 	for _, line := range strings.Split(plain, "\n") {
@@ -144,30 +168,12 @@ func TestCTEventRawYAMLRender_NoStrayColonPrefix(t *testing.T) {
 // confirms the values themselves are actually present and readable.
 func TestCTEventRawYAMLRender_NestedParamsExpanded(t *testing.T) {
 	sdkEv := ctEventWithNestedParams()
-	r := domain.Resource{
-		ID:        "e-d4e5f6a7-test",
-		Type:      "ct-events",
-		RawStruct: sdkEv,
-	}
-
-	k := keys.Default()
-	d := views.NewDetail(
-		domain.Resource{
-			ID:        r.ID,
-			Type:      r.Type,
-			RawStruct: r.RawStruct,
-		},
-		"ct-events",
-		nil,
-		k,
-	)
-	d.SetSize(120, 40)
-	plain := stripANSI(d.View())
 
 	// Assert that no rendered line starts with ": " after trimming leading whitespace.
 	// Before fix: sub-field lines render as ":   keyId: arn:..." — the stray colon
 	// prefix is the observable symptom of the domainItemToFieldItem bug.
 	// This companion test independently verifies the fix from the rendered-value angle.
+	plain := stripAnsi(renderCTEventDetailViaController(t, sdkEv))
 	for _, line := range strings.Split(plain, "\n") {
 		trimmed := strings.TrimLeft(line, " \t")
 		if strings.HasPrefix(trimmed, ": ") {

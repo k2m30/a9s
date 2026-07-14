@@ -42,78 +42,30 @@ func TestQA_Reveal_ViewBeforeSetSize(t *testing.T) {
 	}
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// 3. FrameTitle returns secret name
-// ════════════════════════════════════════════════════════════════════════════
-
-func TestQA_Reveal_FrameTitle(t *testing.T) {
-	k := keys.Default()
-	m := views.NewReveal("secret-name", "hunter2", k)
-	title := m.FrameTitle()
-	if title != "secret-name" {
-		t.Errorf("FrameTitle() = %q, want 'secret-name'", title)
-	}
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// 4. CopyContent returns value and message
-// ════════════════════════════════════════════════════════════════════════════
-
-func TestQA_Reveal_CopyContent(t *testing.T) {
-	k := keys.Default()
-	m := views.NewReveal("secret-name", "hunter2", k)
-	val, msg := m.CopyContent()
-	if val != "hunter2" {
-		t.Errorf("CopyContent() value = %q, want 'hunter2'", val)
-	}
-	if msg != "Secret copied to clipboard" {
-		t.Errorf("CopyContent() message = %q, want 'Secret copied to clipboard'", msg)
-	}
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// 5. SecretValue returns raw value
-// ════════════════════════════════════════════════════════════════════════════
-
-func TestQA_Reveal_SecretValue(t *testing.T) {
-	k := keys.Default()
-	m := views.NewReveal("secret-name", "hunter2", k)
-	val := m.SecretValue()
-	if val != "hunter2" {
-		t.Errorf("SecretValue() = %q, want 'hunter2'", val)
-	}
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// 6. HeaderWarning contains "Secret visible"
-// ════════════════════════════════════════════════════════════════════════════
-
-func TestQA_Reveal_HeaderWarning(t *testing.T) {
-	k := keys.Default()
-	m := views.NewReveal("secret-name", "hunter2", k)
-	warning := m.HeaderWarning()
-	plain := stripANSI(warning)
-	if !strings.Contains(plain, "Secret visible") {
-		t.Errorf("HeaderWarning() stripped = %q, want it to contain 'Secret visible'", plain)
-	}
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// 7. GetHelpContext returns HelpFromReveal
-// ════════════════════════════════════════════════════════════════════════════
-
-func TestQA_Reveal_GetHelpContext(t *testing.T) {
-	k := keys.Default()
-	m := views.NewReveal("secret-name", "hunter2", k)
-	ctx := m.GetHelpContext()
-	if ctx != views.HelpFromReveal {
-		t.Errorf("GetHelpContext() = %v, want HelpFromReveal (%v)", ctx, views.HelpFromReveal)
-	}
-}
+// FrameTitle/CopyContent/SecretValue/HeaderWarning/GetHelpContext are DEAD on
+// RevealModel per specs/022-codebase-cleanup/wave3-map-text.md (reveal.go:
+// "DEAD: ... FrameTitle, CopyContent, SecretValue (copy uses rs.revealValue),
+// GetHelpContext, HeaderWarning"). The live equivalents:
+//   - copy label + exact revealed value: wave3_text_ports_test.go's
+//     TestWave3Port_RevealCopy_CopiesExactValue (drives the real
+//     handleCopy/rsKindReveal seam via rs.revealValue, not m.CopyContent()).
+//   - GetHelpContext / rs.helpContext for reveal: newRevealRS wires
+//     helpContext: views.HelpFromReveal unconditionally (renderer.go); no
+//     live branch reads RevealModel.GetHelpContext() at all.
 
 // ════════════════════════════════════════════════════════════════════════════
 // 8. Scroll with viewport keys does not panic
 // ════════════════════════════════════════════════════════════════════════════
+
+// RevealModel.Update() is DEAD per wave3-map-text.md ("wrap toggle — live is
+// rs.revealWrap"): production drives reveal scroll by updating the stored
+// viewport.Model DIRECTLY (rsKindReveal case, internal/tui/app_stack.go)
+// and round-trips it via RevealModel.GetViewport()/SetViewport() — never
+// through RevealModel.Update(). revealScrollStep mirrors that live seam.
+func revealScrollStep(m *views.RevealModel, msg tea.KeyMsg) {
+	vp, _ := m.GetViewport().Update(msg)
+	m.SetViewport(vp)
+}
 
 func TestQA_Reveal_ScrollWithViewport(t *testing.T) {
 	k := keys.Default()
@@ -123,36 +75,39 @@ func TestQA_Reveal_ScrollWithViewport(t *testing.T) {
 	m.SetSize(80, 5)
 
 	// Scroll down with 'j'
-	m, _ = m.Update(revealKeyPress("j"))
+	revealScrollStep(&m, revealKeyPress("j"))
 	out := m.View()
 	if out == "" {
 		t.Error("View() returned empty after scroll down with j")
 	}
 
 	// Scroll up with 'k'
-	m, _ = m.Update(revealKeyPress("k"))
+	revealScrollStep(&m, revealKeyPress("k"))
 	out = m.View()
 	if out == "" {
 		t.Error("View() returned empty after scroll up with k")
 	}
 
-	// Jump to bottom with 'G'
-	m, _ = m.Update(revealKeyPress("G"))
+	// Jump to bottom with 'G' — bubbles viewport has no default 'G' binding
+	// (see charm.land/bubbles/v2/viewport's DefaultKeyMap): this only proves
+	// the unhandled key doesn't panic, same as production's raw
+	// rs.viewport.Update(msg) dispatch.
+	revealScrollStep(&m, revealKeyPress("G"))
 	out = m.View()
 	if out == "" {
 		t.Error("View() returned empty after jump to bottom with G")
 	}
 
-	// Jump to top with 'g'
-	m, _ = m.Update(revealKeyPress("g"))
+	// Jump to top with 'g' — same caveat as 'G' above.
+	revealScrollStep(&m, revealKeyPress("g"))
 	out = m.View()
 	if out == "" {
 		t.Error("View() returned empty after jump to top with g")
 	}
 
 	// Arrow keys
-	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
-	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	revealScrollStep(&m, tea.KeyPressMsg{Code: tea.KeyDown})
+	revealScrollStep(&m, tea.KeyPressMsg{Code: tea.KeyUp})
 	out = m.View()
 	if out == "" {
 		t.Error("View() returned empty after arrow key scrolling")
@@ -230,22 +185,14 @@ func TestQA_Reveal_EmptyValue(t *testing.T) {
 	if out == "Initializing..." {
 		t.Error("View() returned 'Initializing...' after SetSize, even with empty value")
 	}
-
-	// FrameTitle should still work
-	title := m.FrameTitle()
-	if title != "empty" {
-		t.Errorf("FrameTitle() = %q, want 'empty'", title)
-	}
-
-	// CopyContent should return empty value
-	val, msg := m.CopyContent()
-	if val != "" {
-		t.Errorf("CopyContent() value = %q, want empty string", val)
-	}
-	if msg != "Secret copied to clipboard" {
-		t.Errorf("CopyContent() msg = %q, want 'Secret copied to clipboard'", msg)
-	}
 }
+
+// FrameTitle() is DEAD (no live caller, not resource-type-specific — see
+// qa_docdb_test.go's identical retirement note). The empty-value copy-label
+// edge case (m.CopyContent() above) is ported onto the live
+// handleCopy/rsKindReveal seam as TestWave3Port_RevealCopy_EmptyValue in
+// wave3_text_ports_test.go — handleCopy's rsKindReveal branch has no
+// empty-guard, so an empty secret still copies with the normal label.
 
 // ════════════════════════════════════════════════════════════════════════════
 // 12. Long single-line value does not panic
@@ -261,18 +208,13 @@ func TestQA_Reveal_LongValue(t *testing.T) {
 	if out == "" || out == "Initializing..." {
 		t.Fatalf("View() returned %q for long value", out)
 	}
-
-	// SecretValue should return the full long value
-	if m.SecretValue() != longVal {
-		t.Errorf("SecretValue() length = %d, want %d", len(m.SecretValue()), len(longVal))
-	}
-
-	// CopyContent should return full value
-	val, _ := m.CopyContent()
-	if val != longVal {
-		t.Errorf("CopyContent() value length = %d, want %d", len(val), len(longVal))
-	}
 }
+
+// SecretValue()/CopyContent() are DEAD (copy uses rs.revealValue directly —
+// see reveal.go's DEAD list). The exact-value copy round-trip they checked is
+// already covered length-agnostically by wave3_text_ports_test.go's
+// TestWave3Port_RevealCopy_CopiesExactValue on the live handleCopy seam; no
+// length-specific behavior branch exists to justify a second pin.
 
 // ════════════════════════════════════════════════════════════════════════════
 // 13. Esc key bubbles up (viewport ignores it, returns nil cmd)
@@ -283,12 +225,15 @@ func TestQA_Reveal_EscBubblesUp(t *testing.T) {
 	m := views.NewReveal("esc-test", "secret123", k)
 	m.SetSize(80, 24)
 
-	// Send Esc to the reveal model
-	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	// Production routes Esc the same way as any other reveal key: straight to
+	// the stored viewport (rsKindReveal in app_stack.go), never through
+	// RevealModel.Update() — see revealScrollStep's doc comment above.
+	vp, cmd := m.GetViewport().Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m.SetViewport(vp)
 
-	// The reveal model delegates to viewport which does not handle Esc.
-	// It should not crash. The cmd may be nil (viewport ignores Esc)
-	// or it may be a viewport internal command — either way, no panic.
+	// The viewport does not handle Esc. It should not crash. The cmd may be
+	// nil (viewport ignores Esc) or it may be a viewport internal command —
+	// either way, no panic.
 	_ = cmd
 
 	// Model should still be functional after Esc
@@ -343,19 +288,9 @@ func TestQA_Reveal_JSONValue_ColonInKeys_StaysQuoted(t *testing.T) {
 	}
 }
 
-func TestQA_Reveal_JSONValue_CopyReturnsRaw(t *testing.T) {
-	jsonSecret := `{"api_key":"sk-123456","endpoint":"https://api.example.com"}`
-	k := keys.Default()
-	m := views.NewReveal("my-secret", jsonSecret, k)
-	m.SetSize(80, 24)
-
-	content, _ := m.CopyContent()
-
-	// Copy must return the original raw JSON, not the formatted version.
-	if content != jsonSecret {
-		t.Errorf("CopyContent should return raw JSON %q, got %q", jsonSecret, content)
-	}
-}
+// TestQA_Reveal_JSONValue_CopyReturnsRaw's m.CopyContent() pin (dead per
+// wave3-map-text.md) is ported onto the live handleCopy/rsKindReveal seam as
+// wave3_text_ports_test.go's TestWave3Port_RevealCopy_JSONValueStaysRaw.
 
 func TestQA_Reveal_NonJSON_RenderedAsIs(t *testing.T) {
 	plainSecret := "my-plain-password-123"

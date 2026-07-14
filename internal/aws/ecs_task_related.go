@@ -82,7 +82,7 @@ func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
 
-	logList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "logs")
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
@@ -97,17 +97,6 @@ func checkECSTaskLogs(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	return relatedResultTrunc("logs", ids, truncated)
-}
-
-// ecsTaskRelatedResources returns the resource list for target from cache or by fetching the first page.
-func ecsTaskRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 // checkECSTaskRole returns the IAM role(s) associated with this ECS task:
@@ -145,7 +134,7 @@ func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
 
-	roleList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "role")
+	roleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "role")
 	if err != nil {
 		return resource.ErrorRelated("role", err)
 	}
@@ -164,4 +153,10 @@ func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, c
 		}
 	}
 	return relatedResultTrunc("role", ids, truncated)
+}
+
+// ecsTaskRelatedResources returns the resource list for target from cache or by
+// fetching the first page via the registered paginated fetcher.
+func ecsTaskRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+	return relatedResourcesFor(ctx, clients, cache, target)
 }

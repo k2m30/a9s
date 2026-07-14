@@ -110,11 +110,12 @@ func TestAS140_FetcherListPath_NonFindingStatusVisible(t *testing.T) {
 				},
 			}
 
-			view := newListModel(t, tc.shortName, configForType(tc.shortName), []resource.Resource{res})
+			c := wave3ListControllerWithConfig(t, tc.shortName, configForType(tc.shortName))
+			joined := wave3RowCellsJoined(t, c, tc.shortName, []resource.Resource{res})
 			wantPhrase := domain.HumanizeStatusPhrase(tc.statusPhrase)
-			if !strings.Contains(view, wantPhrase) {
-				t.Errorf("AS-140 regression: list view for %q missing fetcher-emitted Fields[\"status\"] = %q (humanized: %q); got:\n%s",
-					tc.shortName, tc.statusPhrase, wantPhrase, view)
+			if !strings.Contains(joined, wantPhrase) {
+				t.Errorf("AS-140 regression: list row for %q missing fetcher-emitted Fields[\"status\"] = %q (humanized: %q); got: %q",
+					tc.shortName, tc.statusPhrase, wantPhrase, joined)
 			}
 		})
 	}
@@ -151,9 +152,10 @@ func TestAS140_FetcherListPath_FindingsBeatLifecycle(t *testing.T) {
 		},
 	}
 
-	view := newListModel(t, "dbi", configForType("dbi"), []resource.Resource{res})
-	if !strings.Contains(view, "stopped (+1)") {
-		t.Errorf("AS-140: list view should compose Wave-1+Wave-2 stack as %q via phraseFromFindings; got:\n%s",
-			"stopped (+1)", view)
+	c := wave3ListControllerWithConfig(t, "dbi", configForType("dbi"))
+	joined := wave3RowCellsJoined(t, c, "dbi", []resource.Resource{res})
+	if !strings.Contains(joined, "stopped (+1)") {
+		t.Errorf("AS-140: list row should compose Wave-1+Wave-2 stack as %q via phraseFromFindings; got: %q",
+			"stopped (+1)", joined)
 	}
 }

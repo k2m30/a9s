@@ -19,7 +19,7 @@ func checkEBSSnapAMI(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
 	}
 
-	amiList, truncated, err := ebsSnapRelatedResources(ctx, clients, cache, "ami")
+	amiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ami")
 	if err != nil {
 		return resource.ErrorRelated("ami", err)
 	}
@@ -120,7 +120,7 @@ func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 		return resource.UnknownRelated("backup")
 	}
 
-	backupList, truncated, err := ebsSnapRelatedResources(ctx, clients, cache, "backup")
+	backupList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.ErrorRelated("backup", err)
 	}
@@ -138,15 +138,4 @@ func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 	return relatedResultTrunc("backup", ids, truncated)
-}
-
-// ebsSnapRelatedResources returns cached resources for the target type, or fetches the first page.
-func ebsSnapRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

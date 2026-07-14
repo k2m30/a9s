@@ -22,7 +22,7 @@ func checkOpenSearchAlarms(ctx context.Context, clients any, res resource.Resour
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := opensearchRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -174,7 +174,7 @@ func checkOpenSearchCFN(ctx context.Context, clients any, res resource.Resource,
 	if stackName == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
-	cfnList, truncated, err := opensearchRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -255,7 +255,7 @@ func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource,
 
 	// Reverse-scan the acm cache for a cert whose RawStruct.CertificateArn
 	// matches. Return the target Resource.ID (DomainName) so drill lands.
-	acmList, truncated, err := opensearchRelatedResources(ctx, clients, cache, "acm")
+	acmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "acm")
 	if err != nil {
 		return resource.ErrorRelated("acm", err)
 	}
@@ -275,15 +275,4 @@ func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource,
 		return relatedResultTrunc("acm", nil, true)
 	}
 	return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
-}
-
-// opensearchRelatedResources returns the resource list for target from cache or by fetching the first page.
-func opensearchRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

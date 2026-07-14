@@ -30,7 +30,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
-	"github.com/stretchr/testify/require"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -144,9 +143,12 @@ func assertNoFinding(t *testing.T, fake *backupJobsOnlyFake, planID string) {
 		nil,
 		nil,
 	)
-	require.NoError(t, err)
-	require.NotContains(t, result.Findings, planID,
-		"expected no finding for plan %s (found one: %+v)", planID, result.Findings[planID])
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs returned error: %v", err)
+	}
+	if _, ok := result.Findings[planID]; ok {
+		t.Fatalf("expected no finding for plan %s (found one: %+v)", planID, result.Findings[planID])
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -165,30 +167,42 @@ func TestBackup_Enricher_OneFailed_ShowsBrokenPhrase(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs returned error: %v", err)
+	}
 
 	findings, ok := result.Findings[planID]
-	require.True(t, ok, "expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
+	if !ok {
+		t.Fatalf("expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
+	}
 	finding := findings[0]
 
 	// Severity must be Broken.
-	require.Equal(t, domain.SevBroken, finding.Severity, "Severity mismatch — FAILED must map to '!'")
+	if finding.Severity != domain.SevBroken {
+		t.Fatalf("Severity mismatch — FAILED must map to '!': got %v", finding.Severity)
+	}
 
 	// Phrase is the exact spec §4 S4 phrase.
-	require.Equal(t, "1 job failed in last 24h", finding.Phrase,
-		"Phrase mismatch — must match spec §4 S4 list text exactly")
+	if finding.Phrase != "1 job failed in last 24h" {
+		t.Fatalf("Phrase mismatch — must match spec §4 S4 list text exactly: got %q", finding.Phrase)
+	}
 
 	// FieldUpdates must use key "status" (not "last_status").
 	updates, hasUpdates := result.FieldUpdates[planID]
-	require.True(t, hasUpdates, "FieldUpdates must contain an entry for plan %s", planID)
-	require.Equal(t, "1 job failed in last 24h", updates["status"],
-		"FieldUpdates[status] must equal the S4 phrase")
-	require.NotContains(t, updates, "last_status",
-		"FieldUpdates must not contain the banned 'last_status' key")
+	if !hasUpdates {
+		t.Fatalf("FieldUpdates must contain an entry for plan %s", planID)
+	}
+	if updates["status"] != "1 job failed in last 24h" {
+		t.Fatalf("FieldUpdates[status] must equal the S4 phrase: got %q", updates["status"])
+	}
+	if _, hasLastStatus := updates["last_status"]; hasLastStatus {
+		t.Fatal("FieldUpdates must not contain the banned 'last_status' key")
+	}
 
 	// S1: IssueCount must be bumped (one "!" finding).
-	require.GreaterOrEqual(t, result.IssueCount, 1,
-		"IssueCount must be >= 1 when a '!' finding exists")
+	if result.IssueCount < 1 {
+		t.Fatalf("IssueCount must be >= 1 when a '!' finding exists: got %d", result.IssueCount)
+	}
 
 	// U11: Phrase must not contain any Row.Value (skip pure-integer counts — they appear in
 	// both Phrase phrases and count rows by design — and skip the humanized job-state word
@@ -202,12 +216,15 @@ func TestBackup_Enricher_OneFailed_ShowsBrokenPhrase(t *testing.T) {
 		if _, isNum := strconv.Atoi(row.Value); isNum == nil {
 			continue // count values like "1", "3" appear in Phrase phrases — not a U11 violation
 		}
-		require.NotContains(t, finding.Phrase, row.Value,
-			"U11 violation: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
+		if strings.Contains(finding.Phrase, row.Value) {
+			t.Fatalf("U11 violation: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
+		}
 	}
 
 	// Rows must carry the state value for the failed job (humanized: "failed", not "FAILED").
-	require.NotEmpty(t, result.AttentionDetails[planID][finding.Code].Rows, "Rows must not be empty — must carry job state detail")
+	if len(result.AttentionDetails[planID][finding.Code].Rows) == 0 {
+		t.Fatal("Rows must not be empty — must carry job state detail")
+	}
 	stateFound := false
 	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 		if row.Value == "failed" {
@@ -215,8 +232,9 @@ func TestBackup_Enricher_OneFailed_ShowsBrokenPhrase(t *testing.T) {
 			break
 		}
 	}
-	require.True(t, stateFound,
-		"Rows must contain a row with Value='failed' (humanized job state detail); Rows: %v", result.AttentionDetails[planID][finding.Code].Rows)
+	if !stateFound {
+		t.Fatalf("Rows must contain a row with Value='failed' (humanized job state detail); Rows: %v", result.AttentionDetails[planID][finding.Code].Rows)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -236,20 +254,30 @@ func TestBackup_Enricher_TwoFailed_CountsCorrectly(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs returned error: %v", err)
+	}
 
 	findings, ok := result.Findings[planID]
-	require.True(t, ok, "expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
+	if !ok {
+		t.Fatalf("expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
+	}
 	finding := findings[0]
 
-	require.Equal(t, domain.SevBroken, finding.Severity, "Severity mismatch — 2 failed jobs must map to '!'")
-	require.Equal(t, "2 jobs failed in last 24h", finding.Phrase,
-		"Phrase must be '2 jobs failed in last 24h' per spec §4 S4")
+	if finding.Severity != domain.SevBroken {
+		t.Fatalf("Severity mismatch — 2 failed jobs must map to '!': got %v", finding.Severity)
+	}
+	if finding.Phrase != "2 jobs failed in last 24h" {
+		t.Fatalf("Phrase must be '2 jobs failed in last 24h' per spec §4 S4: got %q", finding.Phrase)
+	}
 
 	updates, hasUpdates := result.FieldUpdates[planID]
-	require.True(t, hasUpdates, "FieldUpdates must contain an entry for plan %s", planID)
-	require.Equal(t, "2 jobs failed in last 24h", updates["status"],
-		"FieldUpdates[status] must equal the S4 phrase")
+	if !hasUpdates {
+		t.Fatalf("FieldUpdates must contain an entry for plan %s", planID)
+	}
+	if updates["status"] != "2 jobs failed in last 24h" {
+		t.Fatalf("FieldUpdates[status] must equal the S4 phrase: got %q", updates["status"])
+	}
 
 	// U11: skip pure-integer count values — they naturally appear in count phrases —
 	// and skip the humanized "failed" state word, which legitimately overlaps with
@@ -261,8 +289,9 @@ func TestBackup_Enricher_TwoFailed_CountsCorrectly(t *testing.T) {
 		if _, isNum := strconv.Atoi(row.Value); isNum == nil {
 			continue
 		}
-		require.NotContains(t, finding.Phrase, row.Value,
-			"U11: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
+		if strings.Contains(finding.Phrase, row.Value) {
+			t.Fatalf("U11: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
+		}
 	}
 
 	// Both FAILED and EXPIRED states must appear in Rows (humanized: "failed"/"expired").
@@ -270,8 +299,12 @@ func TestBackup_Enricher_TwoFailed_CountsCorrectly(t *testing.T) {
 	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 		rowVals[row.Value] = true
 	}
-	require.True(t, rowVals["failed"], "Rows must carry humanized failed state; rowValues: %v", rowVals)
-	require.True(t, rowVals["expired"], "Rows must carry humanized expired state; rowValues: %v", rowVals)
+	if !rowVals["failed"] {
+		t.Fatalf("Rows must carry humanized failed state; rowValues: %v", rowVals)
+	}
+	if !rowVals["expired"] {
+		t.Fatalf("Rows must carry humanized expired state; rowValues: %v", rowVals)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -289,16 +322,22 @@ func TestBackup_Enricher_OneAborted_IsAlsoBroken(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs returned error: %v", err)
+	}
 
 	findings, ok := result.Findings[planID]
-	require.True(t, ok, "expected finding for plan %s; ABORTED must map to '!' bucket", planID)
+	if !ok {
+		t.Fatalf("expected finding for plan %s; ABORTED must map to '!' bucket", planID)
+	}
 	finding := findings[0]
 
-	require.Equal(t, domain.SevBroken, finding.Severity,
-		"ABORTED must map to Severity '!' per spec §3.2")
-	require.Equal(t, "1 job failed in last 24h", finding.Phrase,
-		"ABORTED must use the same canonical phrase as FAILED per spec §4")
+	if finding.Severity != domain.SevBroken {
+		t.Fatalf("ABORTED must map to Severity '!' per spec §3.2: got %v", finding.Severity)
+	}
+	if finding.Phrase != "1 job failed in last 24h" {
+		t.Fatalf("ABORTED must use the same canonical phrase as FAILED per spec §4: got %q", finding.Phrase)
+	}
 
 	// U11: skip pure-integer count values.
 	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
@@ -308,8 +347,9 @@ func TestBackup_Enricher_OneAborted_IsAlsoBroken(t *testing.T) {
 		if _, isNum := strconv.Atoi(row.Value); isNum == nil {
 			continue
 		}
-		require.NotContains(t, finding.Phrase, row.Value,
-			"U11: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
+		if strings.Contains(finding.Phrase, row.Value) {
+			t.Fatalf("U11: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
+		}
 	}
 }
 
@@ -330,22 +370,31 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs returned error: %v", err)
+	}
 
 	findings, ok := result.Findings[planID]
-	require.True(t, ok, "expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
+	if !ok {
+		t.Fatalf("expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
+	}
 	finding := findings[0]
 
-	require.Equal(t, domain.SevWarn, finding.Severity,
-		"PARTIAL-only must produce Severity '~' (Warning, not Broken)")
+	if finding.Severity != domain.SevWarn {
+		t.Fatalf("PARTIAL-only must produce Severity '~' (Warning, not Broken): got %v", finding.Severity)
+	}
 	// Spec §4 S4: "partial: K of M resources skipped" where K=1 partial, M=3 total.
-	require.Equal(t, "partial: 1 of 3 resources skipped", finding.Phrase,
-		"Phrase must match spec §4 S4 phrase exactly")
+	if finding.Phrase != "partial: 1 of 3 resources skipped" {
+		t.Fatalf("Phrase must match spec §4 S4 phrase exactly: got %q", finding.Phrase)
+	}
 
 	updates, hasUpdates := result.FieldUpdates[planID]
-	require.True(t, hasUpdates, "FieldUpdates must have entry for plan %s", planID)
-	require.Equal(t, "partial: 1 of 3 resources skipped", updates["status"],
-		"FieldUpdates[status] must equal the S4 phrase")
+	if !hasUpdates {
+		t.Fatalf("FieldUpdates must have entry for plan %s", planID)
+	}
+	if updates["status"] != "partial: 1 of 3 resources skipped" {
+		t.Fatalf("FieldUpdates[status] must equal the S4 phrase: got %q", updates["status"])
+	}
 
 	// S1: IssueCount must NOT bump (spec §4: "~ findings do not bump").
 	// We check by counting only "!" findings in the result.
@@ -357,8 +406,9 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 			}
 		}
 	}
-	require.Equal(t, 0, bangCount,
-		"S1: ~ findings must not increment IssueCount; no '!' findings expected for PARTIAL-only")
+	if bangCount != 0 {
+		t.Fatalf("S1: ~ findings must not increment IssueCount; no '!' findings expected for PARTIAL-only: got %d", bangCount)
+	}
 
 	// U11: Phrase must not contain Row values (skip pure-integer counts).
 	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
@@ -368,8 +418,9 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 		if _, isNum := strconv.Atoi(row.Value); isNum == nil {
 			continue
 		}
-		require.NotContains(t, finding.Phrase, row.Value,
-			"U11: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
+		if strings.Contains(finding.Phrase, row.Value) {
+			t.Fatalf("U11: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
+		}
 	}
 
 	// Rows must carry "Partial jobs" and "Total jobs" (or functionally equivalent integer counts).
@@ -390,10 +441,12 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 			totalCountFound = true
 		}
 	}
-	require.True(t, partialCountFound,
-		"Rows must carry the partial job count (value '1'); Rows: %v", result.AttentionDetails[planID][finding.Code].Rows)
-	require.True(t, totalCountFound,
-		"Rows must carry the total job count (value '3'); Rows: %v", result.AttentionDetails[planID][finding.Code].Rows)
+	if !partialCountFound {
+		t.Fatalf("Rows must carry the partial job count (value '1'); Rows: %v", result.AttentionDetails[planID][finding.Code].Rows)
+	}
+	if !totalCountFound {
+		t.Fatalf("Rows must carry the total job count (value '3'); Rows: %v", result.AttentionDetails[planID][finding.Code].Rows)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -415,24 +468,33 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs returned error: %v", err)
+	}
 
 	findings, ok := result.Findings[planID]
-	require.True(t, ok, "expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
+	if !ok {
+		t.Fatalf("expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
+	}
 	finding := findings[0]
 
 	// U7d: Broken beats Warning.
-	require.Equal(t, domain.SevBroken, finding.Severity,
-		"U7d: Broken must beat Warning when both FAILED and PARTIAL exist")
+	if finding.Severity != domain.SevBroken {
+		t.Fatalf("U7d: Broken must beat Warning when both FAILED and PARTIAL exist: got %v", finding.Severity)
+	}
 
 	// One FAILED job drives the phrase.
-	require.Equal(t, "1 job failed in last 24h", finding.Phrase,
-		"U7d: Phrase uses the failed-bucket phrase when any '!' job exists")
+	if finding.Phrase != "1 job failed in last 24h" {
+		t.Fatalf("U7d: Phrase uses the failed-bucket phrase when any '!' job exists: got %q", finding.Phrase)
+	}
 
 	updates, hasUpdates := result.FieldUpdates[planID]
-	require.True(t, hasUpdates, "FieldUpdates must have entry for plan %s", planID)
-	require.Equal(t, "1 job failed in last 24h", updates["status"],
-		"FieldUpdates[status] must use the '!' phrase")
+	if !hasUpdates {
+		t.Fatalf("FieldUpdates must have entry for plan %s", planID)
+	}
+	if updates["status"] != "1 job failed in last 24h" {
+		t.Fatalf("FieldUpdates[status] must use the '!' phrase: got %q", updates["status"])
+	}
 
 	// S1: IssueCount bumps.
 	bangCount := 0
@@ -443,8 +505,9 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 			}
 		}
 	}
-	require.GreaterOrEqual(t, bangCount, 1,
-		"S1: at least one '!' finding must bump IssueCount")
+	if bangCount < 1 {
+		t.Fatalf("S1: at least one '!' finding must bump IssueCount: got %d", bangCount)
+	}
 
 	// Rows must include both the failed job State AND partial job count
 	// so nothing silently disappears.
@@ -452,8 +515,9 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 	for _, row := range result.AttentionDetails[planID][finding.Code].Rows {
 		rowVals[row.Value] = true
 	}
-	require.True(t, rowVals["failed"],
-		"Rows must contain humanized State=failed; rows: %v", result.AttentionDetails[planID][finding.Code].Rows)
+	if !rowVals["failed"] {
+		t.Fatalf("Rows must contain humanized State=failed; rows: %v", result.AttentionDetails[planID][finding.Code].Rows)
+	}
 
 	// Partial evidence must be preserved alongside the FAILED evidence so the
 	// enricher cannot silently drop partial context when a failed job exists.
@@ -464,7 +528,9 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 			break
 		}
 	}
-	require.True(t, sawPartial, "mixed FAILED+PARTIAL finding must surface partial evidence in Rows")
+	if !sawPartial {
+		t.Fatal("mixed FAILED+PARTIAL finding must surface partial evidence in Rows")
+	}
 
 	// U11: skip pure-integer count values, and skip the humanized "failed" state
 	// word, which legitimately overlaps with the "N job(s) failed..." Phrase.
@@ -475,8 +541,9 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 		if _, isNum := strconv.Atoi(row.Value); isNum == nil {
 			continue
 		}
-		require.NotContains(t, finding.Phrase, row.Value,
-			"U11: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
+		if strings.Contains(finding.Phrase, row.Value) {
+			t.Fatalf("U11: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
+		}
 	}
 }
 
@@ -496,12 +563,15 @@ func TestBackup_Enricher_JobOutsideWindow_IsIgnored(t *testing.T) {
 	assertNoFinding(t, fake, planID)
 
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs returned error: %v", err)
+	}
 
 	// No FieldUpdates for a status phrase either.
 	if updates, ok := result.FieldUpdates[planID]; ok {
-		require.NotContains(t, updates, "status",
-			"FieldUpdates must not set 'status' for an out-of-window job")
+		if _, hasStatus := updates["status"]; hasStatus {
+			t.Fatal("FieldUpdates must not set 'status' for an out-of-window job")
+		}
 	}
 }
 
@@ -527,11 +597,14 @@ func TestBackup_Enricher_NilBackupPlanID_NotBucketed(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs returned error: %v", err)
+	}
 
-	require.Empty(t, result.Findings,
-		"a job with nil BackupPlanId must not produce a finding against any plan; got: %v",
-		findingKeys(result.Findings))
+	if len(result.Findings) != 0 {
+		t.Fatalf("a job with nil BackupPlanId must not produce a finding against any plan; got: %v",
+			findingKeys(result.Findings))
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -550,10 +623,14 @@ func TestBackup_Enricher_BannedWords_NeverAppear(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs returned error: %v", err)
+	}
 
 	findings, ok := result.Findings[planID]
-	require.Truef(t, ok, "expected finding for planID %q, got none", planID)
+	if !ok {
+		t.Fatalf("expected finding for planID %q, got none", planID)
+	}
 	finding := findings[0]
 
 	bannedWords := []string{
@@ -563,15 +640,17 @@ func TestBackup_Enricher_BannedWords_NeverAppear(t *testing.T) {
 	}
 
 	for _, word := range bannedWords {
-		require.NotContains(t, finding.Phrase, word,
-			"Phrase must not contain banned word %q; got Phrase=%q", word, finding.Phrase)
+		if strings.Contains(finding.Phrase, word) {
+			t.Fatalf("Phrase must not contain banned word %q; got Phrase=%q", word, finding.Phrase)
+		}
 	}
 
 	if updates, ok := result.FieldUpdates[planID]; ok {
 		if statusPhrase, ok := updates["status"]; ok {
 			for _, word := range bannedWords {
-				require.NotContains(t, statusPhrase, word,
-					"FieldUpdates[status] must not contain banned word %q; got %q", word, statusPhrase)
+				if strings.Contains(statusPhrase, word) {
+					t.Fatalf("FieldUpdates[status] must not contain banned word %q; got %q", word, statusPhrase)
+				}
 			}
 		}
 	}
@@ -581,8 +660,9 @@ func TestBackup_Enricher_BannedWords_NeverAppear(t *testing.T) {
 	if updates, ok := result.FieldUpdates[planID]; ok {
 		if statusPhrase, ok := updates["status"]; ok {
 			for _, kw := range bareKeywords {
-				require.NotEqual(t, kw, statusPhrase,
-					"FieldUpdates[status] must not be a bare state keyword; got %q", statusPhrase)
+				if statusPhrase == kw {
+					t.Fatalf("FieldUpdates[status] must not be a bare state keyword; got %q", statusPhrase)
+				}
 			}
 		}
 	}
@@ -614,15 +694,19 @@ func TestBackup_Enricher_CadenceComparison_IsSilent(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs returned error: %v", err)
+	}
 
-	require.NotContains(t, result.Findings, planID,
-		"Wave 3 cadence comparison is out-of-scope: plan with stale last-run must emit no finding")
+	if _, ok := result.Findings[planID]; ok {
+		t.Fatal("Wave 3 cadence comparison is out-of-scope: plan with stale last-run must emit no finding")
+	}
 
 	// Verify row color would be green (no status update at all).
 	if updates, ok := result.FieldUpdates[planID]; ok {
-		require.NotContains(t, updates, "status",
-			"out-of-scope cadence check must not write 'status' field update")
+		if _, hasStatus := updates["status"]; hasStatus {
+			t.Fatal("out-of-scope cadence check must not write 'status' field update")
+		}
 	}
 }
 
@@ -649,9 +733,12 @@ func TestBackup_Enricher_JobWithNilCreationDate_IsSkipped(t *testing.T) {
 
 	// Must not panic.
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
-	require.NoError(t, err)
-	require.NotContains(t, result.Findings, planID,
-		"job with nil CreationDate must not produce a finding (enricher skips nil-date jobs)")
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs returned error: %v", err)
+	}
+	if _, ok := result.Findings[planID]; ok {
+		t.Fatal("job with nil CreationDate must not produce a finding (enricher skips nil-date jobs)")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -674,10 +761,13 @@ func TestBackup_Enricher_JobWithNilCreatedBy_IsSkipped(t *testing.T) {
 
 	// Must not panic.
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
-	require.NoError(t, err)
-	require.Empty(t, result.Findings,
-		"job with nil CreatedBy must not produce any findings; got: %v",
-		findingKeys(result.Findings))
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs returned error: %v", err)
+	}
+	if len(result.Findings) != 0 {
+		t.Fatalf("job with nil CreatedBy must not produce any findings; got: %v",
+			findingKeys(result.Findings))
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -694,15 +784,17 @@ func TestBackup_Enricher_ListBackupJobsError_IsReturned(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
-	require.Error(t, err,
-		"enricher must surface the ListBackupJobs error, not swallow it")
-	require.True(t, strings.Contains(err.Error(), "ThrottlingException") ||
-		errors.Is(err, sentinelErr),
-		"returned error must relate to the sentinel; got: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface the ListBackupJobs error, not swallow it")
+	}
+	if !strings.Contains(err.Error(), "ThrottlingException") && !errors.Is(err, sentinelErr) {
+		t.Fatalf("returned error must relate to the sentinel; got: %v", err)
+	}
 
 	// Partial findings must not be present when the API failed completely.
-	require.Empty(t, result.Findings,
-		"enricher must not return partial findings when ListBackupJobs errors")
+	if len(result.Findings) != 0 {
+		t.Fatal("enricher must not return partial findings when ListBackupJobs errors")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -737,7 +829,6 @@ func TestBackup_Enricher_FailedBucket_AllStatesMapToBang(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(string(tc.state), func(t *testing.T) {
 			fake := &backupJobsOnlyFake{
 				jobs: []backuptypes.BackupJob{
@@ -746,17 +837,22 @@ func TestBackup_Enricher_FailedBucket_AllStatesMapToBang(t *testing.T) {
 			}
 
 			result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatalf("EnrichBackupJobs returned error: %v", err)
+			}
 
 			findings, ok := result.Findings[tc.planID]
-			require.True(t, ok,
-				"state %s must produce a finding; got keys %v", tc.state, findingKeys(result.Findings))
+			if !ok {
+				t.Fatalf("state %s must produce a finding; got keys %v", tc.state, findingKeys(result.Findings))
+			}
 			finding := findings[0]
 
-			require.Equal(t, domain.SevBroken, finding.Severity,
-				"state %s must map to Severity '!'", tc.state)
-			require.Equal(t, tc.wantMsg, finding.Phrase,
-				"state %s Phrase must be %q", tc.state, tc.wantMsg)
+			if finding.Severity != domain.SevBroken {
+				t.Fatalf("state %s must map to Severity '!': got %v", tc.state, finding.Severity)
+			}
+			if finding.Phrase != tc.wantMsg {
+				t.Fatalf("state %s Phrase must be %q: got %q", tc.state, tc.wantMsg, finding.Phrase)
+			}
 
 			// U11 for every case. Skip pure-integer row values — counts are
 			// allowed to appear inside the Phrase (e.g. "2 jobs failed
@@ -773,9 +869,10 @@ func TestBackup_Enricher_FailedBucket_AllStatesMapToBang(t *testing.T) {
 				if _, convErr := strconv.Atoi(row.Value); convErr == nil {
 					continue
 				}
-				require.NotContains(t, finding.Phrase, row.Value,
-					"U11: [%s] Phrase %q must not contain Row value %q",
-					tc.state, finding.Phrase, row.Value)
+				if strings.Contains(finding.Phrase, row.Value) {
+					t.Fatalf("U11: [%s] Phrase %q must not contain Row value %q",
+						tc.state, finding.Phrase, row.Value)
+				}
 			}
 		})
 	}
@@ -828,7 +925,9 @@ func TestBackup_Enricher_U11_SummaryNeverContainsRowValues(t *testing.T) {
 
 	fake := &backupJobsOnlyFake{jobs: allJobs}
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("EnrichBackupJobs returned error: %v", err)
+	}
 
 	for planID, findings := range result.Findings {
 		for _, finding := range findings {
@@ -843,9 +942,10 @@ func TestBackup_Enricher_U11_SummaryNeverContainsRowValues(t *testing.T) {
 				if _, isNum := strconv.Atoi(row.Value); isNum == nil {
 					continue
 				}
-				require.NotContains(t, finding.Phrase, row.Value,
-					"U11 violation for plan %s: Phrase %q contains Row value %q — Phrase and Rows must be disjoint",
-					planID, finding.Phrase, row.Value)
+				if strings.Contains(finding.Phrase, row.Value) {
+					t.Fatalf("U11 violation for plan %s: Phrase %q contains Row value %q — Phrase and Rows must be disjoint",
+						planID, finding.Phrase, row.Value)
+				}
 			}
 		}
 	}

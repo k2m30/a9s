@@ -468,9 +468,9 @@ func TestQA_Redis_YAMLView(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 	k := keys.Default()
 	res := fixtures[0]
-	m := views.NewYAML(res, "", k)
+	m := views.NewYAMLWithCtrl(res, "", k, nil)
 	m.SetSize(80, 30)
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 
 	if out == "" || out == "Initializing..." {
 		t.Fatal("Redis YAML view returned empty or initializing")
@@ -494,21 +494,9 @@ func TestQA_Redis_YAMLView(t *testing.T) {
 	}
 }
 
-func TestQA_Redis_YAMLFrameTitle(t *testing.T) {
-	fixtures := fixtureRedisClusters()
-	k := keys.Default()
-	res := fixtures[0]
-	m := views.NewYAML(res, "", k)
-	title := m.FrameTitle()
-
-	expected := res.Name + " yaml"
-	if res.Name == "" {
-		expected = res.ID + " yaml"
-	}
-	if title != expected {
-		t.Errorf("Redis YAML FrameTitle = %q, want %q", title, expected)
-	}
-}
+// TestQA_Redis_YAMLFrameTitle retired: YAMLModel.FrameTitle() is DEAD per
+// specs/022-codebase-cleanup/wave3-map-text.md (no production caller), and
+// title-string behavior is not resource-type-specific.
 
 // ===========================================================================
 // REDIS-YAML-06: Redis YAML raw content for copy
@@ -518,8 +506,8 @@ func TestQA_Redis_YAMLRawContent(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 	k := keys.Default()
 	res := fixtures[0]
-	m := views.NewYAML(res, "", k)
-	raw := m.RawContent()
+	m := views.NewYAMLWithCtrl(res, "", k, nil)
+	raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
 
 	if raw == "" {
 		t.Fatal("Redis YAML RawContent() returned empty string")

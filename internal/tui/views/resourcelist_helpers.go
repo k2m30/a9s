@@ -81,18 +81,6 @@ func (m *ResourceListModel) SetReapplyChecker(checker resource.RelatedChecker, s
 	m.styledRowCache = nil
 }
 
-// ReapplyCheckerAgainst re-runs the carried checker against newPage and merges
-// any newly matched IDs into the related-ID filter set.
-func (m *ResourceListModel) ReapplyCheckerAgainst(newPage []resource.Resource) {
-	m.ctrl.ApplyReapplyCheckerAgainst(newPage)
-	m.styledRowCache = nil
-}
-
-// RelatedIDFilterSize returns the size of the current related-ID filter.
-func (m *ResourceListModel) RelatedIDFilterSize() int {
-	return len(m.ctrl.GetListRelatedIDSet())
-}
-
 // VisibleResources returns the currently-visible (post-filter, post-sort)
 // resources by delegating to the controller snapshot.
 func (m *ResourceListModel) VisibleResources() []resource.Resource {
@@ -106,29 +94,11 @@ func (m *ResourceListModel) VisibleResources() []resource.Resource {
 	return m.ctrl.GetListVisibleResources()
 }
 
-// AppendResourcesForTest appends resources to the controller cache and
-// re-triggers the filter pipeline.
-func (m *ResourceListModel) AppendResourcesForTest(page []resource.Resource) {
-	m.ctrl.ApplyResourcesLoaded(m.typeDef.ShortName, page, nil, true)
-	m.styledRowCache = nil
-}
-
 // SetAutoOpenSingleDetail configures one-shot auto-navigation to detail when
 // a ResourcesLoaded update leaves exactly one filtered row.
 func (m *ResourceListModel) SetAutoOpenSingleDetail(v bool) {
 	m.ctrl.SetListAutoOpenSingle(v)
 }
-
-// GetFilter returns the current filter text.
-func (m *ResourceListModel) GetFilter() string {
-	return m.ctrl.GetListFilter()
-}
-
-// ShortName returns the resource type's short name.
-func (m *ResourceListModel) ShortName() string { return m.typeDef.ShortName }
-
-// LoadedCount returns the total number of resources currently loaded into this view.
-func (m *ResourceListModel) LoadedCount() int { return len(m.ctrl.GetListAllResources()) }
 
 // IsTruncated reports whether more pages remain unfetched on the AWS side.
 func (m *ResourceListModel) IsTruncated() bool {

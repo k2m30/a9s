@@ -12,6 +12,7 @@ package unit
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -19,16 +20,31 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // TestQA_YAML_AllTypes iterates every registered resource type and verifies:
 //
 //	(a) the demo fixture's YAML view renders without error and is non-empty
-//	(b) RawContent() is valid YAML (parseable by yaml.v3)
-//	(c) RawContent() contains no unresolved template markers
-//	(d) FrameTitle() contains "yaml"
-//	(e) RawContent() contains no ANSI escape codes
+//	(b) the marshaled data is valid YAML (parseable by yaml.v3)
+//	(c) the marshaled data contains no unresolved template markers
+//
+// (b)/(c) marshal directly via fieldpath.ToSafeValue + yaml.Marshal — the
+// exact steps YAMLModel.RawContent() (DEAD, no live caller) used internally
+// — rather than through ContentLines()+stripANSI. This keeps the pin on the
+// marshal step itself, independent of the colorizing pass; the colorized
+// path's re-parseability (including colon-bearing quoted keys like
+// "aws:autoscaling:groupName") is pinned separately by
+// TestWave3Port_ColorizeYAML_ColonInQuotedKey_Regression.
+//
+// (d) FrameTitle() was dropped: DEAD, no live caller (see qa_docdb_test.go's
+// identical retirement note). (e) "no ANSI codes" was dropped: the marshal
+// step tested here never touches colorizeYAML, so ANSI-free is tautological;
+// the real ANSI-free clipboard-copy contract is already pinned end-to-end via
+// handleCopy in wave3_text_ports_test.go's
+// TestWave3Port_ErrorLogCopy_UncoloredContent and qa_copy_test.go's
+// TestQA_Copy_YAML_CopiesFullYAML.
 func TestQA_YAML_AllTypes(t *testing.T) {
 	forbidden := []string{"<no value>", "<nil>", "%!(EXTRA", "<missing field>"}
 
@@ -59,13 +75,23 @@ func TestQA_YAML_AllTypes(t *testing.T) {
 				t.Fatalf("YAML view is empty for %s", rt.ShortName)
 			}
 
-			m := yamlModel(res, 120, 40)
-			raw := m.RawContent()
+			var data []byte
+			var marshalErr error
+			if res.RawStruct != nil {
+				safe := fieldpath.ToSafeValue(reflect.ValueOf(res.RawStruct))
+				data, marshalErr = yaml.Marshal(safe)
+			} else if len(res.Fields) > 0 {
+				data, marshalErr = yaml.Marshal(res.Fields)
+			}
+			if marshalErr != nil {
+				t.Fatalf("marshal error for %s: %v", rt.ShortName, marshalErr)
+			}
+			raw := string(data)
 
 			// (b) valid YAML
 			var parsed any
-			if err := yaml.Unmarshal([]byte(raw), &parsed); err != nil {
-				t.Errorf("RawContent() is not valid YAML for %s: %v\n---\n%s", rt.ShortName, err, raw)
+			if err := yaml.Unmarshal(data, &parsed); err != nil {
+				t.Errorf("marshaled data is not valid YAML for %s: %v\n---\n%s", rt.ShortName, err, raw)
 			}
 
 			// (c) no unresolved template markers
@@ -73,17 +99,6 @@ func TestQA_YAML_AllTypes(t *testing.T) {
 				if strings.Contains(raw, f) {
 					t.Errorf("%s YAML contains unresolved template marker %q", rt.ShortName, f)
 				}
-			}
-
-			// (d) FrameTitle contains "yaml"
-			title := m.FrameTitle()
-			if !strings.Contains(title, "yaml") {
-				t.Errorf("%s FrameTitle() = %q, want 'yaml' in title", rt.ShortName, title)
-			}
-
-			// (e) RawContent has no ANSI codes
-			if strings.Contains(raw, "\x1b[") {
-				t.Errorf("%s RawContent() contains ANSI codes — must be plain for clipboard copy", rt.ShortName)
 			}
 		})
 	}

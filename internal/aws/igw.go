@@ -11,25 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchInternetGateways calls the EC2 DescribeInternetGateways API and converts the
-// response into a slice of generic Resource structs.
-func FetchInternetGateways(ctx context.Context, api EC2DescribeInternetGatewaysAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchInternetGatewaysPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchInternetGatewaysPage fetches a single page of internet gateways.
 func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatewaysAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &ec2.DescribeInternetGatewaysInput{

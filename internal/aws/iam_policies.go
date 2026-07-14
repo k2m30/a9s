@@ -43,25 +43,6 @@ type iamPolicyStore interface {
 	Clear()
 }
 
-// FetchIAMPolicies calls the IAM ListPolicies API and returns all pages of
-// customer-managed policies. Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchIAMPolicies(ctx context.Context, api IAMListPoliciesAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchIAMPoliciesPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchIAMPoliciesPage calls the IAM ListPolicies API with Scope=Local
 // and returns a single page of customer-managed policies.
 // Pass an empty continuationToken for the first page.

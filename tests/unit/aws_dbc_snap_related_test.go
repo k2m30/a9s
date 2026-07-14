@@ -218,7 +218,7 @@ func dbcSnapDBC_SnapshotWithRDSRaw(clusterID string) resource.Resource {
 
 // dbcSnapDBC_CompleteCacheWithoutCluster builds a dbc cache that is NOT
 // truncated and does NOT contain the given cluster ID.
-func dbcSnapDBC_CompleteCacheWithoutCluster(missingClusterID string) resource.ResourceCache {
+func dbcSnapDBC_CompleteCacheWithoutCluster(_ string) resource.ResourceCache {
 	return resource.ResourceCache{
 		"dbc": resource.ResourceCacheEntry{
 			IsTruncated: false, // complete — parent definitively absent
@@ -231,7 +231,7 @@ func dbcSnapDBC_CompleteCacheWithoutCluster(missingClusterID string) resource.Re
 
 // dbcSnapDBC_TruncatedCacheWithoutCluster builds a dbc cache that IS truncated
 // and does NOT contain the given cluster ID in the visible window.
-func dbcSnapDBC_TruncatedCacheWithoutCluster(missingClusterID string) resource.ResourceCache {
+func dbcSnapDBC_TruncatedCacheWithoutCluster(_ string) resource.ResourceCache {
 	return resource.ResourceCache{
 		"dbc": resource.ResourceCacheEntry{
 			IsTruncated: true, // truncated — parent may be in later page

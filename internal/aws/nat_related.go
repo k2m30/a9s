@@ -51,7 +51,7 @@ func checkNATRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "rtb", Count: 0}
 	}
 
-	rtbList, truncated, err := natRelatedResources(ctx, clients, cache, "rtb")
+	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
 	if err != nil {
 		return resource.ErrorRelated("rtb", err)
 	}
@@ -123,7 +123,7 @@ func checkNATAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := natRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -145,16 +145,4 @@ func checkNATAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		}
 	}
 	return relatedResultTrunc("alarm", ids, truncated)
-}
-
-// natRelatedResources returns the resource list for target from cache or fetches
-// the first page via the registered paginated fetcher.
-func natRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

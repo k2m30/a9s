@@ -10,25 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchEBEnvironments calls the Elastic Beanstalk DescribeEnvironments API and converts
-// the response into a slice of generic Resource structs.
-func FetchEBEnvironments(ctx context.Context, api EBDescribeEnvironmentsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchEBEnvironmentsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchEBEnvironmentsPage fetches a single page of Elastic Beanstalk environments.
 func FetchEBEnvironmentsPage(ctx context.Context, api EBDescribeEnvironmentsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &elasticbeanstalk.DescribeEnvironmentsInput{

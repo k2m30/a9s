@@ -25,8 +25,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // TestHandleRelatedNavigate_TruncatedCache_InitiatesFetch verifies that
@@ -53,7 +53,9 @@ func TestHandleRelatedNavigate_TruncatedCache_InitiatesFetch(t *testing.T) {
 	})
 
 	ec2Client := fakes.NewEC2()
-	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	ec2Res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), ec2Client, token)
+	})
 	if err != nil || len(ec2Res) < 2 {
 		t.Fatalf("demo ec2 fixtures need at least 2 resources (err=%v, len=%d)", err, len(ec2Res))
 	}
@@ -114,7 +116,9 @@ func TestHandleRelatedNavigate_CompleteCache_NoFetch(t *testing.T) {
 	})
 
 	ec2Client := fakes.NewEC2()
-	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	ec2Res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), ec2Client, token)
+	})
 	if err != nil || len(ec2Res) < 2 {
 		t.Fatalf("demo ec2 fixtures need at least 2 resources (err=%v, len=%d)", err, len(ec2Res))
 	}

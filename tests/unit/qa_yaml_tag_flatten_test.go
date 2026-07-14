@@ -221,7 +221,7 @@ func TestToSafeValue_NonStructSliceUnchanged(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TestYAMLView_TagListFlattened — integration test through YAMLModel.RawContent()
+// TestYAMLView_TagListFlattened — integration test through YAMLModel.ContentLines()
 // ---------------------------------------------------------------------------
 
 // syntheticDBSnapshot is a stand-in for rds.DBSnapshot with a TagList field,
@@ -263,7 +263,7 @@ func TestToSafeValue_NilTagValuePreservedAsNull(t *testing.T) {
 	}
 }
 
-// TestYAMLView_TagListFlattened verifies that when YAMLModel.RawContent() serializes
+// TestYAMLView_TagListFlattened verifies that when YAMLModel.ContentLines() serializes
 // a resource whose RawStruct has a TagList field of []rdstypes.Tag, the resulting YAML
 // contains "Component: x" (flattened map) and NOT "- Key: Component" (struct slice).
 //
@@ -286,8 +286,8 @@ func TestYAMLView_TagListFlattened(t *testing.T) {
 		RawStruct: snap,
 	}
 
-	model := views.NewYAML(res, "rds", keys.Default())
-	content := model.RawContent()
+	model := views.NewYAMLWithCtrl(res, "rds", keys.Default(), nil)
+	content := stripANSI(strings.Join(model.ContentLines(), "\n"))
 
 	if content == "" {
 		t.Fatal("RawContent() returned empty string — resource has RawStruct set")

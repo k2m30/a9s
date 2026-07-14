@@ -86,30 +86,22 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			DisplayNameKey: "role_name",
 		}},
 		Color: colorRole,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchIAMRolesPage(ctx, c.IAM, continuationToken)
-		},
+		}),
 		Wave2: IssueEnricher{Fn: EnrichIAMRoleLastUsed, Priority: 100},
 		FieldKeys: []string{
 			"role_name", "role_id", "path", "create_date", "description",
 			"assume_role_policy_document", "trust_wildcard", "trust_summary",
 			"policy_resources",
 		},
-		FetchByIDs: func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return nil, fmt.Errorf("AWS clients not initialized")
-			}
+		FetchByIDs: fetchByIDsWithClients(func(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
 			getRoleAPI, ok := c.IAM.(IAMGetRoleAPI)
 			if !ok || getRoleAPI == nil {
 				return nil, fmt.Errorf("IAM client does not support GetRole")
 			}
 			return FetchRolesByIDs(ctx, getRoleAPI, ids)
-		},
+		}),
 		Related: []domain.RelatedDef{
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkRoleLambda, NeedsTargetCache: true},
 			{TargetType: "glue", DisplayName: "Glue Jobs", Checker: checkRoleGlue, NeedsTargetCache: true},
@@ -141,11 +133,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
 		},
 		Color: colorPolicy,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			result, err := FetchIAMPoliciesPage(ctx, c.IAM, continuationToken)
 			if err != nil {
 				return result, err
@@ -173,7 +161,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 				result.Pagination.PageSize = len(result.Resources)
 			}
 			return result, inlineErr
-		},
+		}),
 		// AvailabilityFetcher is the cheap, managed-only probe path
 		// (internal/runtime/probes.go's ProbeResourceAvailability, via
 		// resource.GetAvailabilityFetcher): managed policies alone are
@@ -187,34 +175,26 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		// inline-only account (zero managed policies, many inline ones on
 		// groups) would otherwise report a confirmed-empty "0" instead of
 		// the honest lower-bound "N+", making it look unnavigable.
-		AvailabilityFetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		AvailabilityFetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			result, err := FetchIAMPoliciesPage(ctx, c.IAM, continuationToken)
 			if result.Pagination == nil {
 				result.Pagination = &resource.PaginationMeta{}
 			}
 			result.Pagination.IsTruncated = true
 			return result, err
-		},
+		}),
 		Wave2: IssueEnricher{Fn: EnrichIAMPolicy, Priority: 100},
 		FieldKeys: []string{
 			"policy_name", "policy_type", "attachment_count", "is_attachable",
 			"path", "create_date",
 		},
 		IssueEnricherFieldKeys: []string{"risk"},
-		FetchByIDs: func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return nil, fmt.Errorf("AWS clients not initialized")
-			}
+		FetchByIDs: fetchByIDsWithClients(func(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
 			if c.IAMPolicies() == nil {
 				return nil, fmt.Errorf("IAMPolicies store not initialized on ServiceClients")
 			}
 			return FetchIAMPoliciesByIDsFull(ctx, c.IAM, ids, c.IAMPolicies())
-		},
+		}),
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkPolicyRole, NeedsTargetCache: false},
 			{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkPolicyUser, NeedsTargetCache: false},
@@ -243,13 +223,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{Key: "password_last_used", Title: "Password Last Used", Width: 22, Sortable: true},
 		},
 		Color: colorIAMUser,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchIAMUsersPage(ctx, c.IAM, continuationToken)
-		},
+		}),
 		Wave2: IssueEnricher{Fn: EnrichIAMUserMFA, Priority: 100},
 		FieldKeys: []string{
 			"user_name", "user_id", "path", "create_date", "password_last_used",
@@ -286,13 +262,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			DisplayNameKey: "group_name",
 		}},
 		Color: colorIAMGroup,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchIAMGroupsPage(ctx, c.IAM, continuationToken)
-		},
+		}),
 		Wave2:                  IssueEnricher{Fn: EnrichIAMGroup, Priority: 100},
 		FieldKeys:              []string{"group_name", "group_id", "path", "create_date", "arn"},
 		IssueEnricherFieldKeys: []string{"member_count"},
@@ -317,13 +289,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{Key: "description", Title: "Description", Width: 36, Sortable: false},
 		},
 		Color: colorWAF,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchWAFWebACLsPageWithCloudFront(ctx, c.WAFv2, c.WAFv2CloudFront, continuationToken)
-		},
+		}),
 		Wave2:                  IssueEnricher{Fn: EnrichWAFLogging, Priority: 100},
 		FieldKeys:              []string{"name", "id", "description", "scope"},
 		IssueEnricherFieldKeys: []string{"rules_summary"},
@@ -355,13 +323,9 @@ var securityChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals //
 		FieldKeys: []string{
 			"user_name", "user_id", "arn", "path", "create_date", "password_last_used",
 		},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchIAMGroupMembers(ctx, c.IAM, parentCtx, continuationToken)
-		},
+		}),
 	},
 	{
 		Name:      "Role Policies",
@@ -369,13 +333,9 @@ var securityChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals //
 		Columns:   resource.RolePolicyColumns(),
 		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{"policy_name", "policy_arn", "policy_type"},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchRolePolicies(ctx, c.IAM, c.IAM, parentCtx, continuationToken)
-		},
+		}),
 		DetailEnrich: enrichRolePolicy,
 		Findings: []catalog.FindingDef{
 			{Code: CodeRolePolicyOverPrivileged, Phrase: "over-privileged", Severity: domain.SevBroken, Source: "wave1"},

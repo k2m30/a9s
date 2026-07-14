@@ -27,7 +27,7 @@ func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 
 // Install loads the AWS resource catalog into internal/catalog. MUST be called
 // exactly once at program start (main() / TestMain) before any
-// catalog.Find / catalog.All / catalog.ByCategory call.
+// catalog.Find / catalog.All call.
 //
 // The per-category catalog data lives in internal/aws so Install can populate
 // the catalog without forcing internal/catalog to import internal/aws (which

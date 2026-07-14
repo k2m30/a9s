@@ -198,11 +198,19 @@ func TestLayoutCenterTitle_MinimalWidth(t *testing.T) {
 	}
 }
 
-// ── RenderFrame tests ────────────────────────────────────────────────────────
+// ── RenderFrame drawing-behavior tests (022-codebase-cleanup re-audit:
+// "port+delete: RenderFrame + RenderFramePrepadded + TwoColumn ... Port
+// layout_frame_test.go RenderFrame/Prepadded pins onto RenderFrameWithHints
+// (nil-hints output is documented identical)"). RenderFrame and
+// RenderFrameWithHints(..., nil, ...) share byte-for-byte identical top-border
+// and content-row code in frame.go, differing only in the bottom border,
+// which BottomBorderWithHints(nil, w) renders identically to RenderFrame's
+// hardcoded bottom line — every RenderFrame drawing assertion below is
+// ported verbatim onto RenderFrameWithHints with hints=nil. ─────────────────
 
-func TestLayoutRenderFrame_BasicBox(t *testing.T) {
+func TestLayoutRenderFrameWithHints_NilHints_BasicBox(t *testing.T) {
 	lines := []string{"hello", "world"}
-	got := layout.RenderFrame(lines, "test", 20, 6)
+	got := layout.RenderFrameWithHints(lines, "test", nil, 20, 6)
 	outLines := strings.Split(got, "\n")
 
 	// Should have h lines total: top border + content + padding + bottom border
@@ -219,9 +227,9 @@ func TestLayoutRenderFrame_BasicBox(t *testing.T) {
 	}
 }
 
-func TestLayoutRenderFrame_EmptyTitle(t *testing.T) {
+func TestLayoutRenderFrameWithHints_NilHints_EmptyTitle(t *testing.T) {
 	lines := []string{"content"}
-	got := layout.RenderFrame(lines, "", 20, 5)
+	got := layout.RenderFrameWithHints(lines, "", nil, 20, 5)
 	outLines := strings.Split(got, "\n")
 
 	topPlain := stripANSI(outLines[0])
@@ -230,9 +238,9 @@ func TestLayoutRenderFrame_EmptyTitle(t *testing.T) {
 	}
 }
 
-func TestLayoutRenderFrame_ContentPaddedToInnerWidth(t *testing.T) {
+func TestLayoutRenderFrameWithHints_NilHints_ContentPaddedToInnerWidth(t *testing.T) {
 	lines := []string{"hi"}
-	got := layout.RenderFrame(lines, "", 20, 4)
+	got := layout.RenderFrameWithHints(lines, "", nil, 20, 4)
 	outLines := strings.Split(got, "\n")
 
 	if len(outLines) < 2 {
@@ -245,9 +253,9 @@ func TestLayoutRenderFrame_ContentPaddedToInnerWidth(t *testing.T) {
 	}
 }
 
-func TestLayoutRenderFrame_PadsShortContent(t *testing.T) {
+func TestLayoutRenderFrameWithHints_NilHints_PadsShortContent(t *testing.T) {
 	lines := []string{"line1"}
-	got := layout.RenderFrame(lines, "", 20, 6)
+	got := layout.RenderFrameWithHints(lines, "", nil, 20, 6)
 	outLines := strings.Split(got, "\n")
 
 	// h=6 means: top(1) + content(4) + bottom(1) = 6 lines total
@@ -256,9 +264,9 @@ func TestLayoutRenderFrame_PadsShortContent(t *testing.T) {
 	}
 }
 
-func TestLayoutRenderFrame_BorderChars(t *testing.T) {
+func TestLayoutRenderFrameWithHints_NilHints_BorderChars(t *testing.T) {
 	lines := []string{"x"}
-	got := layout.RenderFrame(lines, "", 10, 4)
+	got := layout.RenderFrameWithHints(lines, "", nil, 10, 4)
 	outLines := strings.Split(got, "\n")
 
 	topPlain := stripANSI(outLines[0])
@@ -288,9 +296,9 @@ func TestLayoutRenderFrame_BorderChars(t *testing.T) {
 	}
 }
 
-func TestLayoutRenderFrame_WidthConsistency(t *testing.T) {
+func TestLayoutRenderFrameWithHints_NilHints_WidthConsistency(t *testing.T) {
 	lines := []string{"short", "a longer content line here"}
-	got := layout.RenderFrame(lines, "My Title", 40, 8)
+	got := layout.RenderFrameWithHints(lines, "My Title", nil, 40, 8)
 	outLines := strings.Split(got, "\n")
 
 	for i, line := range outLines {
@@ -373,15 +381,26 @@ func TestLayoutRenderHeader_LeftRightSeparation(t *testing.T) {
 	}
 }
 
-// ── RenderFramePrepadded tests ────────────────────────────────────────────
+// ── RenderFramePrepadded drawing-behavior tests, ported onto
+// RenderFrameWithHints(..., nil, ...) alongside the RenderFrame section above.
+// RenderFramePrepadded's only functional difference from RenderFrame is
+// skipping a now-redundant lipgloss.Width() re-measurement on already-correct-
+// width lines — a performance optimization, not a distinct output shape — so
+// feeding the same pre-padded lines into RenderFrameWithHints (which does its
+// own width check unconditionally) produces byte-identical output, preserving
+// every original assertion. TestLayoutRenderFramePrepadded_MatchesRenderFrame
+// (which asserted RenderFrame(raw)==RenderFramePrepadded(padded), i.e. exactly
+// the equivalence this file's own header comment now documents as proven) is
+// dropped rather than ported: with both original sides now the same function,
+// there is nothing distinct left to assert.
 
-func TestLayoutRenderFramePrepadded_BasicBox(t *testing.T) {
+func TestLayoutRenderFrameWithHints_NilHints_PrepaddedBasicBox(t *testing.T) {
 	// Pre-pad lines to innerW = 20-2 = 18
 	innerW := 18
 	line1 := "hello" + strings.Repeat(" ", innerW-5)
 	line2 := "world" + strings.Repeat(" ", innerW-5)
 	lines := []string{line1, line2}
-	got := layout.RenderFramePrepadded(lines, "test", 20, 6)
+	got := layout.RenderFrameWithHints(lines, "test", nil, 20, 6)
 	outLines := strings.Split(got, "\n")
 
 	if len(outLines) != 6 {
@@ -396,30 +415,8 @@ func TestLayoutRenderFramePrepadded_BasicBox(t *testing.T) {
 	}
 }
 
-func TestLayoutRenderFramePrepadded_MatchesRenderFrame(t *testing.T) {
-	// Pre-pad content to innerW = 40-2 = 38
-	innerW := 38
-	rawLines := []string{"short", "a longer content line here"}
-	paddedLines := make([]string, len(rawLines))
-	for i, line := range rawLines {
-		visW := lipgloss.Width(line)
-		if visW < innerW {
-			paddedLines[i] = line + strings.Repeat(" ", innerW-visW)
-		} else {
-			paddedLines[i] = line
-		}
-	}
-
-	got1 := layout.RenderFrame(rawLines, "My Title", 40, 8)
-	got2 := layout.RenderFramePrepadded(paddedLines, "My Title", 40, 8)
-
-	if got1 != got2 {
-		t.Errorf("RenderFramePrepadded should produce identical output to RenderFrame when content is pre-padded")
-	}
-}
-
-func TestLayoutRenderFramePrepadded_EmptyLines(t *testing.T) {
-	got := layout.RenderFramePrepadded(nil, "test", 20, 5)
+func TestLayoutRenderFrameWithHints_NilHints_PrepaddedEmptyLines(t *testing.T) {
+	got := layout.RenderFrameWithHints(nil, "test", nil, 20, 5)
 	outLines := strings.Split(got, "\n")
 
 	if len(outLines) != 5 {
@@ -434,10 +431,10 @@ func TestLayoutRenderFramePrepadded_EmptyLines(t *testing.T) {
 	}
 }
 
-func TestLayoutRenderFramePrepadded_BorderChars(t *testing.T) {
+func TestLayoutRenderFrameWithHints_NilHints_PrepaddedBorderChars(t *testing.T) {
 	innerW := 8
 	line := "x" + strings.Repeat(" ", innerW-1)
-	got := layout.RenderFramePrepadded([]string{line}, "", 10, 4)
+	got := layout.RenderFrameWithHints([]string{line}, "", nil, 10, 4)
 	outLines := strings.Split(got, "\n")
 
 	topPlain := stripANSI(outLines[0])
@@ -708,25 +705,18 @@ func TestBottomBorderWithHints_HintOrder(t *testing.T) {
 
 // ── RenderFrameWithHints tests ───────────────────────────────────────────────
 
-// TestRenderFrameWithHints_NilHints verifies that nil hints produces output
-// identical to layout.RenderFrame.
-func TestRenderFrameWithHints_NilHints(t *testing.T) {
+// TestRenderFrameWithHints_NilAndEmptyHintsEquivalent verifies that nil and an
+// empty hint slice produce byte-identical output — a genuine invariant
+// (BottomBorderWithHints must not distinguish "no hints" from "zero hints")
+// independent of RenderFrame, whose deletion made the prior two tests'
+// RenderFrame-as-oracle comparison moot (022-codebase-cleanup re-audit:
+// "leave zero test references to the two dead functions").
+func TestRenderFrameWithHints_NilAndEmptyHintsEquivalent(t *testing.T) {
 	lines := []string{"hello", "world"}
-	want := layout.RenderFrame(lines, "title", 40, 8)
-	got := layout.RenderFrameWithHints(lines, "title", nil, 40, 8)
-	if got != want {
-		t.Errorf("RenderFrameWithHints(nil hints) must equal RenderFrame output.\nwant: %q\ngot:  %q", want, got)
-	}
-}
-
-// TestRenderFrameWithHints_EmptyHints verifies that an empty hint slice produces
-// output identical to layout.RenderFrame.
-func TestRenderFrameWithHints_EmptyHints(t *testing.T) {
-	lines := []string{"hello", "world"}
-	want := layout.RenderFrame(lines, "title", 40, 8)
-	got := layout.RenderFrameWithHints(lines, "title", []layout.KeyHint{}, 40, 8)
-	if got != want {
-		t.Errorf("RenderFrameWithHints(empty hints) must equal RenderFrame output.\nwant: %q\ngot:  %q", want, got)
+	withNil := layout.RenderFrameWithHints(lines, "title", nil, 40, 8)
+	withEmpty := layout.RenderFrameWithHints(lines, "title", []layout.KeyHint{}, 40, 8)
+	if withNil != withEmpty {
+		t.Errorf("RenderFrameWithHints(nil) must equal RenderFrameWithHints([]KeyHint{}).\nnil:   %q\nempty: %q", withNil, withEmpty)
 	}
 }
 

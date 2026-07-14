@@ -15,7 +15,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
 	catypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
@@ -190,16 +189,6 @@ func (f *fakeDynamoDBUS1) DescribeKinesisStreamingDestination(_ context.Context,
 		return f.kinesisDestOutput, nil
 	}
 	return &dynamodb.DescribeKinesisStreamingDestinationOutput{}, nil
-}
-
-// newFakeDDBWithKinesisDestinations returns a fakeDynamoDBUS1 with the given
-// Kinesis streaming destination entries.
-func newFakeDDBWithKinesisDestinations(entries []ddbtypes.KinesisDataStreamDestination) *fakeDynamoDBUS1 {
-	return &fakeDynamoDBUS1{
-		kinesisDestOutput: &dynamodb.DescribeKinesisStreamingDestinationOutput{
-			KinesisDataStreamDestinations: entries,
-		},
-	}
 }
 
 // ---------------------------------------------------------------------------

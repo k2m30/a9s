@@ -9,6 +9,7 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // BUG: FetchS3Buckets must paginate ListBuckets.
@@ -34,7 +35,9 @@ func TestFetchS3Buckets_Paginated(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchS3Buckets(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchS3BucketsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

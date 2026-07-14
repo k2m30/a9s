@@ -1,15 +1,16 @@
 // costs_ui_polish_test.go — Cost Explorer: regression pins for the user's
-// screenshot-review batch (all landed at dispatch time — every test here is
-// expected GREEN; each was independently verified to actually pass, not
-// merely written on trust). package unit_test (not unit): none of these
-// items need TUI-level helpers — a pure views.RenderCosts call, a headless
-// Controller via newCostsController (costs_state_test.go, same package), or
-// a pure costs.BuildGrid/domain.HelpGroupsFor call cover every case.
+// screenshot-review batch.
+//
+// package unit_test (not unit): none of these items need TUI-level helpers —
+// a pure views.RenderCosts call, a headless Controller via newCostsController
+// (costs_state_test.go, same package), or a pure costs.BuildGrid/
+// domain.HelpGroupsFor call cover every case.
 package unit_test
 
 import (
 	"math"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -117,14 +118,7 @@ func TestCostsUIPolish_Footer_CarriesCostsFooterHintsFor_SingleSource(t *testing
 
 	wantKeys := []string{"b", "+/-", "0-9", "Enter", "Esc", "ctrl+r"}
 	for _, k := range wantKeys {
-		found := false
-		for _, h := range vs.Footer {
-			if h.Key == k {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !slices.ContainsFunc(vs.Footer, func(h app.KeyHint) bool { return h.Key == k }) {
 			t.Errorf("Snapshot().Footer missing key hint %q", k)
 		}
 	}
@@ -198,14 +192,7 @@ func TestCostsUIPolish_HelpSections_IncludeCostExplorerKeys(t *testing.T) {
 
 	wantKeys := []string{"b", "+/-", "0-9", "enter", "h/l", "j/k"}
 	for _, k := range wantKeys {
-		found := false
-		for _, hint := range costSection.Hints {
-			if hint.Key == k {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !slices.ContainsFunc(costSection.Hints, func(hint domain.HelpHint) bool { return hint.Key == k }) {
 			t.Errorf("COST EXPLORER help section missing key %q, got hints: %+v", k, costSection.Hints)
 		}
 	}
@@ -224,14 +211,7 @@ func TestCostsUIPolish_HelpSections_IncludeCostExplorerKeys(t *testing.T) {
 		t.Fatal("HelpGroupsFor(HelpFromCosts, ...) has no \"OTHER\" section")
 	}
 	for _, k := range []string{"ctrl+r", "esc"} {
-		found := false
-		for _, hint := range otherSection.Hints {
-			if hint.Key == k {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !slices.ContainsFunc(otherSection.Hints, func(hint domain.HelpHint) bool { return hint.Key == k }) {
 			t.Errorf("OTHER help section (costs context) missing key %q, got hints: %+v", k, otherSection.Hints)
 		}
 	}
@@ -241,12 +221,7 @@ func TestCostsUIPolish_HelpSections_IncludeCostExplorerKeys(t *testing.T) {
 // 6 — sort/determinism: rows sort desc by ABSOLUTE total (a large negative
 // credit row ranks by its true magnitude); NaN-producing rows keep
 // deterministic order across repeated runs. The noise-floor fold itself was
-// REMOVED (spec.md Edge Cases "Many small rows" — see costs_round3_test.go)
-// — the former SingleBelowFloorRow test (whose only content was "one
-// below-floor row still renders as itself, not folded") no longer has a
-// distinct intent to preserve now that NO row is ever folded, and was
-// removed rather than kept as a vacuous duplicate of the round3 "all rows
-// render individually" pin.
+// removed (spec.md Edge Cases "Many small rows" — see costs_round3_test.go).
 // ===========================================================================
 
 func costsUIPolishRecord(period costs.Period, key string, amount float64) costs.Record {

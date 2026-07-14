@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/viewport"
+
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -18,6 +20,24 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
+
+// renderDetailPlain builds a DetailBody through the live Controller seam for
+// res/resourceType and renders it via NewTransientDetail+RenderDetail (the
+// live replacement for DetailModel.PlainContent(), which is dead). Used by
+// the 3 detail-family pins below (round 4, specs/022-codebase-cleanup, item
+// 5) — the other 11 tests in this file drive views.ResourceListModel, a
+// different (resourcelist-family) model out of this item's scope.
+func renderDetailPlain(t *testing.T, res resource.Resource, resourceType string) string {
+	t.Helper()
+	c := newDetailController(t, res, resourceType)
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil")
+	}
+	vp := viewport.New(viewport.WithWidth(200), viewport.WithHeight(100))
+	m := views.NewTransientDetail(200, 100, vp)
+	return m.RenderDetail(*body)
+}
 
 // ---------------------------------------------------------------------------
 // Helpers local to this file
@@ -336,12 +356,10 @@ func TestViews_DetailAttention_ReadsAttentionDetails(t *testing.T) {
 		},
 	}
 
-	k := keys.Default()
-	m := views.NewDetail(r, "ec2", nil, k)
-	m.SetSize(200, 100)
-	// Deliberately do NOT call m.SetEnrichmentFinding — pre-fix path uses only that.
-
-	out := m.PlainContent()
+	// Deliberately do NOT call ApplyDetailFinding — the resource's own
+	// Findings/AttentionDetails (seeded via EnsureDetailState) must be what
+	// renders, not a separate enrichment-override path.
+	out := renderDetailPlain(t, r, "ec2")
 
 	if !strings.Contains(out, "Action") || !strings.Contains(out, "reboot") {
 		t.Errorf("detail Attention section must show AttentionDetail row \"Action: reboot\"; got:\n%s", out)
@@ -381,13 +399,13 @@ func TestViews_DetailAttention_PrefersFindingsPhraseOverIssues(t *testing.T) {
 		},
 	}
 
-	k := keys.Default()
-	m := views.NewDetail(r, "ec2", nil, k)
-	m.SetSize(200, 100)
+	out := renderDetailPlain(t, r, "ec2")
 
-	out := m.PlainContent()
-
-	if !strings.Contains(out, "canonical phrase") {
+	// RenderDetail capitalizes the phrase's first letter for display (e.g.
+	// "canonical phrase" -> "Canonical phrase") — case-insensitive check so
+	// the test is not brittle to that display rule (same accommodation as
+	// TestViews_DetailEnrichmentLateUpdatePicksUpFindings below).
+	if !strings.Contains(strings.ToLower(out), "canonical phrase") {
 		t.Errorf("detail Attention section must show Findings phrase \"canonical phrase\"; got:\n%s", out)
 	}
 	if strings.Contains(out, "legacy decoy") {
@@ -528,26 +546,33 @@ func TestViews_DetailEnrichmentLateUpdatePicksUpFindings(t *testing.T) {
 		// "impaired" is a real issue phrase — wave1 Finding will be derived.
 	}
 
-	k := keys.Default()
-	m := views.NewDetail(r, "ec2", nil, k)
-	m.SetSize(200, 100)
+	c := newDetailController(t, r, "ec2")
 
 	// First render: no enrichment finding yet.
-	firstOut := m.PlainContent()
-	_ = firstOut // only used to confirm we can render
+	firstBody := c.Snapshot().Body.Detail
+	if firstBody == nil {
+		t.Fatal("Body.Detail is nil on first render")
+	}
 
-	// Simulate Wave-2 result arriving later.
-	ef := domain.Finding{
+	// Simulate Wave-2 result arriving later — the live equivalent of
+	// SetEnrichmentFinding is Controller.ApplyDetailFinding.
+	ef := &domain.Finding{
 		Code:     "test.pending-maintenance",
 		Phrase:   "pending maintenance",
 		Severity: domain.SevBroken,
 		Source:   "wave2:test",
 	}
-	ad := domain.AttentionDetail{Rows: []domain.DetailRow{{Label: "Action", Value: "reboot"}}}
-	m.SetEnrichmentFinding(&ef, &ad)
+	ad := &domain.AttentionDetail{Rows: []domain.DetailRow{{Label: "Action", Value: "reboot"}}}
+	c.ApplyDetailFinding(ef, ad)
 
 	// Second render: enrichment finding must now appear.
-	secondOut := m.PlainContent()
+	secondBody := c.Snapshot().Body.Detail
+	if secondBody == nil {
+		t.Fatal("Body.Detail is nil on second render")
+	}
+	vp := viewport.New(viewport.WithWidth(200), viewport.WithHeight(100))
+	m := views.NewTransientDetail(200, 100, vp)
+	secondOut := m.RenderDetail(*secondBody)
 	// The view capitalizes the first letter of phrases for display (e.g.
 	// "pending maintenance" → "Pending maintenance"). Use case-insensitive
 	// check so the test is not brittle to capitalization rules.

@@ -22,6 +22,7 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 // TestSensitiveReads_AreReadVerbs is a cross-cutting invariant: every entry
@@ -105,7 +106,7 @@ func TestSensitiveReads_AreReadVerbs(t *testing.T) {
 
 	for _, e := range allowlist {
 		t.Run(e.eventSource+"/"+e.eventName, func(t *testing.T) {
-			verb := awsclient.ClassifyCTVerb(e.eventName, "", "")
+			verb := ctevent.ClassifyCTVerb(e.eventName, "", "")
 			// W and D are the only redundant cases: the verb-path already
 			// escalates W→ct-attention and D→ct-danger, so an allowlist entry
 			// that classifies as W or D adds noise without changing behavior.

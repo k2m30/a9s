@@ -17,6 +17,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/semantics/projection"
 )
 
@@ -28,7 +29,9 @@ import (
 func loadEC2Resources(t *testing.T) []domain.Resource {
 	t.Helper()
 	clients := demo.NewServiceClients()
-	resources, err := awsclient.FetchEC2Instances(context.Background(), clients.EC2)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), clients.EC2, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchEC2Instances: %v", err)
 	}
@@ -242,7 +245,9 @@ func collectTagItems(sections []domain.Section) []domain.Item {
 // omits RawStruct, so the test skips. Add the field to the fixture to enable it.
 func TestProjectionFieldAudit_JSONExpansion(t *testing.T) {
 	clients := demo.NewServiceClients()
-	roles, err := awsclient.FetchIAMRoles(context.Background(), clients.IAM)
+	roles, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchIAMRolesPage(context.Background(), clients.IAM, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchIAMRoles: %v", err)
 	}

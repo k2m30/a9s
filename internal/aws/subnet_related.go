@@ -20,7 +20,7 @@ func checkSubnetEC2(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
 	}
 
-	ec2List, truncated, err := subnetRelatedResources(ctx, clients, cache, "ec2")
+	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
 	if err != nil {
 		return resource.ErrorRelated("ec2", err)
 	}
@@ -50,7 +50,7 @@ func checkSubnetENI(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
 	}
 
-	eniList, truncated, err := subnetRelatedResources(ctx, clients, cache, "eni")
+	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
 		return resource.ErrorRelated("eni", err)
 	}
@@ -80,7 +80,7 @@ func checkSubnetNAT(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "nat", Count: 0}
 	}
 
-	natList, truncated, err := subnetRelatedResources(ctx, clients, cache, "nat")
+	natList, truncated, err := relatedResourcesFor(ctx, clients, cache, "nat")
 	if err != nil {
 		return resource.ErrorRelated("nat", err)
 	}
@@ -105,7 +105,7 @@ func checkSubnetELB(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
 
-	elbList, truncated, err := subnetRelatedResources(ctx, clients, cache, "elb")
+	elbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
 	if err != nil {
 		return resource.ErrorRelated("elb", err)
 	}
@@ -139,7 +139,7 @@ func checkSubnetRTB(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "rtb", Count: 0}
 	}
 
-	rtbList, truncated, err := subnetRelatedResources(ctx, clients, cache, "rtb")
+	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
 	if err != nil {
 		return resource.ErrorRelated("rtb", err)
 	}
@@ -208,7 +208,7 @@ func checkSubnetASG(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
 	}
 
-	asgList, truncated, err := subnetRelatedResources(ctx, clients, cache, "asg")
+	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
 	if err != nil {
 		return resource.ErrorRelated("asg", err)
 	}
@@ -244,7 +244,7 @@ func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "efs", Count: 0}
 	}
 
-	eniList, eniTruncated, err := subnetRelatedResources(ctx, clients, cache, "eni")
+	eniList, eniTruncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
 		return resource.ErrorRelated("efs", err)
 	}
@@ -277,7 +277,7 @@ func checkSubnetEFS(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "efs", Count: 0}
 	}
 
-	efsList, efsTruncated, err := subnetRelatedResources(ctx, clients, cache, "efs")
+	efsList, efsTruncated, err := relatedResourcesFor(ctx, clients, cache, "efs")
 	if err != nil {
 		return resource.ErrorRelated("efs", err)
 	}
@@ -302,7 +302,7 @@ func checkSubnetEKS(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "eks", Count: 0}
 	}
 
-	eksList, truncated, err := subnetRelatedResources(ctx, clients, cache, "eks")
+	eksList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eks")
 	if err != nil {
 		return resource.ErrorRelated("eks", err)
 	}
@@ -334,7 +334,7 @@ func checkSubnetVPCE(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
 	}
 
-	vpceList, truncated, err := subnetRelatedResources(ctx, clients, cache, "vpce")
+	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")
 	if err != nil {
 		return resource.ErrorRelated("vpce", err)
 	}
@@ -366,16 +366,4 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
-}
-
-// subnetRelatedResources returns the resource list for target from cache or fetches
-// the first page via the registered paginated fetcher.
-func subnetRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

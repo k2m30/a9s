@@ -142,11 +142,9 @@ func TestBuildGrid_RowsSortedDescByRowTotal(t *testing.T) {
 	}
 }
 
-// TestBuildGrid_NoFold_AllNonZeroRows_RenderIndividually_NoOthersRollup
-// reconciles the former TestBuildGrid_NoiseFloorRollup_OthersRowLast: the
-// noise-floor fold was REMOVED (spec.md Edge Cases "Many small rows") — a
-// dataset that used to collapse into 2 big rows + 1 "… others" rollup must
-// now render every row individually, with no rollup at all.
+// TestBuildGrid_NoFold_AllNonZeroRows_RenderIndividually_NoOthersRollup: a
+// dataset with many small rows renders every row individually — no "… others"
+// rollup, regardless of magnitude (spec.md Edge Cases "Many small rows").
 func TestBuildGrid_NoFold_AllNonZeroRows_RenderIndividually_NoOthersRollup(t *testing.T) {
 	month := dayPeriod("2026-06-01", "2026-07-01")
 	var recs []costs.Record

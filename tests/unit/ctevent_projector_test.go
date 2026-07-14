@@ -32,6 +32,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
@@ -43,7 +44,9 @@ import (
 func loadCTEventFixtures(t *testing.T) []domain.Resource {
 	t.Helper()
 	clients := demo.NewServiceClients()
-	resources, err := awsclient.FetchCloudTrailEvents(context.Background(), clients.CloudTrail)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), clients.CloudTrail, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchCloudTrailEvents: %v", err)
 	}

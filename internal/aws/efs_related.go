@@ -54,7 +54,7 @@ func checkEFSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 
-	cfnList, truncated, err := efsRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -99,7 +99,7 @@ func checkEFSSG(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
 	}
 
-	eniList, truncated, err := efsRelatedResources(ctx, clients, cache, "eni")
+	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
 		return resource.ErrorRelated("sg", err)
 	}
@@ -138,7 +138,7 @@ func checkEFSSubnet(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 	}
 
-	eniList, truncated, err := efsRelatedResources(ctx, clients, cache, "eni")
+	eniList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
 		return resource.ErrorRelated("subnet", err)
 	}
@@ -165,18 +165,6 @@ func checkEFSSubnet(ctx context.Context, clients any, res resource.Resource, cac
 		ids = append(ids, id)
 	}
 	return relatedResultTrunc("subnet", ids, truncated)
-}
-
-// efsRelatedResources returns the resource list for target from cache or fetches
-// the first page via the registered paginated fetcher.
-func efsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 // checkEFSLambda finds Lambda functions that mount this EFS file system via
@@ -216,7 +204,7 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 	}
 
-	lambdaList, truncated, err := efsRelatedResources(ctx, clients, cache, "lambda")
+	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
 		return resource.ErrorRelated("lambda", err)
 	}
@@ -280,4 +268,10 @@ func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache reso
 	result := relatedResult("ecs-task", ids)
 	result.Truncated = entry.IsTruncated || joinIncomplete
 	return result
+}
+
+// efsRelatedResources returns the resource list for target from cache or by
+// fetching the first page via the registered paginated fetcher.
+func efsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+	return relatedResourcesFor(ctx, clients, cache, target)
 }

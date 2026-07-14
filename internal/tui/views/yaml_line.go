@@ -15,19 +15,26 @@ type yamlLine struct {
 }
 
 // parseYAMLLine tokenizes a raw YAML line (may include leading whitespace)
-// into its structural components. Uses the package-level yamlKeyRe regex.
+// into its structural components. Uses the package-level splitYAMLKeyValue
+// helper so key/value detection matches colorizeYAML exactly (bare colons
+// inside an unquoted key are never treated as the separator).
 func parseYAMLLine(raw string) yamlLine {
 	trimmed := strings.TrimSpace(raw)
-	matches := yamlKeyRe.FindStringSubmatch(trimmed)
-	if matches != nil {
+	dash := ""
+	rest := trimmed
+	if r, ok := strings.CutPrefix(trimmed, "- "); ok {
+		dash = "- "
+		rest = r
+	}
+	if key, val, ok := splitYAMLKeyValue(rest); ok && key != "" {
 		return yamlLine{
-			Dash:  matches[1],
-			Key:   matches[2],
-			Value: strings.TrimSpace(matches[3]),
+			Dash:  dash,
+			Key:   key,
+			Value: strings.TrimSpace(val),
 		}
 	}
-	if rest, ok := strings.CutPrefix(trimmed, "- "); ok {
-		return yamlLine{Dash: "- ", Raw: rest}
+	if dash != "" {
+		return yamlLine{Dash: dash, Raw: rest}
 	}
 	return yamlLine{Raw: trimmed}
 }

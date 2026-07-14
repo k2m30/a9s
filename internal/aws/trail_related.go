@@ -19,7 +19,7 @@ func checkTrailS3(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	bucketName := *trail.S3BucketName
 
-	s3List, truncated, err := trailRelatedResources(ctx, clients, cache, "s3")
+	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")
 	if err != nil {
 		return resource.ErrorRelated("s3", err)
 	}
@@ -51,7 +51,7 @@ func checkTrailLogs(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
 
-	logList, truncated, err := trailRelatedResources(ctx, clients, cache, "logs")
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
@@ -77,7 +77,7 @@ func checkTrailSNS(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	topicARN := *trail.SnsTopicARN
 
-	snsList, truncated, err := trailRelatedResources(ctx, clients, cache, "sns")
+	snsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns")
 	if err != nil {
 		return resource.ErrorRelated("sns", err)
 	}
@@ -103,7 +103,7 @@ func checkTrailKMS(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	kmsRef := *trail.KmsKeyId
 
-	kmsList, truncated, err := trailRelatedResources(ctx, clients, cache, "kms")
+	kmsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "kms")
 	if err != nil {
 		return resource.ErrorRelated("kms", err)
 	}
@@ -137,17 +137,6 @@ func checkTrailRole(_ context.Context, _ any, res resource.Resource, _ resource.
 		return relatedResult("role", []string{arn[idx+1:]})
 	}
 	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
-}
-
-// trailRelatedResources returns the resource list for target from cache or by fetching the first page.
-func trailRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 // parseTrailLogGroupName extracts the log group name from a CloudWatch Logs ARN.

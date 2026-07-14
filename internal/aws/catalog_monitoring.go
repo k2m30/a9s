@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -97,13 +96,9 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			DisplayNameKey: "alarm_name",
 		}},
 		Color: colorAlarm,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudWatchAlarmsPage(ctx, c.CloudWatch, continuationToken)
-		},
+		}),
 		FieldKeys: []string{"alarm_name", "state", "metric_name", "namespace", "threshold", "actions_count"},
 		Related: []domain.RelatedDef{
 			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkAlarmSNS, NeedsTargetCache: false},
@@ -147,13 +142,9 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			DisplayNameKey: "log_group_name",
 		}},
 		Color: colorLogs,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudWatchLogGroupsPage(ctx, c.CloudWatchLogs, continuationToken)
-		},
+		}),
 		Wave2:                  IssueEnricher{Fn: EnrichLogsMetricFilters, Priority: 100},
 		FieldKeys:              []string{"log_group_name", "stored_bytes", "retention_days", "creation_time", "kms_key_id"},
 		IssueEnricherFieldKeys: []string{"last_event_at"},
@@ -189,11 +180,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "multi_region", Title: "Multi-Region", Width: 14, Sortable: true},
 		},
 		Color: colorTrail,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			resources, err := FetchCloudTrailTrails(ctx, c.CloudTrail)
 			if err != nil {
 				return resource.FetchResult{}, err
@@ -202,7 +189,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 				Resources:  resources,
 				Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
 			}, nil
-		},
+		}),
 		// In-fetcher Wave 2: the trail fetcher already issues GetTrailStatus
 		// per-trail and populates is_logging / latest_delivery_error /
 		// log_file_validation_enabled at fetch time. InFetcherWave2Sentinel makes
@@ -249,20 +236,12 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		ExcludeFromIssueBadge: true,
 		Color:                 colorCTEvents,
 		Project:               ctevent.Project,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudTrailEventsPage(ctx, c.CloudTrail, continuationToken)
-		},
-		FilteredFetcher: func(ctx context.Context, clients any, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		}),
+		FilteredFetcher: filteredFetcherWithClients(func(ctx context.Context, c *ServiceClients, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudTrailEventsPageFiltered(ctx, c.CloudTrail, filter, continuationToken)
-		},
+		}),
 		FieldKeys: []string{"event_name", "time", "event_time", "event_time_raw", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "status", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.target_raw", "_ct.outcome"},
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCtEventsRole, NeedsTargetCache: false},
@@ -307,13 +286,9 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			ContextKeys:    map[string]string{"log_group_name": "@parent.log_group_name", "log_stream_name": "Name"},
 			DisplayNameKey: "log_stream_name",
 		}},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchLogStreams(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], continuationToken)
-		},
+		}),
 	},
 	{
 		Name:         "Log Events",
@@ -322,13 +297,9 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		Columns:      resource.LogEventColumns(),
 		Color:        colorWave1OrHealthy,
 		FieldKeys:    []string{"timestamp", "message", "ingestion_time", "event_id"},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchLogEvents(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"], continuationToken)
-		},
+		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeCWLogError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeCWLogWarn, Phrase: "warning", Severity: domain.SevWarn, Source: "wave1"},
@@ -340,13 +311,9 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		Columns:   resource.AlarmHistoryColumns(),
 		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{"timestamp", "history_item_type", "history_summary"},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchAlarmHistory(ctx, c.CloudWatch, parentCtx, continuationToken)
-		},
+		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeAlarmHistoryStateAlarm, Phrase: "alarm", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeAlarmHistoryStateInsufficientData, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1"},

@@ -1,36 +1,24 @@
-// selector_render_parity_test.go — byte-parity gate for the selector flip.
+// selector_render_parity_test.go — live-path coverage for SelectorModel.RenderSelector
+// across selector kinds (profile/region/theme) and a set of scenarios per kind.
 //
-// Asserts that SelectorModel.RenderSelector(body) produces output byte-identical
-// to the legacy SelectorModel.View() for the same logical state — across the
-// three selector kinds (profile, region, theme) and a set of scenarios per kind.
-//
-// Strategy:
-//   - Legacy side: build a SelectorModel via NewProfile/NewRegion/NewTheme,
-//     SetSize, drive cursor via Update(KeyPressMsg) and SetFilter — then call
-//     m.View() to get the oracle string.
-//   - Controller side: construct a SelectorBody that exactly mirrors the
-//     model's filtered/cursor state (matching what buildSelectorBody would
-//     produce for an equivalent SelectorState). Call m.RenderSelector(body)
-//     on the SAME sized model.
-//   - Assert got == legacy EXACTLY (byte-parity). Any difference is a bug in
-//     RenderSelector and must be reported, not suppressed.
-//
-// Note on the controller stack: applyIntents(PushScreen) does not yet
-// initialize SelectorState (that wiring lands in a later PR-C slice), so
-// the controller Body.Selector path is not exercised here. The parity test
-// directly compares View() with RenderSelector(body) on a shared model
-// instance — which is the contract that gates the selector flip.
+// Originally a byte-parity gate comparing RenderSelector(body) against the legacy
+// SelectorModel.View() built via NewProfile/NewRegion/NewTheme. Those constructors
+// and View() are DEAD per specs/022-codebase-cleanup/wave3-map-text.md (selector.go:
+// "LIVE: NewSelectorWithCtrl, NewTransientSelector, Update, SetSize, RenderSelector").
+// Retargeted onto the live seam: NewTransientSelector(w, h) — RenderSelector reads
+// only m.width/m.height from the model, everything else comes from app.SelectorBody
+// — so no Update()-driven cursor walk is needed; each scenario passes the cursor
+// position directly into the SelectorBody it renders. Assertions check that
+// RenderSelector's own contract (selector.go) holds: every visible item renders,
+// every filtered-out item does not, and the active item's "(current)" marker
+// appears when it's in the visible window.
 package unit_test
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
@@ -39,59 +27,14 @@ import (
 // Helpers
 // ---------------------------------------------------------------------------
 
-// selectorParityKeyPress builds a KeyPressMsg for a single character.
-func selectorParityKeyPress(char string) tea.KeyPressMsg {
-	return tea.KeyPressMsg{Code: -1, Text: char}
-}
-
-// assertSelectorParity calls m.View() and m.RenderSelector(body) on the same
-// model and fails with a line-by-line diff if the two strings differ.
-// kind and scenario are used only for error context.
-func assertSelectorParity(t *testing.T, m *views.SelectorModel, body app.SelectorBody, kind, scenario string) {
-	t.Helper()
-	legacy := m.View()
-	got := m.RenderSelector(body)
-	if got == legacy {
-		return
-	}
-	legacyLines := strings.Split(legacy, "\n")
-	gotLines := strings.Split(got, "\n")
-	maxLines := len(legacyLines)
-	if len(gotLines) > maxLines {
-		maxLines = len(gotLines)
-	}
-	var diff strings.Builder
-	diff.WriteString(fmt.Sprintf(
-		"kind=%s scenario=%s — RenderSelector differs from View():\n  legacy lines=%d  RenderSelector lines=%d\n",
-		kind, scenario, len(legacyLines), len(gotLines),
-	))
-	for i := 0; i < maxLines; i++ {
-		legLine, gotLine := "", ""
-		if i < len(legacyLines) {
-			legLine = legacyLines[i]
-		}
-		if i < len(gotLines) {
-			gotLine = gotLines[i]
-		}
-		if legLine != gotLine {
-			diff.WriteString(fmt.Sprintf(
-				"  line %d:\n    legacy:         %q\n    RenderSelector: %q\n",
-				i+1, legLine, gotLine,
-			))
-		}
-	}
-	t.Errorf("byte-parity FAILED:\n%s", diff.String())
-}
-
-// bodyFromModel constructs the SelectorBody that should be byte-identical to
-// what buildSelectorBody(SelectorState) would produce for the same logical
-// state — mirroring the filtering and cursor-clamping logic in selector.go.
+// bodyFromModel constructs the SelectorBody that buildSelectorBody(SelectorState)
+// would produce for the same logical state — mirroring the filtering and
+// cursor-clamping logic in selector.go.
 //
 // items is the full unfiltered list; filterText is the active filter;
 // cursor is the cursor index into the FILTERED list; activeItem is the
 // item that receives the "(current)" indicator; title is the frame title.
 func bodyFromModel(items []string, filterText, activeItem, title string, cursor int) app.SelectorBody {
-	// Apply filter exactly as applyFilter does.
 	var filtered []string
 	if filterText == "" {
 		filtered = items
@@ -103,7 +46,6 @@ func bodyFromModel(items []string, filterText, activeItem, title string, cursor 
 			}
 		}
 	}
-	// Clamp cursor exactly as buildSelectorBody does.
 	if len(filtered) > 0 && cursor >= len(filtered) {
 		cursor = len(filtered) - 1
 	}
@@ -120,6 +62,33 @@ func bodyFromModel(items []string, filterText, activeItem, title string, cursor 
 	}
 }
 
+// assertSelectorRender renders body via the live NewTransientSelector(w, h) seam
+// and checks selector.go's RenderSelector contract: every filtered-in item is
+// present in the output, and — when a filter is active — every filtered-out item
+// is absent.
+func assertSelectorRender(t *testing.T, w, h int, body app.SelectorBody, kind, scenario string) string {
+	t.Helper()
+	m := views.NewTransientSelector(w, h)
+	got := m.RenderSelector(body)
+	for _, item := range body.Items {
+		if !strings.Contains(got, item) {
+			t.Errorf("kind=%s scenario=%s: RenderSelector output missing visible item %q\n---\n%s", kind, scenario, item, got)
+		}
+	}
+	if body.Filter != "" {
+		visible := map[string]bool{}
+		for _, it := range body.Items {
+			visible[it] = true
+		}
+		for _, it := range body.AllItems {
+			if !visible[it] && strings.Contains(got, it) {
+				t.Errorf("kind=%s scenario=%s: filter %q leaked excluded item %q into RenderSelector output\n---\n%s", kind, scenario, body.Filter, it, got)
+			}
+		}
+	}
+	return got
+}
+
 // ---------------------------------------------------------------------------
 // Selector kind descriptors
 // ---------------------------------------------------------------------------
@@ -129,7 +98,6 @@ type selectorKind struct {
 	items      []string
 	activeItem string
 	title      string
-	newModel   func(items []string, active string, k keys.Map) views.SelectorModel
 }
 
 // fakeProfiles/Regions/Themes are realistic but entirely synthetic —
@@ -161,162 +129,90 @@ var fakeThemes = []string{
 
 func selectorKinds() []selectorKind {
 	return []selectorKind{
-		{
-			name:       "profile",
-			items:      fakeProfiles,
-			activeItem: "staging-account",
-			title:      "aws-profiles",
-			newModel:   views.NewProfile,
-		},
-		{
-			name:       "region",
-			items:      fakeRegions,
-			activeItem: "eu-west-1",
-			title:      "aws-regions",
-			newModel:   views.NewRegion,
-		},
-		{
-			name:       "theme",
-			items:      fakeThemes,
-			activeItem: "dracula",
-			title:      "themes",
-			newModel:   views.NewTheme,
-		},
+		{name: "profile", items: fakeProfiles, activeItem: "staging-account", title: "aws-profiles"},
+		{name: "region", items: fakeRegions, activeItem: "eu-west-1", title: "aws-regions"},
+		{name: "theme", items: fakeThemes, activeItem: "dracula", title: "themes"},
 	}
 }
 
 // ---------------------------------------------------------------------------
-// Top-level parity test
+// Top-level test
 // ---------------------------------------------------------------------------
 
-// TestSelectorRenderParity is the byte-parity gate for RenderSelector.
-// Each subtest builds the same logical state on the legacy (View) and
-// controller (RenderSelector) sides and asserts identical output.
-func TestSelectorRenderParity(t *testing.T) {
+// TestSelectorRender_LiveSeam is the live-path coverage gate for RenderSelector.
+// Each subtest builds a SelectorBody for a given scenario and asserts
+// RenderSelector's rendering contract against it.
+func TestSelectorRender_LiveSeam(t *testing.T) {
 	tuitest.NoColor(t)
 
 	for _, kind := range selectorKinds() {
 		kind := kind
 		t.Run(kind.name, func(t *testing.T) {
-			runSelectorParityScenarios(t, kind)
+			runSelectorRenderScenarios(t, kind)
 		})
 	}
 }
 
-func runSelectorParityScenarios(t *testing.T, kind selectorKind) {
-	k := keys.Default()
+func runSelectorRenderScenarios(t *testing.T, kind selectorKind) {
+	filterMap := map[string]string{
+		"profile": "ac",  // matches *-account items
+		"region":  "us",  // matches us-east-1 and us-west-2
+		"theme":   "tok", // matches tokyo-night-*
+	}
+	filter := filterMap[kind.name]
 
-	// -------------------------------------------------------------------------
 	// S1: Default state — no filter, cursor at 0.
-	// -------------------------------------------------------------------------
 	t.Run("S1_Default", func(t *testing.T) {
-		m := kind.newModel(kind.items, kind.activeItem, k)
-		m.SetSize(80, 24)
-
 		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 0)
-		assertSelectorParity(t, &m, body, kind.name, "S1_Default")
+		assertSelectorRender(t, 80, 24, body, kind.name, "S1_Default")
 	})
 
-	// -------------------------------------------------------------------------
 	// S2: Filter active narrowing the list.
-	// -------------------------------------------------------------------------
 	t.Run("S2_FilterActive", func(t *testing.T) {
-		m := kind.newModel(kind.items, kind.activeItem, k)
-		m.SetSize(80, 24)
-
-		// Use a prefix that matches at least one item in every kind:
-		// profiles → "dev", regions → "us", themes → "tokyo"
-		filterMap := map[string]string{
-			"profile": "ac",  // matches *-account items
-			"region":  "us",  // matches us-east-1 and us-west-2
-			"theme":   "tok", // matches tokyo-night-*
-		}
-		filter := filterMap[kind.name]
-
-		m.SetFilter(filter)
-		// cursor stays at 0 after SetFilter (SetFilter resets cursor).
 		body := bodyFromModel(kind.items, filter, kind.activeItem, kind.title, 0)
-		assertSelectorParity(t, &m, body, kind.name, "S2_FilterActive")
+		assertSelectorRender(t, 80, 24, body, kind.name, "S2_FilterActive")
 	})
 
-	// -------------------------------------------------------------------------
 	// S3: Filter matching nothing.
-	// -------------------------------------------------------------------------
 	t.Run("S3_FilterNoMatch", func(t *testing.T) {
-		m := kind.newModel(kind.items, kind.activeItem, k)
-		m.SetSize(80, 24)
-
-		m.SetFilter("zzznomatch")
 		body := bodyFromModel(kind.items, "zzznomatch", kind.activeItem, kind.title, 0)
-		assertSelectorParity(t, &m, body, kind.name, "S3_FilterNoMatch")
-	})
-
-	// -------------------------------------------------------------------------
-	// S4: Cursor on first item (explicit — same as default but explicit move).
-	// -------------------------------------------------------------------------
-	t.Run("S4_CursorFirst", func(t *testing.T) {
-		m := kind.newModel(kind.items, kind.activeItem, k)
-		m.SetSize(80, 24)
-
-		// Move down once then back to top via 'g'.
-		m, _ = m.Update(selectorParityKeyPress("j"))
-		m, _ = m.Update(selectorParityKeyPress("g"))
-		// cursor is now at 0.
-		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 0)
-		assertSelectorParity(t, &m, body, kind.name, "S4_CursorFirst")
-	})
-
-	// -------------------------------------------------------------------------
-	// S5: Cursor on middle item.
-	// -------------------------------------------------------------------------
-	t.Run("S5_CursorMiddle", func(t *testing.T) {
-		m := kind.newModel(kind.items, kind.activeItem, k)
-		m.SetSize(80, 24)
-
-		mid := len(kind.items) / 2
-		for i := 0; i < mid; i++ {
-			m, _ = m.Update(selectorParityKeyPress("j"))
+		got := assertSelectorRender(t, 80, 24, body, kind.name, "S3_FilterNoMatch")
+		if got != "No items available" {
+			t.Errorf("kind=%s scenario=S3_FilterNoMatch: expected empty-state text, got %q", kind.name, got)
 		}
-		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, mid)
-		assertSelectorParity(t, &m, body, kind.name, "S5_CursorMiddle")
 	})
 
-	// -------------------------------------------------------------------------
-	// S6: Cursor on last item.
-	// -------------------------------------------------------------------------
-	t.Run("S6_CursorLast", func(t *testing.T) {
-		m := kind.newModel(kind.items, kind.activeItem, k)
-		m.SetSize(80, 24)
-
-		last := len(kind.items) - 1
-		// Press 'G' to jump to bottom.
-		m, _ = m.Update(selectorParityKeyPress("G"))
-		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, last)
-		assertSelectorParity(t, &m, body, kind.name, "S6_CursorLast")
-	})
-
-	// -------------------------------------------------------------------------
-	// S7: Active-item indicator — ensure "(current)" renders identically.
-	// The activeItem is in the list; cursor is on a different row.
-	// -------------------------------------------------------------------------
-	t.Run("S7_ActiveItemIndicator", func(t *testing.T) {
-		m := kind.newModel(kind.items, kind.activeItem, k)
-		m.SetSize(80, 24)
-
-		// Keep cursor at 0 — if activeItem is at 0 the indicator is on the
-		// selected row; if not it's on a non-selected row. Both paths matter.
+	// S4: Cursor on first item.
+	t.Run("S4_CursorFirst", func(t *testing.T) {
 		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 0)
-		assertSelectorParity(t, &m, body, kind.name, "S7_ActiveItemIndicator")
+		assertSelectorRender(t, 80, 24, body, kind.name, "S4_CursorFirst")
 	})
 
-	// -------------------------------------------------------------------------
-	// S7b: Active-item on non-cursor row (cursor moved past active item).
-	// -------------------------------------------------------------------------
-	t.Run("S7b_ActiveItemNonCursorRow", func(t *testing.T) {
-		m := kind.newModel(kind.items, kind.activeItem, k)
-		m.SetSize(80, 24)
+	// S5: Cursor on middle item.
+	t.Run("S5_CursorMiddle", func(t *testing.T) {
+		mid := len(kind.items) / 2
+		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, mid)
+		assertSelectorRender(t, 80, 24, body, kind.name, "S5_CursorMiddle")
+	})
 
-		// Find the active item index and move cursor past it.
+	// S6: Cursor on last item.
+	t.Run("S6_CursorLast", func(t *testing.T) {
+		last := len(kind.items) - 1
+		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, last)
+		assertSelectorRender(t, 80, 24, body, kind.name, "S6_CursorLast")
+	})
+
+	// S7: Active-item indicator — activeItem's row must carry "(current)".
+	t.Run("S7_ActiveItemIndicator", func(t *testing.T) {
+		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 0)
+		got := assertSelectorRender(t, 80, 24, body, kind.name, "S7_ActiveItemIndicator")
+		if !strings.Contains(got, "(current)") {
+			t.Errorf("kind=%s scenario=S7_ActiveItemIndicator: expected \"(current)\" marker for %q, got:\n%s", kind.name, kind.activeItem, got)
+		}
+	})
+
+	// S7b: Active-item on a non-cursor row (cursor moved past the active item).
+	t.Run("S7b_ActiveItemNonCursorRow", func(t *testing.T) {
 		activeIdx := -1
 		for i, item := range kind.items {
 			if item == kind.activeItem {
@@ -324,58 +220,31 @@ func runSelectorParityScenarios(t *testing.T, kind selectorKind) {
 				break
 			}
 		}
-		// Move cursor to a row after the active item (wrap to 0 if at end).
 		targetCursor := activeIdx + 1
 		if targetCursor >= len(kind.items) {
 			targetCursor = 0
 		}
-		// Move from 0 to targetCursor by pressing j.
-		for i := 0; i < targetCursor; i++ {
-			m, _ = m.Update(selectorParityKeyPress("j"))
-		}
 		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, targetCursor)
-		assertSelectorParity(t, &m, body, kind.name, "S7b_ActiveItemNonCursorRow")
-	})
-
-	// -------------------------------------------------------------------------
-	// S8: Narrow width (40) — forces label truncation by Lipgloss Width().
-	// -------------------------------------------------------------------------
-	t.Run("S8_NarrowWidth40", func(t *testing.T) {
-		m := kind.newModel(kind.items, kind.activeItem, k)
-		m.SetSize(40, 24)
-
-		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 0)
-		assertSelectorParity(t, &m, body, kind.name, "S8_NarrowWidth40")
-	})
-
-	// -------------------------------------------------------------------------
-	// S9: Wide width (200).
-	// -------------------------------------------------------------------------
-	t.Run("S9_WideWidth200", func(t *testing.T) {
-		m := kind.newModel(kind.items, kind.activeItem, k)
-		m.SetSize(200, 24)
-
-		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 0)
-		assertSelectorParity(t, &m, body, kind.name, "S9_WideWidth200")
-	})
-
-	// -------------------------------------------------------------------------
-	// S10: Filter active AND cursor in the middle of filtered results.
-	// -------------------------------------------------------------------------
-	t.Run("S10_FilterActiveCursorMid", func(t *testing.T) {
-		// Use a filter that yields at least 2 items.
-		filterMap := map[string]string{
-			"profile": "ac",
-			"region":  "us",
-			"theme":   "tok",
+		got := assertSelectorRender(t, 80, 24, body, kind.name, "S7b_ActiveItemNonCursorRow")
+		if !strings.Contains(got, "(current)") {
+			t.Errorf("kind=%s scenario=S7b_ActiveItemNonCursorRow: expected \"(current)\" marker for %q, got:\n%s", kind.name, kind.activeItem, got)
 		}
-		filter := filterMap[kind.name]
+	})
 
-		m := kind.newModel(kind.items, kind.activeItem, k)
-		m.SetSize(80, 24)
-		m.SetFilter(filter)
+	// S8: Narrow width (40) — forces label truncation by Lipgloss Width().
+	t.Run("S8_NarrowWidth40", func(t *testing.T) {
+		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 0)
+		assertSelectorRender(t, 40, 24, body, kind.name, "S8_NarrowWidth40")
+	})
 
-		// Count filtered items to find middle.
+	// S9: Wide width (200).
+	t.Run("S9_WideWidth200", func(t *testing.T) {
+		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 0)
+		assertSelectorRender(t, 200, 24, body, kind.name, "S9_WideWidth200")
+	})
+
+	// S10: Filter active AND cursor on the last filtered result.
+	t.Run("S10_FilterActiveCursorMid", func(t *testing.T) {
 		var filtered []string
 		q := strings.ToLower(filter)
 		for _, item := range kind.items {
@@ -386,51 +255,46 @@ func runSelectorParityScenarios(t *testing.T, kind selectorKind) {
 		if len(filtered) < 2 {
 			t.Skipf("filter %q yields < 2 items for %s, skipping cursor-mid scenario", filter, kind.name)
 		}
-
-		// Move cursor to last filtered item.
 		last := len(filtered) - 1
-		for i := 0; i < last; i++ {
-			m, _ = m.Update(selectorParityKeyPress("j"))
-		}
 		body := bodyFromModel(kind.items, filter, kind.activeItem, kind.title, last)
-		assertSelectorParity(t, &m, body, kind.name, "S10_FilterActiveCursorMid")
+		assertSelectorRender(t, 80, 24, body, kind.name, "S10_FilterActiveCursorMid")
 	})
 
-	// -------------------------------------------------------------------------
-	// S11: Small viewport (height=3) — scroll window smaller than list.
-	// -------------------------------------------------------------------------
+	// S11: Small viewport (height=3) — cursor past the first visible window
+	// forces RenderSelector's VisibleWindow scroll logic to kick in. Only the
+	// scrolled-to window is rendered, so this does NOT use assertSelectorRender
+	// (which expects every body.Items entry to be visible) — it checks the
+	// window size and that the cursor's own item scrolled into view instead.
 	t.Run("S11_SmallViewport", func(t *testing.T) {
-		m := kind.newModel(kind.items, kind.activeItem, k)
-		m.SetSize(80, 3)
-
-		// Move cursor past the first visible window.
-		for i := 0; i < 3; i++ {
-			m, _ = m.Update(selectorParityKeyPress("j"))
-		}
 		body := bodyFromModel(kind.items, "", kind.activeItem, kind.title, 3)
-		assertSelectorParity(t, &m, body, kind.name, "S11_SmallViewport")
+		m := views.NewTransientSelector(80, 3)
+		got := m.RenderSelector(body)
+		lines := strings.Split(got, "\n")
+		if len(lines) != 3 {
+			t.Errorf("kind=%s scenario=S11_SmallViewport: expected 3 visible rows (height=3), got %d:\n%s", kind.name, len(lines), got)
+		}
+		if !strings.Contains(got, kind.items[3]) {
+			t.Errorf("kind=%s scenario=S11_SmallViewport: expected cursor item %q scrolled into view, got:\n%s", kind.name, kind.items[3], got)
+		}
 	})
 
-	// -------------------------------------------------------------------------
-	// S12: Empty items list.
-	// -------------------------------------------------------------------------
+	// S12: Empty items list — RenderSelector's documented empty-state text.
 	t.Run("S12_EmptyItems", func(t *testing.T) {
-		m := kind.newModel([]string{}, "", k)
-		m.SetSize(80, 24)
-
 		body := bodyFromModel([]string{}, "", "", kind.title, 0)
-		assertSelectorParity(t, &m, body, kind.name, "S12_EmptyItems")
+		m := views.NewTransientSelector(80, 24)
+		got := m.RenderSelector(body)
+		if got != "No items available" {
+			t.Errorf("kind=%s scenario=S12_EmptyItems: expected empty-state text, got %q", kind.name, got)
+		}
 	})
 
-	// -------------------------------------------------------------------------
 	// S13: Single item list.
-	// -------------------------------------------------------------------------
 	t.Run("S13_SingleItem", func(t *testing.T) {
 		singleItem := kind.items[0]
-		m := kind.newModel([]string{singleItem}, singleItem, k)
-		m.SetSize(80, 24)
-
 		body := bodyFromModel([]string{singleItem}, "", singleItem, kind.title, 0)
-		assertSelectorParity(t, &m, body, kind.name, "S13_SingleItem")
+		got := assertSelectorRender(t, 80, 24, body, kind.name, "S13_SingleItem")
+		if !strings.Contains(got, "(current)") {
+			t.Errorf("kind=%s scenario=S13_SingleItem: expected \"(current)\" marker for the single active item, got:\n%s", kind.name, got)
+		}
 	})
 }

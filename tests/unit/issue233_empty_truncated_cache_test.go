@@ -36,8 +36,8 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // setupLiveModeEC2Detail creates a NON-demo root model (so the real checker path runs),
@@ -55,7 +55,9 @@ func setupLiveModeEC2Detail(t *testing.T) (tui.Model, []resource.Resource) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ec2Client := fakes.NewEC2()
-	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	ec2Res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), ec2Client, token)
+	})
 	if err != nil || len(ec2Res) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
@@ -161,9 +163,9 @@ func TestContract_EmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
 		Result: resource.RelatedCheckResult{
-			TargetType:  "tg",
-			Count:       0,
-			Truncated: true, // honest lower bound: page was truncated
+			TargetType: "tg",
+			Count:      0,
+			Truncated:  true, // honest lower bound: page was truncated
 		},
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			"tg": {
@@ -216,9 +218,9 @@ func TestContract_NonEmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
 		Result: resource.RelatedCheckResult{
-			TargetType:  "tg",
-			Count:       0,
-			Truncated: true,
+			TargetType: "tg",
+			Count:      0,
+			Truncated:  true,
 		},
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			"tg": {
@@ -291,7 +293,9 @@ func TestContract_EmptyCompletePage_IsTruncatedFalse(t *testing.T) {
 // This test PASSES with current code.
 func TestContract_EmptyTruncatedPage_CheckerBehavior_Direct(t *testing.T) {
 	ec2Client := fakes.NewEC2()
-	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	ec2Res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), ec2Client, token)
+	})
 	if err != nil || len(ec2Res) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}

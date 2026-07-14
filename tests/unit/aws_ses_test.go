@@ -25,6 +25,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -205,7 +206,7 @@ func TestFetchSESIdentitiesPage_MultipleIssuesSuffixBumped(t *testing.T) {
 				{
 					IdentityName:       aws.String("broken.acme-corp.com"),
 					IdentityType:       sesv2types.IdentityTypeDomain,
-					SendingEnabled:     false, // second issue
+					SendingEnabled:     false,                               // second issue
 					VerificationStatus: sesv2types.VerificationStatusFailed, // first issue
 				},
 			},
@@ -423,7 +424,9 @@ func TestFetchSESIdentities_NilEmailIdentitiesSliceReturnsZero(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSESIdentities(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSESIdentitiesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

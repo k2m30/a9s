@@ -12,26 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchKinesisStreams calls the Kinesis ListStreams API and converts the
-// response into a slice of generic Resource structs.
-// Uses the StreamSummaries field (not the legacy StreamNames).
-func FetchKinesisStreams(ctx context.Context, api KinesisListStreamsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchKinesisStreamsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // computeKinesisFindings returns a []domain.Finding for the given Kinesis stream state.
 func computeKinesisFindings(state kinesistypes.StreamStatus) []domain.Finding {
 	switch state {

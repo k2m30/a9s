@@ -10,7 +10,9 @@ package unit
 //   - Hint not shown for non-error flashes
 //   - "!" key opens error log viewer (YAMLModel in text mode)
 //   - "!" key with empty history shows flash instead of opening viewer
-//   - NewTextViewer constructor: title, content, CopyContent, RawContent
+//   - Copy-label pin for the error-log text screen lives in
+//     wave3_text_ports_test.go (TestWave3Port_ErrorLogCopy_UncoloredContent) —
+//     the live handleCopy seam, not the dead NewTextViewer constructor.
 // ══════════════════════════════════════════════════════════════════════════════
 
 import (
@@ -21,10 +23,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ── TestErrorHistoryAccumulation ─────────────────────────────────────────────
@@ -318,92 +318,6 @@ func TestErrorLogKeyEmptyHistory(t *testing.T) {
 	if !strings.Contains(plain, "resource-types") {
 		t.Errorf("pressing '!' with empty history must not push a viewer (should stay on main menu), got: %s",
 			plain[:min(300, len(plain))])
-	}
-}
-
-// ── TestTextViewer ────────────────────────────────────────────────────────────
-
-// TestTextViewer verifies the views.NewTextViewer constructor:
-//   - FrameTitle() returns the title passed to the constructor
-//   - View() output contains both lines of the content
-//   - CopyContent() returns the raw text
-//   - RawContent() returns the raw text
-func TestTextViewer_FrameTitle(t *testing.T) {
-	k := keys.Default()
-	tv := views.NewTextViewer("my error log", "line 1\nline 2", k)
-
-	title := tv.FrameTitle()
-	if title != "my error log" {
-		t.Errorf("NewTextViewer FrameTitle() = %q, want %q", title, "my error log")
-	}
-}
-
-func TestTextViewer_ViewContainsContent(t *testing.T) {
-	k := keys.Default()
-	tv := views.NewTextViewer("test title", "line 1\nline 2", k)
-	tv.SetSize(80, 24)
-
-	output := tv.View()
-
-	if !strings.Contains(output, "line 1") {
-		t.Errorf("NewTextViewer View() should contain 'line 1', got: %q", output[:min(200, len(output))])
-	}
-	if !strings.Contains(output, "line 2") {
-		t.Errorf("NewTextViewer View() should contain 'line 2', got: %q", output[:min(200, len(output))])
-	}
-}
-
-func TestTextViewer_CopyContentReturnsRawText(t *testing.T) {
-	k := keys.Default()
-	content := "line 1\nline 2"
-	tv := views.NewTextViewer("test title", content, k)
-
-	got, _ := tv.CopyContent()
-	if got != content {
-		t.Errorf("NewTextViewer CopyContent() = %q, want %q", got, content)
-	}
-}
-
-func TestTextViewer_RawContentReturnsRawText(t *testing.T) {
-	k := keys.Default()
-	content := "line 1\nline 2"
-	tv := views.NewTextViewer("test title", content, k)
-
-	got := tv.RawContent()
-	if got != content {
-		t.Errorf("NewTextViewer RawContent() = %q, want %q", got, content)
-	}
-}
-
-// TestTextViewer_EmptyContent verifies NewTextViewer handles empty content gracefully.
-func TestTextViewer_EmptyContent(t *testing.T) {
-	k := keys.Default()
-	tv := views.NewTextViewer("empty log", "", k)
-	tv.SetSize(80, 24)
-
-	// Must not panic.
-	output := tv.View()
-	_ = output // view may be blank — that's fine
-
-	title := tv.FrameTitle()
-	if title != "empty log" {
-		t.Errorf("NewTextViewer FrameTitle() with empty content = %q, want %q", title, "empty log")
-	}
-}
-
-// TestTextViewer_SatisfiesViewInterface verifies that *views.YAMLModel returned
-// by NewTextViewer satisfies the views.View interface (compile-time check via cast).
-func TestTextViewer_SatisfiesViewInterface(t *testing.T) {
-	k := keys.Default()
-	tv := views.NewTextViewer("interface test", "content", k)
-
-	// views.View requires FrameTitle() and CopyContent() — verify they return sane values.
-	if tv.FrameTitle() == "" {
-		t.Error("NewTextViewer FrameTitle() must return non-empty string")
-	}
-	content, _ := tv.CopyContent()
-	if content != "content" {
-		t.Errorf("NewTextViewer CopyContent() = %q, want %q", content, "content")
 	}
 }
 

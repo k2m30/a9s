@@ -11,8 +11,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	tui "github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	tui "github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -57,7 +57,7 @@ func plainText(s string) string {
 // 26-D01: All matches highlighted with ANSI sequences after search confirmed.
 func TestSearch_D01_AllMatchesHighlighted(t *testing.T) {
 	plain := "running state: running\nnot matching\nalso running here"
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	searchActivateAndConfirm(&s, plain, "running")
 
 	if s.MatchCount() != 3 {
@@ -84,7 +84,7 @@ func TestSearch_D01_AllMatchesHighlighted(t *testing.T) {
 // 26-D02: Current match visually distinct from other matches (different ANSI sequences).
 func TestSearch_D02_CurrentMatchDistinctFromOthers(t *testing.T) {
 	plain := "match one\nmatch two\nmatch three\nmatch four\nmatch five"
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	searchActivateAndConfirm(&s, plain, "match")
 
 	if s.MatchCount() != 5 {
@@ -143,7 +143,7 @@ func TestSearch_D03_HighlightOverridesSyntaxColor(t *testing.T) {
 	plain := "InstanceType: t3.medium"
 	styled := blueOpen + "InstanceType" + reset + ": " + greenOpen + "t3.medium" + reset
 
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain)
 	s.SetQuery("medium")
 
@@ -180,7 +180,7 @@ func TestSearch_D04_HighlightOverridesStatusColor(t *testing.T) {
 	plain := "Status: running"
 	styled := "Status: " + greenOpen + "running" + reset
 
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain)
 	s.SetQuery("running")
 
@@ -216,7 +216,7 @@ func TestSearch_D05_PartialMatchWithinStyledToken(t *testing.T) {
 	plain := "us-east-1a"
 	styled := greenOpen + "us-east-1a" + reset
 
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain)
 	s.SetQuery("east")
 
@@ -428,7 +428,7 @@ func TestSearch_E05_SingleMatch_NoChange(t *testing.T) {
 
 // 26-I01: Case-insensitive by default — "run" matches "running" and "RunTimeConfig".
 func TestSearch_I01_CaseInsensitiveDefault(t *testing.T) {
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent("Status: running\nRunTimeConfig: enabled")
 	s.SetQuery("run")
 
@@ -439,7 +439,7 @@ func TestSearch_I01_CaseInsensitiveDefault(t *testing.T) {
 
 // 26-I02: Case-insensitive matches uppercase YAML keys — "instance" matches "InstanceId", "InstanceType".
 func TestSearch_I02_CaseInsensitiveMatchesUppercaseKeys(t *testing.T) {
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent("InstanceId: i-abc123\nInstanceType: t3.micro\nPublicIpAddress: 1.2.3.4")
 	s.SetQuery("instance")
 
@@ -493,7 +493,7 @@ func TestSearch_J01_SearchOnVisibleTextNotANSI(t *testing.T) {
 	plain := "InstanceType: t3.medium"
 	styled := blueOpen + "InstanceType" + reset + ": " + greenOpen + "t3.medium" + reset
 
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain) // SetContent takes ANSI-stripped plain text
 	s.SetQuery("t3.medium")
 
@@ -533,7 +533,7 @@ func TestSearch_J02_MatchSpansStyledBoundary(t *testing.T) {
 	plain := "Key: value"
 	styled := blueOpen + "Key" + reset + ": value"
 
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain)
 	s.SetQuery("Key: value")
 
@@ -567,7 +567,7 @@ func TestSearch_J04_SearchInColoredStatusValue(t *testing.T) {
 	plain := "Status: running"
 	styled := "Status: " + greenOpen + "running" + reset
 
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain)
 	s.SetQuery("running")
 
@@ -607,7 +607,7 @@ func TestSearch_M01_VeryLongSingleLine(t *testing.T) {
 	longBase64 := strings.Repeat("AAAA", 50) + "LS0t" + strings.Repeat("BBBB", 50)
 	plain := prefix + longBase64
 
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain)
 	s.SetQuery("LS0t")
 
@@ -630,7 +630,7 @@ func TestSearch_M01_VeryLongSingleLine(t *testing.T) {
 func TestSearch_M02_MultipleMatchesSameLine(t *testing.T) {
 	plain := "ERROR: failed to process ERROR code in ERROR handler"
 
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain)
 	s.SetQuery("ERROR")
 
@@ -670,7 +670,7 @@ func TestSearch_M02_MultipleMatchesSameLine(t *testing.T) {
 func TestSearch_M03_MatchAtBeginningOfContent(t *testing.T) {
 	plain := "AmiLaunchIndex: 0\nSomeOtherField: value"
 
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain)
 	s.SetQuery("Ami")
 
@@ -699,7 +699,7 @@ func TestSearch_M04_MatchAtEndOfContent(t *testing.T) {
 	}
 	plain := strings.Join(lines, "\n")
 
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain)
 	s.SetQuery("abcdef0")
 
@@ -724,7 +724,7 @@ func TestSearch_M04_MatchAtEndOfContent(t *testing.T) {
 func TestSearch_M05_SearchSingleCharColon(t *testing.T) {
 	plain := "Key1: val1\nKey2: val2\nKey3: val3\nKey4: val4\nKey5: val5"
 
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain)
 	s.SetQuery(":")
 
@@ -770,7 +770,7 @@ func TestSearch_M06_RapidNavigation(t *testing.T) {
 	}
 	plain := strings.TrimRight(linesBuf.String(), "\n")
 
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain)
 	s.SetQuery(":")
 

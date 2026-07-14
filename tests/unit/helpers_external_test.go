@@ -46,10 +46,6 @@ func detailKeyPress(char string) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: -1, Text: char}
 }
 
-func detailSpecialKey(code rune) tea.KeyPressMsg {
-	return tea.KeyPressMsg{Code: code}
-}
-
 // ---------------------------------------------------------------------------
 // Detail model builders
 // ---------------------------------------------------------------------------
@@ -61,20 +57,6 @@ func newDetailModel(res resource.Resource, resourceType string, cfg *config.View
 	m := views.NewDetail(res, resourceType, cfg, k)
 	m.SetSize(200, 100)
 	return m
-}
-
-// newDetailModelSmall creates a DetailModel with a small viewport to test scrolling.
-func newDetailModelSmall(res resource.Resource, resourceType string, cfg *config.ViewsConfig) views.DetailModel {
-	k := keys.Default()
-	m := views.NewDetail(res, resourceType, cfg, k)
-	m.SetSize(80, 5)
-	return m
-}
-
-// detailApplyMsg sends a message through the DetailModel's Update.
-func detailApplyMsg(m views.DetailModel, msg tea.Msg) (views.DetailModel, tea.Cmd) {
-	updated, cmd := m.Update(msg)
-	return updated, cmd
 }
 
 // ---------------------------------------------------------------------------
@@ -118,4 +100,31 @@ func configForType(typeName string) *config.ViewsConfig {
 			typeName: vd,
 		},
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Paginated fetcher draining -- canonical implementation for the unit_test
+// package. The package-unit (non _test) equivalent lives in helpers_test.go.
+// ---------------------------------------------------------------------------
+
+// collectAllPages drains a paginated fetcher (a *Page function bound to its
+// ctx/api args via closure) until IsTruncated is false, mirroring the
+// deleted all-pages FetchX wrappers' exact semantics: append each page's
+// resources, stop on the first error (discarding any partial results), and
+// stop once Pagination is nil or IsTruncated is false.
+func collectAllPages(fetch func(token string) (resource.FetchResult, error)) ([]resource.Resource, error) {
+	var all []resource.Resource
+	token := ""
+	for {
+		result, err := fetch(token)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			break
+		}
+		token = result.Pagination.NextToken
+	}
+	return all, nil
 }

@@ -61,7 +61,7 @@ func checkECSSvcAlarms(ctx context.Context, clients any, res resource.Resource, 
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := ecsSvcRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -112,7 +112,7 @@ func checkECSSvcCFN(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 
-	cfnList, truncated, err := ecsSvcRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -161,7 +161,7 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 	}
 
 	// Step 2: scan TG cache for matching target groups.
-	tgList, truncatedTG, err := ecsSvcRelatedResources(ctx, clients, cache, "tg")
+	tgList, truncatedTG, err := relatedResourcesFor(ctx, clients, cache, "tg")
 	if err != nil {
 		return resource.ErrorRelated("elb", err)
 	}
@@ -201,7 +201,7 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 	// hits. The elb fetcher populates Fields["load_balancer_arn"]; RawStruct
 	// is the fallback for cache-restored rows that predate the field or lost
 	// it to a stale replay.
-	elbList, truncatedELB, err := ecsSvcRelatedResources(ctx, clients, cache, "elb")
+	elbList, truncatedELB, err := relatedResourcesFor(ctx, clients, cache, "elb")
 	if err != nil {
 		return resource.ErrorRelated("elb", err)
 	}
@@ -252,7 +252,7 @@ func checkECSSvcLogs(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
 
-	logList, truncated, err := ecsSvcRelatedResources(ctx, clients, cache, "logs")
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
@@ -290,18 +290,6 @@ func checkECSSvcSG(_ context.Context, _ any, res resource.Resource, _ resource.R
 	return relatedResult("sg", ids)
 }
 
-// ecsSvcRelatedResources returns the resource list for target from cache or fetches
-// the first page via the registered paginated fetcher.
-func ecsSvcRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
-}
-
 // checkECSSvcRole extracts the IAM role name from the ECS Service's RoleArn field.
 // The RoleArn has the form arn:aws:iam::ACCOUNT:role/ROLE-NAME; the role name is
 // the last segment after "/".
@@ -315,4 +303,10 @@ func checkECSSvcRole(_ context.Context, _ any, res resource.Resource, _ resource
 		return relatedResult("role", []string{arn[idx+1:]})
 	}
 	return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+}
+
+// ecsSvcRelatedResources returns the resource list for target from cache or by
+// fetching the first page via the registered paginated fetcher.
+func ecsSvcRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+	return relatedResourcesFor(ctx, clients, cache, target)
 }

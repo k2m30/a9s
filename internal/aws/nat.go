@@ -11,25 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchNatGateways calls the EC2 DescribeNatGateways API and converts the
-// response into a slice of generic Resource structs.
-func FetchNatGateways(ctx context.Context, api EC2DescribeNatGatewaysAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchNatGatewaysPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchNatGatewaysPage fetches a single page of NAT gateways.
 func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &ec2.DescribeNatGatewaysInput{

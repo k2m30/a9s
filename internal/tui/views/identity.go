@@ -55,11 +55,6 @@ func NewIdentity(profile, region string, k keys.Map) IdentityModel {
 	}
 }
 
-// Init implements tea.Model.
-func (m IdentityModel) Init() (IdentityModel, tea.Cmd) {
-	return m, nil
-}
-
 // Update handles messages. IdentityLoadedMsg/IdentityErrorMsg update state;
 // any KeyMsg sends PopViewMsg (dismisses the view).
 func (m IdentityModel) Update(msg tea.Msg) (IdentityModel, tea.Cmd) {
@@ -196,26 +191,8 @@ func padRight(s string, w int) string {
 	return s + strings.Repeat(" ", w-visW)
 }
 
-// CopyContent returns the ARN for clipboard copy.
-func (m IdentityModel) CopyContent() (string, string) {
-	if m.state == identityLoaded && m.data.ARN != "" {
-		return m.data.ARN, "Copied!"
-	}
-	return "", ""
-}
-
-// GetHelpContext returns the help context for the identity view.
-func (m IdentityModel) GetHelpContext() HelpContext {
-	return HelpFromMainMenu
-}
-
 // SetSize updates layout dimensions.
 func (m *IdentityModel) SetSize(w, h int) {
 	m.width = w
 	m.height = h
-}
-
-// FrameTitle returns "identity".
-func (m IdentityModel) FrameTitle() string {
-	return "identity"
 }

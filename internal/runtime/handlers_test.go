@@ -136,19 +136,6 @@ func findConnectPayload(tasks []TaskRequest) (ConnectPayload, bool) {
 	return ConnectPayload{}, false
 }
 
-// findEmitNavigatePayload returns the EmitNavigatePayload from the first
-// TaskKindEmitNavigate task.
-func findEmitNavigatePayload(tasks []TaskRequest) (EmitNavigatePayload, bool) {
-	for _, t := range tasks {
-		if t.Key.Kind == TaskKindEmitNavigate {
-			if p, ok := t.Payload.(EmitNavigatePayload); ok {
-				return p, true
-			}
-		}
-	}
-	return EmitNavigatePayload{}, false
-}
-
 // ---- HandleFlash tests -----------------------------------------------------
 
 // TestHandleFlash_NotError: IsError=false → single FlashIntent, no

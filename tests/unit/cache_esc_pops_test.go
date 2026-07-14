@@ -25,8 +25,8 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // TestCachePoison_RelatedNavigate_DoesNotOverwriteTopLevelCache verifies that
@@ -60,7 +60,9 @@ func TestCachePoison_RelatedNavigate_DoesNotOverwriteTopLevelCache(t *testing.T)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	clients := demo.NewServiceClients()
-	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), clients.EC2)
+	ec2Res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), clients.EC2, token)
+	})
 	if err != nil || len(ec2Res) < 2 {
 		t.Fatalf("demo ec2 fixtures need at least 2 resources for cache-poisoning test: err=%v len=%d", err, len(ec2Res))
 	}

@@ -11,16 +11,13 @@
 // the view-stack-pushing handlers.
 package runtime
 
-import "github.com/k2m30/a9s/v3/internal/domain"
-
 // ScreenID is the stable identifier for a registered screen. Adapters use
 // it to look up the renderer-specific builder; the shared core never
 // constructs renderer types itself.
 type ScreenID string
 
 // Screen IDs used by the headless controller's applyNavResult and the TUI
-// adapter. Capability screens (logs, ct.scan, cost) reuse the existing
-// ScreenContext-only PushScreen path and are not enumerated here.
+// adapter.
 const (
 	ScreenProfileSelector ScreenID = "profile-selector"
 	ScreenReveal          ScreenID = "reveal"
@@ -70,15 +67,11 @@ const (
 type ScreenContext struct {
 	ResourceType string
 	ResourceID   string
-	Capability   domain.CapabilityID
-	// Query is the zero value when the screen is not query-driven.
-	Query domain.QuerySpec
 }
 
 // ScreenPayload is the marker interface for typed per-Screen payload
 // structs. PushScreen.Payload carries one of these; adapters type-switch
-// on the concrete type to recover the payload fields. nil Payload is
-// permitted when ScreenContext.Capability alone suffices for routing.
+// on the concrete type to recover the payload fields.
 type ScreenPayload interface {
 	isScreenPayload()
 }
@@ -111,21 +104,3 @@ type ChildListPayload struct {
 }
 
 func (ChildListPayload) isScreenPayload() {}
-
-// ScreenDescriptor declaratively describes one registrable screen. Used by
-// the adapter to wire its builder map and by the runtime to validate that
-// a capability resolves to a known screen.
-type ScreenDescriptor struct {
-	ID    ScreenID
-	Title string
-}
-
-// ScreenRegistry is the runtime-side registry of declared screens. The
-// renderer adapter owns the parallel map from ScreenID to its concrete
-// builder type (e.g. tea.Model factory). Capability dispatch flows
-// CapabilityID -> ScreenID -> renderer-specific builder.
-type ScreenRegistry interface {
-	Register(ScreenDescriptor)
-	Get(ScreenID) (ScreenDescriptor, bool)
-	ScreenForCapability(domain.CapabilityID) (ScreenID, bool)
-}

@@ -300,3 +300,22 @@ func TestGetDefaultRegion_NothingAnywhere_FallsBackToUsEast1(t *testing.T) {
 		t.Errorf("expected fallback region %q, got %q", "us-east-1", region)
 	}
 }
+
+// ini.v1 parity: key lookups (region, source_profile) are case-insensitive
+// (InsensitiveKeys); section names are exact-case — do not "fix" findINISection.
+func TestGetDefaultRegion_CapitalizedKeys_MainParity(t *testing.T) {
+	configPath := filepath.Join("..", "testdata", "aws_profile", "config_case_insensitive_keys")
+
+	cases := []struct {
+		profile string
+		want    string
+	}{
+		{"cap-region", "eu-central-1"},
+		{"cap-source", "ap-southeast-2"},
+	}
+	for _, tc := range cases {
+		if got := awsclient.GetDefaultRegion(configPath, tc.profile); got != tc.want {
+			t.Errorf("GetDefaultRegion(%q) = %q, want %q", tc.profile, got, tc.want)
+		}
+	}
+}

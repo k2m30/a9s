@@ -2,6 +2,7 @@ package app
 
 import (
 	"maps"
+	"strconv"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -565,15 +566,15 @@ func menuFrameTitle(ms *MenuState) string {
 	var title string
 	switch {
 	case ms.Filter != "" || ms.AttentionOnly:
-		title = "resource-types(" + itoa(filtered) + "/" + itoa(total) + ")"
+		title = "resource-types(" + strconv.Itoa(filtered) + "/" + strconv.Itoa(total) + ")"
 	default:
-		title = "resource-types(" + itoa(total) + ")"
+		title = "resource-types(" + strconv.Itoa(total) + ")"
 	}
 	if ms.AttentionOnly {
 		title += " [!]"
 	}
 	if ms.EnrichTotal > 0 && ms.EnrichChecked < ms.EnrichTotal {
-		title += " [enriching " + itoa(ms.EnrichChecked) + "/" + itoa(ms.EnrichTotal) + "]"
+		title += " [enriching " + strconv.Itoa(ms.EnrichChecked) + "/" + strconv.Itoa(ms.EnrichTotal) + "]"
 	}
 	return title
 }
@@ -583,10 +584,10 @@ func menuFrameTitle(ms *MenuState) string {
 // menuFrameTitle() carries the full frame title string (base + suffix).
 func menuProgressIndicator(ms *MenuState) string {
 	if ms.EnrichTotal > 0 && ms.EnrichChecked < ms.EnrichTotal {
-		return "[enriching " + itoa(ms.EnrichChecked) + "/" + itoa(ms.EnrichTotal) + "]"
+		return "[enriching " + strconv.Itoa(ms.EnrichChecked) + "/" + strconv.Itoa(ms.EnrichTotal) + "]"
 	}
 	if ms.AvailTotal > 0 && ms.AvailChecked < ms.AvailTotal {
-		return "[checking " + itoa(ms.AvailChecked) + "/" + itoa(ms.AvailTotal) + "]"
+		return "[checking " + strconv.Itoa(ms.AvailChecked) + "/" + strconv.Itoa(ms.AvailTotal) + "]"
 	}
 	return ""
 }
@@ -604,30 +605,6 @@ func menuPageSizeFor(a Action) int {
 		return a.N
 	}
 	return menuPageSize
-}
-
-// itoa converts an int to its decimal string representation without importing
-// strconv (mirrors the views.itoa helper kept in the same conceptual layer).
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	buf := [20]byte{}
-	pos := len(buf)
-	for n > 0 {
-		pos--
-		buf[pos] = byte('0' + n%10)
-		n /= 10
-	}
-	if neg {
-		pos--
-		buf[pos] = '-'
-	}
-	return string(buf[pos:])
 }
 
 // MenuFrameTitle returns the frame-border title for the main-menu screen,

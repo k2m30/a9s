@@ -17,7 +17,7 @@ func checkAMIEC2(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
 	}
 
-	ec2List, truncated, err := amiRelatedResources(ctx, clients, cache, "ec2")
+	ec2List, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
 	if err != nil {
 		return resource.ErrorRelated("ec2", err)
 	}
@@ -54,18 +54,6 @@ func checkAMIEBSSnaps(_ context.Context, _ any, res resource.Resource, _ resourc
 	return relatedResult("ebs-snap", ids)
 }
 
-// amiRelatedResources returns the cached resource list for the given target type,
-// or fetches the first page via the registered paginated fetcher.
-func amiRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
-}
-
 // checkAMIASG scans the asg cache for Auto Scaling Groups whose currently
 // running instances launched from this AMI. The AutoScalingGroup struct does
 // NOT embed an ImageId (it references a LaunchTemplate or LaunchConfiguration,
@@ -80,14 +68,14 @@ func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
 	}
 
-	asgList, asgTruncated, err := amiRelatedResources(ctx, clients, cache, "asg")
+	asgList, asgTruncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
 	if err != nil {
 		return resource.ErrorRelated("asg", err)
 	}
 	if asgList == nil {
 		return resource.UnknownRelated("asg")
 	}
-	ec2List, ec2Truncated, err := amiRelatedResources(ctx, clients, cache, "ec2")
+	ec2List, ec2Truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
 	if err != nil {
 		return resource.ErrorRelated("asg", err)
 	}
@@ -119,4 +107,10 @@ func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	return relatedResultTrunc("asg", ids, (asgTruncated || ec2Truncated))
+}
+
+// amiRelatedResources returns the resource list for target from cache or by
+// fetching the first page via the registered paginated fetcher.
+func amiRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+	return relatedResourcesFor(ctx, clients, cache, target)
 }

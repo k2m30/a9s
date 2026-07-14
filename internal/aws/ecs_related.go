@@ -25,7 +25,7 @@ func checkECSServices(ctx context.Context, clients any, res resource.Resource, c
 		clusterArn = *raw.ClusterArn
 	}
 
-	svcList, truncated, err := ecsRelatedResources(ctx, clients, cache, "ecs-svc")
+	svcList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-svc")
 	if err != nil {
 		return resource.ErrorRelated("ecs-svc", err)
 	}
@@ -57,7 +57,7 @@ func checkECSAlarms(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := ecsRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -97,7 +97,7 @@ func checkECSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 
-	cfnList, truncated, err := ecsRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -134,13 +134,8 @@ func checkECSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("kms", []string{keyID})
 }
 
-// ecsRelatedResources returns the resource list for target from cache or by fetching the first page.
+// ecsRelatedResources returns the resource list for target from cache or by
+// fetching the first page via the registered paginated fetcher.
 func ecsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
+	return relatedResourcesFor(ctx, clients, cache, target)
 }

@@ -11,8 +11,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 func applyRootAndCmd(t *testing.T, m tui.Model, msg tea.Msg) tui.Model {
@@ -42,7 +42,9 @@ func TestFirstScreen_EC2EnterToDetail_ShowsRelatedColumn(t *testing.T) {
 	})
 
 	ec2Client := fakes.NewEC2()
-	ec2, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	ec2, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), ec2Client, token)
+	})
 	if err != nil || len(ec2) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2))
 	}
@@ -73,11 +75,15 @@ func TestFirstScreen_DetailEnterRelatedList_EscReturnsToDetail(t *testing.T) {
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ec2Client2 := fakes.NewEC2()
-	ec2, err2 := awsclient.FetchEC2Instances(context.Background(), ec2Client2)
+	ec2, err2 := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), ec2Client2, token)
+	})
 	if err2 != nil || len(ec2) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err2, len(ec2))
 	}
-	amis, err3 := awsclient.FetchAMIs(context.Background(), ec2Client2)
+	amis, err3 := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAMIsPage(context.Background(), ec2Client2, token)
+	})
 	if err3 != nil || len(amis) == 0 {
 		t.Fatalf("demo ami fixtures missing (err=%v, len=%d)", err3, len(amis))
 	}
@@ -124,7 +130,9 @@ func TestFirstScreen_DetailMissingType_StillShowsRelatedForEC2Shape(t *testing.T
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ec2Client3 := fakes.NewEC2()
-	ec2, err4 := awsclient.FetchEC2Instances(context.Background(), ec2Client3)
+	ec2, err4 := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), ec2Client3, token)
+	})
 	if err4 != nil || len(ec2) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err4, len(ec2))
 	}
@@ -156,8 +164,8 @@ func TestFirstScreen_DetailEnterExternalImageID_DoesNotEndInEmptyAMIList(t *test
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ec2Res := resource.Resource{
-		ID:     "i-external-ami",
-		Name:   "vpn-like-host",
+		ID:   "i-external-ami",
+		Name: "vpn-like-host",
 		Fields: map[string]string{
 			"InstanceId":         "i-external-ami",
 			"State":              "running",

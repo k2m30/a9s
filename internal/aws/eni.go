@@ -13,25 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchNetworkInterfaces calls the EC2 DescribeNetworkInterfaces API and converts the
-// response into a slice of generic Resource structs.
-func FetchNetworkInterfaces(ctx context.Context, api EC2DescribeNetworkInterfacesAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchNetworkInterfacesPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchNetworkInterfacesPage fetches a single page of network interfaces.
 func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInterfacesAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &ec2.DescribeNetworkInterfacesInput{

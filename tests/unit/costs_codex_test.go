@@ -492,36 +492,6 @@ func TestCostsCodex_X4b_MonthCellDrill_WeekWindowStaysWithinSelectedMonth_BothCu
 }
 
 // ===========================================================================
-// X5 (P2) — NextDim must skip dimensions already pinned in the filter, not
-// just check SERVICE. Traced precisely: costs.NextDim (internal/costs/
-// drill.go) checks ONLY DimensionService's pin status before falling to a
-// static switch on cur.RowDim — from the USAGE_TYPE pivot, after pinning
-// USAGE_TYPE then drilling to SERVICE and pinning that too, RowDim==SERVICE
-// hits the switch's "default" case (return DimensionUsageType) regardless
-// of USAGE_TYPE already being pinned in cur.Filter.
-//
-// RECONCILED (architecture.md Seam 3): this exact scenario is re-pinned
-// GREEN at the typed seam in costs_screen_test.go
-// (TestCostsScreen_DrillPath_Next's "X5" case) — production already
-// carries the fix (this test), and DrillPath.Next is expected to port it
-// unchanged. This test stays as the full-stack acceptance pin on the old
-// mechanism until the coder migrates internal/app off costs.NextDim.
-// ===========================================================================
-
-func TestCostsCodex_X5_NextDim_SkipsAlreadyPinnedDimensions(t *testing.T) {
-	probe := costs.DrillLevel{
-		RowDim: costs.DimensionService,
-		Filter: costs.Filter{Equals: map[costs.Dimension][]string{
-			costs.DimensionUsageType: {"USE1-BoxUsage:m5.large"},
-			costs.DimensionService:   {"Amazon Elastic Compute Cloud - Compute"},
-		}},
-	}
-	if got := costs.NextDim(probe); got != costs.DimensionResourceID {
-		t.Errorf("NextDim with USAGE_TYPE and SERVICE both already pinned: got %q, want %q — a redundant one-row USAGE_TYPE level, not advancing to RESOURCE_ID", got, costs.DimensionResourceID)
-	}
-}
-
-// ===========================================================================
 // X6 (P2) — the STATE cursor must clamp when the display filter shrinks
 // rows (metric change), so Enter always acts on the row the user actually
 // sees highlighted. Traced precisely: applyCostsSelect reads

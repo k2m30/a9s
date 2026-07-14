@@ -44,22 +44,11 @@ type HelpModel struct {
 	height            int
 }
 
-// NewHelp returns a HelpModel with the given view context.
-// The resource short name is empty; no resource-specific legend is shown.
-func NewHelp(k keys.Map, ctx HelpContext) HelpModel {
-	return HelpModel{keys: k, context: ctx}
-}
-
 // NewHelpWithResource returns a HelpModel scoped to a specific resource type.
 // When ctx is HelpFromResourceList or HelpFromResourceListPaginated and
 // resourceShortName is "ct-events", a CloudTrail Events legend is appended.
 func NewHelpWithResource(k keys.Map, ctx HelpContext, resourceShortName string) HelpModel {
 	return HelpModel{keys: k, context: ctx, resourceShortName: resourceShortName}
-}
-
-// Init implements tea.Model.
-func (m HelpModel) Init() (HelpModel, tea.Cmd) {
-	return m, nil
 }
 
 // Update handles any key press by sending PopViewMsg.
@@ -221,23 +210,8 @@ func (m HelpModel) buildGroups() []helpGroup {
 	return groups
 }
 
-// CopyContent returns empty — nothing to copy from the help view.
-func (m HelpModel) CopyContent() (string, string) {
-	return "", ""
-}
-
-// GetHelpContext returns the context this help was opened from.
-func (m HelpModel) GetHelpContext() HelpContext {
-	return m.context
-}
-
 // SetSize updates layout dimensions.
 func (m *HelpModel) SetSize(w, h int) {
 	m.width = w
 	m.height = h
-}
-
-// FrameTitle returns "help".
-func (m HelpModel) FrameTitle() string {
-	return "help"
 }

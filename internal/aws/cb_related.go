@@ -47,7 +47,7 @@ func checkCbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 		expectedLogGroup = *project.LogsConfig.CloudWatchLogs.GroupName
 	}
 
-	logList, truncated, err := cbRelatedResources(ctx, clients, cache, "logs")
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
@@ -135,7 +135,7 @@ func checkCbAlarm(ctx context.Context, clients any, res resource.Resource, cache
 	if projectName == "" {
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
-	alarmList, truncated, err := cbRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -181,7 +181,7 @@ func checkCbECR(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
 	}
 
-	ecrList, truncated, err := cbRelatedResources(ctx, clients, cache, "ecr")
+	ecrList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecr")
 	if err != nil {
 		return resource.ErrorRelated("ecr", err)
 	}
@@ -253,7 +253,7 @@ func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache re
 		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
 	}
 
-	s3List, truncated, err := cbRelatedResources(ctx, clients, cache, "s3")
+	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")
 	if err != nil {
 		return resource.ErrorRelated("s3", err)
 	}
@@ -326,15 +326,4 @@ func checkCbSSM(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		}
 	}
 	return relatedResult("ssm", ids)
-}
-
-// cbRelatedResources returns the resource list for target from cache or by fetching the first page.
-func cbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

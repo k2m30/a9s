@@ -11,6 +11,7 @@ import (
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -45,7 +46,9 @@ func TestFetchECRRepositories_ParsesMultiple(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchECRRepositories(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECRRepositoriesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -111,7 +114,9 @@ func TestFetchECRRepositories_RawStructPopulated(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchECRRepositories(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECRRepositoriesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -134,7 +139,9 @@ func TestFetchECRRepositories_ErrorResponse(t *testing.T) {
 		err: fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchECRRepositories(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECRRepositoriesPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -150,7 +157,9 @@ func TestFetchECRRepositories_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchECRRepositories(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECRRepositoriesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

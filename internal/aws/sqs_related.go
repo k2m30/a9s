@@ -26,7 +26,7 @@ func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("sns")
 	}
 
-	subList, truncated, err := sqsRelatedResources(ctx, clients, cache, "sns-sub")
+	subList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns-sub")
 	if err != nil {
 		return resource.ErrorRelated("sns", err)
 	}
@@ -86,7 +86,7 @@ func checkSQSSNSSub(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("sns-sub")
 	}
 
-	subList, truncated, err := sqsRelatedResources(ctx, clients, cache, "sns-sub")
+	subList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns-sub")
 	if err != nil {
 		return resource.ErrorRelated("sns-sub", err)
 	}
@@ -121,7 +121,7 @@ func checkSQSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := sqsRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -175,7 +175,7 @@ func checkSQSSQS(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	thisName := res.ID
 
-	sqsList, truncated, err := sqsRelatedResources(ctx, clients, cache, "sqs")
+	sqsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sqs")
 	if err != nil {
 		return resource.ErrorRelated("sqs", err)
 	}
@@ -226,18 +226,6 @@ func checkSQSSQS(ctx context.Context, clients any, res resource.Resource, cache 
 		ids = append(ids, id)
 	}
 	return relatedResultTrunc("sqs", ids, truncated)
-}
-
-// sqsRelatedResources returns the cached resource list for the given target type,
-// or fetches the first page via the registered paginated fetcher.
-func sqsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 // checkSQSLambda calls lambda:ListEventSourceMappings to find Lambda functions

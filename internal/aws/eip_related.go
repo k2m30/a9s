@@ -49,7 +49,7 @@ func checkEIPNAT(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "nat", Count: 0}
 	}
 
-	natList, truncated, err := eipRelatedResources(ctx, clients, cache, "nat")
+	natList, truncated, err := relatedResourcesFor(ctx, clients, cache, "nat")
 	if err != nil {
 		return resource.ErrorRelated("nat", err)
 	}
@@ -204,7 +204,7 @@ func eipENIID(res resource.Resource) string {
 // (Pattern C — zero extra API calls, cache join only). Returns the matching
 // task Resource and whether the ecs-task cache was truncated.
 func eipMatchingECSTask(ctx context.Context, clients any, cache resource.ResourceCache, eniID string) (resource.Resource, bool, error) {
-	taskList, truncated, err := eipRelatedResources(ctx, clients, cache, "ecs-task")
+	taskList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-task")
 	if err != nil {
 		return resource.Resource{}, truncated, err
 	}
@@ -301,16 +301,4 @@ func checkEIPECS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "ecs", Count: 0}
 	}
 	return relatedResult("ecs", []string{clusterName})
-}
-
-// eipRelatedResources returns the resource list for target from cache or fetches
-// the first page via the registered paginated fetcher.
-func eipRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

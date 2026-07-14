@@ -321,7 +321,7 @@ func TestExecuteTask_FetchIdentity_ReturnsIdentityResult(t *testing.T) {
 // ────────────────────────────────────────────────────────────────────────────
 
 func TestExecuteTask_LoadAvailCache_ReturnsAvailabilityCacheLoaded(t *testing.T) {
-	// Isolate from ~/.a9s/cache/ so no pre-existing file can make Expired=false.
+	// Isolate from ~/.a9s/cache/ so no pre-existing file affects the result.
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	c := newExecutorCore(t)
 	ev, err := c.ExecuteTask(context.Background(), req(runtime.TaskKindLoadAvailCache, ""))
@@ -332,13 +332,9 @@ func TestExecuteTask_LoadAvailCache_ReturnsAvailabilityCacheLoaded(t *testing.T)
 	if !ok {
 		t.Fatalf("expected messages.AvailabilityCacheLoaded, got %T", ev)
 	}
-	// No cache file exists for demo profile → Entries must be non-nil map (possibly empty)
-	// and Expired must be true.
+	// No cache file exists for demo profile → Entries must be non-nil map (possibly empty).
 	if got.Entries == nil {
 		t.Error("Entries must not be nil")
-	}
-	if !got.Expired {
-		t.Error("Expired must be true when no cache file exists")
 	}
 }
 

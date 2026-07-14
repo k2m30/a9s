@@ -13,25 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchCloudFrontDistributions calls the CloudFront ListDistributions API and converts
-// the response into a slice of generic Resource structs.
-func FetchCloudFrontDistributions(ctx context.Context, api CloudFrontListDistributionsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchCloudFrontDistributionsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchCloudFrontDistributionsPage fetches a single page of CloudFront distributions.
 func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDistributionsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &cloudfront.ListDistributionsInput{

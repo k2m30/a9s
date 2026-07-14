@@ -662,7 +662,7 @@ func TestIssueTextStyleGate_RenderedListCellsNeverRawEnum(t *testing.T) {
 func checkCellStyleGate(
 	t *testing.T,
 	shortName, resourceID, columnTitle, cell string,
-	newlyRegressed, readyForBurnDown, stillGapped *[]string,
+	newlyRegressed, _, stillGapped *[]string,
 ) {
 	t.Helper()
 	key := fmt.Sprintf("%s:%s:%s", shortName, resourceID, columnTitle)

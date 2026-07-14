@@ -131,7 +131,7 @@ func checkDbcAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := dbcRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -164,7 +164,7 @@ func checkDbcLogs(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
 
-	logList, truncated, err := dbcRelatedResources(ctx, clients, cache, "logs")
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
@@ -186,17 +186,6 @@ func checkDbcLogs(ctx context.Context, clients any, res resource.Resource, cache
 	return relatedResultTrunc("logs", ids, truncated)
 }
 
-// dbcRelatedResources returns the resource list for target from cache or by fetching the first page.
-func dbcRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
-}
-
 // checkDbcDBI does a reverse lookup — scans the dbi cache for DBInstances
 // whose DBClusterIdentifier matches this cluster's identifier. Aurora /
 // DocumentDB clusters own one or more DBInstance members.
@@ -210,7 +199,7 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
 	}
 
-	dbiList, truncated, err := dbcRelatedResources(ctx, clients, cache, "dbi")
+	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
 	if err != nil {
 		return resource.ErrorRelated("dbi", err)
 	}
@@ -244,7 +233,7 @@ func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "dbc-snap", Count: 0}
 	}
 
-	snapList, truncated, err := dbcRelatedResources(ctx, clients, cache, "dbc-snap")
+	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbc-snap")
 	if err != nil {
 		return resource.ErrorRelated("dbc-snap", err)
 	}
@@ -387,7 +376,7 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
 	}
 
-	secretList, truncated, err := dbcRelatedResources(ctx, clients, cache, "secrets")
+	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
 		return resource.ErrorRelated("secrets", err)
 	}

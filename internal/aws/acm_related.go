@@ -31,7 +31,7 @@ func checkACMCF(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
 	}
 
-	cfList, truncated, err := acmRelatedResources(ctx, clients, cache, "cf")
+	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
 	if err != nil {
 		return resource.ErrorRelated("cf", err)
 	}
@@ -211,16 +211,4 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 	}
 	return relatedResult("r53", ids)
-}
-
-// acmRelatedResources returns the resource list for target from cache or by
-// fetching the first page via the registered paginated fetcher.
-func acmRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

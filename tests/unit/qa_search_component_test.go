@@ -19,7 +19,7 @@ import (
 // TestSearch_SetContentAndQuery_FindsMatches verifies that after setting plain
 // text content and a query, MatchCount() reflects the correct number of hits.
 func TestSearch_SetContentAndQuery_FindsMatches(t *testing.T) {
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent("line one\nline two\nline one again")
 	s.SetQuery("one")
 	if s.MatchCount() != 2 {
@@ -37,7 +37,7 @@ func TestSearch_SetContentAndQuery_FindsMatches(t *testing.T) {
 func TestSearch_Apply_ReturnsHighlightedContent(t *testing.T) {
 	plain := "line one\nline two\nline one again"
 	styled := plain // no existing ANSI in this simple case
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain)
 	s.SetQuery("one")
 
@@ -76,7 +76,7 @@ func TestSearch_ANSIContent_MatchesVisibleTextOnly(t *testing.T) {
 	plain := "hello world"
 	styled := "\x1b[31mhello\x1b[0m world"
 
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain)
 	s.SetQuery("hello")
 
@@ -106,7 +106,7 @@ func TestSearch_ANSIContent_MatchesVisibleTextOnly(t *testing.T) {
 // TestSearch_NextMatch_CyclesThroughMatches verifies that calling NextMatch()
 // advances CurrentMatch() and wraps around after the last match.
 func TestSearch_NextMatch_CyclesThroughMatches(t *testing.T) {
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent("test alpha\ntest beta\ntest gamma")
 	s.SetQuery("test")
 
@@ -143,7 +143,7 @@ func TestSearch_NextMatch_CyclesThroughMatches(t *testing.T) {
 // TestSearch_PrevMatch_CyclesBackward verifies that PrevMatch() decrements
 // CurrentMatch() and wraps from 0 to the last match.
 func TestSearch_PrevMatch_CyclesBackward(t *testing.T) {
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent("test alpha\ntest beta\ntest gamma")
 	s.SetQuery("test")
 
@@ -176,7 +176,7 @@ func TestSearch_PrevMatch_CyclesBackward(t *testing.T) {
 // MatchCount() == 0, MatchInfo() == "0/0 matches", and NextMatch()/PrevMatch()
 // are no-ops (CurrentMatch() stays 0).
 func TestSearch_ZeroMatches_MatchInfoShowsZero(t *testing.T) {
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent("hello")
 	s.SetQuery("xyz")
 
@@ -206,7 +206,7 @@ func TestSearch_ZeroMatches_MatchInfoShowsZero(t *testing.T) {
 // matches and Apply() returns the styled content unchanged.
 func TestSearch_EmptyQuery_NoMatches(t *testing.T) {
 	plain := "hello world"
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent(plain)
 	s.SetQuery("")
 
@@ -226,7 +226,7 @@ func TestSearch_EmptyQuery_NoMatches(t *testing.T) {
 
 // TestSearch_CaseInsensitive verifies that matching is case-insensitive.
 func TestSearch_CaseInsensitive(t *testing.T) {
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent("Hello HELLO hello")
 	s.SetQuery("hello")
 
@@ -242,7 +242,7 @@ func TestSearch_CaseInsensitive(t *testing.T) {
 // TestSearch_Activate_Deactivate verifies IsActive(), IsInputMode(), and that
 // Deactivate() clears the query.
 func TestSearch_Activate_Deactivate(t *testing.T) {
-	s := views.NewSearch()
+	s := views.SearchModel{}
 
 	// Initially inactive.
 	if s.IsActive() {
@@ -275,7 +275,7 @@ func TestSearch_Activate_Deactivate(t *testing.T) {
 // TestSearch_MatchInfo_Format verifies the MatchInfo() format is "N/M matches"
 // where N is the 1-based current match number and M is the total count.
 func TestSearch_MatchInfo_Format(t *testing.T) {
-	s := views.NewSearch()
+	s := views.SearchModel{}
 	s.SetContent("foo alpha\nfoo beta\nfoo gamma\nfoo delta\nfoo epsilon")
 	s.SetQuery("foo")
 

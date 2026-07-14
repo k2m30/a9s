@@ -285,7 +285,9 @@ func TestTransientUnknownDrill_EnterRecomputesInPlace(t *testing.T) {
 	m = focusRelatedRow(m)
 
 	ec2Client := fakes.NewEC2()
-	ec2Res, err := awsclient.FetchEC2Instances(t.Context(), ec2Client)
+	ec2Res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(t.Context(), ec2Client, token)
+	})
 	if err != nil || len(ec2Res) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}

@@ -66,25 +66,6 @@ func buildStatusFromIssues(issues []string) string {
 	return issues[0]
 }
 
-// FetchDBISnapshots calls the RDS DescribeDBSnapshots API and converts the
-// response into a slice of generic Resource structs.
-func FetchDBISnapshots(ctx context.Context, api RDSDescribeDBSnapshotsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchDBISnapshotsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchDBISnapshotsPage fetches a single page of RDS snapshots.
 func FetchDBISnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &rds.DescribeDBSnapshotsInput{

@@ -838,16 +838,6 @@ func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated bool, f
 	m.styledRowCache = nil
 }
 
-// ApplyFieldUpdates merges Wave-2-derived field values into the in-memory
-// resource slices via the controller. Invalidates the styled row cache.
-func (m *ResourceListModel) ApplyFieldUpdates(updates map[string]map[string]string) {
-	if len(updates) == 0 {
-		return
-	}
-	m.ctrl.ApplyListFieldUpdates(m.typeDef.ShortName, updates)
-	m.styledRowCache = nil
-}
-
 // SetTruncatedIDs stores the per-resource truncation set for this resource type.
 // Delegated to the controller.
 func (m *ResourceListModel) SetTruncatedIDs(truncatedIDs map[string]bool) {

@@ -245,6 +245,7 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 			}
 			if len(newLines) > 0 {
 				m.ctrl.UpdateTextLines(newLines)
+				m.ctrl.SetTextResource(msg.EnrichedRes)
 			}
 		}
 	}

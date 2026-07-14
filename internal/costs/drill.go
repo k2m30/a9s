@@ -45,38 +45,6 @@ type FallbackGate struct {
 	SelectedPeriod    Period
 }
 
-// NextDim returns the next drill dimension: pivot dim -> SERVICE (if not
-// yet pinned) -> USAGE_TYPE (if not yet pinned) -> RESOURCE_ID. Returns ""
-// once RESOURCE_ID has been reached — the bottom of the chain. A dimension
-// counts as pinned when it is either cur.RowDim itself (the frame currently
-// being viewed — its own row is about to be pinned by whatever value the
-// caller selects, before this frame's own Filter is updated to reflect it)
-// or already present in cur.Filter.Equals (an ancestor frame's own pin) —
-// checking pin status alone, rather than switching on cur.RowDim, correctly
-// skips a dimension already pinned by an earlier drill step regardless of
-// which pivot dimension the chain started from. Deprecated: superseded by
-// internal/costs/screen.DrillPath.Next, kept for its own direct test
-// coverage (costs.NextDim is no longer called from internal/app).
-func NextDim(cur DrillLevel) Dimension {
-	pinned := func(d Dimension) bool {
-		if cur.RowDim == d {
-			return true
-		}
-		_, ok := cur.Filter.Equals[d]
-		return ok
-	}
-	if cur.RowDim == DimensionResourceID {
-		return ""
-	}
-	if !pinned(DimensionService) {
-		return DimensionService
-	}
-	if !pinned(DimensionUsageType) {
-		return DimensionUsageType
-	}
-	return DimensionResourceID
-}
-
 // resourceDrillWindowDays is the CE hard limit for GetCostAndUsageWithResources:
 // the queried range cannot start more than this many days before now.
 const resourceDrillWindowDays = 14

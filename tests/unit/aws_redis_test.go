@@ -46,20 +46,6 @@ func rgOutput(rg elasticachetypes.ReplicationGroup) *elasticache.DescribeReplica
 	}
 }
 
-// fetchOnePage calls FetchRedisPage with the given mock and returns the first
-// resource, failing if the result count does not equal 1.
-func fetchOnePage(t *testing.T, mock *mockRedisRGClient) (interface{ GetFields() map[string]string }, interface{}) {
-	t.Helper()
-	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
-	if err != nil {
-		t.Fatalf("FetchRedisPage error: %v", err)
-	}
-	if len(result.Resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
-	}
-	return nil, result.Resources[0]
-}
-
 // ---------------------------------------------------------------------------
 // T001 — Healthy available: Fields["status"] == "" (Healthy silence)
 // ---------------------------------------------------------------------------

@@ -34,6 +34,19 @@ jobs:
           else
             echo "RELEASE_NOTES=" >> "$GITHUB_ENV"
           fi
+      - name: Validate formula generation
+        # Gate before anything publishes: render against a synthetic
+        # checksums file, check Ruby syntax, and pin the 4-platform shape.
+        run: |
+          FAKE_SHA=$(printf 'a%.0s' $(seq 64))
+          mkdir -p /tmp/formula-check
+          for platform in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64; do
+            echo "${FAKE_SHA}  a9s_0.0.0-check_${platform}.tar.gz" >> /tmp/formula-check/checksums.txt
+          done
+          scripts/generate-homebrew-formula.sh 0.0.0-check /tmp/formula-check/checksums.txt > /tmp/formula-check/a9s.rb
+          ruby -c /tmp/formula-check/a9s.rb
+          test "$(grep -c 'sha256 ' /tmp/formula-check/a9s.rb)" = 4
+          test "$(grep -c 'releases/download/v0.0.0-check/' /tmp/formula-check/a9s.rb)" = 4
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89  # v7.2.2
         with:
@@ -41,9 +54,23 @@ jobs:
           args: release --clean --parallelism 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
           RELEASE_NOTES: ${{ env.RELEASE_NOTES }}
+      - name: Publish Homebrew formula
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          scripts/generate-homebrew-formula.sh "$VERSION" dist/checksums.txt > /tmp/a9s.rb
+          git clone --depth 1 "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/k2m30/homebrew-a9s.git" /tmp/homebrew-a9s
+          mkdir -p /tmp/homebrew-a9s/Formula
+          cp /tmp/a9s.rb /tmp/homebrew-a9s/Formula/a9s.rb
+          cd /tmp/homebrew-a9s
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/a9s.rb
+          git diff --cached --quiet || git commit -m "Brew formula update for a9s version v${VERSION}"
+          git push
 
   docker:
     name: Docker Image

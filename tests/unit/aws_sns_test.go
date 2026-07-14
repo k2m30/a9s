@@ -9,6 +9,7 @@ import (
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -29,7 +30,9 @@ func TestFetchSNSTopics_ParsesMultipleTopics(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSNSTopics(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSNSTopicsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -83,7 +86,9 @@ func TestFetchSNSTopics_ErrorResponse(t *testing.T) {
 		err:    fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchSNSTopics(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSNSTopicsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -99,7 +104,9 @@ func TestFetchSNSTopics_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSNSTopics(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSNSTopicsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

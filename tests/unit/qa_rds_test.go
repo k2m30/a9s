@@ -70,8 +70,8 @@ func fixtureRDSInstancesExtended() []resource.Resource {
 	base := fixtureRDSInstances()
 	return append(base,
 		resource.Resource{
-			ID:     "stopped-db",
-			Name:   "stopped-db",
+			ID:   "stopped-db",
+			Name: "stopped-db",
 			Fields: map[string]string{
 				"db_identifier":  "stopped-db",
 				"engine":         "mysql",
@@ -83,8 +83,8 @@ func fixtureRDSInstancesExtended() []resource.Resource {
 			},
 		},
 		resource.Resource{
-			ID:     "creating-db",
-			Name:   "creating-db",
+			ID:   "creating-db",
+			Name: "creating-db",
 			Fields: map[string]string{
 				"db_identifier":  "creating-db",
 				"engine":         "postgres",
@@ -96,8 +96,8 @@ func fixtureRDSInstancesExtended() []resource.Resource {
 			},
 		},
 		resource.Resource{
-			ID:     "prod-postgres-primary",
-			Name:   "prod-postgres-primary",
+			ID:   "prod-postgres-primary",
+			Name: "prod-postgres-primary",
 			Fields: map[string]string{
 				"db_identifier":  "prod-postgres-primary",
 				"engine":         "postgres",
@@ -1098,10 +1098,10 @@ func TestQA_RDS_Detail_SwitchToYAML(t *testing.T) {
 func TestQA_RDS_YAML_ContainsFieldKeys(t *testing.T) {
 	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewYAML(res, "", k)
+	m := views.NewYAMLWithCtrl(res, "", k, nil)
 	m.SetSize(120, 40)
 
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 	if out == "Initializing..." || out == "" {
 		t.Fatal("YAML view should not be empty or initializing after SetSize")
 	}
@@ -1117,10 +1117,10 @@ func TestQA_RDS_YAML_ContainsFieldKeys(t *testing.T) {
 func TestQA_RDS_YAML_ContainsFieldValues(t *testing.T) {
 	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewYAML(res, "", k)
+	m := views.NewYAMLWithCtrl(res, "", k, nil)
 	m.SetSize(120, 40)
 
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 	for _, val := range res.Fields {
 		if val == "" {
 			continue
@@ -1131,24 +1131,16 @@ func TestQA_RDS_YAML_ContainsFieldValues(t *testing.T) {
 	}
 }
 
-func TestQA_RDS_YAML_FrameTitle(t *testing.T) {
-	k := keys.Default()
-	res := fixtureRDSInstances()[0]
-	m := views.NewYAML(res, "", k)
-
-	title := m.FrameTitle()
-	expected := "test-docdb-1 yaml"
-	if title != expected {
-		t.Errorf("YAML FrameTitle: expected %q, got %q", expected, title)
-	}
-}
+// TestQA_RDS_YAML_FrameTitle retired: YAMLModel.FrameTitle() is DEAD per
+// specs/022-codebase-cleanup/wave3-map-text.md (no production caller), and
+// title-string behavior is not resource-type-specific.
 
 func TestQA_RDS_YAML_RawContentNonEmpty(t *testing.T) {
 	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewYAML(res, "", k)
+	m := views.NewYAMLWithCtrl(res, "", k, nil)
 
-	raw := m.RawContent()
+	raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
 	if raw == "" {
 		t.Error("YAML RawContent should not be empty")
 	}
@@ -1188,10 +1180,10 @@ func TestQA_RDS_YAML_WithRawStruct(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := views.NewYAML(res, "", k)
+	m := views.NewYAMLWithCtrl(res, "", k, nil)
 	m.SetSize(120, 50)
 
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 	plain := stripANSI(out)
 
 	expectedValues := []string{
@@ -1234,11 +1226,11 @@ func TestQA_RDS_YAML_CreatingInstanceNoEndpoint(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := views.NewYAML(res, "", k)
+	m := views.NewYAMLWithCtrl(res, "", k, nil)
 	m.SetSize(120, 40)
 
 	// Should not panic.
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 	plain := stripANSI(out)
 
 	if strings.Contains(plain, "<nil>") {
@@ -1251,10 +1243,10 @@ func TestQA_RDS_YAML_SyntaxColoring(t *testing.T) {
 
 	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewYAML(res, "", k)
+	m := views.NewYAMLWithCtrl(res, "", k, nil)
 	m.SetSize(120, 40)
 
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 
 	// The raw view should contain ANSI sequences (color codes).
 	if out == stripANSI(out) {

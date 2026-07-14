@@ -13,25 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchAMIs calls the EC2 DescribeImages API and returns all pages of AMIs.
-// Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchAMIs(ctx context.Context, api EC2DescribeImagesAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchAMIsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchAMIsByIDs fetches specific AMIs by image ID, bypassing the
 // Owners=self filter the paginated fetcher applies. Used by the related-panel
 // lazy-add path so checkers referencing public or cross-account AMIs

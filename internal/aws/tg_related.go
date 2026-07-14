@@ -37,7 +37,7 @@ func checkTGELB(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
 
-	elbList, truncated, err := tgRelatedResources(ctx, clients, cache, "elb")
+	elbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
 	if err != nil {
 		return resource.ErrorRelated("elb", err)
 	}
@@ -76,7 +76,7 @@ func checkTGECSSvc(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
 	}
 
-	svcList, truncated, err := tgRelatedResources(ctx, clients, cache, "ecs-svc")
+	svcList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-svc")
 	if err != nil {
 		return resource.ErrorRelated("ecs-svc", err)
 	}
@@ -108,7 +108,7 @@ func checkTGASG(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
 	}
 
-	asgList, truncated, err := tgRelatedResources(ctx, clients, cache, "asg")
+	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
 	if err != nil {
 		return resource.ErrorRelated("asg", err)
 	}
@@ -137,7 +137,7 @@ func checkTGAlarm(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := tgRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -298,16 +298,4 @@ func checkTGLambda(ctx context.Context, clients any, res resource.Resource, _ re
 		}
 	}
 	return relatedResult("lambda", ids)
-}
-
-// tgRelatedResources returns the resource list for target from cache or by
-// fetching the first page via the registered paginated fetcher.
-func tgRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

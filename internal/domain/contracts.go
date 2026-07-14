@@ -151,38 +151,3 @@ func (r RelatedCheckResult) EffectiveState() RelatedRowState {
 	}
 	return r.State
 }
-
-// ─── Capability IDs ────────────────────────────────────────────────────────
-
-// CapabilityID identifies a named capability a resource type may declare.
-type CapabilityID string
-
-const (
-	CapLogs           CapabilityID = "logs"
-	CapCloudTrailScan CapabilityID = "ct.scan"
-	CapCost           CapabilityID = "cost"
-)
-
-// ─── Query spec types ──────────────────────────────────────────────────────
-
-// QueryFilter is a string-based filter hint passed to capability modules.
-type QueryFilter string
-
-// TimeRange specifies a time window in unix seconds. Zero means open-ended.
-type TimeRange struct {
-	Start, End int64
-}
-
-// Cursor is an opaque pagination handle.
-type Cursor string
-
-// QueryLimit is a row cap. Zero means unlimited.
-type QueryLimit int
-
-// QuerySpec bundles the query parameters passed to capability modules.
-type QuerySpec struct {
-	Filter    QueryFilter
-	TimeRange TimeRange
-	Cursor    Cursor
-	Limit     QueryLimit
-}

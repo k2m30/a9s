@@ -73,25 +73,6 @@ func FetchAPIGatewaysPageMerged(ctx context.Context, c *ServiceClients, continua
 	}, nil
 }
 
-// FetchAPIGateways calls the API Gateway V2 GetApis API and converts
-// the response into a slice of generic Resource structs.
-func FetchAPIGateways(ctx context.Context, api APIGatewayV2GetApisAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchAPIGatewaysPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchAPIGatewaysPage fetches a single page of API Gateways.
 func FetchAPIGatewaysPage(ctx context.Context, api APIGatewayV2GetApisAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &apigatewayv2.GetApisInput{

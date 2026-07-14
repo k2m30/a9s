@@ -9,11 +9,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
@@ -460,7 +460,13 @@ func TestIssue119StoryMapCoversAllStories(t *testing.T) {
 	addStoryEvidence([]string{"scenario:ec2_list_loading", "file:tests/unit/tui_resourcelist_test.go"}, "Loading state is centered inside the frame", "Loading state uses a centered fetch message instead of partial list rows")
 	addStoryEvidence([]string{"scenario:ec2_list_empty", "file:tests/unit/tui_resourcelist_test.go"}, "Empty state uses the frame instead of a blank table", "Empty EC2 account or region is still a valid screen state")
 	addStoryEvidence([]string{"scenario:main_menu_default", "file:tests/unit/qa_mainmenu_nav_test.go", "file:tests/unit/qa_filtering_test.go"}, "Main menu shows resource type names and command aliases", "Main menu cursor wraps from bottom to top and top to bottom", "Main menu jump keys move to first and last resource type", "Enter opens the selected resource type list", "Quit key is honored only at the main menu")
-	addStoryEvidence([]string{"file:tests/unit/qa_profile_update_test.go", "scenario:region_selector"}, "Profile selector shows current and unavailable profiles distinctly", "Choosing a different profile updates the visible AWS context", "Region selector returns to the previous screen after selection", "Region change leads to fresh EC2 list content")
+	// qa_profile_update_test.go was retired (wave3 text/selector-family
+	// cleanup, specs/022-codebase-cleanup/wave3-map-text.md): its
+	// ProfileUpdate cursor/selection coverage moved onto the live seam in
+	// tui_selector_test.go + selector_render_parity_test.go, and its
+	// AWS-context/region-refresh integration coverage was already duplicated
+	// in qa_profile_switch_test.go.
+	addStoryEvidence([]string{"file:tests/unit/tui_selector_test.go", "file:tests/unit/selector_render_parity_test.go", "file:tests/unit/qa_profile_switch_test.go", "scenario:region_selector"}, "Profile selector shows current and unavailable profiles distinctly", "Choosing a different profile updates the visible AWS context", "Region selector returns to the previous screen after selection", "Region change leads to fresh EC2 list content")
 	addStoryEvidence([]string{"scenario:ec2_list_wide_default", "file:tests/unit/qa_ec2_test.go"}, "Full-width EC2 list shows all configured columns", "Running rows are colored differently from stopped and terminated rows", "Selected row highlight overrides state-based row coloring", "Table headers are shown without separator lines", "Cursor movement works one row at a time", "Jump keys move to first and last EC2 row", "Page navigation moves by visible page height", "Horizontal scrolling reveals off-screen columns", "Name sort toggles direction on repeated key presses", "Status sort toggles direction on repeated key presses", "Age sort toggles direction on repeated key presses", "Enter opens EC2 detail from the selected row", "Detail shortcut opens the same EC2 detail screen as Enter", "Refresh re-fetches the EC2 list in place", "Escape returns from the EC2 list to the main menu")
 	addStoryEvidence([]string{"file:tests/unit/qa_ec2_test.go"}, "Medium-width EC2 list keeps the leftmost configured columns first", "Narrow but usable EC2 list still exposes the primary columns")
 	addStoryEvidence([]string{"scenario:too_narrow_warning", "file:internal/tui/app.go"}, "EC2 list refuses to render as a broken table below the minimum width")
@@ -554,12 +560,21 @@ func issue119ScenarioNameSet() map[string]struct{} {
 	return out
 }
 
+// views.NewProfile is DEAD per specs/022-codebase-cleanup/wave3-map-text.md
+// (selector.go: "LIVE: NewSelectorWithCtrl, NewTransientSelector, ...").
+// Retargeted onto NewTransientSelector(w, h) + app.SelectorBody, the live
+// seam RenderSelector actually reads from.
 func TestIssue119SelectorStandaloneProfileRender(t *testing.T) {
 	tuitest.NoColor(t)
 
-	sel := views.NewProfile([]string{"default", "staging", "prod"}, "default", keys.Default())
-	sel.SetSize(60, 8)
-	plain := stripAnsi(sel.View())
+	sel := views.NewTransientSelector(60, 8)
+	body := app.SelectorBody{
+		Items:      []string{"default", "staging", "prod"},
+		Selected:   0,
+		AllItems:   []string{"default", "staging", "prod"},
+		ActiveItem: "default",
+	}
+	plain := stripAnsi(sel.RenderSelector(body))
 	if !strings.Contains(plain, "default") || !strings.Contains(plain, "(current)") {
 		t.Fatalf("profile selector should render the active profile distinctly, got:\n%s", plain)
 	}

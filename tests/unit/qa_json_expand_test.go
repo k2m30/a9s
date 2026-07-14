@@ -1,4 +1,4 @@
-package unit
+package unit_test
 
 import (
 	"strings"
@@ -7,10 +7,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
-	"github.com/k2m30/a9s/v3/internal/config"
+	"charm.land/bubbles/v2/viewport"
+
+	"github.com/k2m30/a9s/v3/internal/jsonyaml"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/jsonyaml"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -173,156 +174,6 @@ func TestCompactValue(t *testing.T) {
 // Detail view JSON expansion — integration tests via views.DetailModel
 // ════════════════════════════════════════════════════════════════════════════
 
-// jsonExpandDetailModel builds a DetailModel for a Fields-only resource with a custom
-// ViewsConfig that lists the given field keys as detail paths.
-func jsonExpandDetailModel(fields map[string]string, detailPaths []string) views.DetailModel {
-	k := keys.Default()
-	res := resource.Resource{
-		ID:     "test-resource",
-		Name:   "test",
-		Fields: fields,
-	}
-	detailFields := make([]config.DetailField, len(detailPaths))
-	for i, p := range detailPaths {
-		detailFields[i] = config.DetailField{Path: p}
-	}
-	cfg := &config.ViewsConfig{
-		Views: map[string]config.ViewDef{
-			"ec2": {
-				Detail: detailFields,
-			},
-		},
-	}
-	m := views.NewDetail(res, "ec2", cfg, k)
-	m.SetSize(120, 40)
-	return m
-}
-
-// TestQA_JSONExpand_TopLevelScalar_Expanded verifies that a JSON string value in a detail
-// field is rendered as expanded YAML sub-fields, NOT as a single-line JSON blob.
-func TestQA_JSONExpand_TopLevelScalar_Expanded(t *testing.T) {
-	policyJSON := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject"}]}`
-	fields := map[string]string{
-		"Policy": policyJSON,
-	}
-	m := jsonExpandDetailModel(fields, []string{"Policy"})
-	view := stripANSI(m.View())
-
-	// The raw single-line JSON blob must NOT appear verbatim in the output.
-	if strings.Contains(view, policyJSON) {
-		t.Errorf("detail view rendered raw JSON blob instead of expanding it:\n%s", view)
-	}
-	// Key YAML fields from the expanded policy should be visible.
-	if !strings.Contains(view, "Version") {
-		t.Errorf("detail view missing expanded YAML key 'Version':\n%s", view)
-	}
-	if !strings.Contains(view, "2012-10-17") {
-		t.Errorf("detail view missing expanded YAML value '2012-10-17':\n%s", view)
-	}
-}
-
-// TestQA_JSONExpand_InvalidJSON_PassesThrough verifies that a non-JSON value in a detail
-// field is rendered as-is, without modification.
-func TestQA_JSONExpand_InvalidJSON_PassesThrough(t *testing.T) {
-	plainValue := "arn:aws:iam::123456789012:role/MyRole"
-	fields := map[string]string{
-		"RoleArn": plainValue,
-	}
-	m := jsonExpandDetailModel(fields, []string{"RoleArn"})
-	view := stripANSI(m.View())
-
-	if !strings.Contains(view, plainValue) {
-		t.Errorf("detail view should render plain ARN value as-is, got:\n%s", view)
-	}
-}
-
-// TestQA_JSONExpand_EmptyObject_NotExpanded verifies that "{}" is kept inline
-// and does not trigger JSON expansion (no content to expand).
-func TestQA_JSONExpand_EmptyObject_NotExpanded(t *testing.T) {
-	fields := map[string]string{
-		"Tags": "{}",
-	}
-	m := jsonExpandDetailModel(fields, []string{"Tags"})
-	view := stripANSI(m.View())
-
-	// "{}" should appear as a literal value, not trigger sub-field expansion.
-	if !strings.Contains(view, "{}") {
-		t.Errorf("detail view should keep empty JSON object '{}' inline, got:\n%s", view)
-	}
-}
-
-// TestQA_JSONExpand_YAMLView_Unaffected verifies that RawYAML() is not affected by
-// the JSON expansion logic — it must return the raw Fields map serialized as YAML,
-// not the expanded representation.
-func TestQA_JSONExpand_YAMLView_Unaffected(t *testing.T) {
-	policyJSON := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject"}]}`
-	k := keys.Default()
-	res := resource.Resource{
-		ID:   "test-resource",
-		Name: "test",
-		Fields: map[string]string{
-			"Policy": policyJSON,
-		},
-	}
-	cfg := &config.ViewsConfig{
-		Views: map[string]config.ViewDef{
-			"ec2": {
-				Detail: []config.DetailField{{Path: "Policy"}},
-			},
-		},
-	}
-	m := views.NewDetail(res, "ec2", cfg, k)
-	m.SetSize(120, 40)
-
-	rawYAML := m.RawYAML()
-	// RawYAML must contain the original JSON string as a YAML scalar — not double-expanded.
-	if !strings.Contains(rawYAML, "Policy") {
-		t.Errorf("RawYAML() missing 'Policy' key:\n%s", rawYAML)
-	}
-	// The JSON string itself should appear in RawYAML as a quoted or block scalar,
-	// not silently dropped or replaced with YAML-expanded content.
-	if !strings.Contains(rawYAML, "2012-10-17") {
-		t.Errorf("RawYAML() missing original policy content '2012-10-17':\n%s", rawYAML)
-	}
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// Sub-field JSON expansion
-// ════════════════════════════════════════════════════════════════════════════
-
-// TestQA_JSONExpand_SubField_Expanded verifies that a JSON string nested inside
-// a multi-line section (sub-field value) is expanded into additional sub-fields.
-func TestQA_JSONExpand_SubField_Expanded(t *testing.T) {
-	// Simulate a resource with a nested JSON value inside a multi-line field.
-	// Use Fields map with dotted keys to create sub-fields under a parent.
-	fields := map[string]string{
-		"Config.Policy": `{"Effect":"Allow","Resource":"*"}`,
-		"Config.Name":   "my-config",
-	}
-	m := jsonExpandDetailModel(fields, []string{"Config"})
-	view := stripANSI(m.View())
-
-	// The expanded JSON should show its keys, not a raw blob.
-	if !strings.Contains(view, "Effect") {
-		t.Errorf("sub-field JSON should expand to show 'Effect':\n%s", view)
-	}
-	if !strings.Contains(view, "Allow") {
-		t.Errorf("sub-field JSON should expand to show 'Allow':\n%s", view)
-	}
-	// Non-JSON sub-field should pass through.
-	if !strings.Contains(view, "my-config") {
-		t.Errorf("non-JSON sub-field 'my-config' should pass through:\n%s", view)
-	}
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// Explicit scope boundary tests
-// ════════════════════════════════════════════════════════════════════════════
-
-// TestQA_JSONExpand_JSONView_NotAffected verifies that the JSON view renders
-// via json.MarshalIndent on Fields directly — expandJSONItems only runs in
-// buildFieldList (detail view path), so JSONModel is unaffected. Tests through
-// the actual JSONModel.RawContent() path.
 func TestQA_JSONExpand_JSONView_NotAffected(t *testing.T) {
 	policyJSON := `{"Version":"2012-10-17"}`
 	res := resource.Resource{
@@ -333,10 +184,10 @@ func TestQA_JSONExpand_JSONView_NotAffected(t *testing.T) {
 		},
 	}
 	k := keys.Default()
-	jm := views.NewJSON(res, "ec2", k)
+	jm := views.NewJSONWithCtrl(res, "ec2", k, nil)
 	jm.SetSize(120, 40)
 
-	raw := jm.RawContent()
+	raw := stripAnsi(strings.Join(jm.ContentLines(), "\n"))
 	// JSON view serializes the Fields map — Policy value stays as a JSON string,
 	// not expanded into nested structure.
 	if !strings.Contains(raw, "Policy") {
@@ -351,6 +202,14 @@ func TestQA_JSONExpand_JSONView_NotAffected(t *testing.T) {
 // rendering takes the ctdetail.Parse branch (not the generic buildFieldList path),
 // so expandJSONItems never runs on CT events. Uses a real cloudtrailtypes.Event
 // with a CloudTrailEvent JSON payload containing embedded JSON in RequestParameters.
+//
+// Retargeted (wave3 detail-family cleanup round 4, specs/022-codebase-cleanup)
+// off views.NewDetail(...).View() onto the live Controller.EnsureDetailState +
+// NewTransientDetail.RenderDetail seam. Not a duplicate of wave3_detail_ports_
+// test.go's TestWave3_CTEvents_LiveProjector_SectionHeadersPresentInOrder: that
+// test pins section ORDER via a minimal fixture with no embedded JSON: this one
+// pins the distinct "requestParameters.policy embedded JSON string is not
+// exploded into sub-fields by expandJSONItems" no-crash contract.
 func TestQA_JSONExpand_CloudTrail_OutOfScope(t *testing.T) {
 	ctJSON := `{"eventVersion":"1.08","eventSource":"s3.amazonaws.com","eventName":"PutObject","requestParameters":{"bucketName":"my-bucket","key":"data.json","policy":"{\"Version\":\"2012-10-17\"}"},"responseElements":null}`
 	event := cloudtrailtypes.Event{
@@ -359,17 +218,21 @@ func TestQA_JSONExpand_CloudTrail_OutOfScope(t *testing.T) {
 		EventSource:     aws.String("s3.amazonaws.com"),
 		CloudTrailEvent: aws.String(ctJSON),
 	}
-	k := keys.Default()
 	res := resource.Resource{
 		ID:        "event-ct-scope-test",
 		Name:      "PutObject",
 		RawStruct: event,
 	}
-	cfg := config.DefaultConfig()
-	m := views.NewDetail(res, "ct-events", cfg, k)
-	m.SetSize(120, 40)
 
-	view := stripANSI(m.View())
+	c := newDetailController(t, res, "ct-events")
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil for a ct-events resource")
+	}
+
+	vp := viewport.New(viewport.WithWidth(120), viewport.WithHeight(40))
+	m := views.NewTransientDetail(120, 40, vp)
+	view := stripAnsi(m.RenderDetail(*body))
 
 	// CT branch must be taken — verify CT-specific content appears.
 	if !strings.Contains(view, "PutObject") {

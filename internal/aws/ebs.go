@@ -19,25 +19,6 @@ import (
 // "available" volume is flagged as an orphan (billed hourly, no workload).
 const ebsOrphanAge = 7 * 24 * time.Hour
 
-// FetchEBSVolumes calls the EC2 DescribeVolumes API and returns all pages
-// of volumes. Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchEBSVolumes(ctx context.Context, api EC2DescribeVolumesAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchEBSVolumesPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchEBSVolumesPage calls the EC2 DescribeVolumes API and returns a single
 // page of volumes. Pass an empty continuationToken for the first page.
 func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continuationToken string) (resource.FetchResult, error) {
@@ -169,25 +150,6 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 			TotalHint:   totalHint,
 		},
 	}, nil
-}
-
-// FetchEBSSnapshots calls the EC2 DescribeSnapshots API and returns all pages
-// of snapshots. Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchEBSSnapshots(ctx context.Context, api EC2DescribeSnapshotsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchEBSSnapshotsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
 }
 
 // FetchEBSSnapshotsPage calls the EC2 DescribeSnapshots API and returns a single

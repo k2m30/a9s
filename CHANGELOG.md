@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.49.0] - 2026-07-14
+
+### Fixed
+
+- Text screens (YAML/JSON views) regained four documented keys that had been
+  silently dead since the controller migration: `y`/`J` (YAML↔JSON toggle),
+  `t` (CloudTrail events for the resource), and `d` (open detail view). Only
+  legacy tests had pinned them; they are now pinned on the live key path.
+- YAML syntax coloring no longer corrupts keys containing colons (e.g. the
+  EC2 tag `aws:autoscaling:groupName`): the colorizer split every line on the
+  first colon, producing display text that was no longer valid YAML. The
+  key/value splitter is now quote- and escape-aware, and the invariant
+  "stripping colors yields the original text" is pinned by a regression test.
+
+### Changed
+
+- Codebase cleanup release: net ~37,700 lines removed with behavior pinned
+  before every deletion. The legacy pre-controller view-model layer (dead
+  self-render paths, constructors, and accessors superseded by the
+  controller/ViewState architecture) is gone, along with its orphaned tests —
+  every unique behavior those tests pinned was first ported onto the live
+  seams (44+ new controller-path tests landed in the process).
+- One truth source for list-column resolution: the identity/marker-column
+  cascade previously existed in three near-identical copies (app list lane,
+  runtime save lane, dead views mirror); all callers now delegate to a single
+  shared `resource.ResolveListColumnCascade`.
+- README generation consolidated on `cmd/readmegen` (the duplicate shell
+  script is gone); `cmd/snapshot` uses SDK paginators instead of ~44
+  hand-rolled pagination loops; 100+ copy-pasted client-assertion preludes
+  and 50+ byte-identical related-resource wrappers collapsed into shared
+  helpers; 110+ test-only all-pages fetch wrappers replaced by one test
+  helper.
+- Dependencies dropped: `testify` (with `go-spew`, `go-difflib`) and
+  `gopkg.in/ini.v1` (AWS profile/region parsing now uses a minimal built-in
+  scanner; behavior pinned by existing tests).
+- Homebrew formula publishing no longer uses GoReleaser's deprecated `brews:`
+  generator (#455): the release workflow renders `Formula/a9s.rb` from the
+  release checksums and pushes it to the tap directly, validating the
+  generation path before anything publishes. `brew install k2m30/a9s/a9s`
+  stays a formula — no cask, no Gatekeeper quarantine dialog.
+
+### Removed
+
+- Dead one-shot design-mockup binaries (`cmd/preview-pagination`,
+  `cmd/preview_detail`, `cmd/preview-policy-doc`, `cmd/preview/ct_event`),
+  the never-wired Lambda code-download module, and assorted zero-caller
+  functions verified individually before deletion.
+
 ## [3.48.0] - 2026-07-12
 
 ### Added

@@ -16,7 +16,7 @@ func checkSNSSubTopic(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
 
-	snsList, truncated, err := snsSubRelatedResources(ctx, clients, cache, "sns")
+	snsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns")
 	if err != nil {
 		return resource.ErrorRelated("sns", err)
 	}
@@ -52,7 +52,7 @@ func checkSNSSubLambda(ctx context.Context, clients any, res resource.Resource, 
 		funcName = parts[len(parts)-1]
 	}
 
-	lambdaList, truncated, err := snsSubRelatedResources(ctx, clients, cache, "lambda")
+	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
 		return resource.ErrorRelated("lambda", err)
 	}
@@ -88,7 +88,7 @@ func checkSNSSubSQS(ctx context.Context, clients any, res resource.Resource, cac
 		queueName = parts[len(parts)-1]
 	}
 
-	sqsList, truncated, err := snsSubRelatedResources(ctx, clients, cache, "sqs")
+	sqsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sqs")
 	if err != nil {
 		return resource.ErrorRelated("sqs", err)
 	}
@@ -103,16 +103,4 @@ func checkSNSSubSQS(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	return relatedResultTrunc("sqs", ids, truncated)
-}
-
-// snsSubRelatedResources returns the cached resource list for the given target type,
-// or fetches the first page via the registered paginated fetcher.
-func snsSubRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

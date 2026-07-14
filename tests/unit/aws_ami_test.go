@@ -11,6 +11,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 type capturingDescribeImagesClient struct {
@@ -56,7 +57,9 @@ func TestFetchAMIs_ParsesMultipleImages(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAMIs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAMIsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -98,7 +101,9 @@ func TestFetchAMIs_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAMIs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAMIsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -113,7 +118,9 @@ func TestFetchAMIs_ErrorResponse(t *testing.T) {
 		err:    fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchAMIs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAMIsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -140,7 +147,9 @@ func TestFetchAMIs_FieldExtraction(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAMIs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAMIsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -192,7 +201,9 @@ func TestFetchAMIs_NameFromDirectField(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAMIs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAMIsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -220,7 +231,9 @@ func TestFetchAMIs_PublicTrue(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAMIs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAMIsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -247,7 +260,9 @@ func TestFetchAMIs_RawStructIsImage(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAMIs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAMIsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

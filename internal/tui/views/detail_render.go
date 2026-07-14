@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
@@ -38,27 +40,7 @@ func (m DetailModel) RawYAML() string {
 // as "Key: Value" (raw phrase + capitalized display) rather than the shortened TUI form.
 func (m DetailModel) PlainContent() string {
 	m.plainMode = true
-	content := m.renderContent()
-	// Strip ANSI escape codes
-	result := make([]byte, 0, len(content))
-	i := 0
-	for i < len(content) {
-		if content[i] == '\x1b' && i+1 < len(content) && content[i+1] == '[' {
-			// Skip until we hit a letter
-			j := i + 2
-			for j < len(content) && (content[j] < 'a' || content[j] > 'z') && (content[j] < 'A' || content[j] > 'Z') {
-				j++
-			}
-			if j < len(content) {
-				j++ // skip the letter
-			}
-			i = j
-		} else {
-			result = append(result, content[i])
-			i++
-		}
-	}
-	return string(result)
+	return ansi.Strip(m.renderContent())
 }
 
 // renderContent builds the styled key-value lines from the resource.

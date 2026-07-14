@@ -16,25 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
-// FetchCloudTrailEvents fetches all CloudTrail LookupEvents pages and returns
-// the combined resources. Used by related-resource cold-cache checks and tests.
-func FetchCloudTrailEvents(ctx context.Context, api CloudTrailLookupEventsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchCloudTrailEventsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchCloudTrailEventsPage calls the CloudTrail LookupEvents API and returns
 // a single page of events. Pass an empty continuationToken for the first page.
 func FetchCloudTrailEventsPage(ctx context.Context, api CloudTrailLookupEventsAPI, continuationToken string) (resource.FetchResult, error) {

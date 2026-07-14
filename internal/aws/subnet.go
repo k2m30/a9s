@@ -11,25 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchSubnets calls the EC2 DescribeSubnets API and converts the
-// response into a slice of generic Resource structs.
-func FetchSubnets(ctx context.Context, api EC2DescribeSubnetsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchSubnetsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchSubnetsPage fetches a single page of subnets.
 func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &ec2.DescribeSubnetsInput{

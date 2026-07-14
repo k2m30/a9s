@@ -13,6 +13,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -57,7 +58,9 @@ func TestFetchEBSVolumes_ParsesMultipleVolumes(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEBSVolumes(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBSVolumesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -115,7 +118,9 @@ func TestFetchEBSVolumes_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEBSVolumes(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBSVolumesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -130,7 +135,9 @@ func TestFetchEBSVolumes_ErrorResponse(t *testing.T) {
 		err:    fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchEBSVolumes(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBSVolumesPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -165,7 +172,9 @@ func TestFetchEBSVolumes_FieldExtraction(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEBSVolumes(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBSVolumesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -223,7 +232,9 @@ func TestFetchEBSVolumes_NoAttachment(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEBSVolumes(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBSVolumesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -250,7 +261,9 @@ func TestFetchEBSVolumes_NoNameTag(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEBSVolumes(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBSVolumesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -279,7 +292,9 @@ func TestFetchEBSVolumes_RawStructIsVolume(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEBSVolumes(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBSVolumesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

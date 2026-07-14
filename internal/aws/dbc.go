@@ -13,30 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchDocDBClusters calls the DocumentDB DescribeDBClusters API and converts the
-// response into a slice of generic Resource structs. This covers DocumentDB
-// clusters only. The docdb SDK docstring
-// (docdb@v1.48.12/api_op_DescribeDBClusters.go:14-19) instructs callers to use
-// filterName=engine,Values=docdb for DocDB-only results — unfiltered behavior is
-// documented as ambiguous, not engine-agnostic. Aurora + Multi-AZ clusters are
-// fetched separately via FetchRDSDBClustersPage.
-func FetchDocDBClusters(ctx context.Context, api DocDBDescribeDBClustersAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchDocDBClustersPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchDocDBClustersPage fetches a single page of DocumentDB clusters.
 func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &docdb.DescribeDBClustersInput{

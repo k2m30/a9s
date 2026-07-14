@@ -1,0 +1,12 @@
+[default]
+region = us-east-1
+
+[profile cap-region]
+Region = eu-central-1
+
+[profile cap-source]
+Source_Profile = cap-region-target
+Role_Arn = arn:aws:iam::123456789012:role/example
+
+[profile cap-region-target]
+region = ap-southeast-2

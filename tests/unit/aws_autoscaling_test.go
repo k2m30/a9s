@@ -68,7 +68,9 @@ func TestFetchAutoScalingGroups_ParsesMultipleGroups(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAutoScalingGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -149,7 +151,9 @@ func TestFetchAutoScalingGroups_ErrorResponse(t *testing.T) {
 		err:    fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchAutoScalingGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -165,7 +169,9 @@ func TestFetchAutoScalingGroups_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAutoScalingGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

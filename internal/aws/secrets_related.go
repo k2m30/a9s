@@ -37,7 +37,7 @@ func checkSecretsKMS(ctx context.Context, clients any, res resource.Resource, ca
 		keyID = val[idx+1:]
 	}
 
-	kmsList, truncated, err := secretsRelatedResources(ctx, clients, cache, "kms")
+	kmsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "kms")
 	if err != nil {
 		return resource.ErrorRelated("kms", err)
 	}
@@ -73,7 +73,7 @@ func checkSecretsLambda(ctx context.Context, clients any, res resource.Resource,
 	}
 	funcName := arn[idx+1:]
 
-	lambdaList, truncated, err := secretsRelatedResources(ctx, clients, cache, "lambda")
+	lambdaList, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
 		return resource.ErrorRelated("lambda", err)
 	}
@@ -98,7 +98,7 @@ func checkSecretsCFN(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 
-	cfnList, truncated, err := secretsRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -149,7 +149,7 @@ func checkSecretsDBI(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
 	}
 
-	dbiList, truncated, err := secretsRelatedResources(ctx, clients, cache, "dbi")
+	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
 	if err != nil {
 		return resource.ErrorRelated("dbi", err)
 	}
@@ -171,18 +171,6 @@ func checkSecretsDBI(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	return relatedResultTrunc("dbi", ids, truncated)
-}
-
-// secretsRelatedResources returns the resource list for target from cache or by
-// fetching the first page via the registered paginated fetcher.
-func secretsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 // secretIdentifiers returns the (arn, name) pair for the source secret,
@@ -217,7 +205,7 @@ func checkSecretsCB(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "cb", Count: 0}
 	}
 
-	cbList, truncated, err := secretsRelatedResources(ctx, clients, cache, "cb")
+	cbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cb")
 	if err != nil {
 		return resource.ErrorRelated("cb", err)
 	}

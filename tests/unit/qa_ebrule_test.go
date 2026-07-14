@@ -10,6 +10,7 @@ import (
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -40,7 +41,9 @@ func TestFetchEventBridgeRules_ParsesMultiple(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEventBridgeRules(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEventBridgeRulesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -102,7 +105,9 @@ func TestFetchEventBridgeRules_RawStructPopulated(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEventBridgeRules(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEventBridgeRulesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -125,7 +130,9 @@ func TestFetchEventBridgeRules_ErrorResponse(t *testing.T) {
 		err: fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchEventBridgeRules(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEventBridgeRulesPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -141,7 +148,9 @@ func TestFetchEventBridgeRules_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEventBridgeRules(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEventBridgeRulesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

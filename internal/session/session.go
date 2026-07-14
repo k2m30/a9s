@@ -238,7 +238,7 @@ type Session struct {
 	// both PolicyName and ARN. Replaces the package-level globals previously in
 	// internal/aws/iam_policies.go. Wired into *ServiceClients.IAMPolicies on
 	// every ClientsReadyMsg so FetchIAMPoliciesByIDsFull uses the session store.
-	IAMPolicies PolicyStore
+	IAMPolicies *policyStore
 
 	// IdentityStore is the per-session cache for the AWS caller's account ID
 	// used by Pattern-C related checkers. Replaces the package-level globals
@@ -249,7 +249,7 @@ type Session struct {
 	// than a process-global one. Distinct from Session.Identity (the resolved
 	// *awsclient.CallerIdentity) which holds the human-readable identity
 	// metadata for the header / IdentityModel.
-	IdentityStore IdentityStore
+	IdentityStore *identityStore
 
 	// RuleSets is the per-session, single-slot cache for the SES v1
 	// DescribeActiveReceiptRuleSet response. Replaces the package-level
@@ -257,7 +257,7 @@ type Session struct {
 	// + sesRuleSetCaches map keyed by *ServiceClients pointer). Wired into
 	// *ServiceClients.RuleSets on every ClientsReadyMsg so checkSESLambda /
 	// checkSESS3 see a session-scoped cache rather than a process-global map.
-	RuleSets RuleSetStore
+	RuleSets *ruleSetStore
 }
 
 // New constructs a fresh Session with all maps initialized and generation

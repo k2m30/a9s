@@ -16,25 +16,6 @@ import (
 // or fewer record sets (only the default NS+SOA remain) — likely unused.
 const r53CodeUnusedZone domain.FindingCode = "r53.zone.unused"
 
-// FetchHostedZones calls the Route53 ListHostedZones API and converts
-// the response into a slice of generic Resource structs.
-func FetchHostedZones(ctx context.Context, api Route53ListHostedZonesAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchHostedZonesPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchHostedZonesPage fetches a single page of Route53 hosted zones.
 func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &route53.ListHostedZonesInput{

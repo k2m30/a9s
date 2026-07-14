@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -361,20 +360,12 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		Color:   colorEC2,
 		Augment: augmentEC2StatusChecks,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEC2InstancesPage(ctx, c.EC2, continuationToken)
-		},
-		FetchByIDs: func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return nil, fmt.Errorf("AWS clients not initialized")
-			}
+		}),
+		FetchByIDs: fetchByIDsWithClients(func(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
 			return FetchEC2InstancesByIDs(ctx, c.EC2, ids)
-		},
+		}),
 		Wave2: IssueEnricher{Fn: EnrichEC2InstanceStatus, Priority: 100},
 		FieldKeys: []string{
 			"instance_id", "name", "state", "type", "private_ip", "public_ip",
@@ -473,13 +464,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			},
 		},
 		Color: colorECSSvc,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchECSServicesPage(ctx, c.ECS, c.ECS, c.ECS, continuationToken)
-		},
+		}),
 		Wave2: IssueEnricher{Fn: EnrichECSServices, Priority: 100},
 		FieldKeys: []string{
 			"service_name", "cluster", "status", "desired_count",
@@ -531,13 +518,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "services_count", Title: "Services", Width: 10, Sortable: true},
 		},
 		Color: colorECSCluster,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchECSClustersPage(ctx, c.ECS, c.ECS, continuationToken)
-		},
+		}),
 		Wave2:     IssueEnricher{Fn: EnrichECSClusters, Priority: 100},
 		FieldKeys: []string{"cluster_name", "status", "running_tasks", "pending_tasks", "services_count"},
 		Related: []domain.RelatedDef{
@@ -579,13 +562,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "memory", Title: "Memory", Width: 8, Sortable: true},
 		},
 		Color: colorECSTask,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return fetchECSTasksPageWithJoin(ctx, c.ECS, c.ECS, c.ECS, c.ECS, continuationToken)
-		},
+		}),
 		Wave2: IssueEnricher{Fn: EnrichECSTasks, Priority: 100},
 		// task_role/execution_role/secret_arns/ssm_param_names — emitted by
 		// ecsJoinTaskDefinition's DescribeTaskDefinition join; required by
@@ -647,13 +626,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			},
 		},
 		Color: colorLambda,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchLambdaFunctionsPage(ctx, c.Lambda, continuationToken)
-		},
+		}),
 		FieldKeys: []string{
 			"function_name", "runtime", "state", "last_update_status", "memory",
 			"timeout", "handler", "last_modified", "code_size", "log_group",
@@ -721,13 +696,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{ChildType: "asg_activities", Key: "enter", ContextKeys: map[string]string{"asg_name": "asg_name"}, DisplayNameKey: "asg_name"},
 		},
 		Color: colorASG,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchAutoScalingGroupsPage(ctx, c.AutoScaling, continuationToken)
-		},
+		}),
 		Wave2: IssueEnricher{Fn: EnrichASGScalingActivities, Priority: 100},
 		FieldKeys: []string{
 			"asg_name", "min_size", "max_size", "desired", "instances", "status",
@@ -779,13 +750,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "created", Title: "Created", Width: 18, Sortable: true},
 		},
 		Color: colorEBS,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEBSVolumesPage(ctx, c.EC2, continuationToken)
-		},
+		}),
 		Wave2:     IssueEnricher{Fn: EnrichEBSVolumeStatus, Priority: 10},
 		FieldKeys: []string{"volume_id", "name", "state", "size", "type", "iops", "encrypted", "attached_to", "az", "created"},
 		Related: []domain.RelatedDef{
@@ -827,22 +794,14 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "progress", Title: "Progress", Width: 10, Sortable: false},
 		},
 		Color: colorEBSSnap,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEBSSnapshotsPage(ctx, c.EC2, continuationToken)
-		},
+		}),
 		Wave2:     IssueEnricher{Fn: enrichEBSSnapCrossRef, Priority: 100},
 		FieldKeys: []string{"snapshot_id", "name", "state", "volume_id", "size", "encrypted", "description", "started", "progress"},
-		FetchByIDs: func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return nil, fmt.Errorf("AWS clients not initialized")
-			}
+		FetchByIDs: fetchByIDsWithClients(func(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
 			return FetchEBSSnapshotsByIDs(ctx, c.EC2, ids)
-		},
+		}),
 		Related: []domain.RelatedDef{
 			{TargetType: "ami", DisplayName: "AMIs", Checker: checkEBSSnapAMI, NeedsTargetCache: true},
 			{TargetType: "ebs", DisplayName: "EBS Volume", Checker: checkEBSSnapEBS, NeedsTargetCache: false},
@@ -892,20 +851,12 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			}
 		},
 		Color: colorAMI,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchAMIsPage(ctx, c.EC2, continuationToken)
-		},
-		FetchByIDs: func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return nil, fmt.Errorf("AWS clients not initialized")
-			}
+		}),
+		FetchByIDs: fetchByIDsWithClients(func(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
 			return FetchAMIsByIDs(ctx, c.EC2, ids)
-		},
+		}),
 		FieldKeys: []string{
 			"image_id", "name", "state", "architecture", "platform",
 			"root_device_type", "creation_date", "public", "deprecated",
@@ -948,13 +899,9 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 			ContextKeys:    map[string]string{"log_group": "@parent.log_group", "request_id": "request_id"},
 			DisplayNameKey: "request_id",
 		}},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchLambdaInvocations(ctx, c.CloudWatchLogs, parentCtx["function_name"], parentCtx["log_group"], continuationToken)
-		},
+		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeLambdaInvocationTimeout, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1"},
 		},
@@ -966,13 +913,9 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 		Columns:      resource.LambdaInvocationLogColumns(),
 		Color:        colorWave1OrHealthy,
 		FieldKeys:    []string{"timestamp", "message"},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchLambdaInvocationLogs(ctx, c.CloudWatchLogs, parentCtx["log_group"], parentCtx["request_id"], continuationToken)
-		},
+		}),
 	},
 	{
 		Name:      "Scaling Activities",
@@ -980,13 +923,9 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 		Columns:   resource.AsgActivityColumns(),
 		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{"start_time", "status_code", "description", "cause"},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchAsgActivities(ctx, c.AutoScaling, parentCtx, continuationToken)
-		},
+		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeAsgActivityFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeAsgActivityCancelled, Phrase: "cancelled", Severity: domain.SevWarn, Source: "wave1"},

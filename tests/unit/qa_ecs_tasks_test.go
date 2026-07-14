@@ -59,7 +59,9 @@ func TestQA_ECSTasks_FetchSuccess(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchECSTasks(context.Background(), listClusters, listTasks, describeTasks)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSTasksPage(context.Background(), listClusters, listTasks, describeTasks, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -134,7 +136,9 @@ func TestQA_ECSTasks_FetchNoClusters(t *testing.T) {
 	listTasks := &mockECSListTasksClient{outputs: map[string]*ecs.ListTasksOutput{}}
 	describeTasks := &mockECSDescribeTasksClient{}
 
-	resources, err := awsclient.FetchECSTasks(context.Background(), listClusters, listTasks, describeTasks)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSTasksPage(context.Background(), listClusters, listTasks, describeTasks, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -156,7 +160,9 @@ func TestQA_ECSTasks_FetchNoTasksInCluster(t *testing.T) {
 	}
 	describeTasks := &mockECSDescribeTasksClient{}
 
-	resources, err := awsclient.FetchECSTasks(context.Background(), listClusters, listTasks, describeTasks)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSTasksPage(context.Background(), listClusters, listTasks, describeTasks, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -172,7 +178,9 @@ func TestQA_ECSTasks_FetchListClustersError(t *testing.T) {
 	listTasks := &mockECSListTasksClient{outputs: map[string]*ecs.ListTasksOutput{}}
 	describeTasks := &mockECSDescribeTasksClient{}
 
-	_, err := awsclient.FetchECSTasks(context.Background(), listClusters, listTasks, describeTasks)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSTasksPage(context.Background(), listClusters, listTasks, describeTasks, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

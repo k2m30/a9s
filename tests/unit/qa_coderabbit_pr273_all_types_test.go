@@ -293,7 +293,6 @@ func TestCR273_AllTypes_MenuCtrlZ_NoFalseNegatives(t *testing.T) {
 				IssueCounts:    map[string]int{c.shortName: 2},
 				IssueTruncated: map[string]bool{c.shortName: false},
 				IssueKnown:     map[string]bool{c.shortName: true},
-				Expired:        false,
 			})
 			m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'z', Mod: tea.ModCtrl})
 			plain := stripANSI(rootViewContent(m))
@@ -332,7 +331,6 @@ func TestCR273_AllTypes_MenuCtrlZ_NoFalsePositives(t *testing.T) {
 				IssueCounts:    map[string]int{c.shortName: 0},
 				IssueTruncated: map[string]bool{c.shortName: false},
 				IssueKnown:     map[string]bool{c.shortName: true},
-				Expired:        false,
 			})
 			// Wave 2 clean, if applicable. A type declared hasEnricher=true
 			// whose catalog entry has silently lost its Wave 2 wiring would
@@ -390,7 +388,6 @@ func TestCR273_AllTypes_MenuCtrlZ_Wave2ErroredSubCall_NoFalsePositives(t *testin
 				IssueCounts:    map[string]int{c.shortName: 0},
 				IssueTruncated: map[string]bool{c.shortName: false},
 				IssueKnown:     map[string]bool{c.shortName: true},
-				Expired:        false,
 			})
 			// Wave 2: one sub-call errored → Truncated=true, but Issues=0 and Findings={}.
 			m, _ = rootApplyMsg(m, messages.EnrichmentChecked{

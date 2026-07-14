@@ -707,7 +707,7 @@ func TestQA_HelpContext_AllResourceTypes_ShowResourceListKeys(t *testing.T) {
 func TestQA_HelpContext_PaginatedResourceList_ShowsLoadMore(t *testing.T) {
 	tuitest.ForceColor(t)
 
-	help := views.NewHelp(keys.Default(), views.HelpFromResourceListPaginated)
+	help := views.NewHelpWithResource(keys.Default(), views.HelpFromResourceListPaginated, "ec2")
 	help.SetSize(120, 30)
 
 	output := help.View()
@@ -726,7 +726,7 @@ func TestQA_HelpContext_PaginatedResourceList_ShowsLoadMore(t *testing.T) {
 func TestQA_HelpContext_PaginatedSecretsList_ShowsLoadMoreAndReveal(t *testing.T) {
 	tuitest.ForceColor(t)
 
-	help := views.NewHelp(keys.Default(), views.HelpFromSecretsListPaginated)
+	help := views.NewHelpWithResource(keys.Default(), views.HelpFromSecretsListPaginated, "ec2")
 	help.SetSize(120, 30)
 
 	output := help.View()

@@ -31,10 +31,9 @@ func tgCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 }
 
 const (
-	tgTestARN     = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tg/abc123"
-	tgTestELBARN  = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/def456"
-	tgOtherELBARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/other-alb/999999"
-	tgOtherTGARN  = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/other-tg/xyz789"
+	tgTestARN    = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tg/abc123"
+	tgTestELBARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/def456"
+	tgOtherTGARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/other-tg/xyz789"
 )
 
 // tgSrcResource returns a canonical test resource for the TG.

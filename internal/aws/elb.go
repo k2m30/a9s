@@ -11,25 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchLoadBalancers calls the ELBv2 DescribeLoadBalancers API and converts the
-// response into a slice of generic Resource structs.
-func FetchLoadBalancers(ctx context.Context, api ELBv2DescribeLoadBalancersAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchLoadBalancersPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchLoadBalancersPage fetches a single page of load balancers.
 func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &elbv2.DescribeLoadBalancersInput{

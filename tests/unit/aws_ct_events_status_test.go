@@ -35,7 +35,7 @@ func buildCTEventWithStatus(t *testing.T, id, eventName, eventSource, username s
 }
 
 // plainAccountJSON returns JSON for a regular AssumedRole event with no errorCode.
-func plainAccountJSON(eventName, eventCategory, eventType string) string {
+func plainAccountJSON(_, eventCategory, eventType string) string {
 	return buildFullCTEventJSON(
 		"123456789012", "123456789012", "1.2.3.4", "us-east-1",
 		"aws-cli/2.0", "AssumedRole", eventCategory, eventType, "",

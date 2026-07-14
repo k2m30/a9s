@@ -37,8 +37,8 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -442,12 +442,12 @@ func TestFetchRevealValue_NoRevealFetcher(t *testing.T) {
 // TestProbeResourceAvailability_NilClients pins the CURRENT (correct)
 // contract from commit 89f0f69d ("availability sweep waits for client
 // readiness — no probes against a nil transport"): with nil clients, an
-// AvailabilityCacheLoadedMsg{Expired:true} must NOT dispatch any probe
-// cmds at all — dispatching them would run every probe against a nil
-// transport and fail hard, permanently losing that probe for the session.
-// Instead, Session.AvailSweepPending is latched, and the next successful
-// ClientsReady drains the first batch (fireNextAvailabilityProbes(4)) once a
-// real transport exists.
+// AvailabilityCacheLoadedMsg must NOT dispatch any probe cmds at all —
+// dispatching them would run every probe against a nil transport and fail
+// hard, permanently losing that probe for the session. Instead,
+// Session.AvailSweepPending is latched, and the next successful ClientsReady
+// drains the first batch (fireNextAvailabilityProbes(4)) once a real
+// transport exists.
 //
 // RETIRED the old "dispatches probe cmds, each erroring for nil clients"
 // invariant this test used to pin: that was the pre-89f0f69d contract, which
@@ -460,10 +460,9 @@ func TestProbeResourceAvailability_NilClients(t *testing.T) {
 
 	_, cmd := rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
-		Expired: true,
 	})
 	if cmd != nil {
-		t.Errorf("AvailabilityCacheLoadedMsg{Expired:true} with nil clients must NOT dispatch probe cmds (would run against a nil transport); got non-nil cmd")
+		t.Errorf("AvailabilityCacheLoadedMsg with nil clients must NOT dispatch probe cmds (would run against a nil transport); got non-nil cmd")
 	}
 
 	if !m.Core().Session().AvailSweepPending {

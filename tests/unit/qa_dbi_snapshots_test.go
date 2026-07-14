@@ -39,7 +39,9 @@ func TestQA_DBISnapshots_FetchSuccess(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchDBISnapshots(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchDBISnapshotsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -81,7 +83,9 @@ func TestQA_DBISnapshots_FetchEmpty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchDBISnapshots(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchDBISnapshotsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -95,7 +99,9 @@ func TestQA_DBISnapshots_FetchError(t *testing.T) {
 		err: fmt.Errorf("access denied"),
 	}
 
-	_, err := awsclient.FetchDBISnapshots(context.Background(), mock)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchDBISnapshotsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

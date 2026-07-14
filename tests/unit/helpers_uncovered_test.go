@@ -201,50 +201,6 @@ func TestRelated_SQS_SQS_NoRelationship(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Actor() — IAMUser with ARN only (exercises arnLastSegment)
-// ---------------------------------------------------------------------------
-
-// TestCTDetailActor_IAMUser_ARNOnly verifies that Actor() falls back to
-// arnLastSegment when UserName is empty but ARN has a "/user/name" suffix.
-func TestCTDetailActor_IAMUser_ARNOnly(t *testing.T) {
-	event := &ctevent.Event{
-		UserIdentity: ctevent.UserIdentity{
-			Type:     "IAMUser",
-			UserName: "",
-			ARN:      "arn:aws:iam::123456789012:user/alice",
-		},
-	}
-
-	got := ctevent.Actor(event)
-	want := "IAMUser: alice"
-	if got != want {
-		t.Errorf("Actor() = %q, want %q", got, want)
-	}
-}
-
-// TestCTDetailActor_IAMUser_ARNNoSlash verifies Actor() when ARN has no "/" —
-// arnLastSegment returns "" and Actor falls back to the raw ARN.
-func TestCTDetailActor_IAMUser_ARNNoSlash(t *testing.T) {
-	event := &ctevent.Event{
-		UserIdentity: ctevent.UserIdentity{
-			Type:     "IAMUser",
-			UserName: "",
-			ARN:      "arn:aws:iam::123456789012:root",
-		},
-	}
-
-	got := ctevent.Actor(event)
-	// arnLastSegment returns "" for "arn:aws:iam::123456789012:root" (no "/"),
-	// so Actor falls back to the raw ARN.
-	if got == "" {
-		t.Error("Actor() must not return empty string")
-	}
-	if got == "IAMUser: " {
-		t.Errorf("Actor() = %q — must not produce trailing space with empty name", got)
-	}
-}
-
-// ---------------------------------------------------------------------------
 // 3. ExtractTarget() — ARN-only ResourceRef (exercises labelFromARN)
 // ---------------------------------------------------------------------------
 

@@ -459,9 +459,9 @@ func TestQA_DocDB_YAMLView(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
 	k := keys.Default()
 	res := fixtures[0]
-	m := views.NewYAML(res, "", k)
+	m := views.NewYAMLWithCtrl(res, "", k, nil)
 	m.SetSize(80, 30)
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 
 	if out == "" || out == "Initializing..." {
 		t.Fatal("DocumentDB YAML view returned empty or initializing")
@@ -483,21 +483,9 @@ func TestQA_DocDB_YAMLView(t *testing.T) {
 	}
 }
 
-func TestQA_DocDB_YAMLFrameTitle(t *testing.T) {
-	fixtures := fixtureDocDBClusters()
-	k := keys.Default()
-	res := fixtures[0]
-	m := views.NewYAML(res, "", k)
-	title := m.FrameTitle()
-
-	expected := res.Name + " yaml"
-	if res.Name == "" {
-		expected = res.ID + " yaml"
-	}
-	if title != expected {
-		t.Errorf("DocumentDB YAML FrameTitle = %q, want %q", title, expected)
-	}
-}
+// TestQA_DocDB_YAMLFrameTitle retired: YAMLModel.FrameTitle() is DEAD per
+// specs/022-codebase-cleanup/wave3-map-text.md (no production caller), and
+// title-string behavior is not resource-type-specific.
 
 // ===========================================================================
 // DOCDB-YAML-07: DocumentDB YAML raw content for copy
@@ -507,8 +495,8 @@ func TestQA_DocDB_YAMLRawContent(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
 	k := keys.Default()
 	res := fixtures[0]
-	m := views.NewYAML(res, "", k)
-	raw := m.RawContent()
+	m := views.NewYAMLWithCtrl(res, "", k, nil)
+	raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
 
 	if raw == "" {
 		t.Fatal("DocumentDB YAML RawContent() returned empty string")

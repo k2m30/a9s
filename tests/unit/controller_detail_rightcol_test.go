@@ -1,47 +1,42 @@
 // controller_detail_rightcol_test.go — regression test for Fix 6 (P2-2):
-// DetailModel.Update(RelatedCheckResult) on the controller-backed path must
-// propagate the result to m.rightCol so that Enter on the focused right-column
-// row dispatches RelatedNavigate.
+// a RelatedCheckResult landing on a controller-backed detail screen must
+// update DetailState.RelatedRows so that selecting the focused right-column
+// row dispatches a navigation task.
 //
-// Pre-fix failure: the ctrl != nil branch applied the result to the controller
-// but forgot `m.rightCol, _ = m.rightCol.Update(msg)`. The local rightCol
-// therefore stayed in the loading state it had at construction time. A loading
-// row is not actionable (isActionableRow returns false for loading rows), so
-// Enter on the focused, apparently-resolved row produced no RelatedNavigateMsg —
-// a silent no-op that looked like a broken Enter key to the user.
+// Retargeted (wave3 detail-family cleanup, specs/022-codebase-cleanup) off
+// the legacy DetailModel.Update()/View() ctrl-backed path onto the live
+// Controller.Apply/Snapshot seam: DetailModel.Update(RelatedCheckResult) and
+// Enter-key dispatch no longer exist post-migration, so this test now drives
+// ApplyDetailRelatedResultForResource + ActionRelatedSelect directly and
+// asserts on Snapshot().Body.Detail / the returned tasks.
 //
-// Test strategy (mirrors rightcolumn_actionable_test.go):
-//  1. Build DetailModel via NewDetailWithCtrl with a registered related def.
-//  2. Tab to focus the right column while the row is in loading state (Tab works
-//     in loading state: HasActionableRows returns true for loading rows).
-//  3. Inject RelatedCheckResult with count > 0, which MUST update m.rightCol.
-//  4. Press Enter → assert RelatedNavigate is dispatched.
-//
-// Without Fix 6, step 3 leaves m.rightCol loading; step 4 is a no-op.
+// Pre-fix failure (original bug, now structurally impossible on this path):
+// the ctrl != nil branch applied the result to the controller but forgot to
+// also update the TUI's local rightCol mirror, so a loading row never became
+// selectable. The controller-path equivalent is: before the result lands,
+// the related row is State: RelatedLoading (not actionable — ActionRelatedSelect
+// dispatches nothing); after ApplyDetailRelatedResultForResource lands a
+// resolved count, the SAME row is actionable and ActionRelatedSelect
+// dispatches a task.
 package unit_test
 
 import (
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/session"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // ctrlDetailResourceType is a synthetic resource type used only in this file
 // to avoid polluting the global related registry used by other tests.
 const ctrlDetailResourceType = "ctrl-detail-reg-test-ec2"
 
-// buildCtrlBackedDetail creates a NewDetailWithCtrl with one related def
-// registered and the controller stack already seeded with a ScreenDetail.
-// Returns the DetailModel and a cleanup func.
-func buildCtrlBackedDetail(t *testing.T) (views.DetailModel, func()) {
+// buildCtrlBackedDetailController creates an app.Controller with one related
+// def registered and a ScreenDetail pushed and seeded for res, ready to
+// drive ApplyDetailRelatedResultForResource + ActionRelatedSelect directly.
+func buildCtrlBackedDetailController(t *testing.T) *app.Controller {
 	t.Helper()
 
 	resource.SetRelatedForTest(ctrlDetailResourceType, []resource.RelatedDef{
@@ -51,7 +46,7 @@ func buildCtrlBackedDetail(t *testing.T) (views.DetailModel, func()) {
 			Checker:     noopChecker,
 		},
 	})
-	cleanup := func() { resource.CleanupRelatedForTest(ctrlDetailResourceType) }
+	t.Cleanup(func() { resource.CleanupRelatedForTest(ctrlDetailResourceType) })
 
 	res := resource.Resource{
 		ID:   "i-ctrl001",
@@ -62,16 +57,9 @@ func buildCtrlBackedDetail(t *testing.T) (views.DetailModel, func()) {
 		},
 	}
 
-	s := session.New()
-	s.Profile = "demo"
-	s.Region = "us-east-1"
-	core := runtime.New(s, nil)
-	ctrl := app.New(core)
+	c := newTestController(t)
 
-	// Navigate to a list screen first (mirrors how TUI uses the controller)
-	// then push a detail screen for res.
-	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: ctrlDetailResourceType})
-	ctrl.ApplyIntents([]runtime.UIIntent{
+	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
 			ID: runtime.ScreenDetail,
 			Context: runtime.ScreenContext{
@@ -80,83 +68,54 @@ func buildCtrlBackedDetail(t *testing.T) (views.DetailModel, func()) {
 			},
 		},
 	})
-	ctrl.EnsureDetailState(res, ctrlDetailResourceType)
+	c.EnsureDetailState(res, ctrlDetailResourceType)
+	c.InitDetailRelatedRows(ctrlDetailResourceType)
 
-	k := keys.Default()
-	d := views.NewDetailWithCtrl(res, ctrlDetailResourceType, nil, k, ctrl)
-	d.SetSize(140, 30)
-
-	return d, cleanup
+	return c
 }
 
-// deliverCtrlRelatedResult injects a RelatedCheckResult into d and returns
-// the updated model.
-func deliverCtrlRelatedResult(d views.DetailModel, count int) views.DetailModel {
-	msg := messages.RelatedCheckResult{
-		ResourceType:   ctrlDetailResourceType,
-		DefDisplayName: "Target Groups",
-		Result: resource.RelatedCheckResult{
-			TargetType: "tg",
-			Count:      count,
-		},
+// TestDetailController_RelatedCheckResult_EnablesRelatedSelect verifies that
+// on the live controller path, ApplyDetailRelatedResultForResource updates
+// DetailState.RelatedRows so the row becomes actionable and
+// ActionRelatedSelect dispatches a task — the live replacement for
+// TestDetailModel_CtrlBacked_RelatedCheckResult_EnablesEnterNavigation.
+func TestDetailController_RelatedCheckResult_EnablesRelatedSelect(t *testing.T) {
+	c := buildCtrlBackedDetailController(t)
+
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil after EnsureDetailState + InitDetailRelatedRows")
 	}
-	updated, _ := d.Update(msg)
-	return updated
-}
-
-// TestDetailModel_CtrlBacked_RelatedCheckResult_EnablesEnterNavigation verifies
-// that on the controller-backed path, Update(RelatedCheckResult) propagates
-// the result to m.rightCol, making the row actionable so Enter dispatches
-// RelatedNavigate.
-func TestDetailModel_CtrlBacked_RelatedCheckResult_EnablesEnterNavigation(t *testing.T) {
-	ensureNoColor(t)
-
-	d, cleanup := buildCtrlBackedDetail(t)
-	defer cleanup()
-
-	// Right column must be visible at width=140 with a registered related def.
-	if view := stripAnsi(d.View()); !containsRelated(view) {
-		t.Skip("right column not visible — layout may not show at this terminal size")
+	if len(body.Related) != 1 || body.Related[0].Name != "Target Groups" {
+		t.Fatalf("expected exactly 1 related row 'Target Groups' after InitDetailRelatedRows, got %+v", body.Related)
+	}
+	if !body.Related[0].Loading {
+		t.Fatal("test setup: related row must start Loading before the result lands")
 	}
 
-	// Tab to focus right column while the row is still in loading state.
-	// Loading rows are always focusable (HasActionableRows == true for loading).
-	d, _ = d.Update(tea.KeyPressMsg{Code: tea.KeyTab})
-
-	// Without focus, Enter is a no-op — but we've tabbed so focus is on right col.
-	// Pre-inject check: Enter while loading should NOT produce a nav msg.
-	_, preCmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	if preCmd != nil {
-		if msg := preCmd(); msg != nil {
-			if _, ok := msg.(messages.RelatedNavigate); ok {
-				t.Skip("loading row already produced RelatedNavigate — unexpected but not the regression being tested")
-			}
-		}
+	// Focus the right column and select the (still loading) row — must
+	// dispatch nothing (Fix 6's pre-condition: a loading row is not
+	// actionable).
+	c.Apply(app.Action{Kind: app.ActionToggleFocus})
+	_, preTasks := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: "0"})
+	if len(preTasks) != 0 {
+		t.Fatalf("ActionRelatedSelect on a still-Loading related row dispatched %d tasks, want 0; tasks: %+v", len(preTasks), preTasks)
 	}
 
-	// Deliver the result: count=3, not loading. This is the step that Fix 6 enables.
-	// Without Fix 6: m.rightCol stays loading → Enter is still a no-op.
-	// With Fix 6: m.rightCol is updated to count=3 → isActionableRow == true.
-	d = deliverCtrlRelatedResult(d, 3)
+	// Deliver the result: count=3, not loading. This is the step Fix 6 covers.
+	c.ApplyDetailRelatedResultForResource(ctrlDetailResourceType, "i-ctrl001", "Target Groups", "tg",
+		domain.RelatedResolved, 3, false, "", false, []string{"tg-1", "tg-2", "tg-3"}, nil)
 
-	// Press Enter and collect the emitted message.
-	_, postCmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	if postCmd == nil {
-		t.Fatal("Fix6: Enter on controller-backed detail after RelatedCheckResult produced nil cmd — rightCol was not updated (pre-fix regression)")
+	postBody := c.Snapshot().Body.Detail
+	if postBody.Related[0].Loading {
+		t.Fatal("Fix6: related row still Loading after ApplyDetailRelatedResultForResource — result did not land")
 	}
-	msg := postCmd()
-	if _, ok := msg.(messages.RelatedNavigate); !ok {
-		t.Fatalf("Fix6: Enter produced %T, want messages.RelatedNavigate — rightCol.Update(msg) was not called in the ctrl path", msg)
+	if postBody.Related[0].Count != 3 {
+		t.Fatalf("Fix6: related row Count = %d, want 3 after ApplyDetailRelatedResultForResource", postBody.Related[0].Count)
 	}
-}
 
-// containsRelated returns true when the plain-text view contains the "RELATED"
-// header that signals the right column is rendered.
-func containsRelated(plain string) bool {
-	for i := 0; i+6 < len(plain); i++ {
-		if plain[i:i+7] == "RELATED" {
-			return true
-		}
+	_, postTasks := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: "0"})
+	if len(postTasks) == 0 {
+		t.Fatal("Fix6: ActionRelatedSelect on the now-resolved actionable related row dispatched 0 tasks — result landing did not make the row selectable")
 	}
-	return false
 }

@@ -34,18 +34,10 @@ archives:
         formats:
           - zip
 
-homebrew_casks:
-  - name: a9s
-    binaries:
-      - a9s
-    repository:
-      owner: k2m30
-      name: homebrew-a9s
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Casks
-    homepage: https://github.com/k2m30/a9s
-    description: Terminal UI AWS Resource Manager
-
+# Homebrew formula publishing is NOT done by GoReleaser: `brews:` is
+# deprecated and `homebrew_casks:` ships a cask (quarantine on unsigned
+# macOS binaries — issue #455). The release workflow renders and pushes
+# Formula/a9s.rb via scripts/generate-homebrew-formula.sh instead.
 scoops:
   - repository:
       owner: k2m30

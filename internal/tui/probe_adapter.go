@@ -22,7 +22,6 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 		if store == nil {
 			return messages.AvailabilityCacheLoaded{
 				Entries: make(map[string]int),
-				Expired: true,
 			}
 		}
 		return runtime.CacheStoreToEvent(store)

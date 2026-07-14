@@ -38,7 +38,9 @@ import (
 
 func buildEFSResourcesFromFake() ([]resource.Resource, error) {
 	fake := fakes.NewEFS()
-	return awsclient.FetchEFSFileSystems(context.Background(), fake)
+	return collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEFSFileSystemsPage(context.Background(), fake, token)
+	})
 }
 
 func efsResourceByID(resources []resource.Resource, id string) (resource.Resource, bool) {
@@ -402,7 +404,9 @@ func TestEFS_NoCloudWatchMetricCalls(t *testing.T) {
 	// FetchEFSFileSystems must complete with ZERO external service calls beyond
 	// the EFS client passed in. If the implementation calls CloudWatch, it would
 	// panic on nil-client access or return an error — neither is acceptable.
-	resources, err := awsclient.FetchEFSFileSystems(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEFSFileSystemsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchEFSFileSystems must not call CloudWatch; error: %v", err)
 	}
@@ -463,8 +467,8 @@ func TestFetchEFSFileSystems_StatusField_Warning(t *testing.T) {
 	}
 
 	warningCases := []struct {
-		fsID        string
-		wantPhrase  string
+		fsID       string
+		wantPhrase string
 	}{
 		{"fs-0warncreating0001", "creating"},
 		{"fs-0warnupdating0001", "updating"},

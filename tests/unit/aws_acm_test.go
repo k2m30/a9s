@@ -51,7 +51,9 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchACMCertificates(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchACMCertificatesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -177,7 +179,9 @@ func TestFetchACMCertificates_SameDomainDistinctARN_UniqueIDs(t *testing.T) {
 			},
 		},
 	}
-	resources, err := awsclient.FetchACMCertificates(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchACMCertificatesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -201,7 +205,9 @@ func TestFetchACMCertificates_ErrorResponse(t *testing.T) {
 		err:    fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchACMCertificates(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchACMCertificatesPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -217,7 +223,9 @@ func TestFetchACMCertificates_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchACMCertificates(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchACMCertificatesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

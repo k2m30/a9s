@@ -33,6 +33,8 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
+	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 // ===========================================================================
@@ -56,7 +58,7 @@ func TestCTVerb_ReadPrefixes(t *testing.T) {
 		{"LookupPolicy", "R"},
 	}
 	for _, tc := range cases {
-		got := awsclient.ClassifyCTVerb(tc.eventName, "Management", "AwsApiCall")
+		got := ctevent.ClassifyCTVerb(tc.eventName, "Management", "AwsApiCall")
 		if got != tc.want {
 			t.Errorf("ClassifyCTVerb(%q, Management, AwsApiCall) = %q, want %q", tc.eventName, got, tc.want)
 		}
@@ -85,7 +87,7 @@ func TestCTVerb_WritePrefixes(t *testing.T) {
 		// See TestCTVerb_AssumeRoleVariants_AreR for the positive assertions.
 	}
 	for _, tc := range cases {
-		got := awsclient.ClassifyCTVerb(tc.eventName, "Management", "AwsApiCall")
+		got := ctevent.ClassifyCTVerb(tc.eventName, "Management", "AwsApiCall")
 		if got != tc.want {
 			t.Errorf("ClassifyCTVerb(%q, Management, AwsApiCall) = %q, want %q", tc.eventName, got, tc.want)
 		}
@@ -99,7 +101,7 @@ func TestCTVerb_WritePrefixes(t *testing.T) {
 func TestCTVerb_AssumeRoleVariants_AreR(t *testing.T) {
 	cases := []string{"AssumeRole", "AssumeRoleWithSAML", "AssumeRoleWithWebIdentity"}
 	for _, name := range cases {
-		got := awsclient.ClassifyCTVerb(name, "Management", "AwsApiCall")
+		got := ctevent.ClassifyCTVerb(name, "Management", "AwsApiCall")
 		if got != "R" {
 			t.Errorf("ClassifyCTVerb(%q, Management, AwsApiCall) = %q, want R (STS session-vending exact-match override)", name, got)
 		}
@@ -120,7 +122,7 @@ func TestCTVerb_DestructivePrefixes(t *testing.T) {
 		{"CancelExportTask", "D"},
 	}
 	for _, tc := range cases {
-		got := awsclient.ClassifyCTVerb(tc.eventName, "Management", "AwsApiCall")
+		got := ctevent.ClassifyCTVerb(tc.eventName, "Management", "AwsApiCall")
 		if got != tc.want {
 			t.Errorf("ClassifyCTVerb(%q, Management, AwsApiCall) = %q, want %q", tc.eventName, got, tc.want)
 		}
@@ -131,7 +133,7 @@ func TestCTVerb_InsightCategory(t *testing.T) {
 	// eventCategory "Insight" dominates event-name prefix matching.
 	insightNames := []string{"DescribeInstances", "CreateBucket", "DeleteTable", "SomeUnknownEvent"}
 	for _, name := range insightNames {
-		got := awsclient.ClassifyCTVerb(name, "Insight", "AwsApiCall")
+		got := ctevent.ClassifyCTVerb(name, "Insight", "AwsApiCall")
 		if got != "I" {
 			t.Errorf("ClassifyCTVerb(%q, Insight, AwsApiCall) = %q, want I", name, got)
 		}
@@ -142,7 +144,7 @@ func TestCTVerb_NetworkActivityCategory(t *testing.T) {
 	// eventCategory "NetworkActivity" dominates event-name prefix matching.
 	naNames := []string{"CreateNetworkInterface", "VpcEndpointConnect", "SomeNetEvent"}
 	for _, name := range naNames {
-		got := awsclient.ClassifyCTVerb(name, "NetworkActivity", "AwsApiCall")
+		got := ctevent.ClassifyCTVerb(name, "NetworkActivity", "AwsApiCall")
 		if got != "N" {
 			t.Errorf("ClassifyCTVerb(%q, NetworkActivity, AwsApiCall) = %q, want N", name, got)
 		}
@@ -151,14 +153,14 @@ func TestCTVerb_NetworkActivityCategory(t *testing.T) {
 
 func TestCTVerb_AwsServiceEventType(t *testing.T) {
 	// eventType "AwsServiceEvent" → "S".
-	got := awsclient.ClassifyCTVerb("DescribeVolumes", "Management", "AwsServiceEvent")
+	got := ctevent.ClassifyCTVerb("DescribeVolumes", "Management", "AwsServiceEvent")
 	if got != "S" {
 		t.Errorf("ClassifyCTVerb(DescribeVolumes, Management, AwsServiceEvent) = %q, want S", got)
 	}
 }
 
 func TestCTVerb_UnknownEventName_ReturnsQuestionMark(t *testing.T) {
-	got := awsclient.ClassifyCTVerb("SomeFutureUnknownApiCall", "Management", "AwsApiCall")
+	got := ctevent.ClassifyCTVerb("SomeFutureUnknownApiCall", "Management", "AwsApiCall")
 	if got != "?" {
 		t.Errorf("ClassifyCTVerb(SomeFutureUnknownApiCall, Management, AwsApiCall) = %q, want ?", got)
 	}
@@ -166,17 +168,17 @@ func TestCTVerb_UnknownEventName_ReturnsQuestionMark(t *testing.T) {
 
 func TestCTVerb_Deterministic_SamePrecedenceOrder(t *testing.T) {
 	// Insight category must win over an event name that would otherwise classify as R.
-	gotInsight := awsclient.ClassifyCTVerb("DescribeInstances", "Insight", "AwsApiCall")
+	gotInsight := ctevent.ClassifyCTVerb("DescribeInstances", "Insight", "AwsApiCall")
 	if gotInsight != "I" {
 		t.Errorf("Insight should beat R prefix: got %q, want I", gotInsight)
 	}
 	// NetworkActivity must win over an event name that would classify as W.
-	gotNA := awsclient.ClassifyCTVerb("CreateNetworkInterface", "NetworkActivity", "AwsApiCall")
+	gotNA := ctevent.ClassifyCTVerb("CreateNetworkInterface", "NetworkActivity", "AwsApiCall")
 	if gotNA != "N" {
 		t.Errorf("NetworkActivity should beat W prefix: got %q, want N", gotNA)
 	}
 	// AwsServiceEvent must win over R prefix.
-	gotSvc := awsclient.ClassifyCTVerb("DescribeInstances", "Management", "AwsServiceEvent")
+	gotSvc := ctevent.ClassifyCTVerb("DescribeInstances", "Management", "AwsServiceEvent")
 	if gotSvc != "S" {
 		t.Errorf("AwsServiceEvent type should beat R prefix: got %q, want S", gotSvc)
 	}
@@ -831,7 +833,9 @@ func TestCTEventsFixtureCoverage_AllVerbsPresent(t *testing.T) {
 	// Post-T025C: we read _ct.verb directly.
 
 	ctClient := fakes.NewCloudTrail()
-	resources, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	resources, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), ctClient, token)
+	})
 	if fetchErr != nil || len(resources) == 0 {
 		t.Fatalf("FetchCloudTrailEvents via CloudTrail fake: err=%v, len=%d", fetchErr, len(resources))
 	}
@@ -855,7 +859,7 @@ func TestCTEventsFixtureCoverage_AllVerbsPresent(t *testing.T) {
 			continue
 		}
 		category, eType := ctTestParseEventCategoryType(event.CloudTrailEvent)
-		v := awsclient.ClassifyCTVerb(*event.EventName, category, eType)
+		v := ctevent.ClassifyCTVerb(*event.EventName, category, eType)
 		if _, known := verbBuckets[v]; known {
 			verbBuckets[v] = true
 		}
@@ -877,7 +881,9 @@ func TestCTEventsFixtureCoverage_AllTargetFallbackCategoriesPresent(t *testing.T
 	//   - management (none) (Management + no resources[])
 
 	ctClient := fakes.NewCloudTrail()
-	resources, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	resources, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), ctClient, token)
+	})
 	if fetchErr != nil || len(resources) == 0 {
 		t.Fatalf("FetchCloudTrailEvents via CloudTrail fake: err=%v, len=%d", fetchErr, len(resources))
 	}
@@ -928,7 +934,9 @@ func TestCTEventsFixtureCoverage_AllTargetFallbackCategoriesPresent(t *testing.T
 
 func TestCTEventsFixtureCoverage_AtLeastOneRootEvent(t *testing.T) {
 	ctClient := fakes.NewCloudTrail()
-	resources, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	resources, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), ctClient, token)
+	})
 	if fetchErr != nil || len(resources) == 0 {
 		t.Fatalf("FetchCloudTrailEvents via CloudTrail fake: err=%v, len=%d", fetchErr, len(resources))
 	}
@@ -951,7 +959,9 @@ func TestCTEventsFixtureCoverage_AtLeastOneRootEvent(t *testing.T) {
 
 func TestCTEventsFixtureCoverage_AtLeastOneErrorCodeEvent(t *testing.T) {
 	ctClient := fakes.NewCloudTrail()
-	resources, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	resources, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), ctClient, token)
+	})
 	if fetchErr != nil || len(resources) == 0 {
 		t.Fatalf("FetchCloudTrailEvents via CloudTrail fake: err=%v, len=%d", fetchErr, len(resources))
 	}
@@ -974,7 +984,9 @@ func TestCTEventsFixtureCoverage_AtLeastOneErrorCodeEvent(t *testing.T) {
 
 func TestCTEventsFixtureCoverage_AtLeastOneCrossAccountEvent(t *testing.T) {
 	ctClient := fakes.NewCloudTrail()
-	resources, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	resources, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), ctClient, token)
+	})
 	if fetchErr != nil || len(resources) == 0 {
 		t.Fatalf("FetchCloudTrailEvents via CloudTrail fake: err=%v, len=%d", fetchErr, len(resources))
 	}

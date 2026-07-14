@@ -10,6 +10,7 @@ import (
 	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -37,7 +38,9 @@ func TestFetchKinesisStreams_ParsesMultipleStreams(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchKinesisStreams(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchKinesisStreamsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -85,7 +88,9 @@ func TestFetchKinesisStreams_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchKinesisStreams(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchKinesisStreamsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -100,7 +105,9 @@ func TestFetchKinesisStreams_APIError(t *testing.T) {
 		err: &mockAPIError{code: "AccessDeniedException", message: "access denied"},
 	}
 
-	_, err := awsclient.FetchKinesisStreams(context.Background(), mock)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchKinesisStreamsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -117,7 +124,9 @@ func TestFetchKinesisStreams_NilFields(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchKinesisStreams(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchKinesisStreamsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

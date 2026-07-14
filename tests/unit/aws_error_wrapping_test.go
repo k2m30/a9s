@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // TestErrorWrapping_AllFetchers verifies that every fetcher wraps errors with
@@ -29,7 +30,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "EC2 instances",
 			contains: "fetching EC2 instances",
 			call: func() error {
-				_, err := awsclient.FetchEC2Instances(ctx, &mockEC2Client{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchEC2InstancesPage(ctx, &mockEC2Client{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -37,7 +40,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "S3 buckets",
 			contains: "fetching S3 buckets",
 			call: func() error {
-				_, err := awsclient.FetchS3Buckets(ctx, &mockS3ListBucketsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchS3BucketsPage(ctx, &mockS3ListBucketsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -53,7 +58,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "RDS instances",
 			contains: "fetching RDS instances",
 			call: func() error {
-				_, err := awsclient.FetchRDSInstances(ctx, &mockRDSClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchRDSInstancesPage(ctx, &mockRDSClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -61,7 +68,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Redis replication groups",
 			contains: "fetching Redis replication groups",
 			call: func() error {
-				_, err := awsclient.FetchRedis(ctx, &mockElastiCacheReplicationGroupsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchRedisPage(ctx, &mockElastiCacheReplicationGroupsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -69,7 +78,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "DocDB clusters",
 			contains: "fetching DocumentDB clusters",
 			call: func() error {
-				_, err := awsclient.FetchDocDBClusters(ctx, &mockDocDBClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchDocDBClustersPage(ctx, &mockDocDBClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -87,7 +98,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Secrets",
 			contains: "fetching secrets",
 			call: func() error {
-				_, err := awsclient.FetchSecrets(ctx, &mockSecretsManagerClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchSecretsPage(ctx, &mockSecretsManagerClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -103,7 +116,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "VPCs",
 			contains: "fetching VPCs",
 			call: func() error {
-				_, err := awsclient.FetchVPCs(ctx, &mockEC2DescribeVpcsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchVPCsPage(ctx, &mockEC2DescribeVpcsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -111,7 +126,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Security groups",
 			contains: "fetching security groups",
 			call: func() error {
-				_, err := awsclient.FetchSecurityGroups(ctx, &mockEC2DescribeSecurityGroupsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchSecurityGroupsPage(ctx, &mockEC2DescribeSecurityGroupsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -130,7 +147,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Subnets",
 			contains: "fetching subnets",
 			call: func() error {
-				_, err := awsclient.FetchSubnets(ctx, &mockEC2DescribeSubnetsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchSubnetsPage(ctx, &mockEC2DescribeSubnetsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -138,7 +157,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Route tables",
 			contains: "fetching route tables",
 			call: func() error {
-				_, err := awsclient.FetchRouteTables(ctx, &mockEC2DescribeRouteTablesClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchRouteTablesPage(ctx, &mockEC2DescribeRouteTablesClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -146,7 +167,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "NAT gateways",
 			contains: "fetching NAT gateways",
 			call: func() error {
-				_, err := awsclient.FetchNatGateways(ctx, &mockEC2DescribeNatGatewaysClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchNatGatewaysPage(ctx, &mockEC2DescribeNatGatewaysClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -154,7 +177,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Internet gateways",
 			contains: "fetching internet gateways",
 			call: func() error {
-				_, err := awsclient.FetchInternetGateways(ctx, &mockEC2DescribeInternetGatewaysClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchInternetGatewaysPage(ctx, &mockEC2DescribeInternetGatewaysClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -162,7 +187,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Lambda functions",
 			contains: "fetching Lambda functions",
 			call: func() error {
-				_, err := awsclient.FetchLambdaFunctions(ctx, &mockLambdaListFunctionsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchLambdaFunctionsPage(ctx, &mockLambdaListFunctionsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -170,7 +197,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "CloudWatch alarms",
 			contains: "fetching CloudWatch alarms",
 			call: func() error {
-				_, err := awsclient.FetchCloudWatchAlarms(ctx, &mockCloudWatchDescribeAlarmsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchCloudWatchAlarmsPage(ctx, &mockCloudWatchDescribeAlarmsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -178,7 +207,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "SNS topics",
 			contains: "fetching SNS topics",
 			call: func() error {
-				_, err := awsclient.FetchSNSTopics(ctx, &mockSNSListTopicsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchSNSTopicsPage(ctx, &mockSNSListTopicsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -186,9 +217,11 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "SQS queues - list error",
 			contains: "listing SQS queues",
 			call: func() error {
-				_, err := awsclient.FetchSQSQueues(ctx,
-					&mockSQSListQueuesClient{err: sentinel},
-					&mockSQSGetQueueAttributesClient{})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchSQSQueuesPage(ctx,
+						&mockSQSListQueuesClient{err: sentinel},
+						&mockSQSGetQueueAttributesClient{}, token)
+				})
 				return err
 			},
 		},
@@ -196,7 +229,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Load balancers",
 			contains: "fetching load balancers",
 			call: func() error {
-				_, err := awsclient.FetchLoadBalancers(ctx, &mockELBv2DescribeLoadBalancersClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchLoadBalancersPage(ctx, &mockELBv2DescribeLoadBalancersClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -204,7 +239,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Target groups",
 			contains: "fetching target groups",
 			call: func() error {
-				_, err := awsclient.FetchTargetGroups(ctx, &mockELBv2DescribeTargetGroupsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchTargetGroupsPage(ctx, &mockELBv2DescribeTargetGroupsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -212,9 +249,11 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "ECS clusters - list error",
 			contains: "listing ECS clusters",
 			call: func() error {
-				_, err := awsclient.FetchECSClusters(ctx,
-					&mockECSListClustersClient{err: sentinel},
-					&mockECSDescribeClustersClient{})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchECSClustersPage(ctx,
+						&mockECSListClustersClient{err: sentinel},
+						&mockECSDescribeClustersClient{}, token)
+				})
 				return err
 			},
 		},
@@ -222,10 +261,12 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "ECS services - list clusters error",
 			contains: "listing ECS clusters",
 			call: func() error {
-				_, err := awsclient.FetchECSServices(ctx,
-					&mockECSListClustersClient{err: sentinel},
-					&mockECSListServicesClient{},
-					&mockECSDescribeServicesClient{})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchECSServicesPage(ctx,
+						&mockECSListClustersClient{err: sentinel},
+						&mockECSListServicesClient{},
+						&mockECSDescribeServicesClient{}, token)
+				})
 				return err
 			},
 		},
@@ -233,7 +274,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "CloudFormation stacks",
 			contains: "fetching CloudFormation stacks",
 			call: func() error {
-				_, err := awsclient.FetchCloudFormationStacks(ctx, &mockCFNDescribeStacksClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchCloudFormationStacksPage(ctx, &mockCFNDescribeStacksClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -241,7 +284,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "IAM roles",
 			contains: "fetching IAM roles",
 			call: func() error {
-				_, err := awsclient.FetchIAMRoles(ctx, &mockIAMListRolesClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchIAMRolesPage(ctx, &mockIAMListRolesClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -249,7 +294,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "CloudWatch log groups",
 			contains: "fetching CloudWatch log groups",
 			call: func() error {
-				_, err := awsclient.FetchCloudWatchLogGroups(ctx, &mockCWLogsDescribeLogGroupsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchCloudWatchLogGroupsPage(ctx, &mockCWLogsDescribeLogGroupsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -257,7 +304,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "SSM parameters",
 			contains: "fetching SSM parameters",
 			call: func() error {
-				_, err := awsclient.FetchSSMParameters(ctx, &mockSSMDescribeParametersClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchSSMParametersPage(ctx, &mockSSMDescribeParametersClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -265,9 +314,11 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "DynamoDB tables - list error",
 			contains: "listing DynamoDB tables",
 			call: func() error {
-				_, err := awsclient.FetchDynamoDBTables(ctx,
-					&mockDDBListTablesClient{err: sentinel},
-					&mockDDBDescribeTableClient{})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchDynamoDBTablesPage(ctx,
+						&mockDDBListTablesClient{err: sentinel},
+						&mockDDBDescribeTableClient{}, token)
+				})
 				return err
 			},
 		},
@@ -283,7 +334,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "ACM certificates",
 			contains: "fetching ACM certificates",
 			call: func() error {
-				_, err := awsclient.FetchACMCertificates(ctx, &mockACMListCertificatesClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchACMCertificatesPage(ctx, &mockACMListCertificatesClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -291,7 +344,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Auto Scaling groups",
 			contains: "fetching Auto Scaling groups",
 			call: func() error {
-				_, err := awsclient.FetchAutoScalingGroups(ctx, &mockASGDescribeAutoScalingGroupsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchAutoScalingGroupsPage(ctx, &mockASGDescribeAutoScalingGroupsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -299,7 +354,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "IAM users",
 			contains: "fetching IAM users",
 			call: func() error {
-				_, err := awsclient.FetchIAMUsers(ctx, &mockIAMListUsersClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchIAMUsersPage(ctx, &mockIAMListUsersClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -307,7 +364,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "IAM groups",
 			contains: "fetching IAM groups",
 			call: func() error {
-				_, err := awsclient.FetchIAMGroups(ctx, &mockIAMListGroupsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchIAMGroupsPage(ctx, &mockIAMListGroupsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -315,7 +374,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "RDS snapshots",
 			contains: "fetching RDS snapshots",
 			call: func() error {
-				_, err := awsclient.FetchDBISnapshots(ctx, &mockRDSDescribeDBSnapshotsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchDBISnapshotsPage(ctx, &mockRDSDescribeDBSnapshotsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -323,7 +384,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Transit gateways",
 			contains: "fetching transit gateways",
 			call: func() error {
-				_, err := awsclient.FetchTransitGateways(ctx, &mockEC2DescribeTransitGatewaysClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchTransitGatewaysPage(ctx, &mockEC2DescribeTransitGatewaysClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -331,7 +394,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "VPC endpoints",
 			contains: "fetching VPC endpoints",
 			call: func() error {
-				_, err := awsclient.FetchVPCEndpoints(ctx, &mockEC2DescribeVpcEndpointsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchVPCEndpointsPage(ctx, &mockEC2DescribeVpcEndpointsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -339,7 +404,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Network interfaces",
 			contains: "fetching network interfaces",
 			call: func() error {
-				_, err := awsclient.FetchNetworkInterfaces(ctx, &mockEC2DescribeNetworkInterfacesClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchNetworkInterfacesPage(ctx, &mockEC2DescribeNetworkInterfacesClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -347,7 +414,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "SNS subscriptions",
 			contains: "fetching SNS subscriptions",
 			call: func() error {
-				_, err := awsclient.FetchSNSSubscriptions(ctx, &mockSNSListSubscriptionsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchSNSSubscriptionsPage(ctx, &mockSNSListSubscriptionsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -355,7 +424,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "DocDB cluster snapshots",
 			contains: "fetching DocumentDB cluster snapshots",
 			call: func() error {
-				_, err := awsclient.FetchDocDBClusterSnapshots(ctx, &mockDocDBDescribeSnapshotsClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchDocDBClusterSnapshotsPage(ctx, &mockDocDBDescribeSnapshotsClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -363,10 +434,12 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "ECS tasks - list clusters error",
 			contains: "listing ECS clusters",
 			call: func() error {
-				_, err := awsclient.FetchECSTasks(ctx,
-					&mockECSListClustersClient{err: sentinel},
-					&mockECSListTasksClient{},
-					&mockECSDescribeTasksClient{})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchECSTasksPage(ctx,
+						&mockECSListClustersClient{err: sentinel},
+						&mockECSListTasksClient{},
+						&mockECSDescribeTasksClient{}, token)
+				})
 				return err
 			},
 		},
@@ -374,7 +447,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "IAM policies",
 			contains: "fetching IAM policies",
 			call: func() error {
-				_, err := awsclient.FetchIAMPolicies(ctx, &mockIAMListPoliciesClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchIAMPoliciesPage(ctx, &mockIAMListPoliciesClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -382,7 +457,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "CloudFront distributions",
 			contains: "fetching CloudFront distributions",
 			call: func() error {
-				_, err := awsclient.FetchCloudFrontDistributions(ctx, &mockCloudFrontClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchCloudFrontDistributionsPage(ctx, &mockCloudFrontClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -390,7 +467,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Route53 hosted zones",
 			contains: "fetching Route53 hosted zones",
 			call: func() error {
-				_, err := awsclient.FetchHostedZones(ctx, &mockRoute53Client{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchHostedZonesPage(ctx, &mockRoute53Client{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -398,7 +477,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "API Gateways",
 			contains: "fetching API gateways",
 			call: func() error {
-				_, err := awsclient.FetchAPIGateways(ctx, &mockAPIGatewayV2Client{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchAPIGatewaysPage(ctx, &mockAPIGatewayV2Client{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -406,7 +487,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "ECR repositories",
 			contains: "fetching ECR repositories",
 			call: func() error {
-				_, err := awsclient.FetchECRRepositories(ctx, &mockECRClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchECRRepositoriesPage(ctx, &mockECRClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -414,7 +497,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "EFS file systems",
 			contains: "fetching EFS file systems",
 			call: func() error {
-				_, err := awsclient.FetchEFSFileSystems(ctx, &mockEFSClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchEFSFileSystemsPage(ctx, &mockEFSClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -422,7 +507,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "EventBridge rules",
 			contains: "fetching EventBridge rules",
 			call: func() error {
-				_, err := awsclient.FetchEventBridgeRules(ctx, &mockEventBridgeClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchEventBridgeRulesPage(ctx, &mockEventBridgeClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -430,7 +517,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Step Functions",
 			contains: "fetching Step Functions",
 			call: func() error {
-				_, err := awsclient.FetchStepFunctions(ctx, &mockSFNClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchStepFunctionsPage(ctx, &mockSFNClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -438,7 +527,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "CodePipeline pipelines",
 			contains: "fetching CodePipeline pipelines",
 			call: func() error {
-				_, err := awsclient.FetchCodePipelines(ctx, &mockCodePipelineClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchCodePipelinesPage(ctx, &mockCodePipelineClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -446,7 +537,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Kinesis streams",
 			contains: "fetching Kinesis streams",
 			call: func() error {
-				_, err := awsclient.FetchKinesisStreams(ctx, &mockKinesisClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchKinesisStreamsPage(ctx, &mockKinesisClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -454,7 +547,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "WAF web ACLs",
 			contains: "fetching WAF web ACLs",
 			call: func() error {
-				_, err := awsclient.FetchWAFWebACLs(ctx, &mockWAFv2Client{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchWAFWebACLsPage(ctx, &mockWAFv2Client{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -462,7 +557,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Glue jobs",
 			contains: "fetching Glue jobs",
 			call: func() error {
-				_, err := awsclient.FetchGlueJobs(ctx, &mockGlueClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchGlueJobsPage(ctx, &mockGlueClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -470,7 +567,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Elastic Beanstalk environments",
 			contains: "fetching Elastic Beanstalk environments",
 			call: func() error {
-				_, err := awsclient.FetchEBEnvironments(ctx, &mockEBClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchEBEnvironmentsPage(ctx, &mockEBClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -478,7 +577,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "SES identities",
 			contains: "fetching SES identities",
 			call: func() error {
-				_, err := awsclient.FetchSESIdentities(ctx, &mockSESv2Client{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchSESIdentitiesPage(ctx, &mockSESv2Client{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -486,7 +587,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Redshift clusters",
 			contains: "fetching Redshift clusters",
 			call: func() error {
-				_, err := awsclient.FetchRedshiftClusters(ctx, &mockRedshiftClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchRedshiftClustersPage(ctx, &mockRedshiftClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -502,7 +605,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Athena workgroups",
 			contains: "fetching Athena workgroups",
 			call: func() error {
-				_, err := awsclient.FetchAthenaWorkgroups(ctx, &mockAthenaClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchAthenaWorkgroupsPage(ctx, &mockAthenaClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -510,7 +615,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "CodeArtifact repositories",
 			contains: "fetching CodeArtifact repositories",
 			call: func() error {
-				_, err := awsclient.FetchCodeArtifactRepos(ctx, &mockCodeArtifactClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchCodeArtifactReposPage(ctx, &mockCodeArtifactClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -518,9 +625,11 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "CodeBuild projects - list error",
 			contains: "listing CodeBuild projects",
 			call: func() error {
-				_, err := awsclient.FetchCodeBuildProjects(ctx,
-					&mockCodeBuildListProjectsClient{err: sentinel},
-					&mockCodeBuildBatchGetProjectsClient{})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchCodeBuildProjectsPage(ctx,
+						&mockCodeBuildListProjectsClient{err: sentinel},
+						&mockCodeBuildBatchGetProjectsClient{}, token)
+				})
 				return err
 			},
 		},
@@ -549,7 +658,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "MSK clusters",
 			contains: "fetching MSK clusters",
 			call: func() error {
-				_, err := awsclient.FetchMSKClusters(ctx, &mockMSKListClustersV2Client{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchMSKClustersPage(ctx, &mockMSKListClustersV2Client{err: sentinel}, token)
+				})
 				return err
 			},
 		},
@@ -557,7 +668,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Backup plans",
 			contains: "fetching Backup plans",
 			call: func() error {
-				_, err := awsclient.FetchBackupPlans(ctx, &mockBackupListBackupPlansClient{err: sentinel})
+				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+					return awsclient.FetchBackupPlansPage(ctx, &mockBackupListBackupPlansClient{err: sentinel}, token)
+				})
 				return err
 			},
 		},

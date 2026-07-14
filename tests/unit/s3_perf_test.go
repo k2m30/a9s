@@ -6,6 +6,7 @@ import (
 	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // FetchS3Buckets should only call ListBuckets — no GetBucketLocation.
@@ -14,7 +15,9 @@ func TestFetchS3Buckets_NoGetBucketLocation(t *testing.T) {
 	listClient := &mockFastListBucketsClient{count: 100}
 
 	start := time.Now()
-	resources, err := awsclient.FetchS3Buckets(context.Background(), listClient)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchS3BucketsPage(context.Background(), listClient, token)
+	})
 	elapsed := time.Since(start)
 
 	if err != nil {

@@ -81,7 +81,9 @@ func TestFetchCloudTrailEvents_ParsesMultipleEvents(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCloudTrailEvents(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -123,7 +125,9 @@ func TestFetchCloudTrailEvents_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCloudTrailEvents(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -138,7 +142,9 @@ func TestFetchCloudTrailEvents_ErrorResponse(t *testing.T) {
 		err:    fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchCloudTrailEvents(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -165,7 +171,9 @@ func TestFetchCloudTrailEvents_WalksAllPages(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCloudTrailEvents(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -207,7 +215,9 @@ func TestFetchCloudTrailEvents_FieldExtraction(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCloudTrailEvents(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -263,7 +273,9 @@ func TestFetchCloudTrailEvents_FieldExtraction_MultipleResources(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCloudTrailEvents(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -300,7 +312,9 @@ func TestFetchCloudTrailEvents_EmptyResources(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCloudTrailEvents(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -337,7 +351,9 @@ func TestFetchCloudTrailEvents_ReadOnlyIsString(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCloudTrailEvents(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -375,7 +391,9 @@ func TestFetchCloudTrailEvents_RawStructIsEvent(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCloudTrailEvents(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

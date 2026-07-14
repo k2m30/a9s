@@ -20,6 +20,7 @@ import (
 	redshifttypes "github.com/aws/aws-sdk-go-v2/service/redshift/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ===========================================================================
@@ -68,7 +69,9 @@ func TestFetchSecurityGroups_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSecurityGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSecurityGroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -174,7 +177,9 @@ func TestFetchSubnets_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSubnets(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSubnetsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -262,7 +267,9 @@ func TestFetchVPCs_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchVPCs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchVPCsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -350,7 +357,9 @@ func TestFetchVPCEndpoints_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchVPCEndpoints(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchVPCEndpointsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -438,7 +447,9 @@ func TestFetchNatGateways_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchNatGateways(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchNatGatewaysPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -526,7 +537,9 @@ func TestFetchInternetGateways_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchInternetGateways(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchInternetGatewaysPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -614,7 +627,9 @@ func TestFetchNetworkInterfaces_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchNetworkInterfaces(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchNetworkInterfacesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -702,7 +717,9 @@ func TestFetchRouteTables_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchRouteTables(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchRouteTablesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -790,7 +807,9 @@ func TestFetchTransitGateways_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchTransitGateways(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchTransitGatewaysPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -902,7 +921,9 @@ func TestFetchLoadBalancers_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLoadBalancers(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchLoadBalancersPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -990,7 +1011,9 @@ func TestFetchTargetGroups_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchTargetGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchTargetGroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1077,7 +1100,9 @@ func TestFetchRedis_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchRedis(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchRedisPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1162,7 +1187,9 @@ func TestFetchDocDBClusters_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchDocDBClusters(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchDocDBClustersPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1250,7 +1277,9 @@ func TestFetchDocDBClusterSnapshots_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchDocDBClusterSnapshots(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchDocDBClusterSnapshotsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1338,7 +1367,9 @@ func TestFetchDBISnapshots_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchDBISnapshots(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchDBISnapshotsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1449,7 +1480,9 @@ func TestFetchRedshiftClusters_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchRedshiftClusters(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchRedshiftClustersPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1507,7 +1540,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("sg_error", func(t *testing.T) {
 		mock := &mockSGPaginatedClient{err: testErr}
-		_, err := awsclient.FetchSecurityGroups(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchSecurityGroupsPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1515,7 +1550,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("subnet_error", func(t *testing.T) {
 		mock := &mockSubnetPaginatedClient{err: testErr}
-		_, err := awsclient.FetchSubnets(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchSubnetsPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1523,7 +1560,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("vpc_error", func(t *testing.T) {
 		mock := &mockVPCPaginatedClient{err: testErr}
-		_, err := awsclient.FetchVPCs(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchVPCsPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1531,7 +1570,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("vpce_error", func(t *testing.T) {
 		mock := &mockVPCEPaginatedClient{err: testErr}
-		_, err := awsclient.FetchVPCEndpoints(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchVPCEndpointsPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1539,7 +1580,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("nat_error", func(t *testing.T) {
 		mock := &mockNATPaginatedClient{err: testErr}
-		_, err := awsclient.FetchNatGateways(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchNatGatewaysPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1547,7 +1590,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("igw_error", func(t *testing.T) {
 		mock := &mockIGWPaginatedClient{err: testErr}
-		_, err := awsclient.FetchInternetGateways(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchInternetGatewaysPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1555,7 +1600,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("eni_error", func(t *testing.T) {
 		mock := &mockENIPaginatedClient{err: testErr}
-		_, err := awsclient.FetchNetworkInterfaces(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchNetworkInterfacesPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1563,7 +1610,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("rtb_error", func(t *testing.T) {
 		mock := &mockRTBPaginatedClient{err: testErr}
-		_, err := awsclient.FetchRouteTables(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchRouteTablesPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1571,7 +1620,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("tgw_error", func(t *testing.T) {
 		mock := &mockTGWPaginatedClient{err: testErr}
-		_, err := awsclient.FetchTransitGateways(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchTransitGatewaysPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1579,7 +1630,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("elb_error", func(t *testing.T) {
 		mock := &mockELBPaginatedClient{err: testErr}
-		_, err := awsclient.FetchLoadBalancers(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchLoadBalancersPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1587,7 +1640,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("tg_error", func(t *testing.T) {
 		mock := &mockTGPaginatedClient{err: testErr}
-		_, err := awsclient.FetchTargetGroups(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchTargetGroupsPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1595,7 +1650,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("redis_error", func(t *testing.T) {
 		mock := &mockRedisPaginatedClient{err: testErr}
-		_, err := awsclient.FetchRedis(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchRedisPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1603,7 +1660,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("docdb_error", func(t *testing.T) {
 		mock := &mockDocDBPaginatedClient{err: testErr}
-		_, err := awsclient.FetchDocDBClusters(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchDocDBClustersPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1611,7 +1670,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("docdb_snap_error", func(t *testing.T) {
 		mock := &mockDBCSnapshotsPaginatedClient{err: testErr}
-		_, err := awsclient.FetchDocDBClusterSnapshots(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchDocDBClusterSnapshotsPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1619,7 +1680,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("rds_snap_error", func(t *testing.T) {
 		mock := &mockDBISnapshotsPaginatedClient{err: testErr}
-		_, err := awsclient.FetchDBISnapshots(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchDBISnapshotsPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
@@ -1627,7 +1690,9 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("redshift_error", func(t *testing.T) {
 		mock := &mockRedshiftPaginatedClient{err: testErr}
-		_, err := awsclient.FetchRedshiftClusters(context.Background(), mock)
+		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchRedshiftClustersPage(context.Background(), mock, token)
+		})
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}

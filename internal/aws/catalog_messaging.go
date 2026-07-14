@@ -21,13 +21,9 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		CopyField: "target_arn",
 		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{"target_id", "target_arn", "role_arn", "resource_type_name", "input_summary"},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, continuationToken)
-		},
+		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeEBRuleTargetNoDLQ, Phrase: "no DLQ configured", Severity: domain.SevWarn, Source: "wave1"},
 		},
@@ -50,13 +46,9 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 			ContextKeys:    map[string]string{"execution_arn": "execution_arn", "execution_name": "Name"},
 			DisplayNameKey: "execution_name",
 		}},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchSFNExecutions(ctx, c.SFN, parentCtx, continuationToken)
-		},
+		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeSFNExecutionFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeSFNExecutionTimedOut, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1"},
@@ -73,13 +65,9 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 			"timestamp", "event_type", "event_type_short",
 			"state_name", "event_detail", "event_id", "previous_event_id",
 		},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchSFNExecutionHistory(ctx, c.SFN, parentCtx, continuationToken)
-		},
+		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeSFNHistoryEventFailed, Phrase: "task failed", Severity: domain.SevBroken, Source: "wave1"},
 		},
@@ -93,13 +81,9 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		FieldKeys: []string{
 			"protocol", "endpoint", "confirmation_status", "owner", "subscription_arn", "topic_arn",
 		},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchSNSTopicSubscriptions(ctx, c.SNS, parentCtx["topic_arn"], continuationToken)
-		},
+		}),
 		// Same codes the sns-sub top-level type registers (sns_sub.go) — a
 		// subscription is pending/deleted regardless of whether it was
 		// listed via ListSubscriptions or ListSubscriptionsByTopic.
@@ -230,17 +214,13 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "queue_url", Title: "Queue URL", Width: 50, Sortable: false},
 		},
 		Color: colorSQS,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			listAPI, ok := c.SQS.(SQSListQueuesAPI)
 			if !ok {
 				return resource.FetchResult{}, fmt.Errorf("SQS client does not support ListQueues")
 			}
 			return FetchSQSQueuesPage(ctx, listAPI, c.SQS, continuationToken)
-		},
+		}),
 		Wave2:                  IssueEnricher{Fn: EnrichSQSAttributes, Priority: 100},
 		FieldKeys:              []string{"queue_name", "queue_url", "arn", "approx_messages", "approx_not_visible", "delay_seconds", "kms_key_id"},
 		IssueEnricherFieldKeys: []string{"dlq"},
@@ -275,17 +255,13 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			DisplayNameKey: "display_name",
 		}},
 		Color: colorSNS,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			topicsAPI, ok := c.SNS.(SNSListTopicsAPI)
 			if !ok {
 				return resource.FetchResult{}, fmt.Errorf("SNS client does not support ListTopics")
 			}
 			return FetchSNSTopicsPage(ctx, topicsAPI, continuationToken)
-		},
+		}),
 		Wave2:                  IssueEnricher{Fn: EnrichSNSSubscriptions, Priority: 100},
 		FieldKeys:              []string{"topic_arn", "display_name"},
 		IssueEnricherFieldKeys: []string{"subs_count"},
@@ -314,17 +290,13 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "subscription_arn", Title: "Subscription ARN", Width: 60, Sortable: false},
 		},
 		Color: colorSNSSub,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			subsAPI, ok := c.SNS.(SNSListSubscriptionsAPI)
 			if !ok {
 				return resource.FetchResult{}, fmt.Errorf("SNS client does not support ListSubscriptions")
 			}
 			return FetchSNSSubscriptionsPage(ctx, subsAPI, continuationToken)
-		},
+		}),
 		FieldKeys: []string{"topic_arn", "protocol", "endpoint", "subscription_arn"},
 		Related: []domain.RelatedDef{
 			{TargetType: "sns", DisplayName: "SNS Topic", Checker: checkSNSSubTopic, NeedsTargetCache: true},
@@ -358,13 +330,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "version_label", Title: "Version", Width: 16, Sortable: true},
 		},
 		Color: colorEB,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEBEnvironmentsPage(ctx, c.ElasticBeanstalk, continuationToken)
-		},
+		}),
 		Wave2:     IssueEnricher{Fn: EnrichEBEnvironmentHealth, Priority: 100},
 		FieldKeys: []string{"environment_name", "application_name", "status", "health", "version_label"},
 		Related: []domain.RelatedDef{
@@ -410,13 +378,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			DisplayNameKey: "rule_name",
 		}},
 		Color: colorEBRule,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEventBridgeRulesPage(ctx, c.EventBridge, continuationToken)
-		},
+		}),
 		Wave2:                  IssueEnricher{Fn: EnrichEventBridgeRuleTargets, Priority: 100},
 		FieldKeys:              []string{"name", "state", "event_bus", "schedule", "description", "event_pattern"},
 		IssueEnricherFieldKeys: []string{"target_count"},
@@ -452,13 +416,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "creation_time", Title: "Created", Width: 22, Sortable: true},
 		},
 		Color: colorKinesis,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchKinesisStreamsPage(ctx, c.Kinesis, continuationToken)
-		},
+		}),
 		FieldKeys: []string{"stream_name", "status", "stream_mode", "creation_time"},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkKinesisAlarms, NeedsTargetCache: true},
@@ -487,13 +447,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "version", Title: "Version", Width: 14, Sortable: true},
 		},
 		Color: colorMSK,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchMSKClustersPage(ctx, c.MSK, continuationToken)
-		},
+		}),
 		Wave2:     IssueEnricher{Fn: EnrichMSKCluster, Priority: 100},
 		FieldKeys: []string{"cluster_name", "cluster_type", "state", "version"},
 		Related: []domain.RelatedDef{
@@ -547,13 +503,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			DrillBlockMessage: "Execution history is not available for Express state machines",
 		}},
 		Color: colorSFN,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchStepFunctionsPage(ctx, c.SFN, continuationToken)
-		},
+		}),
 		Wave2:                  IssueEnricher{Fn: EnrichStepFunctionsStatus, Priority: 10},
 		FieldKeys:              []string{"name", "type", "arn", "creation_date"},
 		IssueEnricherFieldKeys: []string{"last_run"},
@@ -590,13 +542,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "status", Title: "Status", Width: 36, Sortable: true},
 		},
 		Color: colorSES,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSESIdentitiesPage(ctx, c.SESv2, continuationToken)
-		},
+		}),
 		Wave2:     IssueEnricher{Fn: EnrichSESAccount, Priority: 100},
 		FieldKeys: []string{"identity_name", "identity_type", "verification_status", "sending_enabled", "status"},
 		Related: []domain.RelatedDef{

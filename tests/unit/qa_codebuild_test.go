@@ -49,7 +49,9 @@ func TestFetchCodeBuildProjects_ParsesMultipleProjects(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCodeBuildProjects(context.Background(), listMock, batchMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCodeBuildProjectsPage(context.Background(), listMock, batchMock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -108,7 +110,9 @@ func TestFetchCodeBuildProjects_ListError(t *testing.T) {
 	}
 	batchMock := &mockCodeBuildBatchGetProjectsClient{}
 
-	resources, err := awsclient.FetchCodeBuildProjects(context.Background(), listMock, batchMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCodeBuildProjectsPage(context.Background(), listMock, batchMock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -125,7 +129,9 @@ func TestFetchCodeBuildProjects_EmptyResponse(t *testing.T) {
 	}
 	batchMock := &mockCodeBuildBatchGetProjectsClient{}
 
-	resources, err := awsclient.FetchCodeBuildProjects(context.Background(), listMock, batchMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCodeBuildProjectsPage(context.Background(), listMock, batchMock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -144,7 +150,9 @@ func TestFetchCodeBuildProjects_BatchGetError(t *testing.T) {
 		err: fmt.Errorf("batch get failed"),
 	}
 
-	resources, err := awsclient.FetchCodeBuildProjects(context.Background(), listMock, batchMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCodeBuildProjectsPage(context.Background(), listMock, batchMock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}

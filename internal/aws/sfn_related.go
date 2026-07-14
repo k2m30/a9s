@@ -42,7 +42,7 @@ func checkSFNLogs(ctx context.Context, clients any, res resource.Resource, cache
 
 	expectedLogGroup := "/aws/vendedlogs/states/" + sfnName
 
-	logList, truncated, err := sfnRelatedResources(ctx, clients, cache, "logs")
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
@@ -68,7 +68,7 @@ func checkSFNAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.UnknownRelated("alarm")
 	}
 
-	alarmList, truncated, err := sfnRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -213,17 +213,6 @@ func lambdaFuncNameFromARN(s string) string {
 		return parts[6]
 	}
 	return ""
-}
-
-// sfnRelatedResources returns the resource list for target from cache or by fetching the first page.
-func sfnRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 // checkSFNEbRule resolves EventBridge rules that target this state machine.

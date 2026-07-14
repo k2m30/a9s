@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
@@ -199,13 +198,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			DisplayNameKey: "lb_name",
 		}},
 		Color: colorELB,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchLoadBalancersPage(ctx, c.ELBv2, continuationToken)
-		},
+		}),
 		Wave2:     IssueEnricher{Fn: EnrichELBAttributes, Priority: 100},
 		FieldKeys: []string{"name", "dns_name", "type", "scheme", "state", "vpc_id", "load_balancer_arn"},
 		Related: []domain.RelatedDef{
@@ -256,13 +251,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			DisplayNameKey: "Name",
 		}},
 		Color: colorTG,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchTargetGroupsPage(ctx, c.ELBv2, continuationToken)
-		},
+		}),
 		Wave2:                  IssueEnricher{Fn: EnrichTargetGroupHealth, Priority: 10},
 		IssueEnricherFieldKeys: []string{"health_summary"},
 		// target_group_arn is required by checkLambdaTG (lambda:tg pivot) to
@@ -302,13 +293,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "description", Title: "Description", Width: 36, Sortable: false},
 		},
 		Color: colorSG,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSecurityGroupsPage(ctx, c.EC2, continuationToken)
-		},
+		}),
 		FieldKeys: []string{"group_id", "group_name", "vpc_id", "description", "dangerous_open_count", "wide_open", "risk_summary"},
 		Related: []domain.RelatedDef{
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkSGVPC, NeedsTargetCache: false},
@@ -342,13 +329,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "is_default", Title: "Default", Width: 9, Sortable: true},
 		},
 		Color: colorVPC,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchVPCsPage(ctx, c.EC2, continuationToken)
-		},
+		}),
 		Wave2:                  IssueEnricher{Fn: EnrichVPCFlowLogs, Priority: 100},
 		IssueEnricherFieldKeys: []string{"flow_logs"},
 		FieldKeys:              []string{"vpc_id", "name", "cidr_block", "state", "is_default"},
@@ -387,13 +370,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "available_ips", Title: "Available IPs", Width: 14, Sortable: true},
 		},
 		Color: colorSubnet,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSubnetsPage(ctx, c.EC2, continuationToken)
-		},
+		}),
 		FieldKeys: []string{"subnet_id", "name", "vpc_id", "cidr_block", "availability_zone", "state", "available_ips"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkSubnetEC2, NeedsTargetCache: true},
@@ -433,13 +412,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "associations_count", Title: "Assoc.", Width: 8, Sortable: true},
 		},
 		Color: colorRTB,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchRouteTablesPage(ctx, c.EC2, continuationToken)
-		},
+		}),
 		FieldKeys: []string{"route_table_id", "name", "vpc_id", "routes_count", "associations_count", "blackhole_routes_count", "is_main"},
 		Related: []domain.RelatedDef{
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkRTBSubnet},
@@ -481,13 +456,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "public_ip", Title: "Public IP", Width: 16, Sortable: false},
 		},
 		Color: colorNAT,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchNatGatewaysPage(ctx, c.EC2, continuationToken)
-		},
+		}),
 		FieldKeys: []string{"nat_gateway_id", "name", "vpc_id", "subnet_id", "state", "public_ip"},
 		Related: []domain.RelatedDef{
 			{TargetType: "vpc", DisplayName: "VPCs", Checker: checkNATVPC},
@@ -523,13 +494,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "state", Title: "Status", Width: 12, Sortable: true},
 		},
 		Color: colorIGW,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchInternetGatewaysPage(ctx, c.EC2, continuationToken)
-		},
+		}),
 		FieldKeys: []string{"igw_id", "name", "vpc_id", "state", "attachments_count"},
 		Related: []domain.RelatedDef{
 			{TargetType: "vpc", DisplayName: "VPCs", Checker: checkIGWVPC},
@@ -560,11 +527,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "domain", Title: "Domain", Width: 8, Sortable: true},
 		},
 		Color: colorEIP,
-		Fetcher: func(ctx context.Context, clients any, _ string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, _ string) (resource.FetchResult, error) {
 			resources, err := FetchElasticIPs(ctx, c.EC2)
 			if err != nil {
 				return resource.FetchResult{}, err
@@ -573,7 +536,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 				Resources:  resources,
 				Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
 			}, nil
-		},
+		}),
 		FieldKeys: []string{"allocation_id", "name", "public_ip", "association_id", "instance_id", "domain", "status"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEIPEC2},
@@ -609,13 +572,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 		},
 		Color: colorVPCE,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchVPCEndpointsPage(ctx, c.EC2, continuationToken)
-		},
+		}),
 		FieldKeys: []string{"vpce_id", "service_name", "type", "state", "vpc_id"},
 		Related: []domain.RelatedDef{
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkVPCESubnet, NeedsTargetCache: false},
@@ -660,13 +619,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "description", Title: "Description", Width: 30, Sortable: false},
 		},
 		Color: colorTGW,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchTransitGatewaysPage(ctx, c.EC2, continuationToken)
-		},
+		}),
 		Wave2:                  IssueEnricher{Fn: EnrichTGWAttachments, Priority: 100},
 		IssueEnricherFieldKeys: []string{"att_status"},
 		FieldKeys:              []string{"tgw_id", "name", "state", "owner_id", "description"},
@@ -703,13 +658,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "private_ip", Title: "Private IP", Width: 16, Sortable: false},
 		},
 		Color: colorENI,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchNetworkInterfacesPage(ctx, c.EC2, continuationToken)
-		},
+		}),
 		FieldKeys: []string{"eni_id", "name", "status", "type", "vpc_id", "private_ip", "requester_managed", "description", "requester_id", "security_groups"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkENIEC2},
@@ -754,13 +705,9 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			ContextKeys:    map[string]string{"listener_arn": "ID"},
 			DisplayNameKey: "listener_display",
 		}},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchELBListeners(ctx, c.ELBv2, parentCtx, continuationToken)
-		},
+		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeELBListenerNoCertificate, Phrase: "no certificate configured", Severity: domain.SevBroken, Source: "wave1"},
 		},
@@ -773,13 +720,9 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		FieldKeys: []string{
 			"priority", "conditions_summary", "action_type", "action_target", "is_default",
 		},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchELBListenerRules(ctx, c.ELBv2, parentCtx, continuationToken)
-		},
+		}),
 	},
 	{
 		Name:         "Target Health",
@@ -788,12 +731,8 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		Color:        colorWave1OrHealthy,
 		LifecycleKey: "health",
 		FieldKeys:    []string{"target_id", "port", "az", "health", "reason", "reason_human", "description"},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchTargetHealth(ctx, c.ELBv2, parentCtx["target_group_arn"], continuationToken)
-		},
+		}),
 	},
 }

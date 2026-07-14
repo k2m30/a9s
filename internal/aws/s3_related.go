@@ -118,7 +118,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 	if stackName == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
-	cfnList, truncated, err := s3RelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -238,7 +238,7 @@ func checkS3Athena(ctx context.Context, clients any, res resource.Resource, cach
 	if bucket == "" {
 		return resource.RelatedCheckResult{TargetType: "athena", Count: 0}
 	}
-	wgList, truncated, err := s3RelatedResources(ctx, clients, cache, "athena")
+	wgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "athena")
 	if err != nil {
 		return resource.ErrorRelated("athena", err)
 	}
@@ -261,7 +261,7 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 	if bucket == "" {
 		return resource.RelatedCheckResult{TargetType: "glue", Count: 0}
 	}
-	jobList, truncated, err := s3RelatedResources(ctx, clients, cache, "glue")
+	jobList, truncated, err := relatedResourcesFor(ctx, clients, cache, "glue")
 	if err != nil {
 		return resource.ErrorRelated("glue", err)
 	}
@@ -297,7 +297,7 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
 	}
 	bucketARN := "arn:aws:s3:::" + bucket
-	bkList, truncated, err := s3RelatedResources(ctx, clients, cache, "backup")
+	bkList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.ErrorRelated("backup", err)
 	}
@@ -323,7 +323,7 @@ func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cach
 	if bucket == "" {
 		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
 	}
-	ruleList, truncated, err := s3RelatedResources(ctx, clients, cache, "eb-rule")
+	ruleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eb-rule")
 	if err != nil {
 		return resource.ErrorRelated("eb-rule", err)
 	}
@@ -359,7 +359,7 @@ func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache r
 	if bucket == "" {
 		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
 	}
-	zoneList, truncated, err := s3RelatedResources(ctx, clients, cache, "r53")
+	zoneList, truncated, err := relatedResourcesFor(ctx, clients, cache, "r53")
 	if err != nil {
 		return resource.ErrorRelated("r53", err)
 	}
@@ -427,7 +427,7 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
 
-	roleList, truncated, rerr := s3RelatedResources(ctx, clients, cache, "role")
+	roleList, truncated, rerr := relatedResourcesFor(ctx, clients, cache, "role")
 	if rerr != nil {
 		return resource.ErrorRelated("role", rerr)
 	}
@@ -509,7 +509,7 @@ func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "trail", Count: 0}
 	}
 
-	trailList, truncated, err := s3RelatedResources(ctx, clients, cache, "trail")
+	trailList, truncated, err := relatedResourcesFor(ctx, clients, cache, "trail")
 	if err != nil {
 		return resource.ErrorRelated("trail", err)
 	}
@@ -544,7 +544,7 @@ func checkS3CF(ctx context.Context, clients any, res resource.Resource, cache re
 		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
 	}
 
-	cfList, truncated, err := s3RelatedResources(ctx, clients, cache, "cf")
+	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
 	if err != nil {
 		return resource.ErrorRelated("cf", err)
 	}
@@ -572,16 +572,4 @@ func checkS3CF(ctx context.Context, clients any, res resource.Resource, cache re
 		}
 	}
 	return relatedResultTrunc("cf", ids, truncated)
-}
-
-// s3RelatedResources returns the resource list for target from cache or by
-// fetching the first page via the registered paginated fetcher.
-func s3RelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

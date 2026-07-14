@@ -247,7 +247,7 @@ func TestLazyAdd_MergesIntoExistingCacheEntry_DedupByID(t *testing.T) {
 // checker result count remains unchanged.
 //
 // This helper is a placeholder: the actual assertion is on checker result count.
-func collectECSTaskCacheViaChecker(t *testing.T, m tui.Model, source resource.Resource) []resource.Resource {
+func collectECSTaskCacheViaChecker(t *testing.T, _ tui.Model, source resource.Resource) []resource.Resource {
 	t.Helper()
 	// We can't read the private cache. Instead, we'll construct the expected
 	// merged state and verify the checker count. This function returns what the

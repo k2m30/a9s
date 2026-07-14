@@ -339,36 +339,3 @@ func ecsJoinTaskDefinition(
 
 	return out, nil
 }
-
-// FetchECSTasks performs a three-step fetch:
-// 1. ListClusters to get cluster ARNs
-// 2. ListTasks per cluster to get task ARNs
-// 3. DescribeTasks per cluster to get full details
-//
-// Fields["efs_file_system_ids"] is always "" (no task-definition join).
-// Use the SetPaginatedForTest path (init) for the full join via DescribeTaskDefinition.
-func FetchECSTasks(
-	ctx context.Context,
-	listClustersAPI ECSListClustersAPI,
-	listTasksAPI ECSListTasksAPI,
-	describeTasksAPI ECSDescribeTasksAPI,
-) ([]resource.Resource, error) {
-	var allResources []resource.Resource
-	continuationToken := ""
-
-	for {
-		result, err := FetchECSTasksPage(ctx, listClustersAPI, listTasksAPI, describeTasksAPI, continuationToken)
-		if err != nil {
-			return nil, err
-		}
-
-		allResources = append(allResources, result.Resources...)
-
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		continuationToken = result.Pagination.NextToken
-	}
-
-	return allResources, nil
-}

@@ -10,6 +10,7 @@ import (
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -45,7 +46,9 @@ func TestFetchGlueJobs_ParsesMultipleJobs(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchGlueJobs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchGlueJobsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -86,7 +89,9 @@ func TestFetchGlueJobs_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchGlueJobs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchGlueJobsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -101,7 +106,9 @@ func TestFetchGlueJobs_APIError(t *testing.T) {
 		err: &mockAPIError{code: "AccessDeniedException", message: "access denied"},
 	}
 
-	_, err := awsclient.FetchGlueJobs(context.Background(), mock)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchGlueJobsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -116,7 +123,9 @@ func TestFetchGlueJobs_NilFields(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchGlueJobs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchGlueJobsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

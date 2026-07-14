@@ -12,25 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchMSKClusters calls the MSK ListClustersV2 API and returns a slice of
-// generic Resource structs.
-func FetchMSKClusters(ctx context.Context, api MSKListClustersV2API) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchMSKClustersPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // computeMSKFindings returns a []domain.Finding for the given MSK cluster state.
 func computeMSKFindings(state kafkatypes.ClusterState) []domain.Finding {
 	switch state {

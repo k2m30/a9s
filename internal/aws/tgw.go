@@ -11,25 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchTransitGateways calls the EC2 DescribeTransitGateways API and converts the
-// response into a slice of generic Resource structs.
-func FetchTransitGateways(ctx context.Context, api EC2DescribeTransitGatewaysAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchTransitGatewaysPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchTransitGatewaysPage fetches a single page of transit gateways.
 func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGatewaysAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &ec2.DescribeTransitGatewaysInput{

@@ -10,6 +10,7 @@ import (
 	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -41,7 +42,9 @@ func TestFetchAthenaWorkgroups_ParsesMultipleWorkgroups(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAthenaWorkgroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAthenaWorkgroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -91,7 +94,9 @@ func TestFetchAthenaWorkgroups_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAthenaWorkgroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAthenaWorkgroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -106,7 +111,9 @@ func TestFetchAthenaWorkgroups_APIError(t *testing.T) {
 		err: &mockAPIError{code: "InternalServerException", message: "internal error"},
 	}
 
-	_, err := awsclient.FetchAthenaWorkgroups(context.Background(), mock)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAthenaWorkgroupsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -124,7 +131,9 @@ func TestFetchAthenaWorkgroups_NilEngineVersion(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAthenaWorkgroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAthenaWorkgroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

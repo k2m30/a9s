@@ -22,6 +22,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // TestFetchCloudFrontDistributions_WAFColumnResolves verifies that the WAF
@@ -69,7 +70,9 @@ func TestFetchCloudFrontDistributions_WAFColumnResolves(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCloudFrontDistributions(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudFrontDistributionsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

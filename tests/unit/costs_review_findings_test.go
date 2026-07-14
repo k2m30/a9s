@@ -50,10 +50,8 @@ import (
 var reviewNow = time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC)
 
 // newCostsScreenController (costs_round3_test.go, same package) is the
-// shared builder — closure-wave harness dedup collapsed this file's own
-// former reviewCostsController (an isolated wrapper around
-// reviewCostsControllerNoIsolation, byte-identical to newCostsScreenController
-// once collapsed) into it.
+// shared controller builder for isolated-cache tests; use it unless the
+// test needs reviewCostsControllerNoIsolation below.
 
 // reviewCostsControllerNoIsolation is the same construction as
 // newCostsScreenController, minus the A9S_CONFIG_FOLDER isolation — for tests

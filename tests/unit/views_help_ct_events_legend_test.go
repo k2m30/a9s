@@ -220,23 +220,9 @@ func TestHelpCTEventsLegend_HiddenFromSelectorView(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// NewHelp (no resource) still works — backwards-compatibility
-// ===========================================================================
-
-func TestHelpCTEventsLegend_NewHelpNoResourceCompatible(t *testing.T) {
-	// The existing NewHelp constructor (without resource name) must still compile
-	// and render without the CloudTrail legend, regardless of context.
-	// This guards against the coder breaking the existing API.
-	h := views.NewHelp(keys.Default(), views.HelpFromResourceList)
-	h.SetSize(120, 40)
-	out := h.View()
-	plain := stripANSI(out)
-
-	// Without a resource short name, the legend must NOT appear.
-	if strings.Contains(plain, "CloudTrail") {
-		t.Error("NewHelp (no resource name) must NOT show CloudTrail legend; legend requires explicit ct-events short name")
-	}
-}
+// views.NewHelp is DEAD per specs/022-codebase-cleanup/wave3-map-text.md
+// (help.go: "LIVE: NewHelpWithResource ...; DEAD: NewHelp"). The
+// no-resource-name case this pinned is exercised by helpWithCTEvents("")
+// above via the live NewHelpWithResource constructor.
 
 // stripANSI is defined in helpers_test.go (same package).

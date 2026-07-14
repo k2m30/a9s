@@ -10,8 +10,8 @@ import (
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -50,39 +50,19 @@ func previewEC2Resource() resource.Resource {
 	}
 }
 
-func TestPreview_RightColumnFilter_HidesNonMatchingRows(t *testing.T) {
-	d, cleanup := ec2StoryDetail(t, 120, 30, true)
-	defer cleanup()
-
-	if !strings.Contains(stripAnsi(d.View()), "Auto Scaling Groups") {
-		t.Fatal("precondition failed: expected Auto Scaling Groups row")
-	}
-
-	// Focus right column, then apply /cloud filter.
-	d, _ = d.Update(tea.KeyPressMsg{Code: tea.KeyTab})
-	for _, ch := range []string{"/", "c", "l", "o", "u", "d"} {
-		d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: ch})
-	}
-	d, _ = d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-
-	view := stripAnsi(d.View())
-	if strings.Contains(view, "Auto Scaling Groups") {
-		t.Errorf("after /cloud filter in right column, non-matching type must be hidden; got:\n%s", view)
-	}
-	if !strings.Contains(view, "CloudWatch Alarms") {
-		t.Errorf("after /cloud filter, cloud-related rows should remain visible; got:\n%s", view)
-	}
-}
-
-func TestPreview_DetailCopyContent_CopiesCurrentFieldValue(t *testing.T) {
-	d, cleanup := ec2StoryDetailWithConfig(t, 120, 30, true)
-	defer cleanup()
-
-	content, _ := d.CopyContent()
-	if content != "i-0a1b2c3d4e5f60001" {
-		t.Errorf("detail CopyContent should copy the active field value; got %q", content)
-	}
-}
+// TestPreview_RightColumnFilter_HidesNonMatchingRows (DetailModel.View()) and
+// TestPreview_DetailCopyContent_CopiesCurrentFieldValue (DetailModel.
+// CopyContent()) deleted (round 4, specs/022-codebase-cleanup, MIXED verdict:
+// delete Detail .View()/.CopyContent halves). Live equivalents:
+// TestBug_Root_RightColumnFilter_TypingFiltersRows (rightcolumn_root_filter_
+// regression_test.go — same right-column filter narrows/hides contract, on
+// the live tui.New() root path) and TestQA_Copy_Detail_CopiesFieldValue
+// (qa_copy_test.go — same "c copies the active field's value" contract, on
+// the live tui.New() root path).
+//
+// TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter below still drives
+// DetailModel.Update() directly (not .View()/.CopyContent) — out of this
+// item's literal scope; kept as-is and flagged as a residual gap.
 
 func TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter(t *testing.T) {
 	d, cleanup := ec2StoryDetail(t, 120, 30, true)

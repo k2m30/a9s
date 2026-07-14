@@ -15,7 +15,9 @@ import (
 func demoRelatedEC2Resource(t *testing.T) resource.Resource {
 	t.Helper()
 	ec2Client := fakes.NewEC2()
-	resources, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), ec2Client, token)
+	})
 	if err != nil || len(resources) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(resources))
 	}

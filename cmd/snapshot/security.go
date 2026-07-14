@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
@@ -16,15 +15,6 @@ import (
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 	smithy "github.com/aws/smithy-go"
 )
-
-// secFormatTime mirrors s3.go's formatTime but is named distinctly to avoid a
-// symbol collision — every file in this package is compiled together.
-func secFormatTime(t *time.Time) string {
-	if t == nil {
-		return ""
-	}
-	return t.Format("2006-01-02 15:04")
-}
 
 // iamUserData is the raw, per-account view of IAM users the checklist generator reads.
 // Records AWS facts only — the checklist generator applies docs/resources/iam-user.md to
@@ -75,8 +65,8 @@ func captureIAMUser(ctx context.Context, cfg aws.Config) (any, error) {
 			users = append(users, iamUser{
 				UserName:         aws.ToString(u.UserName),
 				Arn:              aws.ToString(u.Arn),
-				CreateDate:       secFormatTime(u.CreateDate),
-				PasswordLastUsed: secFormatTime(u.PasswordLastUsed),
+				CreateDate:       snapFormatTime(u.CreateDate),
+				PasswordLastUsed: snapFormatTime(u.PasswordLastUsed),
 			})
 		}
 	}
@@ -102,11 +92,11 @@ func captureIAMUserAccessKeys(ctx context.Context, client *iam.Client, userName 
 		key := iamAccessKey{
 			AccessKeyId: aws.ToString(meta.AccessKeyId),
 			Status:      string(meta.Status),
-			CreateDate:  secFormatTime(meta.CreateDate),
+			CreateDate:  snapFormatTime(meta.CreateDate),
 		}
 		lastUsedOut, err := client.GetAccessKeyLastUsed(ctx, &iam.GetAccessKeyLastUsedInput{AccessKeyId: meta.AccessKeyId})
 		if err == nil && lastUsedOut.AccessKeyLastUsed != nil {
-			key.LastUsedDate = secFormatTime(lastUsedOut.AccessKeyLastUsed.LastUsedDate)
+			key.LastUsedDate = snapFormatTime(lastUsedOut.AccessKeyLastUsed.LastUsedDate)
 		}
 		keys = append(keys, key)
 	}
@@ -160,7 +150,7 @@ func captureIAMGroup(ctx context.Context, cfg aws.Config) (any, error) {
 			groups = append(groups, iamGroup{
 				GroupName:  aws.ToString(g.GroupName),
 				Arn:        aws.ToString(g.Arn),
-				CreateDate: secFormatTime(g.CreateDate),
+				CreateDate: snapFormatTime(g.CreateDate),
 			})
 		}
 	}
@@ -205,7 +195,7 @@ func captureRole(ctx context.Context, cfg aws.Config) (any, error) {
 			roles = append(roles, roleEntry{
 				RoleName:                 aws.ToString(r.RoleName),
 				Arn:                      aws.ToString(r.Arn),
-				CreateDate:               secFormatTime(r.CreateDate),
+				CreateDate:               snapFormatTime(r.CreateDate),
 				AssumeRolePolicyDocument: aws.ToString(r.AssumeRolePolicyDocument),
 			})
 		}
@@ -216,7 +206,7 @@ func captureRole(ctx context.Context, cfg aws.Config) (any, error) {
 		if err != nil || out.Role == nil || out.Role.RoleLastUsed == nil {
 			continue
 		}
-		roles[i].RoleLastUsedDate = secFormatTime(out.Role.RoleLastUsed.LastUsedDate)
+		roles[i].RoleLastUsedDate = snapFormatTime(out.Role.RoleLastUsed.LastUsedDate)
 	}
 
 	return roleData{Roles: roles}, nil
@@ -258,8 +248,8 @@ func capturePolicy(ctx context.Context, cfg aws.Config) (any, error) {
 				Arn:              aws.ToString(p.Arn),
 				AttachmentCount:  aws.ToInt32(p.AttachmentCount),
 				DefaultVersionId: aws.ToString(p.DefaultVersionId),
-				CreateDate:       secFormatTime(p.CreateDate),
-				UpdateDate:       secFormatTime(p.UpdateDate),
+				CreateDate:       snapFormatTime(p.CreateDate),
+				UpdateDate:       snapFormatTime(p.UpdateDate),
 			})
 		}
 	}
@@ -383,10 +373,10 @@ func captureSecrets(ctx context.Context, cfg aws.Config) (any, error) {
 				KmsKeyId:          aws.ToString(s.KmsKeyId),
 				RotationEnabled:   aws.ToBool(s.RotationEnabled),
 				RotationLambdaARN: aws.ToString(s.RotationLambdaARN),
-				LastRotatedDate:   secFormatTime(s.LastRotatedDate),
-				NextRotationDate:  secFormatTime(s.NextRotationDate),
-				LastAccessedDate:  secFormatTime(s.LastAccessedDate),
-				DeletedDate:       secFormatTime(s.DeletedDate),
+				LastRotatedDate:   snapFormatTime(s.LastRotatedDate),
+				NextRotationDate:  snapFormatTime(s.NextRotationDate),
+				LastAccessedDate:  snapFormatTime(s.LastAccessedDate),
+				DeletedDate:       snapFormatTime(s.DeletedDate),
 			}
 			if s.RotationRules != nil {
 				entry.AutomaticallyAfterDays = aws.ToInt64(s.RotationRules.AutomaticallyAfterDays)
@@ -453,8 +443,8 @@ func captureACM(ctx context.Context, cfg aws.Config) (any, error) {
 				CertificateArn: aws.ToString(c.CertificateArn),
 				DomainName:     aws.ToString(c.DomainName),
 				Status:         string(c.Status),
-				NotBefore:      secFormatTime(c.NotBefore),
-				NotAfter:       secFormatTime(c.NotAfter),
+				NotBefore:      snapFormatTime(c.NotBefore),
+				NotAfter:       snapFormatTime(c.NotAfter),
 				InUse:          aws.ToBool(c.InUse),
 			})
 		}
@@ -607,7 +597,7 @@ func captureSSM(ctx context.Context, cfg aws.Config) (any, error) {
 				Type:             string(p.Type),
 				Tier:             string(p.Tier),
 				KeyId:            aws.ToString(p.KeyId),
-				LastModifiedDate: secFormatTime(p.LastModifiedDate),
+				LastModifiedDate: snapFormatTime(p.LastModifiedDate),
 			})
 		}
 	}

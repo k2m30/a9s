@@ -11,25 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchWAFWebACLs calls the WAFv2 ListWebACLs API with Scope=REGIONAL and converts
-// the response into a slice of generic Resource structs.
-func FetchWAFWebACLs(ctx context.Context, api WAFv2ListWebACLsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchWAFWebACLsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchWAFWebACLsPage fetches a single page of REGIONAL-scope WAF web ACLs.
 // Fields["scope"] is always "REGIONAL" — use FetchWAFWebACLsPageWithCloudFront
 // (the production catalog path) to also include CLOUDFRONT-scope ACLs.

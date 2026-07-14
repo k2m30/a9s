@@ -22,7 +22,6 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
-	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -102,18 +101,6 @@ func assertFindings(t *testing.T, r resource.Resource, wantPhrases []string) {
 		if r.Findings[i].Source != "wave1" {
 			t.Errorf("Resource.Findings[%d].Source = %q, want %q", i, r.Findings[i].Source, "wave1")
 		}
-	}
-}
-
-// assertFindingCode asserts that Findings[i].Code matches the expected code.
-func assertFindingCode(t *testing.T, r resource.Resource, i int, want domain.FindingCode) {
-	t.Helper()
-	if i >= len(r.Findings) {
-		t.Errorf("Findings[%d] out of range (len=%d)", i, len(r.Findings))
-		return
-	}
-	if r.Findings[i].Code != want {
-		t.Errorf("Findings[%d].Code = %q, want %q", i, r.Findings[i].Code, want)
 	}
 }
 

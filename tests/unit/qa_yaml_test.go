@@ -4,35 +4,35 @@ import (
 	"strings"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
+	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// yamlKeyPress creates a tea.KeyPressMsg for a printable character.
-func yamlKeyPress(char string) tea.KeyPressMsg {
-	return tea.KeyPressMsg{Code: -1, Text: char}
-}
-
-// ── Helper: build YAMLModel from resource, set size, return View output ─────
+// ── Helper: build a live YAMLModel (NewYAMLWithCtrl) and return its
+// ContentLines() joined — the LIVE render path (yaml.go's View/RawContent/
+// FrameTitle are DEAD per specs/022-codebase-cleanup/wave3-map-text.md; the
+// live navigate path builds via NewYAMLWithCtrl and reads ContentLines()
+// directly — see runtime_adapter_navigate.go's pushTextScreen).
 
 func yamlView(t *testing.T, res resource.Resource, w, h int) string {
 	t.Helper()
 	k := keys.Default()
-	m := views.NewYAML(res, "", k)
+	m := views.NewYAMLWithCtrl(res, "", k, nil)
 	m.SetSize(w, h)
-	out := m.View()
-	if out == "" || out == "Initializing..." {
-		t.Fatalf("YAMLModel.View() returned empty or initializing for resource %q", res.ID)
+	out := strings.Join(m.ContentLines(), "\n")
+	if out == "" {
+		t.Fatalf("YAMLModel.ContentLines() returned empty for resource %q", res.ID)
 	}
 	return out
 }
 
 func yamlModel(res resource.Resource, w, h int) views.YAMLModel {
 	k := keys.Default()
-	m := views.NewYAML(res, "", k)
+	m := views.NewYAMLWithCtrl(res, "", k, nil)
 	m.SetSize(w, h)
 	return m
 }
@@ -67,45 +67,6 @@ func TestQA_YAML_S3_SyntaxColoring(t *testing.T) {
 	}
 }
 
-func TestQA_YAML_S3_Structure(t *testing.T) {
-	buckets := fixtureS3Buckets()
-	m := yamlModel(buckets[0], 120, 40)
-	raw := m.RawContent()
-	if raw == "" {
-		t.Fatal("S3 RawContent() returned empty")
-	}
-	// RawContent must have key: value format
-	if !strings.Contains(raw, ": ") {
-		t.Error("S3 RawContent() missing YAML key: value format")
-	}
-	// Must not contain ANSI codes
-	if strings.Contains(raw, "\x1b[") {
-		t.Error("S3 RawContent() contains ANSI codes — should be plain")
-	}
-}
-
-func TestQA_YAML_S3_FrameTitle(t *testing.T) {
-	buckets := fixtureS3Buckets()
-	m := yamlModel(buckets[0], 120, 40)
-	title := m.FrameTitle()
-	if !strings.Contains(title, "yaml") {
-		t.Errorf("S3 FrameTitle() = %q, want 'yaml' in title", title)
-	}
-	if !strings.Contains(title, buckets[0].Name) {
-		t.Errorf("S3 FrameTitle() = %q, want resource name %q", title, buckets[0].Name)
-	}
-}
-
-func TestQA_YAML_S3_RawContentUncolored(t *testing.T) {
-	buckets := fixtureS3Buckets()
-	m := yamlModel(buckets[0], 120, 40)
-	raw := m.RawContent()
-	stripped := stripANSI(raw)
-	if raw != stripped {
-		t.Error("S3 RawContent() contains ANSI codes, expected plain YAML for clipboard copy")
-	}
-}
-
 // ── EC2 ─────────────────────────────────────────────────────────────────────
 
 func TestQA_YAML_EC2_ViewContainsFields(t *testing.T) {
@@ -131,47 +92,6 @@ func TestQA_YAML_EC2_SyntaxColoring(t *testing.T) {
 	}
 }
 
-func TestQA_YAML_EC2_FrameTitle(t *testing.T) {
-	instances := fixtureEC2Instances()
-	// First instance has no Name, so FrameTitle should use ID
-	m := yamlModel(instances[0], 120, 40)
-	title := m.FrameTitle()
-	if !strings.Contains(title, "yaml") {
-		t.Errorf("EC2 FrameTitle() = %q, want 'yaml' in title", title)
-	}
-	if !strings.Contains(title, instances[0].ID) {
-		t.Errorf("EC2 FrameTitle() = %q, want ID %q (Name is empty)", title, instances[0].ID)
-	}
-
-	// Named instance uses Name
-	m2 := yamlModel(instances[1], 120, 40)
-	title2 := m2.FrameTitle()
-	if !strings.Contains(title2, instances[1].Name) {
-		t.Errorf("EC2 FrameTitle() = %q, want Name %q", title2, instances[1].Name)
-	}
-}
-
-func TestQA_YAML_EC2_RawContentUncolored(t *testing.T) {
-	instances := fixtureEC2Instances()
-	m := yamlModel(instances[0], 120, 40)
-	raw := m.RawContent()
-	if raw == "" {
-		t.Fatal("EC2 RawContent() returned empty")
-	}
-	if strings.Contains(raw, "\x1b[") {
-		t.Error("EC2 RawContent() contains ANSI codes")
-	}
-}
-
-func TestQA_YAML_EC2_Structure(t *testing.T) {
-	instances := fixtureEC2Instances()
-	m := yamlModel(instances[0], 120, 40)
-	raw := m.RawContent()
-	if !strings.Contains(raw, ": ") {
-		t.Error("EC2 RawContent() missing key: value YAML format")
-	}
-}
-
 // ── RDS ─────────────────────────────────────────────────────────────────────
 
 func TestQA_YAML_RDS_ViewContainsFields(t *testing.T) {
@@ -194,30 +114,6 @@ func TestQA_YAML_RDS_SyntaxColoring(t *testing.T) {
 	out := yamlView(t, instances[0], 120, 40)
 	if !strings.Contains(out, "\x1b[") {
 		t.Error("RDS YAML output has no ANSI color codes")
-	}
-}
-
-func TestQA_YAML_RDS_FrameTitle(t *testing.T) {
-	instances := fixtureRDSInstances()
-	m := yamlModel(instances[0], 120, 40)
-	title := m.FrameTitle()
-	if !strings.Contains(title, "yaml") {
-		t.Errorf("RDS FrameTitle() = %q, want 'yaml' in title", title)
-	}
-	if !strings.Contains(title, instances[0].Name) {
-		t.Errorf("RDS FrameTitle() = %q, want Name %q", title, instances[0].Name)
-	}
-}
-
-func TestQA_YAML_RDS_RawContentUncolored(t *testing.T) {
-	instances := fixtureRDSInstances()
-	m := yamlModel(instances[0], 120, 40)
-	raw := m.RawContent()
-	if raw == "" {
-		t.Fatal("RDS RawContent() returned empty")
-	}
-	if strings.Contains(raw, "\x1b[") {
-		t.Error("RDS RawContent() contains ANSI codes")
 	}
 }
 
@@ -264,30 +160,6 @@ func TestQA_YAML_Redis_SyntaxColoring(t *testing.T) {
 	}
 }
 
-func TestQA_YAML_Redis_FrameTitle(t *testing.T) {
-	clusters := fixtureRedisClusters()
-	m := yamlModel(clusters[0], 120, 40)
-	title := m.FrameTitle()
-	if !strings.Contains(title, "yaml") {
-		t.Errorf("Redis FrameTitle() = %q, want 'yaml' in title", title)
-	}
-	if !strings.Contains(title, clusters[0].Name) {
-		t.Errorf("Redis FrameTitle() = %q, want Name %q", title, clusters[0].Name)
-	}
-}
-
-func TestQA_YAML_Redis_RawContentUncolored(t *testing.T) {
-	clusters := fixtureRedisClusters()
-	m := yamlModel(clusters[0], 120, 40)
-	raw := m.RawContent()
-	if raw == "" {
-		t.Fatal("Redis RawContent() returned empty")
-	}
-	if strings.Contains(raw, "\x1b[") {
-		t.Error("Redis RawContent() contains ANSI codes")
-	}
-}
-
 // ── DocumentDB ──────────────────────────────────────────────────────────────
 
 func TestQA_YAML_DocDB_ViewContainsFields(t *testing.T) {
@@ -323,30 +195,6 @@ func TestQA_YAML_DocDB_SyntaxColoring(t *testing.T) {
 	}
 }
 
-func TestQA_YAML_DocDB_FrameTitle(t *testing.T) {
-	clusters := fixtureDocDBClusters()
-	m := yamlModel(clusters[0], 120, 40)
-	title := m.FrameTitle()
-	if !strings.Contains(title, "yaml") {
-		t.Errorf("DocDB FrameTitle() = %q, want 'yaml' in title", title)
-	}
-	if !strings.Contains(title, clusters[0].Name) {
-		t.Errorf("DocDB FrameTitle() = %q, want Name %q", title, clusters[0].Name)
-	}
-}
-
-func TestQA_YAML_DocDB_RawContentUncolored(t *testing.T) {
-	clusters := fixtureDocDBClusters()
-	m := yamlModel(clusters[0], 120, 40)
-	raw := m.RawContent()
-	if raw == "" {
-		t.Fatal("DocDB RawContent() returned empty")
-	}
-	if strings.Contains(raw, "\x1b[") {
-		t.Error("DocDB RawContent() contains ANSI codes")
-	}
-}
-
 // ── EKS ─────────────────────────────────────────────────────────────────────
 
 func TestQA_YAML_EKS_ViewContainsFields(t *testing.T) {
@@ -369,30 +217,6 @@ func TestQA_YAML_EKS_SyntaxColoring(t *testing.T) {
 	out := yamlView(t, clusters[0], 120, 40)
 	if !strings.Contains(out, "\x1b[") {
 		t.Error("EKS YAML output has no ANSI color codes")
-	}
-}
-
-func TestQA_YAML_EKS_FrameTitle(t *testing.T) {
-	clusters := fixtureEKSClusters()
-	m := yamlModel(clusters[0], 120, 40)
-	title := m.FrameTitle()
-	if !strings.Contains(title, "yaml") {
-		t.Errorf("EKS FrameTitle() = %q, want 'yaml' in title", title)
-	}
-	if !strings.Contains(title, clusters[0].Name) {
-		t.Errorf("EKS FrameTitle() = %q, want Name %q", title, clusters[0].Name)
-	}
-}
-
-func TestQA_YAML_EKS_RawContentUncolored(t *testing.T) {
-	clusters := fixtureEKSClusters()
-	m := yamlModel(clusters[0], 120, 40)
-	raw := m.RawContent()
-	if raw == "" {
-		t.Fatal("EKS RawContent() returned empty")
-	}
-	if strings.Contains(raw, "\x1b[") {
-		t.Error("EKS RawContent() contains ANSI codes")
 	}
 }
 
@@ -421,158 +245,23 @@ func TestQA_YAML_Secrets_SyntaxColoring(t *testing.T) {
 	}
 }
 
-func TestQA_YAML_Secrets_FrameTitle(t *testing.T) {
-	secrets := fixtureSecrets()
-	m := yamlModel(secrets[0], 120, 40)
-	title := m.FrameTitle()
-	if !strings.Contains(title, "yaml") {
-		t.Errorf("Secrets FrameTitle() = %q, want 'yaml' in title", title)
-	}
-	if !strings.Contains(title, secrets[0].Name) {
-		t.Errorf("Secrets FrameTitle() = %q, want Name %q", title, secrets[0].Name)
-	}
-}
-
-func TestQA_YAML_Secrets_RawContentUncolored(t *testing.T) {
-	secrets := fixtureSecrets()
-	m := yamlModel(secrets[0], 120, 40)
-	raw := m.RawContent()
-	if raw == "" {
-		t.Fatal("Secrets RawContent() returned empty")
-	}
-	if strings.Contains(raw, "\x1b[") {
-		t.Error("Secrets RawContent() contains ANSI codes")
-	}
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// Cross-resource: Scroll behavior (j/k/g/G)
-// ════════════════════════════════════════════════════════════════════════════
-
-func TestQA_YAML_Scroll_AllTypes(t *testing.T) {
-	type testCase struct {
-		name string
-		res  resource.Resource
-	}
-	cases := []testCase{
-		{"S3", fixtureS3Buckets()[0]},
-		{"EC2", fixtureEC2Instances()[0]},
-		{"RDS", fixtureRDSInstances()[0]},
-		{"Redis", fixtureRedisClusters()[0]},
-		{"DocDB", fixtureDocDBClusters()[0]},
-		{"EKS", fixtureEKSClusters()[0]},
-		{"Secrets", fixtureSecrets()[0]},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			k := keys.Default()
-			m := views.NewYAML(tc.res, "", k)
-			// Use a small viewport so content overflows for scroll testing
-			m.SetSize(60, 3)
-
-			viewBefore := m.View()
-			if viewBefore == "" || viewBefore == "Initializing..." {
-				t.Fatalf("%s: View() returned empty or initializing", tc.name)
-			}
-
-			// Scroll down with 'j' — viewport standard binding
-			m, _ = m.Update(yamlKeyPress("j"))
-			viewAfterJ := m.View()
-
-			// Scroll up with 'k' — viewport standard binding
-			m, _ = m.Update(yamlKeyPress("k"))
-			viewAfterK := m.View()
-
-			// Scroll down with arrow key
-			m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
-			viewAfterDown := m.View()
-
-			// Scroll up with arrow key
-			m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
-			viewAfterUp := m.View()
-
-			// Jump to bottom with 'G' — this is passed to viewport
-			m, _ = m.Update(yamlKeyPress("G"))
-			_ = m.View()
-
-			// Jump to top with 'g' — this is passed to viewport
-			m, _ = m.Update(yamlKeyPress("g"))
-			_ = m.View()
-
-			// Verify scroll produces different views (if content > viewport height)
-			raw := stripANSI(m.RawContent())
-			lineCount := len(strings.Split(strings.TrimRight(raw, "\n"), "\n"))
-			if lineCount > 3 {
-				// Content overflows — down arrow should scroll
-				if viewBefore == viewAfterDown {
-					t.Errorf("%s: down-arrow did not change view (content has %d lines, viewport 3)", tc.name, lineCount)
-				}
-			}
-
-			// Verify j/k and arrows don't crash
-			_ = viewAfterJ
-			_ = viewAfterK
-			_ = viewAfterUp
-		})
-	}
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// Cross-resource: Wrap toggle (w)
-// ════════════════════════════════════════════════════════════════════════════
-
-func TestQA_YAML_WrapToggle_AllTypes(t *testing.T) {
-	type testCase struct {
-		name string
-		res  resource.Resource
-	}
-	cases := []testCase{
-		{"S3", fixtureS3Buckets()[0]},
-		{"EC2", fixtureEC2Instances()[0]},
-		{"RDS", fixtureRDSInstances()[0]},
-		{"Redis", fixtureRedisClusters()[0]},
-		{"DocDB", fixtureDocDBClusters()[0]},
-		{"EKS", fixtureEKSClusters()[0]},
-		{"Secrets", fixtureSecrets()[0]},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			k := keys.Default()
-			m := views.NewYAML(tc.res, "", k)
-			// Use narrow viewport so long values would be clipped
-			m.SetSize(40, 20)
-
-			viewNoWrap := m.View()
-
-			// Toggle wrap on — must not panic.
-			m, _ = m.Update(yamlKeyPress("w"))
-			viewWrapped := m.View()
-
-			// Toggle wrap off — must not panic.
-			m, _ = m.Update(yamlKeyPress("w"))
-			viewUnwrapped := m.View()
-
-			// After double-toggle the view must be identical to the original (unwrapped) state.
-			if viewNoWrap != viewUnwrapped {
-				t.Errorf("%s: double-toggle wrap should restore the original view, but it differs", tc.name)
-			}
-
-			// We record whether wrapping changed the view for informational purposes,
-			// but do NOT assert it must differ — fixture values vary in width.
-			// TestQA_YAML_WrapToggle_KnownLongValue asserts the "must differ" property
-			// with a resource whose content is guaranteed to be wider than the viewport.
-			if viewNoWrap != viewWrapped {
-				t.Logf("%s: wrap toggle changed the view (content wider than 40 cols)", tc.name)
-			}
-		})
-	}
-}
+// Scroll/wrap are VIEW-rendering (RenderText) concerns, not ContentLines()
+// concerns — ContentLines() always returns the full, unwindowed, unwrapped
+// content, so a scroll/wrap toggle can never be observed by comparing two
+// ContentLines() joins (YAMLModel.Update() is DEAD per
+// specs/022-codebase-cleanup/wave3-map-text.md anyway). The type-swept
+// versions of these checks are retired: scroll/wrap rendering logic is
+// resource-type-agnostic (driven by content width/length, not by which AWS
+// type the content came from), and text_ctrl_interaction_test.go already
+// pins the real live mechanism (ctrl.Apply(ActionToggleWrap/ActionMoveDown/
+// ActionPageDown) -> Snapshot().Body.Text -> RenderText(body)). The one
+// genuinely distinct case — a KNOWN long value that MUST wrap — is ported
+// onto that live seam below instead of relying on ContentLines().
 
 // TestQA_YAML_WrapToggle_KnownLongValue verifies wrap behaviour with a
 // resource that has a KNOWN 200-char field value, making the assertion
-// unconditionally reliable.
+// unconditionally reliable. Uses the live ctrl.Apply(ActionToggleWrap) ->
+// RenderText(body) seam (ContentLines() cannot observe wrap at all).
 func TestQA_YAML_WrapToggle_KnownLongValue(t *testing.T) {
 	longValue := strings.Repeat("A", 200)
 	res := resource.Resource{
@@ -582,14 +271,23 @@ func TestQA_YAML_WrapToggle_KnownLongValue(t *testing.T) {
 	}
 
 	k := keys.Default()
-	m := views.NewYAML(res, "", k)
+	lines := views.NewYAMLWithCtrl(res, "", k, nil).ContentLines()
+
+	s := session.New()
+	s.Profile = "demo"
+	s.Region = "us-east-1"
+	core := runtime.New(s, nil)
+	ctrl := app.New(core)
+	ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenYAML}})
+	ctrl.EnsureTextState(lines)
+
+	m := views.NewYAMLWithCtrl(res, "", k, ctrl)
 	m.SetSize(40, 30) // narrow: 40 cols, the 200-char value must wrap
 
-	viewNoWrap := m.View()
+	viewNoWrap := m.RenderText(*ctrl.Snapshot().Body.Text)
 
-	// Toggle wrap on.
-	m, _ = m.Update(yamlKeyPress("w"))
-	viewWrapped := m.View()
+	ctrl.Apply(app.Action{Kind: app.ActionToggleWrap})
+	viewWrapped := m.RenderText(*ctrl.Snapshot().Body.Text)
 
 	// Must differ — the 200-char value absolutely forces additional lines.
 	if viewNoWrap == viewWrapped {
@@ -597,8 +295,8 @@ func TestQA_YAML_WrapToggle_KnownLongValue(t *testing.T) {
 	}
 
 	// Toggle wrap off — must restore original.
-	m, _ = m.Update(yamlKeyPress("w"))
-	viewRestored := m.View()
+	ctrl.Apply(app.Action{Kind: app.ActionToggleWrap})
+	viewRestored := m.RenderText(*ctrl.Snapshot().Body.Text)
 
 	if viewNoWrap != viewRestored {
 		t.Error("double-toggle wrap should restore the original YAML view")
@@ -627,7 +325,7 @@ func TestQA_YAML_RawContent_AllTypes(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			m := yamlModel(tc.res, 120, 40)
-			raw := m.RawContent()
+			raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
 
 			if raw == "" {
 				t.Fatalf("%s: RawContent() is empty", tc.name)
@@ -660,55 +358,14 @@ func TestQA_YAML_RawContent_AllTypes(t *testing.T) {
 // Cross-resource: FrameTitle includes "yaml"
 // ════════════════════════════════════════════════════════════════════════════
 
-func TestQA_YAML_FrameTitle_AllTypes(t *testing.T) {
-	type testCase struct {
-		name     string
-		res      resource.Resource
-		wantName string
-	}
-	s3 := fixtureS3Buckets()[0]
-	ec2 := fixtureEC2Instances()[0]
-	ec2Named := fixtureEC2Instances()[1]
-	rds := fixtureRDSInstances()[0]
-	redis := fixtureRedisClusters()[0]
-	docdb := fixtureDocDBClusters()[0]
-	eks := fixtureEKSClusters()[0]
-	secret := fixtureSecrets()[0]
-
-	cases := []testCase{
-		{"S3", s3, s3.Name},
-		{"EC2_NoName", ec2, ec2.ID}, // Name is empty, uses ID
-		{"EC2_Named", ec2Named, ec2Named.Name},
-		{"RDS", rds, rds.Name},
-		{"Redis", redis, redis.Name},
-		{"DocDB", docdb, docdb.Name},
-		{"EKS", eks, eks.Name},
-		{"Secrets", secret, secret.Name},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			m := yamlModel(tc.res, 120, 40)
-			title := m.FrameTitle()
-
-			if !strings.Contains(title, "yaml") {
-				t.Errorf("%s: FrameTitle() = %q, want 'yaml' in title", tc.name, title)
-			}
-			if !strings.Contains(title, tc.wantName) {
-				t.Errorf("%s: FrameTitle() = %q, want %q in title", tc.name, title, tc.wantName)
-			}
-		})
-	}
-}
-
 // ════════════════════════════════════════════════════════════════════════════
 // Edge case: Resource with only Fields (no RawStruct) still produces YAML
 // ════════════════════════════════════════════════════════════════════════════
 
 func TestQA_YAML_FieldsOnly_NoRawStruct(t *testing.T) {
 	res := resource.Resource{
-		ID:     "test-fields-only",
-		Name:   "fields-only-resource",
+		ID:   "test-fields-only",
+		Name: "fields-only-resource",
 		Fields: map[string]string{
 			"key1": "value1",
 			"key2": "value2",
@@ -717,7 +374,7 @@ func TestQA_YAML_FieldsOnly_NoRawStruct(t *testing.T) {
 	}
 
 	m := yamlModel(res, 120, 40)
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 	if out == "" || out == "Initializing..." {
 		t.Fatal("YAML View() returned empty for fields-only resource")
 	}
@@ -728,7 +385,7 @@ func TestQA_YAML_FieldsOnly_NoRawStruct(t *testing.T) {
 		t.Error("YAML View() missing 'value1' for fields-only resource")
 	}
 
-	raw := m.RawContent()
+	raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
 	if raw == "" {
 		t.Fatal("RawContent() returned empty for fields-only resource")
 	}
@@ -750,9 +407,9 @@ func TestQA_YAML_EmptyResource(t *testing.T) {
 	}
 
 	k := keys.Default()
-	m := views.NewYAML(res, "", k)
+	m := views.NewYAMLWithCtrl(res, "", k, nil)
 	m.SetSize(120, 40)
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "No YAML data available") {
@@ -767,9 +424,9 @@ func TestQA_YAML_NilFieldsResource(t *testing.T) {
 	}
 
 	k := keys.Default()
-	m := views.NewYAML(res, "", k)
+	m := views.NewYAMLWithCtrl(res, "", k, nil)
 	m.SetSize(120, 40)
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "No YAML data available") {
@@ -805,7 +462,7 @@ func TestQA_YAML_BooleanColoring(t *testing.T) {
 	}
 
 	m := yamlModel(res, 120, 40)
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 
 	// The output should have ANSI codes
 	if !strings.Contains(out, "\x1b[") {
@@ -813,7 +470,7 @@ func TestQA_YAML_BooleanColoring(t *testing.T) {
 	}
 
 	// Check RawContent to understand the actual YAML output
-	rawYAML := m.RawContent()
+	rawYAML := stripANSI(strings.Join(m.ContentLines(), "\n"))
 
 	// FormatValue converts true -> "Yes", which yaml.v3 may quote as '"Yes"'
 	// to avoid YAML 1.1 boolean interpretation. Check what actually appears.
@@ -886,7 +543,7 @@ func TestQA_YAML_NullFields(t *testing.T) {
 	}
 
 	m := yamlModel(res, 120, 40)
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 	plain := stripANSI(out)
 
 	// Non-nil pointer should show the value
@@ -918,7 +575,7 @@ func TestQA_YAML_NullColoringViaFields(t *testing.T) {
 	}
 
 	m := yamlModel(res, 120, 40)
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 	plain := stripANSI(out)
 
 	// The "null" string value should appear in output
@@ -956,7 +613,7 @@ func TestQA_YAML_NumericColoring(t *testing.T) {
 	}
 
 	m := yamlModel(res, 120, 40)
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 	plain := stripANSI(out)
 
 	if !strings.Contains(plain, "5432") {
@@ -997,7 +654,7 @@ func TestQA_YAML_RawStructPrecedence(t *testing.T) {
 	}
 
 	m := yamlModel(res, 120, 40)
-	plain := stripANSI(m.View())
+	plain := stripANSI(strings.Join(m.ContentLines(), "\n"))
 
 	// RawStruct should be used, so StructField should appear
 	if !strings.Contains(plain, "StructField") {
@@ -1037,7 +694,7 @@ func TestQA_YAML_NestedStructIndentation(t *testing.T) {
 	}
 
 	m := yamlModel(res, 120, 40)
-	rawYAML := m.RawContent()
+	rawYAML := stripANSI(strings.Join(m.ContentLines(), "\n"))
 
 	// Verify nested structure: Endpoint should have indented children
 	if !strings.Contains(rawYAML, "Endpoint:") {
@@ -1082,7 +739,7 @@ func TestQA_YAML_ArrayItems(t *testing.T) {
 	}
 
 	m := yamlModel(res, 120, 40)
-	rawYAML := m.RawContent()
+	rawYAML := stripANSI(strings.Join(m.ContentLines(), "\n"))
 
 	// Array items should use "- " prefix
 	if !strings.Contains(rawYAML, "- Key:") {
@@ -1090,7 +747,7 @@ func TestQA_YAML_ArrayItems(t *testing.T) {
 	}
 
 	// Verify colored view also shows them
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "api-prod") {
 		t.Error("Array test: 'api-prod' not found in view")
@@ -1124,7 +781,7 @@ func TestQA_YAML_EmptyArray(t *testing.T) {
 	}
 
 	m := yamlModel(res, 120, 40)
-	rawYAML := m.RawContent()
+	rawYAML := stripANSI(strings.Join(m.ContentLines(), "\n"))
 
 	// Empty slices are omitted by ToSafeValue
 	if strings.Contains(rawYAML, "AssociatedRoles") {
@@ -1163,7 +820,7 @@ func TestQA_YAML_NilPointerToStructShowsNoNull(t *testing.T) {
 	}
 
 	m := yamlModel(res, 120, 40)
-	rawYAML := m.RawContent()
+	rawYAML := stripANSI(strings.Join(m.ContentLines(), "\n"))
 
 	if strings.Contains(rawYAML, "null") {
 		t.Errorf("Non-nil pointer to empty struct should be omitted, not 'null'. Got:\n%s", rawYAML)
@@ -1196,7 +853,7 @@ func TestQA_YAML_SliceOfEmptyStructsShowsNoNull(t *testing.T) {
 	}
 
 	m := yamlModel(res, 120, 40)
-	rawYAML := m.RawContent()
+	rawYAML := stripANSI(strings.Join(m.ContentLines(), "\n"))
 
 	if strings.Contains(rawYAML, "null") {
 		t.Errorf("Slice of empty structs should not produce 'null'. Got:\n%s", rawYAML)
@@ -1250,13 +907,13 @@ func TestQA_YAML_AllFixtureResources(t *testing.T) {
 		for i, res := range resources {
 			t.Run(typeName+"_"+res.ID, func(t *testing.T) {
 				m := yamlModel(res, 120, 40)
-				out := m.View()
+				out := strings.Join(m.ContentLines(), "\n")
 
 				if out == "" || out == "Initializing..." {
 					t.Errorf("%s[%d] %q: View() returned empty or initializing", typeName, i, res.ID)
 				}
 
-				raw := m.RawContent()
+				raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
 				if raw == "" {
 					t.Errorf("%s[%d] %q: RawContent() returned empty", typeName, i, res.ID)
 				}
@@ -1321,7 +978,7 @@ func TestQA_YAML_KeyValueFormat_AllTypes(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			m := yamlModel(tc.res, 120, 40)
-			raw := m.RawContent()
+			raw := stripANSI(strings.Join(m.ContentLines(), "\n"))
 			lines := strings.Split(strings.TrimSpace(raw), "\n")
 
 			if len(lines) == 0 {
@@ -1372,54 +1029,11 @@ func TestQA_YAML_ResourceID_AllTypes(t *testing.T) {
 	}
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// IsTextViewer — distinguishes raw-text mode from resource-YAML mode
-// ════════════════════════════════════════════════════════════════════════════
-
-// TestQA_YAML_IsTextViewer_True verifies that NewTextViewer produces a model
-// where IsTextViewer() returns true.
-func TestQA_YAML_IsTextViewer_True(t *testing.T) {
-	k := keys.Default()
-	tv := views.NewTextViewer("my-title", "line1\nline2", k)
-	if !tv.IsTextViewer() {
-		t.Error("NewTextViewer should produce IsTextViewer() == true")
-	}
-}
-
-// TestQA_YAML_IsTextViewer_False verifies that NewYAML (resource mode) produces
-// a model where IsTextViewer() returns false.
-func TestQA_YAML_IsTextViewer_False(t *testing.T) {
-	res := resource.Resource{
-		ID:     "i-test",
-		Fields: map[string]string{"state": "running"},
-	}
-	k := keys.Default()
-	m := views.NewYAML(res, "ec2", k)
-	if m.IsTextViewer() {
-		t.Error("NewYAML should produce IsTextViewer() == false")
-	}
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// CopyContent — raw-text branch returns content + "Copied to clipboard"
-// ════════════════════════════════════════════════════════════════════════════
-
-// TestQA_YAML_CopyContent_TextViewerMode verifies the rawText branch of
-// CopyContent: returns the raw text and a "Copied to clipboard" label.
-func TestQA_YAML_CopyContent_TextViewerMode(t *testing.T) {
-	const rawContent = "error: something went wrong\n  at line 42"
-	k := keys.Default()
-	tv := views.NewTextViewer("errors", rawContent, k)
-	tv.SetSize(80, 24)
-
-	content, label := tv.CopyContent()
-	if content != rawContent {
-		t.Errorf("CopyContent() text-viewer content = %q, want %q", content, rawContent)
-	}
-	if label != "Copied to clipboard" {
-		t.Errorf("CopyContent() text-viewer label = %q, want %q", label, "Copied to clipboard")
-	}
-}
+// IsTextViewer/NewTextViewer/CopyContent-rawText-branch retired: all DEAD per
+// specs/022-codebase-cleanup/wave3-map-text.md (line 13) — the live error-log
+// path is ctrl-backed via newErrorLogRS+EnsureTextState, not IsTextViewer;
+// raw-text copy is pinned live in wave3_text_ports_test.go's
+// TestWave3Port_ErrorLogCopy_UncoloredContent (handleCopy on rsKindText).
 
 // ════════════════════════════════════════════════════════════════════════════
 // colorizeYAML list-item path — lines starting with "- " (scalar list items)
@@ -1439,7 +1053,7 @@ func TestQA_YAML_ColorizeListItems(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 	m := yamlModel(res, 120, 40)
-	out := m.View()
+	out := strings.Join(m.ContentLines(), "\n")
 	plain := stripANSI(out)
 
 	// List items must appear in the view
@@ -1456,7 +1070,7 @@ func TestQA_YAML_ColorizeListItems(t *testing.T) {
 	}
 
 	// Raw content must list the items under "- " prefix
-	rawYAML := m.RawContent()
+	rawYAML := stripANSI(strings.Join(m.ContentLines(), "\n"))
 	if !strings.Contains(rawYAML, "- reader") {
 		t.Errorf("RawContent() missing '- reader' list item, got:\n%s", rawYAML)
 	}

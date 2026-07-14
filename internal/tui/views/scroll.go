@@ -23,49 +23,6 @@ func (s *ScrollState) Total() int {
 	return s.total
 }
 
-// Up decrements the cursor, flooring at 0.
-func (s *ScrollState) Up() {
-	if s.cursor > 0 {
-		s.cursor--
-	}
-}
-
-// Down increments the cursor, capped at total-1.
-func (s *ScrollState) Down() {
-	if s.cursor < s.total-1 {
-		s.cursor++
-	}
-}
-
-// Top sets cursor to 0.
-func (s *ScrollState) Top() {
-	s.cursor = 0
-}
-
-// Bottom sets cursor to max(0, total-1).
-func (s *ScrollState) Bottom() {
-	s.cursor = max(0, s.total-1)
-}
-
-// PageUp moves cursor up by pageSize, flooring at 0.
-func (s *ScrollState) PageUp(pageSize int) {
-	s.cursor -= pageSize
-	if s.cursor < 0 {
-		s.cursor = 0
-	}
-}
-
-// PageDown moves cursor down by pageSize, capped at total-1.
-func (s *ScrollState) PageDown(pageSize int) {
-	s.cursor += pageSize
-	if s.total > 0 && s.cursor >= s.total {
-		s.cursor = s.total - 1
-	}
-	if s.total == 0 {
-		s.cursor = 0
-	}
-}
-
 // SetCursor sets the cursor to n, clamping to [0, total-1].
 func (s *ScrollState) SetCursor(n int) {
 	if s.total == 0 {
@@ -73,17 +30,6 @@ func (s *ScrollState) SetCursor(n int) {
 		return
 	}
 	s.cursor = n
-	s.Clamp()
-}
-
-// SetTotal updates the total count and clamps the cursor.
-func (s *ScrollState) SetTotal(n int) {
-	if n <= 0 {
-		s.total = 0
-		s.cursor = 0
-		return
-	}
-	s.total = n
 	s.Clamp()
 }
 

@@ -10,25 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchCodeArtifactRepos calls the CodeArtifact ListRepositories API and converts the
-// response into a slice of generic Resource structs.
-func FetchCodeArtifactRepos(ctx context.Context, api CodeArtifactListRepositoriesAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchCodeArtifactReposPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchCodeArtifactReposPage fetches a single page of CodeArtifact repositories.
 func FetchCodeArtifactReposPage(ctx context.Context, api CodeArtifactListRepositoriesAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &codeartifact.ListRepositoriesInput{

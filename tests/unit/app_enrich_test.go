@@ -10,9 +10,9 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -82,10 +82,10 @@ func TestDetailView_EnrichResult_UpdatesRawStruct(t *testing.T) {
 		},
 	})
 
-	y := views.NewYAML(enrichedRes, "role_policies", k)
+	y := views.NewYAMLWithCtrl(enrichedRes, "role_policies", k, nil)
 	y.SetSize(120, 40)
 
-	content := stripANSI(y.View())
+	content := stripANSI(strings.Join(y.ContentLines(), "\n"))
 	if !strings.Contains(content, "Document") {
 		t.Error("YAML view should render Document field from enriched RawStruct")
 	}
@@ -115,10 +115,10 @@ func TestDetailView_EnrichResult_YAMLViewShowsDocument(t *testing.T) {
 		},
 	})
 
-	y := views.NewYAML(enrichedRes, "role_policies", k)
+	y := views.NewYAMLWithCtrl(enrichedRes, "role_policies", k, nil)
 	y.SetSize(120, 40)
 
-	content := stripANSI(y.View())
+	content := stripANSI(strings.Join(y.ContentLines(), "\n"))
 	if !strings.Contains(content, "Document") {
 		t.Error("expected YAML view to contain Document section")
 	}
@@ -143,10 +143,10 @@ func TestDetailView_EnrichResult_JSONViewShowsDocument(t *testing.T) {
 		},
 	})
 
-	j := views.NewJSON(enrichedRes, "role_policies", k)
+	j := views.NewJSONWithCtrl(enrichedRes, "role_policies", k, nil)
 	j.SetSize(120, 40)
 
-	content := stripANSI(j.View())
+	content := stripANSI(strings.Join(j.ContentLines(), "\n"))
 	if !strings.Contains(content, "Document") {
 		t.Error("expected JSON view to contain Document")
 	}
@@ -234,10 +234,10 @@ func TestDetailView_EnrichResult_InlinePolicy_YAMLShowsDocument(t *testing.T) {
 		},
 	})
 
-	y := views.NewYAML(enrichedRes, "role_policies", k)
+	y := views.NewYAMLWithCtrl(enrichedRes, "role_policies", k, nil)
 	y.SetSize(120, 40)
 
-	content := stripANSI(y.View())
+	content := stripANSI(strings.Join(y.ContentLines(), "\n"))
 	if !strings.Contains(content, "Document") {
 		t.Error("expected YAML view to show Document section for inline policy after enrichment")
 	}

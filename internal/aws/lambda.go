@@ -12,25 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchLambdaFunctions calls the Lambda ListFunctions API and returns all pages
-// of functions. Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchLambdaFunctions(ctx context.Context, api LambdaListFunctionsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchLambdaFunctionsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchLambdaFunctionsPage calls the Lambda ListFunctions API and returns
 // a single page of functions. Pass an empty continuationToken for the first page.
 func FetchLambdaFunctionsPage(ctx context.Context, api LambdaListFunctionsAPI, continuationToken string) (resource.FetchResult, error) {

@@ -55,9 +55,10 @@ type Controller struct {
 	// ApplyEnrichmentState, parallel to enrichmentStore.
 	enrichmentTruncated map[string]bool
 
-	// viewConfig is the per-session view configuration used by resolveListColumns
-	// to pick the correct column set for each resource type. When nil, the built-in
-	// defaults are used. Set by SetViewConfig after construction.
+	// viewConfig is the per-session view configuration used by
+	// resolveListColumnsForBuild to pick the correct column set for each
+	// resource type. When nil, the built-in defaults are used. Set by
+	// SetViewConfig after construction.
 	viewConfig *config.ViewsConfig
 
 	// fallbackTypeDefs stores ResourceTypeDef for resource types that are not

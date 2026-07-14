@@ -44,7 +44,9 @@ func TestFetchBackupPlans_ParsesMultiplePlans(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchBackupPlans(context.Background(), listMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchBackupPlansPage(context.Background(), listMock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -100,7 +102,9 @@ func TestFetchBackupPlans_ListError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchBackupPlans(context.Background(), listMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchBackupPlansPage(context.Background(), listMock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -116,7 +120,9 @@ func TestFetchBackupPlans_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchBackupPlans(context.Background(), listMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchBackupPlansPage(context.Background(), listMock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

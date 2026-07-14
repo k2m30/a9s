@@ -64,7 +64,7 @@ func checkAlarmASG(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
 	}
 
-	asgList, truncated, err := alarmRelatedResources(ctx, clients, cache, "asg")
+	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
 	if err != nil {
 		return resource.ErrorRelated("asg", err)
 	}
@@ -81,13 +81,8 @@ func checkAlarmASG(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResultTrunc("asg", ids, truncated)
 }
 
-// alarmRelatedResources returns the resource list for target from cache or by fetching the first page.
+// alarmRelatedResources returns the resource list for target from cache or by
+// fetching the first page via the registered paginated fetcher.
 func alarmRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
+	return relatedResourcesFor(ctx, clients, cache, target)
 }

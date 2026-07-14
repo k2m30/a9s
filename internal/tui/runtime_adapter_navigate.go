@@ -19,6 +19,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/atotto/clipboard"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/config"
@@ -268,72 +269,12 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 
 	case runtime.NavigateKindPushYAML:
-		if result.ReplaceCurrent {
-			m.popRS()
-		}
 		y := views.NewYAMLWithCtrl(*result.Resource, result.ResolvedType, m.keys, m.ctrl)
-		y.SetSize(m.innerSize())
-		// Push ScreenYAML onto the controller stack and seed TextState with the
-		// syntax-colored content lines so Snapshot().Body.Text is non-nil from
-		// the first render. Must happen after SetSize so ContentLines() uses the
-		// fully-initialised viewport width for any width-dependent output.
-		// Carry ResourceType + ResourceID so selectedResourceForAction resolves
-		// the resource from this text screen (enables 't', child views, etc.).
-		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
-			ID: runtime.ScreenYAML,
-			Context: runtime.ScreenContext{
-				ResourceType: result.ResolvedType,
-				ResourceID:   result.Resource.ID,
-			},
-		}})
-		m.ctrl.EnsureTextState(y.ContentLines())
-		textRS := newTextRS()
-		res := *result.Resource
-		textRS.textResource = &res
-		w, h := m.innerSize()
-		textRS.width, textRS.height = w, h
-		m.pushRS(textRS)
-		if result.DispatchEnrich {
-			rt := result.ResolvedType
-			return m, func() tea.Msg {
-				return messages.EnrichDetail{ResourceType: rt, Resource: res}
-			}
-		}
-		return m, nil
+		return m.pushTextScreen(result, runtime.ScreenYAML, &y)
 
 	case runtime.NavigateKindPushJSON:
-		if result.ReplaceCurrent {
-			m.popRS()
-		}
 		j := views.NewJSONWithCtrl(*result.Resource, result.ResolvedType, m.keys, m.ctrl)
-		j.SetSize(m.innerSize())
-		// Push ScreenJSON onto the controller stack and seed TextState with the
-		// syntax-colored content lines so Snapshot().Body.Text is non-nil from
-		// the first render. Must happen after SetSize so ContentLines() uses the
-		// fully-initialised viewport width for any width-dependent output.
-		// Carry ResourceType + ResourceID so selectedResourceForAction resolves
-		// the resource from this text screen (enables 't', child views, etc.).
-		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
-			ID: runtime.ScreenJSON,
-			Context: runtime.ScreenContext{
-				ResourceType: result.ResolvedType,
-				ResourceID:   result.Resource.ID,
-			},
-		}})
-		m.ctrl.EnsureTextState(j.ContentLines())
-		textRS := newTextRS()
-		jres := *result.Resource
-		textRS.textResource = &jres
-		w, h := m.innerSize()
-		textRS.width, textRS.height = w, h
-		m.pushRS(textRS)
-		if result.DispatchEnrich {
-			rt := result.ResolvedType
-			return m, func() tea.Msg {
-				return messages.EnrichDetail{ResourceType: rt, Resource: jres}
-			}
-		}
-		return m, nil
+		return m.pushTextScreen(result, runtime.ScreenJSON, &j)
 
 	case runtime.NavigateKindPushHelp:
 		ctx := m.helpContext()
@@ -379,15 +320,9 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		for i, r := range regions {
 			regionCodes[i] = r.Code
 		}
-		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenRegion}})
-		m.ctrl.EnsureSelectorState(regionCodes, m.core.Region(), "aws-regions")
-		selRS := newSelectorRS(func(s string) tea.Msg {
+		return m.pushSelectorScreen(runtime.ScreenRegion, regionCodes, m.core.Region(), "aws-regions", func(s string) tea.Msg {
 			return messages.RegionSelected{Region: s}
 		})
-		wR, hR := m.innerSize()
-		selRS.width, selRS.height = wR, hR
-		m.pushRS(selRS)
-		return m, nil
 
 	case runtime.NavigateKindPushTheme:
 		cfgDir := config.ConfigDir()
@@ -414,15 +349,9 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 				return messages.Flash{Text: "No theme files found in " + themesDir, IsError: true}
 			}
 		}
-		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenTheme}})
-		m.ctrl.EnsureSelectorState(themeFiles, m.activeTheme, "themes")
-		thRS := newSelectorRS(func(s string) tea.Msg {
+		return m.pushSelectorScreen(runtime.ScreenTheme, themeFiles, m.activeTheme, "themes", func(s string) tea.Msg {
 			return messages.ThemeSelected{Theme: s}
 		})
-		wT, hT := m.innerSize()
-		thRS.width, thRS.height = wT, hT
-		m.pushRS(thRS)
-		return m, nil
 
 	case runtime.NavigateKindFetchReveal:
 		return m, navigateTasksToCmd(m, tasks)
@@ -440,6 +369,64 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		m.pushRS(costsRS)
 		return m, navigateTasksToCmd(m, tasks)
 	}
+	return m, nil
+}
+
+// textScreenView is the shared surface of YAMLModel and JSONModel that
+// pushTextScreen needs: a resizable viewport and its rendered content lines.
+type textScreenView interface {
+	SetSize(w, h int)
+	ContentLines() []string
+}
+
+// pushTextScreen handles the shared push logic for NavigateKindPushYAML and
+// NavigateKindPushJSON: sizes the view, pushes the controller screen with
+// resource context, seeds TextState with the syntax-colored content lines
+// (must happen after SetSize so ContentLines() uses the fully-initialised
+// viewport width), pushes the rendererState, and dispatches DetailEnrich
+// when requested. Carries ResourceType + ResourceID so
+// selectedResourceForAction resolves the resource from this text screen
+// (enables 't', child views, etc.).
+func (m Model) pushTextScreen(result runtime.NavigateResult, screenID runtime.ScreenID, view textScreenView) (tea.Model, tea.Cmd) {
+	if result.ReplaceCurrent {
+		m.popRS()
+	}
+	view.SetSize(m.innerSize())
+	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+		ID: screenID,
+		Context: runtime.ScreenContext{
+			ResourceType: result.ResolvedType,
+			ResourceID:   result.Resource.ID,
+		},
+	}})
+	m.ctrl.EnsureTextState(view.ContentLines())
+	res := *result.Resource
+	m.ctrl.SetTextResource(res)
+	textRS := newTextRS()
+	textRS.textResource = &res
+	w, h := m.innerSize()
+	textRS.width, textRS.height = w, h
+	m.pushRS(textRS)
+	if result.DispatchEnrich {
+		rt := result.ResolvedType
+		return m, func() tea.Msg {
+			return messages.EnrichDetail{ResourceType: rt, Resource: res}
+		}
+	}
+	return m, nil
+}
+
+// pushSelectorScreen handles the shared push logic for NavigateKindPushRegion
+// and NavigateKindPushTheme: pushes the controller screen, seeds
+// SelectorState with the option list, current selection, and group key, then
+// pushes a selectorRS wired to onSelect.
+func (m Model) pushSelectorScreen(screenID runtime.ScreenID, options []string, current, group string, onSelect func(string) tea.Msg) (tea.Model, tea.Cmd) {
+	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: screenID}})
+	m.ctrl.EnsureSelectorState(options, current, group)
+	selRS := newSelectorRS(onSelect)
+	w, h := m.innerSize()
+	selRS.width, selRS.height = w, h
+	m.pushRS(selRS)
 	return m, nil
 }
 
@@ -564,7 +551,7 @@ func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 			// Build raw YAML using the controller resource.
 			res := m.ctrl.GetDetailResource()
 			if res.ID != "" {
-				content = rawYAMLFromResource(res)
+				content = views.RawYAMLFromResource(res)
 				if content != "" {
 					label = "Copied detail to clipboard"
 				}
@@ -792,14 +779,6 @@ func (m Model) refreshActiveListWithEnrichmentRerun(tok domain.Gen) tea.Cmd {
 	}
 }
 
-// rawYAMLFromResource converts a resource.Resource to YAML for clipboard copy.
-// Delegates to the exported views.RawYAMLFromResource to reuse the same
-// reflect+yaml.Marshal logic as DetailModel.RawYAML() without needing a stored
-// DetailModel instance.
-func rawYAMLFromResource(res resource.Resource) string {
-	return views.RawYAMLFromResource(res)
-}
-
 // rawContentFromTextBody returns the plain-text content from a TextBody for
 // clipboard copy. Joins lines with newlines, stripping any ANSI color codes
 // that the syntax-colorizer may have embedded.
@@ -812,32 +791,9 @@ func rawContentFromTextBody(body *app.TextBody) string {
 		if i > 0 {
 			sb.WriteByte('\n')
 		}
-		sb.WriteString(stripANSIInline(line))
+		sb.WriteString(ansi.Strip(line))
 	}
 	return sb.String()
-}
-
-// stripANSIInline removes ANSI escape sequences from s. Mirrors the inline
-// logic in DetailModel.PlainContent() in internal/tui/views/detail_render.go.
-func stripANSIInline(s string) string {
-	result := make([]byte, 0, len(s))
-	i := 0
-	for i < len(s) {
-		if s[i] == '\x1b' && i+1 < len(s) && s[i+1] == '[' {
-			j := i + 2
-			for j < len(s) && (s[j] < 'a' || s[j] > 'z') && (s[j] < 'A' || s[j] > 'Z') {
-				j++
-			}
-			if j < len(s) {
-				j++
-			}
-			i = j
-		} else {
-			result = append(result, s[i])
-			i++
-		}
-	}
-	return string(result)
 }
 
 // handleReveal fetches a revealed value using the resource type's registered

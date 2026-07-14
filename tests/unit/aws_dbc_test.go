@@ -88,7 +88,9 @@ func TestFetchDocDBClusters_FieldMapping(t *testing.T) {
 		},
 	})
 
-	resources, err := awsclient.FetchDocDBClusters(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchDocDBClustersPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchDocDBClusters error: %v", err)
 	}
@@ -162,9 +164,9 @@ func TestFetchDocDBClusters_FieldMapping(t *testing.T) {
 
 func TestFetchDocDBClusters_WriterCount(t *testing.T) {
 	cases := []struct {
-		name           string
-		members        []docdbtypes.DBClusterMember
-		wantHasWriter  string
+		name            string
+		members         []docdbtypes.DBClusterMember
+		wantHasWriter   string
 		wantWriterCount string
 	}{
 		{
@@ -222,7 +224,9 @@ func TestFetchDocDBClusters_WriterCount(t *testing.T) {
 					DBClusterMembers:      tc.members,
 				},
 			})
-			resources, err := awsclient.FetchDocDBClusters(context.Background(), mock)
+			resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+				return awsclient.FetchDocDBClustersPage(context.Background(), mock, token)
+			})
 			if err != nil {
 				t.Fatalf("FetchDocDBClusters error: %v", err)
 			}
@@ -261,7 +265,9 @@ func TestFetchDocDBClusters_NilFields(t *testing.T) {
 		},
 	})
 
-	resources, err := awsclient.FetchDocDBClusters(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchDocDBClustersPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchDocDBClusters error: %v", err)
 	}
@@ -299,7 +305,9 @@ func TestFetchDocDBClusters_NilFields(t *testing.T) {
 func TestFetchDocDBClusters_Empty(t *testing.T) {
 	mock := singlePageDocDB(nil)
 
-	resources, err := awsclient.FetchDocDBClusters(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchDocDBClustersPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchDocDBClusters error: %v", err)
 	}
@@ -315,7 +323,9 @@ func TestFetchDocDBClusters_Empty(t *testing.T) {
 
 func TestFetchDocDBClusters_APIError(t *testing.T) {
 	mock := &mockDocDBClustersClient{err: fmt.Errorf("throttled")}
-	resources, err := awsclient.FetchDocDBClusters(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchDocDBClustersPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -396,7 +406,9 @@ func TestFetchDocDBClusters_MultiPageAccumulates(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchDocDBClusters(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchDocDBClustersPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchDocDBClusters error: %v", err)
 	}
@@ -901,9 +913,9 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 	writer := rdstypes.DBClusterMember{IsClusterWriter: boolPtr(true)}
 
 	cases := []struct {
-		name        string
-		cluster     rdstypes.DBCluster
-		wantPhrase  string   // expected Fields["status"] display phrase
+		name         string
+		cluster      rdstypes.DBCluster
+		wantPhrase   string   // expected Fields["status"] display phrase
 		wantFindings []string // expected Findings phrases in order
 	}{
 		{
@@ -916,7 +928,7 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				StorageEncrypted:      boolPtr(true),
 				BackupRetentionPeriod: int32Ptr(7),
 			},
-			wantPhrase:  "",
+			wantPhrase:   "",
 			wantFindings: nil,
 		},
 		{
@@ -929,7 +941,7 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				StorageEncrypted:      boolPtr(true),
 				BackupRetentionPeriod: int32Ptr(7),
 			},
-			wantPhrase:  "no writer: reads only",
+			wantPhrase:   "no writer: reads only",
 			wantFindings: []string{"no writer: reads only"},
 		},
 		{
@@ -942,7 +954,7 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				StorageEncrypted:      boolPtr(true),
 				BackupRetentionPeriod: int32Ptr(7),
 			},
-			wantPhrase:  "delete-protection off",
+			wantPhrase:   "delete-protection off",
 			wantFindings: []string{"delete-protection off"},
 		},
 		{
@@ -955,7 +967,7 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				StorageEncrypted:      boolPtr(false),
 				BackupRetentionPeriod: int32Ptr(7),
 			},
-			wantPhrase:  "not encrypted at rest",
+			wantPhrase:   "not encrypted at rest",
 			wantFindings: []string{"not encrypted at rest"},
 		},
 		{
@@ -968,7 +980,7 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				StorageEncrypted:      boolPtr(true),
 				BackupRetentionPeriod: int32Ptr(0),
 			},
-			wantPhrase:  "no automated backups",
+			wantPhrase:   "no automated backups",
 			wantFindings: []string{"no automated backups"},
 		},
 		{
@@ -981,7 +993,7 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				StorageEncrypted:      boolPtr(false),
 				BackupRetentionPeriod: int32Ptr(0),
 			},
-			wantPhrase:  "delete-protection off (+2)",
+			wantPhrase:   "delete-protection off (+2)",
 			wantFindings: []string{"delete-protection off", "not encrypted at rest", "no automated backups"},
 		},
 		{
@@ -991,7 +1003,7 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				Status:              aws.String("failed"),
 				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
 			},
-			wantPhrase:  "failed: cluster operation",
+			wantPhrase:   "failed: cluster operation",
 			wantFindings: []string{"failed: cluster operation"},
 		},
 		{
@@ -1001,7 +1013,7 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				Status:              aws.String("inaccessible-encryption-credentials"),
 				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
 			},
-			wantPhrase:  "encryption key unreachable",
+			wantPhrase:   "encryption key unreachable",
 			wantFindings: []string{"encryption key unreachable"},
 		},
 		{
@@ -1011,7 +1023,7 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				Status:              aws.String("incompatible-parameters"),
 				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
 			},
-			wantPhrase:  "parameter group incompatible",
+			wantPhrase:   "parameter group incompatible",
 			wantFindings: []string{"parameter group incompatible"},
 		},
 		{
@@ -1021,7 +1033,7 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				Status:              aws.String("modifying"),
 				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
 			},
-			wantPhrase:  "modifying: in progress",
+			wantPhrase:   "modifying: in progress",
 			wantFindings: []string{"modifying: in progress"},
 		},
 		{
@@ -1031,7 +1043,7 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				Status:              aws.String("cross-region-copying"),
 				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
 			},
-			wantPhrase:  "cross-region-copying",
+			wantPhrase:   "cross-region-copying",
 			wantFindings: []string{"cross-region-copying"},
 		},
 	}

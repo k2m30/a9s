@@ -27,7 +27,7 @@ func checkEBSSnap(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: 0}
 	}
 
-	snapList, truncated, err := ebsRelatedResources(ctx, clients, cache, "ebs-snap")
+	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs-snap")
 	if err != nil {
 		return resource.ErrorRelated("ebs-snap", err)
 	}
@@ -69,7 +69,7 @@ func checkEBSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := ebsRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -112,7 +112,7 @@ func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 
-	cfnList, truncated, err := ebsRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -154,7 +154,7 @@ func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 
-	backupList, truncated, err := ebsRelatedResources(ctx, clients, cache, "backup")
+	backupList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.ErrorRelated("backup", err)
 	}
@@ -169,16 +169,4 @@ func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, cac
 		}
 	}
 	return relatedResultTrunc("backup", ids, truncated)
-}
-
-// ebsRelatedResources returns the resource list for target from cache or fetches
-// the first page via the registered paginated fetcher.
-func ebsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

@@ -185,7 +185,6 @@ func (RelatedCheckBatch) AcceptZeroGen() bool    { return true }
 type AvailabilityCacheLoaded struct {
 	Entries        map[string]int  // shortName -> resource count
 	Truncated      map[string]bool // shortName -> true if truncated
-	Expired        bool            // true if cache was beyond TTL
 	IssueCounts    map[string]int  // shortName -> cached issue count
 	IssueTruncated map[string]bool // shortName -> true if issue count was truncated
 	IssueKnown     map[string]bool // shortName -> true if issue count was probed (vs unknown)

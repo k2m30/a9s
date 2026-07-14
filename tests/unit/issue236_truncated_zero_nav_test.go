@@ -9,9 +9,34 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
+
+// newSizedMainMenu creates a MainMenuModel with the given terminal dimensions
+// and NO_COLOR mode enabled for deterministic string assertions.
+func newSizedMainMenu(t *testing.T, w, h int) views.MainMenuModel {
+	t.Helper()
+	tuitest.NoColor(t)
+	m := views.NewMainMenu(keys.Default())
+	m.SetSize(w, h)
+	return m
+}
+
+// menuKeyDown creates a tea.KeyPressMsg for the "j" (down) key.
+func menuKeyDown() tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: -1, Text: "j"}
+}
+
+// menuKeyEnter creates a tea.KeyPressMsg for the Enter key.
+func menuKeyEnter() tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: tea.KeyEnter}
+}
 
 // ---------------------------------------------------------------------------
 // Test 1: cursor can land on a truncated-zero row

@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -90,20 +89,12 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "rotation_enabled", Title: "Rotation", Width: 10, Sortable: true},
 		},
 		Color: colorSecrets,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSecretsPage(ctx, c.SecretsManager, continuationToken)
-		},
-		Reveal: func(ctx context.Context, clients any, resourceID string) (string, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return "", fmt.Errorf("AWS clients not initialized")
-			}
+		}),
+		Reveal: revealWithClients(func(ctx context.Context, c *ServiceClients, resourceID string) (string, error) {
 			return RevealSecret(ctx, c.SecretsManager, resourceID)
-		},
+		}),
 		FieldKeys: []string{"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled", "arn", "status"},
 		Related: []domain.RelatedDef{
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkSecretsKMS, NeedsTargetCache: true},
@@ -146,20 +137,12 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "description", Title: "Description", Width: 30, Sortable: false},
 		},
 		Color: colorSSM,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSSMParametersPage(ctx, c.SSM, continuationToken)
-		},
-		Reveal: func(ctx context.Context, clients any, resourceID string) (string, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return "", fmt.Errorf("AWS clients not initialized")
-			}
+		}),
+		Reveal: revealWithClients(func(ctx context.Context, c *ServiceClients, resourceID string) (string, error) {
 			return RevealSSMParameter(ctx, c.SSM, resourceID)
-		},
+		}),
 		FieldKeys: []string{"name", "type", "version", "last_modified", "description", "risk"},
 		Related: []domain.RelatedDef{
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSSMKMS, NeedsTargetCache: true},
@@ -186,22 +169,10 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "status", Title: "Status", Width: 12, Sortable: true},
 			{Key: "description", Title: "Description", Width: 36, Sortable: false},
 		},
-		Color: colorKMS,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
-			return FetchKMSKeysPage(ctx, c, continuationToken)
-		},
-		Wave2: IssueEnricher{Fn: EnrichKMSRotation, Priority: 100},
-		FetchByIDs: func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return nil, fmt.Errorf("AWS clients not initialized")
-			}
-			return FetchKMSKeysByIDs(ctx, c, ids)
-		},
+		Color:                  colorKMS,
+		Fetcher:                fetcherWithClients(FetchKMSKeysPage),
+		Wave2:                  IssueEnricher{Fn: EnrichKMSRotation, Priority: 100},
+		FetchByIDs:             fetchByIDsWithClients(FetchKMSKeysByIDs),
 		FieldKeys:              []string{"alias", "key_id", "status", "description"},
 		IssueEnricherFieldKeys: []string{"rotation_enabled"},
 		Related: []domain.RelatedDef{

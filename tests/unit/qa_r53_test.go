@@ -10,6 +10,7 @@ import (
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -44,7 +45,9 @@ func TestFetchHostedZones_ParsesMultiple(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchHostedZones(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchHostedZonesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -105,7 +108,9 @@ func TestFetchHostedZones_RawStructPopulated(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchHostedZones(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchHostedZonesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -128,7 +133,9 @@ func TestFetchHostedZones_ErrorResponse(t *testing.T) {
 		err: fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchHostedZones(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchHostedZonesPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -144,7 +151,9 @@ func TestFetchHostedZones_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchHostedZones(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchHostedZonesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

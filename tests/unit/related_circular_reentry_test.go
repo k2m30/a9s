@@ -55,7 +55,9 @@ func circularReentrySetup(t *testing.T) (tui.Model, resource.Resource, resource.
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ec2Client := fakes.NewEC2()
-	ec2Res, err := awsclient.FetchEC2Instances(t.Context(), ec2Client)
+	ec2Res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(t.Context(), ec2Client, token)
+	})
 	if err != nil || len(ec2Res) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
@@ -97,7 +99,7 @@ func circularReentrySetup(t *testing.T) (tui.Model, resource.Resource, resource.
 // related_cache_bug_test.go), which drives the PatchRelatedCache intent
 // (internal/runtime/handlers_resources.go) that populates
 // session.RelatedCacheLRU keyed by RelatedCacheKey("ec2", instance.ID).
-func feedEC2RelatedResults(m tui.Model, instanceID string) tui.Model {
+func feedEC2RelatedResults(m tui.Model, _ string) tui.Model {
 	for _, def := range resource.GetRelated("ec2") {
 		m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 			ResourceType: "ec2",

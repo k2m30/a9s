@@ -303,13 +303,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			DisplayNameKey: "db_identifier",
 		}},
 		Color: colorDBI,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchRDSInstancesPage(ctx, c.RDS, continuationToken)
-		},
+		}),
 		Wave2: IssueEnricher{Fn: EnrichDBIMaintenance, Priority: 10},
 		FieldKeys: []string{
 			"db_identifier", "engine", "engine_version", "status", "class", "endpoint",
@@ -371,11 +367,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			DisplayNameKey: "bucket",
 		}},
 		Color: colorS3,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			// Related-panel contract (docs/resources/s3.md §2): lambda/sns/sqs
 			// pivots must resolve non-zero when this bucket has a matching
 			// notification target. Those checkers read Fields["notification_*"],
@@ -384,7 +376,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			// (cheap API, typically ≤50 buckets per AWS account) in exchange
 			// for having the notification pivots actually work.
 			return FetchS3BucketsPageWithNotifications(ctx, c.S3, c.S3, continuationToken)
-		},
+		}),
 		Wave2: IssueEnricher{Fn: EnrichS3PublicAccessBlock, Priority: 100},
 		FieldKeys: []string{
 			"name",
@@ -431,13 +423,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "endpoint", Title: "Endpoint", Width: 40, Sortable: false},
 		},
 		Color: colorRedis,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchRedisPage(ctx, c.ElastiCache, continuationToken)
-		},
+		}),
 		FieldKeys: []string{"cluster_id", "node_type", "status", "nodes", "endpoint", "arn"},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedisAlarms, NeedsTargetCache: true},
@@ -479,11 +467,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 		},
 		Color: colorDBC,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			if rdsTok, ok2 := strings.CutPrefix(continuationToken, "rds:"); ok2 {
 				result, err := FetchRDSDBClustersPage(ctx, c.RDS, rdsTok)
 				if err != nil {
@@ -535,7 +519,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 					TotalHint:   len(docResult.Resources),
 				},
 			}, nil
-		},
+		}),
 		Wave2: IssueEnricher{Fn: EnrichDBCMaintenance, Priority: 100},
 		FieldKeys: []string{
 			"cluster_id", "engine_version", "status", "instances", "endpoint", "arn",
@@ -585,13 +569,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "billing_mode", Title: "Billing", Width: 16, Sortable: true},
 		},
 		Color: colorDDB,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchDynamoDBTablesPage(ctx, c.DynamoDB, c.DynamoDB, continuationToken)
-		},
+		}),
 		Wave2:     IssueEnricher{Fn: EnrichDynamoDBPITR, Priority: 100},
 		FieldKeys: []string{"table_name", "status", "item_count", "size_bytes", "billing_mode"},
 		Related: []domain.RelatedDef{
@@ -631,11 +611,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 		},
 		Color: colorOpenSearch,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			resources, err := FetchOpenSearchDomains(ctx, c.OpenSearch, c.OpenSearch)
 			if err != nil {
 				return resource.FetchResult{}, err
@@ -644,7 +620,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 				Resources:  resources,
 				Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
 			}, nil
-		},
+		}),
 		Wave2: IssueEnricher{Fn: EnrichOpenSearchDomains, Priority: 100},
 		FieldKeys: []string{
 			"domain_name", "engine_version", "instance_type", "instance_count", "endpoint",
@@ -694,13 +670,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "endpoint", Title: "Endpoint", Width: 44, Sortable: false},
 		},
 		Color: colorRedshift,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchRedshiftClustersPage(ctx, c.Redshift, continuationToken)
-		},
+		}),
 		FieldKeys: []string{
 			"cluster_id", "status", "cluster_status", "node_type", "num_nodes",
 			"db_name", "endpoint", "publicly_accessible", "encrypted",
@@ -761,13 +733,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "mount_targets", Title: "Mounts", Width: 8, Sortable: true},
 		},
 		Color: colorEFS,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEFSFileSystemsPage(ctx, c.EFS, continuationToken)
-		},
+		}),
 		Wave2:     IssueEnricher{Fn: EnrichEFSMountTargets, Priority: 100},
 		FieldKeys: []string{"file_system_id", "name", "status", "performance_mode", "throughput_mode", "encrypted", "mount_targets"},
 		Related: []domain.RelatedDef{
@@ -817,13 +785,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "created", Title: "Created", Width: 22, Sortable: true},
 		},
 		Color: colorDBISnap,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchDBISnapshotsPage(ctx, c.RDS, continuationToken)
-		},
+		}),
 		Wave2:     IssueEnricher{Fn: enrichDBISnapCrossRef, Priority: 100},
 		FieldKeys: []string{"snapshot_id", "db_instance", "status", "engine", "snapshot_type", "created", "arn"},
 		Related: []domain.RelatedDef{
@@ -862,11 +826,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "storage_type", Title: "Storage", Width: 10, Sortable: true},
 		},
 		Color: colorDBCSnap,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			if rdsTok, ok2 := strings.CutPrefix(continuationToken, "rds:"); ok2 {
 				result, err := FetchRDSDBClusterSnapshotsPage(ctx, c.RDS, rdsTok)
 				if err != nil {
@@ -918,7 +878,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 					TotalHint:   len(docResult.Resources),
 				},
 			}, nil
-		},
+		}),
 		Wave2: IssueEnricher{Fn: enrichDBCSnapCrossRef, Priority: 100},
 		FieldKeys: []string{
 			"snapshot_id", "cluster_id", "status", "engine", "snapshot_type",
@@ -958,13 +918,9 @@ var databasesChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 			"timestamp", "event_categories", "message",
 			"source_identifier", "source_type", "source_arn",
 		},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchRDSEvents(ctx, c.RDS, parentCtx["db_identifier"], continuationToken)
-		},
+		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeDBIEventFailure, Phrase: "failure", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeDBIEventLowStorage, Phrase: "low storage", Severity: domain.SevBroken, Source: "wave1"},

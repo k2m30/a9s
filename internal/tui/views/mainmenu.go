@@ -1,6 +1,7 @@
 package views
 
 import (
+	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -160,16 +161,6 @@ func (m MainMenuModel) BottomHints() []layout.KeyHint {
 	return hints
 }
 
-// CopyContent returns empty — nothing to copy from the main menu.
-func (m MainMenuModel) CopyContent() (string, string) {
-	return "", ""
-}
-
-// GetHelpContext returns HelpFromMainMenu.
-func (m MainMenuModel) GetHelpContext() HelpContext {
-	return HelpFromMainMenu
-}
-
 // SelectedItem returns the resource type at the current cursor.
 func (m MainMenuModel) SelectedItem() resource.ResourceTypeDef {
 	item, _ := m.ctrl.MenuSelected()
@@ -180,15 +171,6 @@ func (m MainMenuModel) SelectedItem() resource.ResourceTypeDef {
 func (m *MainMenuModel) SetFilter(filterText string) {
 	m.ctrl.Apply(app.Action{Kind: app.ActionSetFilter, Arg: filterText})
 	m.scrollOffset = 0
-}
-
-// GetFilter returns the current filter text from the controller snapshot.
-func (m *MainMenuModel) GetFilter() string {
-	body := m.ctrl.Snapshot().Body.Menu
-	if body == nil {
-		return ""
-	}
-	return body.Filter
 }
 
 // SetAvailability updates the resource count for a resource type.
@@ -352,9 +334,9 @@ func (m *MainMenuModel) RenderBody(body app.MenuBody) string {
 
 		nameStr := item.Display
 		if item.AvailKnown {
-			countSuffix := " (" + itoa(item.Availability) + ")"
+			countSuffix := " (" + strconv.Itoa(item.Availability) + ")"
 			if item.AvailTruncated {
-				countSuffix = " (" + itoa(item.Availability) + "+)"
+				countSuffix = " (" + strconv.Itoa(item.Availability) + "+)"
 			}
 			nameStr += countSuffix
 		}
@@ -420,7 +402,7 @@ func entryIssueBadge(e app.MenuEntry) string {
 	if e.IssueBadge.Count <= 0 {
 		return ""
 	}
-	suffix := " issues:" + itoa(e.IssueBadge.Count)
+	suffix := " issues:" + strconv.Itoa(e.IssueBadge.Count)
 	if e.IssueBadge.Truncated {
 		suffix += "+"
 	}

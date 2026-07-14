@@ -182,25 +182,6 @@ func sgRiskFindings(wideOpen, dangerousOpenCount, riskSummary string) []domain.F
 	return nil
 }
 
-// FetchSecurityGroups calls the EC2 DescribeSecurityGroups API and returns all
-// pages of security groups. Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchSecurityGroups(ctx context.Context, api EC2DescribeSecurityGroupsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchSecurityGroupsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchSecurityGroupsPage calls the EC2 DescribeSecurityGroups API and returns
 // a single page of security groups. Pass an empty continuationToken for the first page.
 func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsAPI, continuationToken string) (resource.FetchResult, error) {

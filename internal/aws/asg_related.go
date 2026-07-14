@@ -44,7 +44,7 @@ func checkASGAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := asgRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -77,7 +77,7 @@ func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "ng", Count: 0}
 	}
 
-	ngList, truncated, err := asgRelatedResources(ctx, clients, cache, "ng")
+	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
 	if err != nil {
 		return resource.ErrorRelated("ng", err)
 	}
@@ -323,13 +323,8 @@ func asgInstanceProfileToRoles(ctx context.Context, c *ServiceClients, profileNa
 	return roleARNs
 }
 
-// asgRelatedResources returns the resource list for target from cache or fetches it.
+// asgRelatedResources returns the resource list for target from cache or by
+// fetching the first page via the registered paginated fetcher.
 func asgRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
+	return relatedResourcesFor(ctx, clients, cache, target)
 }

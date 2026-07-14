@@ -39,6 +39,7 @@ import (
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -89,7 +90,9 @@ func TestFetchIAMGroups_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchIAMGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchIAMGroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -177,7 +180,9 @@ func TestFetchAPIGateways_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAPIGateways(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAPIGatewaysPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -265,7 +270,9 @@ func TestFetchAthenaWorkgroups_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAthenaWorkgroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAthenaWorkgroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -353,7 +360,9 @@ func TestFetchBackupPlans_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchBackupPlans(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchBackupPlansPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -473,7 +482,9 @@ func TestFetchCodeBuildProjects_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCodeBuildProjects(context.Background(), listMock, batchMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCodeBuildProjectsPage(context.Background(), listMock, batchMock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -561,7 +572,9 @@ func TestFetchCodePipelines_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCodePipelines(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCodePipelinesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -649,7 +662,9 @@ func TestFetchCodeArtifactRepos_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCodeArtifactRepos(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCodeArtifactReposPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -737,7 +752,9 @@ func TestFetchEBEnvironments_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEBEnvironments(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBEnvironmentsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -825,7 +842,9 @@ func TestFetchEFSFileSystems_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEFSFileSystems(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEFSFileSystemsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1023,7 +1042,9 @@ func TestFetchGlueJobs_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchGlueJobs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchGlueJobsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1111,7 +1132,9 @@ func TestFetchMSKClusters_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchMSKClusters(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchMSKClustersPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1199,7 +1222,9 @@ func TestFetchSESIdentities_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSESIdentities(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSESIdentitiesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1287,7 +1312,9 @@ func TestFetchWAFWebACLs_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchWAFWebACLs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchWAFWebACLsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1517,7 +1544,9 @@ func TestFetchSNSSubscriptions_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSNSSubscriptions(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSNSSubscriptionsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

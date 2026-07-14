@@ -12,25 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchEFSFileSystems calls the EFS DescribeFileSystems API and converts
-// the response into a slice of generic Resource structs.
-func FetchEFSFileSystems(ctx context.Context, api EFSDescribeFileSystemsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchEFSFileSystemsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // efsW1Findings returns the active Wave-1 findings for this filesystem in §4
 // precedence order: Broken signals first (error, no mount targets), then
 // Warning signals (creating, updating, deleting). The first finding's phrase

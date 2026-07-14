@@ -12,25 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchSecrets calls the SecretsManager ListSecrets API and returns all pages
-// of secrets. Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchSecrets(ctx context.Context, api SecretsManagerListSecretsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchSecretsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchSecretsPage calls the SecretsManager ListSecrets API and returns a single
 // page of secrets. Pass an empty continuationToken for the first page.
 func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, continuationToken string) (resource.FetchResult, error) {

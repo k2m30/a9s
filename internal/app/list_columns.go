@@ -2,6 +2,7 @@ package app
 
 import (
 	"maps"
+	"strconv"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/internal/config"
@@ -60,165 +61,20 @@ func MaterializeListFields(r resource.Resource, columns []ColumnDef) resource.Re
 	return out
 }
 
-// resolveListColumns mirrors resolveColumns from table_render.go exactly,
-// including the superset check, so the controller column set is always
-// identical to what the TUI renders.
-func resolveListColumns(typeName string) []ColumnDef {
-	return resolveListColumnsWithConfig(nil, typeName)
-}
-
-// resolveListColumnsForBuild mirrors resolveColumns() in table_render.go, using
-// the caller-supplied td (already resolved fallback-first) for the superset
-// first-column-title check. This ensures that custom test typeDefs sharing a
-// ShortName with a catalog type but having a different column layout (e.g.
-// rlTestTypeDef starts with "Instance ID" not "Name") do not get silently
-// switched to the built-in 9-column defaults.
+// resolveListColumnsForBuild resolves the column set for typeName via the
+// shared config.ResolveListColumnCascade, using the caller-supplied td
+// (already resolved fallback-first) for the superset first-column-title
+// check. This ensures that custom test typeDefs sharing a ShortName with a
+// catalog type but having a different column layout (e.g. rlTestTypeDef
+// starts with "Instance ID" not "Name") do not get silently switched to the
+// built-in 9-column defaults.
 func resolveListColumnsForBuild(vc *config.ViewsConfig, typeName string, td *resource.ResourceTypeDef) []ColumnDef {
-	if vc != nil {
-		vd := config.GetViewDef(vc, typeName)
-		if len(vd.List) > 0 {
-			cols := make([]ColumnDef, len(vd.List))
-			for i, lc := range vd.List {
-				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
-			}
-			return cols
-		}
+	lcs := resource.ResolveListColumnCascade(vc, typeName, td)
+	cols := make([]ColumnDef, len(lcs))
+	for i, lc := range lcs {
+		cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
 	}
-
-	defaultVD := config.GetViewDef(nil, typeName)
-
-	// Superset check using the supplied td (fallback-first, not catalog).
-	if td != nil && len(defaultVD.List) > len(td.Columns) {
-		firstMatch := len(td.Columns) == 0 ||
-			(len(defaultVD.List) > 0 && defaultVD.List[0].Title == td.Columns[0].Title)
-		if firstMatch {
-			cols := make([]ColumnDef, len(defaultVD.List))
-			for i, lc := range defaultVD.List {
-				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, Humanize: lc.Humanize}
-			}
-			return cols
-		}
-	}
-
-	// Fall back to td.Columns, carrying Path from defaults by title match.
-	if td != nil && len(td.Columns) > 0 {
-		defaultByTitle := make(map[string]config.ListColumn, len(defaultVD.List))
-		for _, lc := range defaultVD.List {
-			defaultByTitle[lc.Title] = lc
-		}
-		cols := make([]ColumnDef, len(td.Columns))
-		for i, c := range td.Columns {
-			cd := ColumnDef{Key: c.Key, Title: c.Title, Width: c.Width}
-			if def, ok := defaultByTitle[c.Title]; ok {
-				if cd.Path == "" {
-					cd.Path = def.Path
-				}
-				cd.Humanize = def.Humanize
-			}
-			cols[i] = cd
-		}
-		return cols
-	}
-
-	// No td — fall back to raw built-in defaults.
-	if len(defaultVD.List) > 0 {
-		cols := make([]ColumnDef, len(defaultVD.List))
-		for i, lc := range defaultVD.List {
-			cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path}
-		}
-		return cols
-	}
-	return nil
-}
-
-// resolveListColumnsWithConfig resolves the column set for typeName, using vc
-// as the per-session view config (nil = built-in defaults only). Mirrors
-// ResourceListModel.resolveColumns so that buildListBody and View() agree.
-func resolveListColumnsWithConfig(vc *config.ViewsConfig, typeName string) []ColumnDef {
-	td := resource.FindResourceType(typeName)
-
-	// When a per-session view config is provided, use it (mirrors the viewConfig
-	// branch in ResourceListModel.resolveColumns). This ensures path-based columns
-	// (e.g. ENI Status with Key="" Path="Status") are returned with the correct
-	// Key/Path from the config, matching what extractCellValue sees at render time.
-	if vc != nil {
-		vd := config.GetViewDef(vc, typeName)
-		if len(vd.List) > 0 {
-			cols := make([]ColumnDef, len(vd.List))
-			for i, lc := range vd.List {
-				cols[i] = ColumnDef{
-					Key:      lc.Key,
-					Title:    lc.Title,
-					Width:    lc.Width,
-					Path:     lc.Path,
-					Humanize: lc.Humanize,
-				}
-			}
-			return cols
-		}
-	}
-
-	defaultVD := config.GetViewDef(nil, typeName)
-
-	// Superset check: use default view config only when it is strictly larger
-	// than td.Columns AND the first column title matches.
-	if td != nil && len(defaultVD.List) > len(td.Columns) {
-		firstMatch := len(td.Columns) == 0 ||
-			(len(defaultVD.List) > 0 && defaultVD.List[0].Title == td.Columns[0].Title)
-		if firstMatch {
-			cols := make([]ColumnDef, len(defaultVD.List))
-			for i, lc := range defaultVD.List {
-				cols[i] = ColumnDef{
-					Key:      lc.Key,
-					Title:    lc.Title,
-					Width:    lc.Width,
-					Path:     lc.Path,
-					Humanize: lc.Humanize,
-				}
-			}
-			return cols
-		}
-	}
-
-	// Fall back to td.Columns, carrying Path from defaults by title match.
-	if td != nil {
-		defaultByTitle := make(map[string]config.ListColumn, len(defaultVD.List))
-		for _, lc := range defaultVD.List {
-			defaultByTitle[lc.Title] = lc
-		}
-		cols := make([]ColumnDef, len(td.Columns))
-		for i, c := range td.Columns {
-			cd := ColumnDef{
-				Key:   c.Key,
-				Title: c.Title,
-				Width: c.Width,
-			}
-			if def, ok := defaultByTitle[c.Title]; ok {
-				if cd.Path == "" {
-					cd.Path = def.Path
-				}
-				cd.Humanize = def.Humanize
-			}
-			cols[i] = cd
-		}
-		return cols
-	}
-
-	// No td registered: fall back to raw view-config list if available.
-	if len(defaultVD.List) > 0 {
-		cols := make([]ColumnDef, len(defaultVD.List))
-		for i, lc := range defaultVD.List {
-			cols[i] = ColumnDef{
-				Key:      lc.Key,
-				Title:    lc.Title,
-				Width:    lc.Width,
-				Path:     lc.Path,
-				Humanize: lc.Humanize,
-			}
-		}
-		return cols
-	}
-	return nil
+	return cols
 }
 
 // extractListCells builds the cell value slice for one row, mirroring
@@ -418,7 +274,7 @@ func listPhraseFromFindings(findings []domain.Finding) string {
 	if len(findings) == 1 {
 		return findings[top].Phrase
 	}
-	return findings[top].Phrase + " (+" + itoa(len(findings)-1) + ")"
+	return findings[top].Phrase + " (+" + strconv.Itoa(len(findings)-1) + ")"
 }
 
 // hasWave2Finding reports whether findings already contains a Wave-2 entry
@@ -560,10 +416,11 @@ func resolveListStatusCol(columns []ColumnDef, td *resource.ResourceTypeDef) int
 	return -1
 }
 
-// ResolveListColumns exports resolveListColumns for use by constructors that
-// need to translate a 0-based column index to a column key (e.g., sort restore).
+// ResolveListColumns exports the live column-set cascade for use by
+// constructors that need to translate a 0-based column index to a column key
+// (e.g., sort restore).
 func ResolveListColumns(typeName string) []ColumnDef {
-	return resolveListColumns(typeName)
+	return resolveListColumnsForBuild(nil, typeName, resource.FindResourceType(typeName))
 }
 
 // ResolveColumnsForType resolves the column set for typeName using this

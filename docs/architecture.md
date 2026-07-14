@@ -223,9 +223,6 @@ cmd/
   viewsgen/         # generates ~/.a9s/views/*.yaml from built-in defaults
   refgen/           # generates views_reference.yaml from AWS SDK struct reflection
   preview/          # renders static TUI design mockups (no AWS)
-  preview-pagination/  # pagination preview
-  preview-policy-doc/  # policy document preview
-  preview_detail/      # detail view preview
 
 internal/
   aws/           # AWS service clients, resource fetchers, related checkers, enrichers
@@ -429,7 +426,7 @@ All in `internal/tui/views/`:
 | View | File(s) | Purpose |
 |------|---------|---------|
 | **MainMenuModel** | `mainmenu.go` | Category-grouped resource list with availability badges, issue count badges (`issues:N`), ctrl+z quad-state filter, enrichment progress indicator |
-| **ResourceListModel** | `resourcelist.go` | Paginated table with filter, sort, child drill-down; embeds `AttentionFilter` for ctrl+z; tracks `issueCount` for the frame-title `!N` issue suffix (`s3(50+) !5`; `!N+` when truncated, omitted when zero or in ctrl+z attention-only mode) and menu sync-back |
+| **ResourceListModel** | `resourcelist.go` | Paginated table with filter, sort, child drill-down; owns its ctrl+z attention-only toggle; tracks `issueCount` for the frame-title `!N` issue suffix (`s3(50+) !5`; `!N+` when truncated, omitted when zero or in ctrl+z attention-only mode) and menu sync-back |
 | **DetailModel** | `detail.go`, `detail_fields.go`, `detail_helpers.go` | Two-column: field list (left) + related panel (right) |
 | **YAMLModel** | `yaml.go` | YAML dump of RawStruct with syntax highlighting + search. Also doubles as a raw-text viewer via `NewTextViewer()` (used for the `!` error log) |
 | **JSONModel** | `json.go` | JSON dump of RawStruct with syntax highlighting + search |
@@ -482,8 +479,6 @@ The main menu shows `issues:N` badges per resource type, counting resources in w
 5. fall back to column index 0
 
 **`CellDecorators` and `lookupDecorator`**: `ResourceTypeDef.CellDecorators` is a `map[string]func(Resource, string) string` that transforms a cell's display value before render. `lookupDecorator(decs, col)` resolves the right decorator via a fallback chain: column `Key` → column `Path` → `Path`'s final segment (lowercased) → column `Title` (lowercased). Only EC2 currently uses this (to prefix state with `"! "` for impaired or `"~ "` for degraded-but-running).
-
-**AttentionFilter** (`internal/tui/views/attention.go`): A shared toggle struct embedded by both `MainMenuModel` and `ResourceListModel`. Owns only enabled/disabled state — views do their own counting and rendering.
 
 **Issue counting flow**:
 1. Wave 1 probes (or `demoPrefetchCounts()`) count `td.ResolveColor(r).IsIssue()` rows from first page

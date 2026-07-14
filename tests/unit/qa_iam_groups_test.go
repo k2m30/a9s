@@ -37,7 +37,9 @@ func TestQA_IAMGroups_FetchSuccess(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchIAMGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchIAMGroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -78,7 +80,9 @@ func TestQA_IAMGroups_FetchEmpty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchIAMGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchIAMGroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -92,7 +96,9 @@ func TestQA_IAMGroups_FetchError(t *testing.T) {
 		err: fmt.Errorf("access denied"),
 	}
 
-	_, err := awsclient.FetchIAMGroups(context.Background(), mock)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchIAMGroupsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

@@ -10,6 +10,7 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -51,7 +52,9 @@ func TestFetchECSClusters_ParsesMultipleClusters(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchECSClusters(context.Background(), listMock, describeMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSClustersPage(context.Background(), listMock, describeMock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -122,7 +125,9 @@ func TestFetchECSClusters_ListClustersError(t *testing.T) {
 	}
 	describeMock := &mockECSDescribeClustersClient{}
 
-	resources, err := awsclient.FetchECSClusters(context.Background(), listMock, describeMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSClustersPage(context.Background(), listMock, describeMock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -139,7 +144,9 @@ func TestFetchECSClusters_EmptyResponse(t *testing.T) {
 	}
 	describeMock := &mockECSDescribeClustersClient{}
 
-	resources, err := awsclient.FetchECSClusters(context.Background(), listMock, describeMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSClustersPage(context.Background(), listMock, describeMock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

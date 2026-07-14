@@ -50,19 +50,3 @@ func replaceEC2NavigableFields(t *testing.T, fields []resource.NavigableField) {
 		}
 	})
 }
-
-// unregisterEC2NavigableFields strips ec2 navigable fields from the ACTIVE
-// registry for the duration of t and restores them on cleanup. Used by tests
-// that need a clean "no active navigable fields" state for ec2.
-func unregisterEC2NavigableFields(t *testing.T) {
-	t.Helper()
-	orig := resource.GetActiveNavigableFields("ec2")
-	resource.CleanupNavigableFieldsForTest("ec2")
-	t.Cleanup(func() {
-		if orig == nil {
-			resource.CleanupNavigableFieldsForTest("ec2")
-		} else {
-			resource.SetNavigableFieldsForTest("ec2", orig)
-		}
-	})
-}

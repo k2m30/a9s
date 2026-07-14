@@ -30,6 +30,7 @@ import (
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ===========================================================================
@@ -78,7 +79,9 @@ func TestFetchCloudFormationStacks_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCloudFormationStacks(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudFormationStacksPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -169,7 +172,9 @@ func TestFetchCloudWatchAlarms_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCloudWatchAlarms(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudWatchAlarmsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -260,7 +265,9 @@ func TestFetchAutoScalingGroups_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAutoScalingGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAutoScalingGroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -351,7 +358,9 @@ func TestFetchACMCertificates_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchACMCertificates(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchACMCertificatesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -442,7 +451,9 @@ func TestFetchECRRepositories_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchECRRepositories(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECRRepositoriesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -533,7 +544,9 @@ func TestFetchEventBridgeRules_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEventBridgeRules(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEventBridgeRulesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -624,7 +637,9 @@ func TestFetchSecrets_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSecrets(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSecretsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -715,7 +730,9 @@ func TestFetchStepFunctions_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchStepFunctions(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchStepFunctionsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -806,7 +823,9 @@ func TestFetchSSMParameters_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSSMParameters(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSSMParametersPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -914,7 +933,9 @@ func TestFetchHostedZones_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchHostedZones(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchHostedZonesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1032,7 +1053,9 @@ func TestFetchCloudFrontDistributions_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCloudFrontDistributions(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudFrontDistributionsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

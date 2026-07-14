@@ -59,7 +59,9 @@ import (
 // that should have resolved.
 func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 	ctClient := fakes.NewCloudTrail()
-	fixtures, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	fixtures, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), ctClient, token)
+	})
 	if fetchErr != nil || len(fixtures) == 0 {
 		t.Fatalf("demo ct-events fixtures missing (err=%v, len=%d)", fetchErr, len(fixtures))
 	}
@@ -132,7 +134,9 @@ func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 // when clients is not *ServiceClients and FetchRelatedTarget errored.
 func TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker(t *testing.T) {
 	ctClient := fakes.NewCloudTrail()
-	fixtures, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	fixtures, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), ctClient, token)
+	})
 	if fetchErr != nil || len(fixtures) == 0 {
 		t.Fatalf("demo ct-events fixtures missing (err=%v, len=%d)", fetchErr, len(fixtures))
 	}
@@ -198,7 +202,9 @@ func TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker(t *testing.T) {
 // ctEventsRelatedResources to return nil, making checkCtEventsRole return Count=-1.
 func TestCtEventsCheckersResolveFromDemoCache_RoleCheckerAssumedRoleEvents(t *testing.T) {
 	ctClient := fakes.NewCloudTrail()
-	fixtures, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	fixtures, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), ctClient, token)
+	})
 	if fetchErr != nil || len(fixtures) == 0 {
 		t.Fatalf("demo ct-events fixtures missing (err=%v, len=%d)", fetchErr, len(fixtures))
 	}

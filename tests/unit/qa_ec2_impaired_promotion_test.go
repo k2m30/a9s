@@ -36,8 +36,8 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,7 +122,9 @@ func TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired(t *testing.T)
 		},
 	}
 
-	resources, err := awsclient.FetchEC2Instances(context.Background(), stub)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), stub, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchEC2Instances returned unexpected error: %v", err)
 	}
@@ -194,7 +196,9 @@ func TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired(t *testing.
 		},
 	}
 
-	resources, err := awsclient.FetchEC2Instances(context.Background(), stub)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), stub, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchEC2Instances returned unexpected error: %v", err)
 	}
@@ -262,7 +266,9 @@ func TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing(t *
 		},
 	}
 
-	resources, err := awsclient.FetchEC2Instances(context.Background(), stub)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), stub, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchEC2Instances returned unexpected error: %v", err)
 	}
@@ -324,7 +330,9 @@ func TestFetchEC2_LeavesStatusAsRunningWhenBothOk(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEC2Instances(context.Background(), stub)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), stub, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchEC2Instances returned unexpected error: %v", err)
 	}
@@ -370,7 +378,9 @@ func TestFetchEC2_DoesNotPromoteStoppedInstance(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEC2Instances(context.Background(), stub)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), stub, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchEC2Instances returned unexpected error: %v", err)
 	}

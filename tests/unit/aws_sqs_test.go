@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -44,7 +45,9 @@ func TestFetchSQSQueues_ParsesMultipleQueues(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSQSQueues(context.Background(), listMock, attrMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSQSQueuesPage(context.Background(), listMock, attrMock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -110,7 +113,9 @@ func TestFetchSQSQueues_ErrorOnList(t *testing.T) {
 		outputs: map[string]*sqs.GetQueueAttributesOutput{},
 	}
 
-	resources, err := awsclient.FetchSQSQueues(context.Background(), listMock, attrMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSQSQueuesPage(context.Background(), listMock, attrMock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -129,7 +134,9 @@ func TestFetchSQSQueues_EmptyResponse(t *testing.T) {
 		outputs: map[string]*sqs.GetQueueAttributesOutput{},
 	}
 
-	resources, err := awsclient.FetchSQSQueues(context.Background(), listMock, attrMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSQSQueuesPage(context.Background(), listMock, attrMock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -156,7 +163,9 @@ func TestFetchSQSQueues_RawStructIsStructuredAttributes(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSQSQueues(context.Background(), listMock, attrMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSQSQueuesPage(context.Background(), listMock, attrMock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

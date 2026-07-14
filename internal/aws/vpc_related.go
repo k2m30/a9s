@@ -19,7 +19,7 @@ func checkVPCSubnet(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 	}
 
-	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "subnet")
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
 	if err != nil {
 		return resource.ErrorRelated("subnet", err)
 	}
@@ -44,7 +44,7 @@ func checkVPCSG(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
 	}
 
-	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "sg")
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
 	if err != nil {
 		return resource.ErrorRelated("sg", err)
 	}
@@ -69,7 +69,7 @@ func checkVPCEC2(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
 	}
 
-	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "ec2")
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
 	if err != nil {
 		return resource.ErrorRelated("ec2", err)
 	}
@@ -94,7 +94,7 @@ func checkVPCELB(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
 
-	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "elb")
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
 	if err != nil {
 		return resource.ErrorRelated("elb", err)
 	}
@@ -124,7 +124,7 @@ func checkVPCNAT(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "nat", Count: 0}
 	}
 
-	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "nat")
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "nat")
 	if err != nil {
 		return resource.ErrorRelated("nat", err)
 	}
@@ -149,7 +149,7 @@ func checkVPCIGW(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "igw", Count: 0}
 	}
 
-	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "igw")
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "igw")
 	if err != nil {
 		return resource.ErrorRelated("igw", err)
 	}
@@ -174,7 +174,7 @@ func checkVPCRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "rtb", Count: 0}
 	}
 
-	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "rtb")
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
 	if err != nil {
 		return resource.ErrorRelated("rtb", err)
 	}
@@ -199,7 +199,7 @@ func checkVPCVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
 	}
 
-	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "vpce")
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")
 	if err != nil {
 		return resource.ErrorRelated("vpce", err)
 	}
@@ -238,7 +238,7 @@ func checkVPCENI(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
 	}
 
-	list, truncated, err := vpcRelatedResources(ctx, clients, cache, "eni")
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
 		return resource.ErrorRelated("eni", err)
 	}
@@ -306,16 +306,4 @@ func vpcIDFromResource(res resource.Resource) string {
 		return res.ID
 	}
 	return res.Fields["vpc_id"]
-}
-
-// vpcRelatedResources returns the resource list for target from cache or fetches
-// the first page via the registered paginated fetcher.
-func vpcRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

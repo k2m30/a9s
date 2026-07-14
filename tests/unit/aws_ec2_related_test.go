@@ -414,7 +414,9 @@ func TestNavigableFields_EC2_Registered(t *testing.T) {
 
 func TestNavigableFields_EC2_FieldPathsResolve(t *testing.T) {
 	ec2Client := fakes.NewEC2()
-	resources, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), ec2Client, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchEC2Instances via EC2 fake: %v", err)
 	}

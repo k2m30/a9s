@@ -12,17 +12,18 @@ package unit
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
-	"github.com/stretchr/testify/require"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -47,13 +48,20 @@ func (m *backupPlanListMock) ListBackupPlans(_ context.Context, _ *backup.ListBa
 // Spec §3.1: "No Wave 1 signals" — the list API is config-only.
 func TestBackup_Fetcher_HealthyPlan_NoWave1Findings(t *testing.T) {
 	fake := fakes.NewBackup()
-	resources, err := awsclient.FetchBackupPlans(context.Background(), fake)
-	require.NoError(t, err)
-	require.NotEmpty(t, resources)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchBackupPlansPage(context.Background(), fake, token)
+	})
+	if err != nil {
+		t.Fatalf("FetchBackupPlans returned error: %v", err)
+	}
+	if len(resources) == 0 {
+		t.Fatal("FetchBackupPlans returned no resources")
+	}
 
 	for _, r := range resources {
-		require.Empty(t, r.Findings,
-			"Resource.Findings must be empty for plan %s — spec §3.1: no Wave-1 signals", r.ID)
+		if len(r.Findings) != 0 {
+			t.Fatalf("Resource.Findings must be empty for plan %s — spec §3.1: no Wave-1 signals", r.ID)
+		}
 	}
 }
 
@@ -67,8 +75,12 @@ func TestBackup_Fetcher_HealthyPlan_NoWave1Findings(t *testing.T) {
 // Spec §4: "A plan that has *never* run is also Healthy by this rule."
 func TestBackup_Fetcher_NeverRanPlan_IsHealthy(t *testing.T) {
 	fake := fakes.NewBackup()
-	resources, err := awsclient.FetchBackupPlans(context.Background(), fake)
-	require.NoError(t, err)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchBackupPlansPage(context.Background(), fake, token)
+	})
+	if err != nil {
+		t.Fatalf("FetchBackupPlans returned error: %v", err)
+	}
 
 	var found bool
 	for _, r := range resources {
@@ -76,12 +88,16 @@ func TestBackup_Fetcher_NeverRanPlan_IsHealthy(t *testing.T) {
 			continue
 		}
 		found = true
-		require.Empty(t, r.Findings,
-			"plan-never-ran must have no Findings (Healthy — spec §4, no Wave-1 signals §3.1)")
-		require.Empty(t, r.Fields["last_execution"],
-			"plan-never-ran must have empty last_execution field (LastExecutionDate is nil)")
+		if len(r.Findings) != 0 {
+			t.Fatal("plan-never-ran must have no Findings (Healthy — spec §4, no Wave-1 signals §3.1)")
+		}
+		if r.Fields["last_execution"] != "" {
+			t.Fatal("plan-never-ran must have empty last_execution field (LastExecutionDate is nil)")
+		}
 	}
-	require.True(t, found, "plan-never-ran (%s) not found in fetcher output", fixtures.NeverRanPlanID)
+	if !found {
+		t.Fatalf("plan-never-ran (%s) not found in fetcher output", fixtures.NeverRanPlanID)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -92,8 +108,12 @@ func TestBackup_Fetcher_NeverRanPlan_IsHealthy(t *testing.T) {
 // healthy daily plan fixture. Asserts exact field values from the fixture file.
 func TestBackup_Fetcher_MapsHealthyPlanFields(t *testing.T) {
 	fake := fakes.NewBackup()
-	resources, err := awsclient.FetchBackupPlans(context.Background(), fake)
-	require.NoError(t, err)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchBackupPlansPage(context.Background(), fake, token)
+	})
+	if err != nil {
+		t.Fatalf("FetchBackupPlans returned error: %v", err)
+	}
 
 	var found bool
 	for _, r := range resources {
@@ -102,29 +122,43 @@ func TestBackup_Fetcher_MapsHealthyPlanFields(t *testing.T) {
 		}
 		found = true
 
-		require.Equal(t, fixtures.HealthyDailyPlanID, r.ID, "Resource.ID mismatch")
-		require.Equal(t, "acme-daily-backup", r.Name, "Resource.Name mismatch")
-		require.Empty(t, r.Findings, "Resource.Findings must be empty (fetcher silence §3.1)")
+		if r.ID != fixtures.HealthyDailyPlanID {
+			t.Fatalf("Resource.ID mismatch: got %q, want %q", r.ID, fixtures.HealthyDailyPlanID)
+		}
+		if r.Name != "acme-daily-backup" {
+			t.Fatalf("Resource.Name mismatch: got %q, want %q", r.Name, "acme-daily-backup")
+		}
+		if len(r.Findings) != 0 {
+			t.Fatal("Resource.Findings must be empty (fetcher silence §3.1)")
+		}
 
-		require.Equal(t, "acme-daily-backup", r.Fields["plan_name"],
-			"Fields[plan_name] mismatch")
-		require.Equal(t, fixtures.HealthyDailyPlanID, r.Fields["plan_id"],
-			"Fields[plan_id] mismatch")
+		if r.Fields["plan_name"] != "acme-daily-backup" {
+			t.Fatalf("Fields[plan_name] mismatch: got %q, want %q", r.Fields["plan_name"], "acme-daily-backup")
+		}
+		if r.Fields["plan_id"] != fixtures.HealthyDailyPlanID {
+			t.Fatalf("Fields[plan_id] mismatch: got %q, want %q", r.Fields["plan_id"], fixtures.HealthyDailyPlanID)
+		}
 
 		// LastExecutionDate fixture = 2026-04-22T02:00:00Z → "2026-04-22 02:00"
-		require.Equal(t, "2026-04-22 02:00", r.Fields["last_execution"],
-			"Fields[last_execution] must be formatted '2006-01-02 15:04'")
+		if r.Fields["last_execution"] != "2026-04-22 02:00" {
+			t.Fatalf("Fields[last_execution] must be formatted '2006-01-02 15:04': got %q", r.Fields["last_execution"])
+		}
 
 		// resources CSV: healthy plan's selection covers HealthyBucketARN + EFS ARN.
-		require.NotEmpty(t, r.Fields["resources"],
-			"Fields[resources] must be non-empty — fetcher enumerates plan selections")
-		require.Contains(t, r.Fields["resources"], fixtures.HealthyBucketARN,
-			"Fields[resources] must contain HealthyBucketARN from the plan's selection")
+		if r.Fields["resources"] == "" {
+			t.Fatal("Fields[resources] must be non-empty — fetcher enumerates plan selections")
+		}
+		if !strings.Contains(r.Fields["resources"], fixtures.HealthyBucketARN) {
+			t.Fatalf("Fields[resources] must contain HealthyBucketARN from the plan's selection: got %q", r.Fields["resources"])
+		}
 
-		require.NotNil(t, r.RawStruct, "Resource.RawStruct must not be nil")
+		if r.RawStruct == nil {
+			t.Fatal("Resource.RawStruct must not be nil")
+		}
 	}
-	require.True(t, found, "HealthyDailyPlanID %s not found in fetcher output",
-		fixtures.HealthyDailyPlanID)
+	if !found {
+		t.Fatalf("HealthyDailyPlanID %s not found in fetcher output", fixtures.HealthyDailyPlanID)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -137,15 +171,21 @@ func TestBackup_Fetcher_MapsHealthyPlanFields(t *testing.T) {
 // populate Resource.Issues for any backup plan, regardless of job state.
 func TestBackup_Fetcher_ResourceIssuesEmptyForAllFixtures(t *testing.T) {
 	fake := fakes.NewBackup()
-	resources, err := awsclient.FetchBackupPlans(context.Background(), fake)
-	require.NoError(t, err)
-	require.Len(t, resources, 8,
-		"expected 8 fixture plans (impl-plan §2); update this count if fixtures change")
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchBackupPlansPage(context.Background(), fake, token)
+	})
+	if err != nil {
+		t.Fatalf("FetchBackupPlans returned error: %v", err)
+	}
+	if len(resources) != 8 {
+		t.Fatalf("expected 8 fixture plans (impl-plan §2); update this count if fixtures change: got %d", len(resources))
+	}
 
 	for _, r := range resources {
-		require.Empty(t, r.Findings,
-			"Resource.Findings must be empty for plan %s (%s) — spec §3.1 declares no Wave-1 signals",
-			r.ID, r.Name)
+		if len(r.Findings) != 0 {
+			t.Fatalf("Resource.Findings must be empty for plan %s (%s) — spec §3.1 declares no Wave-1 signals",
+				r.ID, r.Name)
+		}
 	}
 }
 
@@ -173,8 +213,12 @@ func TestBackup_Fetcher_NilPlanID_Skipped(t *testing.T) {
 	}
 
 	// Must not panic.
-	resources, err := awsclient.FetchBackupPlans(context.Background(), mock)
-	require.NoError(t, err)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchBackupPlansPage(context.Background(), mock, token)
+	})
+	if err != nil {
+		t.Fatalf("FetchBackupPlans returned error: %v", err)
+	}
 
 	var validFound bool
 	for _, r := range resources {
@@ -183,7 +227,9 @@ func TestBackup_Fetcher_NilPlanID_Skipped(t *testing.T) {
 			break
 		}
 	}
-	require.True(t, validFound, "valid plan 'valid-plan-001' must appear in fetcher output")
+	if !validFound {
+		t.Fatal("valid plan 'valid-plan-001' must appear in fetcher output")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +248,9 @@ func TestBackup_Fetcher_NilPlanID_Skipped(t *testing.T) {
 func TestBackup_DefaultListColumns_OneStatusColumn(t *testing.T) {
 	viewDef := config.DefaultViewDef("backup")
 	cols := viewDef.List
-	require.NotEmpty(t, cols, "default backup list columns must not be empty")
+	if len(cols) == 0 {
+		t.Fatal("default backup list columns must not be empty")
+	}
 
 	// Exactly one column keyed "status".
 	statusCount := 0
@@ -211,14 +259,16 @@ func TestBackup_DefaultListColumns_OneStatusColumn(t *testing.T) {
 			statusCount++
 		}
 	}
-	require.Equal(t, 1, statusCount,
-		"expected exactly one column keyed 'status'; got %d in columns %v",
-		statusCount, cols)
+	if statusCount != 1 {
+		t.Fatalf("expected exactly one column keyed 'status'; got %d in columns %v",
+			statusCount, cols)
+	}
 
 	// No column keyed "last_status".
 	for _, col := range cols {
-		require.NotEqual(t, "last_status", col.Key,
-			"column keyed 'last_status' is banned per spec §4 — replace with 'status'")
+		if col.Key == "last_status" {
+			t.Fatal("column keyed 'last_status' is banned per spec §4 — replace with 'status'")
+		}
 	}
 
 	// No jargon titles.
@@ -228,8 +278,9 @@ func TestBackup_DefaultListColumns_OneStatusColumn(t *testing.T) {
 	}
 	for _, col := range cols {
 		for _, bad := range banned {
-			require.NotEqual(t, bad, col.Title,
-				"column title %q is in the banned jargon set and must not appear", bad)
+			if col.Title == bad {
+				t.Fatalf("column title %q is in the banned jargon set and must not appear", bad)
+			}
 		}
 	}
 
@@ -240,8 +291,9 @@ func TestBackup_DefaultListColumns_OneStatusColumn(t *testing.T) {
 		titleSet[col.Title] = true
 	}
 	for _, title := range required {
-		require.True(t, titleSet[title],
-			"expected identity column %q in default backup list view", title)
+		if !titleSet[title] {
+			t.Fatalf("expected identity column %q in default backup list view", title)
+		}
 	}
 }
 
@@ -316,15 +368,25 @@ func TestBackup_EnumerateSelection_FailClosedOnGetError(t *testing.T) {
 		getSelectionErr:    fmt.Errorf("AccessDeniedException: insufficient permissions"),
 	}
 
-	resources, err := awsclient.FetchBackupPlans(context.Background(), mock)
-	require.NoError(t, err, "FetchBackupPlans must not propagate GetBackupSelection errors")
-	require.Len(t, resources, 1, "one plan must still be returned")
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchBackupPlansPage(context.Background(), mock, token)
+	})
+	if err != nil {
+		t.Fatalf("FetchBackupPlans must not propagate GetBackupSelection errors: %v", err)
+	}
+	if len(resources) != 1 {
+		t.Fatalf("one plan must still be returned: got %d", len(resources))
+	}
 
 	r := resources[0]
-	require.Empty(t, r.Fields["resources"],
-		"Fields[resources] must be empty string when GetBackupSelection fails (fail-closed)")
-	require.Empty(t, r.Fields["not_resources"],
-		"Fields[not_resources] must be empty string when GetBackupSelection fails (fail-closed)")
+	if r.Fields["resources"] != "" {
+		t.Errorf("Fields[resources] must be empty string when GetBackupSelection fails (fail-closed): got %q",
+			r.Fields["resources"])
+	}
+	if r.Fields["not_resources"] != "" {
+		t.Errorf("Fields[not_resources] must be empty string when GetBackupSelection fails (fail-closed): got %q",
+			r.Fields["not_resources"])
+	}
 }
 
 // TestBackup_EnumerateSelection_SuccessReturnsBothCSVs verifies that when all
@@ -361,13 +423,23 @@ func TestBackup_EnumerateSelection_SuccessReturnsBothCSVs(t *testing.T) {
 		getSelectionErr: nil,
 	}
 
-	resources, err := awsclient.FetchBackupPlans(context.Background(), mock)
-	require.NoError(t, err)
-	require.Len(t, resources, 1)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchBackupPlansPage(context.Background(), mock, token)
+	})
+	if err != nil {
+		t.Fatalf("FetchBackupPlans returned error: %v", err)
+	}
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
+	}
 
 	r := resources[0]
-	require.Equal(t, includeARN, r.Fields["resources"],
-		"Fields[resources] must contain the ARN from BackupSelection.Resources")
-	require.Equal(t, excludeARN, r.Fields["not_resources"],
-		"Fields[not_resources] must contain the ARN from BackupSelection.NotResources")
+	if r.Fields["resources"] != includeARN {
+		t.Errorf("Fields[resources] must contain the ARN from BackupSelection.Resources: got %q, want %q",
+			r.Fields["resources"], includeARN)
+	}
+	if r.Fields["not_resources"] != excludeARN {
+		t.Errorf("Fields[not_resources] must contain the ARN from BackupSelection.NotResources: got %q, want %q",
+			r.Fields["not_resources"], excludeARN)
+	}
 }

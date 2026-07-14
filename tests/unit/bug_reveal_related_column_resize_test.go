@@ -9,8 +9,9 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
-	"github.com/k2m30/a9s/v3/internal/tui"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // Reveals bug: detail opened when terminal is narrow, then widened.
@@ -34,7 +35,9 @@ func TestBugReveal_EC2Detail_AutoShowsRelatedAfterResizeToWide(t *testing.T) {
 	m = m2
 
 	clients := demo.NewServiceClients()
-	ec2, err := awsclient.FetchEC2Instances(context.Background(), clients.EC2)
+	ec2, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), clients.EC2, token)
+	})
 	if err != nil || len(ec2) == 0 {
 		t.Fatalf("demo ec2 fixtures missing: err=%v len=%d", err, len(ec2))
 	}
@@ -79,7 +82,9 @@ func TestBugReveal_EC2Detail_ResizeDoesNotOverrideExplicitHide(t *testing.T) {
 	m = m2
 
 	clients2 := demo.NewServiceClients()
-	ec2b, err := awsclient.FetchEC2Instances(context.Background(), clients2.EC2)
+	ec2b, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), clients2.EC2, token)
+	})
 	if err != nil || len(ec2b) == 0 {
 		t.Fatalf("demo ec2 fixtures missing: err=%v len=%d", err, len(ec2b))
 	}

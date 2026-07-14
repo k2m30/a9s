@@ -8,8 +8,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-
-	"gopkg.in/ini.v1"
 )
 
 // AWSRegion represents an AWS region with its code and human-readable display name.
@@ -155,16 +153,7 @@ func GetDefaultRegion(configPath, profile string) string {
 		return fallback
 	}
 
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return fallback
-	}
-
-	cfg, err := ini.LoadSources(ini.LoadOptions{
-		Insensitive:     false,
-		AllowShadows:    true,
-		Loose:           true,
-		InsensitiveKeys: true,
-	}, configPath)
+	sections, err := parseINISections(configPath)
 	if err != nil {
 		return fallback
 	}
@@ -174,14 +163,14 @@ func GetDefaultRegion(configPath, profile string) string {
 		lookupProfile = "default"
 	}
 
-	if region, ok := resolveProfileRegion(cfg, lookupProfile, make(map[string]bool)); ok {
+	if region, ok := resolveProfileRegion(sections, lookupProfile, make(map[string]bool)); ok {
 		return region
 	}
 
-	if region, ok := sectionRegion(cfg, "default"); ok {
+	if region, ok := sectionRegion(sections, "default"); ok {
 		return region
 	}
-	if region, ok := sectionRegion(cfg, "DEFAULT"); ok {
+	if region, ok := sectionRegion(sections, "DEFAULT"); ok {
 		return region
 	}
 
@@ -192,7 +181,7 @@ func GetDefaultRegion(configPath, profile string) string {
 // when absent — follows the profile's source_profile link recursively.
 // visited guards against cycles (A -> B -> A) and, via its growing size,
 // bounds the walk to maxSourceProfileDepth hops.
-func resolveProfileRegion(cfg *ini.File, profile string, visited map[string]bool) (string, bool) {
+func resolveProfileRegion(sections []iniSection, profile string, visited map[string]bool) (string, bool) {
 	if profile == "" || visited[profile] || len(visited) >= maxSourceProfileDepth {
 		return "", false
 	}
@@ -203,27 +192,22 @@ func resolveProfileRegion(cfg *ini.File, profile string, visited map[string]bool
 		sectionName = "default"
 	}
 
-	section, err := cfg.GetSection(sectionName)
-	if err != nil {
+	section, ok := findINISection(sections, sectionName)
+	if !ok {
 		if profile == "default" {
-			section, err = cfg.GetSection("DEFAULT")
+			section, ok = findINISection(sections, "DEFAULT")
 		}
-		if err != nil {
+		if !ok {
 			return "", false
 		}
 	}
 
-	if section.HasKey("region") {
-		if region := strings.TrimSpace(section.Key("region").String()); region != "" {
-			return region, true
-		}
+	if region := strings.TrimSpace(section.keys["region"]); region != "" {
+		return region, true
 	}
 
-	if section.HasKey("source_profile") {
-		sourceProfile := strings.TrimSpace(section.Key("source_profile").String())
-		if sourceProfile != "" {
-			return resolveProfileRegion(cfg, sourceProfile, visited)
-		}
+	if sourceProfile := strings.TrimSpace(section.keys["source_profile"]); sourceProfile != "" {
+		return resolveProfileRegion(sections, sourceProfile, visited)
 	}
 
 	return "", false
@@ -231,15 +215,12 @@ func resolveProfileRegion(cfg *ini.File, profile string, visited map[string]bool
 
 // sectionRegion reads the region key from a named section, reporting ok=false
 // when the section or the key is missing/empty.
-func sectionRegion(cfg *ini.File, sectionName string) (string, bool) {
-	section, err := cfg.GetSection(sectionName)
-	if err != nil {
+func sectionRegion(sections []iniSection, sectionName string) (string, bool) {
+	section, ok := findINISection(sections, sectionName)
+	if !ok {
 		return "", false
 	}
-	if !section.HasKey("region") {
-		return "", false
-	}
-	region := strings.TrimSpace(section.Key("region").String())
+	region := strings.TrimSpace(section.keys["region"])
 	if region == "" {
 		return "", false
 	}

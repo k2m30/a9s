@@ -24,7 +24,6 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"log"
@@ -325,22 +324,3 @@ func lifecycleFragment(rt catalog.ResourceTypeDef) string {
 	return fmt.Sprintf("Lifecycle key: `%s`.", key)
 }
 
-// readLines is a helper used to parse existing markdown files line by line.
-func readLines(path string) ([]string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close() //nolint:errcheck // read-only
-
-	var lines []string
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		lines = append(lines, sc.Text())
-	}
-	return lines, sc.Err()
-}
-
-// ensure readLines is used (it is referenced by future per-category PRs that
-// may need line-level parsing for section updates in large existing files).
-var _ = readLines

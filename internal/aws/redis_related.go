@@ -43,7 +43,7 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := redisRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -118,7 +118,7 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 
-	cfnList, truncated, err := redisRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -168,7 +168,7 @@ func checkRedisCtEvents(ctx context.Context, clients any, res resource.Resource,
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
 	}
 
-	evList, truncated, err := redisRelatedResources(ctx, clients, cache, "ct-events")
+	evList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
 		return resource.ErrorRelated("ct-events", err)
 	}
@@ -244,7 +244,7 @@ func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
 
-	logList, truncated, err := redisRelatedResources(ctx, clients, cache, "logs")
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
@@ -294,7 +294,7 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
 	}
 
-	secretList, truncated, err := redisRelatedResources(ctx, clients, cache, "secrets")
+	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
 		return resource.ErrorRelated("secrets", err)
 	}
@@ -341,7 +341,7 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 		// Cannot determine SGs without member cluster data — report 0.
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
 	}
-	sgList, truncated, err := redisRelatedResources(ctx, clients, cache, "sg")
+	sgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
 	if err != nil {
 		return resource.ErrorRelated("sg", err)
 	}
@@ -388,7 +388,7 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	topicARN := *cc.NotificationConfiguration.TopicArn
 
-	snsList, truncated, err := redisRelatedResources(ctx, clients, cache, "sns")
+	snsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "sns")
 	if err != nil {
 		return resource.ErrorRelated("sns", err)
 	}
@@ -428,7 +428,7 @@ func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 	}
 
-	subnetList, truncated, err := redisRelatedResources(ctx, clients, cache, "subnet")
+	subnetList, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
 	if err != nil {
 		return resource.ErrorRelated("subnet", err)
 	}
@@ -531,15 +531,4 @@ func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) *
 // additional matches, so the displayed count is a lower bound — rendered as "(N+)".
 func truncatedResultRedis(target string, ids []string) resource.RelatedCheckResult {
 	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Truncated: true}
-}
-
-// redisRelatedResources returns the resource list for target from cache or by fetching the first page.
-func redisRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

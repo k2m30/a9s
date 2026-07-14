@@ -29,7 +29,7 @@ func checkDbcSnapDBC(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.UnknownRelated("dbc")
 	}
 
-	dbcList, truncated, err := dbcSnapRelatedResources(ctx, clients, cache, "dbc")
+	dbcList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbc")
 	if err != nil {
 		return resource.ErrorRelated("dbc", err)
 	}
@@ -125,7 +125,7 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 	// can skip the dbc-cache lookup. rdstypes.DBClusterSnapshot carries
 	// DBClusterArn directly; docdbtypes does not.
 	if parentARN == "" {
-		dbcList, dbcTruncated, err := dbcRelatedResources(ctx, clients, cache, "dbc")
+		dbcList, dbcTruncated, err := relatedResourcesFor(ctx, clients, cache, "dbc")
 		if err != nil {
 			return resource.ErrorRelated("backup", err)
 		}
@@ -150,7 +150,7 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 		}
 	}
 
-	planList, truncated, err := dbcRelatedResources(ctx, clients, cache, "backup")
+	planList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.ErrorRelated("backup", err)
 	}
@@ -210,14 +210,3 @@ func dbcResourceARN(raw any) string {
 var checkDbcSnapCTEvents = BuildCTEventsPivotChecker(CTEventsPivotConfig{
 	IDExtractor: func(res resource.Resource) string { return res.ID },
 })
-
-// dbcSnapRelatedResources returns the resource list for target from cache or by fetching the first page.
-func dbcSnapRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
-}

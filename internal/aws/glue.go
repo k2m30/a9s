@@ -11,25 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchGlueJobs calls the Glue GetJobs API and converts the response
-// into a slice of generic Resource structs.
-func FetchGlueJobs(ctx context.Context, api GlueGetJobsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchGlueJobsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchGlueJobsPage fetches a single page of Glue jobs.
 func FetchGlueJobsPage(ctx context.Context, api GlueGetJobsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &glue.GetJobsInput{

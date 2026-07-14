@@ -39,25 +39,6 @@ func roleWildcardTrustFindings(trustWildcard, assumeRolePolicyDoc string) []doma
 	return nil
 }
 
-// FetchIAMRoles calls the IAM ListRoles API and returns all pages of roles.
-// Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchIAMRoles(ctx context.Context, api IAMListRolesAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchIAMRolesPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchIAMRolesPage calls the IAM ListRoles API and returns a single page
 // of roles. Pass an empty continuationToken for the first page.
 func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationToken string) (resource.FetchResult, error) {

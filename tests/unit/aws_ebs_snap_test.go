@@ -12,6 +12,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -52,7 +53,9 @@ func TestFetchEBSSnapshots_ParsesMultipleSnapshots(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEBSSnapshots(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBSSnapshotsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -100,7 +103,9 @@ func TestFetchEBSSnapshots_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEBSSnapshots(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBSSnapshotsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -115,7 +120,9 @@ func TestFetchEBSSnapshots_ErrorResponse(t *testing.T) {
 		err:    fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchEBSSnapshots(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBSSnapshotsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -147,7 +154,9 @@ func TestFetchEBSSnapshots_FieldExtraction(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEBSSnapshots(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBSSnapshotsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -201,7 +210,9 @@ func TestFetchEBSSnapshots_NoNameTag(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEBSSnapshots(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBSSnapshotsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -230,7 +241,9 @@ func TestFetchEBSSnapshots_RawStructIsSnapshot(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEBSSnapshots(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBSSnapshotsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

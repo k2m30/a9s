@@ -24,13 +24,6 @@ import (
 	smithy "github.com/aws/smithy-go"
 )
 
-func opsFormatTime(t *time.Time) string {
-	if t == nil {
-		return ""
-	}
-	return t.Format("2006-01-02 15:04")
-}
-
 // ---------------------------------------------------------------------------
 // cb — CodeBuild Projects
 // ---------------------------------------------------------------------------
@@ -75,17 +68,13 @@ func captureCB(ctx context.Context, cfg aws.Config) (any, error) {
 	client := codebuild.NewFromConfig(cfg)
 
 	var names []string
-	token := (*string)(nil)
-	for {
-		out, err := client.ListProjects(ctx, &codebuild.ListProjectsInput{NextToken: token})
+	paginator := codebuild.NewListProjectsPaginator(client, &codebuild.ListProjectsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		names = append(names, out.Projects...)
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		token = out.NextToken
 	}
 
 	var projects []cbProject
@@ -157,7 +146,7 @@ func captureLatestBuild(ctx context.Context, client *codebuild.Client, projectNa
 		Outcome:      "found",
 		BuildStatus:  string(b.BuildStatus),
 		CurrentPhase: aws.ToString(b.CurrentPhase),
-		EndTime:      opsFormatTime(b.EndTime),
+		EndTime:      snapFormatTime(b.EndTime),
 	}
 }
 
@@ -226,19 +215,15 @@ func capturePipeline(ctx context.Context, cfg aws.Config) (any, error) {
 	client := codepipeline.NewFromConfig(cfg)
 
 	var names []string
-	nextToken := (*string)(nil)
-	for {
-		out, err := client.ListPipelines(ctx, &codepipeline.ListPipelinesInput{NextToken: nextToken})
+	paginator := codepipeline.NewListPipelinesPaginator(client, &codepipeline.ListPipelinesInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		for _, p := range out.Pipelines {
 			names = append(names, aws.ToString(p.Name))
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	var pipelines []pipelineInfo
@@ -260,7 +245,7 @@ func capturePipeline(ctx context.Context, cfg aws.Config) (any, error) {
 						stg.ApprovalTokenExist = true
 					}
 					if a.LatestExecution != nil && a.LatestExecution.LastStatusChange != nil {
-						stg.LatestLastUpdate = opsFormatTime(a.LatestExecution.LastStatusChange)
+						stg.LatestLastUpdate = snapFormatTime(a.LatestExecution.LastStatusChange)
 					}
 				}
 				st.Stages = append(st.Stages, stg)
@@ -349,10 +334,10 @@ func captureCodeArtifact(ctx context.Context, cfg aws.Config) (any, error) {
 	client := codeartifact.NewFromConfig(cfg)
 
 	var repos []codeArtifactRepo
-	nextToken := (*string)(nil)
 	domainKeyCache := map[string]string{}
-	for {
-		out, err := client.ListRepositories(ctx, &codeartifact.ListRepositoriesInput{NextToken: nextToken})
+	paginator := codeartifact.NewListRepositoriesPaginator(client, &codeartifact.ListRepositoriesInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -363,7 +348,7 @@ func captureCodeArtifact(ctx context.Context, cfg aws.Config) (any, error) {
 				DomainName:        aws.ToString(r.DomainName),
 				DomainOwner:       aws.ToString(r.DomainOwner),
 				AdministratorAcct: aws.ToString(r.AdministratorAccount),
-				CreatedTime:       opsFormatTime(r.CreatedTime),
+				CreatedTime:       snapFormatTime(r.CreatedTime),
 				Description:       aws.ToString(r.Description),
 			}
 
@@ -397,10 +382,6 @@ func captureCodeArtifact(ctx context.Context, cfg aws.Config) (any, error) {
 
 			repos = append(repos, repo)
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	return codeArtifactData{Repositories: repos}, nil
@@ -443,9 +424,9 @@ func captureCFN(ctx context.Context, cfg aws.Config) (any, error) {
 	client := cloudformation.NewFromConfig(cfg)
 
 	var stacks []cfnStack
-	nextToken := (*string)(nil)
-	for {
-		out, err := client.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{NextToken: nextToken})
+	paginator := cloudformation.NewDescribeStacksPaginator(client, &cloudformation.DescribeStacksInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -455,8 +436,8 @@ func captureCFN(ctx context.Context, cfg aws.Config) (any, error) {
 				StackName:         aws.ToString(s.StackName),
 				StackStatus:       string(s.StackStatus),
 				StackStatusReason: aws.ToString(s.StackStatusReason),
-				CreationTime:      opsFormatTime(s.CreationTime),
-				LastUpdatedTime:   opsFormatTime(s.LastUpdatedTime),
+				CreationTime:      snapFormatTime(s.CreationTime),
+				LastUpdatedTime:   snapFormatTime(s.LastUpdatedTime),
 				ParentId:          aws.ToString(s.ParentId),
 				RootId:            aws.ToString(s.RootId),
 				RoleARN:           aws.ToString(s.RoleARN),
@@ -464,7 +445,7 @@ func captureCFN(ctx context.Context, cfg aws.Config) (any, error) {
 			}
 			if s.DriftInformation != nil {
 				stack.DriftStatus = string(s.DriftInformation.StackDriftStatus)
-				stack.DriftLastCheckTime = opsFormatTime(s.DriftInformation.LastCheckTimestamp)
+				stack.DriftLastCheckTime = snapFormatTime(s.DriftInformation.LastCheckTimestamp)
 			}
 
 			evOut, err := client.DescribeStackEvents(ctx, &cloudformation.DescribeStackEventsInput{
@@ -481,7 +462,7 @@ func captureCFN(ctx context.Context, cfg aws.Config) (any, error) {
 							LogicalResourceId:    aws.ToString(ev.LogicalResourceId),
 							ResourceStatus:       string(ev.ResourceStatus),
 							ResourceStatusReason: aws.ToString(ev.ResourceStatusReason),
-							Timestamp:            opsFormatTime(ev.Timestamp),
+							Timestamp:            snapFormatTime(ev.Timestamp),
 						}
 						break
 					}
@@ -490,10 +471,6 @@ func captureCFN(ctx context.Context, cfg aws.Config) (any, error) {
 
 			stacks = append(stacks, stack)
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	return cfnData{Stacks: stacks}, nil
@@ -537,9 +514,9 @@ func captureAlarm(ctx context.Context, cfg aws.Config) (any, error) {
 	client := cloudwatch.NewFromConfig(cfg)
 
 	var alarms []alarmInfo
-	nextToken := (*string)(nil)
-	for {
-		out, err := client.DescribeAlarms(ctx, &cloudwatch.DescribeAlarmsInput{NextToken: nextToken})
+	paginator := cloudwatch.NewDescribeAlarmsPaginator(client, &cloudwatch.DescribeAlarmsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -549,7 +526,7 @@ func captureAlarm(ctx context.Context, cfg aws.Config) (any, error) {
 				AlarmArn:                aws.ToString(a.AlarmArn),
 				StateValue:              string(a.StateValue),
 				StateReason:             aws.ToString(a.StateReason),
-				StateUpdatedTimestamp:   opsFormatTime(a.StateUpdatedTimestamp),
+				StateUpdatedTimestamp:   snapFormatTime(a.StateUpdatedTimestamp),
 				ActionsEnabled:          aws.ToBool(a.ActionsEnabled),
 				AlarmActions:            a.AlarmActions,
 				OKActions:               a.OKActions,
@@ -566,10 +543,6 @@ func captureAlarm(ctx context.Context, cfg aws.Config) (any, error) {
 			}
 			alarms = append(alarms, info)
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	return alarmData{Alarms: alarms}, nil
@@ -601,9 +574,9 @@ func captureLogs(ctx context.Context, cfg aws.Config) (any, error) {
 	client := cloudwatchlogs.NewFromConfig(cfg)
 
 	var groups []logGroupInfo
-	nextToken := (*string)(nil)
-	for {
-		out, err := client.DescribeLogGroups(ctx, &cloudwatchlogs.DescribeLogGroupsInput{NextToken: nextToken})
+	paginator := cloudwatchlogs.NewDescribeLogGroupsPaginator(client, &cloudwatchlogs.DescribeLogGroupsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -639,10 +612,6 @@ func captureLogs(ctx context.Context, cfg aws.Config) (any, error) {
 
 			groups = append(groups, info)
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	return logsData{LogGroups: groups}, nil
@@ -717,9 +686,9 @@ func captureTrail(ctx context.Context, cfg aws.Config) (any, error) {
 			info.StatusOutcome = "ok"
 			info.IsLogging = aws.ToBool(statusOut.IsLogging)
 			info.LatestDeliveryError = aws.ToString(statusOut.LatestDeliveryError)
-			info.LatestDeliveryTime = opsFormatTime(statusOut.LatestDeliveryTime)
-			info.StopLoggingTime = opsFormatTime(statusOut.StopLoggingTime)
-			info.StartLoggingTime = opsFormatTime(statusOut.StartLoggingTime)
+			info.LatestDeliveryTime = snapFormatTime(statusOut.LatestDeliveryTime)
+			info.StopLoggingTime = snapFormatTime(statusOut.StopLoggingTime)
+			info.StartLoggingTime = snapFormatTime(statusOut.StartLoggingTime)
 		}
 
 		trails = append(trails, info)
@@ -757,9 +726,9 @@ func captureCTEvents(ctx context.Context, cfg aws.Config) (any, error) {
 
 	var events []ctEventInfo
 	truncated := false
-	nextToken := (*string)(nil)
-	for {
-		out, err := client.LookupEvents(ctx, &cloudtrail.LookupEventsInput{NextToken: nextToken})
+	paginator := cloudtrail.NewLookupEventsPaginator(client, &cloudtrail.LookupEventsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -767,7 +736,7 @@ func captureCTEvents(ctx context.Context, cfg aws.Config) (any, error) {
 			info := ctEventInfo{
 				EventId:         aws.ToString(e.EventId),
 				EventName:       aws.ToString(e.EventName),
-				EventTime:       opsFormatTime(e.EventTime),
+				EventTime:       snapFormatTime(e.EventTime),
 				Username:        aws.ToString(e.Username),
 				EventSource:     aws.ToString(e.EventSource),
 				ReadOnly:        aws.ToString(e.ReadOnly),
@@ -784,13 +753,9 @@ func captureCTEvents(ctx context.Context, cfg aws.Config) (any, error) {
 				break
 			}
 		}
-		if truncated || out.NextToken == nil || *out.NextToken == "" {
-			if out.NextToken != nil && *out.NextToken != "" {
-				truncated = true
-			}
+		if truncated {
 			break
 		}
-		nextToken = out.NextToken
 	}
 
 	return ctEventsData{Events: events, Truncated: truncated}, nil
@@ -823,9 +788,9 @@ func captureBackup(ctx context.Context, cfg aws.Config) (any, error) {
 	client := backupsvc.NewFromConfig(cfg)
 
 	var plans []backupPlanInfo
-	nextToken := (*string)(nil)
-	for {
-		out, err := client.ListBackupPlans(ctx, &backupsvc.ListBackupPlansInput{NextToken: nextToken})
+	planPaginator := backupsvc.NewListBackupPlansPaginator(client, &backupsvc.ListBackupPlansInput{})
+	for planPaginator.HasMorePages() {
+		out, err := planPaginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -833,9 +798,9 @@ func captureBackup(ctx context.Context, cfg aws.Config) (any, error) {
 			info := backupPlanInfo{
 				BackupPlanId:      aws.ToString(p.BackupPlanId),
 				BackupPlanName:    aws.ToString(p.BackupPlanName),
-				CreationDate:      opsFormatTime(p.CreationDate),
-				DeletionDate:      opsFormatTime(p.DeletionDate),
-				LastExecutionDate: opsFormatTime(p.LastExecutionDate),
+				CreationDate:      snapFormatTime(p.CreationDate),
+				DeletionDate:      snapFormatTime(p.DeletionDate),
+				LastExecutionDate: snapFormatTime(p.LastExecutionDate),
 				VersionId:         aws.ToString(p.VersionId),
 			}
 
@@ -854,22 +819,17 @@ func captureBackup(ctx context.Context, cfg aws.Config) (any, error) {
 
 			plans = append(plans, info)
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	since := time.Now().Add(-24 * time.Hour)
 	jobsByPlan := map[string][]string{}
 	jobsOutcome := "ok"
 	jobsCode := ""
-	jobToken := (*string)(nil)
-	for {
-		out, err := client.ListBackupJobs(ctx, &backupsvc.ListBackupJobsInput{
-			ByCreatedAfter: aws.Time(since),
-			NextToken:      jobToken,
-		})
+	jobPaginator := backupsvc.NewListBackupJobsPaginator(client, &backupsvc.ListBackupJobsInput{
+		ByCreatedAfter: aws.Time(since),
+	})
+	for jobPaginator.HasMorePages() {
+		out, err := jobPaginator.NextPage(ctx)
 		if err != nil {
 			jobsOutcome = "error"
 			jobsCode = apiErrorCode(err)
@@ -882,10 +842,6 @@ func captureBackup(ctx context.Context, cfg aws.Config) (any, error) {
 			}
 			jobsByPlan[planID] = append(jobsByPlan[planID], string(j.State))
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		jobToken = out.NextToken
 	}
 
 	for i := range plans {
@@ -927,9 +883,9 @@ func captureAthena(ctx context.Context, cfg aws.Config) (any, error) {
 	client := athena.NewFromConfig(cfg)
 
 	var summaries []athenaSummaryEntry
-	nextToken := (*string)(nil)
-	for {
-		out, err := client.ListWorkGroups(ctx, &athena.ListWorkGroupsInput{NextToken: nextToken})
+	paginator := athena.NewListWorkGroupsPaginator(client, &athena.ListWorkGroupsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -937,14 +893,10 @@ func captureAthena(ctx context.Context, cfg aws.Config) (any, error) {
 			summaries = append(summaries, athenaSummaryEntry{
 				Name:         aws.ToString(wg.Name),
 				State:        string(wg.State),
-				CreationTime: opsFormatTime(wg.CreationTime),
+				CreationTime: snapFormatTime(wg.CreationTime),
 				Description:  aws.ToString(wg.Description),
 			})
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	var workgroups []athenaWorkGroup
@@ -1030,9 +982,9 @@ func captureGlue(ctx context.Context, cfg aws.Config) (any, error) {
 	client := glue.NewFromConfig(cfg)
 
 	var jobs []glueJobInfo
-	nextToken := (*string)(nil)
-	for {
-		out, err := client.GetJobs(ctx, &glue.GetJobsInput{NextToken: nextToken})
+	paginator := glue.NewGetJobsPaginator(client, &glue.GetJobsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -1042,8 +994,8 @@ func captureGlue(ctx context.Context, cfg aws.Config) (any, error) {
 				Role:                  aws.ToString(j.Role),
 				SecurityConfiguration: aws.ToString(j.SecurityConfiguration),
 				LogUri:                aws.ToString(j.LogUri),
-				CreatedOn:             opsFormatTime(j.CreatedOn),
-				LastModifiedOn:        opsFormatTime(j.LastModifiedOn),
+				CreatedOn:             snapFormatTime(j.CreatedOn),
+				LastModifiedOn:        snapFormatTime(j.LastModifiedOn),
 				DefaultArguments:      j.DefaultArguments,
 			}
 			if j.Command != nil {
@@ -1066,16 +1018,12 @@ func captureGlue(ctx context.Context, cfg aws.Config) (any, error) {
 					r := runsOut.JobRuns[0]
 					info.LatestRunState = string(r.JobRunState)
 					info.LatestRunErrorMessage = aws.ToString(r.ErrorMessage)
-					info.LatestRunStartedOn = opsFormatTime(r.StartedOn)
+					info.LatestRunStartedOn = snapFormatTime(r.StartedOn)
 				}
 			}
 
 			jobs = append(jobs, info)
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	return glueData{Jobs: jobs}, nil
@@ -1167,7 +1115,7 @@ func captureOpenSearch(ctx context.Context, cfg aws.Config) (any, error) {
 			}
 			if ds.ServiceSoftwareOptions != nil {
 				info.ServiceSoftwareUpdateAvail = aws.ToBool(ds.ServiceSoftwareOptions.UpdateAvailable)
-				info.ServiceSoftwareAutoUpdate = opsFormatTime(ds.ServiceSoftwareOptions.AutomatedUpdateDate)
+				info.ServiceSoftwareAutoUpdate = snapFormatTime(ds.ServiceSoftwareOptions.AutomatedUpdateDate)
 			}
 			if ds.EncryptionAtRestOptions != nil {
 				info.EncryptionAtRestEnabled = aws.ToBool(ds.EncryptionAtRestOptions.Enabled)
@@ -1239,9 +1187,9 @@ func captureCF(ctx context.Context, cfg aws.Config) (any, error) {
 	client := cloudfront.NewFromConfig(cfg)
 
 	var dists []cfDistribution
-	marker := (*string)(nil)
-	for {
-		out, err := client.ListDistributions(ctx, &cloudfront.ListDistributionsInput{Marker: marker})
+	paginator := cloudfront.NewListDistributionsPaginator(client, &cloudfront.ListDistributionsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -1296,10 +1244,6 @@ func captureCF(ctx context.Context, cfg aws.Config) (any, error) {
 
 			dists = append(dists, info)
 		}
-		if out.DistributionList.IsTruncated == nil || !*out.DistributionList.IsTruncated {
-			break
-		}
-		marker = out.DistributionList.NextMarker
 	}
 
 	return cfData{Distributions: dists}, nil
@@ -1336,9 +1280,9 @@ func captureR53(ctx context.Context, cfg aws.Config) (any, error) {
 	client := route53.NewFromConfig(cfg)
 
 	var zones []r53Zone
-	marker := (*string)(nil)
-	for {
-		out, err := client.ListHostedZones(ctx, &route53.ListHostedZonesInput{Marker: marker})
+	paginator := route53.NewListHostedZonesPaginator(client, &route53.ListHostedZonesInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -1386,10 +1330,6 @@ func captureR53(ctx context.Context, cfg aws.Config) (any, error) {
 
 			zones = append(zones, zone)
 		}
-		if !out.IsTruncated {
-			break
-		}
-		marker = out.NextMarker
 	}
 
 	return r53Data{HostedZones: zones}, nil

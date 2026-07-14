@@ -84,14 +84,8 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 			{Key: "platform_version", Title: "Platform Version", Width: 18, Sortable: true},
 		},
-		Color: colorEKSCluster,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
-			return FetchEKSClustersPage(ctx, c, continuationToken)
-		},
+		Color:   colorEKSCluster,
+		Fetcher: fetcherWithClients(FetchEKSClustersPage),
 		FieldKeys: []string{
 			"cluster_name", "version", "status", "endpoint", "platform_version",
 			"arn", "health_issues_count", "health_issues", "subnet_ids",
@@ -188,9 +182,9 @@ var containersTypes = []catalog.ResourceTypeDef{
 // background fetcher pool keeps a bounded blast radius regardless of how many
 // clusters/nodegroups exist in the account.
 func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
-		return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+	c, err := svcClients(clients)
+	if err != nil {
+		return resource.FetchResult{}, err
 	}
 
 	clusterInput := &eks.ListClustersInput{MaxResults: aws.Int32(DefaultPageSize)}
@@ -291,13 +285,9 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			"scan_status", "finding_counts", "image_uri", "image_digest",
 			"repository_name",
 		},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchECRImages(ctx, c.ECR, parentCtx, continuationToken)
-		},
+		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeECRImageScanFailed, Phrase: "scan failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeECRImageCritical, Phrase: "<N> critical vulnerabilities", Severity: domain.SevBroken, Source: "wave1"},
@@ -341,26 +331,18 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			}
 			return domain.ColorHealthy
 		},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchEcsSvcTasks(ctx, c.ECS, c.ECS, parentCtx["cluster"], parentCtx["service_name"], continuationToken)
-		},
+		}),
 	},
 	{
 		Name:      "Service Events",
 		ShortName: "ecs_svc_events",
 		Columns:   resource.EcsSvcEventColumns(),
 		FieldKeys: []string{"timestamp", "message"},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchEcsSvcEvents(ctx, c.ECS, parentCtx["cluster"], parentCtx["service_name"], continuationToken)
-		},
+		}),
 	},
 	{
 		Name:      "Service Logs",
@@ -368,13 +350,9 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		Columns:   resource.EcsSvcLogColumns(),
 		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{"timestamp", "stream_short", "message"},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchEcsSvcLogs(ctx, c.ECS, c.CloudWatchLogs, parentCtx["cluster"], parentCtx["service_name"], parentCtx["task_definition"], continuationToken)
-		},
+		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeCWLogError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeCWLogWarn, Phrase: "warning", Severity: domain.SevWarn, Source: "wave1"},

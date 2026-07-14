@@ -21,25 +21,6 @@ const rtbCodeBlackholeRoute domain.FindingCode = "rtb.route.blackhole"
 // table with zero subnet associations — unreachable, likely orphaned.
 const rtbCodeOrphanUnassociated domain.FindingCode = "rtb.orphan-unassociated"
 
-// FetchRouteTables calls the EC2 DescribeRouteTables API and converts the
-// response into a slice of generic Resource structs.
-func FetchRouteTables(ctx context.Context, api EC2DescribeRouteTablesAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchRouteTablesPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchRouteTablesPage fetches a single page of route tables.
 func FetchRouteTablesPage(ctx context.Context, api EC2DescribeRouteTablesAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &ec2.DescribeRouteTablesInput{

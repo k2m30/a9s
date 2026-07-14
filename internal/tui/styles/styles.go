@@ -10,13 +10,9 @@ import (
 
 // Composed styles built from the Tokyo Night Dark palette.
 var (
-	HeaderStyle    lipgloss.Style
 	TableHeader    lipgloss.Style
 	RowSelected    lipgloss.Style
 	RowNormal      lipgloss.Style
-	RowAlt         lipgloss.Style
-	BorderNormal   lipgloss.Style
-	BorderFocused  lipgloss.Style
 	DetailKey      lipgloss.Style
 	DetailVal      lipgloss.Style
 	DetailSection  lipgloss.Style
@@ -24,14 +20,11 @@ var (
 	FlashError     lipgloss.Style
 	FilterActive   lipgloss.Style
 	DimText        lipgloss.Style
-	SpinnerStyle   lipgloss.Style
 	NavigableField lipgloss.Style
 	ColSepDim      lipgloss.Style // │ separator when left column is focused
 	ColSepAccent   lipgloss.Style // │ separator when right column is focused
 
-	StatusCheckFailed lipgloss.Style // "!" glyph — RED bold (impaired)
-	StatusCheckWarn   lipgloss.Style // "~" glyph — YELLOW (initializing)
-	StatusCheckOk     lipgloss.Style // GREEN (ok values in detail view)
+	StatusCheckOk lipgloss.Style // GREEN (ok values in detail view)
 
 	// CostGrowthSoft/CostGrowthStrong/CostDropSoft/CostDropStrong are the
 	// Cost Explorer grid's 4-tier delta coloring (costs.DeltaTag
@@ -48,9 +41,6 @@ var (
 	FindingSectionStopped lipgloss.Style // bold + red — used for "!" tier sections
 	FindingSectionPending lipgloss.Style // bold + yellow — used for "~" tier sections
 	FindingSectionDefault lipgloss.Style // bold — used for sections with no tier
-
-	// BannerInfo is the style for informational banners in the resource list view.
-	BannerInfo lipgloss.Style
 
 	HelpCatStyle         lipgloss.Style
 	HelpKeyStyle         lipgloss.Style
@@ -132,13 +122,9 @@ func Reinit() {
 
 func initStyles() {
 	// Reset all styles to zero values first.
-	HeaderStyle = lipgloss.Style{}
 	TableHeader = lipgloss.Style{}
 	RowSelected = lipgloss.Style{}
 	RowNormal = lipgloss.Style{}
-	RowAlt = lipgloss.Style{}
-	BorderNormal = lipgloss.Style{}
-	BorderFocused = lipgloss.Style{}
 	DetailKey = lipgloss.Style{}
 	DetailVal = lipgloss.Style{}
 	DetailSection = lipgloss.Style{}
@@ -146,12 +132,9 @@ func initStyles() {
 	FlashError = lipgloss.Style{}
 	FilterActive = lipgloss.Style{}
 	DimText = lipgloss.Style{}
-	SpinnerStyle = lipgloss.Style{}
 	NavigableField = lipgloss.Style{}
 	ColSepDim = lipgloss.Style{}
 	ColSepAccent = lipgloss.Style{}
-	StatusCheckFailed = lipgloss.Style{}
-	StatusCheckWarn = lipgloss.Style{}
 	StatusCheckOk = lipgloss.Style{}
 	CostGrowthSoft = lipgloss.Style{}
 	CostGrowthStrong = lipgloss.Style{}
@@ -160,7 +143,6 @@ func initStyles() {
 	FindingSectionStopped = lipgloss.Style{}
 	FindingSectionPending = lipgloss.Style{}
 	FindingSectionDefault = lipgloss.Style{}
-	BannerInfo = lipgloss.Style{}
 	HelpCatStyle = lipgloss.Style{}
 	HelpKeyStyle = lipgloss.Style{}
 	HelpDescStyle = lipgloss.Style{}
@@ -197,13 +179,9 @@ func initStyles() {
 		return
 	}
 
-	HeaderStyle = lipgloss.NewStyle().Padding(0, 1)
 	TableHeader = lipgloss.NewStyle().Foreground(ColAccent).Bold(true)
 	RowSelected = lipgloss.NewStyle().Background(ColRowSelectedBg).Foreground(ColRowSelectedFg).Bold(true)
 	RowNormal = lipgloss.NewStyle().Foreground(ColHeaderFg)
-	RowAlt = lipgloss.NewStyle().Foreground(ColHeaderFg).Background(ColRowAltBg)
-	BorderNormal = lipgloss.NewStyle().Foreground(ColBorder)
-	BorderFocused = lipgloss.NewStyle().Foreground(ColAccent)
 	DetailKey = lipgloss.NewStyle().Foreground(ColDetailKey)
 	DetailVal = lipgloss.NewStyle().Foreground(ColDetailVal)
 	DetailSection = lipgloss.NewStyle().Foreground(ColDetailSec).Bold(true)
@@ -211,12 +189,9 @@ func initStyles() {
 	FlashError = lipgloss.NewStyle().Foreground(ColError).Bold(true)
 	FilterActive = lipgloss.NewStyle().Foreground(ColFilter).Bold(true)
 	DimText = lipgloss.NewStyle().Foreground(ColDim)
-	SpinnerStyle = lipgloss.NewStyle().Foreground(ColSpinner)
 	NavigableField = lipgloss.NewStyle().Foreground(ColAccent).Underline(true)
 	ColSepDim = lipgloss.NewStyle().Foreground(ColBorder)
 	ColSepAccent = lipgloss.NewStyle().Foreground(ColAccent)
-	StatusCheckFailed = lipgloss.NewStyle().Foreground(ColStopped).Bold(true)
-	StatusCheckWarn = lipgloss.NewStyle().Foreground(ColPending)
 	StatusCheckOk = lipgloss.NewStyle().Foreground(ColRunning)
 	CostGrowthSoft = lipgloss.NewStyle().Foreground(ColStopped).Faint(true)
 	CostGrowthStrong = lipgloss.NewStyle().Foreground(ColStopped).Bold(true)
@@ -225,5 +200,4 @@ func initStyles() {
 	FindingSectionStopped = lipgloss.NewStyle().Bold(true).Foreground(ColStopped)
 	FindingSectionPending = lipgloss.NewStyle().Bold(true).Foreground(ColPending)
 	FindingSectionDefault = lipgloss.NewStyle().Bold(true)
-	BannerInfo = lipgloss.NewStyle().Foreground(ColPending).Italic(true)
 }

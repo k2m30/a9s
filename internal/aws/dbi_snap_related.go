@@ -23,7 +23,7 @@ func checkDBISnapDBI(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	dbName := *snap.DBInstanceIdentifier
 
-	dbiList, truncated, err := dbiSnapRelatedResources(ctx, clients, cache, "dbi")
+	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
 	if err != nil {
 		return resource.ErrorRelated("dbi", err)
 	}
@@ -60,7 +60,7 @@ func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 
-	kmsList, truncated, err := dbiSnapRelatedResources(ctx, clients, cache, "kms")
+	kmsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "kms")
 	if err != nil {
 		return resource.ErrorRelated("kms", err)
 	}
@@ -75,17 +75,6 @@ func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	return relatedResultTrunc("kms", ids, truncated)
-}
-
-// dbiSnapRelatedResources returns cached resources for the target type, or fetches the first page.
-func dbiSnapRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 // checkDBISnapBackup resolves AWS Backup PLANS that cover this RDS snapshot's
@@ -122,7 +111,7 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 
 	// Resolve parent DBInstanceArn via the dbi cache. If the cache isn't loaded,
 	// the parent ARN is unavailable and the answer is genuinely unknown.
-	dbiList, _, err := dbiSnapRelatedResources(ctx, clients, cache, "dbi")
+	dbiList, _, err := relatedResourcesFor(ctx, clients, cache, "dbi")
 	if err != nil {
 		return resource.ErrorRelated("backup", err)
 	}
@@ -147,7 +136,7 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
 	}
 
-	planList, truncated, err := dbiSnapRelatedResources(ctx, clients, cache, "backup")
+	planList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.ErrorRelated("backup", err)
 	}

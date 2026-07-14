@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"gopkg.in/ini.v1"
 )
 
 // DefaultConfigPath returns the AWS config file path.
@@ -49,28 +47,15 @@ func ListProfiles(configPath string) ([]string, error) {
 // Sections prefixed with "profile " have the prefix stripped.
 // The "default" or "DEFAULT" section maps to "default".
 func parseConfigProfiles(path string, seen map[string]bool) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil
-	}
-
-	cfg, err := ini.LoadSources(ini.LoadOptions{
-		Insensitive:     false,
-		AllowShadows:    true,
-		Loose:           true,
-		InsensitiveKeys: true,
-	}, path)
+	sections, err := parseINISections(path)
 	if err != nil {
 		return err
 	}
 
-	for _, section := range cfg.Sections() {
-		name := section.Name()
+	for _, section := range sections {
+		name := section.name
 		if name == "DEFAULT" || name == "default" {
 			seen["default"] = true
-			continue
-		}
-		// Skip ini's built-in DEFAULT section if empty
-		if name == ini.DefaultSection {
 			continue
 		}
 		// Config file uses "profile <name>" prefix

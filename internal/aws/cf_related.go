@@ -26,7 +26,7 @@ func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache re
 		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
 	}
 
-	s3List, truncated, err := cfRelatedResources(ctx, clients, cache, "s3")
+	s3List, truncated, err := relatedResourcesFor(ctx, clients, cache, "s3")
 	if err != nil {
 		return resource.ErrorRelated("s3", err)
 	}
@@ -86,7 +86,7 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
 
-	elbList, truncated, err := cfRelatedResources(ctx, clients, cache, "elb")
+	elbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
 	if err != nil {
 		return resource.ErrorRelated("elb", err)
 	}
@@ -116,7 +116,7 @@ func checkCfWAF(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	webACLID := *dist.WebACLId
 
-	wafList, truncated, err := cfRelatedResources(ctx, clients, cache, "waf")
+	wafList, truncated, err := relatedResourcesFor(ctx, clients, cache, "waf")
 	if err != nil {
 		return resource.ErrorRelated("waf", err)
 	}
@@ -145,7 +145,7 @@ func checkCfACM(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	certARN := *dist.ViewerCertificate.ACMCertificateArn
 
-	acmList, truncated, err := cfRelatedResources(ctx, clients, cache, "acm")
+	acmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "acm")
 	if err != nil {
 		return resource.ErrorRelated("acm", err)
 	}
@@ -186,7 +186,7 @@ func checkCfR53(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
 	}
 
-	zoneList, truncated, err := cfRelatedResources(ctx, clients, cache, "r53")
+	zoneList, truncated, err := relatedResourcesFor(ctx, clients, cache, "r53")
 	if err != nil {
 		return resource.ErrorRelated("r53", err)
 	}
@@ -258,7 +258,7 @@ func checkCfAlarm(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := cfRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -373,16 +373,4 @@ func checkCfLogs(ctx context.Context, clients any, res resource.Resource, _ reso
 		bucket = bucket[:idx]
 	}
 	return relatedResult("logs", []string{bucket})
-}
-
-// cfRelatedResources returns the resource list for target from cache or by
-// fetching the first page via the registered paginated fetcher.
-func cfRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

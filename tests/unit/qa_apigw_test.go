@@ -11,6 +11,7 @@ import (
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -42,7 +43,9 @@ func TestFetchAPIGateways_ParsesMultiple(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAPIGateways(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAPIGatewaysPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -99,7 +102,9 @@ func TestFetchAPIGateways_RawStructPopulated(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAPIGateways(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAPIGatewaysPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -122,7 +127,9 @@ func TestFetchAPIGateways_ErrorResponse(t *testing.T) {
 		err: fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchAPIGateways(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAPIGatewaysPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -138,7 +145,9 @@ func TestFetchAPIGateways_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAPIGateways(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAPIGatewaysPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

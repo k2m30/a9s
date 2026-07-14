@@ -26,7 +26,7 @@ func checkSSMKMS(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	keyRef := *param.KeyId
 
-	kmsList, truncated, err := ssmRelatedResources(ctx, clients, cache, "kms")
+	kmsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "kms")
 	if err != nil {
 		return resource.ErrorRelated("kms", err)
 	}
@@ -67,16 +67,4 @@ func matchesKMSKeyRef(kmsRes resource.Resource, keyRef string) bool {
 		return true
 	}
 	return false
-}
-
-// ssmRelatedResources returns the cached resource list for the given target type,
-// or fetches the first page via the registered paginated fetcher.
-func ssmRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

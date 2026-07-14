@@ -12,25 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchEventBridgeRules calls the EventBridge ListRules API and converts
-// the response into a slice of generic Resource structs.
-func FetchEventBridgeRules(ctx context.Context, api EventBridgeListRulesAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchEventBridgeRulesPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchEventBridgeRulesPage fetches a single page of EventBridge rules.
 func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &eventbridge.ListRulesInput{

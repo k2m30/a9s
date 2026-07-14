@@ -20,7 +20,7 @@ func checkRedshiftAlarms(ctx context.Context, clients any, res resource.Resource
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := redshiftRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -129,7 +129,7 @@ func checkRedshiftCFN(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 
-	cfnList, truncated, err := redshiftRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -164,7 +164,7 @@ func checkRedshiftSecrets(ctx context.Context, clients any, res resource.Resourc
 	}
 	secretARN := *cluster.MasterPasswordSecretArn
 
-	secretList, truncated, err := redshiftRelatedResources(ctx, clients, cache, "secrets")
+	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
 		return resource.ErrorRelated("secrets", err)
 	}
@@ -289,15 +289,4 @@ func redshiftLoggingStatus(ctx context.Context, clients any, res resource.Resour
 			ClusterIdentifier: &clusterID,
 		})
 	})
-}
-
-// redshiftRelatedResources returns the resource list for target from cache or by fetching the first page.
-func redshiftRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

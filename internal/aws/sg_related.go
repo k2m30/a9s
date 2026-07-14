@@ -30,7 +30,7 @@ func checkSGEC2(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
 	}
 
-	list, truncated, err := sgRelatedResources(ctx, clients, cache, "ec2")
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "ec2")
 	if err != nil {
 		return resource.ErrorRelated("ec2", err)
 	}
@@ -62,7 +62,7 @@ func checkSGENI(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "eni", Count: 0}
 	}
 
-	list, truncated, err := sgRelatedResources(ctx, clients, cache, "eni")
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "eni")
 	if err != nil {
 		return resource.ErrorRelated("eni", err)
 	}
@@ -94,7 +94,7 @@ func checkSGELB(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
 
-	list, truncated, err := sgRelatedResources(ctx, clients, cache, "elb")
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "elb")
 	if err != nil {
 		return resource.ErrorRelated("elb", err)
 	}
@@ -138,7 +138,7 @@ func checkSGSG(ctx context.Context, clients any, res resource.Resource, cache re
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
 	}
 
-	list, truncated, err := sgRelatedResources(ctx, clients, cache, "sg")
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "sg")
 	if err != nil {
 		return resource.ErrorRelated("sg", err)
 	}
@@ -170,7 +170,7 @@ func checkSGLambda(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 	}
 
-	list, truncated, err := sgRelatedResources(ctx, clients, cache, "lambda")
+	list, truncated, err := relatedResourcesFor(ctx, clients, cache, "lambda")
 	if err != nil {
 		return resource.ErrorRelated("lambda", err)
 	}
@@ -207,14 +207,3 @@ func sgReferencedInPermissions(perms []ec2types.IpPermission, sgID string) bool 
 	return false
 }
 
-// sgRelatedResources returns the resource list for target from cache or fetches
-// the first page via the registered paginated fetcher.
-func sgRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
-}

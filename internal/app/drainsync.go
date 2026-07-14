@@ -44,15 +44,6 @@ func DrainSyncContext(ctx context.Context, c *Controller, pending []runtime.Task
 	DrainSyncContextProgress(ctx, c, pending, nil)
 }
 
-// DrainSyncProgress is like DrainSync but invokes onEvent after each handled
-// event, letting a caller push incremental UI updates (e.g. SSE notifications)
-// as results arrive instead of only once at the end. This is what keeps a live
-// (non-demo) web session's menu filling in progressively rather than staying
-// blank for the entire — slow — availability drain. onEvent may be nil.
-func DrainSyncProgress(c *Controller, pending []runtime.TaskRequest, onEvent func()) {
-	DrainSyncContextProgress(context.Background(), c, pending, onEvent)
-}
-
 // DrainSyncContextProgress is the context-aware progress variant. The loop is
 // identical to the plain drain but calls onEvent (when non-nil) after each
 // event is handled, so the controller state is observable as it fills in.
@@ -116,8 +107,8 @@ func DrainSyncContextProgress(ctx context.Context, c *Controller, pending []runt
 // This is the fix for the "whole sweep dies at 60s" defect: a live web
 // availability sweep (identity + cache load + Wave-1 probes + Wave-2
 // enrichments, on the order of 100+ tasks) previously shared ONE
-// context.WithTimeout(60s) umbrella across the entire DrainSyncProgress call
-// (DrainSyncContextProgress with a deadline-bearing ctx). Once that single
+// context.WithTimeout(60s) umbrella across the entire DrainSyncContextProgress
+// call (with a deadline-bearing ctx). Once that single
 // deadline expired, every remaining queued task failed with
 // context.DeadlineExceeded and was dropped — silently, because a task error
 // was (and still is, for callers of the other Drain* variants) just
@@ -237,7 +228,7 @@ func DrainSyncPerTaskTimeout(
 // after the response has already been written.
 //
 // onEvent fires once per executed (blocking) task result — mirroring
-// DrainSyncProgress semantics — and is never invoked for tasks that were
+// DrainSyncContextProgress semantics — and is never invoked for tasks that were
 // deferred as background without executing. onEvent may be nil.
 func DrainSyncPartition(
 	ctx context.Context,

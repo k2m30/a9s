@@ -11,6 +11,7 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -69,7 +70,9 @@ func TestFetchECSServices_ParsesMultipleServices(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchECSServices(context.Background(), listClustersMock, listServicesMock, describeServicesMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSServicesPage(context.Background(), listClustersMock, listServicesMock, describeServicesMock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -144,7 +147,9 @@ func TestFetchECSServices_ListClustersError(t *testing.T) {
 	listServicesMock := &mockECSListServicesClient{}
 	describeServicesMock := &mockECSDescribeServicesClient{}
 
-	resources, err := awsclient.FetchECSServices(context.Background(), listClustersMock, listServicesMock, describeServicesMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSServicesPage(context.Background(), listClustersMock, listServicesMock, describeServicesMock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -180,7 +185,9 @@ func TestFetchECSServices_ClusterNameExtractedFromARN(t *testing.T) {
 			},
 		}
 
-		resources, err := awsclient.FetchECSServices(context.Background(), listClustersMock, listServicesMock, describeServicesMock)
+		resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+			return awsclient.FetchECSServicesPage(context.Background(), listClustersMock, listServicesMock, describeServicesMock, token)
+		})
 		if err != nil {
 			t.Fatalf("arn=%q: unexpected error: %v", tc.arn, err)
 		}
@@ -199,7 +206,9 @@ func TestFetchECSServices_EmptyResponse(t *testing.T) {
 	listServicesMock := &mockECSListServicesClient{}
 	describeServicesMock := &mockECSDescribeServicesClient{}
 
-	resources, err := awsclient.FetchECSServices(context.Background(), listClustersMock, listServicesMock, describeServicesMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSServicesPage(context.Background(), listClustersMock, listServicesMock, describeServicesMock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

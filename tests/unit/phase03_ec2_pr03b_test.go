@@ -60,7 +60,9 @@ func TestEC2Fetcher_RunningStateEmitsNoFinding(t *testing.T) {
 		},
 	})
 
-	resources, err := awsclient.FetchEC2Instances(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchEC2Instances: unexpected error: %v", err)
 	}
@@ -100,7 +102,9 @@ func TestEC2Fetcher_PendingStateEmitsWarnFinding(t *testing.T) {
 		},
 	})
 
-	resources, err := awsclient.FetchEC2Instances(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchEC2Instances: unexpected error: %v", err)
 	}
@@ -108,7 +112,6 @@ func TestEC2Fetcher_PendingStateEmitsWarnFinding(t *testing.T) {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
 	r := resources[0]
-
 
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for pending state", len(r.Findings))
@@ -152,7 +155,9 @@ func TestEC2Fetcher_StoppedServerEmitsBrokenFinding(t *testing.T) {
 		},
 	})
 
-	resources, err := awsclient.FetchEC2Instances(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchEC2Instances: unexpected error: %v", err)
 	}
@@ -160,7 +165,6 @@ func TestEC2Fetcher_StoppedServerEmitsBrokenFinding(t *testing.T) {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
 	r := resources[0]
-
 
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for stopped+Server.* state", len(r.Findings))
@@ -197,7 +201,9 @@ func TestEC2Fetcher_StoppedUserEmitsWarnFinding(t *testing.T) {
 		},
 	})
 
-	resources, err := awsclient.FetchEC2Instances(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchEC2Instances: unexpected error: %v", err)
 	}
@@ -252,7 +258,9 @@ func TestEC2Fetcher_TerminatedEmitsDimFinding(t *testing.T) {
 		},
 	})
 
-	resources, err := awsclient.FetchEC2Instances(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchEC2Instances: unexpected error: %v", err)
 	}
@@ -412,7 +420,9 @@ func TestEC2Fetcher_StoppingStateEmitsWarnFinding(t *testing.T) {
 		},
 	})
 
-	resources, err := awsclient.FetchEC2Instances(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchEC2Instances: unexpected error: %v", err)
 	}

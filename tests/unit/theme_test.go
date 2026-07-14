@@ -9,8 +9,8 @@ import (
 
 	lipgloss "charm.land/lipgloss/v2"
 
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/styles/themes"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
@@ -685,11 +685,19 @@ func TestApplyTheme_WithNoColorEmpty_ProducesMonochrome(t *testing.T) {
 // ===========================================================================
 
 func TestDefaultActiveTheme_TokyoNightMarkedCurrent(t *testing.T) {
-	k := keys.Default()
-	m := views.NewTheme([]string{"tokyo-night.yaml", "dracula.yaml"}, "tokyo-night.yaml", k)
-	m.SetSize(80, 24)
+	// views.NewTheme/View are DEAD per specs/022-codebase-cleanup/wave3-map-text.md;
+	// retargeted onto NewTransientSelector + app.SelectorBody + RenderSelector.
+	themeFiles := []string{"tokyo-night.yaml", "dracula.yaml"}
+	body := app.SelectorBody{
+		Items:      themeFiles,
+		Selected:   0,
+		AllItems:   themeFiles,
+		ActiveItem: "tokyo-night.yaml",
+		Title:      "themes",
+	}
+	m := views.NewTransientSelector(80, 24)
 
-	plain := stripANSI(m.View())
+	plain := stripANSI(m.RenderSelector(body))
 
 	found := false
 	for line := range strings.SplitSeq(plain, "\n") {

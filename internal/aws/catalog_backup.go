@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -35,13 +34,9 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		// Wave 2 enricher surfaces plans whose recent backup jobs have
 		// failed — Wave 1 list is declarative config.
 		Color: colorBackup,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchBackupPlansPage(ctx, c.Backup, continuationToken)
-		},
+		}),
 		Wave2: IssueEnricher{Fn: EnrichBackupJobs, Priority: 100},
 		// selection_tags — required for the ec2:backup and ebs:backup
 		// related-panel pivots (tag-based selection cross-ref).
@@ -70,13 +65,9 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 			"timestamp", "logical_resource_id", "resource_type",
 			"resource_status", "resource_status_reason",
 		},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchCfnEvents(ctx, c.CloudFormation, parentCtx["stack_name"], continuationToken)
-		},
+		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeCfnEventFailed, Phrase: "<status, lowercased>", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeCfnEventInProgress, Phrase: "<status, lowercased>", Severity: domain.SevWarn, Source: "wave1"},
@@ -92,13 +83,9 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 			"logical_resource_id", "physical_resource_id", "resource_type",
 			"resource_status", "drift_status", "last_updated",
 		},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchCfnResources(ctx, c.CloudFormation, parentCtx["stack_name"], continuationToken)
-		},
+		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeCfnResourceFailed, Phrase: "<status, lowercased>", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeCfnResourceInProgress, Phrase: "<status, lowercased>", Severity: domain.SevWarn, Source: "wave1"},

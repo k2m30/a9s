@@ -95,27 +95,6 @@ func computeDBCSnapFindings(snap docdbtypes.DBClusterSnapshot) []domain.Finding 
 	return findings
 }
 
-// FetchDocDBClusterSnapshots calls the DocumentDB DescribeDBClusterSnapshots API and converts the
-// response into a slice of generic Resource structs. This covers DocumentDB cluster
-// snapshots only (docdb@v1.48.12/api_op_DescribeDBClusterSnapshots.go:14).
-// Aurora + Multi-AZ snapshots are fetched separately via FetchRDSDBClusterSnapshotsPage.
-func FetchDocDBClusterSnapshots(ctx context.Context, api DocDBDescribeDBClusterSnapshotsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchDocDBClusterSnapshotsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchDocDBClusterSnapshotsPage fetches a single page of DocumentDB cluster snapshots.
 func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClusterSnapshotsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &docdb.DescribeDBClusterSnapshotsInput{

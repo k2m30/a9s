@@ -28,25 +28,6 @@ const ssmCodePlaintextSensitive domain.FindingCode = "ssm.value.plaintext-sensit
 // not been modified in over 365 days.
 const ssmCodeStaleValue domain.FindingCode = "ssm.value.stale"
 
-// FetchSSMParameters calls the SSM DescribeParameters API and returns all pages
-// of parameters. Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchSSMParameters(ctx context.Context, api SSMDescribeParametersAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchSSMParametersPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchSSMParametersPage calls the SSM DescribeParameters API and returns a single
 // page of parameters. Pass an empty continuationToken for the first page.
 func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, continuationToken string) (resource.FetchResult, error) {

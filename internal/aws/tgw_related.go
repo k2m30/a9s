@@ -67,7 +67,7 @@ func checkTGWRTB(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "rtb", Count: 0}
 	}
 
-	rtbList, truncated, err := tgwRelatedResources(ctx, clients, cache, "rtb")
+	rtbList, truncated, err := relatedResourcesFor(ctx, clients, cache, "rtb")
 	if err != nil {
 		return resource.ErrorRelated("rtb", err)
 	}
@@ -167,16 +167,4 @@ func checkTGWSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 		}
 	}
 	return relatedResult("subnet", ids)
-}
-
-// tgwRelatedResources returns the cached resource list for the given target type,
-// or fetches the first page via the registered paginated fetcher.
-func tgwRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

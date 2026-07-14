@@ -211,7 +211,9 @@ func TestECR_Related_ECSTask_ResolvesViaRealFetcherOutput(t *testing.T) {
 	listTasksAPI := &fakeECSListTasksOnly{taskArns: []string{*task.TaskArn}}
 	describeTasksAPI := &fakeECSDescribeTasksWithImage{tasks: []ecstypes.Task{task}}
 
-	resources, err := awsclient.FetchECSTasks(context.Background(), listClustersAPI, listTasksAPI, describeTasksAPI)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSTasksPage(context.Background(), listClustersAPI, listTasksAPI, describeTasksAPI, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchECSTasks returned error: %v", err)
 	}

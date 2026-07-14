@@ -80,7 +80,7 @@ func checkRTBCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 
-	cfnList, truncated, err := rtbRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -172,7 +172,7 @@ func checkRTBVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
 	}
 
-	vpceList, truncated, err := rtbRelatedResources(ctx, clients, cache, "vpce")
+	vpceList, truncated, err := relatedResourcesFor(ctx, clients, cache, "vpce")
 	if err != nil {
 		return resource.ErrorRelated("vpce", err)
 	}
@@ -190,16 +190,4 @@ func checkRTBVPCE(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	return relatedResultTrunc("vpce", ids, truncated)
-}
-
-// rtbRelatedResources returns the resource list for target from cache or fetches
-// the first page via the registered paginated fetcher.
-func rtbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

@@ -7,7 +7,7 @@ package session
 
 import "sync"
 
-// IdentityStore is a session-scoped cache for the AWS caller's account ID.
+// identityStore is a session-scoped cache for the AWS caller's account ID.
 // Pattern C related-checkers (e.g. Backup ListRecoveryPointsByResource, Glue
 // GetTags) need the caller's account to construct ARNs; this store memoizes
 // the STS GetCallerIdentity result for the lifetime of one Session.
@@ -17,58 +17,40 @@ import "sync"
 // and skip the STS call rather than thrashing on a permission error every
 // related-check pass. Session.Rotate() clears both on profile/region switch.
 //
-// Implementations must be safe for concurrent use.
-type IdentityStore interface {
-	// AccountID returns the cached AWS account ID, or "" if no successful
-	// fetch has been recorded.
-	AccountID() string
-
-	// Err returns the cached error from the last fetch attempt. Non-nil
-	// means a prior call failed AND the failure is sticky — callers must
-	// not retry until Clear() is invoked (e.g. via Session.Rotate).
-	Err() error
-
-	// Set records the result of a fetch. id == "" + err == nil is invalid
-	// (use Clear() instead). On success: id non-empty, err nil. On failure:
-	// id empty, err non-nil.
-	//
-	// Concurrent-safety contract: a failure-flavored Set (id == "" + err !=
-	// nil) is silently DROPPED if AccountID() is already non-empty. This
-	// prevents a slow-failing Pattern-C check from overwriting a successful
-	// AccountID written by an earlier-completing concurrent fetch — naive
-	// last-writer-wins would otherwise poison the cache for the rest of
-	// the session. Successful Set (id != "") always overwrites — this
-	// preserves the "Clear then transient-error then retry succeeds" path.
-	Set(id string, err error)
-
-	// Clear resets the cache so the next call falls through to a fresh
-	// fetch. Called by Session.Rotate on profile/region switch.
-	Clear()
-}
-
+// Safe for concurrent use. internal/aws consumes it via its own local
+// structural interface (identityStore in internal/aws/client.go) rather than
+// importing this type, so the method set below is the real contract.
 type identityStore struct {
 	mu        sync.RWMutex
 	accountID string
 	err       error
 }
 
-// NewIdentityStore returns a new thread-safe IdentityStore.
-func NewIdentityStore() IdentityStore {
+// NewIdentityStore returns a new thread-safe identityStore.
+func NewIdentityStore() *identityStore {
 	return &identityStore{}
 }
 
+// AccountID returns the cached AWS account ID, or "" if no successful fetch
+// has been recorded.
 func (s *identityStore) AccountID() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.accountID
 }
 
+// Err returns the cached error from the last fetch attempt. Non-nil means a
+// prior call failed AND the failure is sticky — callers must not retry until
+// Clear() is invoked (e.g. via Session.Rotate).
 func (s *identityStore) Err() error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.err
 }
 
+// Set records the result of a fetch. id == "" + err == nil is invalid (use
+// Clear() instead). On success: id non-empty, err nil. On failure: id empty,
+// err non-nil.
 func (s *identityStore) Set(id string, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -85,6 +67,8 @@ func (s *identityStore) Set(id string, err error) {
 	s.err = err
 }
 
+// Clear resets the cache so the next call falls through to a fresh fetch.
+// Called by Session.Rotate on profile/region switch.
 func (s *identityStore) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

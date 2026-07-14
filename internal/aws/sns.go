@@ -10,25 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchSNSTopics calls the SNS ListTopics API and returns all pages of topics.
-// Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchSNSTopics(ctx context.Context, api SNSListTopicsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchSNSTopicsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchSNSTopicsPage calls the SNS ListTopics API and returns a single page
 // of topics. Pass an empty continuationToken for the first page.
 func FetchSNSTopicsPage(ctx context.Context, api SNSListTopicsAPI, continuationToken string) (resource.FetchResult, error) {

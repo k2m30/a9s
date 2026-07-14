@@ -28,7 +28,7 @@ func checkKMSEBS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "ebs", Count: 0}
 	}
 
-	ebsList, truncated, err := kmsRelatedResources(ctx, clients, cache, "ebs")
+	ebsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs")
 	if err != nil {
 		return resource.ErrorRelated("ebs", err)
 	}
@@ -59,7 +59,7 @@ func checkKMSRDS(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
 	}
 
-	dbiList, truncated, err := kmsRelatedResources(ctx, clients, cache, "dbi")
+	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
 	if err != nil {
 		return resource.ErrorRelated("dbi", err)
 	}
@@ -91,7 +91,7 @@ func checkKMSSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
 	}
 
-	secretsList, truncated, err := kmsRelatedResources(ctx, clients, cache, "secrets")
+	secretsList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
 		return resource.ErrorRelated("secrets", err)
 	}
@@ -128,18 +128,6 @@ func kmsIDMatches(ref, keyID string) bool {
 		return ref[idx+1:] == keyID
 	}
 	return false
-}
-
-// kmsRelatedResources returns the resource list for target from cache or by
-// fetching the first page via the registered paginated fetcher.
-func kmsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 // kmsIAMPolicyDoc is a minimal IAM policy document used for parsing Principal.AWS fields.

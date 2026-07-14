@@ -19,25 +19,6 @@ const CodeSNSSubPendingConfirmation domain.FindingCode = "sns-sub.state.pending-
 // endpoint has been deleted.
 const CodeSNSSubDeleted domain.FindingCode = "sns-sub.state.deleted"
 
-// FetchSNSSubscriptions calls the SNS ListSubscriptions API and converts the
-// response into a slice of generic Resource structs.
-func FetchSNSSubscriptions(ctx context.Context, api SNSListSubscriptionsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchSNSSubscriptionsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchSNSSubscriptionsPage fetches a single page of SNS subscriptions.
 func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &sns.ListSubscriptionsInput{}

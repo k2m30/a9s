@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
@@ -60,13 +59,9 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			DisplayNameKey: "job_name",
 		}},
 		Color: colorGlue,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchGlueJobsPage(ctx, c.Glue, continuationToken)
-		},
+		}),
 		Wave2:     IssueEnricher{Fn: EnrichGlueJobStatus, Priority: 10},
 		FieldKeys: []string{"job_name", "glue_version", "worker_type", "num_workers", "last_modified"},
 		Related: []domain.RelatedDef{
@@ -101,13 +96,9 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Key: "engine_version", Title: "Engine", Width: 28, Sortable: true},
 		},
 		Color: colorAthena,
-		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchAthenaWorkgroupsPage(ctx, c.Athena, continuationToken)
-		},
+		}),
 		Wave2:     IssueEnricher{Fn: EnrichAthenaWorkGroup, Priority: 100},
 		FieldKeys: []string{"workgroup_name", "state", "description", "engine_version", "result_output_location"},
 		Related: []domain.RelatedDef{
@@ -136,13 +127,9 @@ var dataChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			"execution_time_human", "error_message", "dpu_hours",
 			"run_id", "job_name",
 		},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchGlueJobRuns(ctx, c.Glue, parentCtx["job_name"], continuationToken)
-		},
+		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeGlueRunFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeGlueRunTimeout, Phrase: "timeout", Severity: domain.SevBroken, Source: "wave1"},
@@ -191,12 +178,8 @@ var dataChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			}
 			return map[string]string{"bucket": "", "prefix": ""}
 		},
-		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			c, ok := clients.(*ServiceClients)
-			if !ok || c == nil {
-				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-			}
+		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchS3Objects(ctx, c.S3, parentCtx["bucket"], parentCtx["prefix"], continuationToken)
-		},
+		}),
 	},
 }

@@ -11,6 +11,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -47,7 +48,9 @@ func TestFetchEBEnvironments_ParsesMultipleEnvironments(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEBEnvironments(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBEnvironmentsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -114,7 +117,9 @@ func TestFetchEBEnvironments_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEBEnvironments(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBEnvironmentsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -129,7 +134,9 @@ func TestFetchEBEnvironments_APIError(t *testing.T) {
 		err: &mockAPIError{code: "InvalidParameterValue", message: "invalid"},
 	}
 
-	_, err := awsclient.FetchEBEnvironments(context.Background(), mock)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEBEnvironmentsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

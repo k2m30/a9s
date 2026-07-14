@@ -7,8 +7,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -19,8 +19,8 @@ import (
 // ctEventsEC2Resource returns a test EC2 resource with an ARN field.
 func ctEventsEC2Resource() resource.Resource {
 	return resource.Resource{
-		ID:     "i-test",
-		Name:   "test-instance",
+		ID:   "i-test",
+		Name: "test-instance",
 		Fields: map[string]string{
 			"arn": "arn:aws:ec2:us-east-1:000000000000:instance/i-test",
 		},
@@ -105,8 +105,8 @@ func TestResourceList_TKey_IAMUser_UsesUsername(t *testing.T) {
 		ResourceType: "iam-user",
 		Resources: []resource.Resource{
 			{
-				ID:     "test-user",
-				Name:   "test-user",
+				ID:   "test-user",
+				Name: "test-user",
 				Fields: map[string]string{
 					"user_name": "test-user",
 				},
@@ -129,62 +129,6 @@ func TestResourceList_TKey_IAMUser_UsesUsername(t *testing.T) {
 	}
 }
 
-// TestDetail_TKey_EmitsRelatedNavigateMsg verifies that pressing "t" in a
-// DetailModel emits a RelatedNavigateMsg with TargetType "ct-events".
-func TestDetail_TKey_EmitsRelatedNavigateMsg(t *testing.T) {
-	res := ctEventsEC2Resource()
-	m := views.NewDetail(res, "ec2", nil, keys.Default())
-	m.SetSize(80, 24)
-
-	_, cmd := m.Update(tea.KeyPressMsg{Code: -1, Text: "t"})
-	if cmd == nil {
-		t.Fatal("pressing 't' in DetailModel must return a non-nil cmd")
-	}
-
-	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigate)
-	if !ok {
-		t.Fatalf("pressing 't' in DetailModel must emit RelatedNavigateMsg; got %T", msg)
-	}
-	if nav.TargetType != "ct-events" {
-		t.Errorf("RelatedNavigateMsg.TargetType = %q, want %q", nav.TargetType, "ct-events")
-	}
-	// EC2 CloudTrailKey is "ResourceName:ID" — filter uses res.ID, not Fields["arn"]
-	wantID := "i-test"
-	if nav.FetchFilter["ResourceName"] != wantID {
-		t.Errorf("FetchFilter[ResourceName] = %q, want %q", nav.FetchFilter["ResourceName"], wantID)
-	}
-}
-
-// TestYAML_TKey_EmitsRelatedNavigateMsg verifies that pressing "t" in a
-// YAMLModel emits a RelatedNavigateMsg with TargetType "ct-events".
-func TestYAML_TKey_EmitsRelatedNavigateMsg(t *testing.T) {
-	res := ctEventsEC2Resource()
-	m := views.NewYAML(res, "ec2", keys.Default())
-	m.SetSize(80, 24)
-
-	_, cmd := m.Update(tea.KeyPressMsg{Code: -1, Text: "t"})
-	if cmd == nil {
-		t.Fatal("pressing 't' in YAMLModel must return a non-nil cmd")
-	}
-
-	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigate)
-	if !ok {
-		t.Fatalf("pressing 't' in YAMLModel must emit RelatedNavigateMsg; got %T", msg)
-	}
-	if nav.TargetType != "ct-events" {
-		t.Errorf("RelatedNavigateMsg.TargetType = %q, want %q", nav.TargetType, "ct-events")
-	}
-	// EC2 CloudTrailKey is "ResourceName:ID" — filter uses res.ID
-	wantID := "i-test"
-	if nav.FetchFilter["ResourceName"] != wantID {
-		t.Errorf("FetchFilter[ResourceName] = %q, want %q", nav.FetchFilter["ResourceName"], wantID)
-	}
-}
-
-// TestResourceList_TKey_NoHintOnCtEventsList verifies that the "t" (CloudTrail)
-// hint does not appear in BottomHints() when the list is already showing ct-events.
 func TestResourceList_TKey_NoHintOnCtEventsList(t *testing.T) {
 	td := resource.FindResourceType("ct-events")
 	if td == nil {
@@ -302,22 +246,10 @@ func TestTKey_WorksFromAllViews(t *testing.T) {
 		}
 	})
 
-	t.Run("YAML", func(t *testing.T) {
-		y := views.NewYAML(res, "ec2", k)
-		y.SetSize(80, 40)
-		_, cmd := y.Update(tea.KeyPressMsg{Code: -1, Text: "t"})
-		if cmd == nil {
-			t.Fatal("YAML: t key returned nil cmd")
-		}
-		msg := cmd()
-		nav, ok := msg.(messages.RelatedNavigate)
-		if !ok {
-			t.Fatalf("YAML: expected RelatedNavigateMsg, got %T", msg)
-		}
-		if nav.TargetType != "ct-events" {
-			t.Errorf("YAML: expected ct-events, got %s", nav.TargetType)
-		}
-	})
+	// The YAML case (views.NewYAML+Update, both DEAD per
+	// specs/022-codebase-cleanup/wave3-map-text.md) is retired here: it's
+	// ported onto the live text-screen seam as
+	// wave3_text_ports_test.go's TestWave3Port_YAML_TKey_LiveCTEventsNavigate.
 }
 
 func TestResourceList_TKey_SuppressedOnChildList(t *testing.T) {
@@ -350,42 +282,6 @@ func TestResourceList_TKey_SuppressedOnChildList(t *testing.T) {
 	}
 }
 
-// TestYAML_TKey_SuppressedForChildType_ViaDetail verifies that when YAML is
-// opened from a child detail view (e.g. dbi_events), the YAML view receives
-// the child resourceType and suppresses the "t" key hint and action.
-func TestYAML_TKey_SuppressedForChildType_ViaDetail(t *testing.T) {
-	td := resource.GetChildType("dbi_events")
-	if td == nil {
-		t.Skip("dbi_events child type not registered")
-	}
-	res := resource.Resource{
-		ID:     "evt-001",
-		Name:   "CreateDBInstance",
-		Fields: map[string]string{"event_name": "CreateDBInstance"},
-	}
-	y := views.NewYAML(res, "dbi_events", keys.Default())
-	y.SetSize(80, 40)
-
-	// t key should be no-op (child type suppressed)
-	_, cmd := y.Update(tea.KeyPressMsg{Code: -1, Text: "t"})
-	if cmd != nil {
-		t.Fatal("t key should be suppressed in YAML for child resource type dbi_events")
-	}
-
-	// t hint should be absent
-	hints := y.BottomHints()
-	for _, h := range hints {
-		if h.Key == "t" {
-			t.Fatal("t hint should not appear in YAML for child resource type")
-		}
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Main menu: t key and hint suppression
-// ---------------------------------------------------------------------------
-
-// TestMainMenu_TKey_Noop verifies that pressing t on the main menu is a no-op.
 func TestMainMenu_TKey_Noop(t *testing.T) {
 	k := keys.Default()
 	m := views.NewMainMenu(k)

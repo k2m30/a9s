@@ -11,25 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchVPCEndpoints calls the EC2 DescribeVpcEndpoints API and converts the
-// response into a slice of generic Resource structs.
-func FetchVPCEndpoints(ctx context.Context, api EC2DescribeVpcEndpointsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchVPCEndpointsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchVPCEndpointsPage fetches a single page of VPC endpoints.
 func FetchVPCEndpointsPage(ctx context.Context, api EC2DescribeVpcEndpointsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &ec2.DescribeVpcEndpointsInput{

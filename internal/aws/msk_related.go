@@ -22,7 +22,7 @@ func checkMSKAlarms(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := mskRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -89,7 +89,7 @@ func checkMSKCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 
-	cfnList, truncated, err := mskRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -141,7 +141,7 @@ func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 	}
 
-	subnetList, _, err := mskRelatedResources(ctx, clients, cache, "subnet")
+	subnetList, _, err := relatedResourcesFor(ctx, clients, cache, "subnet")
 	if err != nil {
 		return resource.ErrorRelated("vpc", err)
 	}
@@ -236,17 +236,6 @@ func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, _ 
 		}
 	}
 	return relatedResult("secrets", ids)
-}
-
-// mskRelatedResources returns the resource list for target from cache or by fetching the first page.
-func mskRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 // checkMSKKMS extracts the KMS key ID from the MSK cluster's

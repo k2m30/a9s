@@ -7,9 +7,7 @@ import (
 
 	lipgloss "charm.land/lipgloss/v2"
 
-	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
-	tea "charm.land/bubbletea/v2"
 
 	"github.com/charmbracelet/x/ansi"
 
@@ -17,8 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/layout"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 
 	"gopkg.in/yaml.v3"
@@ -36,22 +32,10 @@ type YAMLModel struct {
 	resourceType string
 	viewport     viewport.Model
 	ready        bool
-	wrap         bool
 	width        int
 	height       int
 	keys         keys.Map
 	search       SearchModel
-	rawText      string // non-empty = raw text mode (no YAML marshaling)
-	rawTitle     string // frame title for raw text mode
-}
-
-// NewYAML creates a YAMLModel for the given resource.
-func NewYAML(res resource.Resource, resourceType string, k keys.Map) YAMLModel {
-	return YAMLModel{
-		res:          res,
-		resourceType: resourceType,
-		keys:         k,
-	}
 }
 
 // NewYAMLWithCtrl creates a YAMLModel backed by the given controller.
@@ -64,225 +48,6 @@ func NewYAMLWithCtrl(res resource.Resource, resourceType string, k keys.Map, ctr
 		resourceType: resourceType,
 		keys:         k,
 	}
-}
-
-// NewTextViewer creates a read-only text viewer using the YAML viewport infrastructure.
-func NewTextViewer(title, content string, k keys.Map) YAMLModel {
-	return YAMLModel{
-		rawText:  content,
-		rawTitle: title,
-		keys:     k,
-	}
-}
-
-// IsTextViewer reports whether this YAMLModel is in raw-text mode (e.g. error log).
-func (m YAMLModel) IsTextViewer() bool {
-	return m.rawText != ""
-}
-
-// Init implements tea.Model. No async work.
-func (m YAMLModel) Init() (YAMLModel, tea.Cmd) {
-	return m, nil
-}
-
-// Update delegates scroll to viewport; handles c (copy), esc (back).
-func (m YAMLModel) Update(msg tea.Msg) (YAMLModel, tea.Cmd) {
-	switch msg := msg.(type) {
-	case messages.EnrichDetailResult:
-		// Accept enriched resource when type and ID match.
-		if msg.ResourceType != m.resourceType || msg.ResourceID != m.res.ID {
-			return m, nil
-		}
-		m.res = msg.EnrichedRes
-		m.refreshViewportContent()
-		// When the controller path is active, replace the TextState Lines with
-		// the re-rendered content from the enriched resource so that
-		// Snapshot().Body.Text reflects the latest data, not the pre-enrichment
-		// snapshot seeded at push time.
-		if m.ctrl != nil {
-			m.ctrl.UpdateTextLines(m.ContentLines())
-		}
-		return m, nil
-	case tea.PasteMsg:
-		if m.search.IsInputMode() {
-			var cmd tea.Cmd
-			m.search, cmd = m.search.Update(msg)
-			if m.ctrl == nil {
-				m.refreshViewportContent()
-			}
-			return m, cmd
-		}
-	case searchPasteMsg:
-		if m.search.IsInputMode() {
-			var cmd tea.Cmd
-			m.search, cmd = m.search.Update(msg)
-			if m.ctrl == nil {
-				m.refreshViewportContent()
-			}
-			return m, cmd
-		}
-	case tea.KeyMsg:
-		// Search input mode captures all keys.
-		if m.search.IsInputMode() {
-			var cmd tea.Cmd
-			m.search, cmd = m.search.Update(msg)
-			if m.ctrl != nil {
-				// SearchModel.Update may have exited input mode (Enter/Esc).
-				if !m.search.IsInputMode() {
-					if m.search.IsActive() {
-						// Enter was pressed — commit query to controller.
-						m.ctrl.Apply(app.Action{Kind: app.ActionSearch, Arg: m.search.Query()})
-					} else {
-						// Esc was pressed — clear controller search.
-						m.ctrl.Apply(app.Action{Kind: app.ActionSearchClear})
-					}
-				}
-			} else {
-				m.refreshViewportContent()
-			}
-			return m, cmd
-		}
-		switch {
-		case key.Matches(msg, m.keys.Search):
-			m.search.Activate()
-			return m, nil
-		case key.Matches(msg, m.keys.SearchNext):
-			if m.search.IsActive() {
-				if m.ctrl != nil {
-					m.ctrl.Apply(app.Action{Kind: app.ActionSearchNext})
-				} else if m.search.MatchCount() > 0 {
-					m.search.NextMatch()
-					m.refreshViewportContent()
-				}
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.SearchPrev):
-			if m.search.IsActive() {
-				if m.ctrl != nil {
-					m.ctrl.Apply(app.Action{Kind: app.ActionSearchPrev})
-				} else if m.search.MatchCount() > 0 {
-					m.search.PrevMatch()
-					m.refreshViewportContent()
-				}
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.Escape):
-			if m.search.IsActive() {
-				m.search.Deactivate()
-				if m.ctrl != nil {
-					m.ctrl.Apply(app.Action{Kind: app.ActionSearchClear})
-				} else {
-					m.refreshViewportContent()
-				}
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.ToggleWrap):
-			if m.ctrl != nil {
-				m.ctrl.Apply(app.Action{Kind: app.ActionToggleWrap})
-			} else {
-				m.wrap = !m.wrap
-				m.viewport.SoftWrap = m.wrap
-				m.refreshViewportContent()
-			}
-			return m, nil
-		case key.Matches(msg, m.keys.Up):
-			if m.ctrl != nil {
-				m.ctrl.Apply(app.Action{Kind: app.ActionMoveUp})
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.Down):
-			if m.ctrl != nil {
-				m.ctrl.Apply(app.Action{Kind: app.ActionMoveDown})
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.Top):
-			if m.ctrl != nil {
-				m.ctrl.Apply(app.Action{Kind: app.ActionMoveTop})
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.Bottom):
-			if m.ctrl != nil {
-				m.ctrl.Apply(app.Action{Kind: app.ActionMoveBottom})
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.PageUp):
-			if m.ctrl != nil {
-				m.ctrl.Apply(app.Action{Kind: app.ActionPageUp, N: max(m.height-1, 1)})
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.PageDown):
-			if m.ctrl != nil {
-				m.ctrl.Apply(app.Action{Kind: app.ActionPageDown, N: max(m.height-1, 1)})
-				return m, nil
-			}
-		case key.Matches(msg, m.keys.CloudTrail):
-			if ff := resource.BuildCloudTrailFilter(m.res, m.resourceType); ff != nil {
-				res := m.res
-				return m, func() tea.Msg {
-					return messages.RelatedNavigate{
-						TargetType:     "ct-events",
-						SourceResource: res,
-						SourceType:     m.resourceType,
-						FetchFilter:    ff,
-					}
-				}
-			}
-			return m, nil
-		case key.Matches(msg, m.keys.Describe):
-			if m.rawText != "" {
-				return m, nil
-			}
-			res := m.res
-			return m, func() tea.Msg {
-				return messages.Navigate{
-					Target:         messages.TargetDetail,
-					Resource:       &res,
-					ResourceType:   m.resourceType,
-					ReplaceCurrent: true,
-				}
-			}
-		case key.Matches(msg, m.keys.JSON):
-			if m.rawText != "" {
-				return m, nil
-			}
-			res := m.res
-			return m, func() tea.Msg {
-				return messages.Navigate{
-					Target:         messages.TargetJSON,
-					Resource:       &res,
-					ResourceType:   m.resourceType,
-					ReplaceCurrent: true,
-				}
-			}
-		case key.Matches(msg, m.keys.YAML):
-			return m, nil
-		}
-	}
-
-	if m.ready {
-		var cmd tea.Cmd
-		m.viewport, cmd = m.viewport.Update(msg)
-		return m, cmd
-	}
-	return m, nil
-}
-
-// View renders YAML content via viewport.
-// When a controller is wired (TUI navigator path), delegates to
-// RenderText(ctrl.Snapshot().Body.Text) so the headless and TUI renderers
-// share one code path. When ctrl is nil (unit tests, isolated callers),
-// falls back to the direct viewport path.
-func (m YAMLModel) View() string {
-	if !m.ready {
-		return "Initializing..."
-	}
-	if m.ctrl != nil {
-		body := m.ctrl.Snapshot().Body.Text
-		if body != nil {
-			return m.RenderText(*body)
-		}
-	}
-	return m.viewport.View()
 }
 
 // SetSize initializes or resizes the viewport.
@@ -315,106 +80,13 @@ func (m *YAMLModel) refreshViewportContent() {
 	m.viewport.SetContent(content)
 }
 
-// IsSearchActive returns true when search is active (input mode or confirmed highlights).
-// When the controller is wired, reflects the controller's TextState.
-func (m YAMLModel) IsSearchActive() bool {
-	if m.ctrl != nil {
-		body := m.ctrl.Snapshot().Body.Text
-		return m.search.IsInputMode() || (body != nil && body.Search != "")
-	}
-	return m.search.IsActive()
-}
-
-// IsSearchInputMode returns true when the search input is capturing keystrokes.
-// This is always model-local (the controller has no concept of typing mode).
-func (m YAMLModel) IsSearchInputMode() bool { return m.search.IsInputMode() }
-
-// SearchInfo returns the search state string for the header.
-// Input mode: "/query" (or "/" when query is empty), Confirmed: "N/M matches", Inactive: "".
-func (m YAMLModel) SearchInfo() string {
-	if m.search.IsInputMode() {
-		return "/" + m.search.Query()
-	}
-	if m.ctrl != nil {
-		body := m.ctrl.Snapshot().Body.Text
-		if body == nil || body.Search == "" {
-			return ""
-		}
-		matches := buildTextSearchMatchesForInfo(body.Lines, body.Search)
-		total := len(matches)
-		if total == 0 {
-			return "0/0 matches"
-		}
-		cursor := body.SearchCursor
-		if cursor < 0 || cursor >= total {
-			cursor = 0
-		}
-		return formatSearchInfo(cursor+1, total)
-	}
-	if !m.search.IsActive() {
-		return ""
-	}
-	return m.search.MatchInfo()
-}
-
 // FrameTitle returns e.g. "i-0abc123 yaml".
 func (m YAMLModel) FrameTitle() string {
-	if m.rawTitle != "" {
-		return m.rawTitle
-	}
 	id := m.res.ID
 	if m.res.Name != "" {
 		id = m.res.Name
 	}
 	return id + " yaml"
-}
-
-// BottomHints implements Hintable for YAMLModel.
-// Delegates to the controller snapshot when a controller is wired; falls back
-// to local state (rawText branch) for nil-controller (test/preview) paths.
-func (m YAMLModel) BottomHints() []layout.KeyHint {
-	if m.ctrl != nil {
-		src := m.ctrl.Snapshot().Footer
-		if len(src) > 0 {
-			hints := make([]layout.KeyHint, len(src))
-			for i, kh := range src {
-				hints[i] = layout.KeyHint{Key: kh.Key, Desc: kh.Help}
-			}
-			return hints
-		}
-	}
-	// Nil-controller path: compute from local model state.
-	if m.rawText != "" {
-		return []layout.KeyHint{
-			{Key: "w", Desc: "Wrap"},
-			{Key: "c", Desc: "Copy"},
-		}
-	}
-	hints := []layout.KeyHint{
-		{Key: "w", Desc: "Wrap"},
-		{Key: "c", Desc: "Copy"},
-	}
-	if resource.BuildCloudTrailFilter(m.res, m.resourceType) != nil {
-		hints = append(hints, layout.KeyHint{Key: "t", Desc: "CloudTrail"})
-	}
-	return hints
-}
-
-// CopyContent returns the raw YAML text for clipboard copy.
-func (m YAMLModel) CopyContent() (string, string) {
-	if m.rawText != "" {
-		return m.rawText, "Copied to clipboard"
-	}
-	content := m.RawContent()
-	if content == "" {
-		return "", ""
-	}
-	return content, "Copied YAML to clipboard"
-}
-
-// GetHelpContext returns HelpFromYAML.
-func (m YAMLModel) GetHelpContext() HelpContext {
-	return HelpFromYAML
 }
 
 // ContentLines returns the syntax-colored YAML content as a slice of lines,
@@ -427,9 +99,6 @@ func (m YAMLModel) ContentLines() []string {
 
 // RawContent returns the uncolored YAML text for clipboard copy.
 func (m YAMLModel) RawContent() string {
-	if m.rawText != "" {
-		return m.rawText
-	}
 	var data []byte
 	var err error
 
@@ -453,9 +122,6 @@ func (m YAMLModel) ResourceID() string {
 
 // renderContent marshals the resource to YAML and applies syntax coloring.
 func (m YAMLModel) renderContent() string {
-	if m.rawText != "" {
-		return m.rawText
-	}
 	var data []byte
 	var err error
 
@@ -511,10 +177,10 @@ func (m *YAMLModel) RenderText(body app.TextBody) string {
 
 // Regex patterns for YAML syntax coloring.
 var (
-	yamlKeyRe  = regexp.MustCompile(`^(\s*(?:- )?)([^\s:][^:]*):(.*)$`)
-	yamlNumRe  = regexp.MustCompile(`^-?\d+(\.\d+)?$`)
-	yamlBoolRe = regexp.MustCompile(`^(true|false|yes|no|Yes|No)$`)
-	yamlNullRe = regexp.MustCompile(`^(null|~)$`)
+	yamlIndentRe = regexp.MustCompile(`^(\s*(?:- )?)(.*)$`)
+	yamlNumRe    = regexp.MustCompile(`^-?\d+(\.\d+)?$`)
+	yamlBoolRe   = regexp.MustCompile(`^(true|false|yes|no|Yes|No)$`)
+	yamlNullRe   = regexp.MustCompile(`^(null|~)$`)
 )
 
 // colorizeYAML applies Tokyo Night syntax colors to YAML text line by line.
@@ -529,13 +195,14 @@ func colorizeYAML(raw string) string {
 	result := make([]string, len(lines))
 
 	for i, line := range lines {
-		matches := yamlKeyRe.FindStringSubmatch(line)
-		if matches != nil {
-			indent := matches[1]
-			keyPart := matches[2]
-			valPart := strings.TrimSpace(matches[3])
+		indentMatch := yamlIndentRe.FindStringSubmatch(line)
+		indent := indentMatch[1]
+		rest := indentMatch[2]
 
-			coloredLine := indent + keyStyle.Render(keyPart) + ":"
+		if key, val, ok := splitYAMLKeyValue(rest); ok && key != "" {
+			valPart := strings.TrimSpace(val)
+
+			coloredLine := indent + keyStyle.Render(key) + ":"
 			if valPart != "" {
 				coloredLine += " " + colorizeValue(valPart, strStyle, numStyle, boolStyle, nullStyle)
 			}
@@ -555,6 +222,53 @@ func colorizeYAML(raw string) string {
 	}
 
 	return strings.Join(result, "\n")
+}
+
+// splitYAMLKeyValue splits a YAML mapping line (with indent/dash already
+// stripped) into its key and value parts, matching how a YAML parser locates
+// the key/value separator: a colon that is quoted-delimited, or an unquoted
+// colon followed by a space or end-of-line. Bare colons inside an unquoted
+// key (e.g. "aws:autoscaling:groupName") are never split on, so coloring
+// never alters the text a YAML parser would see — stripANSI(colorize(x)) == x.
+func splitYAMLKeyValue(s string) (key, val string, ok bool) {
+	if s == "" {
+		return "", "", false
+	}
+	if s[0] == '\'' || s[0] == '"' {
+		quote := s[0]
+		i := 1
+		for i < len(s) {
+			if s[i] == quote {
+				if quote == '\'' && i+1 < len(s) && s[i+1] == '\'' {
+					i += 2
+					continue
+				}
+				if quote == '"' {
+					backslashes := 0
+					for j := i - 1; j >= 0 && s[j] == '\\'; j-- {
+						backslashes++
+					}
+					if backslashes%2 == 1 {
+						i++
+						continue
+					}
+				}
+				i++
+				break
+			}
+			i++
+		}
+		if i < len(s) && s[i] == ':' {
+			return s[:i], s[i+1:], true
+		}
+		return "", "", false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] == ':' && (i == len(s)-1 || s[i+1] == ' ') {
+			return s[:i], s[i+1:], true
+		}
+	}
+	return "", "", false
 }
 
 // colorizeValue applies the appropriate color to a YAML value.

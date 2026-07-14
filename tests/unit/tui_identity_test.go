@@ -8,10 +8,10 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -112,49 +112,14 @@ func TestIdentityView_ErrorState(t *testing.T) {
 	}
 }
 
-// TestIdentityView_CopyContent_ReturnsARN verifies that CopyContent()
-// returns the ARN when identity data is loaded.
-func TestIdentityView_CopyContent_ReturnsARN(t *testing.T) {
-	m := views.NewIdentity("testprofile", "us-east-1", keys.Default())
-	m.SetSize(80, 24)
-	m.SetIdentity(views.IdentityData{
-		AccountID:     "123456789012",
-		ARN:           "arn:aws:sts::123456789012:assumed-role/admin-role/session",
-		RoleName:      "admin-role",
-		IsAssumedRole: true,
-	})
-
-	content, label := m.CopyContent()
-	if content != "arn:aws:sts::123456789012:assumed-role/admin-role/session" {
-		t.Errorf("CopyContent() should return ARN, got %q", content)
-	}
-	if label == "" {
-		t.Error("CopyContent() label should not be empty")
-	}
-}
-
-// TestIdentityView_CopyContent_EmptyWhenLoading verifies CopyContent returns
-// empty when no identity has been loaded.
-func TestIdentityView_CopyContent_EmptyWhenLoading(t *testing.T) {
-	m := views.NewIdentity("testprofile", "us-east-1", keys.Default())
-	m.SetSize(80, 24)
-
-	content, label := m.CopyContent()
-	if content != "" {
-		t.Errorf("CopyContent() should return empty in loading state, got %q", content)
-	}
-	if label != "" {
-		t.Errorf("CopyContent() label should be empty in loading state, got %q", label)
-	}
-}
-
-// TestIdentityView_FrameTitle verifies the frame title is "identity".
-func TestIdentityView_FrameTitle(t *testing.T) {
-	m := views.NewIdentity("testprofile", "us-east-1", keys.Default())
-	if m.FrameTitle() != "identity" {
-		t.Errorf("FrameTitle should be 'identity', got %q", m.FrameTitle())
-	}
-}
+// CopyContent()/FrameTitle() are DEAD on IdentityModel per
+// specs/022-codebase-cleanup/wave3-map-text.md. Live equivalents:
+//   - loaded → copies exact ARN: wave3_text_ports_test.go's
+//     TestWave3Port_IdentityCopy_CopiesExactARN (handleCopy/rsKindIdentity).
+//   - loading → copy is a no-op: wave3_text_ports_test.go's
+//     TestWave3Port_IdentityCopy_NoOpWhileLoading.
+//   - FrameTitle: no live branch reads IdentityModel.FrameTitle() at all —
+//     the identity screen has no rs.helpContext/frame-title dependency on it.
 
 // TestIdentityView_AnyKeyDismisses verifies that any key press sends PopViewMsg.
 func TestIdentityView_AnyKeyDismisses(t *testing.T) {
@@ -351,14 +316,10 @@ func TestLayoutRenderHeader_WithIdentityBadge_Width(t *testing.T) {
 // GetHelpContext — 0% hit: returns HelpFromMainMenu
 // ════════════════════════════════════════════════════════════════════════════
 
-// TestIdentityView_GetHelpContext verifies GetHelpContext returns HelpFromMainMenu.
-func TestIdentityView_GetHelpContext(t *testing.T) {
-	m := views.NewIdentity("testprofile", "us-east-1", keys.Default())
-	got := m.GetHelpContext()
-	if got != views.HelpFromMainMenu {
-		t.Errorf("GetHelpContext() = %v, want HelpFromMainMenu (%v)", got, views.HelpFromMainMenu)
-	}
-}
+// GetHelpContext() is DEAD on IdentityModel per wave3-map-text.md — no live
+// branch reads it; newIdentityRS (renderer.go) never sets rs.helpContext for
+// the identity screen at all (zero value), so there is no live behavior tied
+// to this accessor to port.
 
 // ════════════════════════════════════════════════════════════════════════════
 // Update — unrecognized message type returns unchanged model

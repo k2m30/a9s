@@ -12,8 +12,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ── Clipboard copy tests ────────────────────────────────────────────────────
@@ -388,7 +388,6 @@ func TestWiring_AvailabilityComplete_ClearsFlash(t *testing.T) {
 	// is latched instead.
 	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
-		Expired: true,
 	})
 
 	// ClientsReady drains the latched sweep's first batch of 4 — mirroring
@@ -459,7 +458,9 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 	// Step 1: Find a resource type with known fixture count.
 	// Use ec2 which always has typed-fake fixtures.
 	ec2Client := fakes.NewEC2()
-	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	ec2Res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), ec2Client, token)
+	})
 	if err != nil || len(ec2Res) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
@@ -479,11 +480,10 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: demo.NewServiceClients()})
 
 	// Step 3: Send AvailabilityCacheLoadedMsg to start the probe pipeline.
-	// In demo mode, loadAvailabilityCache returns Expired: true (no cache file),
-	// so we can send the message directly to start probes.
+	// In demo mode, loadAvailabilityCache returns no cache file, so we can
+	// send the message directly to start probes.
 	m, cmd := rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
-		Expired: true,
 	})
 
 	// Step 4: Walk probe cycle, collect results.

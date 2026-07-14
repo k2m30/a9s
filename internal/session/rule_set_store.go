@@ -14,7 +14,7 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-// RuleSetStore is a session-scoped, single-slot cache for the SES v1
+// ruleSetStore is a session-scoped, single-slot cache for the SES v1
 // DescribeActiveReceiptRuleSet response. Each Session owns one store; the
 // keying-by-pointer that the legacy globals required for per-clients
 // isolation is no longer necessary because Sessions ARE the isolation unit.
@@ -28,31 +28,9 @@ import (
 // SES SDK; the consumer (internal/aws/ses_related.go) does the type
 // assertion at the call site.
 //
-// Implementations must be safe for concurrent use.
-type RuleSetStore interface {
-	// Get returns the cached rule set and ok=true if a successful Set has
-	// been recorded; ("", false)-like semantics otherwise (typed as any).
-	Get() (ruleSet any, ok bool)
-
-	// Set caches the rule set. ok becomes true after this call.
-	Set(ruleSet any)
-
-	// Clear empties the cache. Called by Session.Rotate on profile/region
-	// switch and by Ctrl+R on the SES detail view (so receipt-rule changes
-	// are picked up without waiting for a full reconnect).
-	Clear()
-
-	// GetOrFetch returns the cached value if present; otherwise calls fetcher
-	// once across all concurrent callers (single-flight) and caches its result.
-	// The "active" key is fixed because this store has a single slot.
-	//
-	// The fetcher receives a detached context built from ctx so that leader
-	// cancellation does not abort in-flight upstream calls on behalf of
-	// followers whose own ctx remains alive. Each waiting caller selects on
-	// its own ctx.Done() and may bail early without cancelling the fetch.
-	GetOrFetch(ctx context.Context, fetcher func(context.Context) (any, error)) (any, error)
-}
-
+// Safe for concurrent use. internal/aws consumes it via its own local
+// structural interface (ruleSetStore in internal/aws/ses_related.go) rather
+// than importing this type, so the method set below is the real contract.
 type ruleSetStore struct {
 	mu      sync.RWMutex
 	ruleSet any
@@ -61,8 +39,8 @@ type ruleSetStore struct {
 	sf      singleflight.Group
 }
 
-// NewRuleSetStore returns a new thread-safe RuleSetStore.
-func NewRuleSetStore() RuleSetStore {
+// NewRuleSetStore returns a new thread-safe ruleSetStore.
+func NewRuleSetStore() *ruleSetStore {
 	return &ruleSetStore{}
 }
 
@@ -82,12 +60,15 @@ func isNilAny(v any) bool {
 	return false
 }
 
+// Get returns the cached rule set and ok=true if a successful Set has been
+// recorded; ("", false)-like semantics otherwise (typed as any).
 func (s *ruleSetStore) Get() (any, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.ruleSet, s.ok
 }
 
+// Set caches the rule set. ok becomes true after this call.
 func (s *ruleSetStore) Set(ruleSet any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -95,6 +76,9 @@ func (s *ruleSetStore) Set(ruleSet any) {
 	s.ok = true
 }
 
+// Clear empties the cache. Called by Session.Rotate on profile/region switch
+// and by Ctrl+R on the SES detail view (so receipt-rule changes are picked
+// up without waiting for a full reconnect).
 func (s *ruleSetStore) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

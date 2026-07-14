@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 // ===========================================================================
@@ -71,7 +72,7 @@ func TestFormatCTTarget(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		got := awsclient.FormatCTTarget(c.rawARN, localAccount)
+		got := ctevent.FormatCTTarget(c.rawARN, localAccount)
 		if got != c.want {
 			t.Errorf("FormatCTTarget(%q, %q) = %q, want %q per §5",
 				c.rawARN, localAccount, got, c.want)

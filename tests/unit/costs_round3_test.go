@@ -10,20 +10,15 @@
 // packages (same pattern as costs_review_findings_test.go/
 // costs_review2_test.go).
 //
-// SCOPE NOTE on item 1: "-c costs"/"-c ce" acceptance has TWO layers —
-// (a) cmd/a9s/main.go:156's own flag VALIDATION (package main, a separate
-// binary entry point outside tests/unit's write scope — cmd/a9s already has
-// its own package-main tests, e.g. main_wiring_test.go, for exactly this
-// kind of source-level pin, but writing one is not this file's job), and
-// (b) the runtime/TUI navigation behavior once a resolved command string
-// reaches tui.WithCommand (fully testable here, matching every existing
-// qa_cli_command_flag_test.go convention, none of which touch main.go's
-// flag parsing either). The two tests below cover (b) only; (a) is flagged
-// as a residual gap in the QA report, not silently skipped.
+// Item 1 tests only the runtime/TUI navigation half of "-c costs"/"-c ce"
+// (tui.WithCommand onward, matching qa_cli_command_flag_test.go's
+// convention); cmd/a9s/main.go's own flag VALIDATION is package main and
+// covered separately by main_wiring_test.go.
 package unit
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -44,12 +39,10 @@ import (
 var round3Now = time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC)
 
 // newCostsScreenController is the single shared package-unit costs
-// controller builder (closure-wave harness dedup — collapsed from
-// round3CostsController/round6NewCostsController/round8NewCostsController/
-// reviewCostsController, all byte-identical or trivially so). Builds a
-// Controller with ScreenCosts pushed and EnsureCostsState seeded under a
-// fresh, isolated A9S_CONFIG_FOLDER. Blessed in
-// qa_controller_construction_discipline_test.go's ccdBlessedHelpers.
+// controller builder. Builds a Controller with ScreenCosts pushed and
+// EnsureCostsState seeded under a fresh, isolated A9S_CONFIG_FOLDER.
+// Blessed in qa_controller_construction_discipline_test.go's
+// ccdBlessedHelpers.
 //
 // package unit_test's equivalent is costs_state_test.go's
 // newCostsController — the two cannot be merged across the package
@@ -66,19 +59,6 @@ func newCostsScreenController(t *testing.T, now time.Time) *app.Controller {
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(now)
 	return c
-}
-
-func round3TopDrill(t *testing.T, c *app.Controller) costs.DrillLevel {
-	t.Helper()
-	vs := c.Snapshot()
-	if vs.Body.Kind != app.BodyKindCosts {
-		t.Fatalf("expected BodyKindCosts, got %q", vs.Body.Kind)
-	}
-	stack := c.GetCostsDrillStack()
-	if len(stack) == 0 {
-		t.Fatal("GetCostsDrillStack returned an empty stack")
-	}
-	return stack[len(stack)-1]
 }
 
 // round3MonthRecord builds one costs.Record for rowKey, priced amount,
@@ -98,57 +78,34 @@ func round3MonthRecord(now time.Time, rowKey string, amount float64) costs.Recor
 // screen on start.
 // ===========================================================================
 
-func TestCostsRound3_CLICommand_Costs_EmitsNavigateTargetCosts(t *testing.T) {
-	m := tui.New(
-		"demo", "us-east-1",
-		tui.WithClients(demo.NewServiceClients()),
-		tui.WithNoCache(true),
-		tui.WithCommand("costs"),
-	)
-	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
+func TestCostsRound3_CLICommand_EmitsNavigateTargetCosts(t *testing.T) {
+	for _, cliCmd := range []string{"costs", "ce"} {
+		t.Run(cliCmd, func(t *testing.T) {
+			m := tui.New(
+				"demo", "us-east-1",
+				tui.WithClients(demo.NewServiceClients()),
+				tui.WithNoCache(true),
+				tui.WithCommand(cliCmd),
+			)
+			m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	_, cmd := rootApplyMsg(m, messages.ClientsReady{
-		Clients: demo.NewServiceClients(),
-		Region:  "us-east-1",
-	})
+			_, cmd := rootApplyMsg(m, messages.ClientsReady{
+				Clients: demo.NewServiceClients(),
+				Region:  "us-east-1",
+			})
 
-	nav := extractMsg(t, cmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.Navigate)
-		return ok
-	})
-	navMsg, ok := nav.(messages.Navigate)
-	if !ok {
-		t.Fatalf("expected messages.Navigate, got %T", nav)
-	}
-	if navMsg.Target != messages.TargetCosts {
-		t.Errorf("-c costs: NavigateMsg.Target got %v want messages.TargetCosts (got ResourceType=%q — today \"costs\" falls through to the generic NavigateTargetResourceList path, which has no such registered type)", navMsg.Target, navMsg.ResourceType)
-	}
-}
-
-func TestCostsRound3_CLICommand_CEAlias_EmitsNavigateTargetCosts(t *testing.T) {
-	m := tui.New(
-		"demo", "us-east-1",
-		tui.WithClients(demo.NewServiceClients()),
-		tui.WithNoCache(true),
-		tui.WithCommand("ce"),
-	)
-	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
-
-	_, cmd := rootApplyMsg(m, messages.ClientsReady{
-		Clients: demo.NewServiceClients(),
-		Region:  "us-east-1",
-	})
-
-	nav := extractMsg(t, cmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.Navigate)
-		return ok
-	})
-	navMsg, ok := nav.(messages.Navigate)
-	if !ok {
-		t.Fatalf("expected messages.Navigate, got %T", nav)
-	}
-	if navMsg.Target != messages.TargetCosts {
-		t.Errorf("-c ce: NavigateMsg.Target got %v want messages.TargetCosts (got ResourceType=%q)", navMsg.Target, navMsg.ResourceType)
+			nav := extractMsg(t, cmd, func(msg tea.Msg) bool {
+				_, ok := msg.(messages.Navigate)
+				return ok
+			})
+			navMsg, ok := nav.(messages.Navigate)
+			if !ok {
+				t.Fatalf("expected messages.Navigate, got %T", nav)
+			}
+			if navMsg.Target != messages.TargetCosts {
+				t.Errorf("-c %s: NavigateMsg.Target got %v want messages.TargetCosts (got ResourceType=%q — today \"costs\" falls through to the generic NavigateTargetResourceList path, which has no such registered type)", cliCmd, navMsg.Target, navMsg.ResourceType)
+			}
+		})
 	}
 }
 
@@ -179,14 +136,7 @@ func TestCostsRound3_ServiceLabel_StripsVendorPrefix(t *testing.T) {
 
 	wantLabels := []string{"Elastic Compute Cloud - Compute", "Lambda", "Simple Storage Service"}
 	for _, want := range wantLabels {
-		found := false
-		for _, got := range gotLabels {
-			if got == want {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !slices.Contains(gotLabels, want) {
 			t.Errorf("expected a row labeled %q (vendor prefix stripped), got labels: %v", want, gotLabels)
 		}
 	}
@@ -311,7 +261,15 @@ func TestCostsRound3_VerticalScroll_CursorVisible_TotalPinned_AsCursorMovesBeyon
 
 func TestCostsRound3_ZeroValueCell_NeverColoredAsGrowthOrDrop(t *testing.T) {
 	c := newCostsScreenController(t, round3Now)
-	window := round3TopDrill(t, c).Window
+	topSnap := c.Snapshot()
+	if topSnap.Body.Kind != app.BodyKindCosts {
+		t.Fatalf("expected BodyKindCosts, got %q", topSnap.Body.Kind)
+	}
+	stack := c.GetCostsDrillStack()
+	if len(stack) == 0 {
+		t.Fatal("GetCostsDrillStack returned an empty stack")
+	}
+	window := stack[len(stack)-1].Window
 	if len(window) < 2 {
 		t.Fatalf("precondition: window has %d columns, need at least 2", len(window))
 	}

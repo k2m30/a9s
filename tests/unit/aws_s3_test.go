@@ -23,6 +23,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -35,7 +36,9 @@ import (
 // that would produce Issues != nil.
 func TestS3_FetcherResourceIssues_AlwaysEmpty(t *testing.T) {
 	fake := fakes.NewS3()
-	resources, err := awsclient.FetchS3Buckets(context.Background(), fake)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchS3BucketsPage(context.Background(), fake, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchS3Buckets: %v", err)
 	}
@@ -58,7 +61,9 @@ func TestS3_FetcherResourceIssues_AlwaysEmpty(t *testing.T) {
 // matching spec §1. This catches mapping regressions.
 func TestS3_FetcherIdentityFields_HealthyBucket(t *testing.T) {
 	fake := fakes.NewS3()
-	resources, err := awsclient.FetchS3Buckets(context.Background(), fake)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchS3BucketsPage(context.Background(), fake, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchS3Buckets: %v", err)
 	}

@@ -235,7 +235,7 @@ func TestRelated_VPC_NoMatch(t *testing.T) {
 	const otherVPC = "vpc-zzzzzz"
 	res := vpcSrcResource()
 
-	singleEntry := func(target, id string) resource.ResourceCacheEntry {
+	singleEntry := func(_, id string) resource.ResourceCacheEntry {
 		return resource.ResourceCacheEntry{Resources: []resource.Resource{
 			{ID: id, Fields: map[string]string{"vpc_id": otherVPC}},
 		}}

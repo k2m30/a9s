@@ -14,7 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	lambdapkg "github.com/aws/aws-sdk-go-v2/service/lambda"
-	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
@@ -189,16 +188,3 @@ func (f *fakeLambdaWithESM) ListTags(_ context.Context, _ *lambdapkg.ListTagsInp
 
 // Compile-time check.
 var _ awsclient.LambdaAPI = (*fakeLambdaWithESM)(nil)
-
-// newFakeLambdaWithESMFunctions returns a fake whose ListEventSourceMappings
-// returns a mapping for each given function ARN.
-func newFakeLambdaWithESMFunctions(functionARNs []string) *fakeLambdaWithESM {
-	mappings := make([]lambdatypes.EventSourceMappingConfiguration, 0, len(functionARNs))
-	for i := range functionARNs {
-		arn := functionARNs[i]
-		mappings = append(mappings, lambdatypes.EventSourceMappingConfiguration{FunctionArn: &arn})
-	}
-	return &fakeLambdaWithESM{
-		esmOutput: &lambdapkg.ListEventSourceMappingsOutput{EventSourceMappings: mappings},
-	}
-}

@@ -1,3 +1,12 @@
+// theme_selector_test.go — theme selector: (current) marker correctness and
+// Enter -> ThemeSelected emission.
+//
+// views.NewTheme/FrameTitle/View are DEAD per
+// specs/022-codebase-cleanup/wave3-map-text.md (selector.go). Retargeted onto
+// the live seams: NewTransientSelector + app.SelectorBody + RenderSelector for
+// the marker-rendering pins (same live path as selector_render_parity_test.go),
+// and newLiveSelector (tui_selector_test.go) for the Update()-driven Enter
+// selection pin — ThemeSelected is the one message kind not exercised there.
 package unit
 
 import (
@@ -6,42 +15,35 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // ===========================================================================
-// T037 — NewTheme FrameTitle and (current) indicator
+// T037 — theme selector (current) indicator
 // ===========================================================================
 
 func TestNewTheme_FrameTitleAndCurrentIndicator(t *testing.T) {
-	k := keys.Default()
 	themeFiles := []string{"tokyo-night.yaml", "dracula.yaml"}
-
-	m := views.NewTheme(themeFiles, "dracula.yaml", k)
-	m.SetSize(80, 24)
-
-	// FrameTitle must contain "themes" and the item count.
-	title := m.FrameTitle()
-	if !strings.Contains(title, "themes") {
-		t.Errorf("FrameTitle() = %q: expected to contain %q", title, "themes")
+	body := app.SelectorBody{
+		Items:      themeFiles,
+		Selected:   1,
+		AllItems:   themeFiles,
+		ActiveItem: "dracula.yaml",
+		Title:      "themes",
 	}
-	if title != "themes(2)" {
-		t.Errorf("FrameTitle() = %q, want %q", title, "themes(2)")
-	}
+	m := views.NewTransientSelector(80, 24)
+	plain := stripANSI(m.RenderSelector(body))
 
-	// View must contain "dracula.yaml" and "(current)" for the active item.
-	view := m.View()
-	plain := stripANSI(view)
 	if !strings.Contains(plain, "dracula.yaml") {
-		t.Errorf("View() does not contain %q; got:\n%s", "dracula.yaml", plain)
+		t.Errorf("RenderSelector output does not contain %q; got:\n%s", "dracula.yaml", plain)
 	}
 	if !strings.Contains(plain, "(current)") {
-		t.Errorf("View() does not contain %q for active item; got:\n%s", "(current)", plain)
+		t.Errorf("RenderSelector output does not contain %q for active item; got:\n%s", "(current)", plain)
 	}
 
-	// Verify (current) appears on the dracula.yaml line specifically.
 	found := false
 	for line := range strings.SplitSeq(plain, "\n") {
 		if strings.Contains(line, "dracula.yaml") && strings.Contains(line, "(current)") {
@@ -53,7 +55,6 @@ func TestNewTheme_FrameTitleAndCurrentIndicator(t *testing.T) {
 		t.Errorf("dracula.yaml line should have (current) marker; got:\n%s", plain)
 	}
 
-	// Non-active items must NOT have (current).
 	for line := range strings.SplitSeq(plain, "\n") {
 		if strings.Contains(line, "tokyo-night.yaml") && strings.Contains(line, "(current)") {
 			t.Errorf("tokyo-night.yaml (non-active) should not have (current) marker; got line: %q", line)
@@ -70,10 +71,11 @@ func TestNewTheme_SelectionReturnsThemeSelectedMsg(t *testing.T) {
 	themeFiles := []string{"tokyo-night.yaml", "dracula.yaml"}
 
 	// Cursor starts at index 0 (tokyo-night.yaml). Move down to dracula.yaml.
-	m := views.NewTheme(themeFiles, "tokyo-night.yaml", k)
-	m.SetSize(80, 24)
+	m := newLiveSelector(themeFiles, "tokyo-night.yaml", "themes", func(s string) tea.Msg {
+		return messages.ThemeSelected{Theme: s}
+	}, k)
 
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "j"})
+	m, _ = m.Update(selectorKeyPress("j"))
 
 	_, cmd := m.Update(selectorSpecialKey(tea.KeyEnter))
 	if cmd == nil {
@@ -91,19 +93,21 @@ func TestNewTheme_SelectionReturnsThemeSelectedMsg(t *testing.T) {
 }
 
 // ===========================================================================
-// T060 — NewTheme marks the correct theme as current, not others
+// T060 — theme selector marks the correct theme as current, not others
 // ===========================================================================
 
 func TestNewTheme_MarksCorrectThemeAsCurrent(t *testing.T) {
-	k := keys.Default()
 	themeFiles := []string{"tokyo-night.yaml", "dracula.yaml", "nord.yaml"}
+	body := app.SelectorBody{
+		Items:      themeFiles,
+		Selected:   0,
+		AllItems:   themeFiles,
+		ActiveItem: "tokyo-night.yaml",
+		Title:      "themes",
+	}
+	m := views.NewTransientSelector(80, 24)
+	plain := stripANSI(m.RenderSelector(body))
 
-	m := views.NewTheme(themeFiles, "tokyo-night.yaml", k)
-	m.SetSize(80, 24)
-
-	plain := stripANSI(m.View())
-
-	// "tokyo-night.yaml" must have (current).
 	activeFound := false
 	for line := range strings.SplitSeq(plain, "\n") {
 		if strings.Contains(line, "tokyo-night.yaml") && strings.Contains(line, "(current)") {
@@ -115,7 +119,6 @@ func TestNewTheme_MarksCorrectThemeAsCurrent(t *testing.T) {
 		t.Errorf("tokyo-night.yaml (active) should have (current) marker; got:\n%s", plain)
 	}
 
-	// Non-active items must NOT have (current).
 	for line := range strings.SplitSeq(plain, "\n") {
 		if strings.Contains(line, "dracula.yaml") && strings.Contains(line, "(current)") {
 			t.Errorf("dracula.yaml (non-active) should not have (current) marker; got line: %q", line)

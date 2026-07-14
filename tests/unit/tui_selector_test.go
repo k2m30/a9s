@@ -1,19 +1,41 @@
+// tui_selector_test.go — live SelectorModel.Update() coverage: cursor
+// movement (Up/Down/Top/Bottom/PageUp/PageDown) and boundary clamping.
+//
+// NewSelector/NewProfile/NewRegion/NewTheme, View, FrameTitle, Title,
+// SetFilter, GetFilter, CopyContent, GetHelpContext, and Init are DEAD per
+// specs/022-codebase-cleanup/wave3-map-text.md (selector.go: "LIVE:
+// NewSelectorWithCtrl, NewTransientSelector, Update, SetSize, RenderSelector;
+// DEAD: NewSelector, NewProfile, NewRegion, NewTheme, Init, View, FrameTitle,
+// CopyContent, GetHelpContext, Title, SetFilter, GetFilter"). The live
+// equivalents for what those dead methods pinned:
+//   - rendering shape (view-shows-current-marker/all-items/empty, filtered
+//     items): selector_render_parity_test.go's TestSelectorRender_LiveSeam,
+//     built on NewTransientSelector + app.SelectorBody.
+//   - the real '/' filter mode end-to-end: qa_filtering_test.go's
+//     TestQA_Filter_11_15/11_16_*SelectorFilterWorks.
+//   - copy is a no-op on a selector screen: wave3_text_ports_test.go's
+//     TestWave3Port_SelectorCopy_IsNoOp.
+//
+// Update() itself IS live (app_stack.go's rsKindSelector case calls
+// NewSelectorWithCtrl(m.ctrl, ...).Update(msg)), and it drives real
+// app.Controller cursor actions (ActionMoveUp/Down/Top/Bottom/PageUp/
+// PageDown) that nothing else in this suite exercises through a selector
+// screen — kept here via NewSelectorWithCtrl on a throwaway Controller
+// (mirroring exactly what the now-dead NewSelector did internally, minus
+// the dead wrapper itself).
 package unit
 
 import (
-	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
-
-// ═══════════════════════════════════════════════════════════════════════════
-// SelectorModel tests — unified profile/region selector
-// ═══════════════════════════════════════════════════════════════════════════
 
 func selectorKeyPress(char string) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: -1, Text: char}
@@ -23,75 +45,16 @@ func selectorSpecialKey(code rune) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: code}
 }
 
-// ── NewProfile constructor wrapper ──────────────────────────────────────────
-
-func TestSelector_NewProfileReturnsSelector(t *testing.T) {
-	k := keys.Default()
-	m := views.NewProfile([]string{"default", "staging"}, "default", k)
-	// Should be a SelectorModel
-	if m.Title() != "aws-profiles" {
-		t.Errorf("NewProfile Title() = %q, want %q", m.Title(), "aws-profiles")
-	}
-}
-
-func TestSelector_NewProfileEnterReturnsProfileSelectedMsg(t *testing.T) {
-	k := keys.Default()
-	m := views.NewProfile([]string{"default", "staging"}, "default", k)
+// newLiveSelector builds a SelectorModel via the live NewSelectorWithCtrl
+// seam, backed by a throwaway Controller seeded exactly like app_stack.go's
+// pushSelectorScreen seeds the real one.
+func newLiveSelector(items []string, activeItem, title string, onSelect func(string) tea.Msg, k keys.Map) views.SelectorModel {
+	c := app.New(runtime.Bootstrap("", "", nil))
+	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenProfileSelector}})
+	c.EnsureSelectorState(items, activeItem, title)
+	m := views.NewSelectorWithCtrl(c, onSelect, k)
 	m.SetSize(80, 20)
-
-	_, cmd := m.Update(selectorSpecialKey(tea.KeyEnter))
-	if cmd == nil {
-		t.Fatal("Enter should produce a command")
-	}
-	msg := cmd()
-	psm, ok := msg.(messages.ProfileSelected)
-	if !ok {
-		t.Fatalf("expected ProfileSelectedMsg, got %T", msg)
-	}
-	if psm.Profile != "default" {
-		t.Errorf("expected 'default', got %s", psm.Profile)
-	}
-}
-
-// ── NewRegion constructor wrapper ───────────────────────────────────────────
-
-func TestSelector_NewRegionReturnsSelector(t *testing.T) {
-	k := keys.Default()
-	m := views.NewRegion([]string{"us-east-1", "eu-west-1"}, "us-east-1", k)
-	if m.Title() != "aws-regions" {
-		t.Errorf("NewRegion Title() = %q, want %q", m.Title(), "aws-regions")
-	}
-}
-
-func TestSelector_NewRegionEnterReturnsRegionSelectedMsg(t *testing.T) {
-	k := keys.Default()
-	m := views.NewRegion([]string{"us-east-1", "eu-west-1"}, "us-east-1", k)
-	m.SetSize(80, 20)
-
-	_, cmd := m.Update(selectorSpecialKey(tea.KeyEnter))
-	if cmd == nil {
-		t.Fatal("Enter should produce a command")
-	}
-	msg := cmd()
-	rsm, ok := msg.(messages.RegionSelected)
-	if !ok {
-		t.Fatalf("expected RegionSelectedMsg, got %T", msg)
-	}
-	if rsm.Region != "us-east-1" {
-		t.Errorf("expected 'us-east-1', got %s", rsm.Region)
-	}
-}
-
-// ── Title() method ──────────────────────────────────────────────────────────
-
-func TestSelector_Title(t *testing.T) {
-	k := keys.Default()
-	m := views.NewSelector([]string{"a", "b"}, "a", "custom-title", func(s string) tea.Msg {
-		return nil
-	}, k)
-	if m.Title() != "custom-title" {
-		t.Errorf("Title() = %q, want %q", m.Title(), "custom-title")
-	}
+	return m
 }
 
 // ── Navigation: Up/Down ─────────────────────────────────────────────────────
@@ -100,13 +63,11 @@ func TestSelector_DownMovesSelection(t *testing.T) {
 	k := keys.Default()
 	items := []string{"item-1", "item-2", "item-3"}
 	var selected string
-	m := views.NewSelector(items, "item-1", "test", func(s string) tea.Msg {
+	m := newLiveSelector(items, "item-1", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
-	m.SetSize(80, 20)
 
-	// Move down to item-2
 	m, _ = m.Update(selectorKeyPress("j"))
 	m, cmd := m.Update(selectorSpecialKey(tea.KeyEnter))
 	if cmd == nil {
@@ -122,13 +83,11 @@ func TestSelector_UpMovesSelection(t *testing.T) {
 	k := keys.Default()
 	items := []string{"item-1", "item-2", "item-3"}
 	var selected string
-	m := views.NewSelector(items, "item-1", "test", func(s string) tea.Msg {
+	m := newLiveSelector(items, "item-1", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
-	m.SetSize(80, 20)
 
-	// Move down twice, then up once
 	m, _ = m.Update(selectorKeyPress("j"))
 	m, _ = m.Update(selectorKeyPress("j"))
 	m, _ = m.Update(selectorKeyPress("k"))
@@ -142,22 +101,19 @@ func TestSelector_UpMovesSelection(t *testing.T) {
 	}
 }
 
-// ── Navigation: Top/Bottom (g/G) — NEW in SelectorModel ────────────────────
+// ── Navigation: Top/Bottom (g/G) ────────────────────────────────────────────
 
 func TestSelector_GGoesToTop(t *testing.T) {
 	k := keys.Default()
 	items := []string{"item-1", "item-2", "item-3"}
 	var selected string
-	m := views.NewSelector(items, "item-1", "test", func(s string) tea.Msg {
+	m := newLiveSelector(items, "item-1", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
-	m.SetSize(80, 20)
 
-	// Move down to item-3
 	m, _ = m.Update(selectorKeyPress("j"))
 	m, _ = m.Update(selectorKeyPress("j"))
-	// Now press g to go to top
 	m, _ = m.Update(selectorKeyPress("g"))
 	m, cmd := m.Update(selectorSpecialKey(tea.KeyEnter))
 	if cmd == nil {
@@ -173,13 +129,11 @@ func TestSelector_ShiftGGoesToBottom(t *testing.T) {
 	k := keys.Default()
 	items := []string{"item-1", "item-2", "item-3"}
 	var selected string
-	m := views.NewSelector(items, "item-1", "test", func(s string) tea.Msg {
+	m := newLiveSelector(items, "item-1", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
-	m.SetSize(80, 20)
 
-	// Press G to go to bottom
 	m, _ = m.Update(selectorKeyPress("G"))
 	m, cmd := m.Update(selectorSpecialKey(tea.KeyEnter))
 	if cmd == nil {
@@ -200,7 +154,7 @@ func TestSelector_PageDownMovesCursor(t *testing.T) {
 		items[i] = "item-" + string(rune('a'+i%26))
 	}
 	var selected string
-	m := views.NewSelector(items, "", "test", func(s string) tea.Msg {
+	m := newLiveSelector(items, "", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
@@ -212,7 +166,6 @@ func TestSelector_PageDownMovesCursor(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	cmd()
-	// After page down, cursor should have moved past 0
 	if selected == items[0] {
 		t.Error("after PageDown, cursor should have moved past first item")
 	}
@@ -225,13 +178,12 @@ func TestSelector_PageUpMovesCursor(t *testing.T) {
 		items[i] = "item-" + string(rune('a'+i%26))
 	}
 	var selected string
-	m := views.NewSelector(items, "", "test", func(s string) tea.Msg {
+	m := newLiveSelector(items, "", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
 	m.SetSize(80, 10)
 
-	// Go to bottom, then page up
 	m, _ = m.Update(selectorKeyPress("G"))
 	m, _ = m.Update(selectorSpecialKey(tea.KeyPgUp))
 	m, cmd := m.Update(selectorSpecialKey(tea.KeyEnter))
@@ -239,7 +191,6 @@ func TestSelector_PageUpMovesCursor(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	cmd()
-	// Should not be at bottom after page up
 	if selected == items[len(items)-1] {
 		t.Error("after G then PageUp, cursor should not be at bottom")
 	}
@@ -251,11 +202,10 @@ func TestSelector_CursorStopsAtTop(t *testing.T) {
 	k := keys.Default()
 	items := []string{"a", "b", "c"}
 	var selected string
-	m := views.NewSelector(items, "", "test", func(s string) tea.Msg {
+	m := newLiveSelector(items, "", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
-	m.SetSize(80, 20)
 
 	m, _ = m.Update(selectorKeyPress("k"))
 	m, _ = m.Update(selectorKeyPress("k"))
@@ -273,11 +223,10 @@ func TestSelector_CursorStopsAtBottom(t *testing.T) {
 	k := keys.Default()
 	items := []string{"a", "b", "c"}
 	var selected string
-	m := views.NewSelector(items, "", "test", func(s string) tea.Msg {
+	m := newLiveSelector(items, "", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
-	m.SetSize(80, 20)
 
 	m, _ = m.Update(selectorKeyPress("j"))
 	m, _ = m.Update(selectorKeyPress("j"))
@@ -293,192 +242,11 @@ func TestSelector_CursorStopsAtBottom(t *testing.T) {
 	}
 }
 
-// ── FrameTitle ──────────────────────────────────────────────────────────────
-
-func TestSelector_FrameTitleShowsCount(t *testing.T) {
-	k := keys.Default()
-	m := views.NewProfile([]string{"a", "b", "c"}, "a", k)
-	if m.FrameTitle() != "aws-profiles(3)" {
-		t.Errorf("FrameTitle() = %q, want %q", m.FrameTitle(), "aws-profiles(3)")
-	}
-}
-
-func TestSelector_FrameTitleShowsFilteredCount(t *testing.T) {
-	k := keys.Default()
-	m := views.NewProfile([]string{"alpha", "beta", "gamma"}, "alpha", k)
-	m.SetFilter("al")
-	title := m.FrameTitle()
-	if title != "aws-profiles(1/3)" {
-		t.Errorf("FrameTitle() = %q, want %q", title, "aws-profiles(1/3)")
-	}
-}
-
-func TestSelector_RegionFrameTitle(t *testing.T) {
-	k := keys.Default()
-	m := views.NewRegion([]string{"us-east-1", "eu-west-1"}, "us-east-1", k)
-	if m.FrameTitle() != "aws-regions(2)" {
-		t.Errorf("FrameTitle() = %q, want %q", m.FrameTitle(), "aws-regions(2)")
-	}
-}
-
-// ── View rendering ──────────────────────────────────────────────────────────
-
-func TestSelector_ViewShowsCurrentMarker(t *testing.T) {
-	k := keys.Default()
-	m := views.NewProfile([]string{"default", "staging", "prod"}, "staging", k)
-	m.SetSize(80, 20)
-	view := m.View()
-	plain := stripANSI(view)
-	if !strings.Contains(plain, "(current)") {
-		t.Error("view should show (current) marker for active item")
-	}
-	// The (current) marker should be on the staging line
-	lines := strings.Split(plain, "\n")
-	found := false
-	for _, line := range lines {
-		if strings.Contains(line, "staging") && strings.Contains(line, "(current)") {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("staging line should have (current) marker, got: %s", plain)
-	}
-}
-
-func TestSelector_ViewShowsAllItems(t *testing.T) {
-	k := keys.Default()
-	items := []string{"item-1", "item-2", "item-3"}
-	m := views.NewSelector(items, "", "test", func(s string) tea.Msg { return nil }, k)
-	m.SetSize(80, 20)
-	view := m.View()
-	for _, item := range items {
-		if !strings.Contains(view, item) {
-			t.Errorf("view should contain %q", item)
-		}
-	}
-}
-
-func TestSelector_ViewEmptyItems(t *testing.T) {
-	k := keys.Default()
-	m := views.NewProfile([]string{}, "", k)
-	m.SetSize(80, 20)
-	view := m.View()
-	if !strings.Contains(view, "No items available") {
-		t.Errorf("empty selector should show 'No items available', got: %s", view)
-	}
-}
-
-// ── Filter ──────────────────────────────────────────────────────────────────
-
-func TestSelector_SetFilterFiltersItems(t *testing.T) {
-	k := keys.Default()
-	m := views.NewProfile([]string{"alpha", "beta", "gamma"}, "alpha", k)
-	m.SetSize(80, 20)
-	m.SetFilter("be")
-	view := m.View()
-	plain := stripANSI(view)
-	if !strings.Contains(plain, "beta") {
-		t.Error("filtered view should contain 'beta'")
-	}
-	if strings.Contains(plain, "alpha") {
-		t.Error("filtered view should NOT contain 'alpha'")
-	}
-	if strings.Contains(plain, "gamma") {
-		t.Error("filtered view should NOT contain 'gamma'")
-	}
-}
-
-func TestSelector_SetFilterResetsCursor(t *testing.T) {
-	k := keys.Default()
-	items := []string{"alpha", "beta", "gamma"}
-	var selected string
-	m := views.NewSelector(items, "", "test", func(s string) tea.Msg {
-		selected = s
-		return messages.ProfileSelected{Profile: s}
-	}, k)
-	m.SetSize(80, 20)
-
-	// Move cursor down
-	m, _ = m.Update(selectorKeyPress("j"))
-	// Apply filter
-	m.SetFilter("ga")
-	// Enter should select filtered item at cursor 0
-	m, cmd := m.Update(selectorSpecialKey(tea.KeyEnter))
-	if cmd == nil {
-		t.Fatal("Enter should produce a command")
-	}
-	cmd()
-	if selected != "gamma" {
-		t.Errorf("after filter 'ga', Enter should select 'gamma', got %s", selected)
-	}
-}
-
-func TestSelector_GetFilter(t *testing.T) {
-	k := keys.Default()
-	m := views.NewProfile([]string{"a", "b"}, "a", k)
-	m.SetFilter("test-filter")
-	if m.GetFilter() != "test-filter" {
-		t.Errorf("GetFilter() = %q, want %q", m.GetFilter(), "test-filter")
-	}
-}
-
-func TestSelector_ClearFilter(t *testing.T) {
-	k := keys.Default()
-	m := views.NewProfile([]string{"alpha", "beta"}, "alpha", k)
-	m.SetSize(80, 20)
-	m.SetFilter("be")
-	m.SetFilter("")
-	view := m.View()
-	plain := stripANSI(view)
-	if !strings.Contains(plain, "alpha") {
-		t.Error("after clearing filter, view should contain 'alpha'")
-	}
-	if !strings.Contains(plain, "beta") {
-		t.Error("after clearing filter, view should contain 'beta'")
-	}
-}
-
-// ── CopyContent ─────────────────────────────────────────────────────────────
-
-func TestSelector_CopyContentReturnsEmpty(t *testing.T) {
-	k := keys.Default()
-	m := views.NewProfile([]string{"a"}, "a", k)
-	content, label := m.CopyContent()
-	if content != "" || label != "" {
-		t.Errorf("CopyContent() should return empty, got %q, %q", content, label)
-	}
-}
-
-// ── GetHelpContext ───────────────────────────────────────────────────────────
-
-func TestSelector_GetHelpContextReturnsSelector(t *testing.T) {
-	k := keys.Default()
-	m := views.NewProfile([]string{"a"}, "a", k)
-	if m.GetHelpContext() != views.HelpFromSelector {
-		t.Errorf("GetHelpContext() should return HelpFromSelector, got %v", m.GetHelpContext())
-	}
-}
-
-// ── Init ────────────────────────────────────────────────────────────────────
-
-func TestSelector_InitReturnsNilCmd(t *testing.T) {
-	k := keys.Default()
-	m := views.NewProfile([]string{"a"}, "a", k)
-	m2, cmd := m.Init()
-	if cmd != nil {
-		t.Error("Init() should return nil cmd")
-	}
-	if m2.Title() != "aws-profiles" {
-		t.Error("Init() should return same model")
-	}
-}
-
 // ── Unhandled keys ──────────────────────────────────────────────────────────
 
 func TestSelector_UnhandledKeyReturnsNilCmd(t *testing.T) {
 	k := keys.Default()
-	m := views.NewProfile([]string{"a"}, "a", k)
+	m := newLiveSelector([]string{"a"}, "a", "test", func(s string) tea.Msg { return nil }, k)
 	_, cmd := m.Update(selectorKeyPress("x"))
 	if cmd != nil {
 		t.Error("unhandled key 'x' should return nil cmd")
@@ -487,17 +255,23 @@ func TestSelector_UnhandledKeyReturnsNilCmd(t *testing.T) {
 
 func TestSelector_NonKeyMsgPassthrough(t *testing.T) {
 	k := keys.Default()
-	m := views.NewProfile([]string{"a", "b"}, "a", k)
-	m2, cmd := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	items := []string{"a", "b"}
+	var selected string
+	m := newLiveSelector(items, "a", "test", func(s string) tea.Msg {
+		selected = s
+		return messages.ProfileSelected{Profile: s}
+	}, k)
+	_, cmd := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	if cmd != nil {
 		t.Error("WindowSizeMsg should return nil cmd")
 	}
-	if m2.FrameTitle() != "aws-profiles(2)" {
-		t.Errorf("model should be unchanged after non-key msg, got %q", m2.FrameTitle())
+	// Model must still function normally after a non-key message.
+	m, cmd = m.Update(selectorSpecialKey(tea.KeyEnter))
+	if cmd == nil {
+		t.Fatal("Enter should still produce a command after a non-key msg")
+	}
+	cmd()
+	if selected != "a" {
+		t.Errorf("selection unaffected by non-key msg, expected 'a', got %s", selected)
 	}
 }
-
-// ── Compile-time interface checks ───────────────────────────────────────────
-
-var _ views.View = (*views.SelectorModel)(nil)
-var _ views.Filterable = (*views.SelectorModel)(nil)

@@ -81,30 +81,6 @@ func newFakeSESv2WithEventDestinations(identityName, configSetName string, dests
 	}
 }
 
-// newFakeSESv2Empty returns a fakeSESv2Batch5 whose GetEmailIdentity returns
-// no config set name and GetConfigurationSetEventDestinations returns no dests.
-func newFakeSESv2Empty(identityName string) *fakeSESv2Batch5 {
-	return &fakeSESv2Batch5{
-		getEmailIdentityFn: func(input *sesv2.GetEmailIdentityInput) (*sesv2.GetEmailIdentityOutput, error) {
-			name := ""
-			if input.EmailIdentity != nil {
-				name = *input.EmailIdentity
-			}
-			if name == identityName {
-				return &sesv2.GetEmailIdentityOutput{
-					ConfigurationSetName: aws.String("acme-config-set"),
-				}, nil
-			}
-			return &sesv2.GetEmailIdentityOutput{}, nil
-		},
-		getConfigSetEventDestsFn: func(_ *sesv2.GetConfigurationSetEventDestinationsInput) (*sesv2.GetConfigurationSetEventDestinationsOutput, error) {
-			return &sesv2.GetConfigurationSetEventDestinationsOutput{
-				EventDestinations: []sesv2types.EventDestination{},
-			}, nil
-		},
-	}
-}
-
 // ---------------------------------------------------------------------------
 // fakeSecretsManagerBatch5 — implements SecretsManagerAPI
 // Controllable method: GetResourcePolicy.

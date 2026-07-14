@@ -13,25 +13,6 @@ import (
 // iamtypes.Group: no navigable cross-ref fields — the Group struct carries only
 // GroupName, GroupId, Arn, Path, CreateDate. Members and policies are runtime API relationships.
 
-// FetchIAMGroups calls the IAM ListGroups API and returns all pages of groups.
-// Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchIAMGroups(ctx context.Context, api IAMListGroupsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchIAMGroupsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchIAMGroupsPage calls the IAM ListGroups API and returns a single page
 // of groups. Pass an empty continuationToken for the first page.
 func FetchIAMGroupsPage(ctx context.Context, api IAMListGroupsAPI, continuationToken string) (resource.FetchResult, error) {

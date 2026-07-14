@@ -654,6 +654,69 @@ func (m Model) handleTextKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model, t
 		}
 		return m, nil
 
+	case key.Matches(msg, m.keys.YAML):
+		// Toggle JSON -> YAML (ReplaceCurrent, mirroring the pre-refactor
+		// YAMLModel/JSONModel toggle). A no-op when already on YAML or on a
+		// non-YAML/JSON text screen (e.g. error log).
+		if screenID, ctx := m.ctrl.GetTextScreenContext(); screenID == runtime.ScreenJSON {
+			res := m.ctrl.GetTextResource()
+			return m, func() tea.Msg {
+				return messages.Navigate{
+					Target:         messages.TargetYAML,
+					Resource:       &res,
+					ResourceType:   ctx.ResourceType,
+					ReplaceCurrent: true,
+				}
+			}
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.JSON):
+		// Toggle YAML -> JSON (ReplaceCurrent), same rationale as above.
+		if screenID, ctx := m.ctrl.GetTextScreenContext(); screenID == runtime.ScreenYAML {
+			res := m.ctrl.GetTextResource()
+			return m, func() tea.Msg {
+				return messages.Navigate{
+					Target:         messages.TargetJSON,
+					Resource:       &res,
+					ResourceType:   ctx.ResourceType,
+					ReplaceCurrent: true,
+				}
+			}
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.CloudTrail):
+		res := m.ctrl.GetTextResource()
+		_, ctx := m.ctrl.GetTextScreenContext()
+		if ff := resource.BuildCloudTrailFilter(res, ctx.ResourceType); ff != nil {
+			return m, func() tea.Msg {
+				return messages.RelatedNavigate{
+					TargetType:     "ct-events",
+					SourceResource: res,
+					SourceType:     ctx.ResourceType,
+					FetchFilter:    ff,
+				}
+			}
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.Describe):
+		// No-op on raw-text screens (error log) where there is no backing
+		// resource, mirroring the pre-refactor YAMLModel guard on rawText.
+		if _, ctx := m.ctrl.GetTextScreenContext(); ctx.ResourceType != "" {
+			res := m.ctrl.GetTextResource()
+			return m, func() tea.Msg {
+				return messages.Navigate{
+					Target:         messages.TargetDetail,
+					Resource:       &res,
+					ResourceType:   ctx.ResourceType,
+					ReplaceCurrent: true,
+				}
+			}
+		}
+		return m, nil
+
 	case key.Matches(msg, m.keys.Up):
 		if rs.ctrlBacked {
 			m.ctrl.Apply(app.Action{Kind: app.ActionMoveUp})

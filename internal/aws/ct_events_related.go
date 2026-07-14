@@ -136,6 +136,37 @@ func ctEventsRelatedResources(_ context.Context, _ any, cache resource.ResourceC
 	return nil, false, nil
 }
 
+// ctEventsMatchTarget resolves an event-derived id list against target's
+// related-resource cache: a cold (nil) cache trusts ids outright, a proven
+// cache keeps only ids that resolve to a cached resource by ID or Name, and a
+// truncated cache falls back to trusting ids (it can't disprove a miss).
+func ctEventsMatchTarget(ctx context.Context, clients any, cache resource.ResourceCache, target string, ids []string) resource.RelatedCheckResult {
+	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, target)
+	if err != nil {
+		return resource.ErrorRelated(target, err)
+	}
+	if resourceList == nil {
+		return relatedResult(target, ids)
+	}
+
+	wantSet := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		wantSet[id] = struct{}{}
+	}
+	var matched []string
+	for _, r := range resourceList {
+		if _, ok := wantSet[r.ID]; ok {
+			matched = append(matched, r.ID)
+		} else if _, ok := wantSet[r.Name]; ok {
+			matched = append(matched, r.ID)
+		}
+	}
+	if truncated {
+		return relatedResult(target, ids)
+	}
+	return relatedResult(target, matched)
+}
+
 // extractCTResourceIDs scans the event's Resources slice for entries matching
 // awsResourceType (e.g. "AWS::EC2::Instance") and returns the bare identifiers
 // (ResourceName with any "/" prefix trimmed to the last segment).
@@ -244,30 +275,7 @@ func checkCtEventsEC2(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
 	}
 
-	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "ec2")
-	if err != nil {
-		return resource.ErrorRelated("ec2", err)
-	}
-	if resourceList == nil {
-		return relatedResult("ec2", ids)
-	}
-
-	wantSet := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		wantSet[id] = struct{}{}
-	}
-	var matched []string
-	for _, r := range resourceList {
-		if _, ok := wantSet[r.ID]; ok {
-			matched = append(matched, r.ID)
-		} else if _, ok := wantSet[r.Name]; ok {
-			matched = append(matched, r.ID)
-		}
-	}
-	if truncated {
-		return relatedResult("ec2", ids)
-	}
-	return relatedResult("ec2", matched)
+	return ctEventsMatchTarget(ctx, clients, cache, "ec2", ids)
 }
 
 // checkCtEventsS3 extracts S3 bucket names from the CloudTrail event.
@@ -293,30 +301,7 @@ func checkCtEventsS3(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
 	}
 
-	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "s3")
-	if err != nil {
-		return resource.ErrorRelated("s3", err)
-	}
-	if resourceList == nil {
-		return relatedResult("s3", ids)
-	}
-
-	wantSet := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		wantSet[id] = struct{}{}
-	}
-	var matched []string
-	for _, r := range resourceList {
-		if _, ok := wantSet[r.ID]; ok {
-			matched = append(matched, r.ID)
-		} else if _, ok := wantSet[r.Name]; ok {
-			matched = append(matched, r.ID)
-		}
-	}
-	if truncated {
-		return relatedResult("s3", ids)
-	}
-	return relatedResult("s3", matched)
+	return ctEventsMatchTarget(ctx, clients, cache, "s3", ids)
 }
 
 // checkCtEventsLambda extracts Lambda function names from the CloudTrail event.
@@ -346,30 +331,7 @@ func checkCtEventsLambda(ctx context.Context, clients any, res resource.Resource
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 	}
 
-	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "lambda")
-	if err != nil {
-		return resource.ErrorRelated("lambda", err)
-	}
-	if resourceList == nil {
-		return relatedResult("lambda", ids)
-	}
-
-	wantSet := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		wantSet[id] = struct{}{}
-	}
-	var matched []string
-	for _, r := range resourceList {
-		if _, ok := wantSet[r.ID]; ok {
-			matched = append(matched, r.ID)
-		} else if _, ok := wantSet[r.Name]; ok {
-			matched = append(matched, r.ID)
-		}
-	}
-	if truncated {
-		return relatedResult("lambda", ids)
-	}
-	return relatedResult("lambda", matched)
+	return ctEventsMatchTarget(ctx, clients, cache, "lambda", ids)
 }
 
 // checkCtEventsRDS extracts RDS instance/cluster identifiers from the CloudTrail event.
@@ -416,30 +378,7 @@ func checkCtEventsRDS(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
 	}
 
-	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "dbi")
-	if err != nil {
-		return resource.ErrorRelated("dbi", err)
-	}
-	if resourceList == nil {
-		return relatedResult("dbi", ids)
-	}
-
-	wantSet := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		wantSet[id] = struct{}{}
-	}
-	var matched []string
-	for _, r := range resourceList {
-		if _, ok := wantSet[r.ID]; ok {
-			matched = append(matched, r.ID)
-		} else if _, ok := wantSet[r.Name]; ok {
-			matched = append(matched, r.ID)
-		}
-	}
-	if truncated {
-		return relatedResult("dbi", ids)
-	}
-	return relatedResult("dbi", matched)
+	return ctEventsMatchTarget(ctx, clients, cache, "dbi", ids)
 }
 
 // checkCtEventsKMS extracts KMS key IDs from the CloudTrail event.
@@ -469,30 +408,7 @@ func checkCtEventsKMS(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 
-	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "kms")
-	if err != nil {
-		return resource.ErrorRelated("kms", err)
-	}
-	if resourceList == nil {
-		return relatedResult("kms", ids)
-	}
-
-	wantSet := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		wantSet[id] = struct{}{}
-	}
-	var matched []string
-	for _, r := range resourceList {
-		if _, ok := wantSet[r.ID]; ok {
-			matched = append(matched, r.ID)
-		} else if _, ok := wantSet[r.Name]; ok {
-			matched = append(matched, r.ID)
-		}
-	}
-	if truncated {
-		return relatedResult("kms", ids)
-	}
-	return relatedResult("kms", matched)
+	return ctEventsMatchTarget(ctx, clients, cache, "kms", ids)
 }
 
 // stripKMSKeyID strips a KMS key ID or ARN down to the bare UUID
@@ -527,30 +443,7 @@ func checkCtEventsSecrets(ctx context.Context, clients any, res resource.Resourc
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
 	}
 
-	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "secrets")
-	if err != nil {
-		return resource.ErrorRelated("secrets", err)
-	}
-	if resourceList == nil {
-		return relatedResult("secrets", ids)
-	}
-
-	wantSet := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		wantSet[id] = struct{}{}
-	}
-	var matched []string
-	for _, r := range resourceList {
-		if _, ok := wantSet[r.ID]; ok {
-			matched = append(matched, r.ID)
-		} else if _, ok := wantSet[r.Name]; ok {
-			matched = append(matched, r.ID)
-		}
-	}
-	if truncated {
-		return relatedResult("secrets", ids)
-	}
-	return relatedResult("secrets", matched)
+	return ctEventsMatchTarget(ctx, clients, cache, "secrets", ids)
 }
 
 // checkCtEventsVPCE extracts VPC Endpoint IDs from the CloudTrail event.
@@ -572,30 +465,7 @@ func checkCtEventsVPCE(ctx context.Context, clients any, res resource.Resource, 
 		return resource.RelatedCheckResult{TargetType: "vpce", Count: 0}
 	}
 
-	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "vpce")
-	if err != nil {
-		return resource.ErrorRelated("vpce", err)
-	}
-	if resourceList == nil {
-		return relatedResult("vpce", ids)
-	}
-
-	wantSet := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		wantSet[id] = struct{}{}
-	}
-	var matched []string
-	for _, r := range resourceList {
-		if _, ok := wantSet[r.ID]; ok {
-			matched = append(matched, r.ID)
-		} else if _, ok := wantSet[r.Name]; ok {
-			matched = append(matched, r.ID)
-		}
-	}
-	if truncated {
-		return relatedResult("vpce", ids)
-	}
-	return relatedResult("vpce", matched)
+	return ctEventsMatchTarget(ctx, clients, cache, "vpce", ids)
 }
 
 // checkCtEventsSG extracts Security Group IDs from the CloudTrail event.
@@ -621,30 +491,7 @@ func checkCtEventsSG(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
 	}
 
-	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "sg")
-	if err != nil {
-		return resource.ErrorRelated("sg", err)
-	}
-	if resourceList == nil {
-		return relatedResult("sg", ids)
-	}
-
-	wantSet := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		wantSet[id] = struct{}{}
-	}
-	var matched []string
-	for _, r := range resourceList {
-		if _, ok := wantSet[r.ID]; ok {
-			matched = append(matched, r.ID)
-		} else if _, ok := wantSet[r.Name]; ok {
-			matched = append(matched, r.ID)
-		}
-	}
-	if truncated {
-		return relatedResult("sg", ids)
-	}
-	return relatedResult("sg", matched)
+	return ctEventsMatchTarget(ctx, clients, cache, "sg", ids)
 }
 
 // checkCtEventsDDB extracts DynamoDB table names from the CloudTrail event.
@@ -670,30 +517,7 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "ddb", Count: 0}
 	}
 
-	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "ddb")
-	if err != nil {
-		return resource.ErrorRelated("ddb", err)
-	}
-	if resourceList == nil {
-		return relatedResult("ddb", ids)
-	}
-
-	wantSet := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		wantSet[id] = struct{}{}
-	}
-	var matched []string
-	for _, r := range resourceList {
-		if _, ok := wantSet[r.ID]; ok {
-			matched = append(matched, r.ID)
-		} else if _, ok := wantSet[r.Name]; ok {
-			matched = append(matched, r.ID)
-		}
-	}
-	if truncated {
-		return relatedResult("ddb", ids)
-	}
-	return relatedResult("ddb", matched)
+	return ctEventsMatchTarget(ctx, clients, cache, "ddb", ids)
 }
 
 // ---------------------------------------------------------------------------
@@ -807,32 +631,7 @@ func checkCtEventsTrail(ctx context.Context, clients any, res resource.Resource,
 		return resource.RelatedCheckResult{TargetType: "trail", Count: 0}
 	}
 
-	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "trail")
-	if err != nil {
-		return resource.ErrorRelated("trail", err)
-	}
-	if resourceList == nil {
-		return relatedResult("trail", ids)
-	}
-
-	wantSet := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		wantSet[id] = struct{}{}
-	}
-	var matched []string
-	for _, r := range resourceList {
-		if _, ok := wantSet[r.ID]; ok {
-			matched = append(matched, r.ID)
-			continue
-		}
-		if _, ok := wantSet[r.Name]; ok {
-			matched = append(matched, r.ID)
-		}
-	}
-	if truncated {
-		return relatedResult("trail", ids)
-	}
-	return relatedResult("trail", matched)
+	return ctEventsMatchTarget(ctx, clients, cache, "trail", ids)
 }
 
 // checkCtEventsCFN extracts CloudFormation stack names from the CloudTrail event.
@@ -867,28 +666,5 @@ func checkCtEventsCFN(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 
-	resourceList, truncated, err := ctEventsRelatedResources(ctx, clients, cache, "cfn")
-	if err != nil {
-		return resource.ErrorRelated("cfn", err)
-	}
-	if resourceList == nil {
-		return relatedResult("cfn", ids)
-	}
-
-	wantSet := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		wantSet[id] = struct{}{}
-	}
-	var matched []string
-	for _, r := range resourceList {
-		if _, ok := wantSet[r.ID]; ok {
-			matched = append(matched, r.ID)
-		} else if _, ok := wantSet[r.Name]; ok {
-			matched = append(matched, r.ID)
-		}
-	}
-	if truncated {
-		return relatedResult("cfn", ids)
-	}
-	return relatedResult("cfn", matched)
+	return ctEventsMatchTarget(ctx, clients, cache, "cfn", ids)
 }

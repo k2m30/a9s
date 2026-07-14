@@ -10,6 +10,7 @@ import (
 	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -40,7 +41,9 @@ func TestFetchCodeArtifactRepos_ParsesMultipleRepos(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCodeArtifactRepos(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCodeArtifactReposPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -87,7 +90,9 @@ func TestFetchCodeArtifactRepos_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCodeArtifactRepos(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCodeArtifactReposPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -102,7 +107,9 @@ func TestFetchCodeArtifactRepos_APIError(t *testing.T) {
 		err: &mockAPIError{code: "AccessDeniedException", message: "access denied"},
 	}
 
-	_, err := awsclient.FetchCodeArtifactRepos(context.Background(), mock)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCodeArtifactReposPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -117,7 +124,9 @@ func TestFetchCodeArtifactRepos_NilFields(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchCodeArtifactRepos(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCodeArtifactReposPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

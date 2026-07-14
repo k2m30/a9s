@@ -39,7 +39,9 @@ func TestPR03d_VPCFetcher_PendingEmitsWarnFinding(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchVPCs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchVPCsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchVPCs: unexpected error: %v", err)
 	}

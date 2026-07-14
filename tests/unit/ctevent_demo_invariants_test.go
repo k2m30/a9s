@@ -28,11 +28,11 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 // ---------------------------------------------------------------------------
@@ -45,7 +45,9 @@ func loadAllCTFixtures(t *testing.T) []resource.Resource {
 	t.Helper()
 	clients := demo.NewServiceClients()
 	ctx := context.Background()
-	fixtures, err := awsclient.FetchCloudTrailEvents(ctx, clients.CloudTrail)
+	fixtures, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(ctx, clients.CloudTrail, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchCloudTrailEvents: %v", err)
 	}
@@ -94,44 +96,68 @@ func buildFakeResourceCache(t *testing.T) resource.ResourceCache {
 		}
 	}
 
-	roles, err := awsclient.FetchIAMRoles(ctx, clients.IAM)
+	roles, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchIAMRolesPage(ctx, clients.IAM, token)
+	})
 	fetch("role", roles, err)
 
-	users, err := awsclient.FetchIAMUsers(ctx, clients.IAM)
+	users, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchIAMUsersPage(ctx, clients.IAM, token)
+	})
 	fetch("iam-user", users, err)
 
-	instances, err := awsclient.FetchEC2Instances(ctx, clients.EC2)
+	instances, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(ctx, clients.EC2, token)
+	})
 	fetch("ec2", instances, err)
 
-	buckets, err := awsclient.FetchS3Buckets(ctx, clients.S3)
+	buckets, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchS3BucketsPage(ctx, clients.S3, token)
+	})
 	fetch("s3", buckets, err)
 
-	lambdas, err := awsclient.FetchLambdaFunctions(ctx, clients.Lambda)
+	lambdas, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchLambdaFunctionsPage(ctx, clients.Lambda, token)
+	})
 	fetch("lambda", lambdas, err)
 
-	rdsInstances, err := awsclient.FetchRDSInstances(ctx, clients.RDS)
+	rdsInstances, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchRDSInstancesPage(ctx, clients.RDS, token)
+	})
 	fetch("rds", rdsInstances, err)
 
 	kmsKeys, err := awsclient.FetchKMSKeys(ctx, clients.KMS, clients.KMS, clients.KMS)
 	fetch("kms", kmsKeys, err)
 
-	secrets, err := awsclient.FetchSecrets(ctx, clients.SecretsManager)
+	secrets, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSecretsPage(ctx, clients.SecretsManager, token)
+	})
 	fetch("secrets", secrets, err)
 
-	vpce, err := awsclient.FetchVPCEndpoints(ctx, clients.EC2)
+	vpce, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchVPCEndpointsPage(ctx, clients.EC2, token)
+	})
 	fetch("vpce", vpce, err)
 
-	sgs, err := awsclient.FetchSecurityGroups(ctx, clients.EC2)
+	sgs, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSecurityGroupsPage(ctx, clients.EC2, token)
+	})
 	fetch("sg", sgs, err)
 
-	ddbTables, err := awsclient.FetchDynamoDBTables(ctx, clients.DynamoDB, clients.DynamoDB)
+	ddbTables, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchDynamoDBTablesPage(ctx, clients.DynamoDB, clients.DynamoDB, token)
+	})
 	fetch("ddb", ddbTables, err)
 
-	stacks, err := awsclient.FetchCloudFormationStacks(ctx, clients.CloudFormation)
+	stacks, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudFormationStacksPage(ctx, clients.CloudFormation, token)
+	})
 	fetch("cfn", stacks, err)
 
 	// Also populate ct-events itself for self-pivot lookups.
-	ctEvents, err := awsclient.FetchCloudTrailEvents(ctx, clients.CloudTrail)
+	ctEvents, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(ctx, clients.CloudTrail, token)
+	})
 	fetch("ct-events", ctEvents, err)
 
 	return cache

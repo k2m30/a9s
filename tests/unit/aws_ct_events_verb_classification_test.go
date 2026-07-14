@@ -12,7 +12,7 @@ package unit
 import (
 	"testing"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 func TestClassifyCTVerb_V2Table(t *testing.T) {
@@ -122,7 +122,7 @@ func TestClassifyCTVerb_V2Table(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := awsclient.ClassifyCTVerb(c.eventName, c.eventCategory, c.eventType)
+			got := ctevent.ClassifyCTVerb(c.eventName, c.eventCategory, c.eventType)
 			if got != c.want {
 				t.Errorf("ClassifyCTVerb(%q, %q, %q) = %q, want %q per §2.1",
 					c.eventName, c.eventCategory, c.eventType, got, c.want)

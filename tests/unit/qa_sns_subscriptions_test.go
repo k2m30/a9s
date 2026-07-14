@@ -35,7 +35,9 @@ func TestQA_SNSSubscriptions_FetchSuccess(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSNSSubscriptions(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSNSSubscriptionsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -76,7 +78,9 @@ func TestQA_SNSSubscriptions_FetchEmpty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSNSSubscriptions(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSNSSubscriptionsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -90,7 +94,9 @@ func TestQA_SNSSubscriptions_FetchError(t *testing.T) {
 		err: fmt.Errorf("access denied"),
 	}
 
-	_, err := awsclient.FetchSNSSubscriptions(context.Background(), mock)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSNSSubscriptionsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

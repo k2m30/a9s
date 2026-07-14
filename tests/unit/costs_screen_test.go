@@ -276,6 +276,15 @@ func TestCostsScreen_DrillPath_Next(t *testing.T) {
 	}{
 		{"nothing pinned: SERVICE first", nil, costs.DimensionService, true},
 		{
+			// Ported from the retired costs.NextDim's TestNextDim_Chain ("pivot
+			// SERVICE with SERVICE already pinned in the filter drills to
+			// USAGE_TYPE") — the one case not already covered by the X5/
+			// canonical-order/leaf cases below (022-codebase-cleanup re-audit).
+			"SERVICE alone pinned -> USAGE_TYPE",
+			[]costs.Dimension{costs.DimensionService},
+			costs.DimensionUsageType, true,
+		},
+		{
 			"X5: USAGE_TYPE then SERVICE both pinned -> RESOURCE_ID, not a redundant USAGE_TYPE",
 			[]costs.Dimension{costs.DimensionUsageType, costs.DimensionService},
 			costs.DimensionResourceID, true,

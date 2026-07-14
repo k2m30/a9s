@@ -20,7 +20,9 @@ import (
 //  3. Lines matching `.Checker(<anything containing nil>)` — direct nil-client
 //     checker invocations bypass the demo transport entirely.
 //
-// This test is expected to FAIL until T045–T049 rewrite the offenders.
+// T045–T049 (specs/014-demo-transport-mock) rewrote every offender onto the
+// shared demo harness; this test now passes and acts as a regression gate —
+// it fails again if any of the three anti-patterns are reintroduced.
 // Report file paths and line numbers so engineers know exactly what to fix.
 func TestNoForbiddenTestHelpers(t *testing.T) {
 	t.Helper()

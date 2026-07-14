@@ -8,8 +8,6 @@ vendor/
 # Binaries
 /a9s
 /preview
-/preview_detail
-/preview-pagination
 /related-resources-preview
 /snapshot
 /checklist

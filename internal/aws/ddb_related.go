@@ -40,7 +40,7 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := ddbRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -82,7 +82,7 @@ func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cac
 	if tableARN == "" {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
 	}
-	backupList, truncated, err := ddbRelatedResources(ctx, clients, cache, "backup")
+	backupList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.ErrorRelated("backup", err)
 	}
@@ -147,17 +147,6 @@ func truncatedResultDDB(target string, ids []string) resource.RelatedCheckResult
 	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Truncated: true}
 }
 
-// ddbRelatedResources returns the resource list for target from cache or by fetching the first page.
-func ddbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
-}
-
 // checkDdbLambda finds Lambda functions wired to this DynamoDB table's stream
 // (Pattern A — live API). DDB Streams are consumed through
 // lambda:ListEventSourceMappings; the EventSourceArn on each mapping matches
@@ -196,4 +185,10 @@ func checkDdbLambda(ctx context.Context, clients any, res resource.Resource, _ r
 		}
 	}
 	return relatedResult("lambda", ids)
+}
+
+// ddbRelatedResources returns the resource list for target from cache or by
+// fetching the first page via the registered paginated fetcher.
+func ddbRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+	return relatedResourcesFor(ctx, clients, cache, target)
 }

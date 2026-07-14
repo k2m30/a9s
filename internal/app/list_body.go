@@ -2,6 +2,7 @@ package app
 
 import (
 	"maps"
+	"strconv"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -280,26 +281,11 @@ func isStaleReplace(existing, incoming []resource.Resource, pagination *resource
 }
 
 // dedupAgainstExisting returns the subset of incoming whose ID is not already
-// present in existing. Rows are keyed by their stable resource ID (C2/C6):
-// an append that would introduce a row already on the screen is dropped
-// rather than shown twice. Order of the surviving rows is preserved.
+// present in existing (C2/C6): an append that would introduce a row already
+// on the screen is dropped rather than shown twice. Delegates to
+// resource.DedupByID, the single-source implementation.
 func dedupAgainstExisting(existing, incoming []resource.Resource) []resource.Resource {
-	if len(incoming) == 0 {
-		return incoming
-	}
-	seen := make(map[string]struct{}, len(existing))
-	for _, r := range existing {
-		seen[r.ID] = struct{}{}
-	}
-	out := make([]resource.Resource, 0, len(incoming))
-	for _, r := range incoming {
-		if _, dup := seen[r.ID]; dup {
-			continue
-		}
-		seen[r.ID] = struct{}{}
-		out = append(out, r)
-	}
-	return out
+	return resource.DedupByID(existing, incoming)
 }
 
 // materializeListFieldsForType resolves the column set for typeName the same
@@ -515,9 +501,9 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 	filtered := len(visible)
 	truncated := ls.HasPagination
 
-	totalStr := itoa(total)
+	totalStr := strconv.Itoa(total)
 	if truncated {
-		totalStr = itoa(total) + "+"
+		totalStr = strconv.Itoa(total) + "+"
 	}
 
 	// Loading-more indicator goes inside the count parentheses, mirroring the
@@ -532,11 +518,11 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 	var title string
 	switch {
 	case hasTextFilter && isAttention:
-		title = name + "(" + itoa(filtered) + " of " + totalStr + ")"
+		title = name + "(" + strconv.Itoa(filtered) + " of " + totalStr + ")"
 	case hasTextFilter:
-		title = name + "(" + itoa(filtered) + "/" + totalStr + ")"
+		title = name + "(" + strconv.Itoa(filtered) + "/" + totalStr + ")"
 	case isAttention:
-		title = name + "(" + itoa(filtered) + " of " + totalStr + ")"
+		title = name + "(" + strconv.Itoa(filtered) + " of " + totalStr + ")"
 	default:
 		title = name + "(" + totalStr + ")"
 	}
@@ -546,7 +532,7 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 	}
 	if !isAttention {
 		if issueCount := c.listIssueCount(ls, typeName); issueCount > 0 {
-			title += " !" + itoa(issueCount)
+			title += " !" + strconv.Itoa(issueCount)
 			if c.enrichmentTruncated[typeName] {
 				title += "+"
 			}
@@ -931,7 +917,7 @@ func listHasBadgeFinding(r resource.Resource) bool {
 		if f.Severity == domain.SevBroken {
 			return true
 		}
-		if resource.IsIssueSeverity(f.Severity) && !f.IsWave2Sourced() {
+		if f.Severity.IsIssue() && !f.IsWave2Sourced() {
 			return true
 		}
 	}

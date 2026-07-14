@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -52,6 +53,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
+
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ServiceClients holds AWS service clients for all supported services.
@@ -221,7 +224,8 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 //
 // Read paths use a read-lock; write paths use a write-lock. The lock guards
 // only the field itself — methods on the returned store are independently
-// thread-safe per session.{PolicyStore,IdentityStore,RuleSetStore} contracts.
+// thread-safe per the session-side concrete store implementations'
+// contracts.
 
 // IAMPolicies returns the session-scoped IAM policy store, or nil if not
 // yet wired. Concurrency-safe.
@@ -295,4 +299,78 @@ func (c *ServiceClients) SetRuleSets(s ruleSetStore) {
 	c.storesMu.Lock()
 	defer c.storesMu.Unlock()
 	c.ruleSets = s
+}
+
+// svcClients asserts clients holds an initialized *ServiceClients, the
+// prelude every catalog fetcher/reveal closure needs before it can dereference
+// a specific service client. Centralizes the assertion and its error text
+// (previously duplicated at every registration site).
+func svcClients(clients any) (*ServiceClients, error) {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil {
+		return nil, fmt.Errorf("AWS clients not initialized")
+	}
+	return c, nil
+}
+
+// fetcherWithClients adapts a *ServiceClients-typed page fetcher into the
+// domain.PaginatedFetcher shape a catalog ResourceTypeDef's Fetcher/
+// AvailabilityFetcher field expects, running the svcClients assertion once
+// instead of duplicating it in every registration closure.
+func fetcherWithClients(fn func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error)) func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+	return func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+		c, err := svcClients(clients)
+		if err != nil {
+			return resource.FetchResult{}, err
+		}
+		return fn(ctx, c, continuationToken)
+	}
+}
+
+// filteredFetcherWithClients is fetcherWithClients for a ResourceTypeDef's
+// FilteredFetcher field (domain.FilteredPaginatedFetcher).
+func filteredFetcherWithClients(fn func(ctx context.Context, c *ServiceClients, filter map[string]string, continuationToken string) (resource.FetchResult, error)) func(ctx context.Context, clients any, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
+	return func(ctx context.Context, clients any, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
+		c, err := svcClients(clients)
+		if err != nil {
+			return resource.FetchResult{}, err
+		}
+		return fn(ctx, c, filter, continuationToken)
+	}
+}
+
+// childFetcherWithClients is fetcherWithClients for a ResourceTypeDef's
+// ChildFetcher field (domain.PaginatedChildFetcher).
+func childFetcherWithClients(fn func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error)) func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	return func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+		c, err := svcClients(clients)
+		if err != nil {
+			return resource.FetchResult{}, err
+		}
+		return fn(ctx, c, parentCtx, continuationToken)
+	}
+}
+
+// fetchByIDsWithClients is fetcherWithClients for a ResourceTypeDef's
+// FetchByIDs field (domain.FetchByIDsFunc).
+func fetchByIDsWithClients(fn func(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error)) func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
+	return func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
+		c, err := svcClients(clients)
+		if err != nil {
+			return nil, err
+		}
+		return fn(ctx, c, ids)
+	}
+}
+
+// revealWithClients is fetcherWithClients for a ResourceTypeDef's Reveal
+// field (domain.RevealFetcher).
+func revealWithClients(fn func(ctx context.Context, c *ServiceClients, resourceID string) (string, error)) func(ctx context.Context, clients any, resourceID string) (string, error) {
+	return func(ctx context.Context, clients any, resourceID string) (string, error) {
+		c, err := svcClients(clients)
+		if err != nil {
+			return "", err
+		}
+		return fn(ctx, c, resourceID)
+	}
 }

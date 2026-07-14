@@ -21,7 +21,7 @@ func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource,
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := kinesisRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -90,7 +90,7 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 	if stackName == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
-	cfnList, truncated, err := kinesisRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -137,17 +137,6 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, _ 
 	}
 	keyID := kmsKeyIDFromField(*out.StreamDescriptionSummary.KeyId, res.Type)
 	return relatedResult("kms", []string{keyID})
-}
-
-// kinesisRelatedResources returns the resource list for target from cache or by fetching the first page.
-func kinesisRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 // checkKinesisDDB is a reverse-scan checker for the kinesis→ddb relationship.

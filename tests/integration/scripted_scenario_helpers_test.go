@@ -162,14 +162,6 @@ func fullIntegrationMustFindResourceByNameContains(t *testing.T, clients *awscli
 	}, fullIntegrationFindResourceOptions{})
 }
 
-func fullIntegrationMustFindResourceByFieldContains(t *testing.T, clients *awsclient.ServiceClients, resourceType, fieldKey, needle string, opts fullIntegrationFindResourceOptions) resource.Resource {
-	t.Helper()
-	needle = strings.ToLower(strings.TrimSpace(needle))
-	return fullIntegrationMustFindResource(t, clients, resourceType, func(res resource.Resource) bool {
-		return strings.Contains(strings.ToLower(res.Fields[fieldKey]), needle)
-	}, opts)
-}
-
 func fullIntegrationMustFindResource(t *testing.T, clients *awsclient.ServiceClients, resourceType string, pred func(resource.Resource) bool, opts fullIntegrationFindResourceOptions) resource.Resource {
 	t.Helper()
 

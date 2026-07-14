@@ -12,56 +12,6 @@ func filterPinning(dim costs.Dimension, values ...string) costs.Filter {
 	return costs.Filter{Equals: map[costs.Dimension][]string{dim: values}}
 }
 
-func TestNextDim_Chain(t *testing.T) {
-	tests := []struct {
-		name string
-		cur  costs.DrillLevel
-		want costs.Dimension
-	}{
-		{
-			name: "pivot LINKED_ACCOUNT with no SERVICE pinned yet drills to SERVICE",
-			cur:  costs.DrillLevel{RowDim: costs.Dimension("LINKED_ACCOUNT"), Filter: costs.Filter{}},
-			want: costs.Dimension("SERVICE"),
-		},
-		{
-			name: "pivot REGION with no SERVICE pinned yet drills to SERVICE (account/region -> service)",
-			cur:  costs.DrillLevel{RowDim: costs.Dimension("REGION"), Filter: costs.Filter{}},
-			want: costs.Dimension("SERVICE"),
-		},
-		{
-			name: "pivot SERVICE with SERVICE already pinned in the filter drills to USAGE_TYPE",
-			cur: costs.DrillLevel{
-				RowDim: costs.Dimension("SERVICE"),
-				Filter: filterPinning(costs.Dimension("SERVICE"), "Amazon Elastic Compute Cloud - Compute"),
-			},
-			want: costs.Dimension("USAGE_TYPE"),
-		},
-		{
-			name: "pivot USAGE_TYPE with SERVICE pinned drills to RESOURCE_ID",
-			cur: costs.DrillLevel{
-				RowDim: costs.Dimension("USAGE_TYPE"),
-				Filter: filterPinning(costs.Dimension("SERVICE"), "Amazon Elastic Compute Cloud - Compute"),
-			},
-			want: costs.Dimension("RESOURCE_ID"),
-		},
-		{
-			name: "pivot RESOURCE_ID is the bottom of the chain",
-			cur: costs.DrillLevel{
-				RowDim: costs.Dimension("RESOURCE_ID"),
-				Filter: filterPinning(costs.Dimension("SERVICE"), "Amazon Elastic Compute Cloud - Compute"),
-			},
-			want: costs.Dimension(""),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := costs.NextDim(tt.cur); got != tt.want {
-				t.Errorf("NextDim(RowDim=%q) = %q, want %q", tt.cur.RowDim, got, tt.want)
-			}
-		})
-	}
-}
-
 // TestResourceDrillAllowed covers ResourceDrillAllowed's NEW contract: it no
 // longer inspects period dates itself — the caller passes l.Window through
 // ClampResourceDrillWindow first (see TestClampResourceDrillWindow_* below),

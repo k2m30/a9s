@@ -30,7 +30,7 @@ func checkEC2TargetGroups(ctx context.Context, clients any, res resource.Resourc
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
 	}
-	tgList, truncated, err := ec2RelatedResources(ctx, clients, cache, "tg")
+	tgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "tg")
 	if err != nil {
 		return resource.ErrorRelated("tg", err)
 	}
@@ -69,7 +69,7 @@ func checkEC2ASG(ctx context.Context, clients any, res resource.Resource, cache 
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
 	}
-	asgList, truncated, err := ec2RelatedResources(ctx, clients, cache, "asg")
+	asgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "asg")
 	if err != nil {
 		return resource.ErrorRelated("asg", err)
 	}
@@ -101,7 +101,7 @@ func checkEC2Alarms(ctx context.Context, clients any, res resource.Resource, cac
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
-	alarmList, truncated, err := ec2RelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -133,7 +133,7 @@ func checkEC2CFN(ctx context.Context, clients any, res resource.Resource, cache 
 	if stackName == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
-	cfnList, truncated, err := ec2RelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -163,7 +163,7 @@ func checkEC2EIP(ctx context.Context, clients any, res resource.Resource, cache 
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
 	}
-	eipList, truncated, err := ec2RelatedResources(ctx, clients, cache, "eip")
+	eipList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eip")
 	if err != nil {
 		return resource.ErrorRelated("eip", err)
 	}
@@ -214,7 +214,7 @@ func checkEC2NodeGroups(ctx context.Context, clients any, res resource.Resource,
 	if clusterName == "" && nodegroupName == "" {
 		return resource.RelatedCheckResult{TargetType: "ng", Count: 0}
 	}
-	ngList, truncated, err := ec2RelatedResources(ctx, clients, cache, "ng")
+	ngList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ng")
 	if err != nil {
 		return resource.ErrorRelated("ng", err)
 	}
@@ -256,7 +256,7 @@ func checkEC2CloudTrailEvents(ctx context.Context, clients any, res resource.Res
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
 	}
-	eventList, truncated, err := ec2RelatedResources(ctx, clients, cache, "ct-events")
+	eventList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
 		return resource.ErrorRelated("ct-events", err)
 	}
@@ -292,7 +292,7 @@ func checkEC2EBSSnap(ctx context.Context, clients any, res resource.Resource, ca
 	if len(volumeIDs) == 0 {
 		return resource.RelatedCheckResult{TargetType: "ebs-snap", Count: 0}
 	}
-	snapList, truncated, err := ec2RelatedResources(ctx, clients, cache, "ebs-snap")
+	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ebs-snap")
 	if err != nil {
 		return resource.ErrorRelated("ebs-snap", err)
 	}
@@ -327,24 +327,6 @@ func checkEC2SG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		}
 	}
 	return relatedResult("sg", ids)
-}
-
-// ec2RelatedResources returns the resource list for target from cache or by
-// fetching the first page. Returns (resources, isTruncated, error).
-// isTruncated=true means the list is partial; callers should return an
-// UnknownRelated result when 0 matches are found in a truncated list.
-func ec2RelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	// When AWS clients are not initialized (nil or wrong type), the registered
-	// paginated fetchers return "AWS clients not initialized". Treat this as a
-	// graceful no-op (no resources available) rather than a hard error, preserving
-	// the same semantics as the old nil-client early-return.
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 func ec2Identity(res resource.Resource) (instanceID, vpcID, stackName string) {
@@ -488,7 +470,7 @@ func checkEC2Role(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	profileName := arn[idx+1:]
 
-	roleList, truncated, err := ec2RelatedResources(ctx, clients, cache, "role")
+	roleList, truncated, err := relatedResourcesFor(ctx, clients, cache, "role")
 	if err != nil {
 		return resource.ErrorRelated("role", err)
 	}
@@ -526,4 +508,10 @@ func checkEC2Role(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	return relatedResult("role", ids)
+}
+
+// ec2RelatedResources returns the resource list for target from cache or by
+// fetching the first page via the registered paginated fetcher.
+func ec2RelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+	return relatedResourcesFor(ctx, clients, cache, target)
 }

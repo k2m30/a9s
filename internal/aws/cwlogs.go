@@ -26,25 +26,6 @@ const logsCodeStaleEmpty domain.FindingCode = "logs.stale-empty"
 // group as stale.
 const logsStaleEmptyAge = 90 * 24 * time.Hour
 
-// FetchCloudWatchLogGroups calls the CloudWatchLogs DescribeLogGroups API and
-// returns all pages of log groups. Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchCloudWatchLogGroups(ctx context.Context, api CWLogsDescribeLogGroupsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchCloudWatchLogGroupsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchCloudWatchLogGroupsPage calls the CloudWatchLogs DescribeLogGroups API and returns
 // a single page of log groups. Pass an empty continuationToken for the first page.
 func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGroupsAPI, continuationToken string) (resource.FetchResult, error) {

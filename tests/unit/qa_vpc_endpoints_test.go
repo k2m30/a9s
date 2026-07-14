@@ -35,7 +35,9 @@ func TestQA_VPCEndpoints_FetchSuccess(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchVPCEndpoints(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchVPCEndpointsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -72,7 +74,9 @@ func TestQA_VPCEndpoints_FetchEmpty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchVPCEndpoints(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchVPCEndpointsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -86,7 +90,9 @@ func TestQA_VPCEndpoints_FetchError(t *testing.T) {
 		err: fmt.Errorf("access denied"),
 	}
 
-	_, err := awsclient.FetchVPCEndpoints(context.Background(), mock)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchVPCEndpointsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

@@ -42,7 +42,7 @@ func checkGlueAlarms(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := glueRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -70,7 +70,7 @@ func checkGlueAlarms(ctx context.Context, clients any, res resource.Resource, ca
 // Pattern N — Glue jobs write to /aws-glue/jobs/output and /aws-glue/jobs/error
 // regardless of job name (shared log groups across all Glue jobs in the account).
 func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	logList, truncated, err := glueRelatedResources(ctx, clients, cache, "logs")
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
@@ -123,7 +123,7 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 	if stackName == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
-	cfnList, truncated, err := glueRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -227,7 +227,7 @@ func checkGlueAthena(ctx context.Context, clients any, res resource.Resource, ca
 	if jobName == "" {
 		return resource.RelatedCheckResult{TargetType: "athena", Count: 0}
 	}
-	wgList, truncated, err := glueRelatedResources(ctx, clients, cache, "athena")
+	wgList, truncated, err := relatedResourcesFor(ctx, clients, cache, "athena")
 	if err != nil {
 		return resource.ErrorRelated("athena", err)
 	}
@@ -277,15 +277,4 @@ func checkGlueSecrets(_ context.Context, _ any, res resource.Resource, _ resourc
 		ids = append(ids, name)
 	}
 	return relatedResult("secrets", ids)
-}
-
-// glueRelatedResources returns the resource list for target from cache or by fetching the first page.
-func glueRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

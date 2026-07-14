@@ -9,6 +9,7 @@ import (
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -36,7 +37,9 @@ func TestFetchWAFWebACLs_ParsesMultipleACLs(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchWAFWebACLs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchWAFWebACLsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -77,7 +80,9 @@ func TestFetchWAFWebACLs_ScopeRegional(t *testing.T) {
 		},
 	}
 
-	_, err := awsclient.FetchWAFWebACLs(context.Background(), mock)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchWAFWebACLsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -98,7 +103,9 @@ func TestFetchWAFWebACLs_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchWAFWebACLs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchWAFWebACLsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -113,7 +120,9 @@ func TestFetchWAFWebACLs_APIError(t *testing.T) {
 		err: &mockAPIError{code: "WAFInternalErrorException", message: "internal error"},
 	}
 
-	_, err := awsclient.FetchWAFWebACLs(context.Background(), mock)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchWAFWebACLsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

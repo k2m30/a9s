@@ -34,25 +34,6 @@ func computeDDBFindings(status ddbtypes.TableStatus) []domain.Finding {
 	}
 }
 
-// FetchDynamoDBTables calls the DynamoDB ListTables/DescribeTable APIs and
-// returns all pages of tables. Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchDynamoDBTables(ctx context.Context, listAPI DDBListTablesAPI, describeAPI DDBDescribeTableAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchDynamoDBTablesPage(ctx, listAPI, describeAPI, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchDynamoDBTablesPage performs a two-step fetch: ListTables (single page) to get
 // names, then DescribeTable per table for full details.
 // Pass an empty continuationToken for the first page.

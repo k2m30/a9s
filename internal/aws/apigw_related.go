@@ -99,7 +99,7 @@ func checkApigwLogs(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
 
-	logList, truncated, err := apigwRelatedResources(ctx, clients, cache, "logs")
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
@@ -262,7 +262,7 @@ func checkApigwAlarm(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := apigwRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -297,7 +297,7 @@ func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	suffix := apiID + ".execute-api."
 
-	cfList, truncated, err := apigwRelatedResources(ctx, clients, cache, "cf")
+	cfList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cf")
 	if err != nil {
 		return resource.ErrorRelated("cf", err)
 	}
@@ -408,7 +408,7 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
 
-	elbList, truncated, fetchErr := apigwRelatedResources(ctx, clients, cache, "elb")
+	elbList, truncated, fetchErr := relatedResourcesFor(ctx, clients, cache, "elb")
 	if fetchErr != nil {
 		return resource.ErrorRelated("elb", fetchErr)
 	}
@@ -502,15 +502,4 @@ func checkApigwRole(ctx context.Context, clients any, res resource.Resource, _ r
 	}
 
 	return relatedResult("role", mapKeys(seen))
-}
-
-// apigwRelatedResources returns the resource list for target from cache or by fetching the first page.
-func apigwRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

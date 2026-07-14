@@ -5,34 +5,54 @@ package unit_test
 //
 // Assertion definitions:
 //
-//	D1: Pressing Enter on an actionable typed row (Count>0, ResourceIDs non-empty)
-//	    dispatches a RelatedNavigateMsg with non-empty RelatedIDs and matching TargetType.
+//	D1: An actionable typed row (Count>0, ResourceIDs non-empty) dispatches at
+//	    least one fetch task scoped to the def's TargetType.
 //
-//	D2: Pressing Enter on a non-actionable row (Count=0, no FetchFilter)
-//	    dispatches nothing — cmd is nil.
+//	D2: A non-actionable row (Count=0, no FetchFilter) dispatches nothing —
+//	    zero tasks.
 //
-//	D3: Pressing Enter on a pivot row (Count=-1, FetchFilter non-empty, ResourceIDs
-//	    empty) dispatches a RelatedNavigateMsg with non-empty FetchFilter and empty
-//	    RelatedIDs. This catches the actionability guard bug where len(resourceIDs)>0
-//	    was checked instead of len(fetchFilter)>0.
+//	D3: A pivot row (State: RelatedDeferred, FetchFilter non-empty,
+//	    ResourceIDs empty) dispatches a KindFetchFiltered task carrying the
+//	    SAME FetchFilter. This catches the actionability guard bug where
+//	    len(resourceIDs)>0 was checked instead of len(fetchFilter)>0.
 //
 // Scope: all demo ct-events fixtures × all 17 registered RelatedDef groups.
 // The test uses demo.GetResources("ct-events") — no hardcoded event IDs.
+//
+// Retargeted (wave3 detail-family cleanup, specs/022-codebase-cleanup) off
+// views.NewDetail(...).Update(tea.KeyEnter) (dead: DetailModel.Update/View)
+// onto the live Controller.Apply/Snapshot seam: ApplyDetailRelatedResultForResource
+// injects one real checker result per subtest, ActionRelatedSelect activates
+// the row, and the returned []runtime.TaskRequest replaces the old
+// messages.RelatedNavigate assertions.
+//
+// Fidelity note: the old test asserted directly on a dispatched
+// messages.RelatedNavigate{TargetType, RelatedIDs, FetchFilter, SourceResource}.
+// The live controller path does not return that message — actionable
+// navigation applies synchronously to controller state (screen push, list
+// seeding) and only surfaces as []runtime.TaskRequest when a fetch is still
+// needed. ViewState (Snapshot()) exposes no resource-type/ID field for the
+// newly-pushed screen, so "landed on the correct target screen" is not
+// independently observable from this package. The proxy used here — every
+// controller in this file is fresh (newTestController, empty RowStore), so
+// relatedFetchTasks/HandleRelatedNavigate can never take the cache-hit
+// (NavigationKindDetail / already-covered-IDs) branch — is unconditionally
+// true given that setup: D1/D3 tasks are guaranteed non-empty precisely
+// because nothing is pre-cached. TargetType is verified via
+// TaskRequest.Key.Scope (set to ev.TargetType at every task construction
+// site in internal/runtime/handlers_related.go and internal/app/navigate.go).
 
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
+	"github.com/k2m30/a9s/v3/internal/app"
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 )
 
 // ctEventsRealCheckerResults runs all registered ct-events real checkers against
@@ -51,60 +71,6 @@ func ctEventsRealCheckerResults(res resource.Resource, cache resource.ResourceCa
 	return results
 }
 
-// ---------------------------------------------------------------------------
-// Dispatch-test helpers (local to this file)
-// ---------------------------------------------------------------------------
-
-// newCTEventsDetail creates a DetailModel for a ct-events resource with the
-// right column auto-shown (width=200 triggers auto-show for registered defs).
-func newCTEventsDetail(res resource.Resource) views.DetailModel {
-	k := keys.Default()
-	cfg := config.DefaultConfig()
-	d := views.NewDetail(res, "ct-events", cfg, k)
-	d.SetSize(200, 40)
-	return d
-}
-
-// injectCTResult delivers a single RelatedCheckResultMsg into a ct-events
-// DetailModel and returns the updated model.
-func injectCTResult(d views.DetailModel, result resource.RelatedCheckResult) views.DetailModel {
-	updated, _ := d.Update(messages.RelatedCheckResult{
-		ResourceType: "ct-events",
-		Result:       result,
-	})
-	return updated
-}
-
-// ctFocusRightColumn focuses the right column using the ScrollRight ("l") key.
-// The right column receives focus when HasActionableRows() is true, which is
-// satisfied by any loading row.
-func ctFocusRightColumn(d views.DetailModel) views.DetailModel {
-	// "l" = ScrollRight — focuses right column when HasActionableRows
-	updated, _ := d.Update(tea.KeyPressMsg{Code: -1, Text: "l"})
-	return updated
-}
-
-// ctPressDownN presses the Down key n times on a focused right column.
-func ctPressDownN(d views.DetailModel, n int) views.DetailModel {
-	for range n {
-		d, _ = d.Update(tea.KeyPressMsg{Code: tea.KeyDown})
-	}
-	return d
-}
-
-// ctExecuteCmd runs the tea.Cmd and returns the produced tea.Msg.
-// Returns nil when cmd is nil.
-func ctExecuteCmd(cmd tea.Cmd) tea.Msg {
-	if cmd == nil {
-		return nil
-	}
-	return cmd()
-}
-
-// ---------------------------------------------------------------------------
-// TestCtEventsRightColumnDispatch
-// ---------------------------------------------------------------------------
-
 // sampleCTFixtures selects 3 representative fixtures from a larger set:
 // the first, the middle, and the last. This keeps the dispatch test under 20ms
 // while still exercising diverse event shapes (with/without related, error events).
@@ -115,26 +81,48 @@ func sampleCTFixtures(all []resource.Resource) []resource.Resource {
 	return []resource.Resource{all[0], all[len(all)/2], all[len(all)-1]}
 }
 
+// buildCTEventsRightColController builds a fresh controller (empty RowStore —
+// see the file header's fidelity note) with a ct-events resource pushed to
+// ScreenDetail and all related rows initialised to Loading.
+func buildCTEventsRightColController(t *testing.T, fixture resource.Resource) *app.Controller {
+	t.Helper()
+	c := newTestController(t)
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PushScreen{
+			ID:      runtime.ScreenDetail,
+			Context: runtime.ScreenContext{ResourceType: "ct-events", ResourceID: fixture.ID},
+		},
+	})
+	c.EnsureDetailState(fixture, "ct-events")
+	c.InitDetailRelatedRows("ct-events")
+	return c
+}
+
+// ctRelatedRowIndex returns the index of the related row matching displayName
+// — the disambiguator for ct-events self-pivot defs that share a TargetType.
+func ctRelatedRowIndex(related []app.RelatedBlock, displayName string) int {
+	for i, row := range related {
+		if row.Name == displayName {
+			return i
+		}
+	}
+	return -1
+}
+
+// ---------------------------------------------------------------------------
+// TestCtEventsRightColumnDispatch
+// ---------------------------------------------------------------------------
+
 // TestCtEventsRightColumnDispatch iterates all demo ct-events fixtures × all
 // 17 registered RelatedDef groups and asserts the dispatch invariants D1, D2, D3.
 //
 // For each (fixture, group) pair:
-//  1. Build a DetailModel with that fixture.
-//  2. Inject the demo checker result for that group only (other rows loading).
-//  3. Focus the right column — ensureCursorValid() lands on the one actionable row.
-//  4. Press Enter and inspect the dispatched cmd.
-//
-// D1: Count>0 → cmd returns RelatedNavigateMsg with non-empty RelatedIDs or FetchFilter.
-// D2: Count=0 and no FetchFilter → pressing Enter at each row position dispatches no
-//
-//	RelatedNavigateMsg for this target type.
-//
-// D3: Count=-1 and FetchFilter non-empty → cmd returns RelatedNavigateMsg with
-//
-//	non-empty FetchFilter and EMPTY RelatedIDs.
+//  1. Build a fresh Controller with that fixture on ScreenDetail.
+//  2. Deliver the real checker result for that group only via
+//     ApplyDetailRelatedResultForResource (other rows stay Loading).
+//  3. Focus the right column and call ActionRelatedSelect on that row's index.
+//  4. Inspect the returned []runtime.TaskRequest.
 func TestCtEventsRightColumnDispatch(t *testing.T) {
-	ensureNoColor(t)
-
 	allFixtures := loadAllCTFixtures(t)
 
 	// Sample 3 representative fixtures: first (index 0), one with related resources
@@ -173,116 +161,86 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 					}
 
 					// Classify the result.
-					isTypedHit := result.Count > 0
 					isPivot := result.State == domain.RelatedDeferred
 					isNotActionable := result.Count == 0 && len(result.FetchFilter) == 0
 
+					c := buildCTEventsRightColController(t, fixture)
+					errMsg := ""
+					if result.Err != nil {
+						errMsg = result.Err.Error()
+					}
+					c.ApplyDetailRelatedResultForResource("ct-events", fixture.ID, def.DisplayName, def.TargetType,
+						result.EffectiveState(), result.Count, false, errMsg, result.Truncated, result.ResourceIDs, result.FetchFilter)
+
+					body := c.Snapshot().Body.Detail
+					if body == nil {
+						t.Fatalf("Body.Detail is nil after EnsureDetailState + InitDetailRelatedRows — %s", label)
+					}
+					idx := ctRelatedRowIndex(body.Related, def.DisplayName)
+
 					if isNotActionable {
-						// D2: Row with Count=0 and no FetchFilter must not dispatch
-						// a RelatedNavigateMsg to this target type on Enter.
-						// All rows remain at loading state except this one (Count=0).
-						// ensureCursorValid skips Count=0 rows in favour of loading rows.
-						// Navigate through all positions and verify no navigation to target type.
-						d := newCTEventsDetail(fixture)
-						d = injectCTResult(d, result)
-						d = ctFocusRightColumn(d)
-						for i := range len(defs) {
-							if i > 0 {
-								d = ctPressDownN(d, 1)
-							}
-							_, cmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-							msg := ctExecuteCmd(cmd)
-							if navMsg, ok2 := msg.(messages.RelatedNavigate); ok2 {
-								if navMsg.TargetType == def.TargetType {
-									t.Errorf("D2 FAIL: Count=0 row dispatched RelatedNavigateMsg — %s"+
-										" | dispatched TargetType=%q RelatedIDs=%v FetchFilter=%v",
-										label, navMsg.TargetType, navMsg.RelatedIDs, navMsg.FetchFilter)
-								}
-							}
+						// D2: Count=0/no-FetchFilter rows for a ct-events self-pivot
+						// TargetType (this fixture pointing at itself) are suppressed
+						// entirely from Body.Detail.Related by isSelfPivotZeroDetailRow
+						// (detail_cursor.go) — there is no row to select, which is a
+						// stronger form of "dispatches nothing" than the D2 assertion
+						// below. When the row IS present (non-self-pivot Count=0 case),
+						// activate it and assert zero tasks as before.
+						if idx < 0 {
+							return
+						}
+						c.Apply(app.Action{Kind: app.ActionToggleFocus})
+						_, tasks := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: strconv.Itoa(idx)})
+						if len(tasks) != 0 {
+							t.Errorf("D2 FAIL: Count=0 row dispatched %d task(s) — %s | tasks=%+v",
+								len(tasks), label, tasks)
 						}
 						return
 					}
 
-					// For actionable rows: build model, inject only this result,
-					// then focus. ensureCursorValid() moves cursor to the one
-					// actionable row.
-					d := newCTEventsDetail(fixture)
-					d = injectCTResult(d, result)
-					d = ctFocusRightColumn(d)
+					if idx < 0 {
+						t.Fatalf("related row for %q not found after ApplyDetailRelatedResultForResource — %s", def.DisplayName, label)
+					}
+					c.Apply(app.Action{Kind: app.ActionToggleFocus})
+					_, tasks := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: strconv.Itoa(idx)})
 
-					// Press Enter to activate the selected row.
-					_, cmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-
-					if isTypedHit {
-						// D1: Count>0 typed row must dispatch RelatedNavigateMsg with
-						// non-empty RelatedIDs (or FetchFilter for cache-miss path).
-						if cmd == nil {
-							t.Errorf("D1 FAIL: Count=%d typed row dispatched nil cmd — %s",
-								result.Count, label)
-							return
-						}
-						msg := ctExecuteCmd(cmd)
-						navMsg, navOK := msg.(messages.RelatedNavigate)
-						if !navOK {
-							t.Errorf("D1 FAIL: Count=%d typed row dispatched %T, want RelatedNavigateMsg — %s",
-								result.Count, msg, label)
-							return
-						}
-						if navMsg.TargetType != def.TargetType {
-							t.Errorf("D1 FAIL: RelatedNavigateMsg.TargetType=%q, want %q — %s",
-								navMsg.TargetType, def.TargetType, label)
-						}
-						if len(navMsg.RelatedIDs) == 0 && len(navMsg.FetchFilter) == 0 {
-							t.Errorf("D1 FAIL: RelatedNavigateMsg has empty RelatedIDs AND empty FetchFilter — %s"+
-								" | result.Count=%d result.ResourceIDs=%v",
-								label, result.Count, result.ResourceIDs)
-						}
-						if navMsg.SourceResource.ID != fixture.ID {
-							t.Errorf("D1 FAIL: RelatedNavigateMsg.SourceResource.ID=%q, want %q — %s",
-								navMsg.SourceResource.ID, fixture.ID, label)
+					// D1/D3: an actionable row (typed hit or pivot) must dispatch at
+					// least one fetch task scoped to this def's TargetType — see the
+					// file header's fidelity note for why this is unconditionally
+					// true given a fresh, empty-RowStore controller.
+					if len(tasks) == 0 {
+						t.Errorf("D1/D3 FAIL: actionable row (Count=%d, State=%v, FetchFilter=%v) dispatched 0 tasks — %s",
+							result.Count, result.State, result.FetchFilter, label)
+						return
+					}
+					for _, task := range tasks {
+						if task.Key.Scope != def.TargetType {
+							t.Errorf("dispatched task Scope=%q, want %q — %s", task.Key.Scope, def.TargetType, label)
 						}
 					}
 
 					if isPivot {
-						// D3: Pivot row (State: RelatedDeferred, FetchFilter non-empty,
-						// ResourceIDs empty) must dispatch RelatedNavigateMsg with
-						// non-empty FetchFilter and EMPTY RelatedIDs.
-						// This catches the actionability guard bug where len(resourceIDs)>0
-						// was checked instead of len(fetchFilter)>0.
-						if cmd == nil {
-							t.Errorf("D3 FAIL: pivot row (State: RelatedDeferred, FetchFilter=%v) dispatched nil cmd"+
-								" — right column actionability guard may be checking resourceIDs instead of fetchFilter — %s",
-								result.FetchFilter, label)
-							return
-						}
-						msg := ctExecuteCmd(cmd)
-						navMsg, navOK := msg.(messages.RelatedNavigate)
-						if !navOK {
-							t.Errorf("D3 FAIL: pivot row dispatched %T, want RelatedNavigateMsg — %s"+
-								" | FetchFilter=%v",
-								msg, label, result.FetchFilter)
-							return
-						}
-						if navMsg.TargetType != def.TargetType {
-							t.Errorf("D3 FAIL: RelatedNavigateMsg.TargetType=%q, want %q — %s",
-								navMsg.TargetType, def.TargetType, label)
-						}
-						if len(navMsg.FetchFilter) == 0 {
-							t.Errorf("D3 FAIL: pivot RelatedNavigateMsg.FetchFilter is empty, want non-empty — %s"+
-								" | result.FetchFilter=%v",
-								label, result.FetchFilter)
-						}
-						if len(navMsg.RelatedIDs) != 0 {
-							t.Errorf("D3 FAIL: pivot RelatedNavigateMsg.RelatedIDs=%v, want empty — %s",
-								navMsg.RelatedIDs, label)
-						}
-						// Verify FetchFilter keys/values are preserved exactly.
-						for k, v := range result.FetchFilter {
-							got := navMsg.FetchFilter[k]
-							if got != v {
-								t.Errorf("D3 FAIL: FetchFilter[%q]=%q, want %q — %s",
-									k, got, v, label)
+						// D3: pivot row (State: RelatedDeferred, FetchFilter non-empty,
+						// ResourceIDs empty) must dispatch a KindFetchFiltered task
+						// carrying the SAME FetchFilter — the actionability guard bug
+						// regression this test was written for (len(resourceIDs)>0 was
+						// checked instead of len(fetchFilter)>0).
+						found := false
+						for _, task := range tasks {
+							payload, ok := task.Payload.(runtime.FetchFilteredPayload)
+							if !ok {
+								continue
 							}
+							found = true
+							for k, v := range result.FetchFilter {
+								if payload.Filter[k] != v {
+									t.Errorf("D3 FAIL: FetchFilter[%q]=%q, want %q — %s", k, payload.Filter[k], v, label)
+								}
+							}
+						}
+						if !found {
+							t.Errorf("D3 FAIL: pivot row (FetchFilter=%v) dispatched no KindFetchFiltered task — %s | tasks=%+v",
+								result.FetchFilter, label, tasks)
 						}
 					}
 				})
@@ -296,30 +254,26 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestCtEventsRightColumnDispatch_LoadingRowNotActionable verifies that loading
-// rows (no RelatedCheckResultMsg delivered) do NOT dispatch a RelatedNavigateMsg
-// when Enter is pressed. Loading rows are focusable but not navigable.
+// rows (no result delivered) do NOT dispatch any task when ActionRelatedSelect
+// activates them. Loading rows are focusable but not navigable.
 func TestCtEventsRightColumnDispatch_LoadingRowNotActionable(t *testing.T) {
-	ensureNoColor(t)
-
 	fixtures := loadAllCTFixtures(t)
 
 	// Use the first fixture — all rows stay in loading state (no results injected).
 	fixture := fixtures[0]
-	d := newCTEventsDetail(fixture)
-	// Do NOT inject any results — all rows stay in loading state.
-	d = ctFocusRightColumn(d)
+	c := buildCTEventsRightColController(t, fixture)
+	c.Apply(app.Action{Kind: app.ActionToggleFocus})
 
-	defs := resource.GetRelated("ct-events")
-	for i := range len(defs) {
-		current := d
-		if i > 0 {
-			current = ctPressDownN(d, i)
-		}
-		_, cmd := current.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-		msg := ctExecuteCmd(cmd)
-		if _, ok2 := msg.(messages.RelatedNavigate); ok2 {
-			t.Errorf("loading row at position %d dispatched RelatedNavigateMsg — loading rows must not be navigable (event=%s)",
-				i, fixture.ID)
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil after EnsureDetailState + InitDetailRelatedRows")
+	}
+
+	for i := range body.Related {
+		_, tasks := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: strconv.Itoa(i)})
+		if len(tasks) != 0 {
+			t.Errorf("loading row at position %d dispatched %d task(s) — loading rows must not be navigable (event=%s)",
+				i, len(tasks), fixture.ID)
 		}
 	}
 }

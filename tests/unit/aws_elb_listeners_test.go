@@ -939,7 +939,9 @@ func TestFetchLoadBalancers_HasLoadBalancerArn(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchLoadBalancers(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchLoadBalancersPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

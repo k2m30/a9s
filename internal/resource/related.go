@@ -394,15 +394,13 @@ var navigableFieldRegistry = map[string][]NavigableField{}
 // state past the second Unregister.
 var navigableFieldPrevious = map[string][][]NavigableField{}
 
-// defaultNavFieldMu guards defaultNavFieldRegistry. Writes happen only during
-// package init; reads can happen from any goroutine after startup. The mutex
-// provides defense-in-depth for test binaries that may call
-// SetDefaultNavFieldsForTest from multiple goroutines in parallel.
+// defaultNavFieldMu guards defaultNavFieldRegistry. Reads can happen from
+// any goroutine after startup.
 var defaultNavFieldMu sync.RWMutex
 
-// defaultNavFieldRegistry is an immutable-by-convention registry populated at
-// init time by aws/*.go packages via SetDefaultNavFieldsForTest. It is never
-// modified after package initialisation. NavFieldsProvider (used by
+// defaultNavFieldRegistry is an immutable-by-convention registry, currently
+// always empty (nothing writes to it). GetDefaultNavFields falls through to
+// the catalog Navigable defaults below. NavFieldsProvider (used by
 // projection.Generic) reads from this registry. DetailModel reads from the
 // mutable navigableFieldRegistry so that tests can construct models without
 // any nav field registrations.
@@ -613,19 +611,6 @@ func CleanupNavigableFieldsForTest(shortName string) {
 	}
 }
 
-// SetDefaultNavFieldsForTest stores the canonical (production) navigable field
-// definitions for a resource type into the immutable-by-convention default
-// registry. Called from aws/*.go init() functions instead of
-// SetNavigableFieldsForTest so that the mutable active registry (read by
-// DetailModel) stays empty until BootstrapActiveNavFields is invoked at app
-// startup. Tests that construct DetailModels directly never see init-time nav
-// fields unless they explicitly call SetNavigableFieldsForTest.
-func SetDefaultNavFieldsForTest(shortName string, fields []NavigableField) {
-	defaultNavFieldMu.Lock()
-	defer defaultNavFieldMu.Unlock()
-	defaultNavFieldRegistry[shortName] = fields
-}
-
 // GetDefaultNavFields returns the default (init-time) navigable field definitions
 // for the given resource short name. Returns nil if none were registered at init.
 // Used by NavFieldsProvider so that projection.Generic always sees the canonical
@@ -648,13 +633,6 @@ func GetDefaultNavFields(shortName string) []NavigableField {
 // cmd/a9s/main.go) so that DetailModel navigability works in production.
 // Must be called after all init() functions have run (i.e. inside main()).
 // Noop in test binaries that never call this function.
-//
-// Concurrency: NOT safe to call concurrently with SetDefaultNavFieldsForTest.
-// Bootstrap snapshots the default registry under one lock, releases it, and
-// then takes the active registry's lock — there is a small window where a
-// concurrent SetDefaultNavFieldsForTest would not be reflected in the snapshot.
-// In production this is fine because Bootstrap runs after init() in the
-// single-threaded main goroutine, before any concurrent activity begins.
 func BootstrapActiveNavFields() {
 	defaultNavFieldMu.RLock()
 	snapshot := make(map[string][]NavigableField, len(defaultNavFieldRegistry))

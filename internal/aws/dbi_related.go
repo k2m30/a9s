@@ -81,7 +81,7 @@ func checkDbiAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
-	alarmList, truncated, err := dbiRelatedResources(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
 		return resource.ErrorRelated("alarm", err)
 	}
@@ -114,7 +114,7 @@ func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "dbi-snap", Count: 0}
 	}
 
-	snapList, truncated, err := dbiRelatedResources(ctx, clients, cache, "dbi-snap")
+	snapList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi-snap")
 	if err != nil {
 		return resource.ErrorRelated("dbi-snap", err)
 	}
@@ -145,7 +145,7 @@ func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache
 
 	prefix := "/aws/rds/instance/" + dbID + "/"
 
-	logList, truncated, err := dbiRelatedResources(ctx, clients, cache, "logs")
+	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
 	if err != nil {
 		return resource.ErrorRelated("logs", err)
 	}
@@ -160,17 +160,6 @@ func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache
 		}
 	}
 	return relatedResultTrunc("logs", ids, truncated)
-}
-
-// dbiRelatedResources returns the resource list for target from cache or by fetching the first page.
-func dbiRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }
 
 // checkDbiSecrets resolves the Secrets Manager secret managed for this RDS
@@ -190,7 +179,7 @@ func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	secretARN := *db.MasterUserSecret.SecretArn
 
-	secretList, truncated, err := dbiRelatedResources(ctx, clients, cache, "secrets")
+	secretList, truncated, err := relatedResourcesFor(ctx, clients, cache, "secrets")
 	if err != nil {
 		return resource.ErrorRelated("secrets", err)
 	}
@@ -321,7 +310,7 @@ func checkDbiCTEvents(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
 	}
 	fetchFilter := map[string]string{"ResourceName": dbID}
-	eventList, truncated, err := dbiRelatedResources(ctx, clients, cache, "ct-events")
+	eventList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ct-events")
 	if err != nil {
 		r := resource.ErrorRelated("ct-events", err)
 		r.FetchFilter = fetchFilter

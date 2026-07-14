@@ -37,7 +37,7 @@ func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 
-	cfnList, truncated, err := cfnRelatedResources(ctx, clients, cache, "cfn")
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
 	if err != nil {
 		return resource.ErrorRelated("cfn", err)
 	}
@@ -159,15 +159,4 @@ func checkCfnEBRule(ctx context.Context, clients any, res resource.Resource, _ r
 		return resource.UnknownRelated("eb-rule")
 	}
 	return relatedResult("eb-rule", ids)
-}
-
-// cfnRelatedResources returns the resource list for target from cache or by fetching the first page.
-func cfnRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
-	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
-			return nil, false, nil
-		}
-	}
-	return resources, isTruncated, err
 }

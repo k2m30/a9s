@@ -57,11 +57,6 @@ func searchReadClipboard() tea.Msg {
 	return searchPasteMsg(str)
 }
 
-// NewSearch returns a zero-value SearchModel ready for use.
-func NewSearch() SearchModel {
-	return SearchModel{}
-}
-
 // SetContent stores the plain-text content and recomputes matches.
 // The caller must pass ANSI-stripped text; Apply() receives the styled version.
 func (s *SearchModel) SetContent(plain string) {

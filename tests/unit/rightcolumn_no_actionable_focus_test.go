@@ -35,8 +35,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -128,7 +128,9 @@ func TestRightColumnNoActionableRowsBlocksFocus(t *testing.T) {
 	ensureNoColor(t)
 
 	ctClient := fakes.NewCloudTrail()
-	fixtures, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	fixtures, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), ctClient, token)
+	})
 	if fetchErr != nil || len(fixtures) == 0 {
 		t.Fatalf("demo ct-events fixtures missing (err=%v, len=%d)", fetchErr, len(fixtures))
 	}
@@ -255,7 +257,9 @@ func TestRightColumnNoActionableRowsBlocksFocus_AllFixtures(t *testing.T) {
 	ensureNoColor(t)
 
 	ctClient := fakes.NewCloudTrail()
-	fixtures, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	fixtures, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), ctClient, token)
+	})
 	if fetchErr != nil || len(fixtures) == 0 {
 		t.Fatalf("demo ct-events fixtures missing (err=%v, len=%d)", fetchErr, len(fixtures))
 	}

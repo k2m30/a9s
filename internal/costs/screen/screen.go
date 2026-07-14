@@ -17,14 +17,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/costs"
 )
 
-// CoverageView is the subset of (*costs.Store)'s read surface PlanFetch
-// needs — a store, or anything shaped like one (tests seed a real
-// *costs.Store; production passes cs.Store through the same interface).
-type CoverageView interface {
-	Lookup(q costs.Query, window []costs.Period, now time.Time) (records []costs.Record, missing []costs.Period)
-	AnomaliesCoverage(window []costs.Period, now time.Time) (marks []costs.AnomalyMark, ok bool)
-}
-
 // FetchPlan is what ensureCostsShapeFetched needs to know before dispatching
 // a KindFetchCosts task. Grid and Anomalies are computed independently —
 // cost coverage and anomaly freshness have different lifecycles and never
@@ -40,7 +32,7 @@ type FetchPlan struct {
 // PlanFetch derives FetchPlan from store's own coverage/freshness state at
 // now — the single place both halves of "does anything need fetching" are
 // decided, so a caller can never accidentally couple them.
-func PlanFetch(store CoverageView, q costs.Query, window []costs.Period, now time.Time) FetchPlan {
+func PlanFetch(store *costs.Store, q costs.Query, window []costs.Period, now time.Time) FetchPlan {
 	_, missing := store.Lookup(q, window, now)
 	_, anomaliesFresh := store.AnomaliesCoverage(window, now)
 	return FetchPlan{

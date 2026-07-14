@@ -93,11 +93,6 @@ type LoadResources struct {
 
 func (LoadResources) isCmd() {}
 
-// Refresh triggers a re-fetch of the current resource list.
-type Refresh struct{}
-
-func (Refresh) isCmd() {}
-
 // RelatedCheckStarted requests that the app core dispatch related-resource
 // checkers. Emitted by DetailModel when user presses 'r'. The core handles
 // this because it owns clients and ResourceCache — views cannot dispatch AWS

@@ -24,8 +24,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // setupEC2ListWithCache navigates to the EC2 list, loads all EC2 resources, and
@@ -47,7 +47,9 @@ func setupEC2ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 	})
 
 	ec2Client := fakes.NewEC2()
-	ec2Res, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	ec2Res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), ec2Client, token)
+	})
 	if err != nil || len(ec2Res) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
@@ -146,7 +148,9 @@ func TestRelatedNavigate_CachedTargetID_UsesCachedResults(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	ec2Client2 := fakes.NewEC2()
-	ec2Res, err2 := awsclient.FetchEC2Instances(context.Background(), ec2Client2)
+	ec2Res, err2 := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), ec2Client2, token)
+	})
 	if err2 != nil || len(ec2Res) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err2, len(ec2Res))
 	}

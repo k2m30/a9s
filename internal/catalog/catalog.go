@@ -1,8 +1,10 @@
 package catalog
 
+import "strings"
+
 // registry is the installed top-level catalog. Populated exactly once by
 // SetTypes (called from aws.Install at program start / TestMain). All Find /
-// All / ByCategory / AllShortNames lookups read from this slice.
+// All / AllShortNames lookups read from this slice.
 //
 // The per-category catalog data lives in internal/aws/ (not here) to break the
 // `catalog → aws` cycle that direct fetcher references would otherwise force.
@@ -15,8 +17,8 @@ var registry []ResourceTypeDef //nolint:gochecknoglobals // process-scope catalo
 var childRegistry map[string]ResourceTypeDef //nolint:gochecknoglobals // process-scope catalog: set once at startup
 
 // installed records whether SetTypes has been called. Used to surface a
-// loud panic from Find / All / ByCategory if a binary forgets the install
-// (typically a test package whose TestMain does not call aws.Install).
+// loud panic from Find / All if a binary forgets the install (typically a
+// test package whose TestMain does not call aws.Install).
 var installed bool //nolint:gochecknoglobals // process-scope catalog: set once at startup
 
 // childInstalled records whether SetChildTypes has been called. Independent
@@ -25,8 +27,8 @@ var installed bool //nolint:gochecknoglobals // process-scope catalog: set once 
 var childInstalled bool //nolint:gochecknoglobals // process-scope catalog: set once at startup
 
 // SetTypes installs the top-level catalog. MUST be called exactly once at
-// program start (main() / TestMain) BEFORE any Find / All / ByCategory call.
-// Idempotent on identical input; panics on a second call with different data
+// program start (main() / TestMain) BEFORE any Find / All call. Idempotent
+// on identical input; panics on a second call with different data
 // (defensive against accidental re-install with diverging slices in tests).
 func SetTypes(types []ResourceTypeDef) {
 	if installed {
@@ -64,13 +66,12 @@ func SetChildTypes(children []ResourceTypeDef) {
 // test binaries that forget to invoke aws.Install in TestMain.
 func Find(name string) *ResourceTypeDef {
 	requireInstalled()
-	nameLower := toLower(name)
 	for i := range registry {
-		if toLower(registry[i].ShortName) == nameLower {
+		if strings.EqualFold(registry[i].ShortName, name) {
 			return &registry[i]
 		}
 		for _, alias := range registry[i].Aliases {
-			if toLower(alias) == nameLower {
+			if strings.EqualFold(alias, name) {
 				return &registry[i]
 			}
 		}
@@ -99,21 +100,6 @@ func AllShortNames() []string {
 		names[i] = rt.ShortName
 	}
 	return names
-}
-
-// ByCategory returns all resource types with the given Category value.
-// Returns nil when the catalog has no entries for that category.
-//
-// Panics if SetTypes has not been called.
-func ByCategory(cat string) []ResourceTypeDef {
-	requireInstalled()
-	var result []ResourceTypeDef
-	for _, rt := range registry {
-		if rt.Category == cat {
-			result = append(result, rt)
-		}
-	}
-	return result
 }
 
 // FindChild returns the child-type ResourceTypeDef for the given short name,
@@ -186,14 +172,3 @@ func sameChildren(existing map[string]ResourceTypeDef, proposed []ResourceTypeDe
 	return true
 }
 
-// toLower is a minimal ASCII lower-case helper that avoids importing strings
-// or unicode for this hot path.
-func toLower(s string) string {
-	b := []byte(s)
-	for i, c := range b {
-		if c >= 'A' && c <= 'Z' {
-			b[i] = c + 32
-		}
-	}
-	return string(b)
-}

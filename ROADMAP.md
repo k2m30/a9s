@@ -26,7 +26,7 @@ This document outlines the planned direction for a9s. Priorities may shift based
 - **Pagination** -- `M` to load more for large result sets (demo mode showcases this)
 - **Issues shown in UI** -- background health checks surface findings as `!`/`~` row markers, `issues:N` menu badges, and a unified Attention section in detail views; `Ctrl+Z` filters to affected resources
 - **Cost Explorer** -- `:costs` opens a spend grid that matches the AWS invoice: pivot by service/region/account/usage type/purchase option/charge category, zoom years to days, drill any cell down to usage types, individual EC2 instances, and their detail views; anomaly markers with dollar impact; closed months cached on disk and rendered offline
-- **23,300+ unit tests**
+- **20,300+ unit tests**
 
 ## Short-Term
 

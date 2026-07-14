@@ -45,13 +45,9 @@ func captureS3(ctx context.Context, cfg aws.Config) (any, error) {
 	client := s3.NewFromConfig(cfg)
 
 	var buckets []s3Bucket
-	token := ""
-	for {
-		in := &s3.ListBucketsInput{}
-		if token != "" {
-			in.ContinuationToken = &token
-		}
-		out, err := client.ListBuckets(ctx, in)
+	pager := s3.NewListBucketsPaginator(client, &s3.ListBucketsInput{})
+	for pager.HasMorePages() {
+		out, err := pager.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -59,13 +55,9 @@ func captureS3(ctx context.Context, cfg aws.Config) (any, error) {
 			buckets = append(buckets, s3Bucket{
 				Name:         aws.ToString(b.Name),
 				Region:       aws.ToString(b.BucketRegion),
-				CreationDate: formatTime(b.CreationDate),
+				CreationDate: snapFormatTime(b.CreationDate),
 			})
 		}
-		if out.ContinuationToken == nil || *out.ContinuationToken == "" {
-			break
-		}
-		token = *out.ContinuationToken
 	}
 
 	for i := range buckets {
@@ -99,7 +91,10 @@ func capturePAB(ctx context.Context, client *s3.Client, bucket string) s3PAB {
 	}
 }
 
-func formatTime(t *time.Time) string {
+// snapFormatTime is the single formatTime implementation shared by every
+// capture file in this package (each AWS SDK service response uses the same
+// *time.Time -> "2006-01-02 15:04" convention).
+func snapFormatTime(t *time.Time) string {
 	if t == nil {
 		return ""
 	}

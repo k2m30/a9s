@@ -7,8 +7,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -229,7 +229,7 @@ func TestQA_HelpContext_ResourceList_ShowsCommandsSection(t *testing.T) {
 // TestQA_HelpContext_Detail_ShowsCommandsSection verifies that the COMMANDS
 // section appears in help opened from the detail view.
 func TestQA_HelpContext_Detail_ShowsCommandsSection(t *testing.T) {
-	h := views.NewHelp(keys.Default(), views.HelpFromDetail)
+	h := views.NewHelpWithResource(keys.Default(), views.HelpFromDetail, "ec2")
 	h.SetSize(120, 40)
 	plain := stripANSI(h.View())
 
@@ -247,7 +247,7 @@ func TestQA_HelpContext_Detail_ShowsCommandsSection(t *testing.T) {
 // TestQA_HelpContext_YAML_ShowsCommandsSection verifies that the COMMANDS
 // section appears in help opened from the YAML view.
 func TestQA_HelpContext_YAML_ShowsCommandsSection(t *testing.T) {
-	h := views.NewHelp(keys.Default(), views.HelpFromYAML)
+	h := views.NewHelpWithResource(keys.Default(), views.HelpFromYAML, "ec2")
 	h.SetSize(120, 40)
 	plain := stripANSI(h.View())
 
@@ -265,7 +265,7 @@ func TestQA_HelpContext_YAML_ShowsCommandsSection(t *testing.T) {
 // TestQA_HelpContext_JSON_ShowsCommandsSection verifies that the COMMANDS
 // section appears in help opened from the JSON view.
 func TestQA_HelpContext_JSON_ShowsCommandsSection(t *testing.T) {
-	h := views.NewHelp(keys.Default(), views.HelpFromJSON)
+	h := views.NewHelpWithResource(keys.Default(), views.HelpFromJSON, "ec2")
 	h.SetSize(120, 40)
 	plain := stripANSI(h.View())
 
@@ -283,7 +283,7 @@ func TestQA_HelpContext_JSON_ShowsCommandsSection(t *testing.T) {
 // TestQA_HelpContext_Selector_ShowsCommandsSection verifies that the COMMANDS
 // section appears in help opened from the selector (profile/region picker).
 func TestQA_HelpContext_Selector_ShowsCommandsSection(t *testing.T) {
-	h := views.NewHelp(keys.Default(), views.HelpFromSelector)
+	h := views.NewHelpWithResource(keys.Default(), views.HelpFromSelector, "ec2")
 	h.SetSize(120, 40)
 	plain := stripANSI(h.View())
 
@@ -301,7 +301,7 @@ func TestQA_HelpContext_Selector_ShowsCommandsSection(t *testing.T) {
 // TestQA_HelpContext_Reveal_ShowsCommandsSection verifies that the COMMANDS
 // section appears in help opened from the reveal view.
 func TestQA_HelpContext_Reveal_ShowsCommandsSection(t *testing.T) {
-	h := views.NewHelp(keys.Default(), views.HelpFromReveal)
+	h := views.NewHelpWithResource(keys.Default(), views.HelpFromReveal, "ec2")
 	h.SetSize(120, 40)
 	plain := stripANSI(h.View())
 

@@ -67,7 +67,7 @@ func (f *sesEnrichmentFake) GetAccount(
 var _ awsclient.SESv2API = (*sesEnrichmentFake)(nil)
 
 // sesResourceRow returns a test identity resource for enrichment input.
-func sesResourceRow(id, status string) resource.Resource {
+func sesResourceRow(id, _ string) resource.Resource {
 	return resource.Resource{
 		ID:     id,
 		Name:   id,

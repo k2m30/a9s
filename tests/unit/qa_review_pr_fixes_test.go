@@ -35,7 +35,9 @@ func (acmExpiredFake) ListCertificates(_ context.Context, _ *acm.ListCertificate
 }
 
 func TestACM_DaysLeft_RecentlyExpired(t *testing.T) {
-	resources, err := awsclient.FetchACMCertificates(context.Background(), acmExpiredFake{})
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchACMCertificatesPage(context.Background(), acmExpiredFake{}, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}

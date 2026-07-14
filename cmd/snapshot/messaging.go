@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigateway"
@@ -50,19 +49,15 @@ func captureSNS(ctx context.Context, cfg aws.Config) (any, error) {
 	client := sns.NewFromConfig(cfg)
 
 	var topics []snsTopic
-	var nextToken *string
-	for {
-		out, err := client.ListTopics(ctx, &sns.ListTopicsInput{NextToken: nextToken})
+	paginator := sns.NewListTopicsPaginator(client, &sns.ListTopicsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		for _, t := range out.Topics {
 			topics = append(topics, snsTopic{TopicArn: aws.ToString(t.TopicArn)})
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	for i := range topics {
@@ -107,9 +102,9 @@ func captureSNSSub(ctx context.Context, cfg aws.Config) (any, error) {
 	client := sns.NewFromConfig(cfg)
 
 	var subs []snsSubscription
-	var nextToken *string
-	for {
-		out, err := client.ListSubscriptions(ctx, &sns.ListSubscriptionsInput{NextToken: nextToken})
+	paginator := sns.NewListSubscriptionsPaginator(client, &sns.ListSubscriptionsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -122,10 +117,6 @@ func captureSNSSub(ctx context.Context, cfg aws.Config) (any, error) {
 				Owner:           aws.ToString(s.Owner),
 			})
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	return snsSubData{Subscriptions: subs}, nil
@@ -166,19 +157,15 @@ func captureSQS(ctx context.Context, cfg aws.Config) (any, error) {
 	client := sqs.NewFromConfig(cfg)
 
 	var queues []sqsQueue
-	var nextToken *string
-	for {
-		out, err := client.ListQueues(ctx, &sqs.ListQueuesInput{NextToken: nextToken})
+	paginator := sqs.NewListQueuesPaginator(client, &sqs.ListQueuesInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
 		for _, url := range out.QueueUrls {
 			queues = append(queues, sqsQueue{QueueUrl: url})
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	for i := range queues {
@@ -248,6 +235,8 @@ type ebRuleTarget struct {
 func captureEBRule(ctx context.Context, cfg aws.Config) (any, error) {
 	client := eventbridge.NewFromConfig(cfg)
 
+	// No SDK paginator exists for eventbridge — the service ships none at all
+	// (its api_op_*.go files define no NewXxxPaginator) — hand-rolled loop retained.
 	var rules []ebRule
 	var nextToken *string
 	for {
@@ -285,6 +274,8 @@ func captureEBRuleTargets(ctx context.Context, client *eventbridge.Client, ruleN
 		in.EventBusName = aws.String(eventBusName)
 	}
 
+	// No SDK paginator exists for eventbridge (see captureEBRule) — hand-rolled
+	// loop retained.
 	var items []ebRuleTarget
 	var nextToken *string
 	for {
@@ -347,13 +338,9 @@ func captureKinesis(ctx context.Context, cfg aws.Config) (any, error) {
 	client := kinesis.NewFromConfig(cfg)
 
 	var streams []kinesisStream
-	var exclusiveStartStreamName *string
-	for {
-		in := &kinesis.ListStreamsInput{}
-		if exclusiveStartStreamName != nil {
-			in.ExclusiveStartStreamName = exclusiveStartStreamName
-		}
-		out, err := client.ListStreams(ctx, in)
+	paginator := kinesis.NewListStreamsPaginator(client, &kinesis.ListStreamsInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -362,14 +349,9 @@ func captureKinesis(ctx context.Context, cfg aws.Config) (any, error) {
 				StreamARN:               aws.ToString(s.StreamARN),
 				StreamName:              aws.ToString(s.StreamName),
 				StreamStatus:            string(s.StreamStatus),
-				StreamCreationTimestamp: msgFormatTime(s.StreamCreationTimestamp),
+				StreamCreationTimestamp: snapFormatTime(s.StreamCreationTimestamp),
 			})
 		}
-		if out.HasMoreStreams == nil || !*out.HasMoreStreams || len(out.StreamSummaries) == 0 {
-			break
-		}
-		last := out.StreamSummaries[len(out.StreamSummaries)-1].StreamName
-		exclusiveStartStreamName = last
 	}
 
 	for i := range streams {
@@ -421,9 +403,9 @@ func captureMSK(ctx context.Context, cfg aws.Config) (any, error) {
 	client := kafka.NewFromConfig(cfg)
 
 	var clusters []mskCluster
-	var nextToken *string
-	for {
-		out, err := client.ListClustersV2(ctx, &kafka.ListClustersV2Input{NextToken: nextToken})
+	paginator := kafka.NewListClustersV2Paginator(client, &kafka.ListClustersV2Input{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -433,7 +415,7 @@ func captureMSK(ctx context.Context, cfg aws.Config) (any, error) {
 				ClusterName:    aws.ToString(c.ClusterName),
 				State:          string(c.State),
 				ClusterType:    string(c.ClusterType),
-				CreationTime:   msgFormatTime(c.CreationTime),
+				CreationTime:   snapFormatTime(c.CreationTime),
 				CurrentVersion: aws.ToString(c.CurrentVersion),
 			}
 			if c.StateInfo != nil {
@@ -444,10 +426,6 @@ func captureMSK(ctx context.Context, cfg aws.Config) (any, error) {
 			}
 			clusters = append(clusters, mc)
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	return mskData{Clusters: clusters}, nil
@@ -485,9 +463,9 @@ func captureSES(ctx context.Context, cfg aws.Config) (any, error) {
 	client := sesv2.NewFromConfig(cfg)
 
 	var identities []sesIdentity
-	var nextToken *string
-	for {
-		out, err := client.ListEmailIdentities(ctx, &sesv2.ListEmailIdentitiesInput{NextToken: nextToken})
+	paginator := sesv2.NewListEmailIdentitiesPaginator(client, &sesv2.ListEmailIdentitiesInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -499,10 +477,6 @@ func captureSES(ctx context.Context, cfg aws.Config) (any, error) {
 				VerificationStatus: string(id.VerificationStatus),
 			})
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	account := captureSESAccount(ctx, client)
@@ -562,9 +536,9 @@ func captureSFN(ctx context.Context, cfg aws.Config) (any, error) {
 	client := sfn.NewFromConfig(cfg)
 
 	var machines []sfnStateMachine
-	var nextToken *string
-	for {
-		out, err := client.ListStateMachines(ctx, &sfn.ListStateMachinesInput{NextToken: nextToken})
+	paginator := sfn.NewListStateMachinesPaginator(client, &sfn.ListStateMachinesInput{})
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -573,13 +547,9 @@ func captureSFN(ctx context.Context, cfg aws.Config) (any, error) {
 				Name:            aws.ToString(m.Name),
 				StateMachineArn: aws.ToString(m.StateMachineArn),
 				Type:            string(m.Type),
-				CreationDate:    msgFormatTime(m.CreationDate),
+				CreationDate:    snapFormatTime(m.CreationDate),
 			})
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
 	}
 
 	for i := range machines {
@@ -606,8 +576,8 @@ func captureSFNLastExecution(ctx context.Context, client *sfn.Client, stateMachi
 	return sfnExecutionProbe{
 		Outcome:      "found",
 		ExecutionArn: aws.ToString(e.ExecutionArn),
-		StartDate:    msgFormatTime(e.StartDate),
-		StopDate:     msgFormatTime(e.StopDate),
+		StartDate:    snapFormatTime(e.StartDate),
+		StopDate:     snapFormatTime(e.StopDate),
 	}
 }
 
@@ -653,6 +623,8 @@ func captureAPIGW(ctx context.Context, cfg aws.Config) (any, error) {
 	v2Client := apigatewayv2.NewFromConfig(cfg)
 	v1Client := apigateway.NewFromConfig(cfg)
 
+	// No SDK paginator exists for apigatewayv2 GetApis (the package only
+	// generates NewListRoutingRulesPaginator) — hand-rolled loop retained.
 	var v2APIs []apigwV2API
 	var v2NextToken *string
 	for {
@@ -665,7 +637,7 @@ func captureAPIGW(ctx context.Context, cfg aws.Config) (any, error) {
 				ApiId:        aws.ToString(a.ApiId),
 				Name:         aws.ToString(a.Name),
 				ProtocolType: string(a.ProtocolType),
-				CreatedDate:  msgFormatTime(a.CreatedDate),
+				CreatedDate:  snapFormatTime(a.CreatedDate),
 			})
 		}
 		if out.NextToken == nil || *out.NextToken == "" {
@@ -679,9 +651,9 @@ func captureAPIGW(ctx context.Context, cfg aws.Config) (any, error) {
 	}
 
 	var v1APIs []apigwV1API
-	var position *string
-	for {
-		out, err := v1Client.GetRestApis(ctx, &apigateway.GetRestApisInput{Position: position})
+	v1Paginator := apigateway.NewGetRestApisPaginator(v1Client, &apigateway.GetRestApisInput{})
+	for v1Paginator.HasMorePages() {
+		out, err := v1Paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -689,13 +661,9 @@ func captureAPIGW(ctx context.Context, cfg aws.Config) (any, error) {
 			v1APIs = append(v1APIs, apigwV1API{
 				Id:          aws.ToString(a.Id),
 				Name:        aws.ToString(a.Name),
-				CreatedDate: msgFormatTime(a.CreatedDate),
+				CreatedDate: snapFormatTime(a.CreatedDate),
 			})
 		}
-		if out.Position == nil || *out.Position == "" {
-			break
-		}
-		position = out.Position
 	}
 
 	return apigwData{V2APIs: v2APIs, V1APIs: v1APIs}, nil
@@ -714,15 +682,4 @@ func captureAPIGWStages(ctx context.Context, client *apigatewayv2.Client, apiId 
 		})
 	}
 	return apigwV2Stages{Outcome: "ok", Items: items}
-}
-
-// ---------------------------------------------------------------------
-// shared helpers
-// ---------------------------------------------------------------------
-
-func msgFormatTime(t *time.Time) string {
-	if t == nil {
-		return ""
-	}
-	return t.Format("2006-01-02 15:04")
 }

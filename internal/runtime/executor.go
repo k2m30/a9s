@@ -217,7 +217,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		if store == nil {
 			return messages.AvailabilityCacheLoaded{
 				Entries: make(map[string]int),
-				Expired: true,
 			}, nil
 		}
 		return cacheStoreToEvent(store), nil
@@ -644,18 +643,12 @@ func (c *Core) saveProbeResourcesToTypeFiles(probeResources map[string][]resourc
 // it is not duplicated onto this event. Exported so renderer adapters (e.g.
 // the TUI's tea.Cmd-based loadAvailabilityCache) share this single
 // conversion instead of re-deriving it.
-//
-// Expired is always false: C1 is a deliberate no-TTL contract — arbitrarily
-// old rows render as long as they are stale-marked (Refreshing) and
-// re-verification is already running. The field is retained for message-shape
-// stability only; no production code branches on it.
 func CacheStoreToEvent(store *cache.Store) messages.AvailabilityCacheLoaded {
 	if store == nil {
 		// Mirrors the TaskKindLoadAvailCache case above: a nil store (no
 		// cache loaded for this pair) is "no knowledge yet", not a panic.
 		return messages.AvailabilityCacheLoaded{
 			Entries: make(map[string]int),
-			Expired: true,
 		}
 	}
 	return cacheStoreToEvent(store)
@@ -695,7 +688,6 @@ func cacheStoreToEvent(store *cache.Store) messages.AvailabilityCacheLoaded {
 	return messages.AvailabilityCacheLoaded{
 		Entries:        entries,
 		Truncated:      truncated,
-		Expired:        false,
 		IssueCounts:    issueCounts,
 		IssueTruncated: issueTruncated,
 		IssueKnown:     issueKnown,

@@ -77,8 +77,8 @@ func FetchCodeBuildProjectsPage(
 		}
 
 		r := resource.Resource{
-			ID:    name,
-			Name:  name,
+			ID:   name,
+			Name: name,
 			Fields: map[string]string{
 				"name":          name,
 				"source_type":   sourceType,
@@ -107,32 +107,4 @@ func FetchCodeBuildProjectsPage(
 			TotalHint:   -1,
 		},
 	}, nil
-}
-
-// FetchCodeBuildProjects performs a two-step fetch:
-// 1. ListProjects to get project names (paginated via NextToken)
-// 2. BatchGetProjects to get full project details
-func FetchCodeBuildProjects(
-	ctx context.Context,
-	listAPI CodeBuildListProjectsAPI,
-	batchAPI CodeBuildBatchGetProjectsAPI,
-) ([]resource.Resource, error) {
-	var allResources []resource.Resource
-	continuationToken := ""
-
-	for {
-		result, err := FetchCodeBuildProjectsPage(ctx, listAPI, batchAPI, continuationToken)
-		if err != nil {
-			return nil, err
-		}
-
-		allResources = append(allResources, result.Resources...)
-
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		continuationToken = result.Pagination.NextToken
-	}
-
-	return allResources, nil
 }

@@ -146,135 +146,14 @@ func TestWave2_ListStatusColumn_ShowsConcretePhrase_ForIssueFinding(t *testing.T
 }
 
 // ---------------------------------------------------------------------------
-// 2. S5 in detail: full Detail sentence renders alongside the short Phrase.
+// 2 and 3 (S5-in-detail full sentence, and Detail=="" fallback) were legacy
+// views.DetailModel.PlainContent()-driven pins for the same claim
+// TestWave3_DetailAttention_RendersFullDetailSentence_AlongsidePhrase /
+// TestWave3_DetailAttention_FallsBackToPhrase_WhenDetailEmpty
+// (tests/unit/wave3_detail_ports_test.go) now pin on the live
+// injectAttentionSectionDetail path — removed here, wave3 detail-family
+// cleanup (specs/022-codebase-cleanup).
 // ---------------------------------------------------------------------------
-
-// TestWave2_DetailAttention_RendersFullDetailSentence_AlongsidePhrase verifies
-// bug (4): the detail view's Attention section must render the full S5
-// operator sentence (Finding.Detail) on its own line, in addition to the
-// short S4 Phrase — not the Phrase alone.
-//
-// COMPILE-RED: domain.Finding has no Detail field yet.
-func TestWave2_DetailAttention_RendersFullDetailSentence_AlongsidePhrase(t *testing.T) {
-	// PlainContent() renders plain text regardless of NO_COLOR — no color
-	// reset needed here (mirrors TestViews_DetailAttention_PrefersFindingsPhraseOverIssues
-	// in phase03_view_reads_test.go, which also skips it for PlainContent-only assertions).
-
-	const code domain.FindingCode = "dbi.pending-maintenance"
-	r := resource.Resource{
-		ID:   "db-maint-1",
-		Name: "prod-maint-db",
-		Fields: map[string]string{
-			"status": "available",
-		},
-		Findings: []domain.Finding{
-			{
-				Code:     code,
-				Phrase:   "maintenance scheduled",
-				Detail:   "Pending maintenance action overdue: system-update.",
-				Severity: domain.SevWarn,
-				Source:   "wave2:dbi",
-			},
-		},
-	}
-
-	k := keys.Default()
-	m := views.NewDetail(r, "dbi", nil, k)
-	m.SetSize(200, 100)
-
-	out := m.PlainContent()
-
-	if !strings.Contains(out, "Pending maintenance action overdue: system-update.") {
-		t.Errorf("detail Attention section must render the full S5 Detail sentence; got:\n%s", out)
-	}
-	if !strings.Contains(out, "maintenance scheduled") {
-		t.Errorf("detail Attention section must still render the short S4 Phrase alongside Detail; got:\n%s", out)
-	}
-	// The two must appear as genuinely separate lines, not concatenated —
-	// otherwise the "short phrase for triage, full sentence for follow-up"
-	// contract collapses into one run-on string.
-	foundPhraseLine := false
-	foundDetailLine := false
-	for _, ln := range strings.Split(out, "\n") {
-		if strings.Contains(ln, "maintenance scheduled") && !strings.Contains(ln, "Pending maintenance action overdue") {
-			foundPhraseLine = true
-		}
-		if strings.Contains(ln, "Pending maintenance action overdue: system-update.") {
-			foundDetailLine = true
-		}
-	}
-	if !foundPhraseLine {
-		t.Errorf("expected a line containing only the short Phrase (no Detail text on it); got:\n%s", out)
-	}
-	if !foundDetailLine {
-		t.Errorf("expected a separate line containing the full Detail sentence; got:\n%s", out)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// 3. S5 fallback: Detail=="" still renders Phrase, no stray empty line.
-// ---------------------------------------------------------------------------
-
-// TestWave2_DetailAttention_FallsBackToPhrase_WhenDetailEmpty verifies that
-// when Finding.Detail is the empty string, the Attention section still
-// renders the Phrase line and does not emit an extra blank line where the
-// Detail sentence would have gone.
-//
-// COMPILE-RED: domain.Finding has no Detail field yet.
-func TestWave2_DetailAttention_FallsBackToPhrase_WhenDetailEmpty(t *testing.T) {
-	// PlainContent() renders plain text regardless of NO_COLOR — no color
-	// reset needed here (see comment in the sibling test above).
-
-	const code domain.FindingCode = "ec2.instance-status-impaired"
-	r := resource.Resource{
-		ID:   "i-nodep-1",
-		Name: "worker-nodetail",
-		Fields: map[string]string{
-			"state": "running",
-		},
-		Findings: []domain.Finding{
-			{
-				Code:     code,
-				Phrase:   "impaired: system checks failing",
-				Detail:   "",
-				Severity: domain.SevBroken,
-				Source:   "wave2:ec2",
-			},
-		},
-	}
-
-	k := keys.Default()
-	m := views.NewDetail(r, "ec2", nil, k)
-	m.SetSize(200, 100)
-
-	out := m.PlainContent()
-
-	if !strings.Contains(out, "impaired: system checks failing") {
-		t.Errorf("Attention section must render Phrase when Detail is empty; got:\n%s", out)
-	}
-
-	// No stray blank line immediately following the Attention phrase entry —
-	// find the phrase line, then assert the very next non-empty content line
-	// is NOT an empty string masquerading as a Detail placeholder. We check
-	// this by ensuring there is no line that is purely whitespace sitting
-	// directly between the Attention section header and the next real field,
-	// beyond the single pre-existing separator blank line the section always
-	// emits after all entries (see injectAttentionSection's trailing Spacer).
-	lines := strings.Split(out, "\n")
-	phraseIdx := -1
-	for i, ln := range lines {
-		if strings.Contains(ln, "impaired: system checks failing") {
-			phraseIdx = i
-			break
-		}
-	}
-	if phraseIdx == -1 {
-		t.Fatal("phrase line not found")
-	}
-	if phraseIdx+1 < len(lines) && strings.TrimSpace(lines[phraseIdx+1]) == "" {
-		t.Errorf("expected no stray empty line directly after the Phrase entry when Detail is empty (fallback must not add blank lines); line after phrase: %q", lines[phraseIdx+1])
-	}
-}
 
 // ---------------------------------------------------------------------------
 // 4. logs retention-nil (docs/resources/logs.md §4).

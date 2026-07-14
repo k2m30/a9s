@@ -72,7 +72,7 @@ func TestPhase03_AttentionDetailShape(t *testing.T) {
 // TestPhase03_DetailRowTierZeroValue documents the contract that an omitted
 // Tier field defaults to the empty string.
 func TestPhase03_DetailRowTierZeroValue(t *testing.T) {
-	r := domain.DetailRow{Label: "L", Value: "V"}
+	r := domain.DetailRow{}
 	if r.Tier != "" {
 		t.Errorf("Tier zero value: got %q, want %q", r.Tier, "")
 	}
@@ -136,7 +136,7 @@ func TestPhase03_ResourceCoreFieldsPresent(t *testing.T) {
 // TestPhase03_ResourceTypeDefLifecycleKey verifies that ResourceTypeDef
 // accepts and returns the LifecycleKey field.
 func TestPhase03_ResourceTypeDefLifecycleKey(t *testing.T) {
-	td := resource.ResourceTypeDef{ShortName: "ec2", LifecycleKey: "state"}
+	td := resource.ResourceTypeDef{LifecycleKey: "state"}
 	if td.LifecycleKey != "state" {
 		t.Errorf("LifecycleKey: got %q, want %q", td.LifecycleKey, "state")
 	}

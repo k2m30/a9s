@@ -161,12 +161,19 @@ type DetailRelatedRow struct {
 // TextState holds the mutable display state for a YAML/JSON text screen.
 // Lines is the syntax-colored content set once at push time (set by
 // EnsureTextState) and never mutated; all other fields are updated by Apply.
+// Resource is the resource this text screen was rendered from — set at push
+// time and replaced by SetTextResource when async detail enrichment lands,
+// mirroring DetailState.Resource. GetTextResource reads it directly instead
+// of re-resolving through the row cache, so a y/J toggle (or any other
+// GetTextResource caller) sees enriched fields even when no Detail screen is
+// on the stack to have received them via ApplyDetailEnrichmentForResource.
 type TextState struct {
-	Lines        []string `json:"lines,omitempty"`
-	Search       string   `json:"search,omitempty"`
-	SearchCursor int      `json:"search_cursor"`
-	Wrap         bool     `json:"wrap,omitempty"`
-	ScrollY      int      `json:"scroll_y"`
+	Lines        []string          `json:"lines,omitempty"`
+	Search       string            `json:"search,omitempty"`
+	SearchCursor int               `json:"search_cursor"`
+	Wrap         bool              `json:"wrap,omitempty"`
+	ScrollY      int               `json:"scroll_y"`
+	Resource     resource.Resource `json:"resource,omitzero"`
 }
 
 // SelectorState holds the mutable display state for a profile/region/theme

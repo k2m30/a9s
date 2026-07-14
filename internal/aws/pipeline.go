@@ -10,25 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchCodePipelines calls the CodePipeline ListPipelines API and converts
-// the response into a slice of generic Resource structs.
-func FetchCodePipelines(ctx context.Context, api CodePipelineListPipelinesAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchCodePipelinesPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchCodePipelinesPage fetches a single page of CodePipeline pipelines.
 // No client context is available here to resolve the real account, so
 // Fields["arn"] is left empty. Use FetchCodePipelinesPageWithClients (the

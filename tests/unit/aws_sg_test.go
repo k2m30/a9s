@@ -10,6 +10,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/tests/testdata"
 )
 
@@ -68,7 +69,9 @@ func TestFetchSecurityGroups_ParsesMultipleGroups(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSecurityGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSecurityGroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -138,7 +141,9 @@ func TestFetchSecurityGroups_ErrorResponse(t *testing.T) {
 		err:    fmt.Errorf("AWS API error: access denied"),
 	}
 
-	resources, err := awsclient.FetchSecurityGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSecurityGroupsPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -158,7 +163,9 @@ func TestFetchSecurityGroups_EmptyResponse(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSecurityGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSecurityGroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -185,7 +192,9 @@ func TestFetchSecurityGroups_RawStructPopulated(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSecurityGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSecurityGroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -233,7 +242,9 @@ func TestFetchSecurityGroups_NilFieldsHandled(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSecurityGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSecurityGroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -273,7 +284,9 @@ func TestFetchSecurityGroups_RealAWSData(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchSecurityGroups(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSecurityGroupsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

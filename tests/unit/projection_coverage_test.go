@@ -88,7 +88,9 @@ func TestProjectorCoverageAllTypes(t *testing.T) {
 // credentials are required, no global state is modified.
 func TestGenericWithConfig_NilConfigSurvives(t *testing.T) {
 	clients := demo.NewServiceClients()
-	ec2Resources, err := awsclient.FetchEC2Instances(context.Background(), clients.EC2)
+	ec2Resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), clients.EC2, token)
+	})
 	if err != nil || len(ec2Resources) == 0 {
 		// Fall back to a minimal synthetic resource if demo fetch is unavailable.
 		t.Log("demo EC2 fetch returned no resources; using minimal synthetic fixture")
@@ -132,41 +134,61 @@ func fetchDemoResourceSample(t *testing.T) map[string][]domain.Resource {
 	}
 
 	// Compute
-	ec2res, err := awsclient.FetchEC2Instances(ctx, clients.EC2)
+	ec2res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(ctx, clients.EC2, token)
+	})
 	tryAdd("ec2", ec2res, err)
 
 	// Containers
-	ecsRes, err := awsclient.FetchECSClusters(ctx, clients.ECS, clients.ECS)
+	ecsRes, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSClustersPage(ctx, clients.ECS, clients.ECS, token)
+	})
 	tryAdd("ecs", ecsRes, err)
 
 	// Database
-	rdsRes, err := awsclient.FetchRDSInstances(ctx, clients.RDS)
+	rdsRes, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchRDSInstancesPage(ctx, clients.RDS, token)
+	})
 	tryAdd("rds", rdsRes, err)
 
-	ddbRes, err := awsclient.FetchDynamoDBTables(ctx, clients.DynamoDB, clients.DynamoDB)
+	ddbRes, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchDynamoDBTablesPage(ctx, clients.DynamoDB, clients.DynamoDB, token)
+	})
 	tryAdd("ddb", ddbRes, err)
 
 	// Storage
-	s3Res, err := awsclient.FetchS3Buckets(ctx, clients.S3)
+	s3Res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchS3BucketsPage(ctx, clients.S3, token)
+	})
 	tryAdd("s3", s3Res, err)
 
 	// Serverless
-	lambdaRes, err := awsclient.FetchLambdaFunctions(ctx, clients.Lambda)
+	lambdaRes, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchLambdaFunctionsPage(ctx, clients.Lambda, token)
+	})
 	tryAdd("lambda", lambdaRes, err)
 
 	// Security / identity
-	iamRoles, err := awsclient.FetchIAMRoles(ctx, clients.IAM)
+	iamRoles, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchIAMRolesPage(ctx, clients.IAM, token)
+	})
 	tryAdd("role", iamRoles, err)
 
-	secretsRes, err := awsclient.FetchSecrets(ctx, clients.SecretsManager)
+	secretsRes, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSecretsPage(ctx, clients.SecretsManager, token)
+	})
 	tryAdd("secrets", secretsRes, err)
 
 	// Monitoring
-	ctRes, err := awsclient.FetchCloudTrailEvents(ctx, clients.CloudTrail)
+	ctRes, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(ctx, clients.CloudTrail, token)
+	})
 	tryAdd("ct-events", ctRes, err)
 
 	// Networking
-	sgsRes, err := awsclient.FetchSecurityGroups(ctx, clients.EC2)
+	sgsRes, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchSecurityGroupsPage(ctx, clients.EC2, token)
+	})
 	tryAdd("sg", sgsRes, err)
 
 	return out

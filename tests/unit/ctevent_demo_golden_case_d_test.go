@@ -22,6 +22,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // TestCTDetailDemoGolden_CaseD renders the ct-events detail view for fixture
@@ -35,7 +36,9 @@ func TestCTDetailDemoGolden_CaseD(t *testing.T) {
 
 	// Load the demo fixture for ct-events.
 	ctClient := fakes.NewCloudTrail()
-	resources, fetchErr := awsclient.FetchCloudTrailEvents(context.Background(), ctClient)
+	resources, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchCloudTrailEventsPage(context.Background(), ctClient, token)
+	})
 	if fetchErr != nil || len(resources) == 0 {
 		t.Fatalf("demo ct-events fixtures missing (err=%v, len=%d)", fetchErr, len(resources))
 	}

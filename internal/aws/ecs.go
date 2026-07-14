@@ -11,25 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchECSClusters performs a two-step fetch: ListClusters to get ARNs,
-// then DescribeClusters for full details.
-func FetchECSClusters(ctx context.Context, listAPI ECSListClustersAPI, describeAPI ECSDescribeClustersAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchECSClustersPage(ctx, listAPI, describeAPI, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchECSClustersPage fetches a single page of ECS clusters.
 // It paginates ListClusters using continuationToken, then calls DescribeClusters
 // for the batch of ARNs returned on that page.

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/internal/runtime"
@@ -112,9 +113,9 @@ func selectorFrameTitle(ss *SelectorState) string {
 	visible := selectorVisibleItems(ss)
 	filtered := len(visible)
 	if ss.Filter != "" && filtered != total {
-		return ss.Title + "(" + itoa(filtered) + "/" + itoa(total) + ")"
+		return ss.Title + "(" + strconv.Itoa(filtered) + "/" + strconv.Itoa(total) + ")"
 	}
-	return ss.Title + "(" + itoa(total) + ")"
+	return ss.Title + "(" + strconv.Itoa(total) + ")"
 }
 
 // SelectorFrameTitle returns the frame-border title for the top selector

@@ -10,25 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchTargetGroups calls the ELBv2 DescribeTargetGroups API and converts the
-// response into a slice of generic Resource structs.
-func FetchTargetGroups(ctx context.Context, api ELBv2DescribeTargetGroupsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchTargetGroupsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchTargetGroupsPage fetches a single page of target groups.
 func FetchTargetGroupsPage(ctx context.Context, api ELBv2DescribeTargetGroupsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &elbv2.DescribeTargetGroupsInput{

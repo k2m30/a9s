@@ -11,6 +11,7 @@ import (
 	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ===========================================================================
@@ -87,7 +88,9 @@ func TestFetchECSClusters_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchECSClusters(context.Background(), listMock, describeMock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSClustersPage(context.Background(), listMock, describeMock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -256,12 +259,15 @@ func TestFetchECSServices_PaginatedListClusters(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchECSServices(
-		context.Background(),
-		listClustersMock,
-		listServicesMock,
-		describeServicesMock,
-	)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSServicesPage(
+			context.Background(),
+			listClustersMock,
+			listServicesMock,
+			describeServicesMock,
+			token,
+		)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -427,12 +433,15 @@ func TestFetchECSTasks_PaginatedListClusters(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchECSTasks(
-		context.Background(),
-		listClustersMock,
-		listTasksMock,
-		describeTasksMock,
-	)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchECSTasksPage(
+			context.Background(),
+			listClustersMock,
+			listTasksMock,
+			describeTasksMock,
+			token,
+		)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -546,7 +555,9 @@ func TestFetchKinesisStreams_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchKinesisStreams(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchKinesisStreamsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

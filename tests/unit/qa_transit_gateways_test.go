@@ -36,7 +36,9 @@ func TestQA_TransitGateways_FetchSuccess(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchTransitGateways(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchTransitGatewaysPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,7 +86,9 @@ func TestQA_TransitGateways_FetchEmpty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchTransitGateways(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchTransitGatewaysPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -98,7 +102,9 @@ func TestQA_TransitGateways_FetchError(t *testing.T) {
 		err: fmt.Errorf("access denied"),
 	}
 
-	_, err := awsclient.FetchTransitGateways(context.Background(), mock)
+	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchTransitGatewaysPage(context.Background(), mock, token)
+	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

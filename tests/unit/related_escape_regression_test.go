@@ -10,8 +10,9 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
-	"github.com/k2m30/a9s/v3/internal/tui"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // Regression guard for related navigation UX:
@@ -26,11 +27,15 @@ func TestRelatedNavigate_FilteredList_EscReturnsToDetail(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ec2Client := fakes.NewEC2()
-	ec2, err := awsclient.FetchEC2Instances(context.Background(), ec2Client)
+	ec2, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEC2InstancesPage(context.Background(), ec2Client, token)
+	})
 	if err != nil || len(ec2) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2))
 	}
-	amis, err := awsclient.FetchAMIs(context.Background(), ec2Client)
+	amis, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAMIsPage(context.Background(), ec2Client, token)
+	})
 	if err != nil || len(amis) == 0 {
 		t.Fatalf("demo ami fixtures missing (err=%v, len=%d)", err, len(amis))
 	}

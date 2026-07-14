@@ -453,10 +453,10 @@ func TestPR03b_EBSFetcher_InUseEmitsNoFinding(t *testing.T) {
 	mock := &pr03bEBSVolMock{
 		vols: []ec2types.Volume{
 			{
-				VolumeId:  aws.String("vol-0abc123def456"),
-				State:     ec2types.VolumeStateInUse,
-				Size:      aws.Int32(100),
-				Encrypted: aws.Bool(true),
+				VolumeId:   aws.String("vol-0abc123def456"),
+				State:      ec2types.VolumeStateInUse,
+				Size:       aws.Int32(100),
+				Encrypted:  aws.Bool(true),
 				VolumeType: ec2types.VolumeTypeGp3,
 			},
 		},
@@ -554,7 +554,9 @@ func TestPR03b_AMIFetcher_AvailableEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAMIs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAMIsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchAMIs: unexpected error: %v", err)
 	}
@@ -587,7 +589,9 @@ func TestPR03b_AMIFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchAMIs(context.Background(), mock)
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchAMIsPage(context.Background(), mock, token)
+	})
 	if err != nil {
 		t.Fatalf("FetchAMIs: unexpected error: %v", err)
 	}

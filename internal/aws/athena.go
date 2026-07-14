@@ -11,25 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// FetchAthenaWorkgroups calls the Athena ListWorkGroups API and converts the
-// response into a slice of generic Resource structs.
-func FetchAthenaWorkgroups(ctx context.Context, api AthenaListWorkGroupsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchAthenaWorkgroupsPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchAthenaWorkgroupsPage fetches a single page of Athena workgroups. When
 // api also implements AthenaGetWorkGroupAPI, each workgroup is enriched with
 // result_output_location (and any other per-config fields) so sibling

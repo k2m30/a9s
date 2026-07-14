@@ -49,25 +49,6 @@ func rgTransientPhrase(state string) string {
 	return ""
 }
 
-// FetchRedis calls the ElastiCache DescribeReplicationGroups API and converts
-// all pages into a slice of generic Resource structs.
-func FetchRedis(ctx context.Context, api ElastiCacheDescribeReplicationGroupsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchRedisPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchRedisPage fetches a single page of ElastiCache ReplicationGroups and maps
 // each to a resource.Resource. RawStruct is set to the full ReplicationGroup struct.
 func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroupsAPI, continuationToken string) (resource.FetchResult, error) {
