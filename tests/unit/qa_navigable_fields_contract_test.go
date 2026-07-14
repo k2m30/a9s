@@ -266,6 +266,10 @@ var navigableContracts = []navContract{
 	{shortName: "transfer", apiDoc: "https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html", fieldPath: "LoggingRole", targetType: "role", reasoning: "DescribedServer.LoggingRole — the CloudWatch logging role; first stop for 'why are there no logs'."},
 	{shortName: "transfer", apiDoc: "https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html", fieldPath: "Certificate", targetType: "acm", reasoning: "DescribedServer.Certificate — the FTPS identity certificate ACM ARN."},
 	{shortName: "transfer", apiDoc: "https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html", fieldPath: "EndpointDetails.VpcId", targetType: "vpc", reasoning: "DescribedServer.EndpointDetails.VpcId — top of the partner-reachability chain."},
+	{shortName: "transfer", apiDoc: "https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html", fieldPath: "EndpointDetails.SubnetIds", targetType: "subnet", reasoning: "endpoint ENI subnets; partner-reachability debugging, navigable like VpcId."},
+	{shortName: "transfer", apiDoc: "https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html", fieldPath: "EndpointDetails.AddressAllocationIds", targetType: "eip", reasoning: "internet-facing endpoint static addresses; partners allowlist these."},
+	{shortName: "transfer", apiDoc: "https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html", fieldPath: "EndpointDetails.VpcEndpointId", targetType: "vpce", reasoning: "the endpoint that carries the security groups."},
+	{shortName: "transfer", apiDoc: "https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html", fieldPath: "IdentityProviderDetails.Function", targetType: "lambda", reasoning: "the custom authorizer; 'why is auth rejecting this user' jumps straight to it."},
 
 	// vpce — VPC Endpoints  (the user's screenshot bug class)
 	{shortName: "vpce", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html", fieldPath: "VpcId", targetType: "vpc", reasoning: "VpcEndpoint.VpcId — VPC the endpoint lives in."},

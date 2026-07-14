@@ -726,6 +726,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Related: []domain.RelatedDef{
 			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkTransferACM},
+			{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkTransferEIP},
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkTransferLambda},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTransferLogs},
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkTransferRole},
@@ -738,6 +739,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "LoggingRole", TargetType: "role"},
 			{FieldPath: "Certificate", TargetType: "acm"},
 			{FieldPath: "EndpointDetails.VpcId", TargetType: "vpc"},
+			{FieldPath: "EndpointDetails.SubnetIds", TargetType: "subnet"},
+			{FieldPath: "EndpointDetails.AddressAllocationIds", TargetType: "eip"},
+			{FieldPath: "EndpointDetails.VpcEndpointId", TargetType: "vpce"},
+			{FieldPath: "IdentityProviderDetails.Function", TargetType: "lambda"},
 		},
 		Findings: []catalog.FindingDef{
 			{Code: transferCodeOffline, Phrase: "offline: not accepting transfers", Severity: domain.SevWarn, Source: "wave1"},

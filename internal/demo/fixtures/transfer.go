@@ -184,16 +184,18 @@ var sharedTransferFixtures = sync.OnceValue(func() *TransferFixtures {
 	}
 
 	// GRAPH ROOT — AS2+FTPS gateway. Countable pivots: role 1, vpc 1,
-	// subnet 3, vpce 1, logs 2, acm 1 = 6, with ≥2 on subnet+logs (2/6 —
-	// VpcId/VpcEndpointId/Certificate/LoggingRole are 1:1 by API shape;
-	// documented structural ceiling, transfer-impl-plan.md §2).
+	// subnet 3, vpce 1, logs 2, acm 1, eip 3 = 7, with ≥2 on subnet+logs+eip
+	// (3/7 — VpcId/VpcEndpointId/Certificate/LoggingRole are 1:1 by API shape;
+	// documented structural ceiling, transfer-impl-plan.md §2). AllocationIds
+	// match ec2.go's buildAddresses eipalloc-0transfer111111{a,b,c} entries.
 	gateway := transferBaseServer(ProdAS2GatewayID, transfertypes.StateOnline, "SHA256:6b1f9c9e2a4d4e8f91a37d5c8e2f4b6a70c1d2e3f4a5")
 	gateway.EndpointType = transfertypes.EndpointTypeVpc
 	gateway.Protocols = []transfertypes.Protocol{transfertypes.ProtocolAs2, transfertypes.ProtocolFtps}
 	gateway.EndpointDetails = &transfertypes.EndpointDetails{
-		VpcId:         aws.String(fixtProdVPCID),
-		VpcEndpointId: aws.String(ProdAS2GatewayVpcEndpointID),
-		SubnetIds:     []string{fixtProdPublicSubnetA, fixtProdPublicSubnetB, fixtProdPrivateSubnetA},
+		VpcId:                aws.String(fixtProdVPCID),
+		VpcEndpointId:        aws.String(ProdAS2GatewayVpcEndpointID),
+		SubnetIds:            []string{fixtProdPublicSubnetA, fixtProdPublicSubnetB, fixtProdPrivateSubnetA},
+		AddressAllocationIds: []string{"eipalloc-0transfer111111a", "eipalloc-0transfer111111b", "eipalloc-0transfer111111c"},
 	}
 	gateway.Certificate = aws.String(ProdACMCertARN1)
 	gateway.StructuredLogDestinations = []string{

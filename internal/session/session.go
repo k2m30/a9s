@@ -118,6 +118,18 @@ type Session struct {
 	// static policy, not session state.
 	NoCache bool
 
+	// SweptPairs records, per profile+"--"+region pair visited this process
+	// lifetime, whether the Wave-1 availability sweep has run to completion
+	// at least once. Session-lifetime BY DESIGN: unlike every other
+	// Rotate-cleared queue/counter, Rotate() must NOT clear this map — the
+	// whole point is that a profile/region switch back to an
+	// already-fully-swept pair skips the redundant full-menu sweep instead
+	// of re-running it from scratch (live defect 2026-07-14: `:profile`
+	// switching re-ran the FULL sweep, all types plus Wave-2 enrichment, on
+	// EVERY switch instead of once per pair). Read/written under pairMu,
+	// same as Profile/Region, via PairSwept/MarkPairSwept/ClearPairSwept.
+	SweptPairs map[string]bool
+
 	// pairMu guards two related things that must be observed together
 	// atomically across goroutines: the live Profile/Region pair, and
 	// CacheStore + its cacheStore{Profile,Region} load-stamp below.
@@ -277,6 +289,7 @@ func New() *Session {
 		RowStore:               NewRowStore(),
 		RelatedCache:           NewRelatedCacheLRU(MaxRelatedCacheEntries),
 		FilteredRows:           NewFilteredRowsLRU(MaxFilteredRowsEntries),
+		SweptPairs:             make(map[string]bool),
 		RelatedGen:             1,
 		EnrichGen:              1,
 		EnrichmentGen:          1,
@@ -313,6 +326,44 @@ func (s *Session) SetProfileRegion(profile, region string) {
 	defer s.pairMu.Unlock()
 	s.Profile = profile
 	s.Region = region
+}
+
+// sweptPairKey returns the SweptPairs key for a profile/region pair — always
+// profile+"--"+region, never the reverse or any other separator, so every
+// reader/writer of SweptPairs agrees on the same key shape.
+func sweptPairKey(profile, region string) string {
+	return profile + "--" + region
+}
+
+// PairSwept reports whether the CURRENT profile/region pair's Wave-1
+// availability sweep has already run to completion at least once this
+// session. Reads Profile/Region under pairMu, same discipline as
+// CurrentPair.
+func (s *Session) PairSwept() bool {
+	s.pairMu.Lock()
+	defer s.pairMu.Unlock()
+	return s.SweptPairs[sweptPairKey(s.Profile, s.Region)]
+}
+
+// MarkPairSwept records that the CURRENT profile/region pair's Wave-1
+// availability sweep has completed. Called by
+// handleAvailabilityChecked once AvailChecked reaches AvailTotal for a
+// non-empty sweep.
+func (s *Session) MarkPairSwept() {
+	s.pairMu.Lock()
+	defer s.pairMu.Unlock()
+	s.SweptPairs[sweptPairKey(s.Profile, s.Region)] = true
+}
+
+// ClearPairSwept removes the CURRENT profile/region pair's swept memo, so
+// the next availability-cache load re-runs the full sweep instead of
+// skipping it. Used by the manual full-menu refresh gesture (Ctrl+R on the
+// main menu) — an explicit user refresh must always re-probe even an
+// already-swept pair.
+func (s *Session) ClearPairSwept() {
+	s.pairMu.Lock()
+	defer s.pairMu.Unlock()
+	delete(s.SweptPairs, sweptPairKey(s.Profile, s.Region))
 }
 
 // EnsureCacheStore returns the *cache.Store for the current Profile/Region
@@ -501,4 +552,11 @@ func (s *Session) Rotate() {
 	// RuleSets: reset to a fresh store so the cached SES rule set from the
 	// prior session cannot leak into the next.
 	s.RuleSets = NewRuleSetStore()
+
+	// SweptPairs is deliberately NOT cleared here — unlike every other field
+	// above, it is session-lifetime by design: the whole point of the
+	// sweep-once-per-pair contract (see SweptPairs' doc comment) is that a
+	// profile/region switch survives in this map, so switching back to an
+	// already-fully-swept pair skips the redundant full sweep instead of
+	// re-running it on every switch.
 }

@@ -55,6 +55,7 @@ var navIDExtractors = map[string]func(string) string{
 	"logs":     arnLastColonSegment,
 	"s3":       s3BucketFromARN,
 	"iam-user": arnLastSlashSegment,
+	"lambda":   lambdaARNToBareName,
 }
 
 // arnLastSlashSegment returns the substring after the last "/".
@@ -77,6 +78,24 @@ func arnLastColonSegment(s string) string {
 		return ""
 	}
 	return s[i+1:]
+}
+
+// lambdaARNToBareName extracts the bare function name from a Lambda ARN,
+// mirroring the canonical lambdaARNToName (internal/aws/ses_related.go) —
+// the same ":function:" split with the trailing version/alias segment
+// stripped. Example: "arn:aws:lambda:us-east-1:123:function:fn:v1" → "fn".
+// Returns "" when the value carries no ":function:" marker (a plain bare
+// name), so NavIDFromValue's caller falls back to the raw value unchanged.
+func lambdaARNToBareName(s string) string {
+	const marker = ":function:"
+	_, tail, found := strings.Cut(s, marker)
+	if !found {
+		return ""
+	}
+	if colon := strings.Index(tail, ":"); colon >= 0 {
+		tail = tail[:colon]
+	}
+	return tail
 }
 
 // s3BucketFromARN extracts the bucket name from an S3 bucket ARN.
@@ -251,11 +270,12 @@ func LoadingRelated(targetType string) RelatedCheckResult {
 // so the rule cannot drift between renderers.
 //
 // A related row's final disposition is one of (never "(?)", which is forbidden):
-//   1. "(N)"        — an exact count                     (actionable)
-//   2. "(N+)"/"(0+)"— a lower bound                      (actionable)
-//   3. dimmed "(0)" — a proven zero                      (NOT actionable — dead end)
-//   4. blank        — "we aren't counting this, drill in" (actionable: Unknown/Deferred)
-//   5. blank dimmed — the checker errored                (NOT actionable — dead end)
+//  1. "(N)"        — an exact count                     (actionable)
+//  2. "(N+)"/"(0+)"— a lower bound                      (actionable)
+//  3. dimmed "(0)" — a proven zero                      (NOT actionable — dead end)
+//  4. blank        — "we aren't counting this, drill in" (actionable: Unknown/Deferred)
+//  5. blank dimmed — the checker errored                (NOT actionable — dead end)
+//
 // RelatedError is a dead end like a proven zero: an error is surfaced through a
 // Flash{IsError:true} + the "!" error log (Golden Contract rule 6), and the user
 // retries with Ctrl+R rather than drilling into data that never resolved.

@@ -608,6 +608,12 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		m.core.ResetProbeMaps()
 		// Reset the menu's availability / issue-count state via the controller.
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
+		// Sweep-once-per-pair contract: an explicit manual refresh must
+		// always re-probe every type, even for a pair already marked fully
+		// swept this session — clear the current pair's completed-sweep
+		// memo before the reload dispatches, so handleAvailabilityCacheLoaded
+		// takes the full-sweep path instead of the already-swept skip path.
+		m.core.Session().ClearPairSwept()
 		m.flash = flashState{text: "Refreshing availability...", isError: false, active: true}
 		cmd := m.loadAvailabilityCache()
 		return m, cmd

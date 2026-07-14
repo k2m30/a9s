@@ -4,7 +4,7 @@ package unit_test
 // (docs/resources/transfer.md §2, docs/resources/transfer-impl-plan.md §1
 // "related_targets"). Checkers live in internal/aws/transfer_related.go.
 //
-// All 7 real pivots (acm, lambda, logs, role, subnet, vpc, vpce) are
+// All 8 real pivots (acm, eip, lambda, logs, role, subnet, vpc, vpce) are
 // field-driven (read a field on the DescribedServer, no API call) — these
 // are exercised against the REAL FetchTransferServersPage output for the
 // relevant demo fixtures, avoiding any guess at internal Fields/RawStruct
@@ -58,6 +58,7 @@ func TestRelated_Transfer_Registered(t *testing.T) {
 
 	expected := map[string]string{
 		"acm":       "ACM Certificates",
+		"eip":       "Elastic IPs",
 		"lambda":    "Lambda Functions",
 		"logs":      "Log Groups",
 		"role":      "IAM Roles",
@@ -101,7 +102,7 @@ func TestRelated_Transfer_ExcludedTargetsNotRegistered(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Field-driven checkers — graph root (prod-as2-gateway) counts per
 // transfer-impl-plan.md §1 "related_targets": role 1, vpc 1, subnet 3,
-// vpce 1, logs 2, acm 1.
+// vpce 1, logs 2, acm 1, eip 3.
 // ---------------------------------------------------------------------------
 
 func TestRelated_Transfer_GraphRootCounts(t *testing.T) {
@@ -117,6 +118,7 @@ func TestRelated_Transfer_GraphRootCounts(t *testing.T) {
 		{"vpce", 1, "EndpointDetails.VpcEndpointId"},
 		{"logs", 2, "StructuredLogDestinations"},
 		{"acm", 1, "Certificate"},
+		{"eip", 3, "EndpointDetails.AddressAllocationIds"},
 	} {
 		t.Run(tc.target, func(t *testing.T) {
 			checker := checkerByTarget(t, "transfer", tc.target)
@@ -162,6 +164,7 @@ func TestRelated_Transfer_PublicEndpointConditionalPivotsAbsent(t *testing.T) {
 		{"lambda", 0},
 		{"logs", 0},
 		{"role", 1},
+		{"eip", 0},
 	} {
 		t.Run(tc.target, func(t *testing.T) {
 			checker := checkerByTarget(t, "transfer", tc.target)
@@ -173,6 +176,41 @@ func TestRelated_Transfer_PublicEndpointConditionalPivotsAbsent(t *testing.T) {
 				t.Errorf("Err = %v, want nil", result.Err)
 			}
 		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// eip — internet-facing endpoint static addresses. Only the AS2 gateway
+// carries AddressAllocationIds; every other endpoint shape (PUBLIC, or VPC
+// without static addresses) must resolve to a clean 0, and a degraded
+// ListedServer row (no DescribeServer access) must resolve to
+// RelatedUnknown, not panic.
+// ---------------------------------------------------------------------------
+
+func TestRelated_Transfer_EIP_ZeroOnFixturesWithoutAddressAllocation(t *testing.T) {
+	for _, id := range []string{fixtures.SftpUsersProdID, fixtures.SftpLambdaAuthID} {
+		t.Run(id, func(t *testing.T) {
+			res := transferResourceByID(t, id)
+			checker := checkerByTarget(t, "transfer", "eip")
+			result := checker(context.Background(), nil, res, resource.ResourceCache{})
+			if result.Count != 0 {
+				t.Errorf("Count = %d, want 0 (no EndpointDetails.AddressAllocationIds on %s)", result.Count, id)
+			}
+			if result.Err != nil {
+				t.Errorf("Err = %v, want nil", result.Err)
+			}
+		})
+	}
+}
+
+func TestRelated_Transfer_EIP_DegradedRowUnknown(t *testing.T) {
+	res := transferResourceByID(t, fixtures.WarnTransferDetailsDeniedID)
+	checker := checkerByTarget(t, "transfer", "eip")
+
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.State != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (degraded ListedServer row carries no EndpointDetails field)", result.State)
 	}
 }
 

@@ -132,7 +132,7 @@
 | `tg` | [API_TargetGroup](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_TargetGroup.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs-svc`, `elb`, `lambda`, `vpc` |
 | `tgw` | [API_TransitGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html) | `ct-events`, `role`, `rtb`, `subnet`, `vpc` |
 | `trail` | [API_Trail](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Trail.html) | `ct-events`, `kms`, `logs`, `role`, `s3`, `sns` |
-| `transfer` | [API_DescribedServer](https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html) | `acm`, `ct-events`, `lambda`, `logs`, `role`, `subnet`, `vpc`, `vpce` |
+| `transfer` | [API_DescribedServer](https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedServer.html) | `acm`, `ct-events`, `eip`, `lambda`, `logs`, `role`, `subnet`, `vpc`, `vpce` |
 | `vpc` | [API_Vpc](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html) | `cfn`, `ct-events`, `ec2`, `elb`, `eni`, `igw`, `nat`, `rtb`, `sg`, `subnet`, `tgw`, `vpce` |
 | `vpce` | [API_VpcEndpoint](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html) | `alarm`, `ct-events`, `eni`, `logs`, `r53`, `rtb`, `sg`, `subnet`, `vpc` |
 | `waf` | [API_WebACL](https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html) | `alarm`, `apigw`, `cf`, `ct-events`, `elb`, `logs` |
@@ -1056,6 +1056,7 @@ AWS API: <https://docs.aws.amazon.com/transfer/latest/userguide/API_DescribedSer
 
 - **`acm`** — `DescribedServer.Certificate` (ACM ARN, present for FTPS servers only — the server identity cert; AS2 certificates are transfer-managed, not ACM).
 - **`ct-events`** — Audit trail for server changes ("who stopped this server").
+- **`eip`** — `EndpointDetails.AddressAllocationIds` (present for internet-facing VPC endpoints only) — the static addresses partners allowlist; live-witnessed ×3 on an internet-facing SFTP server (2026-07-14).
 - **`lambda`** — `IdentityProviderDetails.Function` when `IdentityProviderType == AWS_LAMBDA` — "why is auth rejecting this user" jumps to the authorizer.
 - **`logs`** — `StructuredLogDestinations` (log-group ARNs) — where a failed-transfer investigation actually goes.
 - **`role`** — `LoggingRole` — first stop for "why are there no logs".

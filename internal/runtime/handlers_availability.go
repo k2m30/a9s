@@ -148,30 +148,46 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		})
 	}
 
-	// Build queue of all resource types to check in background.
+	// Build queue of all resource types to check in background — unless the
+	// current profile/region pair already ran this sweep to completion once
+	// this session (PairSwept). A revisit of an already-swept pair (e.g. a
+	// `:profile` switch back to a pair visited earlier) must not rebuild
+	// AvailQueue, fire a single probe, or latch AvailSweepPending — it only
+	// reports the progress intent as already done, so the menu shows no
+	// spinner for a sweep that would just re-derive data this session
+	// already verified. Disk-cache seeding above (menu counts + RowStore)
+	// runs unconditionally either way.
 	allNames := resource.AllShortNames()
-	c.session.AvailQueue = allNames
-	c.session.AvailChecked = 0
-	c.session.AvailTotal = len(allNames)
 
-	intents = append(intents, PatchMenuCheckProgress{Checked: 0, Total: c.session.AvailTotal})
-
-	// The disk-cache load races ahead of the AWS connect on startup by
-	// design (Init fires both concurrently via tea.Batch for instant-paint,
-	// C1) — it routinely wins, since local disk I/O finishes long before a
-	// network connect settles. Dispatching probe tasks while Clients is
-	// still nil would run every one of them against a nil transport and
-	// fail hard ("AWS clients not initialized"), permanently losing that
-	// probe for the session instead of actually checking availability (the
-	// four resource types first in resource.AllShortNames() were observed
-	// failing this way). Latch AvailSweepPending instead; the next
-	// successful HandleClientsReady drains the first batch once a real
-	// transport exists.
 	var tasks []TaskRequest
-	if c.session.Clients != nil {
-		tasks = append(tasks, c.fireNextAvailabilityProbes(4)...)
+	if c.session.PairSwept() {
+		c.session.AvailTotal = len(allNames)
+		c.session.AvailChecked = c.session.AvailTotal
+		intents = append(intents, PatchMenuCheckProgress{Checked: c.session.AvailChecked, Total: c.session.AvailTotal})
 	} else {
-		c.session.AvailSweepPending = true
+		c.session.AvailQueue = allNames
+		c.session.AvailChecked = 0
+		c.session.AvailTotal = len(allNames)
+
+		intents = append(intents, PatchMenuCheckProgress{Checked: 0, Total: c.session.AvailTotal})
+
+		// The disk-cache load races ahead of the AWS connect on startup by
+		// design (Init fires both concurrently via tea.Batch for
+		// instant-paint, C1) — it routinely wins, since local disk I/O
+		// finishes long before a network connect settles. Dispatching probe
+		// tasks while Clients is still nil would run every one of them
+		// against a nil transport and fail hard ("AWS clients not
+		// initialized"), permanently losing that probe for the session
+		// instead of actually checking availability (the four resource
+		// types first in resource.AllShortNames() were observed failing
+		// this way). Latch AvailSweepPending instead; the next successful
+		// HandleClientsReady drains the first batch once a real transport
+		// exists.
+		if c.session.Clients != nil {
+			tasks = append(tasks, c.fireNextAvailabilityProbes(4)...)
+		} else {
+			c.session.AvailSweepPending = true
+		}
 	}
 
 	// DEF-14/D11: consume the one-shot -c navigation armed by
@@ -372,6 +388,15 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	// All checks done — clear progress indicator and save cache.
 	intents = append(intents, PatchMenuCheckProgress{Checked: 0, Total: 0}) // 0,0 = done
 	intents = append(intents, ClearFlash{})
+
+	// The current profile/region pair's Wave-1 sweep has now genuinely
+	// completed (not just interrupted by a mid-sweep pair switch) — memoize
+	// it so a later revisit of this same pair skips the redundant sweep
+	// (see Session.PairSwept's doc comment). Guarded on a non-empty sweep so
+	// a stray zero-total call can never trivially mark a pair swept.
+	if c.session.AvailTotal > 0 {
+		c.session.MarkPairSwept()
+	}
 
 	// DEF-7 (restated on RowStore): snapshot RowStore NOW, before a later
 	// mutation (e.g. a subsequent handleEnrichmentChecked's

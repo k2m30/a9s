@@ -23,7 +23,13 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ct-events`, `lambda`, `logs`, `role`, `subnet`, `vpc`, `vpce`.
+Expected targets from `docs/related-resources.md` Per-type contract: `acm`, `ct-events`, `eip`, `lambda`, `logs`, `role`, `subnet`, `vpc`, `vpce`.
+
+### `eip`
+
+- **Why related**: `EndpointDetails.AddressAllocationIds` — the static addresses of an internet-facing VPC endpoint; these are exactly what partners allowlist, so "which IPs is this server on" is one pivot away.
+- **How discovered**: read field (present only when the VPC endpoint is internet-facing); allocation ids match the `eip` type's IDs directly.
+- **Count shown**: yes.
 
 ### `acm`
 
@@ -166,6 +172,7 @@ Every problem row names its cause in the Status column (`offline: not accepting 
 ## 6. Citations
 
 - Pivot set and exclusions — `docs/related-resources.md` § `transfer`; `AWS SDK Go v2 — transfer/types.DescribedServer § Certificate, § IdentityProviderDetails, § StructuredLogDestinations, § LoggingRole, § EndpointDetails`; sg exclusion per SDK doc on `EndpointDetails § SecurityGroupIds` ("not populated in DescribeServer responses").
+- eip pivot + SubnetIds/AddressAllocationIds navigability — `user (2026-07-14, live acceptance testing): internet-facing server witnessed with EndpointDetails.AddressAllocationIds ×3 — the original AS2 witness had an internal endpoint, which hid this field`; `AWS SDK Go v2 — transfer/types.EndpointDetails § AddressAllocationIds`.
 - Wave-1 State mapping — `docs/attention-signals.md` § Networking row `transfer`; `AWS SDK Go v2 — transfer/types.ListedServer § State`.
 - LoggingRole-nil and UserCount-zero non-signals — `a9s-devops (2026-07-14): possible=yes, worth=no. Structured logging makes nil legitimate; AS2/external-IdP servers legitimately 0 users.`
 - Security-policy denylist — `a9s-devops (2026-07-14): possible=yes, worth=yes. Denylist beats latest-chasing (FIPS/restricted variants).`

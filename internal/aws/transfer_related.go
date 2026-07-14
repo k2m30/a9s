@@ -97,6 +97,22 @@ func checkTransferSubnet(_ context.Context, _ any, res resource.Resource, _ reso
 	return relatedResult("subnet", server.EndpointDetails.SubnetIds)
 }
 
+// checkTransferEIP reads EndpointDetails.AddressAllocationIds directly
+// (Pattern F); present only when EndpointType == VPC on an internet-facing
+// server. AllocationIds already match the eip type's canonical Resource.ID
+// (eip.go's FetchElasticIPs sets Resource.ID = AllocationId directly), so no
+// ARN extraction is needed.
+func checkTransferEIP(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
+	if !ok {
+		return resource.UnknownRelated("eip")
+	}
+	if server.EndpointDetails == nil || len(server.EndpointDetails.AddressAllocationIds) == 0 {
+		return resource.RelatedCheckResult{TargetType: "eip", Count: 0}
+	}
+	return relatedResult("eip", server.EndpointDetails.AddressAllocationIds)
+}
+
 // checkTransferVPC reads EndpointDetails.VpcId directly (Pattern F);
 // present only when EndpointType == VPC.
 func checkTransferVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {

@@ -126,6 +126,7 @@ func TestScenario_TransferVisual(t *testing.T) {
 		"VPC Endpoints":    1,
 		"Log Groups":       2,
 		"ACM Certificates": 1,
+		"Elastic IPs":      3,
 	} {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, atLeast)
 	}

@@ -2053,6 +2053,35 @@ func buildAddresses() []ec2types.Address {
 				{Key: aws.String("Name"), Value: aws.String("unassociated-eip")},
 			},
 		},
+		// transfer eip pivot — three unattached addresses reserved for the
+		// prod-as2-gateway Transfer Family server's EndpointDetails.
+		// AddressAllocationIds (transfer.go). Documentation-range PublicIps
+		// (RFC 5737 TEST-NET-3, 203.0.113.0/24) since these are not actually
+		// bound to any ENI/instance in the demo graph.
+		{
+			AllocationId: aws.String("eipalloc-0transfer111111a"), PublicIp: aws.String("203.0.113.10"),
+			Domain: ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("prod-as2-gateway-eip-a")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+		{
+			AllocationId: aws.String("eipalloc-0transfer111111b"), PublicIp: aws.String("203.0.113.11"),
+			Domain: ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("prod-as2-gateway-eip-b")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+		{
+			AllocationId: aws.String("eipalloc-0transfer111111c"), PublicIp: aws.String("203.0.113.12"),
+			Domain: ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("prod-as2-gateway-eip-c")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
 	}
 }
 

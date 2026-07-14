@@ -418,8 +418,13 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 			}
 			return m, func() tea.Msg { return nav }
 		default:
-			// All other keys (including '/', character typing when filtering, Enter
-			// for navigation/confirm, Backspace) go to the right-column widget.
+			// The widget owns only filter interactions: text/Backspace/Enter while
+			// the filter input is active, and '/' to start filtering. Every other
+			// key acts on the detail screen itself (y/J/t/w/g/G...) regardless of
+			// which column holds the cursor.
+			if !rs.rightCol.IsFiltering() && !key.Matches(msg, m.keys.Search) {
+				break
+			}
 			var cmd tea.Cmd
 			rs.rightCol, cmd = rs.rightCol.Update(msg)
 
