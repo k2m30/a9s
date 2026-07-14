@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.51.0] - 2026-07-14
+
+### Added
+
+- New resource type: **Transfer Family (`transfer`, aliases `sftp`, `as2`,
+  `ftps`)** — the 68th type (main menu 69). Lists servers and describes each
+  in the same pass; status phrases per lifecycle state (`offline: not
+  accepting transfers`, `start failed`, …) plus two operator warnings: a
+  legacy security policy (weak ciphers / old TLS, denylist — FIPS/restricted
+  variants never false-positive) and no activity logging at all. Nine
+  related pivots — ACM certificate, Elastic IPs (internet-facing endpoints),
+  Lambda authorizer, log groups, logging role, subnets, VPC, VPC endpoint,
+  CloudTrail events — and seven navigable detail fields, including the
+  lambda authorizer ARN via a new central lambda name extractor.
+- **Agreements child view** (`e` on a server) — AS2 agreements with local /
+  partner profiles and base directory; an INACTIVE agreement warns
+  `inactive: partner traffic rejected`, and the agreement detail resolves
+  each profile's `As2Id` and certificate expiry on demand (expired → Broken,
+  under 30 days → Warning).
+- **Rich degraded rows**: a server whose `DescribeServer` is denied keeps
+  every field the list already returned — state finding included — and adds
+  `details denied`, extending the v3.50.0 honest-degradation contract.
+- **The availability sweep runs once per session per profile–region pair.**
+  Switching profiles back and forth no longer re-probes every type and
+  re-runs every background check — a revisited pair seeds instantly from the
+  session's own disk cache. An interrupted sweep finishes on revisit, and
+  `Ctrl+R` on the main menu always forces a full re-sweep.
+
+### Fixed
+
+- `y` (YAML), `J` (JSON) and `t` (CloudTrail) now work while the related
+  column holds the cursor; `h` correctly returns focus to the detail body.
+  The related-panel `/` filter is unaffected.
+
 ## [3.50.0] - 2026-07-14
 
 ### Added
