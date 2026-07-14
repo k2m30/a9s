@@ -4,7 +4,7 @@ Derived from [`docs/resources/lt.md`](lt.md). Spec has zero TBDs. Implementation
 
 ## 0. Architecture decisions
 
-**In-fetcher N+1 (the transfer/mwaa pattern).** `DescribeLaunchTemplates` carries no `LaunchTemplateData`; every §2 pivot field and all §3.2 signals live on the `$Default` version. The fetcher does `DescribeLaunchTemplates` (paginated) + `DescribeLaunchTemplateVersions(LaunchTemplateId, Versions=["$Default"])` per template — both `RetryOnThrottle`, E3/E5 aggregation, all findings fetcher-written (`Source: "wave1"`). NO enrichment file, NO `Wave2` catalog field.
+**In-fetcher N+1 (the transfer/mwaa pattern).** `DescribeLaunchTemplates` carries no `LaunchTemplateData`; every §2 pivot field and all §3.2 signals live on the `$Default` version. The fetcher does `DescribeLaunchTemplates` (paginated) + `DescribeLaunchTemplateVersions(LaunchTemplateId, Versions=["$Default"])` per template — both `RetryOnThrottle`, E3/E5 aggregation. IMDSv1/unencrypted/details-denied findings are fetcher-written (`Source: "wave1"`); the deprecated-ami finding alone lives in a cache-scan enricher (see its bullet below) because the fetcher has no sibling caches. NO `Wave2` API-calling enrichment.
 
 **RawStruct = composite wrapper.** Neither SDK shape alone carries the whole detail story: the list `LaunchTemplate` has `DefaultVersionNumber`/`LatestVersionNumber`/`Tags` but no data; the `LaunchTemplateVersion` has `LaunchTemplateData`/`CreatedBy`/`CreateTime` but not the latest-version number or tags. RawStruct is an exported wrapper in `internal/aws/lt.go`:
 
@@ -25,7 +25,7 @@ Findings (codes `lt.*`):
 
 - `lt.warn.imdsv1` "IMDSv1 allowed" SevWarn — `MetadataOptions == nil || HttpTokens != "required"` (unset defaults to optional — SDK-cited)
 - `lt.warn.unencrypted` "EBS encryption disabled" SevWarn — any `BlockDeviceMappings[].Ebs.Encrypted == false` explicit; nil never flags
-- `lt.warn.deprecated_ami` "deprecated AMI" SevWarn — ImageId in loaded ami cache AND DeprecationTime past; needs the ami cache at fetch time → implemented as a cache cross-ref inside the FETCHER? NO — fetcher has no sibling caches. Decision: this finding is computed by the ec2-style checker layer? Also no. RESOLUTION: the deprecated-ami signal is the ONLY cross-cache finding; implement it exactly like the existing cross-ref findings if a precedent exists (grep `attention-signals.md` "Cross-ref" rows marked IMPLEMENTED); if every cross-ref finding in the fleet is currently NOT IMPLEMENTED (backlog), this signal ships as the same documented backlog state rather than inventing the first cross-cache finding mechanism ad hoc. Phase 0 of implementation MUST resolve this with a grep and record the answer here.
+- `lt.warn.deprecated_ami` "deprecated AMI" SevWarn — ImageId in loaded ami cache AND DeprecationTime past. RESOLVED (2026-07-14): the house mechanism is the cache-scan enricher layer — `internal/aws/snapshot_cross_ref.go` (dbi-snap/dbc-snap orphan + past-retention findings scan the in-memory ResourceCache with zero AWS calls, route through `IssueEnricherResult.Findings`, surface in S4 via `phraseFromFindings` and S5 Attention). lt registers the same-layer enricher (`lt_issue_enrichment.go`, cache-scan only — zero SDK calls, Wave-1-classified per that file's doc comment); the snapshot-specific config helper is NOT reused (orphan/retention rules don't fit), but the layer, registration shape, and idempotency contract are mirrored verbatim. IMDSv1/unencrypted stay fetcher-written; details-denied stays fetcher-written.
 - `DetailsDeniedFindingDef("lt")`
 
 §4 precedence: imdsv1 → unencrypted → deprecated_ami → details_denied.
@@ -82,6 +82,7 @@ Menu badge: imdsv1, imdsv1-def, unencrypted, multi, denied = **issues:5** (+1 if
 | internal/aws/lt.go — fetcher + LTRaw + findings | 7 coder |
 | internal/aws/lt_interfaces.go — narrow LT API on the EC2 client (EC2API already in client.go — extend, don't add a client field) | 6a stub / 7 extend |
 | internal/aws/lt_related.go — 8 checkers (5 Pattern F via LTRaw, 3 cache cross-ref) | 7 coder |
+| internal/aws/lt_issue_enrichment.go — deprecated-ami cache-scan enricher (zero SDK calls; mirrors snapshot_cross_ref.go's layer + registration shape) | 7 coder |
 | internal/aws/catalog_compute.go — ResourceTypeDef (Category COMPUTE, Aliases [lt launch-template launchtemplate launch-templates lts] — uniqueness gate), Navigable (DefaultVersion.LaunchTemplateData.ImageId→ami is NOT navigable-registry-compatible if ami indexes by id — verify; LoggingRole-style role jump N/A) | 7 coder |
 | internal/config/defaults_compute.go — columns: Name, Status, Default, Latest, Created By, Created | 7 coder |
 | .a9s/views/lt.yaml (viewsgen) | 7 coder |
