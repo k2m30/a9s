@@ -69,7 +69,7 @@ func TestRelated_ASGSG_LaunchConfigPath_ReturnsSecurityGroups(t *testing.T) {
 	res := resource.Resource{
 		ID: "my-asg",
 		RawStruct: asgtypes.AutoScalingGroup{
-			AutoScalingGroupName:     aws.String("my-asg"),
+			AutoScalingGroupName:    aws.String("my-asg"),
 			LaunchConfigurationName: aws.String(lcName),
 		},
 	}
@@ -102,7 +102,7 @@ func TestRelated_ASGSG_LaunchConfigPath_DescribeError(t *testing.T) {
 	res := resource.Resource{
 		ID: "my-asg",
 		RawStruct: asgtypes.AutoScalingGroup{
-			AutoScalingGroupName:     aws.String("my-asg"),
+			AutoScalingGroupName:    aws.String("my-asg"),
 			LaunchConfigurationName: aws.String("my-launch-config"),
 		},
 	}
@@ -124,7 +124,7 @@ func TestRelated_ASGSG_LaunchConfigPath_EmptyResult(t *testing.T) {
 	res := resource.Resource{
 		ID: "my-asg",
 		RawStruct: asgtypes.AutoScalingGroup{
-			AutoScalingGroupName:     aws.String("my-asg"),
+			AutoScalingGroupName:    aws.String("my-asg"),
 			LaunchConfigurationName: aws.String("my-launch-config"),
 		},
 	}
@@ -790,6 +790,9 @@ func (f *fakeEC2VPCELogsFlowLogs) DescribeTransitGatewayRouteTables(_ context.Co
 }
 func (f *fakeEC2VPCELogsFlowLogs) DescribeLaunchTemplateVersions(_ context.Context, _ *ec2.DescribeLaunchTemplateVersionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
 	return &ec2.DescribeLaunchTemplateVersionsOutput{}, nil
+}
+func (f *fakeEC2VPCELogsFlowLogs) DescribeLaunchTemplates(_ context.Context, _ *ec2.DescribeLaunchTemplatesInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplatesOutput, error) {
+	return &ec2.DescribeLaunchTemplatesOutput{}, nil
 }
 
 // fakeEC2VPCELogsError is a minimal EC2API fake whose DescribeFlowLogs always

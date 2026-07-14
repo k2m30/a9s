@@ -189,6 +189,9 @@ var navigableContracts = []navContract{
 	{shortName: "lambda", apiDoc: "https://docs.aws.amazon.com/lambda/latest/api/API_VpcConfigResponse.html", fieldPath: "VpcConfig.SecurityGroupIds", targetType: "sg", reasoning: "FunctionConfiguration.VpcConfig.SecurityGroupIds — SGs attached to the function's ENIs."},
 	{shortName: "lambda", apiDoc: "https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html", fieldPath: "KMSKeyArn", targetType: "kms", reasoning: "FunctionConfiguration.KMSKeyArn — KMS key used to encrypt env vars."},
 
+	// lt — Launch Templates
+	{shortName: "lt", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_ResponseLaunchTemplateData.html", fieldPath: "DefaultVersion.LaunchTemplateData.NetworkInterfaces.SubnetId", targetType: "subnet", reasoning: "LaunchTemplateData.NetworkInterfaces[].SubnetId — a template that pins a subnet pins instance placement; navigable to the subnet."},
+
 	// logs — CloudWatch Log Groups
 	{shortName: "logs", apiDoc: "https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_LogGroup.html", fieldPath: "KmsKeyId", targetType: "kms", reasoning: "LogGroup.KmsKeyId — KMS key for log data encryption."},
 

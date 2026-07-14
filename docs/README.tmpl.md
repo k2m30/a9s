@@ -11,7 +11,7 @@
 
 ![a9s demo](docs/demos/demo.gif)
 
-Browse, inspect, and manage 68 AWS resource types from your terminal. a9s gives you a real-time, keyboard-driven interface to your AWS infrastructure -- no clicking through the console, no memorizing CLI flags.
+Browse, inspect, and manage 69 AWS resource types from your terminal. a9s gives you a real-time, keyboard-driven interface to your AWS infrastructure -- no clicking through the console, no memorizing CLI flags.
 
 **Read-only by design.** a9s never makes write calls to AWS. Safe to use in production. Write operations are on the [roadmap](ROADMAP.md) only after the project has proven itself as a trusted tool (10k+ stars).
 
@@ -23,7 +23,7 @@ Browse, inspect, and manage 68 AWS resource types from your terminal. a9s gives 
 
 ## Features
 
-- **68 AWS resource types** across 12 service categories
+- **69 AWS resource types** across 12 service categories
 - **Cost Explorer** — a spend grid that matches your AWS invoice, with pivots, zoom, anomaly markers, and drill-down to the resources behind the numbers (see below)
 - **Issue detection** — background health checks mark broken/degraded resources with `!`/`~` and per-type issue counts; `Ctrl+Z` filters to what needs attention
 - Real-time resource browsing with vim-style keyboard navigation
@@ -76,7 +76,7 @@ number.
 
 | Category | Resource Types |
 |----------|---------------|
-| **Compute** | EC2 Instances, ECS Services, ECS Clusters, ECS Tasks, Lambda Functions, Auto Scaling Groups, Elastic Beanstalk, EBS Volumes, EBS Snapshots, AMIs |
+| **Compute** | EC2 Instances, ECS Services, ECS Clusters, ECS Tasks, Lambda Functions, Auto Scaling Groups, Elastic Beanstalk, EBS Volumes, EBS Snapshots, AMIs, Launch Templates |
 | **Containers** | EKS Clusters, EKS Node Groups |
 | **Networking** | Load Balancers, Target Groups, Security Groups, VPCs, Subnets, Route Tables, NAT Gateways, Internet Gateways, Elastic IPs, VPC Endpoints, Transit Gateways, Network Interfaces, Transfer Family |
 | **Databases & Storage** | DB Instances, S3 Buckets, ElastiCache Redis, DB Clusters, DynamoDB Tables, OpenSearch Domains, Redshift Clusters, EFS File Systems, DB Instance Snapshots, DB Cluster Snapshots |
@@ -110,7 +110,7 @@ a9s stores view configuration in `~/.a9s/views/` and theme configuration in `~/.
 
 ## AWS Permissions
 
-a9s claims to be read-only — but a dedicated IAM role with an explicit allow-list lets AWS enforce that guarantee rather than relying on the code. The **[Minimal IAM Profile](https://github.com/k2m30/a9s/wiki/Minimal-IAM-Profile)** wiki page has the full policy JSON covering all 68 resource types, CLI setup steps, and a Terraform module.
+a9s claims to be read-only — but a dedicated IAM role with an explicit allow-list lets AWS enforce that guarantee rather than relying on the code. The **[Minimal IAM Profile](https://github.com/k2m30/a9s/wiki/Minimal-IAM-Profile)** wiki page has the full policy JSON covering all 69 resource types, CLI setup steps, and a Terraform module.
 
 ## Environment Variables
 

@@ -1,0 +1,37 @@
+list:
+  Name:
+    key: name
+    width: 32
+  Status:
+    key: status
+    width: 32
+  Default:
+    key: default_version
+    width: 10
+  Latest:
+    key: latest_version
+    width: 10
+  Created By:
+    key: created_by
+    width: 24
+  Created:
+    key: created
+    width: 18
+
+detail:
+  - Template.LaunchTemplateId
+  - Template.LaunchTemplateName
+  - Template.DefaultVersionNumber
+  - Template.LatestVersionNumber
+  - Template.CreatedBy
+  - Template.CreateTime
+  - Template.Tags
+  - DefaultVersion.LaunchTemplateData.ImageId
+  - DefaultVersion.LaunchTemplateData.InstanceType
+  - DefaultVersion.LaunchTemplateData.KeyName
+  - DefaultVersion.LaunchTemplateData.IamInstanceProfile
+  - DefaultVersion.LaunchTemplateData.SecurityGroupIds
+  - DefaultVersion.LaunchTemplateData.SecurityGroups
+  - DefaultVersion.LaunchTemplateData.NetworkInterfaces
+  - DefaultVersion.LaunchTemplateData.BlockDeviceMappings
+  - DefaultVersion.LaunchTemplateData.MetadataOptions

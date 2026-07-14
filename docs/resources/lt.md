@@ -118,13 +118,13 @@ All three signals ride the same single call: `DescribeLaunchTemplateVersions(Ver
 
 ## 4. Issue Visualization
 
-Surfaces S1–S5 per `docs/attention-signals.md` §Visualization Surfaces; wave→surface mapping as standard. Every signal is color-bearing (no glyph-on-green case exists for lt — fleet precedent since mwaa/transfer: issue findings color the row).
+Surfaces S1–S5 per `docs/attention-signals.md` §Visualization Surfaces; wave→surface mapping as standard. The describe-borne fetcher signals are color-bearing (yellow rows); the deprecated-AMI signal is the cache-scan background check and takes the established Wave-2 `~`-on-Healthy treatment (the dbi maintenance-scheduled precedent): green row + `~` glyph, no menu-badge bump.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | IMDSv1 allowed | 2 | Warning | n/a | S2, S4, S5 | `IMDSv1 allowed` | `Instance metadata does not require session tokens; IMDSv1 credentials are exposed to SSRF.` |
 | EBS encryption off | 2 | Warning | n/a | S2, S4, S5 | `EBS encryption disabled` | `A block device explicitly sets Encrypted=false; launched instances get unencrypted volumes.` |
-| deprecated AMI | 2 | Warning | n/a | S2, S4, S5 | `deprecated AMI` | `The default version references an AMI past its deprecation time.` |
+| deprecated AMI | 2 | Healthy + background check | `~` | S3, S4, S5 | `deprecated AMI` | `The default version references an AMI past its deprecation time.` |
 | `DescribeLaunchTemplateVersions` denied | 2 | Warning | n/a | S2, S4, S5 | `details denied` | `Access to the default version was denied; only the listed fields are visible.` |
 
 Notes:
@@ -133,6 +133,7 @@ Notes:
 - Multiple findings stack with the framework `(+N)` suffix; S5 enumerates each.
 - AccessDenied on `ec2:DescribeLaunchTemplates`: menu row shows the error state, never `0`.
 - Healthy templates (IMDSv2 required, no explicit-off encryption, current AMI) render green with a blank Status — the normal case for a well-run account is a silent list.
+- The deprecated-AMI `~` does not bump the `issues:N` badge (S1 counts urgent findings only) — the template still launches; the glyph plus the Status phrase flag it for the next maintenance window, exactly like RDS maintenance-scheduled.
 
 ## 4.1 UX review (two sentences)
 

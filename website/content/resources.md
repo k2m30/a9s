@@ -3,7 +3,7 @@ title: "Resource Types"
 type: resources
 ---
 
-a9s supports **68 AWS resource types** across **12 service categories**. All API calls are read-only.
+a9s supports **69 AWS resource types** across **12 service categories**. All API calls are read-only.
 
 ## Compute
 
@@ -19,6 +19,7 @@ a9s supports **68 AWS resource types** across **12 service categories**. All API
 | EBS Volumes | `ebs` |
 | EBS Snapshots | `ebs-snap` |
 | AMIs | `ami` |
+| Launch Templates | `lt` |
 
 ## Containers
 

@@ -81,7 +81,7 @@ var knownAcronymExemptions = map[string]bool{
 	"ARN": true, "ARNS": true, "VPC": true, "TLS": true, "SSL": true, "DNS": true,
 	"WAF": true, "IAM": true, "KMS": true, "SG": true, "AMI": true,
 	"CIS": true, "ACL": true, "MFA": true, "DLQ": true, "PITR": true,
-	"CIDR": true, "NAT": true, "IGW": true, "EIP": true, "ENI": true,
+	"CIDR": true, "NAT": true, "IGW": true, "EIP": true, "ENI": true, "EBS": true, "SSRF": true,
 	// AWS service-name / protocol acronyms that appear inline in
 	// hand-written prose (e.g. "no HTTPS redirect", "isolated: quarantined
 	// by AWS", "orphan: source DB deleted", "AccessDenied: ... S3 bucket

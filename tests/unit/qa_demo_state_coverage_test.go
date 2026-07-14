@@ -161,6 +161,7 @@ var knownStateCoverageGaps = map[string]bool{
 	"kinesis:broken": true, "kinesis:dim": true,
 	"kms:dim":     true, // colorKMS (internal/aws/catalog_secrets.go) has exactly three branches — Enabled->Healthy, Disabled->Warning, PendingDeletion/PendingImport/PendingReplicaDeletion/Unavailable->Broken — and no Dim return; docs/resources/kms.md §3.1/§3.2 document no Dim-producing signal for this type.
 	"logs:broken": true, "logs:dim": true,
+	"lt:broken": true, "lt:dim": true, // colorLT (internal/aws/catalog_compute.go) is colorFromAnyFinding-only, and every registered lt.* FindingDef (imdsv1/unencrypted/deprecated_ami/details_denied) is SevWarn; docs/resources/lt.md §4 documents no Broken/Dim-producing signal for this type ("every lt signal is color-bearing... no glyph-on-green case exists for lt").
 	"msk:dim":      true,
 	"ng:dim":       true,
 	"pipeline:dim": true, "pipeline:warning": true,

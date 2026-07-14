@@ -14,3 +14,14 @@ import (
 type EC2DescribeLaunchTemplatesAPI interface {
 	DescribeLaunchTemplates(ctx context.Context, params *ec2.DescribeLaunchTemplatesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplatesOutput, error)
 }
+
+// EC2FetchLaunchTemplatesAPI combines DescribeLaunchTemplates and
+// DescribeLaunchTemplateVersions — the paginated list call plus the
+// per-template "$Default" describe call FetchLaunchTemplatesPage
+// (lt.go) funds every related-panel pivot and Wave 2 signal from
+// (docs/resources/lt.md §1), mirroring EC2FetchInstancesAPI's combined-API
+// convention (ec2_interfaces.go).
+type EC2FetchLaunchTemplatesAPI interface {
+	EC2DescribeLaunchTemplatesAPI
+	EC2DescribeLaunchTemplateVersionsAPI
+}

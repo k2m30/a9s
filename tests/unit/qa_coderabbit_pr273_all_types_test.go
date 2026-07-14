@@ -88,6 +88,7 @@ var typeContracts = []typeContract{
 	{shortName: "kinesis", apiDoc: "https://docs.aws.amazon.com/kinesis/latest/APIReference/API_DescribeStreamSummary.html", statusField: "stream_status", healthyStatuses: []string{"ACTIVE"}, warningStatuses: []string{"CREATING", "UPDATING", "DELETING"}, brokenStatuses: nil, reasoning: "Kinesis StreamStatus values are ACTIVE | CREATING | UPDATING | DELETING per DescribeStreamSummary — no failure state; transitional states produce yellow rows."},
 	{shortName: "kms", apiDoc: "https://docs.aws.amazon.com/kms/latest/APIReference/API_ListKeys.html", statusField: "", reasoning: "KMS keys have KeyState (Enabled/Disabled/PendingDeletion/…) — currently config-only in a9s; PendingDeletion is arguably a warning."},
 	{shortName: "logs", apiDoc: "https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_DescribeLogGroups.html", statusField: "", reasoning: "CloudWatch Log Groups have no lifecycle state — retention/encryption are admin config."},
+	{shortName: "lt", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_ResponseLaunchTemplateData.html", statusField: "status", healthyStatuses: []string{""}, warningStatuses: []string{"IMDSv1 allowed", "EBS encryption disabled", "deprecated AMI", "details denied"}, hasEnricher: true, reasoning: "colorLT (internal/aws/catalog_compute.go) is colorFromAnyFinding-only (docs/resources/lt.md §4) — every lt signal is color-bearing and SevWarn: imdsv1/unencrypted/details-denied are fetcher-written (computeLTFindings in lt.go), deprecated-ami is emitted by the Wave 2 cache-scan enricher EnrichLTDeprecatedAMI. No broken-severity finding is registered for this type."},
 	{shortName: "msk", apiDoc: "https://docs.aws.amazon.com/msk/1.0/apireference/v1-clusters.html", statusField: "state", healthyStatuses: []string{"ACTIVE"}, warningStatuses: []string{"CREATING", "UPDATING", "MAINTENANCE", "REBOOTING_BROKER", "HEALING"}, brokenStatuses: []string{"FAILED"}, reasoning: "MSK ClusterState per ListClustersV2 — FAILED surfaces as a broken row."},
 	{shortName: "opensearch", apiDoc: "https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DescribeDomain.html", statusField: "", reasoning: "OpenSearch DomainStatus has Processing/UpgradeProcessing/Deleted flags plus ClusterHealth Red/Yellow/Green — Red surfaces as broken, Yellow as warning, transitions as warning."},
 	{shortName: "policy", apiDoc: "https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListPolicies.html", statusField: "", reasoning: "IAM policies have no lifecycle state."},
@@ -221,6 +222,7 @@ var findingsOnlyColorTypes = map[string]bool{ //nolint:gochecknoglobals // test-
 	"ami":      true,
 	"ebs-snap": true,
 	"transfer": true,
+	"lt":       true,
 }
 
 func TestCR273_AllTypes_ColorClassification(t *testing.T) {

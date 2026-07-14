@@ -147,4 +147,5 @@ type EC2API interface {
 	EC2DescribeVolumeStatusAPI           // Wave 2 enrichment
 	EC2DescribeFlowLogsAPI               // Wave 2 enrichment
 	EC2DescribeLaunchTemplateVersionsAPI // asg→ami, asg→role, asg→sg
+	EC2DescribeLaunchTemplatesAPI        // lt list call (lt_interfaces.go)
 }

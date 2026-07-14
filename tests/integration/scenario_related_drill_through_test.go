@@ -91,6 +91,11 @@ var drillThroughFixtures = []struct {
 	{"mwaa/prod-airflow-etl", "mwaa", demofixtures.ProdAirflowEtlID},
 	{"transfer/prod-as2-gateway", "transfer", demofixtures.ProdAS2GatewayID},
 	{"transfer/sftp-lambda-auth", "transfer", demofixtures.SftpLambdaAuthID},
+	// lt: two graph-roots — field pivots (ami/kms/sg) + cache cross-refs
+	// (asg/ec2) live on prod-web-lt; the NI-path pivots (ng/subnet) on
+	// eks-node-lt. Union semantics cover the full §2 contract.
+	{"lt/prod-web-lt", "lt", demofixtures.ProdWebLTID},
+	{"lt/eks-node-lt", "lt", demofixtures.EKSNodeLTID},
 }
 
 // drillThroughGroups collapses the flat fixture list into groups sharing a

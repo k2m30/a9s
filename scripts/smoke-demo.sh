@@ -118,7 +118,7 @@ forbid() {
 # (resource.AllResourceTypes()) plus the synthetic Cost Explorer pseudo-entry
 # (internal/app/menu.go's menuAllItems() appends costsMenuTypeDef, which is
 # deliberately excluded from AllResourceTypes() itself).
-expect menu.txt "resource-types(69)" "menu shows the full catalog"
+expect menu.txt "resource-types(70)" "menu shows the full catalog"
 
 # Security groups: owner-worded risk phrases, no raw classifier tokens.
 expect sg.txt "all ports open" "sg wide-open row uses the owner wording"

@@ -267,5 +267,29 @@ func computeDefaultViews() map[string]ViewDef {
 				{Path: "BlockDeviceMappings"}, {Path: "Tags"},
 			},
 		},
+		"lt": {
+			List: []ListColumn{
+				{Title: "Name", Key: "name", Width: 32},
+				{Title: "Status", Key: "status", Width: 32},
+				{Title: "Default", Key: "default_version", Width: 10},
+				{Title: "Latest", Key: "latest_version", Width: 10},
+				{Title: "Created By", Key: "created_by", Width: 24},
+				{Title: "Created", Key: "created", Width: 18},
+			},
+			Detail: []DetailField{
+				{Path: "Template.LaunchTemplateId"}, {Path: "Template.LaunchTemplateName"},
+				{Path: "Template.DefaultVersionNumber"}, {Path: "Template.LatestVersionNumber"},
+				{Path: "Template.CreatedBy"}, {Path: "Template.CreateTime"}, {Path: "Template.Tags"},
+				{Path: "DefaultVersion.LaunchTemplateData.ImageId"},
+				{Path: "DefaultVersion.LaunchTemplateData.InstanceType"},
+				{Path: "DefaultVersion.LaunchTemplateData.KeyName"},
+				{Path: "DefaultVersion.LaunchTemplateData.IamInstanceProfile"},
+				{Path: "DefaultVersion.LaunchTemplateData.SecurityGroupIds"},
+				{Path: "DefaultVersion.LaunchTemplateData.SecurityGroups"},
+				{Path: "DefaultVersion.LaunchTemplateData.NetworkInterfaces"},
+				{Path: "DefaultVersion.LaunchTemplateData.BlockDeviceMappings"},
+				{Path: "DefaultVersion.LaunchTemplateData.MetadataOptions"},
+			},
+		},
 	}
 }

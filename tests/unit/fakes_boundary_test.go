@@ -116,6 +116,9 @@ func (f fakeEC2BoundaryAccessDenied) DescribeTransitGatewayRouteTables(_ context
 func (f fakeEC2BoundaryAccessDenied) DescribeLaunchTemplateVersions(_ context.Context, _ *ec2.DescribeLaunchTemplateVersionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
 	return &ec2.DescribeLaunchTemplateVersionsOutput{}, nil
 }
+func (f fakeEC2BoundaryAccessDenied) DescribeLaunchTemplates(_ context.Context, _ *ec2.DescribeLaunchTemplatesInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplatesOutput, error) {
+	return &ec2.DescribeLaunchTemplatesOutput{}, nil
+}
 
 // ---------------------------------------------------------------------------
 // fakeEC2BoundaryThrottle — EC2 fake whose DescribeSubnets returns a throttle
@@ -199,6 +202,9 @@ func (f *fakeEC2BoundaryThrottle) DescribeTransitGatewayRouteTables(_ context.Co
 }
 func (f *fakeEC2BoundaryThrottle) DescribeLaunchTemplateVersions(_ context.Context, _ *ec2.DescribeLaunchTemplateVersionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
 	return &ec2.DescribeLaunchTemplateVersionsOutput{}, nil
+}
+func (f *fakeEC2BoundaryThrottle) DescribeLaunchTemplates(_ context.Context, _ *ec2.DescribeLaunchTemplatesInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplatesOutput, error) {
+	return &ec2.DescribeLaunchTemplatesOutput{}, nil
 }
 
 // ---------------------------------------------------------------------------

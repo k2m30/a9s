@@ -187,6 +187,10 @@ func (f *fakeEC2Batch2) DescribeLaunchTemplateVersions(_ context.Context, input 
 	return &ec2.DescribeLaunchTemplateVersionsOutput{}, nil
 }
 
+func (f *fakeEC2Batch2) DescribeLaunchTemplates(_ context.Context, _ *ec2.DescribeLaunchTemplatesInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplatesOutput, error) {
+	return &ec2.DescribeLaunchTemplatesOutput{}, nil
+}
+
 // newFakeEC2WithSubnets returns a fakeEC2Batch2 whose DescribeSubnets returns
 // the supplied subnets.
 func newFakeEC2WithSubnets(subnets []ec2types.Subnet) *fakeEC2Batch2 {
@@ -460,4 +464,3 @@ func newFakeELBv2WithLBsAndListeners(lbs []elbv2types.LoadBalancer, listeners []
 		},
 	}
 }
-

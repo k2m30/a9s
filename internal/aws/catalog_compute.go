@@ -223,6 +223,15 @@ func colorAMI(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
+// colorLT: every lt signal is color-bearing (docs/resources/lt.md §4 — no
+// glyph-on-green case, fleet precedent since mwaa/transfer).
+func colorLT(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
+
 // augmentEC2StatusChecks injects a Status Checks section after the State block.
 func augmentEC2StatusChecks(r domain.Resource, sections []domain.Section) []domain.Section {
 	state := r.Fields["state"]
@@ -878,6 +887,51 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeAMIStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeAMIStateDim, Phrase: "deregistered", Severity: domain.SevDim, Source: "wave1"},
 			{Code: CodeAMIDeprecated, Phrase: "deprecated", Severity: domain.SevWarn, Source: "wave1"},
+		},
+	},
+	{
+		Name:          "Launch Templates",
+		ShortName:     "lt",
+		Aliases:       []string{"lt", "launch-template", "launchtemplate", "launch-templates", "lts"},
+		Category:      "COMPUTE",
+		CloudTrailKey: "ResourceName:ID",
+		Columns: []domain.Column{
+			{Key: "name", Title: "Name", Width: 32, Sortable: true},
+			{Key: "status", Title: "Status", Width: 32, Sortable: true},
+			{Key: "default_version", Title: "Default", Width: 10, Sortable: true},
+			{Key: "latest_version", Title: "Latest", Width: 10, Sortable: true},
+			{Key: "created_by", Title: "Created By", Width: 24, Sortable: true},
+			{Key: "created", Title: "Created", Width: 18, Sortable: true},
+		},
+		Color: colorLT,
+		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
+			return FetchLaunchTemplatesPage(ctx, c.EC2, continuationToken)
+		}),
+		Wave2:     IssueEnricher{Fn: EnrichLTDeprecatedAMI, Priority: 100},
+		FieldKeys: []string{"name", "status", "default_version", "latest_version", "created_by", "created"},
+		Related: []domain.RelatedDef{
+			{TargetType: "ami", DisplayName: "AMI", Checker: checkLTAMI},
+			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkLTASG, NeedsTargetCache: true},
+			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkLTEC2, NeedsTargetCache: true},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkLTKMS},
+			{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkLTNG, NeedsTargetCache: true},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkLTSG},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkLTSubnet},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("lt")},
+		},
+		// ami (ssm-ref ambiguity) and kms/sg (alias forms / union-of-two-fields,
+		// not a single unconditional value→ID shape) are deliberately NOT
+		// registered — the related panel already carries the correct pivot
+		// logic for those; NetworkInterfaces[].SubnetId is the one §2 field
+		// that is unconditionally a subnet ID whenever present.
+		Navigable: []domain.NavigableField{
+			{FieldPath: "DefaultVersion.LaunchTemplateData.NetworkInterfaces.SubnetId", TargetType: "subnet"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: ltCodeIMDSv1, Phrase: "IMDSv1 allowed", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: ltCodeUnencrypted, Phrase: "EBS encryption disabled", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: ltCodeDeprecatedAMI, Phrase: "deprecated AMI", Severity: domain.SevWarn, Source: "wave2"},
+			DetailsDeniedFindingDef("lt"),
 		},
 	},
 }
