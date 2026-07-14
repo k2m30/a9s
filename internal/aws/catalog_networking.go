@@ -705,7 +705,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
 		Columns: []domain.Column{
-			{Key: "server_id", Title: "Server Id", Width: 24, Sortable: true},
+			{Key: "server_id", Title: "Server Id", Width: 32, Sortable: true},
 			{Key: "status", Title: "Status", Width: 32, Sortable: true},
 			{Key: "domain", Title: "Domain", Width: 10, Sortable: true},
 			{Key: "endpoint_type", Title: "Endpoint", Width: 14, Sortable: true},
