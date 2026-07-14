@@ -216,14 +216,19 @@ install-hooks:
 ready-to-push: check-no-real-data test-race lint security gofix verify-readonly verify-zero-init check-readme snapshot mdlint smoke smoke-related smoke-costs
 	@echo "PASS: ready-to-push gate green"
 
-# Stage 7 — Pre-release gate. Run before tagging a release. Subsumes ready-to-push
-# plus the full demo-mode integration suite AND the live read-only smokes
-# (smoke-live + smoke-related-live) — a real-AWS pass is a mandatory pre-tag gate,
-# not a checklist line. The live smokes require an explicit PROFILE and REGION
-# (no default) and refuse any profile whose name is not *readonly*.
-# Requires read-only AWS credentials and tmux. See docs/development-process.md.
+# Stage 7 — Pre-release gate. ADDITIVE on top of Stage 6: it does NOT re-run
+# ready-to-push — a green `make ready-to-push` on this same tree is the
+# prerequisite (Stage 6 precedes Stage 7 by process; re-running test-race/
+# lint/security here doubled every release for no signal). This target adds
+# only what Stage 6 lacks: the full demo-mode integration suite AND the live
+# read-only smokes (smoke-live + smoke-related-live) — a real-AWS pass is a
+# mandatory pre-tag gate, not a checklist line. The live smokes require an
+# explicit PROFILE and REGION (no default) and refuse any profile whose name
+# is not *readonly*. Requires read-only AWS credentials and tmux.
+# See docs/development-process.md.
 # Usage: make ready-to-release PROFILE=<readonly-profile> REGION=<region>
-ready-to-release: ready-to-push integration smoke-live smoke-related-live
+ready-to-release: integration smoke-live smoke-related-live
+	@echo "Prerequisite (NOT re-run here): green 'make ready-to-push' on this same tree — Stage 6."
 	@echo "Manual checklist (not automatable, must be confirmed by release owner):"
 	@echo "  [ ] CHANGELOG.md updated for this version"
 	@echo "  [ ] releases/vX.Y.Z.md written"
