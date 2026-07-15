@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.53.1] - 2026-07-15
+
+### Changed
+
+- Internal duplication audit across the mwaa/transfer/lt/vpc-peer series
+  removed ~340 lines with no behavior change: a shared details-denied finding
+  builder, per-state finding lookup tables, merged launch-template/vpc-peer/
+  Lambda helpers, one shared row-color function, and de-duplicated demo
+  fixtures/fakes. All status phrases, related-panel counts, and findings are
+  unchanged.
+
 ## [3.53.0] - 2026-07-15
 
 ### Added
