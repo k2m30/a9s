@@ -205,6 +205,7 @@ func TestQA_EC2_A4_StatusColoring_StoppedRowHasANSI(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -707,6 +708,7 @@ func TestQA_EC2_A12_1_EmptyInstanceList(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -730,6 +732,7 @@ func TestQA_EC2_A13_1_LoadingState(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -749,6 +752,7 @@ func TestQA_EC2_A14_1_TerminalTooNarrow(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 50, Height: 40})
 
 	plain := stripANSI(rootViewContent(m))
@@ -761,6 +765,7 @@ func TestQA_EC2_A14_5_TerminalTooShort(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 5})
 
 	plain := stripANSI(rootViewContent(m))
@@ -1117,6 +1122,7 @@ func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 
 	// Start at main menu

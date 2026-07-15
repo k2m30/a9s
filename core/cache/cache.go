@@ -116,7 +116,18 @@ func DirIn(root, profile, region string) string {
 	if root == "" {
 		return ""
 	}
-	return filepath.Join(root, SanitizePathElem(profile)+"--"+SanitizePathElem(region))
+	dir := filepath.Join(root, SanitizePathElem(profile)+"--"+SanitizePathElem(region))
+	// root is the untainted trust boundary (process config, never user input);
+	// profile/region are user-controlled. "" is the same "no cache" sentinel
+	// every caller (LoadDirIn, SaveType) already treats as "this pair does
+	// not resolve" — comparing dir against a root-derived value, rather than
+	// against another value built from profile/region, is what makes this a
+	// real containment barrier instead of a tainted-vs-tainted comparison.
+	cleanRoot := filepath.Clean(root)
+	if cleaned := filepath.Clean(dir); cleaned != cleanRoot && !strings.HasPrefix(cleaned, cleanRoot+string(os.PathSeparator)) {
+		return ""
+	}
+	return dir
 }
 
 // Root returns the cache root directory (~/.a9s/cache/), honoring the
@@ -303,6 +314,13 @@ func (s *Store) Put(shortName string, tf TypeFile) {
 // SaveType error rather than panicking, so this failure mode is tolerated by
 // design, not merely by accident.
 func (s *Store) SaveType(shortName string) error {
+	// filepath.IsLocal is the guard shape static taint analysis recognizes as
+	// a path-injection barrier; ContainsAny alone is not. IsLocal alone would
+	// still allow a nested element like "sub/evil", so ContainsAny keeps the
+	// stricter single-path-element rule this package requires.
+	if strings.ContainsAny(shortName, `/\`) || !filepath.IsLocal(shortName) {
+		return fmt.Errorf("cache: SaveType(%s): shortName must be a single local path element", shortName)
+	}
 	tf, ok := s.types[shortName]
 	if !ok {
 		return fmt.Errorf("cache: SaveType(%s): no staged state (call Put first)", shortName)
@@ -329,13 +347,14 @@ func (s *Store) SaveType(shortName string) error {
 		return fmt.Errorf("marshaling cache type %s: %w", shortName, err)
 	}
 
-	path := filepath.Join(dir, shortName+".yaml")
+	fname := shortName + ".yaml"
+	path := filepath.Join(dir, fname)
 	cleanDir := filepath.Clean(dir)
 	if cleaned := filepath.Clean(path); cleaned != cleanDir && !strings.HasPrefix(cleaned, cleanDir+string(os.PathSeparator)) {
 		return fmt.Errorf("cache: SaveType(%s): resolved path %s escapes cache directory %s", shortName, cleaned, cleanDir)
 	}
 
-	tmpFile, err := os.CreateTemp(dir, shortName+".yaml.tmp.*")
+	tmpFile, err := os.CreateTemp(dir, fname+".tmp.*")
 	if err != nil {
 		return fmt.Errorf("creating cache temp file in %s: %w", dir, err)
 	}

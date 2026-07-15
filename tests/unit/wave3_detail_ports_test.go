@@ -210,6 +210,7 @@ func TestWave3_Detail_EnterOnNavigableField_TUIKeyRoute_NavigatesToTarget(t *tes
 	})
 
 	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	t.Cleanup(func() { m.CloseController() })
 	m, _ = tuitest.Step(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = tuitest.Step(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 

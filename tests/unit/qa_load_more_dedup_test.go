@@ -149,6 +149,7 @@ func TestLoadMore_TUI_ColdOpen_NoDuplicates(t *testing.T) {
 		tui.WithIsDemo(true),
 		tui.WithProfile(profile),
 		tui.WithRegion(region))
+	t.Cleanup(func() { m.CloseController() })
 	// Height is tall enough to render all 55 rows without viewport
 	// scrolling — the assertions below check row-ID occurrences and the
 	// frame title text, both of which must be visible in the rendered
