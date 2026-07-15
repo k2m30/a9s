@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package aws — testing helper for retry configuration.
 package aws
 

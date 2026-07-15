@@ -10,11 +10,11 @@
 //	B) The persisted file got count:50, exact:true, rows:0 on a 55-bucket
 //	   account: a page-1 session.ResourceCache entry stored WITHOUT its
 //	   Pagination (HandleResourcesLoaded's PatchResourceCache at
-//	   internal/runtime/handlers_resources.go builds
+//	   core/runtime/handlers_resources.go builds
 //	   Entry{Resources: ev.Resources} — no Pagination) makes
 //	   availabilityFromResourceCache derive truncated=false for a page-1-
 //	   shaped entry, producing a false-exact 50 that SaveAvailabilityCache
-//	   (internal/runtime/probes.go) then accepts as a downgrade of the
+//	   (core/runtime/probes.go) then accepts as a downgrade of the
 //	   previously-stored true-exact 55, dropping the fuller Rows.
 //
 // Pins (harnesses: qa_load_more_dedup_test.go's poisoning-sequence shape +
@@ -48,7 +48,7 @@ import (
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestFalseExact_PageOneEntryWithoutPagination_NeverDowngradesExact drives
-// the REAL Core.HandleResourcesLoaded handler (internal/runtime/
+// the REAL Core.HandleResourcesLoaded handler (core/runtime/
 // handlers_resources.go) on a fresh Core with no cached entry for "s3" yet
 // — the exact !alreadyCached branch that builds the PatchResourceCache
 // intent — with ev.Pagination reporting a truncated 50-row first page (the
@@ -215,7 +215,7 @@ func TestNilPaginationEntry_IsNotExact(t *testing.T) {
 // list must REMAIN at 55 rows/exact — the late replace must be rejected,
 // not silently accepted as a fresher truth.
 //
-// RED today: internal/app/list_body.go's applyResourcesLoaded replaces
+// RED today: core/app/list_body.go's applyResourcesLoaded replaces
 // ls.Rows unconditionally on append=false (`ls.Rows = resources`), with no
 // check for whether the incoming page is an older, shallower subset of
 // what is already on screen.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package aws — lt_issue_enrichment.go: deprecated-AMI cross-cache signal
 // for Launch Templates.
 //
@@ -15,7 +17,7 @@
 //     which never matches the ami- prefix) is never a signal — absence is
 //     non-definitive, not "deregistered".
 //   - Idempotent per the layer contract: ApplyWave2ToRow
-//     (internal/runtime/helpers.go) strips prior wave2: findings before
+//     (core/runtime/helpers.go) strips prior wave2: findings before
 //     merging fresh ones, so repeated runs never double-append.
 package aws
 

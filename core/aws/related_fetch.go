@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // related_fetch.go provides a generic helper for fetching related resources.
 package aws
 

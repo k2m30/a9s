@@ -240,7 +240,7 @@ func collectTagItems(sections []domain.Section) []domain.Item {
 // a JSON string. The projector must detect it and emit an ItemHeader + multiple
 // ItemSubfield rows.
 //
-// Fixture limitation: this test requires that internal/demo/fixtures/iam.go
+// Fixture limitation: this test requires that core/demo/fixtures/iam.go
 // includes a RawStruct with AssumeRolePolicyDocument. Currently the fixture
 // omits RawStruct, so the test skips. Add the field to the fixture to enable it.
 func TestProjectionFieldAudit_JSONExpansion(t *testing.T) {
@@ -265,7 +265,7 @@ func TestProjectionFieldAudit_JSONExpansion(t *testing.T) {
 	}
 	if target == nil {
 		t.Skip("no IAM role fixture with RawStruct — cannot test JSON expansion; " +
-			"add AssumeRolePolicyDocument to internal/demo/fixtures/iam.go to enable")
+			"add AssumeRolePolicyDocument to core/demo/fixtures/iam.go to enable")
 	}
 
 	sections := projection.Generic(*target)

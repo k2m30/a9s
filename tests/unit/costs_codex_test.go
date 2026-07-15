@@ -2,7 +2,7 @@
 // + two live-tmux repros. Every item traced against current source before
 // writing; a trace disproving the reviewer's stated claim is called out
 // inline where found. package unit_test: every finding is reachable via the
-// headless app.Controller / internal/costs / internal/aws surface, reusing
+// headless app.Controller / core/costs / core/aws surface, reusing
 // sibling unit_test files' helpers (newCostsController/topDrill/
 // fixedCostsNow/monthRecord/fullMetricRecord/findFetchCostsTask/
 // baseServiceQuery), same convention as costs_selfreview_test.go.
@@ -29,7 +29,7 @@ import (
 
 // ===========================================================================
 // X1 (P1) — demo acceptance path. Traced precisely: costs.ResourceDrillAllowed
-// (internal/costs/drill.go) refuses any SERVICE other than the literal
+// (core/costs/drill.go) refuses any SERVICE other than the literal
 // resourceDrillAllowedService ("Amazon Elastic Compute Cloud - Compute")
 // BEFORE ever reaching CostsResourceRowsByService — and the planted growth
 // story lives under fixtures.CostsGrowthService = "EC2 - Other", which is
@@ -190,7 +190,7 @@ func TestCostsCodex_X1_GrowthStory_ResourceChain_EndToEnd_OverDemoTransport(t *t
 // ===========================================================================
 // X2 (P1) — a CostsLoaded produced under SkipAnomalies must not clear cached
 // marks nor renew the anomaly TTL. Traced precisely: ApplyCostsLoaded
-// (internal/app/costs_state.go) calls cs.Store.PutAnomalies(ev.Anomalies,
+// (core/app/costs_state.go) calls cs.Store.PutAnomalies(ev.Anomalies,
 // cs.Now) UNCONDITIONALLY on every successful delivery — CostsLoaded carries
 // no AnomaliesFetched/authoritative flag distinguishing "genuinely fetched
 // zero" from "skipped, anomalies untouched" (the executor leaves
@@ -319,7 +319,7 @@ func TestCostsCodex_X2_SkipAnomalies_PreservesMarksAndTTL(t *testing.T) {
 // ===========================================================================
 // X3 (P2) — a warm-cache restart (cost data fully covered, anomaly slot
 // absent) must still emit an anomalies-only fetch. Traced precisely:
-// ensureCostsShapeFetched (internal/app/costs_state.go) returns nil the
+// ensureCostsShapeFetched (core/app/costs_state.go) returns nil the
 // moment len(missing)==0, WITHOUT ever checking cs.Store.Anomalies(cs.Now)
 // freshness — that check only happens inside the missing!=0 branch (there,
 // only to set the SkipAnomalies flag on an already-needed main fetch).
@@ -392,7 +392,7 @@ func TestCostsCodex_X3_WarmCostCache_AbsentAnomalies_StillEmitsFetch(t *testing.
 
 // ===========================================================================
 // X4 — the drilled frame's window must lie WITHIN the selected cell's
-// period. Traced precisely: applyCostsSelect (internal/app/costs_state.go)
+// period. Traced precisely: applyCostsSelect (core/app/costs_state.go)
 // computes anchor := selectedPeriod.Start then newWindow :=
 // costs.BuildWindow(newGran, anchor) — for newGran==Month (drilling out of a
 // YEAR cell), BuildWindow(Month, anchor) calls monthWindow(anchor, 12),
@@ -680,7 +680,7 @@ func TestCostsCodex_X8_MixedCurrencies_TotalNotBareNumber(t *testing.T) {
 // X9 — LoadStore.Recovered()==true must surface a user-visible flash when
 // the costs screen initializes. Traced precisely: costs.Store.Recovered()
 // exists (store.go) but has zero references anywhere in
-// internal/app/costs_state.go — a corrupt on-disk cache is silently
+// core/app/costs_state.go — a corrupt on-disk cache is silently
 // discarded with no notification.
 //
 // RECONCILED (architecture.md Seam 6): the mechanism this pin originally

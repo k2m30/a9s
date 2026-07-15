@@ -13,7 +13,7 @@
 // behavior through the two LIVE production seams instead, both reachable
 // from tests/unit/ as an external (package unit_test) black-box:
 //
-//  1. resolveListMarkerCol (internal/app/list_columns.go) — mirrors
+//  1. resolveListMarkerCol (core/app/list_columns.go) — mirrors
 //     resolveIdentityColumn's 5-step cascade exactly (its own doc comment:
 //     "Cascade must match resolveIdentityColumn exactly"). Driven via a
 //     fully-controlled per-type config.ViewsConfig (GetViewDef replaces

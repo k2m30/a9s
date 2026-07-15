@@ -75,9 +75,9 @@ Resources that exist but are usually managed through IaC or other abstractions.
 ## What You Know About a9s
 
 Read the current resource types and features from the codebase when asked. You know:
-- 66 top-level resource types across 12 service categories (catalog slices in `internal/aws/catalog_*.go`; browse the README services table for the list)
+- 66 top-level resource types across 12 service categories (catalog slices in `core/aws/catalog_*.go`; browse the README services table for the list)
 - The app is read-only (browse + copy, no mutations)
-- Per-resource view config lives in `.a9s/views/<shortName>.yaml`, generated from `internal/config/defaults_<category>.go`
+- Per-resource view config lives in `.a9s/views/<shortName>.yaml`, generated from `core/config/defaults_<category>.go`
 - Adding a resource follows the spec-first pipeline: `a9s-resource-spec` → `a9s-implement-resource`
 
 ## Output Format

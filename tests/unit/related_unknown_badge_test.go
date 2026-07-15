@@ -3,7 +3,7 @@
 // loading, no error, no FetchFilter) renders with NO count badge (blank) and is
 // ACTIONABLE, never as a "(?)" badge.
 //
-// Contract under test (resource.FormatRelatedCount, internal/resource/related.go):
+// Contract under test (resource.FormatRelatedCount, core/resource/related.go):
 //   - State: RelatedDeferred (server-side FetchFilter pivot) → ""  (actionable
 //     drill-in link; the filtered re-fetch resolves the real count on entry)
 //   - State: RelatedUnknown (no filter)                      → ""  (blank,

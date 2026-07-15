@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package fixtures provides VPC Peering Connection fixture data for the EC2
 // fake. VPC peering rides the EC2 service client (DescribeVpcPeeringConnections)
-// — no dedicated client field, see internal/demo/client.go and
-// internal/demo/fakes/ec2.go.
+// — no dedicated client field, see core/demo/client.go and
+// core/demo/fakes/ec2.go.
 package fixtures
 
 import (

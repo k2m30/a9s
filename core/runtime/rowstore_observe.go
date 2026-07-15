@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // rowstore_observe.go — RowStore dual-write for the two events HandleEvent
 // must never apply intents for (task #17 wave 1 — row-store unification).
 //
@@ -6,14 +8,14 @@
 // (HandleResourcesLoaded / HandleRelatedCheckResult) that existing callers
 // (the TUI adapter, Controller.Handle) invoke directly — NOT through
 // HandleEvent. Wiring HandleEvent's switch to call those methods for these
-// two message types would make Controller.Handle (internal/app/handle.go,
+// two message types would make Controller.Handle (core/app/handle.go,
 // out of this stage's scope) apply the same intents a second time via its
 // existing, separate ResourcesLoaded/RelatedCheckResult pipeline — a real
 // behavior change. This file gives HandleEvent's ResourcesLoaded/
 // RelatedCheckResult cases a session-mutation-only path (RowStore dual-write,
 // no intents/tasks) so a generic HandleEvent caller (this stage's
 // differential-harness pin, a future headless caller) sees the store update
-// without touching internal/app-owned intent application.
+// without touching core/app-owned intent application.
 package runtime
 
 import (

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // dbi_snap_related.go contains related-resource checker functions for RDS DB instance snapshots.
 package aws
 

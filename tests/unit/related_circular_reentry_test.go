@@ -97,7 +97,7 @@ func circularReentrySetup(t *testing.T) (tui.Model, resource.Resource, resource.
 // feedEC2RelatedResults delivers a RelatedCheckResult with Count=2 for every
 // registered ec2 related def (mirrors setupEC2DetailWithResults in
 // related_cache_bug_test.go), which drives the PatchRelatedCache intent
-// (internal/runtime/handlers_resources.go) that populates
+// (core/runtime/handlers_resources.go) that populates
 // session.RelatedCacheLRU keyed by RelatedCacheKey("ec2", instance.ID).
 func feedEC2RelatedResults(m tui.Model, _ string) tui.Model {
 	for _, def := range resource.GetRelated("ec2") {
@@ -254,7 +254,7 @@ func TestRelatedCircularReentry_CacheMiss_DispatchesChecks(t *testing.T) {
 // TestRelatedCircularReentry_HeaderShowsResolvedVersion verifies that after
 // the A->B->A circular drill, the header of the re-entered detail screen
 // contains the resolved buildinfo version string. tui.Version is a package
-// var normally set by cmd/a9s/main.go from internal/buildinfo at real
+// var normally set by cmd/a9s/main.go from core/buildinfo at real
 // startup; the test sets it directly so the assertion is independent of the
 // build-time injection mechanism. This pins the direction-agnostic half of
 // the header contract: whatever the coder decides "[N]" should be (present

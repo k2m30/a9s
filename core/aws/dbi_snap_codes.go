@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // dbi_snap_codes.go — canonical FindingCode constants for the dbi-snap
 // resource type (RDS DB instance snapshot).
 package aws

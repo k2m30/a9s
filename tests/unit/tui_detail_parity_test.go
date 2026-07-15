@@ -4,15 +4,15 @@
 //  1. app_dispatch.go's local PatchDetail case (ClearDetailFindingsForType +
 //     ApplyDetailFindingForResource loop over EnrichmentFindings/
 //     EnrichmentAttentionDetails) moves into Controller.applyIntents
-//     (internal/app/intents.go), which today documents PatchDetail as an
+//     (core/app/intents.go), which today documents PatchDetail as an
 //     intentional no-op (the TUI-local case being deleted was carrying it).
 //  2. The related-cache replay embedded in the TUI's NavigateKindPushDetail
 //     case (runtime_adapter_navigate.go ~L224-245: iterate cached
 //     RelatedCacheResult entries, call
 //     ctrl.ApplyDetailRelatedResultForResource) moves into the controller's
-//     own detail-open path (internal/app/controller.go's
+//     own detail-open path (core/app/controller.go's
 //     openSelectedListDetail, which already replays the cache for the
-//     select-from-list flow — internal/app/navigate.go's applyNavResult,
+//     select-from-list flow — core/app/navigate.go's applyNavResult,
 //     NavigateKindPushDetail case, currently has NO such replay). After the
 //     collapse both lanes must replay identically and short-circuit the
 //     KindRelatedCheck fan-out on a cache hit.
@@ -85,7 +85,7 @@ func newDetailParityTUIModel(t *testing.T) tui.Model {
 
 // detailParityEnrichmentCheckedEvent builds the real production message
 // (messages.EnrichmentChecked) that HandleEnrichmentChecked
-// (internal/runtime/handlers_availability.go) folds into a runtime.PatchDetail
+// (core/runtime/handlers_availability.go) folds into a runtime.PatchDetail
 // intent (among others). Gen/TypeGen are left at zero deliberately —
 // EnrichmentChecked.AcceptZeroGen() is true and handleEnrichmentChecked's
 // per-type guard is `msg.TypeGen != 0 && msg.TypeGen != current`, so a zero
@@ -147,7 +147,7 @@ func pushDetailResource() resource.Resource {
 }
 
 // attentionFieldRows returns the FieldRows from body.Fields with
-// Path=="Attention" — mirrors internal/app/controller_regression_test.go's
+// Path=="Attention" — mirrors core/app/controller_regression_test.go's
 // helper of the same name (unexported there; a local copy is required since
 // tests/unit is a different package).
 func attentionFieldRows(body *app.DetailBody) []app.FieldRow {

@@ -65,7 +65,7 @@ func newChainDemoModel(t *testing.T) tui.Model {
 }
 
 // ec2TestResource returns a representative EC2 resource fixture.
-// IDs are chosen to match fixtures in internal/demo/fixtures_compute.go so that
+// IDs are chosen to match fixtures in core/demo/fixtures_compute.go so that
 // forward navigations (VpcId, SubnetId, GroupId) resolve to existing fixtures.
 func ec2TestResource() resource.Resource {
 	return resource.Resource{
@@ -891,7 +891,7 @@ func TestEC2_058_CloudTrailPreFiltered(t *testing.T) {
 	// The expected result is a pre-filtered search view for the EC2 instance ID.
 	// The CloudTrail Events type's canonical ShortName is "ct-events" (not
 	// "cloudtrail", which is a registered alias of the separate "trail" type —
-	// see internal/aws/catalog_monitoring.go/catalog_data.go).
+	// see core/aws/catalog_monitoring.go/catalog_data.go).
 	cloudtrailEvents := []resource.Resource{
 		{ID: "event-001", Name: "RunInstances",
 			Fields: map[string]string{"resource_name": "i-0a1b2c3d4e5f60001", "status": "Success"}},

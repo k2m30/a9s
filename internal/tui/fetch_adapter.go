@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // fetch_adapter.go — thin Bubble Tea adapter over runtime.Core fetch methods.
 // Each method captures ctx and clients, delegates to the corresponding Core
 // method, and converts the result to TUI message types.
@@ -80,7 +82,7 @@ func (m *Model) fetchByIDDetail(targetType, id string) tea.Cmd {
 	if clients == nil {
 		// Clients() is nil until the Init()/ClientsReady round trip installs
 		// it (handleClientsReadySuccess's own PreSuppliedClients fallback,
-		// internal/runtime/handlers.go) — a real key press can only reach
+		// core/runtime/handlers.go) — a real key press can only reach
 		// this adapter after that has settled, but a directly-driven Update
 		// sequence (a scripted key-chain, or a harness that skips Init())
 		// can call this before it has. PreSuppliedClients is already sitting

@@ -6,9 +6,9 @@
 // cite the specific rule (C3/C4/C5/C6/C7) each pin locks in.
 //
 // Investigation note (DEF-3): a static trace of the current committed
-// production wiring (internal/app/handle.go's maybeSaveResourceListCache,
-// internal/runtime/probes.go's SaveResourceListCache, and
-// internal/runtime/handlers_availability.go's rowsFromCacheRows) shows
+// production wiring (core/app/handle.go's maybeSaveResourceListCache,
+// core/runtime/probes.go's SaveResourceListCache, and
+// core/runtime/handlers_availability.go's rowsFromCacheRows) shows
 // Findings ARE threaded through save (resource.Resource.Findings ->
 // cache.Row.Findings) and seed-back (cache.Row.Findings ->
 // resource.Resource.Findings) on the straightforward top-level list-open
@@ -188,10 +188,10 @@ func TestWebBoot_WarmListOpen_FetchTaskDeferredAsBackground(t *testing.T) {
 // downgrade an already-exact stored total in the LIVE menu view-state
 // (session.MenuState via PatchMenuAvailability), mirroring the guard that
 // already exists on the disk-persist path (SaveAvailabilityCache /
-// SaveResourceListCache in internal/runtime/probes.go).
+// SaveResourceListCache in core/runtime/probes.go).
 //
-// Pinned seam: internal/app/intents.go's PatchMenuAvailability case (called
-// from internal/runtime/handlers_availability.go's handleAvailabilityChecked)
+// Pinned seam: core/app/intents.go's PatchMenuAvailability case (called
+// from core/runtime/handlers_availability.go's handleAvailabilityChecked)
 // currently overwrites ms.Availability[type]/ms.Truncated[type]
 // unconditionally with the incoming Count/Truncated — no comparison against
 // the current stored exactness. This test drives the REAL AvailabilityChecked
@@ -503,13 +503,13 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 // per-surface/sticky, so it cannot satisfy C4's "marker" requirement on its
 // own).
 //
-// Additionally: runtime.Core.HandleEvent's switch (internal/runtime/
+// Additionally: runtime.Core.HandleEvent's switch (core/runtime/
 // orchestrator.go) has NO case for messages.APIError at all — only the TUI
 // adapter's shim calls Core.HandleAPIError directly, bypassing
 // Controller.Handle/Core.HandleEvent entirely. A web/headless caller feeding
 // a messages.APIError through Controller.Handle (exactly what
 // ExecuteTask(KindFetchResources) returns on full failure, per
-// internal/runtime/executor.go) currently gets nil intents/tasks back — the
+// core/runtime/executor.go) currently gets nil intents/tasks back — the
 // list's Refreshing flag never clears and no error reaches ListBody. Both
 // halves are pinned below.
 // -----------------------------------------------------------------------
@@ -638,7 +638,7 @@ func TestMenuEntry_Origin_CacheBeforeVerification_FlipsOnAvailabilityChecked(t *
 // TaskKindSaveCache executor case; SaveResourceListCache (which carries
 // rows) is only ever called from maybeSaveResourceListCache, reachable
 // solely through the list-open -> applyResourcesLoaded -> syncExactTotalToMenu
-// chain in internal/app/handle.go.
+// chain in core/app/handle.go.
 //
 // The sanity-gap addendum (a TypeFile whose Rows length contradicts Count)
 // is SKIPPED per the dispatch's explicit instruction: C7 describes each
@@ -739,16 +739,16 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 // -----------------------------------------------------------------------
 // DEF-8 (C6) — Wave-2 findings applied to an OPEN live list must reach the
 // persisted per-type cache. Verified live (last gap before the S3-pilot
-// rerun): applyEnrichment (internal/runtime/helpers.go, driven from
+// rerun): applyEnrichment (core/runtime/helpers.go, driven from
 // Core.handleEnrichmentChecked via the real messages.EnrichmentChecked
 // event) mutates findings into session.ResourceCache / LazyResourceCache /
 // ProbeResources only. Separately, PatchResourceList's intent handler
-// (internal/app/intents.go) stores the SAME findings into the controller's
+// (core/app/intents.go) stores the SAME findings into the controller's
 // own c.enrichmentStore map (applyEnrichmentState) — a parallel
 // id->domain.Finding lookup used only by GetListEnrichmentFindings for glyph
 // rendering. Neither of those two writes ever touches ls.Rows[i].Findings or
 // c.resourceCache[type][i].Findings, which is what
-// maybeSaveResourceListCache (internal/app/handle.go) reads when persisting
+// maybeSaveResourceListCache (core/app/handle.go) reads when persisting
 // (Findings: r.Findings, copied straight from ls.Rows). Net effect on a real
 // account: s3.yaml carries issues:5 in the header and every row with ZERO
 // findings — a cold-boot reseed then has nothing for the already-green DEF-3
@@ -762,7 +762,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 // account produces (fetch, then a later enrichment probe).
 //
 // Contract note for the fix: the controller's enrichment-application seam
-// (PatchResourceList's intent case in internal/app/intents.go, alongside its
+// (PatchResourceList's intent case in core/app/intents.go, alongside its
 // existing applyEnrichmentState + applyListFieldUpdates calls) must ALSO
 // write findings onto the controller's own row stores (ls.Rows +
 // c.resourceCache) — the same explicit dual-store propagation pattern

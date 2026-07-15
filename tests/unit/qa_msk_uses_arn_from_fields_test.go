@@ -25,7 +25,7 @@ import (
 // strictMSKFake mirrors AWS: rejects DescribeClusterV2 when ClusterArn is not
 // a valid ARN. mu guards calledWith, which is written concurrently:
 // EnrichMSKCluster fans out DescribeClusterV2 calls per resource via
-// internal/aws.ForEachParallel (EnrichmentParallelism goroutines).
+// core/aws.ForEachParallel (EnrichmentParallelism goroutines).
 type strictMSKFake struct {
 	awsclient.MSKAPI
 	mu         sync.Mutex

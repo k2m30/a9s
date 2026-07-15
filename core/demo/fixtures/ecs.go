@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package fixtures provides ECS fixture data for the ECS fake.
 package fixtures
 

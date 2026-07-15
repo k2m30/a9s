@@ -44,7 +44,7 @@ type apigwPaginatedFake struct {
 	pages map[string][]*apigatewayv2.GetStagesOutput
 
 	// mu guards callCounts, which is written concurrently: EnrichAPIGatewayStage
-	// fans out GetStages calls per resource via internal/aws.ForEachParallel
+	// fans out GetStages calls per resource via core/aws.ForEachParallel
 	// (EnrichmentParallelism goroutines).
 	mu sync.Mutex
 	// callCounts tracks how many times GetStages was called per API ID.

@@ -57,7 +57,7 @@
 //     failed) — expected, pre-existing debt.
 //
 // s3 must NOT appear in knownStateCoverageGaps for its documented
-// "public access block incomplete" finding: internal/demo/fixtures/s3.go
+// "public access block incomplete" finding: core/demo/fixtures/s3.go
 // already carries a bucket with an incomplete GetPublicAccessBlockOutput, so
 // EnrichS3PublicAccessBlock (or the Wave-1 classification, whichever the
 // registry wires) must produce a witness. If s3 shows a gap here, the harness
@@ -139,13 +139,13 @@ var knownStateCoverageGaps = map[string]bool{
 	// resource from its output once torn down, so no fixture — demo or
 	// real — can ever witness it without misrepresenting live AWS
 	// behavior.
-	"redis:dim": true, // colorRedis (internal/aws/catalog_databases.go) has no Dim branch — deleted as dead code per AWS API behavior (a torn-down ElastiCache ReplicationGroup simply stops appearing in DescribeReplicationGroups rather than reporting a "deleted" status; see docs/resources/redis.md §3.1/§3.2/§5 and the Bug 4 pin in aws_classifier_fivepack_test.go).
+	"redis:dim": true, // colorRedis (core/aws/catalog_databases.go) has no Dim branch — deleted as dead code per AWS API behavior (a torn-down ElastiCache ReplicationGroup simply stops appearing in DescribeReplicationGroups rather than reporting a "deleted" status; see docs/resources/redis.md §3.1/§3.2/§5 and the Bug 4 pin in aws_classifier_fivepack_test.go).
 
 	// Reason class: "color never modeled by the classifier or any
 	// FindingDef" — verified per entry against BOTH the type's Color func
-	// (internal/aws/catalog_*.go — no switch case or FieldUpdates-driven
+	// (core/aws/catalog_*.go — no switch case or FieldUpdates-driven
 	// branch returns this domain.Color) AND its registered
-	// catalog.FindingDef table (internal/aws/catalog_*.go Findings: [] —
+	// catalog.FindingDef table (core/aws/catalog_*.go Findings: [] —
 	// no entry carries the matching Severity). With neither a structural
 	// path nor a registered Finding of that severity, no fixture of any
 	// shape could ever witness this bucket — it is not a fixture gap.
@@ -174,9 +174,9 @@ var knownStateCoverageGaps = map[string]bool{
 	"iam-user:dim": true,
 	"igw:broken":   true, "igw:dim": true,
 	"kinesis:broken": true, "kinesis:dim": true,
-	"kms:dim":     true, // colorKMS (internal/aws/catalog_secrets.go) has exactly three branches — Enabled->Healthy, Disabled->Warning, PendingDeletion/PendingImport/PendingReplicaDeletion/Unavailable->Broken — and no Dim return; docs/resources/kms.md §3.1/§3.2 document no Dim-producing signal for this type.
+	"kms:dim":     true, // colorKMS (core/aws/catalog_secrets.go) has exactly three branches — Enabled->Healthy, Disabled->Warning, PendingDeletion/PendingImport/PendingReplicaDeletion/Unavailable->Broken — and no Dim return; docs/resources/kms.md §3.1/§3.2 document no Dim-producing signal for this type.
 	"logs:broken": true, "logs:dim": true,
-	"lt:broken": true, "lt:dim": true, // colorLT (internal/aws/catalog_compute.go) is colorFromAnyFinding-only, and every registered lt.* FindingDef (imdsv1/unencrypted/deprecated_ami/details_denied) is SevWarn; docs/resources/lt.md §4 documents no Broken/Dim-producing signal for this type ("every lt signal is color-bearing... no glyph-on-green case exists for lt").
+	"lt:broken": true, "lt:dim": true, // colorLT (core/aws/catalog_compute.go) is colorFromAnyFinding-only, and every registered lt.* FindingDef (imdsv1/unencrypted/deprecated_ami/details_denied) is SevWarn; docs/resources/lt.md §4 documents no Broken/Dim-producing signal for this type ("every lt signal is color-bearing... no glyph-on-green case exists for lt").
 	"msk:dim":      true,
 	"ng:dim":       true,
 	"pipeline:dim": true, "pipeline:warning": true,
@@ -197,11 +197,11 @@ var knownStateCoverageGaps = map[string]bool{
 	"subnet:dim": true,
 	"tg:dim":     true, "tg:warning": true,
 	"trail:dim":    true,
-	"transfer:dim": true, // colorTransfer (internal/aws/catalog_networking.go) is colorFromAnyFinding-only, and no registered FindingDef carries SevDim — structurally, AWS Transfer Family's DescribeServer State enum (OFFLINE|ONLINE|STARTING|STOPPING|START_FAILED|STOP_FAILED per docs.aws.amazon.com/transfer/latest/APIReference/API_DescribeServer.html) has no deleted/terminal value at all, so no fixture of any shape could ever witness a Dim row for this type.
+	"transfer:dim": true, // colorTransfer (core/aws/catalog_networking.go) is colorFromAnyFinding-only, and no registered FindingDef carries SevDim — structurally, AWS Transfer Family's DescribeServer State enum (OFFLINE|ONLINE|STARTING|STOPPING|START_FAILED|STOP_FAILED per docs.aws.amazon.com/transfer/latest/APIReference/API_DescribeServer.html) has no deleted/terminal value at all, so no fixture of any shape could ever witness a Dim row for this type.
 	"vpc:broken":   true, "vpc:dim": true,
 	"waf:broken": true, "waf:dim": true,
 
-	// ct-events:healthy — colorCTEvents (internal/aws/catalog_monitoring.go)
+	// ct-events:healthy — colorCTEvents (core/aws/catalog_monitoring.go)
 	// has exactly two colored branches (ct-danger -> Broken, ct-attention ->
 	// Warning) and defaults every other status straight to Dim; Healthy is
 	// not a reachable return value from this classifier by design, not a
@@ -225,7 +225,7 @@ var knownStateCoverageGaps = map[string]bool{
 	// healthy so the rest of the demo fleet has a non-degraded sending
 	// identity to reference. The distress shapes for account-shutdown /
 	// account-probation / quota-high are constructed inline in QA tests
-	// instead (see internal/demo/fixtures/ses.go's own doc comment).
+	// instead (see core/demo/fixtures/ses.go's own doc comment).
 	"ses:ses.account-shutdown":  true,
 	"ses:ses.account-probation": true,
 	"ses:ses.quota-high":        true,
@@ -281,7 +281,7 @@ func buildDemoStateTypeCache(t *testing.T) (map[string][]resource.Resource, reso
 // returns the resolved domain.Color bucket set (via td.ResolveColor) across
 // every fixture resource — computed on a runtime.ApplyWave2ToRow-folded copy
 // of each resource, so a Color func that leads with colorFromAnyFinding
-// (internal/aws/catalog_color_helpers.go) can see the Wave-2 finding exactly
+// (core/aws/catalog_color_helpers.go) can see the Wave-2 finding exactly
 // as production's runtime.Core.applyEnrichment fold does, not just the raw
 // pre-enrichment Wave-1 resource. FieldUpdates is intentionally NOT folded
 // here — a Color func whose only path to a given bucket runs through the

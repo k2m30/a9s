@@ -6,7 +6,7 @@
 // the dead-path tests can be deleted later without losing coverage:
 //
 //  1. EC2-008 — the field-cursor skip loop in applyDetailActions
-//     (internal/app/detail_cursor.go ActionMoveDown) never lands FieldCursor
+//     (core/app/detail_cursor.go ActionMoveDown) never lands FieldCursor
 //     on a section-header or spacer row while advancing through interior
 //     rows. Previously pinned only via DetailModel.Update
 //     (detail_cursor_stable_test.go uses a header-free resource;
@@ -22,7 +22,7 @@
 //     and is NOT covered by this file — flagged separately to the architect
 //     rather than papered over here.
 //
-//  2. #280 — mergeDetailRelatedRow (internal/app/handle.go), reached live via
+//  2. #280 — mergeDetailRelatedRow (core/app/handle.go), reached live via
 //     Controller.ApplyDetailRelatedResultForResource, matches a
 //     RelatedCheckResult to a related row by DefDisplayName so that
 //     resource types with multiple related-defs sharing one TargetType
@@ -43,13 +43,13 @@
 //     ct_events_rightcol_dispatch_test.go's D3/D2 assertions. The live
 //     equivalent is Controller.Apply(ActionRelatedSelect) ->
 //     handleActionRelatedSelect -> dispatchRelatedNavigate
-//     (internal/app/actions_nav.go, internal/app/navigate.go).
+//     (core/app/actions_nav.go, core/app/navigate.go).
 //
 // Each test seeds controller state directly (newDetailController,
 // Controller.ApplyDetailRelated) rather than replaying real AWS fixtures, so
 // these tests are independent of the ct-events checkers/demo fixtures and of
 // the dead-path test files they replace — they must keep passing after those
-// files are deleted. The blank import of internal/aws below is required for
+// files are deleted. The blank import of core/aws below is required for
 // that independence: it registers ct-events' RelatedDefs and its
 // FilteredPaginatedFetcher in the catalog, which resource.GetRelated and
 // resource.GetFilteredPaginatedFetcher read from.
@@ -79,7 +79,7 @@ import (
 // flat-field fallback — no RawStruct, so the ec2-specific fieldpath projector
 // yields no sections — so this seeds an Attention block via
 // Controller.ApplyDetailFinding (mirroring TestDetailRenderParity_EC2Attention),
-// which injectAttentionSectionDetail (internal/app/detail_body.go) always
+// which injectAttentionSectionDetail (core/app/detail_body.go) always
 // prepends as exactly one IsSection header ("Attention (N)") followed by the
 // finding rows and a trailing IsSpacer — the same field-item shape the skip
 // loop in applyDetailActions must skip over regardless of whether the section
@@ -216,7 +216,7 @@ func TestDetailController_ApplyDetailRelatedResultForResource_CtEventsSelfPivots
 // NavigationKindFilteredList. The source detail's own ResourceType is
 // deliberately "ec2", not "ct-events": a same-type ("self") pivot with
 // Count==0 is suppressed from the visible related list entirely by
-// isSelfPivotZeroDetailRow (internal/app/detail_cursor.go) regardless of
+// isSelfPivotZeroDetailRow (core/app/detail_cursor.go) regardless of
 // State, and Count is not meaningful for RelatedDeferred rows (task58 forbids
 // the old Count==-1 sentinel), so a cross-type pivot is the only way to keep
 // this row visible and selectable at Arg "0" without reintroducing a banned

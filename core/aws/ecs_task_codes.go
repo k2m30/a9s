@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // ecs_task_codes.go — canonical FindingCode constants for the ecs-task resource type.
 // The fetcher writes Findings using these codes; the
 // ecs-task Color func reads them (any Finding, wave1 or wave2) to color rows.

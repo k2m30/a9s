@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package ctevent
 
 // Summarizer is the per-service request-parameters summarizer signature.

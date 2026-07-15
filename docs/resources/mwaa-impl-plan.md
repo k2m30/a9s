@@ -109,7 +109,7 @@ THEN:  no CloudWatch metric strings (SchedulerHeartbeat etc.) surface anywhere;
        produce NO finding
 ```
 
-## 2. Fixture list (single source: `internal/demo/fixtures/mwaa.go`)
+## 2. Fixture list (single source: `core/demo/fixtures/mwaa.go`)
 
 All values synthetic (account `123456789012`, region of the demo profile). `<name>` = environment name = `Resource.ID`.
 
@@ -169,16 +169,16 @@ Full file scope union (supersedes the skill's default list — new-service wirin
 
 | File | Action | Owner |
 |------|--------|-------|
-| `internal/demo/fixtures/mwaa.go` | create (§2) | 6a coder |
-| `internal/demo/fixtures/{alarm,logs,kms,role,s3,sg/vpc-graph}` siblings | targeted adds so every §2 pivot resolves | 6a coder |
-| `internal/demo/fakes/mwaa.go` | create — typed fake over the two APIs; validates unknown names with ResourceNotFoundException; permissive-free (rule U15 spirit; MWAA has no ARN params) | 6a coder |
-| `internal/demo/client.go` | `clients.MWAA = fakes.NewMWAA()` | 6a coder |
-| `internal/aws/mwaa.go` | create — `FetchMWAAEnvironmentsPage` (ListEnvironments + GetEnvironment N+1, RetryOnThrottle both, E3/E5 aggregation, findings per §1, fields incl. arn/airflow_version/environment_class/workers/schedulers/webserver_access_mode/endpoint_management/weekly_maintenance_window/webserver_url/source_bucket/kms_key/execution_role/log-group ARNs/subnets/sgs/celery_queue) | 7 coder |
-| `internal/aws/mwaa_interfaces.go` | create — `MWAAAPI` narrow interface (ListEnvironments, GetEnvironment) | 7 coder |
-| `internal/aws/mwaa_related.go` | create — checkers per §2: kms/logs/role/s3/sg/subnet field-driven, alarm via sibling-cache dimension match, ct-events via `ctEventsCheckerFor("mwaa")` | 7 coder |
-| `internal/aws/client.go` | `MWAA MWAAAPI` field + `mwaa.NewFromConfig(cfg)` | 7 coder |
-| `internal/aws/catalog_data.go` | `ResourceTypeDef` literal: ShortName `mwaa`, Aliases `["mwaa","airflow"]` (uniqueness gate: `airflow` free as of 2026-07-14), Category DATA, columns per defaults, Color from findings helpers, Fetcher, Related, Navigable (role/kms/s3/logs/sg/subnet field paths via NavIDFromValue-compatible extractors), FieldKeys, Findings []catalog.FindingDef, CloudTrailKey | 7 coder |
-| `internal/config/defaults_data.go` | one Status column + identity columns: Name, Airflow (version), Class, Workers, Schedulers, Access, Created; Status column flagged per humanized-enum convention | 7 coder |
+| `core/demo/fixtures/mwaa.go` | create (§2) | 6a coder |
+| `core/demo/fixtures/{alarm,logs,kms,role,s3,sg/vpc-graph}` siblings | targeted adds so every §2 pivot resolves | 6a coder |
+| `core/demo/fakes/mwaa.go` | create — typed fake over the two APIs; validates unknown names with ResourceNotFoundException; permissive-free (rule U15 spirit; MWAA has no ARN params) | 6a coder |
+| `core/demo/client.go` | `clients.MWAA = fakes.NewMWAA()` | 6a coder |
+| `core/aws/mwaa.go` | create — `FetchMWAAEnvironmentsPage` (ListEnvironments + GetEnvironment N+1, RetryOnThrottle both, E3/E5 aggregation, findings per §1, fields incl. arn/airflow_version/environment_class/workers/schedulers/webserver_access_mode/endpoint_management/weekly_maintenance_window/webserver_url/source_bucket/kms_key/execution_role/log-group ARNs/subnets/sgs/celery_queue) | 7 coder |
+| `core/aws/mwaa_interfaces.go` | create — `MWAAAPI` narrow interface (ListEnvironments, GetEnvironment) | 7 coder |
+| `core/aws/mwaa_related.go` | create — checkers per §2: kms/logs/role/s3/sg/subnet field-driven, alarm via sibling-cache dimension match, ct-events via `ctEventsCheckerFor("mwaa")` | 7 coder |
+| `core/aws/client.go` | `MWAA MWAAAPI` field + `mwaa.NewFromConfig(cfg)` | 7 coder |
+| `core/aws/catalog_data.go` | `ResourceTypeDef` literal: ShortName `mwaa`, Aliases `["mwaa","airflow"]` (uniqueness gate: `airflow` free as of 2026-07-14), Category DATA, columns per defaults, Color from findings helpers, Fetcher, Related, Navigable (role/kms/s3/logs/sg/subnet field paths via NavIDFromValue-compatible extractors), FieldKeys, Findings []catalog.FindingDef, CloudTrailKey | 7 coder |
+| `core/config/defaults_data.go` | one Status column + identity columns: Name, Airflow (version), Class, Workers, Schedulers, Access, Created; Status column flagged per humanized-enum convention | 7 coder |
 | `.a9s/views/mwaa.yaml` | generated via `go run ./cmd/viewsgen/` | 7 coder |
 | `tests/unit/aws_mwaa_test.go` | fetcher tests §1 | 6b QA |
 | `tests/unit/aws_mwaa_related_test.go` | checker tests §2 | 6b QA |
@@ -187,7 +187,7 @@ Full file scope union (supersedes the skill's default list — new-service wirin
 | `tests/integration/demo_full_integration_test.go` | expectedTopLevel: mwaa entry (15 rows, issues:3); menu count 67→68 | runner (phase 8) |
 | `docs/README.tmpl.md` + `README.md` (regen) + `website/content/resources.md` | counts 66→67 + services-table row | runner (phase 9 docs) |
 | `.a9s/views_reference.yaml` | regen via `go run ./cmd/refgen/` (SDK module added) | runner |
-| `internal/demo/handlers.go` | only if typed-fake path insufficient (expected: no change) | 6a coder |
+| `core/demo/handlers.go` | only if typed-fake path insufficient (expected: no change) | 6a coder |
 
 No `mwaa_issue_enrichment.go`, no `mwaa_detail_enrichment.go` (§0). `Wave2` field omitted on the catalog literal.
 

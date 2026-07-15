@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package app
 
 import (
@@ -85,7 +87,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// DEF-2/C5: a truncated probe result must never downgrade an
 				// already-exact stored total — mirrors the guard
 				// SaveResourceListCache/SaveAvailabilityCache already apply on the
-				// disk-persist path (internal/runtime/probes.go). Exactness only
+				// disk-persist path (core/runtime/probes.go). Exactness only
 				// ever advances: an untruncated observation always wins; a
 				// truncated one only wins when the current entry is itself unknown
 				// or already truncated, or reports a count that is not SMALLER than
@@ -175,7 +177,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			}
 			// C9: this intent is the only rotation-visible chokepoint on the
 			// Controller — fired by both HandleProfileSelected and
-			// HandleRegionSelected (internal/runtime/handlers.go), as well as
+			// HandleRegionSelected (core/runtime/handlers.go), as well as
 			// menu Ctrl+R. session.Rotate bumps generation counters but never
 			// reaches into the Controller, so without this a stale
 			// enrichmentStore[type] entry from a prior profile/region pair can
@@ -228,7 +230,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			// SetIdentityIntent is emitted by Core.HandleIdentityLoaded (via
 			// HandleEvent) when the identity fetch succeeds. Store the resolved
 			// domain mirror so snapshot can build IdentityBody without importing
-			// internal/aws or inspecting the TUI view stack.
+			// core/aws or inspecting the TUI view stack.
 			if v.Identity != nil {
 				c.identityResult = v.Identity
 				c.identityLoading = false

@@ -4,16 +4,16 @@
 // wave3-map-list-menu.md) onto the LIVE controller seams, so the legacy
 // pins can be deleted in a later round without losing coverage:
 //
-//  1. listFilterResources (internal/app/list_filter.go) — Fields-value and
-//     Findings-phrase text-filter match branches. internal/app/list_test.go's
+//  1. listFilterResources (core/app/list_filter.go) — Fields-value and
+//     Findings-phrase text-filter match branches. core/app/list_test.go's
 //     TestListFilter_* only exercises Name-based matches.
-//  2. reapplyCheckerAgainst (internal/app/list_filter.go), driven through the
+//  2. reapplyCheckerAgainst (core/app/list_filter.go), driven through the
 //     real c.Handle(messages.ResourcesLoaded{...}) event path — merge-across-
 //     LoadMore, non-approx extension, zero-initial filtering, and sort
 //     preservation. Existing coverage (reapply_checker_leak_test.go,
 //     headless_regression_test.go) only pins leak-prevention and payload
 //     shape, never the merge/grow/sort behavior itself.
-//  3. resolveListMarkerCol (internal/app/list_columns.go) — byte-parity
+//  3. resolveListMarkerCol (core/app/list_columns.go) — byte-parity
 //     against the legacy identity-column cascade (resolveIdentityColumn in
 //     internal/tui/views/table_render.go), across every real catalog type.
 //     tui_viewstate_purity_list_test.go's MarkerCol case only covers the
@@ -515,7 +515,7 @@ func TestWave3MarkerColParity_EnrichmentFindingsWithHScroll_AllResourceTypes(t *
 //    embedded r.Findings is empty must still be shown under the attention
 //    filter (ctrl+z) when it carries a Wave-2 enrichment finding correlated
 //    by ID only (c.listEnrichmentFindings, fed by ApplyEnrichmentState).
-//    internal/app/list_test.go's TestListAttention_* only exercise resources
+//    core/app/list_test.go's TestListAttention_* only exercise resources
 //    with a populated r.Findings — this branch (`len(r.Findings) == 0` +
 //    `findings[r.ID]` lookup in applyListFilters) was otherwise unpinned.
 //    Ported from the deleted qa_attention_filter_test.go's
@@ -560,7 +560,7 @@ func TestWave3AttentionFilter_IncludesResourcesWithWave2OnlyFindings(t *testing.
 //    match. Ported from the deleted resourcelist_mismatched_type_test.go's
 //    TestResourceListModel_ResourcesLoaded_DropsMismatchedType/
 //    AppliesMatchingType — the alias-specific cases were not otherwise pinned
-//    at the controller level (internal/app/handle.go:187-230 documents the
+//    at the controller level (core/app/handle.go:187-230 documents the
 //    canonicalization intent but had no positive test).
 // ===========================================================================
 

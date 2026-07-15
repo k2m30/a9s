@@ -7,7 +7,7 @@ package unit
 // columns) matches the intended attention-column field.
 //
 // This test will FAIL until the coder adds all 23 attention columns to the
-// internal/config/defaults_*.go files.
+// core/config/defaults_*.go files.
 
 import (
 	"strings"

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package app
 
 import (
@@ -173,7 +175,7 @@ func helpContextForScreen(id runtime.ScreenID) domain.HelpContext {
 // populate the ? help overlay, sourced from the same domain.HelpGroupsFor
 // table the TUI's internal/tui/views/help.go renders directly (single source
 // of truth for help-overlay key/description content — see
-// internal/domain/helpkeys.go). The context is derived from the screen
+// core/domain/helpkeys.go). The context is derived from the screen
 // directly beneath ScreenHelp on the controller stack, i.e. the screen that
 // was active when help was opened.
 //

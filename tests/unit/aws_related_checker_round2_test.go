@@ -52,9 +52,9 @@ import (
 // ---------------------------------------------------------------------------
 // 1. checkAlarmCTEvents — alarm.md / ct-events cross-ref field key.
 //
-// checkAlarmCTEvents (internal/aws/alarm_related_extra.go:181) reads
+// checkAlarmCTEvents (core/aws/alarm_related_extra.go:181) reads
 // evRes.Fields["event_source"], but FetchCloudTrailEventsPage
-// (internal/aws/ct_events.go:248) writes the AWS EventSource value under
+// (core/aws/ct_events.go:248) writes the AWS EventSource value under
 // Fields["source"], never "event_source". The Contains() guard permanently
 // compares against "" — this pivot can never match real ct-events data.
 // ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ func TestAlarm_Related_CTEvents_MatchesBySourceField(t *testing.T) {
 					Name: "PutMetricAlarm",
 					Fields: map[string]string{
 						// ct_events.go emits Fields["source"], not "event_source"
-						// (internal/aws/ct_events.go:248).
+						// (core/aws/ct_events.go:248).
 						"source":     "monitoring.amazonaws.com",
 						"event_name": "PutMetricAlarm",
 					},
@@ -90,9 +90,9 @@ func TestAlarm_Related_CTEvents_MatchesBySourceField(t *testing.T) {
 // ---------------------------------------------------------------------------
 // 2. checkECRCFN — ecr.md aws:cloudformation:stack-name tag cross-ref.
 //
-// ecrCFNStackName (internal/aws/ecr_related.go:125-128) reads
+// ecrCFNStackName (core/aws/ecr_related.go:125-128) reads
 // res.Fields["cfn_stack_name"], a key FetchECRRepositoriesPage
-// (internal/aws/ecr.go) never populates — no ListTagsForResource call is
+// (core/aws/ecr.go) never populates — no ListTagsForResource call is
 // wired anywhere in the ECR fetch/check path. The correct mechanism calls
 // ecr:ListTagsForResource (one call per open repo, in budget) and matches
 // the aws:cloudformation:stack-name tag against the cfn cache.
@@ -161,9 +161,9 @@ func TestECR_Related_CFN_ResolvesViaListTagsForResource(t *testing.T) {
 // ---------------------------------------------------------------------------
 // 3. checkECRECSTask — ecr.md image-URI substring cross-ref.
 //
-// checkECRECSTask (internal/aws/ecr_related_extra.go:66) already scans every
+// checkECRECSTask (core/aws/ecr_related_extra.go:66) already scans every
 // ecs-task Fields value for ".dkr.ecr." + "/"+repoName, but the real
-// FetchECSTasksPage (internal/aws/ecs_task.go:127-141) never stores the
+// FetchECSTasksPage (core/aws/ecs_task.go:127-141) never stores the
 // container image URI (Task.Containers[].Image) in any Fields entry — this
 // test drives the real fetch path with a task carrying a live container
 // image and proves no Fields value contains it, so checkECSTaskECR
@@ -479,12 +479,12 @@ func TestMSK_Related_Lambda_APIErrorSetsErrAndNegativeCount(t *testing.T) {
 // ---------------------------------------------------------------------------
 // 5. checkLogsECSTask — logs.md family-from-task_definition cross-ref.
 //
-// checkLogsECSTask (internal/aws/logs_related.go:149-166) extracts a family
+// checkLogsECSTask (core/aws/logs_related.go:149-166) extracts a family
 // substring from the log group name and checks it against cached ecs-task
 // ID/Name — but FetchECSTasks always sets task ID/Name to the bare task UUID
-// (internal/aws/ecs_task.go:81-85), never the family. The correct mechanism
+// (core/aws/ecs_task.go:81-85), never the family. The correct mechanism
 // extracts family:revision from Fields["task_definition"]
-// (arn:...:task-definition/<family>:<rev>, internal/aws/ecs_task.go:99/134)
+// (arn:...:task-definition/<family>:<rev>, core/aws/ecs_task.go:99/134)
 // and matches on that instead of the bare UUID.
 // ---------------------------------------------------------------------------
 
@@ -518,9 +518,9 @@ func TestLogs_Related_ECSTask_MatchesFamilyFromTaskDefinitionField(t *testing.T)
 // ---------------------------------------------------------------------------
 // 6. checkPipelineEbRule — pipeline.md ARN construction, no extra call.
 //
-// checkPipelineEbRule (internal/aws/pipeline_related.go:300) already calls
+// checkPipelineEbRule (core/aws/pipeline_related.go:300) already calls
 // eventbridge:ListRuleNamesByTarget correctly, but reads res.Fields["arn"],
-// a key FetchCodePipelinesPage (internal/aws/pipeline.go:74-80) never
+// a key FetchCodePipelinesPage (core/aws/pipeline.go:74-80) never
 // populates (only name/pipeline_type/created/updated/version are set). The
 // correct mechanism constructs the ARN
 // (arn:aws:codepipeline:<region>:<account>:<name> — AWS CodePipeline
@@ -592,9 +592,9 @@ func TestPipeline_Related_EbRule_ResolvesViaRealFetcherOutput(t *testing.T) {
 // ---------------------------------------------------------------------------
 // 7. checkSQSKMS — sqs.md GetQueueAttributes KmsMasterKeyId, no extra call.
 //
-// FetchSQSQueuesPage (internal/aws/sqs.go:64-71) already calls
+// FetchSQSQueuesPage (core/aws/sqs.go:64-71) already calls
 // GetQueueAttributes with AttributeNameAll, which returns KmsMasterKeyId in
-// the attrs map — but the fetcher (internal/aws/sqs.go:93-100) never copies
+// the attrs map — but the fetcher (core/aws/sqs.go:93-100) never copies
 // that value into Fields["kms_key_id"]. checkSQSKMS reads that missing key
 // and permanently returns State: RelatedUnknown / Count:0. This test drives the real fetch path
 // with a fake GetQueueAttributes response carrying KmsMasterKeyId and proves
@@ -665,15 +665,15 @@ func TestSQS_Related_KMS_ResolvesFromGetQueueAttributesKmsMasterKeyId(t *testing
 // ---------------------------------------------------------------------------
 // 8. checkSubnetASG / checkSubnetEKS — reverse cross-ref field keys.
 //
-// checkSubnetASG (internal/aws/subnet_related.go:236) reads
+// checkSubnetASG (core/aws/subnet_related.go:236) reads
 // asgRes.Fields["vpc_zone_identifier"] / ["subnets"], but
-// FetchAutoScalingGroupsPage (internal/aws/asg.go) never writes either key
+// FetchAutoScalingGroupsPage (core/aws/asg.go) never writes either key
 // (only asg_name/min_size/.../suspended_processes are set) — the sibling
 // forward checker checkASGSubnets reads RawStruct.VPCZoneIdentifier
 // directly and works fine, but this reverse checker only looks at Fields.
-// checkSubnetEKS (internal/aws/subnet_related.go:283) has the identical bug
+// checkSubnetEKS (core/aws/subnet_related.go:283) has the identical bug
 // for Fields["subnets"]/["subnet_ids"] against buildEKSResource
-// (internal/aws/eks.go), whose Fields never carry subnet IDs (they live on
+// (core/aws/eks.go), whose Fields never carry subnet IDs (they live on
 // RawStruct.ResourcesVpcConfig.SubnetIds).
 // ---------------------------------------------------------------------------
 
@@ -704,7 +704,7 @@ func TestSubnet_Related_ASG_ResolvesViaRealFetcherOutput(t *testing.T) {
 
 	hasSubnetField := fetchResult.Resources[0].Fields["vpc_zone_identifier"] != "" || fetchResult.Resources[0].Fields["subnets"] != ""
 	if !hasSubnetField {
-		t.Fatalf("neither Fields[vpc_zone_identifier] nor Fields[subnets] is populated on real FetchAutoScalingGroupsPage output — checkSubnetASG (internal/aws/subnet_related.go:236) can never resolve without one of them")
+		t.Fatalf("neither Fields[vpc_zone_identifier] nor Fields[subnets] is populated on real FetchAutoScalingGroupsPage output — checkSubnetASG (core/aws/subnet_related.go:236) can never resolve without one of them")
 	}
 
 	cache := resource.ResourceCache{
@@ -768,7 +768,7 @@ func TestSubnet_Related_EKS_ResolvesViaRealFetcherOutput(t *testing.T) {
 
 	hasSubnetField := fetchResult.Resources[0].Fields["subnets"] != "" || fetchResult.Resources[0].Fields["subnet_ids"] != ""
 	if !hasSubnetField {
-		t.Fatalf("neither Fields[subnets] nor Fields[subnet_ids] is populated on real FetchEKSClustersPage output — checkSubnetEKS (internal/aws/subnet_related.go:283) can never resolve without one of them")
+		t.Fatalf("neither Fields[subnets] nor Fields[subnet_ids] is populated on real FetchEKSClustersPage output — checkSubnetEKS (core/aws/subnet_related.go:283) can never resolve without one of them")
 	}
 
 	cache := resource.ResourceCache{
@@ -789,12 +789,12 @@ func TestSubnet_Related_EKS_ResolvesViaRealFetcherOutput(t *testing.T) {
 // ---------------------------------------------------------------------------
 // 9. checkASGRole / checkECRRole — bare role name, not full ARN.
 //
-// checkASGRole (internal/aws/asg_related.go:224-250) and checkECRRole ->
-// ecrPolicyRoleARNs (internal/aws/ecr_related_extra.go:183-211) both return
+// checkASGRole (core/aws/asg_related.go:224-250) and checkECRRole ->
+// ecrPolicyRoleARNs (core/aws/ecr_related_extra.go:183-211) both return
 // full role ARNs verbatim, unlike every sibling role-pivot checker
-// (checkEC2Role, internal/aws/ec2_related.go:497-498) which strips to the
+// (checkEC2Role, core/aws/ec2_related.go:497-498) which strips to the
 // bare name after the last "/". FetchRolesByIDs
-// (internal/aws/iam_roles.go:173) calls iam:GetRole(RoleName: id), which AWS
+// (core/aws/iam_roles.go:173) calls iam:GetRole(RoleName: id), which AWS
 // requires to be a bare name — a full-ARN ResourceID 404s when drilled into.
 // ---------------------------------------------------------------------------
 
@@ -813,7 +813,7 @@ func TestASG_Related_Role_ReturnsBareRoleName(t *testing.T) {
 	}
 	for _, id := range result.ResourceIDs {
 		if id != "AWSServiceRoleForAutoScaling" {
-			t.Fatalf("ResourceIDs = %v, want bare role name [AWSServiceRoleForAutoScaling] (iam:GetRole requires RoleName, not an ARN, per FetchRolesByIDs / internal/aws/iam_roles.go:173) — got full ARN %q", result.ResourceIDs, id)
+			t.Fatalf("ResourceIDs = %v, want bare role name [AWSServiceRoleForAutoScaling] (iam:GetRole requires RoleName, not an ARN, per FetchRolesByIDs / core/aws/iam_roles.go:173) — got full ARN %q", result.ResourceIDs, id)
 		}
 	}
 }
@@ -881,7 +881,7 @@ func (f *fakeECRGetRepositoryPolicy) GetRepositoryPolicy(_ context.Context, _ *e
 // 10. checkGlueCFN — region resolves from clients/config, not env; account
 // comes from the session-scoped identity store, not a live STS call.
 //
-// checkGlueCFN (internal/aws/glue_related.go:126) resolves region from
+// checkGlueCFN (core/aws/glue_related.go:126) resolves region from
 // c.Region (falling back to GetDefaultRegion) rather than os.Getenv, so it
 // is immune to AWS_REGION/AWS_DEFAULT_REGION being unset in this test
 // process. The remaining dependency is accountIDFromClients, which reads
@@ -945,10 +945,10 @@ func TestGlue_Related_CFN_ResolvesRegionWithoutEnvVar(t *testing.T) {
 // ---------------------------------------------------------------------------
 // 11. checkWAFCF — CLOUDFRONT-scope resolves; REGIONAL keeps returning 0.
 //
-// checkWAFCF (internal/aws/waf_related.go:150-186) already guards on
+// checkWAFCF (core/aws/waf_related.go:150-186) already guards on
 // Fields["scope"] == CLOUDFRONT and calls
 // cloudfront:ListDistributionsByWebACLId correctly — but
-// FetchWAFWebACLsPage (internal/aws/waf.go:36,85) hardcodes both the
+// FetchWAFWebACLsPage (core/aws/waf.go:36,85) hardcodes both the
 // ListWebACLs request and every result's Fields["scope"] to
 // wafv2types.ScopeRegional, so no WAF resource can ever carry
 // scope=CLOUDFRONT today. This test constructs a CLOUDFRONT-scope resource
@@ -1089,7 +1089,7 @@ var _ = wafv2.ListWebACLsInput{}
 // ---------------------------------------------------------------------------
 // 12. checkEIPECS / checkEIPECSSvc — zero-call ENI cross-ref.
 //
-// checkEIPECS/ECSSvc/ECSTask (internal/aws/eip_related.go:196-220) are all
+// checkEIPECS/ECSSvc/ECSTask (core/aws/eip_related.go:196-220) are all
 // hardcoded to return State: RelatedUnknown whenever res.ID != "" — each function's own
 // comment claims resolving requires per-cluster DescribeTasks, "outside the
 // 1-call budget." But the EIP's NetworkInterfaceId (already on
@@ -1169,7 +1169,7 @@ func TestEIP_Related_ECS_MatchesViaTaskClusterArn(t *testing.T) {
 // ---------------------------------------------------------------------------
 // 13. checkR53Logs — ListQueryLoggingConfigs cross-ref.
 //
-// checkR53Logs (internal/aws/r53_related.go:314-319) is hardcoded to return
+// checkR53Logs (core/aws/r53_related.go:314-319) is hardcoded to return
 // State: RelatedUnknown whenever res.ID != "" — its own comment states
 // route53:ListQueryLoggingConfigs "is not in Route53API yet." The correct
 // mechanism issues one ListQueryLoggingConfigs call per open zone and
@@ -1226,7 +1226,7 @@ func TestR53_Related_Logs_ResolvesViaListQueryLoggingConfigs(t *testing.T) {
 // ---------------------------------------------------------------------------
 // 14. checkVPCER53 — ListHostedZonesByVPC cross-ref.
 //
-// checkVPCER53 (internal/aws/vpce_related.go:197-202) is hardcoded to
+// checkVPCER53 (core/aws/vpce_related.go:197-202) is hardcoded to
 // return State: RelatedUnknown whenever res.ID != "" — its own comment states the
 // associated-zones list lives on route53:ListHostedZonesByVPC, "not in the
 // r53 hosted-zone cache." The correct mechanism issues one
@@ -1284,10 +1284,10 @@ func TestVPCE_Related_R53_ResolvesViaListHostedZonesByVPC(t *testing.T) {
 // ---------------------------------------------------------------------------
 // 15. checkSubnetEFS — zero-call ENI cross-ref (reverse of checkEFSSubnet).
 //
-// checkSubnetEFS (internal/aws/subnet_related.go:258-263) is hardcoded to
+// checkSubnetEFS (core/aws/subnet_related.go:258-263) is hardcoded to
 // return State: RelatedUnknown whenever res.ID != "" — its own comment claims mount
 // targets require per-file-system DescribeMountTargets, "outside the 1-call
-// budget." But checkEFSSubnet (internal/aws/efs_related.go:141-177) already
+// budget." But checkEFSSubnet (core/aws/efs_related.go:141-177) already
 // solves the exact same relationship in reverse with zero extra calls: scan
 // the eni cache for mount-target ENIs whose Description contains the
 // filesystem ID. This test mirrors that pattern for the subnet->efs
@@ -1321,13 +1321,13 @@ func TestSubnet_Related_EFS_MatchesViaMountTargetENIScan(t *testing.T) {
 // docs/attention-signals.md L158 / docs/resources/trail.md:68-92 require
 // r.Findings for: LogFileValidationEnabled==false (Warning),
 // IsLogging==false (Broken), LatestDeliveryError non-empty (Broken).
-// FetchCloudTrailTrails (internal/aws/trail.go) computes all three signals
+// FetchCloudTrailTrails (core/aws/trail.go) computes all three signals
 // into Fields but never appends to r.Findings — this is also why "trail" is
 // pinned in knownIssueCoverageGaps (isIssueCapable sees a registered Wave-2
 // enricher but InFetcherWave2Sentinel unconditionally returns empty
 // Findings). The demo fixtures already carry both witnesses:
 // security-audit-trail (IsLogging=false) and data-events-trail
-// (LatestDeliveryError set) — internal/demo/fixtures/cloudtrail.go.
+// (LatestDeliveryError set) — core/demo/fixtures/cloudtrail.go.
 // ---------------------------------------------------------------------------
 
 func TestTrail_Fetcher_EmitsFindingsForDocumentedWave1And2Signals(t *testing.T) {

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package app
 
 import (
@@ -28,8 +30,8 @@ func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskReques
 	// a pivot left at the transient blank-navigable state (domain.RelatedUnknown,
 	// no FetchFilter) must resolve to its real count once the user drills into the target
 	// type and returns, without a manual Ctrl+R. Mirrors the shape
-	// HandleRelatedCheckStarted (internal/runtime/related.go) and
-	// openRelatedDetail (internal/app/navigate.go) already produce, so this
+	// HandleRelatedCheckStarted (core/runtime/related.go) and
+	// openRelatedDetail (core/app/navigate.go) already produce, so this
 	// is renderer-agnostic — both TUI and web/headless callers get the
 	// recompute from this single ActionBack effect.
 	var tasks []runtime.TaskRequest

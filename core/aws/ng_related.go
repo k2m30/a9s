@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // ng_related.go contains EKS Node Group related-resource checker functions.
 package aws
 

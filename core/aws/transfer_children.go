@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // transfer_children.go — Transfer Family Agreements child view. Agreements
 // are the only server-scoped child (DescribedAgreement.ServerId;
 // ListAgreements(ServerId)) — docs/resources/transfer.md §2.1. Profiles and

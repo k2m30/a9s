@@ -3,11 +3,11 @@ package unit
 // qa_ebs_snap_color_test.go — Color contract pin for EBS Snapshots.
 //
 // Since the color-findings-conformance wave (qa_color_findings_conformance_test.go),
-// colorEBSSnap is colorFromAnyFinding-only (internal/aws/catalog_compute.go) —
+// colorEBSSnap is colorFromAnyFinding-only (core/aws/catalog_compute.go) —
 // it has NO raw-field fallback at all. Every non-healthy case here attaches a
-// Finding shaped exactly like the real fetcher (internal/aws/ebs.go, wave1
+// Finding shaped exactly like the real fetcher (core/aws/ebs.go, wave1
 // state Findings + ebsSnapStructuralFindings) or the real Wave-2 cross-ref
-// enricher (internal/aws/ebs_snap_issue_enrichment.go, Source
+// enricher (core/aws/ebs_snap_issue_enrichment.go, Source
 // "wave2:ebs-snap"). Fields are kept for realism/context only — they are no
 // longer read by Color.
 //

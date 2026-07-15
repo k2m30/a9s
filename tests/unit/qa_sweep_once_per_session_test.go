@@ -11,7 +11,7 @@
 //	existing pairMu. Session-lifetime: Rotate() does NOT clear it; New()
 //	initializes it.
 //
-//	handleAvailabilityCacheLoaded (internal/runtime/handlers_availability.go):
+//	handleAvailabilityCacheLoaded (core/runtime/handlers_availability.go):
 //	when c.session.PairSwept() is true, it must NOT rebuild AvailQueue, NOT
 //	fire probes, NOT latch AvailSweepPending — the PatchMenuCheckProgress
 //	intent must report done (Checked==Total). Disk-cache seeding of
@@ -23,7 +23,7 @@
 //	internal/tui's Model.handleRefresh (Ctrl+R on the main menu,
 //	runtime_adapter_navigate.go:591) is the one existing manual full-menu
 //	refresh gesture (the headless Controller.handleActionRefresh in
-//	internal/app/actions_list.go has no menu-level branch at all — it is a
+//	core/app/actions_list.go has no menu-level branch at all — it is a
 //	no-op on the menu screen). It must clear the current pair's memo before
 //	re-triggering the availability-cache reload.
 package unit_test
@@ -107,7 +107,7 @@ func drainAvailabilitySweep(c *app.Controller, s *session.Session, initial []run
 }
 
 // switchPair simulates the house profile/region-switch flow (mirrors
-// Core.HandleProfileSelected in internal/runtime/handlers.go): rotate the
+// Core.HandleProfileSelected in core/runtime/handlers.go): rotate the
 // session, set the new pair, then clear the root menu's availability state
 // the way the real switch handler's MenuClearAvailabilityIntent does — so a
 // revisit test can't accidentally read stale Controller-level menu state
@@ -288,7 +288,7 @@ func TestSweepOnce_RotatePreservesSweptPairs(t *testing.T) {
 // 6 — Manual full-menu refresh (Ctrl+R on the main menu, the ONE existing
 // gesture found at internal/tui/runtime_adapter_navigate.go:591
 // Model.handleRefresh's rsKindMenu branch) must clear the current pair's
-// memo before re-sweeping. internal/app's headless
+// memo before re-sweeping. core/app's headless
 // Controller.handleActionRefresh (actions_list.go) has no menu-level branch
 // at all, so this contract is TUI-only.
 // -----------------------------------------------------------------------

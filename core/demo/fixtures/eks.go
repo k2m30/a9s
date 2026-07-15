@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package fixtures provides EKS fixture data for the EKS fake.
 package fixtures
 

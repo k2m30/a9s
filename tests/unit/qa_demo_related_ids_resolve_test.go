@@ -6,9 +6,9 @@
 // Concrete instance this test pins: ./a9s --demo, EC2 instance
 // i-0a1b2c3d4e5f60016 shows a non-zero IAM Roles related count (the ec2
 // fixture references instance profile "acme-ec2-instance-profile" at
-// internal/demo/fixtures/ec2.go:53), but drilling in fails with
+// core/demo/fixtures/ec2.go:53), but drilling in fails with
 // "role FetchByIDs failed for 1 of 1 IDs: acme-ec2-instance-profile:
-// NoSuchEntity" because no such role exists in internal/demo/fixtures/iam.go.
+// NoSuchEntity" because no such role exists in core/demo/fixtures/iam.go.
 //
 // This reuses qa_demo_pivot_coverage_test.go's harness verbatim
 // (buildDemoTypeCache / demo.NewServiceClients / the real registered
@@ -16,8 +16,8 @@
 // resolves each witnessed ResourceID the same way the app's related-drill
 // resolves a single/known target ID: resource.GetFetchByIDs(targetType),
 // called as fn(ctx, clients, []string{id}) (see
-// internal/runtime/executor.go's KindFetchByIDDetail case and
-// internal/runtime/handlers_related.go's ResolveRelatedNavigate /
+// core/runtime/executor.go's KindFetchByIDDetail case and
+// core/runtime/handlers_related.go's ResolveRelatedNavigate /
 // relatedFetchTasks, which is the only production consumer of the
 // FetchByIDs field on catalog.ResourceTypeDef). Target types with no
 // registered FetchByIDs helper cannot be drilled by exact ID in demo mode
@@ -124,7 +124,7 @@ func TestDemoRelatedIDsResolve_EveryWitnessedIDIsFetchable(t *testing.T) {
 // containsResourceID reports whether resolved (the output of a FetchByIDs
 // call) contains a resource whose ID matches id — mirroring how the executor
 // treats a FetchByIDs response: any returned resource with a matching ID
-// counts as a successful resolution (see internal/runtime/executor.go's
+// counts as a successful resolution (see core/runtime/executor.go's
 // KindFetchByIDDetail case, which fails the drill only when len(res) == 0 or
 // the target ID is simply absent from what was returned).
 func containsResourceID(resolved []resource.Resource, id string) bool {

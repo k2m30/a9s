@@ -887,10 +887,10 @@ func TestViews_ListColor_ECSInactiveIsBroken(t *testing.T) {
 // RETIRED the old "empty-Findings fallback" framing this test used to pin
 // (TestViews_IssueCount_FallbackUsesTypeResolveColor): since the
 // color-findings-conformance wave, colorEC2 is colorFromAnyFinding-only
-// (internal/aws/catalog_compute.go, no raw-field fallback at all), so
+// (core/aws/catalog_compute.go, no raw-field fallback at all), so
 // Findings=nil no longer "forces a Fields-reading fallback path" — it simply
 // yields ColorHealthy. The resource here instead carries the Finding the
-// real fetcher (internal/aws/ec2.go) attaches for a Server.*-forced stop
+// real fetcher (core/aws/ec2.go) attaches for a Server.*-forced stop
 // (CodeEC2StateStoppedServer, SevBroken), which is what td.ResolveColor
 // actually reads now. See qa_color_findings_conformance_test.go for the
 // standing architectural gate.

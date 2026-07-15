@@ -8,7 +8,7 @@ package unit
 // error. This meant a transient ListGroupPolicies throttle permanently prevented
 // inline policy resolution on subsequent calls within the same session.
 //
-// Contract after fix (internal/aws/iam_policies.go):
+// Contract after fix (core/aws/iam_policies.go):
 //   - When fetchInlineGroupPolicies returns (inlines, inlineErr) with inlineErr != nil,
 //     store.InlineBuilt() remains false → next call retries the inline fetch.
 //   - When fetchInlineGroupPolicies succeeds, store.MarkInlineBuilt() is called → cached.

@@ -2,6 +2,34 @@
 
 a9s is built entirely with [Claude Code](https://docs.anthropic.com/en/docs/claude-code). We encourage contributors to do the same. This guide covers setup, workflow, and the do's and don'ts of working on this codebase with Claude Code.
 
+## Licensing and the Contributor License Agreement (CLA)
+
+a9s is dual-licensed: the whole repository is GPL-3.0-or-later, and the
+packages under `core/` are additionally offered by the copyright holder
+under a separate commercial license (see
+[COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md)). Dual licensing only works
+while the copyright holder can relicense every line under `core/`.
+
+Therefore:
+
+- **Any contribution that touches `core/` requires a signed Contributor
+  License Agreement** based on the
+  [Apache Individual Contributor License Agreement](https://www.apache.org/licenses/icla.pdf)
+  (with "the Foundation" read as the a9s copyright holder, Mikhail
+  Chuprynski). The CLA grants the copyright holder a perpetual, worldwide,
+  irrevocable copyright and patent license to your contribution, including
+  the right to sublicense and to distribute it under other license terms.
+- **Un-CLA'd contributions cannot be merged into `core/`.** A PR touching
+  `core/` from a contributor without a CLA on file will be rewritten by the
+  maintainer or closed, however small the diff.
+- Contributions limited to `internal/tui/`, `tests/`, `docs/`, or `website/`
+  are accepted under the inbound=outbound GPL-3.0-or-later norm and do not
+  require a CLA — though signing one is welcome.
+
+To sign, open an issue titled `CLA: <your GitHub handle>` stating that you
+accept the Apache ICLA terms with the a9s copyright holder as licensee, or
+attach the completed ICLA form to your first PR.
+
 ## Prerequisites
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed and authenticated
@@ -72,7 +100,7 @@ Skills are reusable workflows loaded by Claude Code:
 
 ## Do's
 
-- **Do describe intent, not implementation.** Say "add CloudWatch Metrics as a resource type" not "create a file internal/aws/cloudwatch_metrics.go with a function..."
+- **Do describe intent, not implementation.** Say "add CloudWatch Metrics as a resource type" not "create a file core/aws/cloudwatch_metrics.go with a function..."
 - **Do let Claude Code run the pre-push checklist.** It runs tests, lint, vulncheck, consistency checker, coverage analyzer, and architect review. Don't skip it.
 - **Do ask Claude Code to explain code** before modifying it. It has full context of the codebase.
 - **Do use `--demo` mode** to verify UI changes without AWS credentials: `./a9s --demo`
@@ -95,10 +123,10 @@ This is the most common contribution. Just tell Claude Code:
 > "Add CloudWatch Metrics as a new resource type"
 
 It will use the `a9s-add-resource` skill which covers:
-1. Fetcher in `internal/aws/`
-2. Type definition — a `catalog.ResourceTypeDef` literal in `internal/aws/catalog_<category>.go`
-3. Default view config in `internal/config/defaults.go`
-4. Demo fixtures in `internal/demo/`
+1. Fetcher in `core/aws/`
+2. Type definition — a `catalog.ResourceTypeDef` literal in `core/aws/catalog_<category>.go`
+3. Default view config in `core/config/defaults.go`
+4. Demo fixtures in `core/demo/`
 5. Unit tests for fetcher, view rendering, and demo fixtures
 6. README and website updates
 
@@ -107,18 +135,18 @@ It will use the `a9s-add-resource` skill which covers:
 ```
 cmd/a9s/            main binary
 cmd/refgen/         views_reference.yaml generator
-internal/aws/       AWS service clients, resource fetchers (read-only), catalog_*.go registry literals
-internal/app/       headless controller (ViewState, actions) shared by TUI and web
-internal/catalog/   the resource registry (ResourceTypeDef and friends)
-internal/config/    YAML config loading
-internal/demo/      synthetic fixture data for --demo mode
-internal/domain/    core value types (Finding, Resource, Gen, …)
-internal/fieldpath/ struct field extraction via reflection
-internal/resource/  backward-compat alias layer over internal/catalog
-internal/runtime/   platform-agnostic app core (runtime.Core, message handlers)
-internal/session/   session-scoped state (RowStore, caches, generation counters)
+core/aws/           AWS service clients, resource fetchers (read-only), catalog_*.go registry literals
+core/app/           headless controller (ViewState, actions) shared by TUI and web
+core/catalog/       the resource registry (ResourceTypeDef and friends)
+core/config/        YAML config loading
+core/demo/          synthetic fixture data for --demo mode
+core/domain/        core value types (Finding, Resource, Gen, …)
+core/fieldpath/     struct field extraction via reflection
+core/resource/      backward-compat alias layer over core/catalog
+core/runtime/       platform-agnostic app core (runtime.Core, message handlers)
+core/session/       session-scoped state (RowStore, caches, generation counters)
+core/web/           web-UI adapter
 internal/tui/       Bubble Tea views, keys, layout, styles, messages
-internal/web/       web-UI adapter
 tests/unit/         unit tests
 tests/integration/  integration tests
 ```

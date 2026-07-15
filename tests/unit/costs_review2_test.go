@@ -18,7 +18,7 @@
 // *** Every other test in this file compiles clean today and is a genuine
 // *** runtime red/green against EXISTING production surface only.
 //
-//  1. internal/costs/store.go: Store.MergeCoverage(q Query, covered []Period,
+//  1. core/costs/store.go: Store.MergeCoverage(q Query, covered []Period,
 //     now time.Time) — R2. ADDITIVE (existing 3-arg Merge is untouched, so
 //     every current Merge call site keeps compiling unchanged): stamps every
 //     period in `covered` as fetched-at-now, including periods with zero
@@ -27,7 +27,7 @@
 //     period (a young account, or spend fully filtered out) is invisible to
 //     it today and Lookup reports that period missing forever. Follows
 //     Merge's own closed-immutable/open-always-refreshes rule.
-//  2. internal/costs/grid.go: ApplyRowAttrs(g Grid, attrs map[string]string)
+//  2. core/costs/grid.go: ApplyRowAttrs(g Grid, attrs map[string]string)
 //     Grid — R8. A NEW package-level function operating on an
 //     already-built Grid (relabels Rows[i].Label to "name (id)" when attrs
 //     has an entry for Rows[i].Key, leaving unmatched keys as the raw ID) —
@@ -38,10 +38,10 @@
 //
 // Contract: specs/021-cost-explorer/data-model.md, spec.md FR-007/FR-012/
 // FR-014/FR-017, and the current production code in
-// internal/app/costs_state.go, internal/app/costs_body.go,
-// internal/runtime/handlers_navigate.go, internal/app/navigate.go,
-// internal/runtime/executor.go, internal/tui/runtime_adapter_navigate.go,
-// internal/costs/{store,grid,drill}.go — each finding below was
+// core/app/costs_state.go, core/app/costs_body.go,
+// core/runtime/handlers_navigate.go, core/app/navigate.go,
+// core/runtime/executor.go, internal/tui/runtime_adapter_navigate.go,
+// core/costs/{store,grid,drill}.go — each finding below was
 // independently re-verified against current code before being scoped here.
 package unit
 
@@ -134,7 +134,7 @@ func TestCostsReview2_R2_ZeroRecordPeriod_MergeCoverage_NotReportedMissing(t *te
 
 func TestCostsReview2_R3_MainMenuNavigateToCosts_WarmCache_ZeroFetches(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	// NavigateKindPushCosts (internal/app/navigate.go) seeds CostsState via
+	// NavigateKindPushCosts (core/app/navigate.go) seeds CostsState via
 	// c.ensureCostsState(time.Now()) — a hard-coded wall clock, not
 	// injectable — so the seed window below must be built from the same
 	// real clock the navigation path will use.
@@ -333,7 +333,7 @@ func TestCostsReview2_R6_DemoTransport_AnomalyFlowsToCellMarkAndFooter(t *testin
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	// reviewNow (Jul 15, 2026) trailing 12 months covers Aug'25-Jul'26,
 	// which includes the fixture's planted anomaly month (Jan'26 —
-	// internal/demo/fixtures/costs.go's CostsGrowthMonth, anchored off the
+	// core/demo/fixtures/costs.go's CostsGrowthMonth, anchored off the
 	// fixed CostsAnchorMonth constant, never time.Now()).
 	c.EnsureCostsState(reviewNow)
 

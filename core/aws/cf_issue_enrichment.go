@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // cf_issue_enrichment.go — Wave 2 issue enrichment for the cf resource type.
 package aws
 

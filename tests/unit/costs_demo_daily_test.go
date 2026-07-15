@@ -1,7 +1,7 @@
 // costs_demo_daily_test.go — Cost Explorer: FR-018 violation found by a
 // post-fix tmux smoke of ./a9s --demo: week/day zoom renders an empty grid
-// because the demo CE handler (internal/demo/costs_handlers.go) ignores the
-// request's Granularity and internal/demo/fixtures/costs.go carries monthly
+// because the demo CE handler (core/demo/costs_handlers.go) ignores the
+// request's Granularity and core/demo/fixtures/costs.go carries monthly
 // rows only, so a DAILY GetCostAndUsage request returns month-sized buckets
 // (or nothing, once TimePeriod narrows to a sub-month range) instead of one
 // bucket per day.
@@ -13,7 +13,7 @@
 // history" Range is the wrong shape for the narrow month/week ranges these
 // tests need.
 //
-// Evergreen-demo reconciliation (round 4): internal/demo/fixtures/costs.go's
+// Evergreen-demo reconciliation (round 4): core/demo/fixtures/costs.go's
 // month generation is now relative to fixtures.CostsAnchorMonth (computed
 // from "now" at process start, not a stale hardcoded literal) — every month
 // literal below is derived from that exported anchor (and from

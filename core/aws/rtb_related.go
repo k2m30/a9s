@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // rtb_related.go contains Route Table related-resource checker functions.
 package aws
 

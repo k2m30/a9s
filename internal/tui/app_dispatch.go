@@ -1,13 +1,15 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // app_dispatch.go — TUI-side runtime intent + task dispatchers (applyIntents,
 // pushScreen, applyTheme, tasksToCmd, dispatchTaskRequests, coreUpdate).
 //
 // applyIntents forwards every intent to the headless controller
-// (m.ctrl.ApplyIntents) first — see internal/app/intents.go for the
+// (m.ctrl.ApplyIntents) first — see core/app/intents.go for the
 // controller-side cases, including the cache-cross-write intents
 // (PatchResourceCache, PatchRelatedCache, PatchLazyResourceCache) and
 // PatchDetail (detail-view enrichment), which write session/screen-stack
 // state owned by Core/Controller via the typed accessors in
-// internal/runtime/accessors.go. The local switch in applyIntents below only
+// core/runtime/accessors.go. The local switch in applyIntents below only
 // covers renderer-side effects with no controller equivalent, or the
 // rendererState half of an intent already applied controller-side by the
 // forward.
@@ -31,7 +33,7 @@ import (
 // screen-builder closures, theme-apply errors).
 //
 // The ENTIRE slice is forwarded to m.ctrl.ApplyIntents in one call, first —
-// the controller (internal/app/intents.go) is the single source of truth for
+// the controller (core/app/intents.go) is the single source of truth for
 // every intent it knows about (menu/list/enrichment patches, stack ops,
 // identity, flash, error-log, and the cache-cross-write intents
 // PatchResourceCache/PatchRelatedCache/PatchLazyResourceCache, which write

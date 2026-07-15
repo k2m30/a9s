@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package domain
 
 // Severity classifies a resource or finding by its health level.

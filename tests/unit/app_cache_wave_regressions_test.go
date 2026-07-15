@@ -1,5 +1,5 @@
 // app_cache_wave_regressions_test.go — regression pins for the Codex+
-// CodeRabbit fix wave on internal/app (branch feat/cache).
+// CodeRabbit fix wave on core/app (branch feat/cache).
 //
 // Covers:
 //
@@ -115,7 +115,7 @@ func TestActionRefresh_EmptyList_StillShowsLoading(t *testing.T) {
 // the frame title and HasPagination=true — BEFORE any live refetch task has
 // executed. This is the disk-cache-seeded counterpart to the
 // already-covered in-session ProbeTruncated seeding path
-// (internal/app/navigate.go's NavigateKindPushResourceList branch): here the
+// (core/app/navigate.go's NavigateKindPushResourceList branch): here the
 // truncation signal must survive a full cold load-from-disk round trip via
 // AvailabilityCacheLoaded, not just a same-session probe.
 func TestWarmListOpen_TruncatedDiskSeed_ShowsNPlus_BeforeRefetch(t *testing.T) {

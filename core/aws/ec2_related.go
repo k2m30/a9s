@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // ec2_related.go contains EC2 related-resource checker functions and shared helpers.
 package aws
 

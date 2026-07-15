@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // handlers_resources.go — Update()-switch session-mutation handlers.
 //
 // Platform-agnostic (c *Core) Handle* methods for the five resource/detail
@@ -15,7 +17,7 @@
 // Plus two utility methods used by the adapter:
 //
 //	(*Core).AllRegions        — call-through to awsclient.AllRegions so the
-//	                            adapter need not import internal/aws.
+//	                            adapter need not import core/aws.
 //	(*Core).ResetRuleSets     — session.RuleSets swap + Clients rewire (used
 //	                            by SES refresh paths in handleRefresh).
 //
@@ -342,7 +344,7 @@ func (c *Core) HandleIdentityError(ev IdentityErrorEvent) ([]UIIntent, []TaskReq
 }
 
 // AllRegions returns the commercial-partition region catalogue. Exposed
-// on Core so the adapter does not need to import internal/aws directly
+// on Core so the adapter does not need to import core/aws directly
 // for the region selector.
 func (c *Core) AllRegions() []awsclient.AWSRegion {
 	return awsclient.AllRegions()
@@ -353,7 +355,7 @@ func (c *Core) AllRegions() []awsclient.AWSRegion {
 // DescribeActiveReceiptRuleSet calls write to the orphaned old store on
 // completion. Called by the SES refresh paths in handleRefresh (detail
 // view and resource list view, when ResourceType == "ses"). Exposed on
-// Core so the adapter does not need to import internal/session for the
+// Core so the adapter does not need to import core/session for the
 // NewRuleSetStore call.
 func (c *Core) ResetRuleSets() {
 	c.session.RuleSets = session.NewRuleSetStore()

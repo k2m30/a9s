@@ -3,7 +3,7 @@ package unit_test
 // aws_vpcpeer_related_test.go — related-resource checker tests for vpc-peer
 // (EC2 VPC Peering Connections) (docs/resources/vpc-peer.md §2,
 // docs/resources/vpc-peer-impl-plan.md §1 "related_targets"). Checkers live
-// in internal/aws/vpcpeer_related.go.
+// in core/aws/vpcpeer_related.go.
 //
 // Three pivots: rtb (cache-scan by Routes[].VpcPeeringConnectionId — the
 // house fleet cache-scan convention, same as lt's checkLTEC2: cache ABSENT

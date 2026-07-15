@@ -2,7 +2,7 @@
 // "color derives from findings" architectural invariant: for every registered
 // type × demo fixture row, td.ResolveColor(merged) must equal the color
 // implied by the resource's own Findings (Wave-1 seeded, Wave-2 merged) via
-// the shared severity-to-color mapping in internal/resource/severity_color.go
+// the shared severity-to-color mapping in core/resource/severity_color.go
 // (ColorFromSeverity / ColorFromWave1) — NOT some other structural field the
 // classifier reads directly.
 //
@@ -10,7 +10,7 @@
 // res.Findings: any SevBroken finding -> ColorBroken; else any SevWarn ->
 // ColorWarning; else any SevDim -> ColorDim; no findings at all -> ColorHealthy.
 // This reuses resource.ColorFromSeverity's exact severity->color table (see
-// internal/resource/severity_color.go) rather than reinventing the mapping;
+// core/resource/severity_color.go) rather than reinventing the mapping;
 // the only addition here is the "pick the worst finding" reduction, which
 // ColorFromWave1 does NOT do (it only inspects Source=="wave1" findings, first
 // match wins) — this gate deliberately looks at ALL findings regardless of
@@ -32,12 +32,12 @@
 // conversions, not silently drift.
 //
 // No exemption is carved out for "lifecycle dim without findings": the only
-// two exported functions in internal/resource/severity_color.go
+// two exported functions in core/resource/severity_color.go
 // (ColorFromSeverity, ColorFromWave1) define no such carve-out —
 // ColorFromWave1's ok=false path (no wave1 Finding present) returns
 // (ColorHealthy, false), not Dim. Per-type helpers like colorFallback /
 // colorWave1OrHealthy / cfnStackColor / acmColor / r53Color in
-// internal/aws/catalog_color_helpers.go are exactly the raw-field classifiers
+// core/aws/catalog_color_helpers.go are exactly the raw-field classifiers
 // this gate is designed to catch — they are not "the shared severity
 // functions" the owner's exemption clause refers to.
 //

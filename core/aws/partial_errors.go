@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package aws — partial_errors.go
 //
 // AggregateFailures and AggregateMissing implement the canonical composite

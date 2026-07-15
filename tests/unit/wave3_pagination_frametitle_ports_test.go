@@ -7,7 +7,7 @@
 // Update()/FrameTitle() directly; the controller/ViewState render path is
 // the only live consumer, per this file's Wave 3 siblings).
 //
-// The existing controller-oracle coverage (internal/app/list_test.go's
+// The existing controller-oracle coverage (core/app/list_test.go's
 // TestListFrameTitle_LoadingState_NonEmpty / ShowsCountAfterLoad) only
 // asserts "non-empty" / "3 appears somewhere" — neither pins the exact
 // "(N+)"/"(N)" suffix format nor any of the five transition scenarios below.

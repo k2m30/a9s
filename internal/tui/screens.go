@@ -1,10 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // screens.go — Bubble Tea adapter's screen-builder registry. This is the
 // renderer-side parallel of runtime.ScreenRegistry: the runtime emits
 // PushScreen{ID, Context, Payload}; the adapter resolves ID through the
 // builders map below and invokes the closure to construct a *rendererState
 // plus any follow-up tea.Cmd. The runtime never sees tea.Model or
 // views.View; the adapter never invents ScreenIDs (they live in
-// internal/runtime).
+// core/runtime).
 //
 // The registered builders cover the profile selector, reveal, and child list.
 // Capability screens (logs, ct.scan, cost) are not yet built here.

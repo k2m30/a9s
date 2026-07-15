@@ -217,7 +217,7 @@ func TestEnrichEC2InstanceStatus_NilClientReturnsEmptyFindingsNoError(t *testing
 }
 
 // TestEnrichEC2InstanceStatus_SystemStatusInitializingIsWarningNotImpaired pins
-// Finding B (internal/aws/ec2_issue_enrichment.go ~line 134): AWS
+// Finding B (core/aws/ec2_issue_enrichment.go ~line 134): AWS
 // "initializing" status must NOT be stamped with the "impaired" wording.
 //
 // docs/resources/ec2.md §4 row (line 226):

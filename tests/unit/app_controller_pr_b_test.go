@@ -1,4 +1,4 @@
-// app_controller_pr_b_test.go — contract tests for internal/app.Controller (PR-B).
+// app_controller_pr_b_test.go — contract tests for core/app.Controller (PR-B).
 //
 // Covers the two lanes added / wired in PR-B:
 //
@@ -65,7 +65,7 @@ import (
 //
 // Formerly IsNoOpPassThrough / "Deferred to post-PR-C": that was accurate
 // when Core.HandleResourcesLoaded's list-open Wave-2 dispatch did not exist.
-// It now does (see internal/runtime/handlers_resources.go's TypeGen==0
+// It now does (see core/runtime/handlers_resources.go's TypeGen==0
 // branch) and HandleEvent forwards its tasks for exactly this reason — a
 // headless/web session opening a list must get row flags and the menu badge
 // without waiting for a Ctrl+R rerun. This test still pins the "no

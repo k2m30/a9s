@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package aws
 
 // dbc_snap_issue_enrichment_internal_test.go — internal package tests for the
 // dbc-snap cross-ref enricher's handling of Broken+orphan stacking.
 //
-// Lives in internal/aws (not tests/unit) so it can call the unexported
+// Lives in core/aws (not tests/unit) so it can call the unexported
 // enrichDBCSnapCrossRef package-level var directly, testing the exact
 // function wired into catalog_databases.go's dbc-snap Wave2 field.
 //

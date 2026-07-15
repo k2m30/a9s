@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package domain
 
 // Section is the output unit of a DetailProjector. Each Section corresponds

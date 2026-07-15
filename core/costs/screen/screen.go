@@ -1,10 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package screen is the Cost Explorer screen's pure state machine
 // (specs/021-cost-explorer/architecture.md): the "what should happen"
-// decisions internal/app used to make inline, mixed in with session
+// decisions core/app used to make inline, mixed in with session
 // bookkeeping. Every function here is pure — inputs are values, outputs are
 // typed outcomes; no session, no controller, no clocks except an injected
-// now. Imports internal/costs only; internal/app imports this package, so
-// this package must never import internal/app, internal/runtime, or
+// now. Imports core/costs only; core/app imports this package, so
+// this package must never import core/app, core/runtime, or
 // internal/tui.
 package screen
 
@@ -90,7 +92,7 @@ func finerGranularity(g costs.Granularity) costs.Granularity {
 // frame's pivot dimension and accumulated ancestry, its granularity, and
 // whether its own shape is still in flight. ResourceTypeFor is the a9s
 // catalog lookup (CostExplorerServiceName -> shortName), injected so this
-// package never imports internal/resource.
+// package never imports core/resource.
 type ScreenState struct {
 	RowDim          costs.Dimension
 	Path            DrillPath
@@ -148,7 +150,7 @@ type PushDrill struct {
 	// SAME finerGranularity(state.Granularity) step Select already
 	// computed internally to build Window via WindowWithin, surfaced so
 	// the caller never re-derives it (the "two homes" duplication this
-	// field closes: internal/app used to keep its own finerGranularity
+	// field closes: core/app used to keep its own finerGranularity
 	// copy purely to set the pushed DrillLevel's Granularity field).
 	Granularity costs.Granularity
 	// ParentGranularity/SelectedPeriod/ParentCellNonZero carry the

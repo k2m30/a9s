@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // nat_related.go contains NAT Gateway related-resource checker functions.
 package aws
 

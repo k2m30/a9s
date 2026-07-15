@@ -19,11 +19,11 @@ Surviving subagents and their write boundaries:
 
 | Subagent | Writes to | Use for |
 |---|---|---|
-| `a9s-coder` | `internal/`, `cmd/`, `.a9s/` | Go production code — **no tests** |
+| `a9s-coder` | `core/`, `internal/`, `cmd/`, `.a9s/` | Go production code — **no tests** |
 | `a9s-qa` | `tests/unit/` | Go test code — **no production code** |
 | `a9s-qa-stories` | Nothing (read-only) | Given/when/then stories from the design spec, zero source knowledge |
 | `a9s-consistency-checker` | Nothing (read-only) | Cross-file drift: code ↔ docs ↔ website ↔ config |
-| `a9s-fixtures` | `internal/demo/` | Test/demo fixtures from real AWS via the AWS MCP tool |
+| `a9s-fixtures` | `core/demo/` | Test/demo fixtures from real AWS via the AWS MCP tool |
 | `a9s-devops` | All | AWS-practitioner consult: resource priorities, real-world workflows |
 | `tui-designer` | Design artifacts | TUI wireframes, color schemes, preview mockups |
 
@@ -66,7 +66,7 @@ Every unit of work goes through these stages. Stages 2, 4, 6.5 may be **skipped*
 
 **When the lane applies — all of the following must hold:**
 
-1. The change touches **only** `*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICENSE`, or `CHANGELOG.md`. No Go source, tests, fixtures, Makefile, `.github/workflows/`, `internal/`, or `cmd/`.
+1. The change touches **only** `*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICENSE`, or `CHANGELOG.md`. No Go source, tests, fixtures, Makefile, `.github/workflows/`, `core/`, `internal/`, or `cmd/`.
 2. Size is `XS`: ≤ 30 LOC added/changed across ≤ 2 files.
 3. The change is one of: typo fix, link fix, formatting/style fix, or clarification.
 4. The change does **not** reverse an existing rule. Reversing a rule routes through normal Stages 1–5.
@@ -134,7 +134,7 @@ This target is the canonical gate. It MUST pass locally with zero edits before a
 9. `make smoke` — tmux-driven demo smoke over the compiled binary (`scripts/smoke-demo.sh`): rendered menu counts, humanized statuses, per-row issue causes, the reference bucket's related panel. Requires tmux. When demo fixtures legitimately change, update the script's assertions in the same PR.
 10. `make smoke-related` — tmux-driven demo smoke dedicated to the RELATED panel (`scripts/smoke-related-demo.sh`): exact fixture witness badges, the zero-count-row cursor skip, a count-1 drill landing on the target detail, a circular drill re-showing cached counts, and the ec2 IAM Role pivot. Requires tmux.
 
-For changes that touch `internal/aws/` real-account behavior, additionally run the live integration test against a real AWS profile (this is also the entry to Stage 6.5):
+For changes that touch `core/aws/` real-account behavior, additionally run the live integration test against a real AWS profile (this is also the entry to Stage 6.5):
 
 ```bash
 A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ \
@@ -150,7 +150,7 @@ For pure docs changes (`*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICEN
 
 ### Stage 6.5 — Post-merge real-AWS validation
 
-- **Trigger**: a merge to `main` touches `internal/aws/`, fetchers, child views, related-resource pivots, or fixtures. Skipped for pure-docs and pure-tooling changes. For a multi-PR refactor program, also run a batch pass at each phase boundary (≥ 3 PRs merged since the last real-AWS sign-off), since mocks cannot fully cover large refactor surfaces.
+- **Trigger**: a merge to `main` touches `core/aws/`, fetchers, child views, related-resource pivots, or fixtures. Skipped for pure-docs and pure-tooling changes. For a multi-PR refactor program, also run a batch pass at each phase boundary (≥ 3 PRs merged since the last real-AWS sign-off), since mocks cannot fully cover large refactor surfaces.
 - **Tools**: the integration test binaries under `tests/integration/`; `make smoke-live PROFILE=<profile>-readonly [REGION=...]` — a data-independent TUI sweep over every non-empty resource type in the account (raw-enum and vacuous-status forbids, related-panel settle checks); `make smoke-related-live PROFILE=<profile>-readonly [REGION=...]` — the RELATED-panel-dedicated companion (settled counted badge, drill-and-return, a surviving "(?)" row staying actionable). Live smoke runs only on `*readonly` profiles by construction.
 - **Action**: run the integration suite against a real AWS profile (`A9S_CT_PROFILE=<profile>`), run `make smoke-live` and `make smoke-related-live`, exercise the changed surface (list → detail → child view → related view) across ≥ 4 distinct resource types for a phase-boundary pass, and capture pass/fail per scenario.
 - **Exit**: all real-AWS scenarios green, or a scoped regression note with a follow-up fix.

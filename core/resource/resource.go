@@ -1,10 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package resource defines the generic resource model used across all AWS resource types.
 package resource
 
 import "github.com/k2m30/a9s/v3/core/domain"
 
 // Resource is the generic AWS resource instance. Declaration lives in
-// internal/domain; this alias lets existing consumers compile without changes.
+// core/domain; this alias lets existing consumers compile without changes.
 type Resource = domain.Resource
 
 // DedupByID returns the subset of incoming whose ID is not already present in

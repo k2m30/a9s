@@ -16,4 +16,4 @@ ignore:
   # is tautological (fake returns what fake literally returns); their
   # real behavior is covered indirectly via TUI demo-mode integration
   # tests. Exclude from coverage to avoid incentivizing busywork tests.
-  - "internal/demo/fakes/**"
+  - "core/demo/fakes/**"

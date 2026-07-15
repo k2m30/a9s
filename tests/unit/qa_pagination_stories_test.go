@@ -49,11 +49,11 @@ func effectiveTitleName(rt resource.ResourceTypeDef) string {
 // expectedIssueSuffix derives the " !N" frame-title suffix the pagination
 // contract (docs/attention-signals.md §Visualization Surfaces / §S1) mandates
 // for the given page of resources, independent of buildListFrameTitle's
-// internals (Controller.listIssueCount, internal/app/list_body.go).
+// internals (Controller.listIssueCount, core/app/list_body.go).
 //
 // It mirrors listIssueCount's exact per-resource predicate: a resource counts
 // as an issue when it carries an issue-severity Finding (listHasIssueFinding,
-// internal/app/list_filter.go), or — when it has no Findings at all — when
+// core/app/list_filter.go), or — when it has no Findings at all — when
 // rt.ResolveColor(r).IsIssue() is true (Warning/Broken). These tests never
 // trigger Wave-2 enrichment (no AvailabilityCheckedMsg is sent), so the
 // enrichment-findings-map branch of listIssueCount is always empty here and
@@ -489,7 +489,7 @@ func TestStoryD5_CWLogs_500LogGroups_AllReturned(t *testing.T) {
 // ---------------------------------------------------------------------------
 // D.6: Security Groups with 1200 groups
 //
-// NOTE: The current SG fetcher (internal/aws/sg.go) does NOT paginate.
+// NOTE: The current SG fetcher (core/aws/sg.go) does NOT paginate.
 // It makes a single DescribeSecurityGroups call and returns whatever
 // the API returns in that one response. The DescribeSecurityGroups API
 // does support pagination (NextToken) but the fetcher does not loop.

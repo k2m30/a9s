@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // snapshot_cross_ref.go — generic Wave-1 cross-ref enricher pattern shared
 // across snapshot resource types (dbi-snap, dbc-snap, future ebs-snap).
 //
@@ -210,7 +212,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 			}
 
 			// setWave2Finding is the sole append-only builder for both Findings
-			// and AttentionDetails (internal/aws/issue_enrichment.go) — it
+			// and AttentionDetails (core/aws/issue_enrichment.go) — it
 			// drives the detail-view Attention section AND the S4 status
 			// column at render time via phraseFromFindings(r.Findings).
 			setWave2Finding(&result, res.ID, code, phrase, severity, cfg.ShortName, rows, "")

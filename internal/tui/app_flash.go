@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package tui
 
 // app_flash.go — flash-message lifecycle and API-error surface. These handlers

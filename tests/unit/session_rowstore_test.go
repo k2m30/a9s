@@ -1,15 +1,15 @@
 // session_rowstore_test.go — Stage-1 pin suite for the row-store
 // unification plan (rowstore-unification-plan.md, Stage 1: "Introduce
 // RowStore behind existing maps, dual-write scaffolding, zero behavior
-// change"). Pins the CONTRACT of internal/session.RowStore /
-// internal/session.TypeRows (internal/session/rowstore.go) against
+// change"). Pins the CONTRACT of core/session.RowStore /
+// core/session.TypeRows (core/session/rowstore.go) against
 // docs/design/cache-requirements.md C2/C5/C6/C6a/C6b/C9 and the defects
 // those rules rule out (D7, D12-D17), mirroring the semantics
-// internal/runtime/probes.go:reconcileTypeFile already enforces for the
-// on-disk file and internal/app/list_body.go's dedupAgainstExisting/
+// core/runtime/probes.go:reconcileTypeFile already enforces for the
+// on-disk file and core/app/list_body.go's dedupAgainstExisting/
 // isStaleReplace already enforce for the per-screen ListState.
 //
-// API pinned here (internal/session/rowstore.go, landed):
+// API pinned here (core/session/rowstore.go, landed):
 //
 //	type Origin int
 //	const (OriginDisk Origin = iota; OriginProbe; OriginFetch)
@@ -116,8 +116,8 @@ func TestRowStore_Observe_AppendDedupsByID_NewRowsStillAdded(t *testing.T) {
 // -----------------------------------------------------------------------
 
 // TestRowStore_Observe_StaleTruncatedSubsetRejectedOnceExact mirrors
-// isStaleReplaceRows (which mirrors internal/app/list_body.go's
-// isStaleReplace and internal/runtime/probes.go's reconcileTypeFile rule 1):
+// isStaleReplaceRows (which mirrors core/app/list_body.go's
+// isStaleReplace and core/runtime/probes.go's reconcileTypeFile rule 1):
 // a non-append, truncated replay whose row IDs are a strict subset of the
 // already-stored fuller set must be REJECTED — the existing (fuller) rows
 // come back unchanged and the store's own state is untouched — the
@@ -844,7 +844,7 @@ func TestRowStoreControllerPin_EnrichmentChecked_FieldUpdates_FoldsIntoRowStore(
 	})
 
 	// Seed the sentinel type's own RowStore entry too — BuildEnrichQueue
-	// (internal/runtime/probes.go) only enqueues a Wave-2 entry when
+	// (core/runtime/probes.go) only enqueues a Wave-2 entry when
 	// RowStore.Snapshot(type).Gen != 0 (observed-at-all).
 	_, _ = c.Handle(messages.AvailabilityChecked{
 		ResourceType: rowStoreControllerPinSentinelWave2Type,

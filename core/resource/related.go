@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package resource
 
 import (
@@ -12,12 +14,12 @@ import (
 )
 
 // RelatedDef defines one related resource class for a given resource type.
-// Declaration lives in internal/domain/contracts.go; this alias keeps
+// Declaration lives in core/domain/contracts.go; this alias keeps
 // existing consumers compiling.
 type RelatedDef = domain.RelatedDef
 
 // NavigableField associates a detail view field path with a target resource type.
-// Declaration lives in internal/domain/contracts.go; this alias keeps
+// Declaration lives in core/domain/contracts.go; this alias keeps
 // existing consumers compiling.
 type NavigableField = domain.NavigableField
 
@@ -111,7 +113,7 @@ func s3BucketFromARN(s string) string {
 
 // RelatedCheckResult is returned by a RelatedChecker and carries all state
 // needed by the right-column panel to display a row and navigate on Enter.
-// Declaration lives in internal/domain/contracts.go; this alias keeps
+// Declaration lives in core/domain/contracts.go; this alias keeps
 // existing consumers compiling.
 //
 // Semantics (FR-008 / FR-014):
@@ -129,17 +131,17 @@ func s3BucketFromARN(s string) string {
 type RelatedCheckResult = domain.RelatedCheckResult
 
 // ResourceCacheEntry holds a snapshot of one resource type's list plus
-// truncation state. Declaration lives in internal/domain/contracts.go; this
+// truncation state. Declaration lives in core/domain/contracts.go; this
 // alias keeps existing consumers compiling.
 type ResourceCacheEntry = domain.ResourceCacheEntry
 
 // ResourceCache is a read-only snapshot of already-loaded resource lists,
-// keyed by resource short name. Declaration lives in internal/domain/contracts.go;
+// keyed by resource short name. Declaration lives in core/domain/contracts.go;
 // this alias keeps existing consumers compiling.
 type ResourceCache = domain.ResourceCache
 
 // RelatedChecker returns a count of related resources of a specific type.
-// Declaration lives in internal/domain/contracts.go; this alias keeps
+// Declaration lives in core/domain/contracts.go; this alias keeps
 // existing consumers compiling.
 type RelatedChecker = domain.RelatedChecker
 
@@ -500,7 +502,7 @@ func CleanupRelatedForTest(shortName string) {
 
 // FetchByIDsFunc fetches specific resource instances by ID, bypassing any
 // filter the top-level paginated fetcher applies.
-// Declaration lives in internal/domain/contracts.go; this alias keeps
+// Declaration lives in core/domain/contracts.go; this alias keeps
 // existing consumers compiling.
 type FetchByIDsFunc = domain.FetchByIDsFunc
 

@@ -4,7 +4,7 @@
 // writing, not guessed from the review prose alone.
 //
 // package unit_test (not unit): every finding here is reachable via the
-// headless app.Controller / pure internal/costs / internal/aws surface —
+// headless app.Controller / pure core/costs / core/aws surface —
 // no TUI helper is needed (C2 explicitly requires NO TUI adapter
 // involvement) — so this file reuses costs_state_test.go's
 // newCostsController/topDrill/fixedCostsNow/monthRecord and
@@ -39,9 +39,9 @@ import (
 
 // ===========================================================================
 // C2 (P1) — web/headless resource jump. Traced precisely: applyCostsSelect's
-// RESOURCE_ID branch (internal/app/costs_state.go) returns a BARE
+// RESOURCE_ID branch (core/app/costs_state.go) returns a BARE
 // runtime.TaskRequest{Key: KindFetchByIDDetail, ...} with no placeholder-
-// list/AutoOpenSingle wiring. autoOpenSingleDetail (internal/app/handle.go)
+// list/AutoOpenSingle wiring. autoOpenSingleDetail (core/app/handle.go)
 // — the seam the related panel's own by-ID single-target drill uses
 // (navigate.go:495-506's placeholder list + AutoOpenSingle) — only fires
 // when the TOP screen is ScreenResourceList or ScreenChildList (handle.go
@@ -114,7 +114,7 @@ func TestCostsSelfReview_C2_WebResourceJump_HeadlessReachesEC2Detail(t *testing.
 		t.Fatalf("web/headless lane: Enter on a costs resource row + its fetch delivery did not reach the EC2 detail view — Body.Kind = %q, want %q (no TUI adapter involved in this test)", vs.Body.Kind, app.BodyKindDetail)
 	}
 	// detailFrameTitleLocked prefers Resource.Name over Resource.ID whenever
-	// Name is non-empty (internal/app/detail_state.go) — this is the global
+	// Name is non-empty (core/app/detail_state.go) — this is the global
 	// convention every detail screen follows, not something costs-specific
 	// should special-case. The injected fixture sets Name "web-prod-01", so
 	// the title carries that, not the raw ID.
@@ -139,7 +139,7 @@ func TestCostsSelfReview_C2_WebResourceJump_HeadlessReachesEC2Detail(t *testing.
 }
 
 // ===========================================================================
-// C3 (P1) — mapAnomaly (internal/aws/costs.go) must normalize CE's anomaly
+// C3 (P1) — mapAnomaly (core/aws/costs.go) must normalize CE's anomaly
 // date strings to date-only so marks match grid columns. Traced precisely:
 // mapAnomaly sets `Period: costs.Period{Start: aws.ToString(a.AnomalyStartDate),
 // End: aws.ToString(a.AnomalyEndDate)}` verbatim from the raw AWS response —
@@ -209,7 +209,7 @@ func strPtrSelfReview(s string) *string { return &s }
 
 // C4(a): a successful fetch delivering ZERO anomalies must clear cached
 // marks (PutAnomalies unconditional on success). Traced precisely:
-// ApplyCostsLoaded (internal/app/costs_state.go) only calls
+// ApplyCostsLoaded (core/app/costs_state.go) only calls
 // `cs.Store.PutAnomalies(ev.Anomalies, cs.Now)` inside `if
 // len(ev.Anomalies) > 0`, so a genuine "no anomalies this fetch" result
 // never overwrites a stale cached mark from an earlier fetch.
@@ -266,7 +266,7 @@ func TestCostsSelfReview_C4a_ZeroAnomalyResult_ClearsCachedMarks(t *testing.T) {
 
 // C4(b): the anomaly fetch's own request cost must fold into
 // CostsLoaded.Requests, not just the main cost-and-usage fetch's count.
-// Traced precisely: internal/runtime/executor.go's KindFetchCosts case sets
+// Traced precisely: core/runtime/executor.go's KindFetchCosts case sets
 // `Requests: result.RequestCount` — result is CostFetchResult from
 // FetchCostAndUsage/FetchCostAndUsageWithResources ONLY; the anomaly fetch
 // (awsclient.FetchCostAnomalies, a separate GetAnomalies API call) that
@@ -339,7 +339,7 @@ func TestCostsSelfReview_C4b_AnomalyFetch_RequestCountFoldsIntoCostsLoadedReques
 
 // C4(c): when the store's anomaly TTL is fresh, the dispatched payload must
 // ask the executor to skip the anomaly fetch. FetchCostsPayload
-// (internal/runtime/handlers_navigate.go) has NO such flag today — only
+// (core/runtime/handlers_navigate.go) has NO such flag today — only
 // Query and Window. Since this field does not exist yet, this pins its
 // PRESENCE compile-safely via reflection (matching this session's
 // established "quality-batch Currency field" pattern for a not-yet-landed
@@ -455,8 +455,8 @@ func TestCostsSelfReview_C5c_MergeCoverage_NeverRefreshesFetchedAt_OnBucketRecor
 
 // ===========================================================================
 // C6 (P2) — UTC day truncation. Traced precisely: both Period.Closed
-// (internal/costs/types.go) and ClampResourceDrillWindow
-// (internal/costs/drill.go) build `time.Date(now.Year(), now.Month(),
+// (core/costs/types.go) and ClampResourceDrillWindow
+// (core/costs/drill.go) build `time.Date(now.Year(), now.Month(),
 // [now.Day(),] 0,0,0,0, time.UTC)` — extracting Y/M/D from `now` AS
 // AUTHORED (whatever zone it carries) but then representing that as if it
 // were already a UTC clock reading, instead of `now.UTC()` first. At a
@@ -500,7 +500,7 @@ func TestCostsSelfReview_C6_ClampResourceDrillWindow_UsesUTCDate_NotLocalZoneDat
 // C9 (P2) — CostsBody.DataThrough must derive from the store: re-entering
 // the costs screen over a warm disk cache (no fetch fired) must still show
 // a correct data-through footer. Traced precisely: EnsureCostsState
-// (internal/app/costs_state.go) constructs a fresh CostsState with
+// (core/app/costs_state.go) constructs a fresh CostsState with
 // `Store: costs.LoadStore(...)` (warm from disk) but never initializes
 // DataThrough — it stays "" until ApplyCostsLoaded sets it from a LIVE
 // fetch delivery, which never happens when the shape is already fully
@@ -547,8 +547,8 @@ func TestCostsSelfReview_C9_DataThrough_DerivesFromWarmStore_NoFetchNeeded(t *te
 
 // ===========================================================================
 // C10 (P2) — error taxonomy + retry. Traced precisely: classifyCostsError
-// (internal/aws/costs.go) only matches "AccessDeniedException" in its
-// switch, but ClassifyAWSError (internal/aws/errors.go, the shared
+// (core/aws/costs.go) only matches "AccessDeniedException" in its
+// switch, but ClassifyAWSError (core/aws/errors.go, the shared
 // taxonomy) matches BOTH "AccessDenied" and "AccessDeniedException" — some
 // AWS API paths return the bare code. CE calls are also not wrapped in
 // RetryOnThrottle at all (zero references in costs.go), unlike
@@ -627,7 +627,7 @@ func (s *selfReviewFlakyThrottleCostsAPI) GetCostAndUsage(_ context.Context, _ *
 // ===========================================================================
 // C11 (P2) — a CostsLoaded arriving after the costs screen was FULLY
 // popped must still Merge+Save into the session store. Traced precisely:
-// costsStateBeneathOverlay (internal/app/costs_state.go) searches the
+// costsStateBeneathOverlay (core/app/costs_state.go) searches the
 // stack top-down for a ScreenCosts entry and returns nil when none exists
 // (the screen was popped all the way off, not merely overlaid by
 // Help/Identity) — ApplyCostsLoaded's `if cs == nil { return }` then drops

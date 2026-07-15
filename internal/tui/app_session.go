@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package tui
 
 // app_session.go — AWS-session lifecycle handlers: clients-ready bootstrap,

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // transfer_related.go contains Transfer Family server related-resource
 // checker functions. Every checker here is zero-extra-API-call: the
 // fetcher's DescribeServer pass already carries every field these checkers

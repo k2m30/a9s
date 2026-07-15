@@ -600,7 +600,7 @@ updated accordingly. Flagged in Open Contract Questions.
 
 **Notes** If the demo fixture contains no out-of-scope IDs, this story
 degrades to the in-scope drill in LA-012. The demo fixture surface area is
-documented in `internal/demo/fixtures/` (file-location note only — do not
+documented in `core/demo/fixtures/` (file-location note only — do not
 read the fixture files to author these stories).
 
 ### STORY-LA-081: Cold-cache drill triggers prefetch for the target type

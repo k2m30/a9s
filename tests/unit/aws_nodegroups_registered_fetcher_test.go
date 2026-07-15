@@ -6,7 +6,7 @@ package unit
 //
 // These tests are DISTINCT from aws_nodegroups_image_id_test.go, which only exercises
 // the standalone FetchNodeGroups helper. This file targets the closure registered in
-// internal/aws/ng.go via resource.SetPaginatedForTest("ng", ...).
+// core/aws/ng.go via resource.SetPaginatedForTest("ng", ...).
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/demo/fakes"
 	"github.com/k2m30/a9s/v3/core/resource"
 
-	// Side-effect import: triggers init() in internal/aws which calls
+	// Side-effect import: triggers init() in core/aws which calls
 	// resource.SetPaginatedForTest("ng", ...) — required so GetPaginatedFetcher("ng") is non-nil.
 	_ "github.com/k2m30/a9s/v3/core/aws"
 )
@@ -146,7 +146,7 @@ func newNGTestClients(eksFake *ngTestEKSFake, ec2Fake *ngTestEC2Fake) *awsclient
 func TestRegisteredNGFetcher_ResolvesImageIDFromCustomLaunchTemplate(t *testing.T) {
 	pf := resource.GetPaginatedFetcher("ng")
 	if pf == nil {
-		t.Fatal("paginated fetcher for 'ng' not registered — ensure internal/aws package is imported")
+		t.Fatal("paginated fetcher for 'ng' not registered — ensure core/aws package is imported")
 	}
 
 	desiredCustom := int32(3)
@@ -327,7 +327,7 @@ var errNGTestLTNotFound = fmt.Errorf("EC2 API error: launch template not found")
 func TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow(t *testing.T) {
 	pf := resource.GetPaginatedFetcher("ng")
 	if pf == nil {
-		t.Fatal("paginated fetcher for 'ng' not registered — ensure internal/aws package is imported")
+		t.Fatal("paginated fetcher for 'ng' not registered — ensure core/aws package is imported")
 	}
 
 	eksFake := &ngTestEKSFake{

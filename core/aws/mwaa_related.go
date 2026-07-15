@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // mwaa_related.go contains MWAA environment related-resource checker
 // functions. Every checker here is zero-extra-API-call: the fetcher's
 // GetEnvironment pass already carries every field these checkers read, so

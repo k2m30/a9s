@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package session owns the in-memory orchestration state for the active
 // profile/region session: fetch-availability queue, Wave 2 enrichment queue,
 // per-type caches, and the generation counters that invalidate stale async
@@ -44,7 +46,7 @@ type Session struct {
 	// Session identity — set by the caller (tui.New / handler) before/after
 	// Rotate. Writers on the Bubble Tea update goroutine (profile/region
 	// switch handlers, connect success/failure handlers in
-	// internal/runtime/handlers.go) MUST write both fields together via
+	// core/runtime/handlers.go) MUST write both fields together via
 	// SetProfileRegion rather than direct field assignment — see pairMu's
 	// doc comment for the cross-goroutine race this guards against.
 	// Same-goroutine reads on the update path (e.g. Core.Profile()/Region())
@@ -135,7 +137,7 @@ type Session struct {
 	// Profile/Region are written on the Bubble Tea update goroutine by the
 	// profile/region-switch handlers (HandleProfileSelected/
 	// HandleRegionSelected/handleClientsReadyFailure/
-	// handleClientsReadySuccess in internal/runtime/handlers.go) — all via
+	// handleClientsReadySuccess in core/runtime/handlers.go) — all via
 	// SetProfileRegion, never by direct field assignment. They are read
 	// cross-goroutine by EnsureCacheStore/WithCacheStore/ReadCacheStore's own
 	// callers, which historically read c.session.Profile/Region at the Core
@@ -145,7 +147,7 @@ type Session struct {
 	// -race on CI run 28839454135: Core.HandleProfileSelected's write at
 	// handlers.go:418 against Core.WithCacheStore's read at accessors.go:97,
 	// reached via the single-writer goroutine runAvailabilitySaveLoop spawns
-	// in internal/app/menu.go). EnsureCacheStore/WithCacheStore/ReadCacheStore
+	// in core/app/menu.go). EnsureCacheStore/WithCacheStore/ReadCacheStore
 	// now read the pair via CurrentPair while already holding pairMu, closing
 	// that gap for every caller in one place rather than one at a time.
 	//
@@ -199,7 +201,7 @@ type Session struct {
 	// Wave 2 issue-enrichment dispatch.
 	//
 	// ProbeResources/ProbeTruncated DIED in task #17 wave 1 stage 2 (row-store
-	// unification): every read/write site in internal/session, internal/runtime,
+	// unification): every read/write site in core/session, core/runtime,
 	// and internal/tui now goes through RowStore (Origin=OriginProbe/OriginDisk/
 	// OriginFetch as appropriate) instead of these two maps. See RowStore's doc
 	// comment for the semantics this replaces.
@@ -246,13 +248,13 @@ type Session struct {
 
 	// IAMPolicies is the per-session cache for IAM policy resources, keyed by
 	// both PolicyName and ARN. Replaces the package-level globals previously in
-	// internal/aws/iam_policies.go. Wired into *ServiceClients.IAMPolicies on
+	// core/aws/iam_policies.go. Wired into *ServiceClients.IAMPolicies on
 	// every ClientsReadyMsg so FetchIAMPoliciesByIDsFull uses the session store.
 	IAMPolicies *policyStore
 
 	// IdentityStore is the per-session cache for the AWS caller's account ID
 	// used by Pattern-C related checkers. Replaces the package-level globals
-	// previously in internal/aws/identity_cache.go (identityCacheMu /
+	// previously in core/aws/identity_cache.go (identityCacheMu /
 	// cachedAccountID / cachedAccountErr). Wired into *ServiceClients.
 	// IdentityStore on every ClientsReadyMsg so Pattern-C related checkers
 	// (Glue tags, EBS Backup) see a per-profile/region scoped cache rather
@@ -263,7 +265,7 @@ type Session struct {
 
 	// RuleSets is the per-session, single-slot cache for the SES v1
 	// DescribeActiveReceiptRuleSet response. Replaces the package-level
-	// globals previously in internal/aws/ses_related.go (sesRuleSetCacheMu
+	// globals previously in core/aws/ses_related.go (sesRuleSetCacheMu
 	// + sesRuleSetCaches map keyed by *ServiceClients pointer). Wired into
 	// *ServiceClients.RuleSets on every ClientsReadyMsg so checkSESLambda /
 	// checkSESS3 see a session-scoped cache rather than a process-global map.

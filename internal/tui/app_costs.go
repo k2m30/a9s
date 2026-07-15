@@ -1,5 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // app_costs.go — Cost Explorer screen key routing. Translates rsKindCosts
-// key events into the costs Action kinds (internal/app/action.go); movement
+// key events into the costs Action kinds (core/app/action.go); movement
 // and drill/back reuse the same Action vocabulary every other ctrl-backed
 // screen uses (ActionMoveUp/Down, ActionScrollLeft/Right, ActionSelect,
 // ActionBack), following the same pattern as handleDetailKeyMsg /

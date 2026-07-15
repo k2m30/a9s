@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package resource
 
 // ResolveNavigationTarget looks up a navigation target by name, checking both

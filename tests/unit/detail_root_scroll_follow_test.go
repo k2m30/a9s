@@ -1,6 +1,6 @@
 // detail_root_scroll_follow_test.go — TDD red-phase pin for the LIVE app_stack.go
 // wiring gap behind the detail-view scroll-follows-cursor bug. The controller-level
-// fix (internal/app/detail_cursor.go's reconcileDetailScrollToCursor) is already
+// fix (core/app/detail_cursor.go's reconcileDetailScrollToCursor) is already
 // covered by detail_controller_scroll_follow_test.go, but that test calls
 // controller.Apply directly with Action.N pre-set — it never exercises the real
 // key-dispatch path the running binary uses. A --demo smoke proved the fix does

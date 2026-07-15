@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // related_shared.go contains helpers shared across the per-resource
 // related-resource checker files (*_related.go) in this package.
 package aws

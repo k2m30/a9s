@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package domain
 
 import "context"
@@ -91,7 +93,7 @@ type ParentContext map[string]string
 
 // ─── Function signatures ───────────────────────────────────────────────────
 //
-// The internal/resource sites keep `type X = domain.X` re-export aliases.
+// The core/resource sites keep `type X = domain.X` re-export aliases.
 // Current signatures use `any` for clients and `string` for tokens.
 
 // PaginatedFetcher returns a single page of resources.
@@ -114,7 +116,7 @@ type FetchByIDsFunc func(ctx context.Context, clients any, ids []string) ([]Reso
 type DetailEnricher func(ctx context.Context, clients any, res Resource) (Resource, error)
 
 // RelatedChecker returns a count of related resources of a specific type.
-// Note: returns RelatedCheckResult which remains in internal/resource/ for now.
+// Note: returns RelatedCheckResult which remains in core/resource/ for now.
 type RelatedChecker func(ctx context.Context, clients any, res Resource, cache ResourceCache) RelatedCheckResult
 
 // RelatedCheckResult is returned by a RelatedChecker.

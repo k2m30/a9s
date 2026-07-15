@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // dbc_codes.go — canonical FindingCode constants for the dbc resource type
 // (DocumentDB cluster + Aurora DB cluster — they share the dbc short-name).
 package aws

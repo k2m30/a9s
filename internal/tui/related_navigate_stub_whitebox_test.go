@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package tui
 
 // related_navigate_stub_whitebox_test.go — OPEN INVESTIGATION white-box port
@@ -18,7 +20,7 @@ package tui
 // SetListAutoOpenSingle -> root Model.Update(empty ResourcesLoaded) ->
 // handleResourcesLoaded's StubCreator branch.
 //
-// Uses the real "ami" ResourceTypeDef (internal/aws/catalog_compute.go),
+// Uses the real "ami" ResourceTypeDef (core/aws/catalog_compute.go),
 // which has both a StubCreator and FetchByIDs registered — the same type the
 // original resourcelist_ami_stub_test.go was written against, and the type
 // named in the investigation's traced chain. FetchByIDs matters: with
@@ -82,7 +84,7 @@ func firstNavigateMsg(cmd tea.Cmd) (messages.Navigate, bool) {
 }
 
 // amiSourceEC2 is the EC2 instance whose ImageId field drives the
-// navigable-field RelatedNavigate to "ami" (internal/aws/catalog_compute.go's
+// navigable-field RelatedNavigate to "ami" (core/aws/catalog_compute.go's
 // Navigable: []domain.NavigableField{{FieldPath: "ImageId", TargetType:
 // "ami"}}) — the same field-navigation origin the investigation traced.
 func amiSourceEC2() resource.Resource {

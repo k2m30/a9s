@@ -61,7 +61,7 @@ func TestWave2AttentionKeying_TwoFindingsOneResource_EachFindingsAttentionRowsSu
 	// ARRANGE: replicate exactly what two setWave2Finding(&result, resourceID,
 	// ...) calls — one per independently-evaluated condition, each with its
 	// OWN non-empty rows — produce under TODAY's IssueEnricherResult shape.
-	// setWave2Finding is unexported (internal/aws/issue_enrichment.go:129) so
+	// setWave2Finding is unexported (core/aws/issue_enrichment.go:129) so
 	// it cannot be called from tests/unit directly; its documented behavior
 	// (doc comment lines 117-124, and the `if _, ok :=
 	// r.AttentionDetails[resourceID]; !ok` guard at line 152 that enforces
@@ -83,7 +83,7 @@ func TestWave2AttentionKeying_TwoFindingsOneResource_EachFindingsAttentionRowsSu
 	}
 
 	// ACT: fold through the real production seam, exactly as
-	// Core.applyEnrichment (internal/runtime/helpers.go:36) does for every
+	// Core.applyEnrichment (core/runtime/helpers.go:36) does for every
 	// row of a cached resource type.
 	row := &domain.Resource{ID: resourceID}
 	td := resource.ResourceTypeDef{ShortName: shortName}

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package resource
 
 import (
@@ -15,7 +17,7 @@ import (
 const DefaultPageSize = 50
 
 // ParentContext holds key-value pairs passed from a parent view to a child
-// fetcher. Declaration lives in internal/domain/contracts.go; this alias keeps
+// fetcher. Declaration lives in core/domain/contracts.go; this alias keeps
 // existing consumers compiling.
 type ParentContext = domain.ParentContext
 
@@ -257,12 +259,12 @@ func CleanupChildTypeForTest(shortName string) {
 }
 
 // PaginatedFetcher returns a single page of resources.
-// Declaration lives in internal/domain/contracts.go; this alias keeps
+// Declaration lives in core/domain/contracts.go; this alias keeps
 // existing consumers compiling.
 type PaginatedFetcher = domain.PaginatedFetcher
 
 // PaginatedChildFetcher returns a single page of child resources.
-// Declaration lives in internal/domain/contracts.go; this alias keeps
+// Declaration lives in core/domain/contracts.go; this alias keeps
 // existing consumers compiling.
 type PaginatedChildFetcher = domain.PaginatedChildFetcher
 
@@ -324,7 +326,7 @@ func SetAvailabilityFetcherForTest(shortName string, f AvailabilityFetcher) {
 // fall back to GetPaginatedFetcher in that case. Legacy-first: the runtime
 // test-override map wins so SetAvailabilityFetcherForTest takes effect;
 // catalog.ResourceTypeDef.AvailabilityFetcher (the permanent production
-// registration, e.g. internal/aws/catalog_security.go's "policy" entry) is
+// registration, e.g. core/aws/catalog_security.go's "policy" entry) is
 // the read-only fallback.
 func GetAvailabilityFetcher(shortName string) AvailabilityFetcher {
 	if fn, ok := availabilityRegistry[shortName]; ok {
@@ -368,7 +370,7 @@ func CleanupPaginatedChildForTest(shortName string) {
 }
 
 // FilteredPaginatedFetcher returns a single page of resources filtered server-side.
-// Declaration lives in internal/domain/contracts.go; this alias keeps
+// Declaration lives in core/domain/contracts.go; this alias keeps
 // existing consumers compiling.
 type FilteredPaginatedFetcher = domain.FilteredPaginatedFetcher
 
@@ -398,7 +400,7 @@ func CleanupFilteredPaginatedForTest(shortName string) {
 }
 
 // RevealFetcher is the function signature for reveal value fetchers.
-// Declaration lives in internal/domain/contracts.go; this alias keeps
+// Declaration lives in core/domain/contracts.go; this alias keeps
 // existing consumers compiling.
 type RevealFetcher = domain.RevealFetcher
 

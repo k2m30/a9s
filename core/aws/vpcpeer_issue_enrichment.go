@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // vpcpeer_issue_enrichment.go — Wave 2 cache-scan enrichment for vpc-peer.
 //
 // Mirrors lt_issue_enrichment.go's EnrichLTDeprecatedAMI layer: zero AWS API

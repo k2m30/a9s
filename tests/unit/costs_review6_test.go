@@ -17,7 +17,7 @@ import (
 )
 
 // ===========================================================================
-// Q1 (internal/app/handle.go:~170) — Store.Save marshals the store's own
+// Q1 (core/app/handle.go:~170) — Store.Save marshals the store's own
 // maps AFTER c.mu is released (the write-must-not-block-under-the-lock
 // design, handle.go's own doc comment). costs.Store carries no mutex of its
 // own (confirmed by reading its field list — profile/path/data/recovered/
@@ -92,9 +92,9 @@ func TestCostsReview6_Q1_ConcurrentDeliveryDuringSave_NeverCorruptsOnDiskCache(t
 }
 
 // ===========================================================================
-// Q2 (internal/app/costs_state.go:~1055) — the N3 granularity fallback
+// Q2 (core/app/costs_state.go:~1055) — the N3 granularity fallback
 // re-plans a RESOURCE_ID-shaped frame at its parent granularity/period
-// WITHOUT re-applying ClampResourceDrillWindow (internal/costs/drill.go) —
+// WITHOUT re-applying ClampResourceDrillWindow (core/costs/drill.go) —
 // a clamped-then-allowed RESOURCE_ID drill whose finer (day-level) fetch
 // genuinely returns zero re-queries the UNCLAMPED parent (week) window,
 // which can start before the 14-day resource-drill retention cutoff.
@@ -190,7 +190,7 @@ func TestCostsReview6_Q2_FallbackOnResourceFrame_ReclampsAgainstRetentionCutoff(
 }
 
 // ===========================================================================
-// Q3 (internal/costs/window.go:79 daysWithinPeriod) — ignores sel.End
+// Q3 (core/costs/window.go:79 daysWithinPeriod) — ignores sel.End
 // entirely, tiling the WHOLE ISO week containing sel.Start instead of just
 // sel itself. WindowWithin(oneDayPeriod, Day, now) must return exactly that
 // one day, not all 7 days of its enclosing week.
@@ -211,7 +211,7 @@ func TestCostsReview6_Q3_WindowWithin_OneDayPeriod_TilesExactlyThatDay(t *testin
 }
 
 // ===========================================================================
-// Q4 behavior (internal/app/actions_list.go:170) — Go evaluates return
+// Q4 behavior (core/app/actions_list.go:170) — Go evaluates return
 // operands left-to-right, so `return c.snapshot(), c.forceRefreshCostsLocked()`
 // runs c.snapshot() BEFORE forceRefreshCostsLocked() mutates cs.Loading —
 // Apply(ActionRefresh) on a warm costs screen returns the STALE pre-refresh

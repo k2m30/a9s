@@ -14,13 +14,13 @@
 //  2. BootstrapLive must pass the REAL StackDepth (len(c.stack)) and
 //     HasActiveRL (c.topListState() != nil) into ClientsReadyEvent instead
 //     of the hardcoded StackDepth: 1 / omitted HasActiveRL — otherwise
-//     maybeRefreshIntents (internal/runtime/handlers.go) can never see an
+//     maybeRefreshIntents (core/runtime/handlers.go) can never see an
 //     active list and never emits RefreshActiveListIntent.
 //  3. RefreshActiveListIntent is a documented no-op in the headless
-//     controller (internal/app/intents.go's ApplyIntents default-case
+//     controller (core/app/intents.go's ApplyIntents default-case
 //     comment) — some new controller-side mechanism (a helper the coder
 //     will name activeListRefreshTasks, extracted from
-//     handleActionRefresh's list branch, internal/app/actions_list.go
+//     handleActionRefresh's list branch, core/app/actions_list.go
 //     lines 184-199) must turn that intent into a real
 //     KindFetchResources task for the active list's type, at BOTH:
 //     - BootstrapLive's return (the STARTUP connect seam), and
@@ -28,8 +28,8 @@
 //     profile-switch reconnect seam) — reached when DrainSync/
 //     DrainSyncPartition executes a TaskKindConnect task and feeds the
 //     resulting messages.ClientsReady through Controller.Handle
-//     (internal/app/drainsync.go, c.Handle(ev) at the end of the loop
-//     body). NOTE: as committed at HEAD, internal/runtime/orchestrator.go's
+//     (core/app/drainsync.go, c.Handle(ev) at the end of the loop
+//     body). NOTE: as committed at HEAD, core/runtime/orchestrator.go's
 //     Core.HandleEvent switch has NO case for messages.ClientsReady at
 //     all (it is explicitly documented as a TUI-shim-only event,
 //     handled outside HandleEvent) — so today a ClientsReady fed
@@ -62,7 +62,7 @@ import (
 // TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact fixture
 // pattern) so a controller built against the same profile/region pair can
 // warm-seed ProbeResources from disk via EnsureCacheStore/CacheStoreToEvent,
-// exactly as internal/web/construct.go's newSession does for the live,
+// exactly as core/web/construct.go's newSession does for the live,
 // no-pre-supplied-clients path.
 func seedS3TypeFile(t *testing.T, profile, region string) {
 	t.Helper()
@@ -115,7 +115,7 @@ func TestSessionNew_PendingRefreshTrue(t *testing.T) {
 //
 // Setup: a live controller (no clients) whose disk cache already has s3
 // rows (seedS3TypeFile) is warmed via EnsureCacheStore/CacheStoreToEvent —
-// the same mechanism internal/web/construct.go's newSession runs for the
+// the same mechanism core/web/construct.go's newSession runs for the
 // live no-pre-supplied-clients path — so the very first snapshot carries
 // cached counts (C1 precondition).
 //
@@ -130,7 +130,7 @@ func TestSessionNew_PendingRefreshTrue(t *testing.T) {
 // for a TaskKindConnect result: feeding a messages.ClientsReady event
 // through Controller.Handle (this is what a profile-switch reconnect's
 // TaskKindConnect task result flows through, per
-// internal/app/drainsync.go's `_, followUp := c.Handle(ev)`). The RETURNED
+// core/app/drainsync.go's `_, followUp := c.Handle(ev)`). The RETURNED
 // follow-up tasks must include a KindFetchResources task scoped to "s3" —
 // the navigated type — proving the last pre-connect navigation is replayed
 // automatically once connected, instead of being permanently dropped.

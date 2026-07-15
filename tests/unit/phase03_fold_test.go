@@ -53,7 +53,7 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// slugForTest mirrors the unexported slug() function in internal/semantics/attention/derive.go.
+// slugForTest mirrors the unexported slug() function in core/semantics/attention/derive.go.
 // It normalizes a phrase to a stable code suffix for use in test wantCode assertions.
 // Lowercase; runs of non-alphanumerics collapse to a single dot; leading/trailing dots trimmed.
 //

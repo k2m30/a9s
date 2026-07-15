@@ -498,7 +498,7 @@ func TestRelated_EFS_ECSTask_GraphRoot(t *testing.T) {
 // EFS→EC2 pivot was removed (2026-04-24): the previous test asserted
 // Count=0 as "intentional per spec §5", but a registered pivot that always
 // returns 0 is a U9 violation regardless of the excuse. See
-// internal/aws/efs_related.go for the removal rationale.
+// core/aws/efs_related.go for the removal rationale.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------

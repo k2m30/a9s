@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // redshift_related.go contains Redshift Cluster related-resource checker functions.
 package aws
 

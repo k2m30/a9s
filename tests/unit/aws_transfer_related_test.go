@@ -2,7 +2,7 @@ package unit_test
 
 // aws_transfer_related_test.go — related-resource checker tests for transfer
 // (docs/resources/transfer.md §2, docs/resources/transfer-impl-plan.md §1
-// "related_targets"). Checkers live in internal/aws/transfer_related.go.
+// "related_targets"). Checkers live in core/aws/transfer_related.go.
 //
 // All 8 real pivots (acm, eip, lambda, logs, role, subnet, vpc, vpce) are
 // field-driven (read a field on the DescribedServer, no API call) — these

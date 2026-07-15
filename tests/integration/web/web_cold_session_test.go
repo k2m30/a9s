@@ -12,8 +12,8 @@
 // dispatching) and no existing gate would go red.
 //
 // This gate boots the real web server with an ISOLATED empty config/cache dir
-// (A9S_CONFIG_FOLDER → fresh t.TempDir(); honored by internal/config
-// GetConfigDir and internal/cache's dir resolution) and asserts, over the real
+// (A9S_CONFIG_FOLDER → fresh t.TempDir(); honored by core/config
+// GetConfigDir and core/cache's dir resolution) and asserts, over the real
 // HTTP surface with a cookie-preserving client, that the menu populates from
 // in-session work ALONE:
 //
@@ -52,13 +52,13 @@ const (
 	coldSessionPollInterval = 100 * time.Millisecond
 
 	// coldS3Wave2Phrase is the stable wave-2 status text EnrichS3PublicAccessBlock
-	// writes into the s3 list row's status field (internal/aws/s3_issue_enrichment.go,
+	// writes into the s3 list row's status field (core/aws/s3_issue_enrichment.go,
 	// FieldUpdates["status"]); pinned as the spec §4 phrase in
 	// tests/integration/scenario_s3_visual_test.go (s3S4Phrase).
 	coldS3Wave2Phrase = "public access block incomplete"
 
 	// coldS3ExpectedIssueCount is the canonical s3 demo-fixture issue count:
-	// exactly 4 buckets in internal/demo/fixtures/s3.go carry a PAB "!"
+	// exactly 4 buckets in core/demo/fixtures/s3.go carry a PAB "!"
 	// finding — a9s-demo-nopab (nil → NoSuchPublicAccessBlockConfiguration),
 	// a9s-demo-partial-pab (BlockPublicAcls=false), a9s-demo-multifail-pab
 	// (two flags false), a9s-demo-nilcfg (nil inner config); every other

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // detail_scalar_navid_test.go — Pin 3 regression pin for scalar NavID extraction.
 //
 // Verifies that buildFieldList() applies NavIDFromValue to top-level scalar

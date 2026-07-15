@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package views
 
 // ScrollState manages cursor position and scroll window calculation

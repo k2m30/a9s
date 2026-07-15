@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package app
 
 import "github.com/k2m30/a9s/v3/core/runtime"
 
 // IsBackgroundTaskKind classifies a runtime.TaskKind as "background" (its
-// result feeds internal/session state that a later render consumes, rather
+// result feeds core/session state that a later render consumes, rather
 // than being the screen content itself) versus "blocking" (its result IS the
 // screen content, or it is a renderer-only adapter task that must complete
 // before the screen is usable).

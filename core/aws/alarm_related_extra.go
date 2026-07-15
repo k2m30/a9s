@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // alarm_related_extra.go contains CloudWatch alarm related-resource checkers
 // that resolve alarm dimension values back to source resources.
 package aws

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // rds_codes.go — placeholder for the rds short-name slot in the FindingCode
 // catalog. Actual codes for the RDS DB instance resource type live in
 // dbi_codes.go (CodeDBI*) and dbi_snap_codes.go (CodeDBISnap*); this file

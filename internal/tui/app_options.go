@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // app_options.go — tui.Model construction options (WithProfile, WithRegion,
 // WithIsDemo, WithNoCache, WithClients, WithActiveTheme, WithCommand).
 //

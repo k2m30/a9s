@@ -8,7 +8,7 @@ package unit_test
 //   - Fetchers STOP writing Resource.Status for lifecycle states.
 //   - Fetchers EMIT canonical Finding entries (Source: "wave1") for non-healthy
 //     states.
-//   - Each type has a corresponding internal/aws/<svc>_codes.go with constants.
+//   - Each type has a corresponding core/aws/<svc>_codes.go with constants.
 //   - Each type's Color func reads Findings first, then falls back to structural
 //     fields.
 //
@@ -636,13 +636,13 @@ func TestPR03c_ECSTaskFetcher_RunningEmitsNoFinding(t *testing.T) {
 // CURRENT (correct) contract: a STOPPED ECS task with a normal
 // (UserInitiated) stop code emits exactly one SevDim Finding
 // (CodeECSTaskStateStopped), because colorECSTask is now
-// colorFromAnyFinding-first (internal/aws/catalog_compute.go) — it needs a
+// colorFromAnyFinding-first (core/aws/catalog_compute.go) — it needs a
 // Finding to color from, not a bare stop_code Fields read.
 //
 // RETIRED the old "STOPPED emits no Finding" invariant this test used to pin
 // (TestPR03c_ECSTaskFetcher_StoppedEmitsNoFinding): that was the
 // pre-color-findings-conformance contract. ecsTaskStructuralFindings
-// (internal/aws/ecs_task_codes.go) now emits the Dim Finding for this
+// (core/aws/ecs_task_codes.go) now emits the Dim Finding for this
 // branch. See qa_color_findings_conformance_test.go for the standing
 // architectural gate.
 func TestPR03c_ECSTaskFetcher_StoppedUserInitiatedEmitsDimFinding(t *testing.T) {

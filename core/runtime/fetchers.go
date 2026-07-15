@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // fetchers.go — pure fetch-execution layer for the runtime Core. Each method
 // performs the AWS call and returns a raw result; adapters wrap the call in
 // platform-specific async machinery (e.g. tea.Cmd for the Bubble Tea adapter).

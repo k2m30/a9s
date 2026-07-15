@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // app_stack_invariant.go — the goal-4 mechanical check that the renderer
 // stack (m.stack, []*rendererState) is a strict 1:1 mirror of the headless
 // controller's screen stack (m.ctrl.ScreenIDs()).

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // ses_related.go contains SES related-resource checker functions.
 package aws
 
@@ -12,9 +14,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ruleSetStore is the unexported shape internal/aws expects from a
+// ruleSetStore is the unexported shape core/aws expects from a
 // per-Session SES rule set cache. session.RuleSetStore satisfies this via
-// duck-typing — internal/aws cannot import internal/session without a cycle,
+// duck-typing — core/aws cannot import core/session without a cycle,
 // so the local interface mirrors the methods needed here.
 type ruleSetStore interface {
 	Get() (any, bool)

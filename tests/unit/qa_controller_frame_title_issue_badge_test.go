@@ -34,11 +34,11 @@ import (
 // the same lifecycle-bucket convention proven in qa_frame_title_issues_test.go)
 // and the rest are "running" (healthy, not an issue).
 //
-// colorEBS (internal/aws/catalog_compute.go) still classifies off
+// colorEBS (core/aws/catalog_compute.go) still classifies off
 // Fields["state"] via a raw-field fallback. colorEC2, since the
 // color-findings-conformance wave, is colorFromAnyFinding-only (no raw-field
 // fallback at all) — so the ec2 "stopped" issue rows here also carry the
-// wave1 Finding the real fetcher (internal/aws/ec2.go) attaches for a
+// wave1 Finding the real fetcher (core/aws/ec2.go) attaches for a
 // user-initiated stop (CodeEC2StateStopped, SevWarn), matching colorEC2's
 // current mechanism. colorEBS has no "stopped" case, falling through to its
 // default branch (ColorHealthy) — so "stopped" only works as the issue-state
@@ -52,7 +52,7 @@ func controllerIssueResources(n, wantIssues int) []resource.Resource {
 // controllerIssueResourcesWithState is like controllerIssueResources but lets
 // the caller supply the type-specific healthy/issue lifecycle-state values,
 // since the Warning/Broken state vocabulary differs per resource type's Color
-// func (see colorEC2 vs colorEBS in internal/aws/catalog_compute.go). When
+// func (see colorEC2 vs colorEBS in core/aws/catalog_compute.go). When
 // issueState is ec2's "stopped" value, the matching wave1 Finding
 // (CodeEC2StateStopped, SevWarn) is attached too, since colorEC2 no longer
 // reads Fields["state"] directly.

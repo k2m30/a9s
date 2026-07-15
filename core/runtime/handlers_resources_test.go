@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // handlers_resources_test.go — Core-direct unit tests for the five h4-b
 // Handle* methods (HandleResourcesLoaded, HandleEnrichDetailResult,
 // HandleRelatedCheckResult, HandleIdentityLoaded, HandleIdentityError)
@@ -403,7 +405,7 @@ func TestResetRuleSets_SwapsStoreAndRewiresClients(t *testing.T) {
 
 // TestAllRegions_ReturnsCommercialPartition verifies the call-through
 // helper: Core exposes the awsclient region catalogue so the adapter
-// can drop its internal/aws import in h4-c.
+// can drop its core/aws import in h4-c.
 func TestAllRegions_ReturnsCommercialPartition(t *testing.T) {
 	sess := session.New()
 	c := New(sess, catalog.All())

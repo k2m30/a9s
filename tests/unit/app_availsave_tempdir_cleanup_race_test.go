@@ -3,7 +3,7 @@
 // empty` failure.
 //
 // Root cause (traced, not assumed): Controller.Close's own doc comment
-// (internal/app/menu.go) already states the contract precisely — a test
+// (core/app/menu.go) already states the contract precisely — a test
 // that queues an availability save (directly or via Handle/Apply) must
 // call Close BEFORE its t.TempDir() cleanup runs, or the async writer
 // goroutine (runAvailabilitySaveLoop, started by queueAvailabilitySave)

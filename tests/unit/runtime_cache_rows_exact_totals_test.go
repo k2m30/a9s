@@ -11,8 +11,8 @@
 // the controller's ResourcesLoaded/load-more handling so web gets it too.
 //
 // Today (confirmed by reading internal/tui/app_stack.go:40-99 and
-// internal/app/handle.go + internal/app/list_body.go) this sync-back exists
-// ONLY in the TUI's popRS — internal/app.Controller.Handle/
+// core/app/handle.go + core/app/list_body.go) this sync-back exists
+// ONLY in the TUI's popRS — core/app.Controller.Handle/
 // handleResourcesLoadedEvent/applyResourcesLoaded never touch
 // PatchMenuAvailability at all. These tests pin the controller-level
 // behavior directly via Handle(messages.ResourcesLoaded{...}) — no
@@ -24,7 +24,7 @@
 //     event with Append=true and Pagination.IsTruncated=false — the natural
 //     shape of the KindFetchMore task's result once the fetcher's next-token
 //     comes back empty (mirrors FetchMorePayload/handleActionLoadMore in
-//     internal/app/actions_list.go, which starts the load-more fetch but
+//     core/app/actions_list.go, which starts the load-more fetch but
 //     does not itself see the result — the result re-enters through the
 //     same Handle(ResourcesLoaded) lane as a normal fetch, distinguished by
 //     Append=true).
@@ -36,7 +36,7 @@
 //     curCount`).
 //   - Disk persistence is pinned via the same on-disk cache.Entry.Count/
 //     Truncated fields the SaveAvailabilityCache seam already writes
-//     (internal/runtime/probes.go) — this test asserts the controller
+//     (core/runtime/probes.go) — this test asserts the controller
 //     triggers that same disk write path when the in-session
 //     PatchMenuAvailability fires from a load-more exhaustion, not a novel
 //     disk format.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // waf_related.go defines the related-resource checkers for WAF Web ACLs.
 // The Related slice for "waf" is registered via the catalog struct literal in
 // catalog_security.go; this file contains only the per-target checker

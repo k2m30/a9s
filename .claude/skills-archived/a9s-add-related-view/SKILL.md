@@ -15,8 +15,8 @@ can run in parallel (pattern is rigid).
 **Infrastructure must be in place first.** These must exist before any
 per-resource related views can be added:
 
-- `internal/resource/related.go` -- types, registries (`RelatedDef`, `NavigableField`), helper constructors
-- `RelatedCheckResult` (event) and `RelatedNavigate` (cmd) in `internal/runtime/messages/{event,cmd}.go`
+- `core/resource/related.go` -- types, registries (`RelatedDef`, `NavigableField`), helper constructors
+- `RelatedCheckResult` (event) and `RelatedNavigate` (cmd) in `core/runtime/messages/{event,cmd}.go`
 - `ToggleRelated` binding in `internal/tui/keys/keys.go`
 - Two-column detail view in `internal/tui/views/detail.go` (field-list model with embedded rightColumnModel)
 - Handler code in `internal/tui/app.go` (main Update switch) and `internal/tui/app_related.go` for `RelatedCheckResult` and `RelatedNavigate`
@@ -224,7 +224,7 @@ Common mistakes:
 
 # CODER STEPS (1-7) -- a9s-coder agent only
 
-### 1. Registration: add to `internal/aws/{source}.go` (or `{source}_related.go`)
+### 1. Registration: add to `core/aws/{source}.go` (or `{source}_related.go`)
 
 **IMPORTANT:** Module path is `github.com/k2m30/a9s/v3/...` (the `/v3` suffix is required).
 
@@ -266,7 +266,7 @@ func init() {
 - `FieldPath string` -- matches a label rendered in the detail view (e.g., "VpcId")
 - `TargetType string` -- resource short name to navigate to
 
-### 2. Checker functions: `internal/aws/{source}_related.go` (NEW FILE)
+### 2. Checker functions: `core/aws/{source}_related.go` (NEW FILE)
 
 The `RelatedChecker` type signature is:
 
@@ -353,7 +353,7 @@ func {source}RelatedResources(ctx context.Context, clients interface{}, cache re
 
 **There is no `Available bool` field.**
 
-### 3. Interfaces: `internal/aws/<service>_interfaces.go` (APPEND if needed)
+### 3. Interfaces: `core/aws/<service>_interfaces.go` (APPEND if needed)
 
 Only needed if the checker's live-fetch fallback calls an API not already
 covered by existing interfaces. Cache-only checkers that never call live APIs
@@ -370,10 +370,10 @@ type {TypeName}{APICall}API interface {
 
 Register a demo checker so the related panel shows realistic data in demo mode.
 
-**Hybrid fixture pattern (014-demo-transport-mock).** Demo mode has two layers: the legacy HTTP transport (`internal/demo/transport.go` + `handlers.go`) is the base for all services, and per-service typed fakes (`internal/demo/fakes/<service>.go`) override individual services. Currently only EC2 uses a typed fake.
+**Hybrid fixture pattern (014-demo-transport-mock).** Demo mode has two layers: the legacy HTTP transport (`core/demo/transport.go` + `handlers.go`) is the base for all services, and per-service typed fakes (`core/demo/fakes/<service>.go`) override individual services. Currently only EC2 uses a typed fake.
 
-- **Preferred (migrated services):** add fixture data to `internal/demo/fixtures/<service>.go` and extend the matching fake in `internal/demo/fakes/<service>.go`.
-- **Legacy (non-migrated services):** add fixture data to the matching `internal/demo/fixtures_*.go` category file and (if needed) extend handlers in `internal/demo/handlers.go`.
+- **Preferred (migrated services):** add fixture data to `core/demo/fixtures/<service>.go` and extend the matching fake in `core/demo/fakes/<service>.go`.
+- **Legacy (non-migrated services):** add fixture data to the matching `core/demo/fixtures_*.go` category file and (if needed) extend handlers in `core/demo/handlers.go`.
 
 When adding a new resource type, match the service's current layer. Do not mix layers for the same service.
 
@@ -381,7 +381,7 @@ When adding a new resource type, match the service's current layer. Do not mix l
 
 No separate demo registry is needed. Related checkers run against the typed fakes automatically. Ensure the target resource type's fixtures contain IDs that match what the source resource's fields reference. For example, if EC2 instances reference `vpc-prod-main` in their VpcId field, the VPC fake's fixtures must include a VPC with that ID.
 
-Add fixture data to `internal/demo/fixtures/<service>.go` for the target resource type. The related checker will find it via the standard prefetch + cache path.
+Add fixture data to `core/demo/fixtures/<service>.go` for the target resource type. The related checker will find it via the standard prefetch + cache path.
 
 **Never** amend tests if fixtures do not have related IDs/fields. Fix fixtures, not tests.
 
@@ -396,7 +396,7 @@ resource's regular fetcher populates the Fields keys that the
 `NavigableField` entries reference.
 
 For example, if a `NavigableField` has `FieldPath: "VpcId"`, verify
-that `internal/aws/{source}.go` populates a field with key "VpcId" or that
+that `core/aws/{source}.go` populates a field with key "VpcId" or that
 the field appears in the detail view from RawStruct reflection.
 
 If a required field is missing from Fields, add it to the regular fetcher.
@@ -728,16 +728,16 @@ When the architect scopes related views for resource X, the handoff uses:
 
 ### CODER TASK:
 Files to create:
-  internal/aws/{source}_related.go -- checker functions + cache helper (reuse shared relatedResult and assertStruct from ec2_related.go — do NOT redefine)
+  core/aws/{source}_related.go -- checker functions + cache helper (reuse shared relatedResult and assertStruct from ec2_related.go — do NOT redefine)
 Files to modify:
-  internal/aws/{source}.go -- append RegisterRelated + RegisterNavigableFields in init()
-  internal/demo/fixtures/<service>.go -- ensure target resource fixtures contain matching IDs
-  internal/aws/{service}_interfaces.go -- append new interfaces (only if live-fetch fallback needs them)
+  core/aws/{source}.go -- append RegisterRelated + RegisterNavigableFields in init()
+  core/demo/fixtures/<service>.go -- ensure target resource fixtures contain matching IDs
+  core/aws/{service}_interfaces.go -- append new interfaces (only if live-fetch fallback needs them)
     Append point: after last narrow interface, before the aggregate {Service}API
 Context files (read-only):
-  internal/aws/{source}.go -- verify Fields keys exist
-  internal/aws/ec2_related.go -- canonical checker pattern
-  internal/resource/related.go -- type definitions
+  core/aws/{source}.go -- verify Fields keys exist
+  core/aws/ec2_related.go -- canonical checker pattern
+  core/resource/related.go -- type definitions
   docs/design/related-resources/{source}.md -- relationship details
   .a9s/views_reference.yaml -- verify field paths
 
@@ -755,6 +755,6 @@ What to test:
   - Cold-cache checker: drives real checker through typed fakes via newDemoColdCacheApp
   - Registry: all expected defs registered
 Context files (read-only):
-  internal/aws/{source}_related.go -- function signatures
-  internal/resource/related.go -- type definitions
+  core/aws/{source}_related.go -- function signatures
+  core/resource/related.go -- type definitions
 ```

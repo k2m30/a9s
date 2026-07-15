@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package aws
 
 import (
@@ -113,7 +115,7 @@ type alarmHistoryStateData struct {
 // alarmHistoryFindings returns a wave1 finding for a StateUpdate history item
 // whose newState.StateValue is ALARM or INSUFFICIENT_DATA — the same two
 // non-healthy states colorAlarm classifies for the live alarm resource
-// (internal/aws/catalog_monitoring.go). ConfigurationUpdate/Action items and
+// (core/aws/catalog_monitoring.go). ConfigurationUpdate/Action items and
 // transitions to OK carry no finding (healthy/informational).
 func alarmHistoryFindings(historyItemType, historyData string) []domain.Finding {
 	if historyItemType != string(cwtypes.HistoryItemTypeStateUpdate) || historyData == "" {

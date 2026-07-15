@@ -4,9 +4,9 @@
 // through reconcileTypeFile"). Written against HEAD 7ac3b5ca (Stage 3
 // landed: session.ResourceCache/LazyResourceCache are gone, RowStore is the
 // sole per-type row store; Stage 4 has NOT landed — Controller still owns
-// its own resourceCache map (internal/app/controller.go:35-37) and
+// its own resourceCache map (core/app/controller.go:35-37) and
 // applyResourcesLoaded still writes both ls.Rows AND c.resourceCache
-// (internal/app/list_body.go)).
+// (core/app/list_body.go)).
 //
 // Each pin states its own honest RED/GREEN status at HEAD in its doc
 // comment. Several are GREEN today (regression guards for the deletion);
@@ -111,7 +111,7 @@ func stage4PinS3Resource(id string) resource.Resource {
 // handlers_related.go), selected via ActionRelatedSelect (the same path
 // app_related_cursor_skip_test.go's newRelatedSkipController drives). This
 // is the real Controller.dispatchRelatedNavigate -> applyRelatedNavResult
-// path Stage 4 touches (internal/app/navigate.go), NOT the separate legacy
+// path Stage 4 touches (core/app/navigate.go), NOT the separate legacy
 // internal/tui ResourceListModel stacking mechanism.
 func pushStackedRelatedFilteredS3List(t *testing.T, ctrl *app.Controller, relatedIDs []string) {
 	t.Helper()
@@ -146,7 +146,7 @@ func pushStackedRelatedFilteredS3List(t *testing.T, ctrl *app.Controller, relate
 // the only direction Ctrl+R/load-more (both topListState()-scoped) can ever
 // violate.
 //
-// HONEST STATUS AT HEAD (7ac3b5ca): GREEN. internal/app/list_body.go's
+// HONEST STATUS AT HEAD (7ac3b5ca): GREEN. core/app/list_body.go's
 // applyResourcesLoaded already writes exclusively to the SCREEN's own
 // ls.Rows (the "Bug 1 fix" comment: "Writing to ls.Rows ensures that two
 // stacked list screens of the same resource type never share a row
@@ -304,7 +304,7 @@ func stage4PinReorderedS3ViewConfig() *config.ViewsConfig {
 //
 //   - List-lane save: Controller.maybeSaveResourceListCache, fired
 //     synchronously on every Handle(messages.ResourcesLoaded) delivery
-//     (internal/app/handle.go:212) via materializeAllListFieldsForSave,
+//     (core/app/handle.go:212) via materializeAllListFieldsForSave,
 //     which resolves columns through resolveListColumnsForBuild(c.viewConfig,
 //     ...) — SEES the session's SetViewConfig override.
 //   - Sweep-lane save: the EnrichmentChecked "all done" TaskKindSaveCache
@@ -316,8 +316,8 @@ func stage4PinReorderedS3ViewConfig() *config.ViewsConfig {
 //
 // HONEST STATUS AT HEAD (7ac3b5ca): RED — this is the live D16-class
 // divergence the dispatch asked this pin to either confirm-green or catch.
-// Verified by direct code reading (internal/runtime/probes.go's
-// resolveSaveColumns vs internal/app/list_columns.go's
+// Verified by direct code reading (core/runtime/probes.go's
+// resolveSaveColumns vs core/app/list_columns.go's
 // resolveListColumnsForBuild): resolveSaveColumns has no viewConfig
 // parameter and always resolves against config.GetViewDef(nil, shortName),
 // so a session-level SetViewConfig column reorder/rename is applied by the
@@ -445,10 +445,10 @@ func TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane(t *testing.T) 
 	ctrl.ApplyResourcesLoaded(stage4PinType, seeded, nil, false)
 
 	// Since the color-findings-conformance wave, colorS3 is
-	// colorFromAnyFinding-only (internal/aws/catalog_databases.go) — a
+	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — a
 	// SevBroken Finding resolves the row's whole-row color to "broken"
 	// directly (resolveListDecoratorFull's DecoratorError glyph branch only
-	// fires when ResolveColor()==ColorHealthy; see internal/app/list_columns.go
+	// fires when ResolveColor()==ColorHealthy; see core/app/list_columns.go
 	// and .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
 	// ListRow.Color=="broken" is the stronger, correct check throughout this test.
 	preSwap := ctrl.Snapshot()
@@ -535,17 +535,17 @@ func TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane(t *testing.T) 
 
 // =============================================================================
 // Pin 4 — Controller.resourceCache absence: a source-scan asserting no
-// `resourceCache map[string]` field exists under internal/app. Written to
+// `resourceCache map[string]` field exists under core/app. Written to
 // FAIL today (the field still exists), listing current readers, so it
 // flips to pass once the coder deletes it (mirrors
 // rowstore_stage2_pins_test.go's caseInsensitiveGrepSyncProbeResourcesForTypeCallers
 // pattern applied to a field declaration instead of a function name).
 // =============================================================================
 
-// scanForResourceCacheFieldDeclaration walks internal/app's production Go
+// scanForResourceCacheFieldDeclaration walks core/app's production Go
 // source (*.go, excluding *_test.go) for the literal field declaration
 // pattern `resourceCache map[string]` — the exact shape of
-// Controller.resourceCache's declaration at internal/app/controller.go:37
+// Controller.resourceCache's declaration at core/app/controller.go:37
 // today. Comment-only lines are skipped (a future doc comment referencing
 // the deleted field by name, e.g. explaining what replaced it, must not
 // keep this pin permanently red). Returns every non-comment match found as
@@ -588,7 +588,7 @@ func scanForResourceCacheFieldDeclaration(t *testing.T) (string, error) {
 	return strings.Join(hits, "\n"), nil
 }
 
-// scanForResourceCacheReaders walks internal/app's production Go source for
+// scanForResourceCacheReaders walks core/app's production Go source for
 // any remaining CODE reference to `c.resourceCache` or `.resourceCache[` —
 // the field-access shape used throughout list_body.go, footer.go, text.go,
 // and controller.go today (per the row-store unification plan's own
@@ -635,14 +635,14 @@ func scanForResourceCacheReaders(t *testing.T) (string, error) {
 }
 
 // TestStage4Pin_ControllerResourceCacheField_NoLongerExists asserts that no
-// production file under internal/app declares a `resourceCache
+// production file under core/app declares a `resourceCache
 // map[string]` field, and (as a companion sub-test) that no production file
-// under internal/app references `resourceCache` at all — the full deletion
+// under core/app references `resourceCache` at all — the full deletion
 // the plan's Stage 4 mandates ("Controller.resourceCache dies with all its
 // readers").
 //
 // HONEST STATUS AT HEAD (7ac3b5ca): RED, by construction and confirmed by
-// direct source reading — internal/app/controller.go:35-37 declares
+// direct source reading — core/app/controller.go:35-37 declares
 // `resourceCache map[string][]resource.Resource` today, with readers/writers
 // at controller.go:197, footer.go:97, list_body.go (writer at
 // applyResourcesLoaded:126-142, readers/mutators at
@@ -659,7 +659,7 @@ func TestStage4Pin_ControllerResourceCacheField_NoLongerExists(t *testing.T) {
 			t.Fatalf("scan for resourceCache field declaration failed: %v", err)
 		}
 		if out != "" {
-			t.Errorf("Controller.resourceCache field declaration still present under internal/app (Stage 4 must delete it):\n%s", out)
+			t.Errorf("Controller.resourceCache field declaration still present under core/app (Stage 4 must delete it):\n%s", out)
 		}
 	})
 
@@ -669,7 +669,7 @@ func TestStage4Pin_ControllerResourceCacheField_NoLongerExists(t *testing.T) {
 			t.Fatalf("scan for resourceCache readers failed: %v", err)
 		}
 		if out != "" {
-			t.Errorf("production reference(s) to resourceCache still present under internal/app after Stage 4 (want the field and every reader/writer deleted per the plan — ListState.Rows / RowStore must be the only remaining row source):\n%s", out)
+			t.Errorf("production reference(s) to resourceCache still present under core/app after Stage 4 (want the field and every reader/writer deleted per the plan — ListState.Rows / RowStore must be the only remaining row source):\n%s", out)
 		}
 	})
 }
@@ -690,7 +690,7 @@ func TestStage4Pin_ControllerResourceCacheField_NoLongerExists(t *testing.T) {
 // finding survives, not two).
 //
 // HONEST STATUS AT HEAD (7ac3b5ca): GREEN for the field-value half.
-// applyListFieldUpdates (internal/app/list_body.go) applies
+// applyListFieldUpdates (core/app/list_body.go) applies
 // map[string]string updates via maps.Copy onto EACH row's Fields map
 // independently on ls.Rows and (separately) on c.resourceCache[typeName] —
 // two DISTINCT Resource value slices (ls.Rows and c.resourceCache hold

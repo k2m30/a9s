@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package fixtures provides EC2 Launch Template fixture data for the EC2 fake.
 // Launch templates ride the EC2 service client (DescribeLaunchTemplates,
 // DescribeLaunchTemplateVersions) — no dedicated client field, see
-// internal/demo/client.go and internal/demo/fakes/ec2.go.
+// core/demo/client.go and core/demo/fakes/ec2.go.
 package fixtures
 
 import (

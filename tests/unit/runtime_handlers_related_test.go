@@ -1,6 +1,6 @@
 // runtime_handlers_related_test.go — public-seam coverage for
 // (*runtime.Core).HandleRelatedNavigate after the AS-150 migration moved the
-// handler out of internal/tui into internal/runtime.
+// handler out of internal/tui into core/runtime.
 //
 // Cases A–K mirror the Stage 2 scope on AS-201. The runtime seam is exactly
 // what AS-150 exposed — these tests stand up *runtime.Core directly through
@@ -57,7 +57,7 @@ func TestHandleRelatedNavigate_UnknownType_Flash(t *testing.T) {
 // Case B — child type (e.g. "s3_objects") → EnterChildView, no tasks.
 //
 // Registers a transient child type for this test so the assertion does not
-// depend on internal/aws being imported (which would pull init() side effects
+// depend on core/aws being imported (which would pull init() side effects
 // into tests/unit).
 func TestHandleRelatedNavigate_ChildType_EnterChildView(t *testing.T) {
 	const childShort = "test_child_type_handle_related_b"
@@ -159,7 +159,7 @@ func TestHandleRelatedNavigate_FetchFilter_RegisteredFetcher_FilteredList(t *tes
 // by-ID-capable type → FilteredList with FilterText==TargetID and a single
 // KindFetchByIDDetail task.
 //
-// "ec2" now registers FetchByIDs (internal/aws/catalog_compute.go — the
+// "ec2" now registers FetchByIDs (core/aws/catalog_compute.go — the
 // costs resource-row navigation jump added it), so this case moved from the
 // KindFetchResources else-branch to the KindFetchByIDDetail branch. The
 // KindFetchResources-else-branch behavior itself is still pinned, just
@@ -267,7 +267,7 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_FullyCached_NoFetch(t *testing
 // can populate and scope it. This is the identical path "(N+)" takes; the zero
 // lower bound is never special-cased into a "goes to all" list, and never left
 // without a fetch (which would strand the list empty). A NON-truncated no-scope
-// event is the defensive ResourceList fallback instead — see the internal/runtime
+// event is the defensive ResourceList fallback instead — see the core/runtime
 // package test TestHandleRelatedNavigate_ResourceList_EmitsFetchResources.
 func TestHandleRelatedNavigate_TruncatedZero_ScopedListWithFetch(t *testing.T) {
 	c, _ := newRuntimeCore(t)
@@ -377,7 +377,7 @@ func TestHandleRelatedNavigate_ByIDCapableType_CacheMiss_EmitsFetchByIDDetail(t 
 // cannot accidentally route all cache-miss TargetID drills through the
 // by-ID path.
 func TestHandleRelatedNavigate_NonByIDType_CacheMiss_EmitsFetchResources(t *testing.T) {
-	// "lambda" has no FetchByIDs helper registered in internal/aws/
+	// "lambda" has no FetchByIDs helper registered in core/aws/
 	// catalog_compute.go (unlike "ec2", "ebs-snap", "ami" — confirmed
 	// directly against that file). If that ever changes this test will
 	// catch the regression in the opposite direction. "ec2" itself moved to

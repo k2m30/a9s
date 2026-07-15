@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package web provides a minimal HTTP server that renders app.ViewState as
 // HTML, accepting semantic Actions via POST /action and exposing the current
 // state as JSON via GET /state. It is the web renderer counterpart to

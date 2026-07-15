@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // s3_cross_region.go — Shared detection of S3 cross-region API rejections.
 //
 // ListBuckets returns ALL buckets globally regardless of the configured S3

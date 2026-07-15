@@ -12,7 +12,7 @@ import (
 // costs.Store is not given exact method signatures in data-model.md (only
 // the on-disk YAML shape and the closed/open/merge/anomaly-TTL policy
 // prose). The surface exercised below mirrors the existing
-// internal/cache.Store convention (LoadDir/Put/SaveType) adapted to the
+// core/cache.Store convention (LoadDir/Put/SaveType) adapted to the
 // single-file-per-profile layout in data-model.md:
 //
 //	costs.CachePath(profile string) string

@@ -32,7 +32,7 @@
 //
 // Item 5 (P2) — a live ValidationException on a real account
 // ("You haven't enabled historical data beyond 14 months.") on year zoom.
-// costsHistoryHorizonMonths (internal/app/costs_state.go) is unexported and
+// costsHistoryHorizonMonths (core/app/costs_state.go) is unexported and
 // unreachable from tests/unit — mirrored here as a literal (13, matching
 // the constant read directly off disk during scoring) rather than
 // re-derived, with a comment tying it back explicitly.
@@ -159,7 +159,7 @@ func TestCostsQuality_Item1_DeltaTag_FourTierColorScale(t *testing.T) {
 // ===========================================================================
 // Item 2 — humanized anomaly footer: service, impact amount, and usage
 // type, no raw "DIMENSION=value" dumps. Confirmed via direct trace:
-// internal/aws/costs.go's mapAnomaly builds RootCause as literally
+// core/aws/costs.go's mapAnomaly builds RootCause as literally
 // fmt.Sprintf("%s=%s", dim, value) joined by ", " — this test originally
 // fed exactly that shape as the seeded AnomalyMark.RootCause.
 //
@@ -220,7 +220,7 @@ func TestCostsQuality_Item2_AnomalyFooter_Humanized_NoRawDimensionDump(t *testin
 // state line the TUI already computes, from ONE shared source exposed via
 // Controller.Snapshot().FrameTitle.
 //
-// Confirmed via direct trace: internal/app/snapshot.go:71 hardcodes
+// Confirmed via direct trace: core/app/snapshot.go:71 hardcodes
 // `vs.FrameTitle = string(runtime.ScreenCosts)` (the bare "costs" string)
 // for the costs screen kind, while internal/tui/app_view.go's frameTitle()
 // computes a RICH state line via its own package-private costsFrameTitle()
@@ -287,7 +287,7 @@ func TestCostsQuality_Item3c_WebAppJS_KeyMap_HasVimMovementAliases(t *testing.T)
 }
 
 // ===========================================================================
-// Item 4 — currency in the footer. Grid.Currency (internal/costs/grid.go)
+// Item 4 — currency in the footer. Grid.Currency (core/costs/grid.go)
 // is already correctly resolved by BuildGrid (single-currency -> that
 // currency; mixed currencies -> "" per its own unitSet logic) but is
 // silently dropped: CostsBody has no Currency field, and neither
@@ -373,13 +373,13 @@ func readQualityFile(t *testing.T, path string) (string, error) {
 // unclamped Range.Start throws ValidationException "You haven't enabled
 // historical data beyond 14 months."
 //
-// costsHistoryHorizonMonths (internal/app/costs_state.go, = 13) is
+// costsHistoryHorizonMonths (core/app/costs_state.go, = 13) is
 // unexported and unreachable from tests/unit — mirrored here as a literal,
 // tied back explicitly rather than re-derived.
 // ===========================================================================
 
 func TestCostsQuality_Item5_YearZoom_RangeStart_ClampedToHistoryHorizon(t *testing.T) {
-	const historyHorizonMonths = 13 // mirrors internal/app/costs_state.go's costsHistoryHorizonMonths
+	const historyHorizonMonths = 13 // mirrors core/app/costs_state.go's costsHistoryHorizonMonths
 
 	c := newCostsScreenController(t, round8Now)
 	_, tasks := c.Apply(app.Action{Kind: app.ActionCostZoomOut}) // month -> year

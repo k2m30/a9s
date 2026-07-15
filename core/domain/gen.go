@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package domain
 
 // Gen is the program-wide generation-counter type used by async-result

@@ -213,7 +213,7 @@ func TestCommandNavigation_NoCacheDir_StillFires(t *testing.T) {
 // -c navigation for that lane continues to fire directly from
 // handleClientsReadySuccess, exactly like the pre-existing
 // TestHandleClientsReady_Success_Command_StackDepth1 pin in
-// internal/runtime/handlers_test.go (mirrored here through Core's public
+// core/runtime/handlers_test.go (mirrored here through Core's public
 // API since tests/unit cannot reach unexported runtime internals).
 func TestCommandNavigation_DemoLane_StillFires(t *testing.T) {
 	c := runtime.Bootstrap(demo.DemoProfile, demo.DemoRegion, catalog.All())

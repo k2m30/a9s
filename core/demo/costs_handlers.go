@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // costs_handlers.go — demo transport handlers for AWS Cost Explorer
 // (service prefix "ce", awsjson1.1, X-Amz-Target
 // "AWSInsightsIndexService.<Operation>"). Cost Explorer has no typed-fake
-// client path (internal/aws.CostsAPI is shaped around SDK response types,
+// client path (core/aws.CostsAPI is shaped around SDK response types,
 // not a mockable Go interface with per-field fixture data), so it is served
-// as raw JSON like STS — built from internal/demo/fixtures/costs.go,
+// as raw JSON like STS — built from core/demo/fixtures/costs.go,
 // filtered/grouped per the request's Granularity, GroupBy, and Filter so
 // the growth-story drill (SERVICE=EC2 - Other x USAGE_TYPE) narrows
 // correctly.
@@ -25,7 +27,7 @@ import (
 )
 
 // registerCostExplorerHandlers registers the four CE operations the Cost
-// Explorer feature calls (internal/aws/costs.go): GetCostAndUsage,
+// Explorer feature calls (core/aws/costs.go): GetCostAndUsage,
 // GetCostAndUsageWithResources, GetAnomalies, GetDimensionValues.
 func registerCostExplorerHandlers(t *Transport) {
 	fx := fixtures.NewCostsFixtures()
@@ -42,7 +44,7 @@ func registerCostExplorerHandlers(t *Transport) {
 }
 
 // ceDimensionFilter mirrors the CE Expression tree shape this feature ever
-// sends (internal/aws/costs.go's buildFilterExpression): a single
+// sends (core/aws/costs.go's buildFilterExpression): a single
 // Dimensions clause, an And-list of Dimensions/Not clauses, or a Not
 // wrapping one Dimensions clause (the unblended metric's RECORD_TYPE
 // exclusion).
@@ -394,7 +396,7 @@ func costsSplitAmountAcrossDays(amount float64, days int) []float64 {
 }
 
 // costsMetricValues maps one aggregated amount onto all four CE metrics the
-// fetcher always requests (internal/aws/costs.go's ceMetrics) — the demo
+// fetcher always requests (core/aws/costs.go's ceMetrics) — the demo
 // dataset has no separate blended/amortized modeling, so every metric
 // mirrors the invoice (UnblendedCost) amount.
 func costsMetricValues(amount float64) map[string]map[string]string {

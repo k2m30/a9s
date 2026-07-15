@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package app
 
 import (
@@ -444,9 +446,9 @@ func (c *Controller) runAvailabilitySaveLoop() {
 // Every real Controller owner must call this on its own shutdown path:
 //   - TUI: internal/tui.Model exposes it via CloseController, called from
 //     cmd/a9s's runProgram.
-//   - Web: each per-browser-session Controller (internal/web/construct.go's
+//   - Web: each per-browser-session Controller (core/web/construct.go's
 //     newSession) is closed when the server's own context is cancelled
-//     (internal/web/server.go's ListenAndServe) — sessions are otherwise
+//     (core/web/server.go's ListenAndServe) — sessions are otherwise
 //     never individually evicted in this server, so process shutdown is the
 //     only reachable hook today.
 //
@@ -472,9 +474,9 @@ func (c *Controller) Close() {
 // NOTE (task #17 wave 1 stage 2, row-store unification): this used to read
 // session.ProbeResources directly; that field is gone as of stage 2. This
 // one-line re-point to core.ProbeOriginTypeNames() is the minimal edit
-// needed to keep internal/app compiling — internal/app itself is out of
+// needed to keep core/app compiling — core/app itself is out of
 // scope for stage 2 (its own ResourceCache lanes are Stage 3). Flagged for
-// Stage 3 to fold into whatever internal/app's own RowStore migration does.
+// Stage 3 to fold into whatever core/app's own RowStore migration does.
 func (c *Controller) menuRefreshing() bool {
 	for _, shortName := range c.core.ProbeOriginTypeNames() {
 		canon := shortName

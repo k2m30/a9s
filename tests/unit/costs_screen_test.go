@@ -1,6 +1,6 @@
 // costs_screen_test.go — contract tests for the Cost Explorer domain
 // refactor (specs/021-cost-explorer/architecture.md). TDD compile-red: the
-// new package internal/costs/screen does not exist yet, and internal/costs
+// new package core/costs/screen does not exist yet, and core/costs
 // (existing) does not yet carry AnomalyResult/FetchResult/
 // Store.ApplyFetchResult/Money/TotalOutcome/SumCells/TrailingWindow/
 // WindowWithin. This whole test binary is expected to fail to compile until
@@ -9,14 +9,14 @@
 //
 // Package attribution (deduced from the doc's own type signatures, not
 // merely its package-layout intro, to avoid an import cycle):
-//   - internal/costs (EXISTING, extended): AnomalyResult, FetchResult,
+//   - core/costs (EXISTING, extended): AnomalyResult, FetchResult,
 //     (*Store).ApplyFetchResult, Money, TotalOutcome, SumCells,
-//     TrailingWindow, WindowWithin — BuildGrid (existing, internal/costs)
+//     TrailingWindow, WindowWithin — BuildGrid (existing, core/costs)
 //     must call SumCells directly, and (*Store) methods must reference
-//     FetchResult/AnomalyResult directly; internal/costs cannot import
-//     internal/costs/screen (screen imports costs), so these types cannot
+//     FetchResult/AnomalyResult directly; core/costs cannot import
+//     core/costs/screen (screen imports costs), so these types cannot
 //     live in screen without a cycle.
-//   - internal/costs/screen (NEW): CoverageView, FetchPlan, PlanFetch,
+//   - core/costs/screen (NEW): CoverageView, FetchPlan, PlanFetch,
 //     DrillPath, SelectOutcome (+ NoSelection/PushDrill/OpenResource/
 //     Refuse — NoSelection replaces the former WaitForRows/NoSelectableRow
 //     pair: the sole consumer (applyCostsSelect) always treated them
@@ -24,7 +24,7 @@
 //     ScreenState, GridRowRef, PeriodRef, Select, ResourceLocator,
 //     ViewModel, CursorPos, Viewport, BuildViewModel — the screen-level
 //     "what should happen"/"what should render" decisions the doc's intro
-//     describes moving out of internal/app. InitOutcome (one-field bool
+//     describes moving out of core/app. InitOutcome (one-field bool
 //     ceremony wrapping Store.Recovered()) was cut by the same review —
 //     callers read Store.Recovered() directly now.
 //
@@ -48,7 +48,7 @@
 //	type PeriodRef struct { Period costs.Period }
 //
 // PushDrill.Granularity (added this round) — closes the "two homes"
-// duplication where internal/app kept its own copy of finerGranularity to
+// duplication where core/app kept its own copy of finerGranularity to
 // set the pushed frame's Granularity, alongside Select's OWN internal
 // finerGranularity call that already built Window at that same step. Field
 // added directly to the existing PushDrill struct:
@@ -58,9 +58,9 @@
 // Seam 8 (CostsViewModel, added this round) speculative construction —
 // CursorPos/Viewport are named in the doc's BuildViewModel signature but
 // never typed beyond that. Chosen to carry exactly what the CURRENT adapter
-// mechanics being extracted need (internal/app/costs_state.go's
+// mechanics being extracted need (core/app/costs_state.go's
 // liveCostGrid/costsVisibleColumnRange/costsGridCacheKey,
-// internal/app/costs_body.go's buildCostsBody cursor-clamp block — read
+// core/app/costs_body.go's buildCostsBody cursor-clamp block — read
 // directly to ground this hypothesis, not guessed from the doc's prose
 // alone):
 //
@@ -86,7 +86,7 @@ import (
 )
 
 // ===========================================================================
-// Seam 1 — FetchPlan / PlanFetch (internal/costs/screen)
+// Seam 1 — FetchPlan / PlanFetch (core/costs/screen)
 //
 // "Freshness inputs are computed independently — cost coverage and anomaly
 // freshness have different lifecycles and never gate each other." Table
@@ -147,7 +147,7 @@ func TestCostsScreen_PlanFetch_GridAndAnomalyFreshnessDeriveIndependently(t *tes
 
 // ===========================================================================
 // Seam 2 + Seam 6 — AnomalyResult through (*costs.Store).ApplyFetchResult
-// (internal/costs, extended)
+// (core/costs, extended)
 //
 // Reconciles the X2-vs-C4a collision: TestCostsSelfReview_C4a's intent
 // (authoritative-empty clears) is case "requested, empty" below; the X2
@@ -257,7 +257,7 @@ type costsScreenTestError struct{ msg string }
 func (e *costsScreenTestError) Error() string { return e.msg }
 
 // ===========================================================================
-// Seam 3 — DrillPath.Next (internal/costs/screen)
+// Seam 3 — DrillPath.Next (core/costs/screen)
 //
 // "skips pinned" is the X5 behavior: from usage-type pivot, USAGE_TYPE
 // pinned, drilled to SERVICE and pinned that too — Next() must not offer
@@ -312,7 +312,7 @@ func TestCostsScreen_DrillPath_Next(t *testing.T) {
 }
 
 // ===========================================================================
-// Seam 4 — Select outcomes (internal/costs/screen)
+// Seam 4 — Select outcomes (core/costs/screen)
 //
 // Reconciles the X6/X7 codex pins where their mechanism moves into this
 // seam: X7 (fast Enter through a still-loading level pins an empty value)
@@ -418,7 +418,7 @@ func TestCostsScreen_Select_RowPresent_PushDrill_NonEmptyValue_WindowWithinSelec
 // (month -> week): a year-granularity frame's PushDrill must report
 // GranularityMonth, with Window built at that same granularity — the one
 // place this decision is made, never re-derived by the caller (the "two
-// homes" duplication this pin closes: internal/app used to keep its own
+// homes" duplication this pin closes: core/app used to keep its own
 // copy of finerGranularity to set the pushed frame's Granularity field,
 // even though Select already computed the equivalent chain step internally
 // to build Window).
@@ -522,7 +522,7 @@ func TestCostsScreen_Select_ResourceLeaf_OutOfWindow_Refuse(t *testing.T) {
 }
 
 // ===========================================================================
-// Seam 8 — ResourceLocator construction (internal/costs/screen)
+// Seam 8 — ResourceLocator construction (core/costs/screen)
 //
 // Region/AccountID were cut from ResourceLocator by a later ponytail-review
 // pass (written-never-read — no consumer ever read either field off the
@@ -534,8 +534,8 @@ func TestCostsScreen_Select_ResourceLeaf_OutOfWindow_Refuse(t *testing.T) {
 // ===========================================================================
 
 // ===========================================================================
-// Seam 4 (window half) — TrailingWindow vs WindowWithin (internal/costs,
-// extended: BuildGrid/ClampResourceDrillWindow, existing internal/costs
+// Seam 4 (window half) — TrailingWindow vs WindowWithin (core/costs,
+// extended: BuildGrid/ClampResourceDrillWindow, existing core/costs
 // functions, need these directly without an import cycle through screen).
 //
 // X4a landed as a green pin via the new constructor: WindowWithin(year,
@@ -615,8 +615,8 @@ func TestCostsScreen_TrailingWindow_AnchorAndNow_ClampCeilingComesFromNow(t *tes
 }
 
 // ===========================================================================
-// Seam 5 — Money / TotalOutcome / SumCells (internal/costs, extended:
-// BuildGrid, existing internal/costs, must call SumCells directly)
+// Seam 5 — Money / TotalOutcome / SumCells (core/costs, extended:
+// BuildGrid, existing core/costs, must call SumCells directly)
 //
 // Absorbs the X8 pin at the domain level (a USD+EUR sum cannot leave the
 // domain layer as a bare number); the body-level X8 pin (costs_codex_test.go,
@@ -660,14 +660,14 @@ func TestCostsScreen_SumCells_MixedUnits_NoTotalValueConsumed(t *testing.T) {
 // ===========================================================================
 
 // ===========================================================================
-// Seam 8 — CostsViewModel / BuildViewModel (internal/costs/screen)
+// Seam 8 — CostsViewModel / BuildViewModel (core/costs/screen)
 //
 // "The renderer and Enter handler share one clamped view-model" — the
 // adapter's display filter, cursor clamp, viewport slice, and grid-cache
 // key all move here as one pure BuildViewModel. Traced against the CURRENT
-// adapter mechanics being extracted (internal/app/costs_state.go's
+// adapter mechanics being extracted (core/app/costs_state.go's
 // liveCostGrid/filterCostsZeroDisplayGridRows/costsVisibleColumnRange/
-// costsGridCacheKey, internal/app/costs_body.go's buildCostsBody
+// costsGridCacheKey, core/app/costs_body.go's buildCostsBody
 // cursor-clamp block):
 //   - display filter: filterCostsZeroDisplayGridRows drops rows whose
 //     VISIBLE cells all round to "0.0" (costsAmountRoundsToZero) — EXCEPT

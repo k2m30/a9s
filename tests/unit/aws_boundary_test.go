@@ -257,7 +257,7 @@ func TestChecker_Approximate_PropagatedFromCache(t *testing.T) {
 		}
 		// checkEFSECSTask reads the joined EFS file-system IDs from
 		// Fields["efs_file_system_ids"] (populated by the ecs-task fetcher's
-		// DescribeTaskDefinition join — see internal/aws/ecs_task.go).
+		// DescribeTaskDefinition join — see core/aws/ecs_task.go).
 		taskRes := resource.Resource{
 			ID:   "efs-boundary-task",
 			Name: "efs-boundary-task",

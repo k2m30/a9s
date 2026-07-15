@@ -2,7 +2,7 @@ package unit_test
 
 // aws_lt_related_test.go — related-resource checker tests for lt (EC2 Launch
 // Templates) (docs/resources/lt.md §2, docs/resources/lt-impl-plan.md §1
-// "related_targets"). Checkers live in internal/aws/lt_related.go.
+// "related_targets"). Checkers live in core/aws/lt_related.go.
 //
 // 5 pivots are Pattern F via *awsclient.LTRaw (ami, kms, sg, subnet — read a
 // field on the $Default version, no API call). 3 are cache cross-ref

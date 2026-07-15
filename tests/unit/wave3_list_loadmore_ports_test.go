@@ -2,19 +2,19 @@
 // for the ActionLoadMore no-op/debounce/error-recovery mechanism and the
 // sort/cursor stability of a plain (non-checker) load-more append, ported
 // from the doomed legacy qa_pagination_stories_test.go funcs onto the LIVE
-// Controller seam (internal/app/actions_list.go handleActionLoadMore,
-// internal/app/list_state.go ClearListLoading, internal/app/list_body.go
+// Controller seam (core/app/actions_list.go handleActionLoadMore,
+// core/app/list_state.go ClearListLoading, core/app/list_body.go
 // buildListBody's per-render sort/select-clamp) so those legacy funcs can be
 // deleted without losing coverage:
 //
 //   - TestStoryH1_DemoMode_PaginationForLargeTypes / _ChildViews_Pagination
 //     (M-key no-op when not truncated, produces a cmd when truncated) and
 //     TestStoryI1_EmptyLoadMore_MBecomesNoop / TestStoryI2_RapidMPresses_Debounced:
-//     internal/app/headless_regression_test.go's TestActionLoadMore_* funcs
+//     core/app/headless_regression_test.go's TestActionLoadMore_* funcs
 //     only cover the "truncated -> produces a KindFetchMore task" branch
 //     (payload shape). Nothing exercises the "!HasPagination -> nil tasks"
 //     or "already LoadingMore -> nil tasks (debounce)" guard branches.
-//   - TestStoryI4_LoadMoreAfterSort_PreservesSortOrder: internal/app/list_test.go's
+//   - TestStoryI4_LoadMoreAfterSort_PreservesSortOrder: core/app/list_test.go's
 //     TestListSort_* never combines an active sort with an append; the only
 //     append+sort coverage anywhere (wave3_list_ports_test.go's
 //     RelatedCheckerCarry_PreservesSortAfterMerge) drives the reapplyCheckerAgainst

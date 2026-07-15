@@ -175,7 +175,7 @@ func TestRelated_MSK_Lambda_Found(t *testing.T) {
 }
 
 // TestRelated_MSK_Lambda_MappedFnNotInCache_FallsBackToARNBareName pins the
-// union contract (internal/aws/related_common.go
+// union contract (core/aws/related_common.go
 // lambdaEventSourceMappingLambdaCheck): a ListEventSourceMappings-confirmed
 // FunctionArn that is NOT the one resolved in a non-truncated lambda
 // ResourceCache is not dropped — it is still counted via the bare function

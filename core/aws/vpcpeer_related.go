@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // vpcpeer_related.go contains VPC Peering Connection related-resource
 // checker functions.
 //

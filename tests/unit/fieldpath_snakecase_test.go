@@ -11,7 +11,7 @@ import (
 // purpose is to make current behavior a conscious contract, not an accidental one.
 //
 // WARNING: If a future change "fixes" ACM → a_c_m, review both call sites first:
-//   - internal/fieldpath/extract.go ExtractFieldList fallback lookup (line ~400)
+//   - core/fieldpath/extract.go ExtractFieldList fallback lookup (line ~400)
 //   - internal/tui/views/detail_render.go renderFromConfig fallback lookup (line ~140)
 //
 // Both only pass PascalCase paths like VpcId today, so the limitation never fires.

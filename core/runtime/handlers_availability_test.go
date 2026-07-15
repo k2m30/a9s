@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package runtime
 
 // handlers_availability_test.go — locks the two NEEDS-CHANGES invariants from

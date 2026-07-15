@@ -3,7 +3,7 @@ package unit_test
 // related_validate_test.go — Tests for ARCH-06: ValidateRelatedResult helper.
 //
 // ValidateRelatedResult(r resource.RelatedCheckResult) error
-// (internal/resource/related.go) enforces invariants on RelatedCheckResult
+// (core/resource/related.go) enforces invariants on RelatedCheckResult
 // values returned by RelatedCheckers. Since task #58 replaced the Count==-1
 // sentinel with the domain.RelatedRowState enum, the invariants are keyed off
 // State rather than a negative Count:

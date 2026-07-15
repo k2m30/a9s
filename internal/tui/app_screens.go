@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package tui
 
 // app_screens.go — view-stack push handlers for screens constructed in response

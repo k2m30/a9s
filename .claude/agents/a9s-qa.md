@@ -84,8 +84,8 @@ Both modes still run the SCOPE GATE above first — missing scope is an immediat
 ## Your Scope
 
 **Writes to:** `tests/unit/` — test files only
-**Reads:** `internal/`, `cmd/` — for type signatures and function contracts (read-only)
-**Never writes to:** `internal/`, `cmd/`, `.a9s/` — production code is off-limits
+**Reads:** `core/`, `internal/`, `cmd/` — for type signatures and function contracts (read-only)
+**Never writes to:** `core/`, `internal/`, `cmd/`, `.a9s/` — production code is off-limits
 
 ## Testing Strategy
 

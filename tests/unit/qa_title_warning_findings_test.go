@@ -1,13 +1,13 @@
 // qa_title_warning_findings_test.go — RED regression test for the S1
-// aggregation bug in Controller.listIssueCount (internal/app/list_body.go).
+// aggregation bug in Controller.listIssueCount (core/app/list_body.go).
 //
 // Per docs/attention-signals.md §Visualization Surfaces (S1) and §S1 — list
 // frame title issue count: "N uses the same aggregation as the menu badge:
 // Wave 1 issue-colored rows plus Wave 2 `!`-severity findings for the
 // resources in the list. `~` findings do not bump." "~" findings are
-// glyphToSeverity("~") == domain.SevWarn (internal/aws/snapshot_cross_ref.go);
+// glyphToSeverity("~") == domain.SevWarn (core/aws/snapshot_cross_ref.go);
 // "!" findings are glyphToSeverity("!") == domain.SevBroken
-// (internal/aws/issue_enrichment.go setWave2Finding docstring).
+// (core/aws/issue_enrichment.go setWave2Finding docstring).
 //
 // Root cause: listIssueCount's Wave-2 fallback branch only checks map
 // membership —
@@ -128,7 +128,7 @@ func TestController_ListIssueCount_MixedSeverityFindings_CountsBangOnly(t *testi
 // case (c): the title's " !N" suffix uses the SAME aggregation as
 // Controller.GetListIssueCount() — the documented single source of truth for
 // both the menu badge and the list-title suffix (see the S1 contract comment
-// at internal/app/list_body.go above buildListFrameTitle, and listIssueCount's
+// at core/app/list_body.go above buildListFrameTitle, and listIssueCount's
 // own docstring referencing the menu sync-back). This guards against a future
 // fix that repairs the title's inline computation but leaves
 // GetListIssueCount (and therefore the menu badge) on the old, wrong

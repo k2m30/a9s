@@ -1,5 +1,5 @@
 // qa_detail_open_enrichment_multifinding_test.go — regression pin for a P2 bug
-// found by Codex in the v3.47.0 landing (internal/runtime/handlers_availability.go
+// found by Codex in the v3.47.0 landing (core/runtime/handlers_availability.go
 // around the PatchDetail construction in handleEnrichmentChecked).
 //
 // handleEnrichmentChecked folds allFindings (map[string][]domain.Finding — every
@@ -15,9 +15,9 @@
 //	    EnrichmentAttentionDetails: msg.AttentionDetails,
 //	})
 //
-// internal/app/intents.go's PatchDetail case iterates the per-resource slice
+// core/app/intents.go's PatchDetail case iterates the per-resource slice
 // and calls applyDetailFindingsForResource with every finding
-// (internal/app/detail_state.go), so a resource that is ALREADY OPEN in a
+// (core/app/detail_state.go), so a resource that is ALREADY OPEN in a
 // detail view when a multi-finding EnrichmentChecked result arrives shows
 // every independently-evaluated condition in its Attention block, not just
 // the worst one.
@@ -118,7 +118,7 @@ func TestHandleEnrichmentChecked_DetailAlreadyOpen_MultiFinding_BothFindingsReac
 		t.Fatalf("test setup: expected the worst finding %q on the open detail's Attention block; got rows: %v", detailOpenMultiFindingBroken.Phrase, attentionText)
 	}
 	if !strings.Contains(joined, strings.ToLower(detailOpenMultiFindingWarn.Phrase)) {
-		t.Errorf("BUG: open detail's Attention block is missing the second finding %q (got rows: %v) — internal/runtime/handlers_availability.go's PatchDetail construction in handleEnrichmentChecked passes msg.Findings (the single worst-severity Finding per resource) as EnrichmentFindings instead of allFindings (the full per-resource []domain.Finding slice), so internal/app/intents.go's PatchDetail case (and applyFindingToState in internal/app/detail_state.go) only ever receive and apply ONE finding for a resource whose detail is already open — the second independently-evaluated condition never reaches the live view until the user closes and reopens the detail.",
+		t.Errorf("BUG: open detail's Attention block is missing the second finding %q (got rows: %v) — core/runtime/handlers_availability.go's PatchDetail construction in handleEnrichmentChecked passes msg.Findings (the single worst-severity Finding per resource) as EnrichmentFindings instead of allFindings (the full per-resource []domain.Finding slice), so core/app/intents.go's PatchDetail case (and applyFindingToState in core/app/detail_state.go) only ever receive and apply ONE finding for a resource whose detail is already open — the second independently-evaluated condition never reaches the live view until the user closes and reopens the detail.",
 			detailOpenMultiFindingWarn.Phrase, attentionText)
 	}
 }

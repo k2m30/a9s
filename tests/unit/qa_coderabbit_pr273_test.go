@@ -416,7 +416,7 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 	// from this Finding (colorFromAnyFinding) — resolveListDecoratorFull no
 	// longer emits the "! " glyph prefix for a non-Healthy row (that branch
 	// only fires when ResolveColor()==ColorHealthy; see
-	// internal/app/list_columns.go). The stronger, renderer-agnostic contract
+	// core/app/list_columns.go). The stronger, renderer-agnostic contract
 	// is that the row is now a counted issue: it must survive the ctrl+z
 	// attention filter, which only the real Wave-2 Finding could cause here
 	// (the fixture's Fields carry no lifecycle signal of their own).

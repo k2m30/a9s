@@ -27,7 +27,7 @@ import (
 // strictACMFake mirrors AWS: rejects DescribeCertificate when CertificateArn
 // is not a valid ARN. mu guards calledWith, which is written concurrently:
 // EnrichACMCertificate fans out DescribeCertificate calls per resource via
-// internal/aws.ForEachParallel (EnrichmentParallelism goroutines).
+// core/aws.ForEachParallel (EnrichmentParallelism goroutines).
 type strictACMFake struct {
 	awsclient.ACMAPI
 	mu         sync.Mutex

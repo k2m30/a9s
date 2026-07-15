@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // wave2_carry.go — C6b Wave-2 carry: when a rows-carrying write lacks the
 // Wave-2 data that the rows it replaces already have, this file's helpers
 // carry that data forward per row ID so a bare Wave-1 refresh (a sweep

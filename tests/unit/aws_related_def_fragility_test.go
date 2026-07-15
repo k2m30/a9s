@@ -13,9 +13,9 @@ package unit_test
 //     would return WAFInvalidParameterException.
 //
 // The fixes live in:
-//   - internal/aws/eks_related_extra.go (checkEKSAMI)
-//   - internal/aws/ng_related.go (checkNGAMI)
-//   - internal/aws/elb_related.go (checkELBWAF)
+//   - core/aws/eks_related_extra.go (checkEKSAMI)
+//   - core/aws/ng_related.go (checkNGAMI)
+//   - core/aws/elb_related.go (checkELBWAF)
 
 import (
 	"context"

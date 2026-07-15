@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package keys
 
 import "charm.land/bubbles/v2/key"

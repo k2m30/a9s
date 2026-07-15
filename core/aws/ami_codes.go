@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // ami_codes.go — canonical FindingCode constants for the ami resource type.
 // The fetcher writes Findings using these codes; the
 // AMI Color func reads wave1 Findings (Source == "wave1") to color rows.

@@ -9,7 +9,7 @@
 // PopSelectorIntent cases).
 //
 // Oracle: internal/tui/app_stack_invariant.go's exported Model.StackInSync()
-// (backed by internal/app/snapshot.go's Controller.ScreenIDs()) is the
+// (backed by core/app/snapshot.go's Controller.ScreenIDs()) is the
 // wave-3 debug-buildable invariant check — asserted after EVERY step below.
 // StackInSync groups some ScreenIDs under one rsKind (list: ScreenResourceList
 // or ScreenChildList; text: ScreenYAML or ScreenJSON; selector: any of the
@@ -367,7 +367,7 @@ func TestStackSync_ChildListFlow(t *testing.T) {
 //
 // Reproduced via the real production message path: ThemeSelected ->
 // ThemeFileRead (success) is the one production event that emits
-// PopSelectorIntent (internal/runtime/handlers.go HandleThemeFileRead).
+// PopSelectorIntent (core/runtime/handlers.go HandleThemeFileRead).
 // Asserts the resulting screen is the DETAIL view underneath the selector —
 // exactly one level up, not two (which would land on the list instead).
 func TestStackSync_DoublePopGuard(t *testing.T) {

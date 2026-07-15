@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package aws — lt.go: EC2 Launch Template fetcher.
 //
 // docs/resources/lt.md §1: DescribeLaunchTemplates (the list call) carries

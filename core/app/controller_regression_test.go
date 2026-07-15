@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // controller_regression_test.go — regression tests for five controller-path bugs
 // fixed in the headless/PR-C work.
 //

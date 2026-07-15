@@ -15,17 +15,17 @@ package unit
 //       sentence the spec calls for.
 //
 // Expected fix (implemented by a9s-coder, NOT in this file):
-//   - internal/domain/finding.go: Finding gains `Detail string` (S5 sentence;
+//   - core/domain/finding.go: Finding gains `Detail string` (S5 sentence;
 //     empty ⇒ render falls back to Phrase, no stray blank line).
-//   - internal/app/list_columns.go (listExtractCellValue) and/or
+//   - core/app/list_columns.go (listExtractCellValue) and/or
 //     internal/tui/views/resourcelist.go (renderListDataRow): when a row's
 //     enrichment-map Finding (delivered via SetEnrichmentState /
-//     GetListEnrichmentFindings, see internal/app/list_filter.go
+//     GetListEnrichmentFindings, see core/app/list_filter.go
 //     applyEnrichmentState) is issue-severity (SevWarn/SevBroken), the
 //     Status/lifecycle cell must show that Finding's Phrase — not just a
 //     glyph prefix on the identity column (today's ONLY effect of
 //     SetEnrichmentState per resolveListDecoratorFull in
-//     internal/app/list_columns.go).
+//     core/app/list_columns.go).
 //   - internal/tui/views/detail_fields.go (injectAttentionSection): each
 //     Attention entry must render both the short Phrase line (already does,
 //     via capitalizeFirst) AND — on its own additional line — the full
@@ -39,13 +39,13 @@ package unit
 //     only existing fields) but fails at assertion time because
 //     SetEnrichmentState's findings map never reaches listExtractCellValue —
 //     it only drives the "! "/"~ " glyph prefix on the identity column, per
-//     resolveListDecoratorFull (internal/app/list_columns.go) and
+//     resolveListDecoratorFull (core/app/list_columns.go) and
 //     buildMarkerModel-style harnesses (see qa_enrichment_marker_test.go).
 //   - Tests #5-#7 (s3/ec2/dbi exemplars, driven through the real Wave-2
 //     enrichers) are COMPILE-RED for the same reason as #2/#3 (they assert
 //     on Finding.Detail) AND LOGIC-RED even post-compile-fix: none of
 //     EnrichS3PublicAccessBlock, EnrichEC2InstanceStatus, EnrichDBIMaintenance
-//     (internal/aws/*.go) call setWave2Finding with a Detail argument; ec2's
+//     (core/aws/*.go) call setWave2Finding with a Detail argument; ec2's
 //     enricher additionally emits "system status: impaired" (built from
 //     strings.ToLower(row.Label)+": "+row.Value) instead of the §4-mandated
 //     "impaired: system checks failing", and dbi's enricher emits the
@@ -193,7 +193,7 @@ var _ awsclient.CWLogsDescribeLogGroupsAPI = (*logsRetentionNilFake)(nil)
 // Finding with the exact §4-mandated Phrase and Detail.
 //
 // LOGIC-RED today regardless of the Detail field: FetchCloudWatchLogGroupsPage
-// (internal/aws/cwlogs.go) does not classify retention-nil into a
+// (core/aws/cwlogs.go) does not classify retention-nil into a
 // domain.Finding at all — it only stores the raw retention_days field string.
 // This test fails today with zero Findings on the resource, not merely a
 // missing Detail string; the coder must add Wave-1 classification for this

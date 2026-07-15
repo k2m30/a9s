@@ -46,10 +46,10 @@ Do NOT explore the codebase to fill in gaps. Do NOT guess what files to change. 
 
 ## Your Scope
 
-**Writes to:** `internal/`, `cmd/`, `.a9s/` — production code only
-**Reads:** `internal/`, `cmd/`, `.a9s/`, `docs/design/` — for context
+**Writes to:** `core/`, `internal/`, `cmd/`, `.a9s/` — production code only
+**Reads:** `core/`, `internal/`, `cmd/`, `.a9s/`, `docs/design/` — for context
 **Never writes to:** `tests/` — QA agent owns all test files
-**Never writes to:** `internal/fieldpath/` — frozen
+**Never writes to:** `core/fieldpath/` — frozen
 
 ## Project Layout
 
@@ -57,7 +57,7 @@ Do NOT explore the codebase to fill in gaps. Do NOT guess what files to change. 
 internal/tui/
 ├── app.go                  # Root tea.Model — view stack, routing, header
 ├── keys/keys.go            # All key.Binding definitions
-├── (messages live in internal/runtime/messages/ — typed Cmd/Event taxonomy)
+├── (messages live in core/runtime/messages/ — typed Cmd/Event taxonomy)
 ├── styles/
 │   ├── palette.go          # Tokyo Night Dark named color constants
 │   └── styles.go           # Composed lipgloss.Style vars
@@ -126,9 +126,9 @@ Follow the spec exactly. The `a9s-implement-resource` skill (run by the main ses
 ## Common Patterns
 
 ### Async AWS fetch
-Fetching is catalog-driven: the type's `Fetcher` field (wrapped with `fetcherWithClients(...)` in `internal/aws/catalog_<category>.go`) is dispatched by the runtime — do NOT hand-roll `tea.Cmd` fetches in views. A fetcher itself takes narrow interfaces:
+Fetching is catalog-driven: the type's `Fetcher` field (wrapped with `fetcherWithClients(...)` in `core/aws/catalog_<category>.go`) is dispatched by the runtime — do NOT hand-roll `tea.Cmd` fetches in views. A fetcher itself takes narrow interfaces:
 ```go
-// internal/aws/ec2.go
+// core/aws/ec2.go
 func FetchEC2Instances(ctx context.Context, api EC2FetchInstancesAPI) ([]resource.Resource, error)
 ```
 

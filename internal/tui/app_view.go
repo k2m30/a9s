@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // app_view.go — tui.Model render-path helpers: the View() composition plus the
 // header-right / account-badge / identity-role / identity-to-view-data helpers.
 //

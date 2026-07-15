@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // yaml_line.go — shared YAML line tokenization and plain-text formatting.
 // Used by both the YAML document view and the detail field-list view
 // so that markers and spacing stay identical across cursor states and views.

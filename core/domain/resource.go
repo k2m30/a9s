@@ -1,10 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package domain is the leaf type-declaration package for a9s.
 // It carries no internal imports and no presentation library imports.
 // All types declared here are stable contracts shared across layers.
 package domain
 
 // Resource represents a single AWS resource instance.
-// internal/resource re-exports this via a type alias.
+// core/resource re-exports this via a type alias.
 //
 // Canonical model — see `docs/historical/refactor/03-finding-model.md`.
 type Resource struct {

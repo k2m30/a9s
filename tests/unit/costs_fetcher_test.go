@@ -12,7 +12,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/costs"
 )
 
-// Fetcher functions under test (internal/aws, package aws) are named to
+// Fetcher functions under test (core/aws, package aws) are named to
 // mirror the paginated-fetch convention already used across this package
 // (e.g. FetchAlarmHistory), adapted to the four CE interfaces named in
 // data-model.md's "AWS layer" section:
@@ -237,7 +237,7 @@ func TestFetchCostAndUsage_ParsesAllFourMetrics(t *testing.T) {
 	// checks already exhaustively rules out any 5th key, so no separate
 	// costs.MetricNetUnblended absence check is needed. The constant
 	// itself is unreferenced anywhere in tests/unit as of this edit — flag
-	// for the coder: costs.MetricNetUnblended (internal/costs/types.go)
+	// for the coder: costs.MetricNetUnblended (core/costs/types.go)
 	// can now be deleted, it was only kept alive by this reference.
 	var sum float64
 	for _, amt := range metrics {

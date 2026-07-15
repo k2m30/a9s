@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package fixtures provides DocumentDB cluster fixture data for the DocDB fake.
 package fixtures
 

@@ -36,7 +36,7 @@ import (
 // strictSFNFake mirrors AWS: rejects ListExecutions when StateMachineArn is not
 // a valid ARN (does not start with "arn:aws:"). mu guards listCalledWith,
 // which is written concurrently: EnrichStepFunctionsStatus fans out
-// ListExecutions calls per resource via internal/aws.ForEachParallel
+// ListExecutions calls per resource via core/aws.ForEachParallel
 // (EnrichmentParallelism goroutines).
 type strictSFNFake struct {
 	awsclient.SFNAPI

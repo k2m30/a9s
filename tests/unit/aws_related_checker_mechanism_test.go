@@ -30,7 +30,7 @@ import (
 // already-loaded elb list by LoadBalancer.LoadBalancerArn"
 //
 // At HEAD the final step matches elbRes.ID (a bare LB *name*, per
-// internal/aws/elb.go's `ID: lbName`) against the LoadBalancerArns set (full
+// core/aws/elb.go's `ID: lbName`) against the LoadBalancerArns set (full
 // ARNs) — an ID/ARN type mismatch that can never match on real data. The
 // correct mechanism cross-references Fields["load_balancer_arn"].
 // ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ func TestLambda_Related_TG_MatchesViaDescribeTargetHealth(t *testing.T) {
 					ID:   "order-tg",
 					Name: "order-tg",
 					// target_group_arn mirrors what the real tg fetcher emits
-					// (internal/aws/tg.go: Fields["target_group_arn"] = tgArn) —
+					// (core/aws/tg.go: Fields["target_group_arn"] = tgArn) —
 					// the checker and this fake are both keyed by ARN.
 					Fields: map[string]string{"target_type": "lambda", "target_group_arn": tgArn},
 				},
@@ -607,7 +607,7 @@ func mechanismEC2CheckerByTarget(t *testing.T, target string) resource.RelatedCh
 func TestFakes_LambdaListTags_ServesCloudFormationStackNameTag(t *testing.T) {
 	fake := fakes.NewLambda()
 	// api-gateway-authorizer / acme-eks-cluster is the real fixture wiring
-	// (internal/demo/fixtures/lambda.go: Tags["api-gateway-authorizer"] =
+	// (core/demo/fixtures/lambda.go: Tags["api-gateway-authorizer"] =
 	// {"aws:cloudformation:stack-name": "acme-eks-cluster"}, acme-eks-cluster
 	// being a real cfn.go stack fixture) — not a synthetic pair.
 	fnArn := "arn:aws:lambda:us-east-1:123456789012:function:api-gateway-authorizer"

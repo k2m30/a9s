@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package runtime
 
 import (
@@ -116,11 +118,11 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		// follow-up). The TUI adapter calls Core.HandleResourcesLoaded
 		// directly (bypassing HandleEvent entirely, see
 		// runtime_adapter_resources.go) and Controller.Handle
-		// (internal/app/handle.go) already runs its own, separate
+		// (core/app/handle.go) already runs its own, separate
 		// ResourcesLoaded pipeline (handleResourcesLoadedEvent /
 		// applyResourcesLoaded). Applying HandleResourcesLoaded's intents here
 		// too would double-apply PatchResourceCache/ClearFlash for every
-		// Controller.Handle caller (web/headless/tests) — a real internal/app
+		// Controller.Handle caller (web/headless/tests) — a real core/app
 		// behavior change this stage must not make. Feed RowStore the same
 		// canonicalization + Fetch-origin write HandleResourcesLoaded performs,
 		// then call HandleResourcesLoaded ourselves and forward ONLY its

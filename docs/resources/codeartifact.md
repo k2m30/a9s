@@ -59,7 +59,7 @@ One bullet per distinct signal.
 
 - **Signal**: repository permissions policy grants public access (`"Principal":"*"` in the policy document) → **`!` background concern** ("public access policy").
   - **State bucket**: Healthy + `!` background concern.
-  - **API call**: `GetRepositoryPermissionsPolicy` — one call per repository. Implemented: `internal/aws/codeartifact_issue_enrichment.go:100-132`.
+  - **API call**: `GetRepositoryPermissionsPolicy` — one call per repository. Implemented: `core/aws/codeartifact_issue_enrichment.go:100-132`.
   - **Cost shape**: per-resource.
   - **Why**: a publicly readable/writable CodeArtifact repository is a real supply-chain exposure (dependency-confusion and package-poisoning surface) that operators must see — a9s-devops (2026-07-05): possible=yes, worth=yes.
 
@@ -130,7 +130,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `CreatedTime` field used for age computation — `AWS SDK Go v2 — codeartifact/types.RepositorySummary § CreatedTime`.
 - `PackageSummary` shape (emptiness check via `ListPackages` response) — `AWS SDK Go v2 — codeartifact/types.PackageSummary`.
 - Wave 3 item (`DescribeRepository` encryption check) — `docs/attention-signals.md § CI/CD` (codeartifact row, Wave 3 cell). The `GetRepositoryPermissionsPolicy` analysis originally listed there shipped as a Wave 2 signal and was moved to §3.2 during this amendment.
-- Wave 2 public-policy signal (`"Principal":"*"` in the repository permissions policy → `!` "public access policy"; policy absent → `~` "no permissions policy") — implemented `internal/aws/codeartifact_issue_enrichment.go:100-132`, one `GetRepositoryPermissionsPolicy` call per repo — a9s-devops (2026-07-05): possible=yes, worth=yes. A public CodeArtifact repository is a live supply-chain exposure (dependency confusion, package poisoning); operators doing an access review must see it without leaving the list.
+- Wave 2 public-policy signal (`"Principal":"*"` in the repository permissions policy → `!` "public access policy"; policy absent → `~` "no permissions policy") — implemented `core/aws/codeartifact_issue_enrichment.go:100-132`, one `GetRepositoryPermissionsPolicy` call per repo — a9s-devops (2026-07-05): possible=yes, worth=yes. A public CodeArtifact repository is a live supply-chain exposure (dependency confusion, package poisoning); operators doing an access review must see it without leaving the list.
 - Expected related targets (`ct-events`, `kms`) — `docs/related-resources.md § Per-type contract` and `docs/related-resources.md § codeartifact`.
 - `kms` pivot field citation (domain-level, not repo-level) — `AWS SDK Go v2 — codeartifact/types.DomainDescription § EncryptionKey`; `codeartifact/types.RepositorySummary § DomainName, DomainOwner` provides the lookup keys for `DescribeDomain`. The earlier wording "Repo EncryptionKey" in `docs/related-resources.md § codeartifact` was factually wrong (no such field exists on the Repository shape) and was amended during this spec generation — a9s-devops (2026-04-20): possible=yes, worth=yes; rationale — CodeArtifact encryption is domain-scoped; pivoting from repo to KMS requires a one-hop `DescribeDomain` call, which is cheap (cacheable per domain) and directly serves the "who depends on this CMK?" workflow during key rotation / access-audit reviews.
 - `DescribeRepository` noted as Wave 3 — `docs/attention-signals.md § CI/CD` (codeartifact row, Wave 3 cell).

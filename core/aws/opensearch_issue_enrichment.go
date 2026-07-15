@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // opensearch_issue_enrichment.go — Wave 2 issue enrichment for opensearch.
 // No AWS API call — reads signal flags populated by the fetcher.
 package aws

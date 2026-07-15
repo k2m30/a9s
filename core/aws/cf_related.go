@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // cf_related.go contains CloudFront distribution related-resource checker functions.
 package aws
 

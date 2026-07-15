@@ -27,10 +27,10 @@
 //
 // Test 3 (TestCoreLoadAvailabilityCache_EmptyRegion_ResolvesConfigDefault)
 // pins the shared runtime.Core.LoadAvailabilityCache seam
-// (internal/runtime/probes.go) that both the TUI Init seed and
-// internal/web/construct.go's newSession rely on: an empty-region session
+// (core/runtime/probes.go) that both the TUI Init seed and
+// core/web/construct.go's newSession rely on: an empty-region session
 // must still resolve the config-file default and seed from that pair's disk
-// cache. internal/web/construct.go's newSession is unexported and
+// cache. core/web/construct.go's newSession is unexported and
 // unreachable from tests/unit, so this test pins the shared Core-level seam
 // it delegates to (LoadAvailabilityCache), which is the same seam
 // TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu in
@@ -180,7 +180,7 @@ func applyNonConnectLeg(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 // connect settles it) must not block the disk seed entirely. The profile's
 // default region is resolvable synchronously from a local AWS config file
 // via awsclient.GetDefaultRegion(awsclient.DefaultConfigPath(), profile) —
-// the exact call handleClientsReadySuccess (internal/runtime/handlers.go)
+// the exact call handleClientsReadySuccess (core/runtime/handlers.go)
 // already makes post-connect — so the seed should resolve and use that same
 // region.
 //
@@ -233,20 +233,20 @@ func TestTUIInit_EmptyRegion_ResolvesConfigDefaultForSeed(t *testing.T) {
 
 // ────────────────────────────────────────────────────────────────────────────
 // Test 3 — the shared runtime.Core.LoadAvailabilityCache seam (used by both
-// the TUI Init seed and internal/web/construct.go's newSession) must resolve
+// the TUI Init seed and core/web/construct.go's newSession) must resolve
 // an empty region from the config-file default.
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestCoreLoadAvailabilityCache_EmptyRegion_ResolvesConfigDefault pins the
-// shared runtime-level seam directly: internal/web/construct.go's newSession
+// shared runtime-level seam directly: core/web/construct.go's newSession
 // is unexported and unreachable from tests/unit (confirmed: only
-// internal/web itself can construct it), so this test pins the exact Core
+// core/web itself can construct it), so this test pins the exact Core
 // method newSession's live (no-pre-supplied-clients) branch delegates to —
-// runtime.Core.LoadAvailabilityCache (internal/runtime/probes.go) — which is
+// runtime.Core.LoadAvailabilityCache (core/runtime/probes.go) — which is
 // also the same method tui.Model's probe_adapter.go loadAvailabilityCache
 // wraps for Test 1/2 above. A green result here is a green result for both
 // callers' empty-region behavior; it does not exercise
-// internal/web/construct.go's newSession wiring itself (that plumbing is a
+// core/web/construct.go's newSession wiring itself (that plumbing is a
 // two-line direct call with no branching left to pin once this seam is
 // fixed).
 //

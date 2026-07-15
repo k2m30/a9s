@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package domain
 
 // Color classifies a resource's health for display, filtering, and badges.

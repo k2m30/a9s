@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package fixtures provides ASG fixture data for the ASG fake.
 package fixtures
 
@@ -393,7 +395,7 @@ func buildActivitiesFor(asgName string) []asgtypes.Activity {
 			Progress:             aws.Int32(50),
 		},
 		// Cancelled — required for asg_activities' Findings-based coloring
-		// witness (asgActivityFindings, internal/aws/asg_activities.go): a
+		// witness (asgActivityFindings, core/aws/asg_activities.go): a
 		// StatusCode=Cancelled activity is the only demo witness of this
 		// branch.
 		{

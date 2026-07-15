@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	// Fixture IDs sourced from internal/demo/fixtures/efs.go so renames or
+	// Fixture IDs sourced from core/demo/fixtures/efs.go so renames or
 	// fixture regeneration propagate to this test automatically.
 	efsWarnCreating         = demofixtures.WarnEFSCreatingID
 	efsWarnUpdating         = demofixtures.WarnEFSUpdatingID

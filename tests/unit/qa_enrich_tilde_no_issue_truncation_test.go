@@ -10,7 +10,7 @@
 // EnrichmentCap, tying the aggregate Truncated flag (read by the badge as
 // "this count is a lower bound") to their own per-resource API-call cap
 // instead of to the issue count. EnrichSESAccount
-// (internal/aws/ses_issue_enrichment.go) already gets this right by setting
+// (core/aws/ses_issue_enrichment.go) already gets this right by setting
 // Truncated = false unconditionally; the 18 enrichers here must match it.
 //
 // Each subtest drives one enricher with EnrichmentCap+1 (51) synthetic
@@ -30,7 +30,7 @@ import (
 )
 
 // tildeOnlyIssueEnricherFunc matches awsclient.IssueEnricherFunc
-// (internal/aws/issue_enrichment.go), the shared contract every case below
+// (core/aws/issue_enrichment.go), the shared contract every case below
 // implements.
 type tildeOnlyIssueEnricherFunc func(context.Context, *awsclient.ServiceClients, []resource.Resource, resource.ResourceCache) (awsclient.IssueEnricherResult, error)
 

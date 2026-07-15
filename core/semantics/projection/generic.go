@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package projection provides DetailProjector implementations for resource types.
 package projection
 
@@ -14,31 +16,31 @@ import (
 
 // ─── Injectable resource-registry callbacks ───────────────────────────────
 //
-// projection cannot import internal/resource (no import cycle from
-// internal/semantics back to internal/resource). The callbacks
-// below are set by internal/resource at init time so Generic can access
+// projection cannot import core/resource (no import cycle from
+// core/semantics back to core/resource). The callbacks
+// below are set by core/resource at init time so Generic can access
 // per-type metadata without creating that cycle.
 //
 // Callers that don't wire these (e.g. isolated unit tests that never import
-// internal/resource) get graceful fallback: nil callbacks → no navigability,
+// core/resource) get graceful fallback: nil callbacks → no navigability,
 // no alias normalisation, no per-type field ordering (falls through to
 // Fields-only flat rendering).
 
 // NavFieldsProvider returns the navigable field definitions for a resource
 // type, enabling Generic to mark matching detail items as navigable.
-// Set by internal/resource.init().
+// Set by core/resource.init().
 var NavFieldsProvider func(shortName string) []domain.NavigableField
 
 // NavIDProvider resolves an ARN/value to a bare resource ID for navigation.
-// Set by internal/resource.init().
+// Set by core/resource.init().
 var NavIDProvider func(targetType, value string) string
 
 // FieldAliasProvider normalises a Fields map by adding PascalCase aliases for
-// the snake_case keys produced by fetchers. Set by internal/resource.init().
+// the snake_case keys produced by fetchers. Set by core/resource.init().
 var FieldAliasProvider func(shortName string, fields map[string]string) map[string]string
 
 // FieldKeysProvider returns the registered field keys for a resource type.
-// Set by internal/resource.init().
+// Set by core/resource.init().
 var FieldKeysProvider func(shortName string) []string
 
 // ─── View-config cache ────────────────────────────────────────────────────

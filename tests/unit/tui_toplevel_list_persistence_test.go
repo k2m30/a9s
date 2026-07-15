@@ -4,14 +4,14 @@
 // (via app.Controller.ApplyIntents + EnsureListState), not
 // PushChildListScreen's runtime.ScreenChildList. Before that fix, EVERY
 // top-level TUI list open silently disabled Controller.maybeSaveResourceListCache's
-// C6 disk-cache save gate (internal/app/handle.go's syncExactTotalToMenu,
+// C6 disk-cache save gate (core/app/handle.go's syncExactTotalToMenu,
 // which only persists when screen.ID == runtime.ScreenResourceList) — a
 // genuine navigate-and-append session in the running TUI never wrote a
 // per-type cache file to disk, RED at commit effdd465 (confirmed by reading
 // PushChildListScreen's runtime.ScreenChildList push at that commit).
 //
-// Item A/B/C — see internal/app/handle.go, internal/app/list_body.go,
-// internal/app/navigate.go, internal/runtime/handlers_navigate.go for the
+// Item A/B/C — see core/app/handle.go, core/app/list_body.go,
+// core/app/navigate.go, core/runtime/handlers_navigate.go for the
 // production-side contracts these tests pin against.
 //
 // SCOPE NOTE on item B (screen-ID guard): internal/tui.Model.ctrl is
@@ -20,12 +20,12 @@
 // tests/unit black-box test cannot directly assert
 // (*app.Controller).ScreenIDs() through the TUI layer. maybeSaveResourceListCache
 // and syncExactTotalToMenu share the exact same single gate
-// (screen.ID == runtime.ScreenResourceList — internal/app/handle.go), so
+// (screen.ID == runtime.ScreenResourceList — core/app/handle.go), so
 // TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk below (which CAN only
 // pass if that gate is satisfied) is an indirect but airtight proof that the
 // TUI's pushed screen carries ScreenResourceList, not ScreenChildList.
 // TestScreenIDGuard_TopLevelCommandVsPushChildListScreen additionally pins
-// the underlying invariant directly at the internal/app layer (both call
+// the underlying invariant directly at the core/app layer (both call
 // paths are reachable from tests/unit), guarding the semantic the TUI
 // depends on even though this package cannot observe *tui.Model's own
 // screen stack.
@@ -140,7 +140,7 @@ func TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk(t *testing.T) {
 // -----------------------------------------------------------------------
 
 // TestScreenIDGuard_TopLevelCommandVsPushChildListScreen pins, at the
-// internal/app layer, the exact invariant the TUI adapter's fix depends on:
+// core/app layer, the exact invariant the TUI adapter's fix depends on:
 // a top-level command-driven list open (the app.Controller path
 // handleActionCommand -> applyNavResult mirrors what the TUI's fixed
 // handleNavigate now drives via ApplyIntents{PushScreen{ScreenResourceList}})
@@ -221,7 +221,7 @@ func TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch(t *testin
 
 	// Fresh TUI model over the SAME profile/region pair, so HandleNavigate's
 	// cache-miss fallback (no ProbeResources observed yet) reads the just-seeded
-	// disk pair (internal/runtime/handlers_navigate.go's ReadCacheStore branch).
+	// disk pair (core/runtime/handlers_navigate.go's ReadCacheStore branch).
 	m := tuitest.Sized(profile, region)
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = tuitest.Step(m, messages.Navigate{

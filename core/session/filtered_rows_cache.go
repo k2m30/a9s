@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // filtered_rows_cache.go — session home for server-side-filtered
 // related-drill results (cache contract C6).
 //

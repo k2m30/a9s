@@ -1,10 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // relatedcache.go — related-cache helpers.
 //
 // RelatedCacheKey and RelatedCacheReplay are free functions that live here
-// (rather than internal/session) so renderer adapters can call them via
-// internal/runtime instead of importing internal/session. RelatedCacheResult is
+// (rather than core/session) so renderer adapters can call them via
+// core/runtime instead of importing core/session. RelatedCacheResult is
 // re-exported as a type alias so callers can construct cache entries using
-// the runtime name; the underlying type still lives in internal/session
+// the runtime name; the underlying type still lives in core/session
 // because *session.RelatedCacheLRU stores it and session.Session.New
 // initialises the cache field.
 package runtime
@@ -16,13 +18,13 @@ import (
 
 // RelatedCacheResult is the per-row payload stored in the related-cache
 // LRU. Alias for session.RelatedCacheResult so renderer adapters need not
-// import internal/session to construct cache entries.
+// import core/session to construct cache entries.
 type RelatedCacheResult = session.RelatedCacheResult
 
 // RelatedCacheKey builds the map key for RelatedCache lookups, using the
 // same `<resourceType>:<resourceID>` format as the session-side helper.
 // Moved here so renderer adapters can resolve cache keys without importing
-// internal/session.
+// core/session.
 func RelatedCacheKey(resourceType, resourceID string) string {
 	return resourceType + ":" + resourceID
 }

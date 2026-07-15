@@ -1,5 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package fixtures — costs.go provides the synthetic Cost Explorer dataset
-// served by the demo transport's ce:* handlers (internal/demo/handlers.go).
+// served by the demo transport's ce:* handlers (core/demo/handlers.go).
 // Evergreen: CostsAnchorMonth is resolved once, from the real wall clock,
 // when the process starts — not per-render, so a single run stays
 // internally consistent, and every demo session opens on a genuinely
@@ -77,7 +79,7 @@ var CostsGrowthMonth = costsMonthsEndingAt(CostsAnchorMonth, 13)[6]
 
 // CostsResourceRow is one (resource ID, daily amount) fact for the
 // GetCostAndUsageWithResources synthetic dataset — resource IDs reference
-// real fixture entities (internal/demo/fixtures/ec2.go's EC2 instances) so
+// real fixture entities (core/demo/fixtures/ec2.go's EC2 instances) so
 // a future resource-detail jump lands on an entity that actually exists.
 type CostsResourceRow struct {
 	ResourceID  string
@@ -88,7 +90,7 @@ type CostsResourceRow struct {
 // the CE canonical SERVICE dimension value GetCostAndUsageWithResources is
 // ever filtered on. Only services with a registered a9s detail-view mapping
 // (a catalog entry whose CostExplorerServiceName is set, resolved by
-// internal/app/costs_state.go's costsResourceRowTargetType) carry entries.
+// core/app/costs_state.go's costsResourceRowTargetType) carry entries.
 // The three g5.xlarge instances (ec2.go's ml-inference-0{1,2,3}) are the
 // growth story's own resource-drill target — their combined daily amounts
 // plausibly attribute CostsGrowthMonth's spike; the other three (web-prod-0{1,2},

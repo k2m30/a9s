@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package app
 
 import (
@@ -927,10 +929,10 @@ func listHasBadgeFinding(r resource.Resource) bool {
 // stripWave2Findings returns findings with every Wave-2 entry
 // (domain.Finding.IsWave2Sourced) removed, preserving the order of the
 // remaining entries. Mirrors stripWave2 in internal/tui/app_enrich_fold.go
-// and applyWave2ToRow's strip step in internal/runtime/helpers.go — kept as a
-// sibling here (rather than imported) because internal/app must not depend
-// on internal/tui (internal/tui already depends on internal/app) or
-// internal/runtime's unexported helpers.
+// and applyWave2ToRow's strip step in core/runtime/helpers.go — kept as a
+// sibling here (rather than imported) because core/app must not depend
+// on internal/tui (internal/tui already depends on core/app) or
+// core/runtime's unexported helpers.
 func stripWave2Findings(findings []domain.Finding) []domain.Finding {
 	if len(findings) == 0 {
 		return findings

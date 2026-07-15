@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // igw_related.go contains Internet Gateway related-resource checker functions.
 package aws
 

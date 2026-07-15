@@ -29,7 +29,7 @@ import (
 //
 // Post-refactor, the strings "system_status" and "instance_status" must not
 // appear anywhere in internal/tui/ (excluding *_test.go files). The EC2
-// CellDecorators func lives in internal/resource/, which is the correct owner.
+// CellDecorators func lives in core/resource/, which is the correct owner.
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestColorRefactor_NoEC2FieldsInPresentationLayer(t *testing.T) {
@@ -93,11 +93,11 @@ func projectRoot(t *testing.T) string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TestColorRefactor_EC2Color_ImpairedPromotion pins colorEC2
-// (internal/aws/catalog_compute.go), which since the color-findings-conformance
+// (core/aws/catalog_compute.go), which since the color-findings-conformance
 // wave is colorFromAnyFinding-only with NO raw-field fallback — every
 // non-healthy case must attach a Finding shaped like the real fetcher
-// (internal/aws/ec2.go wave1 Findings) or Wave-2 enricher
-// (internal/aws/ec2_issue_enrichment.go, Source "wave2:ec2"). Fields are kept
+// (core/aws/ec2.go wave1 Findings) or Wave-2 enricher
+// (core/aws/ec2_issue_enrichment.go, Source "wave2:ec2"). Fields are kept
 // for realism/context only — they are no longer read by Color.
 func TestColorRefactor_EC2Color_ImpairedPromotion(t *testing.T) {
 	td := resource.FindResourceType("ec2")

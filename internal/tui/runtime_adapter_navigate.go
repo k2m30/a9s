@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // runtime_adapter_navigate.go — Bubble Tea adapter glue for runtime.Core's
 // HandleNavigate entry point.
 //
@@ -252,7 +254,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			// cached rows directly into the controller's DetailState and
 			// reports whether it did — single source of truth shared with the
 			// headless/web NavigateKindPushDetail case in
-			// internal/app/navigate.go (applyNavResult). Only dispatch the
+			// core/app/navigate.go (applyNavResult). Only dispatch the
 			// TUI's own concurrent fan-out (relatedCheckCmd, one goroutine per
 			// RelatedDef) on a cache miss.
 			if !m.ctrl.ReplayRelatedCache(result.ResolvedType, *result.Resource) {

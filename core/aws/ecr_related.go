@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // ecr_related.go contains ECR related-resource checker functions.
 package aws
 

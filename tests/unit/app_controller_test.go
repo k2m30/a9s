@@ -1,4 +1,4 @@
-// app_controller_test.go — contract tests for internal/app.Controller (PR-A).
+// app_controller_test.go — contract tests for core/app.Controller (PR-A).
 //
 // Behavioral contracts covered:
 //

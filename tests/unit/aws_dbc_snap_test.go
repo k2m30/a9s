@@ -5,7 +5,7 @@ package unit
 // Spec: docs/resources/dbc-snap.md §3.1 + §4
 //
 // ComputeDBCSnapStatusAndIssues is the fetcher-local §4 phrase computer added
-// by the coder's refactor of internal/aws/dbc_snap.go. It follows the same
+// by the coder's refactor of core/aws/dbc_snap.go. It follows the same
 // contract as ComputeDBISnapStatusAndIssues (dbi-snap) but with the dbc-snap
 // signal set:
 //

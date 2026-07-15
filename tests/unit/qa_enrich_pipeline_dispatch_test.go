@@ -4,13 +4,13 @@ package unit
 // enrichment dispatch bug (issue #017-issue-counts-attention-filter).
 //
 // Root cause: Wave 1 stores CodePipeline probe resources under ShortName
-// "pipeline" (internal/resource/types_cicd.go:51), but buildEnrichQueue's
+// "pipeline" (core/resource/types_cicd.go:51), but buildEnrichQueue's
 // order slice and the EnricherRegistry both use key "pipe". Result: buildEnrichQueue
 // never sees "pipeline" in probeResources and the enricher is never dispatched.
 //
 // Fix: rename both "pipe" → "pipeline" in buildEnrichQueue's order slice
 // (internal/tui/app_fetchers.go:537) and in EnricherRegistry
-// (internal/aws/pipeline_issue_enrichment.go).
+// (core/aws/pipeline_issue_enrichment.go).
 //
 // This test seeds probeResources["pipeline"] via AvailabilityCheckedMsg (the
 // same path that Wave 1 uses at the end of the availability-probe cycle), then

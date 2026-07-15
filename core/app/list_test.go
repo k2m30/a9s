@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // list_test.go — contract tests for the controller-side list machinery.
 //
 // Behaviors covered:

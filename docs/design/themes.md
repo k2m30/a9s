@@ -168,11 +168,11 @@ theme: "~/.a9s/themes/my-theme.yaml"  # path to custom theme file
 **Goal:** Read theme selection from `config.yaml` and apply at startup.
 
 **Files to create:**
-- `internal/config/appconfig.go` — `AppConfig` struct with `Theme` field, `LoadAppConfig()` function
+- `core/config/appconfig.go` — `AppConfig` struct with `Theme` field, `LoadAppConfig()` function
 
 **Files to modify:**
 - `internal/tui/app.go` — load app config at init, call `ApplyTheme()` before first render
-- `internal/config/config.go` — share lookup chain logic
+- `core/config/config.go` — share lookup chain logic
 
 **Acceptance criteria:**
 - `theme: "catppuccin"` in config switches colors
@@ -184,7 +184,7 @@ theme: "~/.a9s/themes/my-theme.yaml"  # path to custom theme file
 **Goal:** Allow user-defined YAML theme files.
 
 **Files to modify:**
-- `internal/config/appconfig.go` — detect file path vs built-in name, parse YAML theme file
+- `core/config/appconfig.go` — detect file path vs built-in name, parse YAML theme file
 - `internal/tui/styles/theme.go` — `ThemeFromYAML(data []byte) (Theme, error)` with validation
 
 **Acceptance criteria:**

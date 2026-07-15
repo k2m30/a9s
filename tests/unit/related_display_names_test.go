@@ -58,7 +58,7 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		targetType string
 	}
 	// Golden map: (resourceShortName, targetType) → expected DisplayName.
-	// Derived from internal/aws/*_related.go and verified against source.
+	// Derived from core/aws/*_related.go and verified against source.
 	golden := map[key]string{
 		// eb (Elastic Beanstalk) — required minimum
 		{"eb", "cfn"}:  "CloudFormation Stack",

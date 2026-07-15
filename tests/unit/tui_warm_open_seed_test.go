@@ -5,7 +5,7 @@
 // yet, but session.RowStore DOES hold retained first-page rows from a
 // prior Wave-1 probe / disk-cache replay), the two renderer adapters diverge:
 //
-//   - internal/app/navigate.go's applyNavResult, NavigateKindPushResourceList
+//   - core/app/navigate.go's applyNavResult, NavigateKindPushResourceList
 //     branch (controller/headless/web lane) seeds the pushed list straight
 //     from c.core.Session().RowStore.Snapshot(res.ResolvedType) (Rows +
 //     Pagination.IsTruncated → synthetic PaginationMeta), so the list renders

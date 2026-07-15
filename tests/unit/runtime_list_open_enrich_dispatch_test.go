@@ -5,7 +5,7 @@
 // Root cause (verified by reading the real call chains, not the dispatch's
 // claim alone):
 //
-//   - internal/runtime/handlers_resources.go's HandleResourcesLoaded only
+//   - core/runtime/handlers_resources.go's HandleResourcesLoaded only
 //     appends a TaskRequest{Kind: TaskKindProbeEnrich} inside the
 //     `if ev.TypeGen != 0 && ev.TypeGen == c.session.EnrichmentTypeGen[...]`
 //     branch — the Ctrl+R-for-rerun path. A normal list-open message carries
@@ -22,10 +22,10 @@
 //     be pinning a fiction — pins below match the actual (broken) shared
 //     behavior instead of an imagined TUI-only special case.
 //   - The headless/web lane is even more clearly broken: HandleEvent's
-//     messages.ResourcesLoaded case (internal/runtime/orchestrator.go) is
+//     messages.ResourcesLoaded case (core/runtime/orchestrator.go) is
 //     explicitly "Row-store dual-write ONLY" — it calls
 //     observeResourcesLoadedRows and returns nil, nil, NEVER reaching
-//     Core.HandleResourcesLoaded. Controller.Handle (internal/app/handle.go)
+//     Core.HandleResourcesLoaded. Controller.Handle (core/app/handle.go)
 //     only adds its own append-only branches (refreshTasksForIntents,
 //     autoOpenSingleDetail) on top of HandleEvent's tasks — none of them
 //     request TaskKindProbeEnrich. So a web/headless session that opens a
@@ -198,7 +198,7 @@ func TestHandleResourcesLoaded_ErrorLoad_NoProbeEnrich(t *testing.T) {
 // TaskKindProbeEnrich task among the TaskRequests, for an issue-capable type.
 //
 // RED today: HandleEvent's messages.ResourcesLoaded case
-// (internal/runtime/orchestrator.go) is documented "Row-store dual-write
+// (core/runtime/orchestrator.go) is documented "Row-store dual-write
 // ONLY" — it calls observeResourcesLoadedRows and returns nil, nil,
 // NEVER invoking Core.HandleResourcesLoaded. Controller.Handle's only
 // additional task sources for this message (refreshTasksForIntents,

@@ -86,7 +86,7 @@ func containsRelatedCheckStartedMsg(msgs []tea.Msg) bool {
 func TestRelatedNavigate_CachedTargetID_DispatchesRelatedCheck(t *testing.T) {
 	defs := resource.GetRelated("ec2")
 	if len(defs) == 0 {
-		t.Fatal("no ec2 related defs registered — internal/aws import should register them")
+		t.Fatal("no ec2 related defs registered — core/aws import should register them")
 	}
 
 	m, ec2Res := setupEC2ListWithCache(t)
@@ -138,7 +138,7 @@ func TestRelatedNavigate_CachedTargetID_DispatchesRelatedCheck(t *testing.T) {
 func TestRelatedNavigate_CachedTargetID_UsesCachedResults(t *testing.T) {
 	defs := resource.GetRelated("ec2")
 	if len(defs) == 0 {
-		t.Fatal("no ec2 related defs registered — internal/aws import should register them")
+		t.Fatal("no ec2 related defs registered — core/aws import should register them")
 	}
 
 	// Use setupEC2DetailWithResults to build state with results cached (Count=2 per type).
@@ -192,7 +192,7 @@ func TestRelatedNavigate_CachedTargetID_UsesCachedResults(t *testing.T) {
 func TestRelatedNavigate_SingleRelatedID_CacheHit_DispatchesRelatedCheck(t *testing.T) {
 	defs := resource.GetRelated("ec2")
 	if len(defs) == 0 {
-		t.Fatal("no ec2 related defs registered — internal/aws import should register them")
+		t.Fatal("no ec2 related defs registered — core/aws import should register them")
 	}
 
 	m, ec2Res := setupEC2ListWithCache(t)

@@ -4,7 +4,7 @@ package unit
 //
 // Each case is non-tautological: fields are set to realistic values that a
 // real fetcher would produce. The expected colors are read from the production
-// Color func in internal/resource/types_compute.go.
+// Color func in core/resource/types_compute.go.
 //
 // Skipped cases (not in production Color func):
 //   - in_service / instances / suspended_processes fields — production Color

@@ -3,11 +3,11 @@ package unit
 // qa_ec2_color_test.go — Color contract pin for EC2 Instances.
 //
 // Since the color-findings-conformance wave (qa_color_findings_conformance_test.go),
-// colorEC2 is colorFromAnyFinding-only (internal/aws/catalog_compute.go) — it
+// colorEC2 is colorFromAnyFinding-only (core/aws/catalog_compute.go) — it
 // has NO raw-field fallback at all. Color is entirely derived from Findings,
 // so every non-healthy case here must attach a Finding shaped exactly like
-// the real fetcher (internal/aws/ec2.go, wave1 lifecycle Findings) or the
-// real Wave-2 enricher (internal/aws/ec2_issue_enrichment.go, Source
+// the real fetcher (core/aws/ec2.go, wave1 lifecycle Findings) or the
+// real Wave-2 enricher (core/aws/ec2_issue_enrichment.go, Source
 // "wave2:ec2") would produce. Fields are kept for realism/context only —
 // they are no longer read by Color.
 //

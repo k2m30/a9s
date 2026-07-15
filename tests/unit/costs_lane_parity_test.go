@@ -120,7 +120,7 @@ func TestCostsLaneParity_A_DrillToResourceJump_Success(t *testing.T) {
 		t.Fatal("headless precondition: USAGE_TYPE -> RESOURCE_ID drill did not emit a fetch task")
 	}
 	resourcePeriod := costs.WindowWithin(usagePeriod, costs.GranularityDay, now)[0]
-	// A REAL demo fixture ID (internal/demo/fixtures/ec2.go's "web-prod-01")
+	// A REAL demo fixture ID (core/demo/fixtures/ec2.go's "web-prod-01")
 	// — the by-ID fetch runs against the actual demo transport in both
 	// lanes, so it must resolve as found, not a not-found Flash.
 	const realID = "i-0a1b2c3d4e5f60001"

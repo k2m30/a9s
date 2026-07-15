@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package aws — testing helper for IAM policy related-checkers.
 // SetIAMListEntitiesAPIForTest installs a mock IAMListEntitiesForPolicyAPI and
 // returns a restore function. Tests call the restore function (typically via defer)

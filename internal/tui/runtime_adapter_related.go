@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // runtime_adapter_related.go — Bubble Tea adapter glue for two runtime entry
 // points: HandleRelatedNavigate and HandleRelatedCheckStarted.
 //
@@ -16,7 +18,7 @@
 // type, and if so fans out one checker goroutine per def via relatedCheckCmd
 // (capped by runtime.MaxConcurrentProbes). The actual probe loop stays here in
 // the adapter because it depends on m.core.Clients(), m.appCtx, and tea.Cmd —
-// platform glue that does not belong in internal/runtime.
+// platform glue that does not belong in core/runtime.
 //
 // Exact-ID drills now route through the runtime's KindFetchByIDDetail task for
 // any type with a registered FetchByIDs helper (ami, kms, policy, ebs-snap).

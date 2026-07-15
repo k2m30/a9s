@@ -6,7 +6,7 @@ package unit
 // RelatedIDs path).
 //
 // The runtime is the sole decision-maker for fetch tasks
-// (internal/runtime/handlers_related.go relatedFetchTasks). The adapter must
+// (core/runtime/handlers_related.go relatedFetchTasks). The adapter must
 // translate the emitted []TaskRequest into tea.Cmd values and never silently
 // drop them, regardless of how much the cache already covers.
 //
@@ -185,7 +185,7 @@ func TestRelatedNavigate_AllRelatedIDs_InCache_NoFetch(t *testing.T) {
 //        One ID is in the cache; the other is not — coverage is partial.
 // Then:  The returned cmd is non-nil (a full re-fetch is issued).
 //
-// Contract: per internal/runtime/handlers_related.go relatedFetchTasks() and
+// Contract: per core/runtime/handlers_related.go relatedFetchTasks() and
 // the pinning runtime test
 // TestRelatedFetchTasks_PartialCoverage_NotTruncated_FetchAll, when any
 // RelatedID is missing from cache and the cache cannot page further
@@ -224,6 +224,6 @@ func TestRelatedNavigate_PartialCache_NotTruncated_FetchesFullList(t *testing.T)
 		t.Fatal("BUG: RelatedNavigateMsg with partial coverage on a non-truncated cache " +
 			"must initiate a full re-fetch (cmd should be non-nil) — runtime is the SSOT " +
 			"for the fetch decision and emits KindFetchResources here " +
-			"(see internal/runtime/handlers_related.go relatedFetchTasks)")
+			"(see core/runtime/handlers_related.go relatedFetchTasks)")
 	}
 }

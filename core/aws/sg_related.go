@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // sg_related.go contains Security Group related-resource checker functions.
 package aws
 

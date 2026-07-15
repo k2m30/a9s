@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // cfn_related.go contains CloudFormation related-resource checker functions.
 package aws
 

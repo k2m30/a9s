@@ -1,14 +1,14 @@
 package unit
 
 // aws_backup_match_test.go — regression tests for BackupPlanCoversARN in
-// internal/aws/backup_match.go.
+// core/aws/backup_match.go.
 //
 // These tests pin:
 //   - NotResources exclusion: exclusion always wins over a Resources match.
 //   - Whitespace trimming around CSV entries.
 //
 // Wildcard / regex-metachar / empty-input semantics moved with the matcher to
-// internal/semantics/selector; see semantics_selector_match_arn_test.go.
+// core/semantics/selector; see semantics_selector_match_arn_test.go.
 
 import (
 	"testing"

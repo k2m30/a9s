@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package runtime
 
 import (
@@ -321,7 +323,7 @@ func (PatchLazyResourceCache) isIntent() {}
 // adapter. The runtime writes session.Identity (still typed as
 // *awsclient.CallerIdentity) before emitting; this
 // intent gives the renderer a renderer-shaped value to apply to active
-// views (today: IdentityModel.SetIdentity) without importing internal/aws.
+// views (today: IdentityModel.SetIdentity) without importing core/aws.
 // nil Identity is permitted and signals a no-op render-side update
 // (the session field is already cleared by Core in that path).
 type SetIdentityIntent struct {

@@ -5,7 +5,7 @@
 //  1. PersistedRows_CarryEveryRenderableColumn: a persisted s3 Row lacked the
 //     "region" field even though the list renders a Region column — the cells
 //     stayed empty until a later fetch replaced the seeded rows.
-//     MaterializeListFields (internal/app/list_columns.go) only fires when
+//     MaterializeListFields (core/app/list_columns.go) only fires when
 //     r.RawStruct != nil (its very first line: "if r.RawStruct == nil {
 //     return r }"). A fresh live fetch always carries a real RawStruct
 //     (Scenario A below, which already passes at HEAD for every type). A
@@ -28,7 +28,7 @@
 //     fetcher is telling it there is more.
 //
 //  3. SilentSwap_NeverDropsKnownFindings: applyResourcesLoaded
-//     (internal/app/list_body.go) re-applies Wave-2 findings onto a freshly
+//     (core/app/list_body.go) re-applies Wave-2 findings onto a freshly
 //     swapped-in page ONLY from c.enrichmentStore (the session-scoped Wave-2
 //     map) — see its "known := c.listEnrichmentFindings(typeName)" tail. It
 //     never consults the OUTGOING rows' own persisted r.Findings. A cold-boot
@@ -62,7 +62,7 @@ import (
 // fieldCompletenessPair builds a fresh, hermetic Controller/Core pair backed
 // by a per-test temp cache directory. Callers must still open a top-level
 // list screen (openTopLevelList) via the same ActionCommand entry point
-// production code uses (internal/app/actions_view.go handleActionCommand) so
+// production code uses (core/app/actions_view.go handleActionCommand) so
 // maybeSaveResourceListCache's C6 scope gate (screen.ID ==
 // ScreenResourceList, EscPops=false, ParentContext=nil) is satisfied and a
 // subsequent ApplyResourcesLoaded call actually reaches disk. Mirrors
@@ -198,7 +198,7 @@ func pathBackedKeylessColumns(cols []app.ColumnDef, lifecycleKey string) []app.C
 // an old-format on-disk Row that is MISSING a target column's Fields key
 // (e.g. an s3 Row saved by a build that predates that column, or any
 // partial-write gap) is loaded back via rowsFromCacheRows
-// (internal/runtime/handlers_availability.go) into a resource.Resource with
+// (core/runtime/handlers_availability.go) into a resource.Resource with
 // RawStruct == nil (disk never carries RawStruct, C6). RED at HEAD: once
 // reseeded this way, MaterializeListFields's very first line ("if
 // r.RawStruct == nil { return r }") makes the missing column PERMANENTLY
@@ -504,7 +504,7 @@ func TestPoisonedExact_HealsOnContradiction(t *testing.T) {
 // silently drop it.
 //
 // Contract (fixed, mirrors qa_cache_lifecycle_test.go's Scenario 3 finding
-// and internal/app/list_body.go's applyResourcesLoaded carry-forward): a
+// and core/app/list_body.go's applyResourcesLoaded carry-forward): a
 // fresh fetch result IS the authoritative statement about WAVE-1 state for a
 // row — a row that comes back with zero findings this time means any
 // WAVE-1-sourced issue is RESOLVED, and carrying that old Wave-1 finding
@@ -536,10 +536,10 @@ func TestSilentSwap_NeverDropsKnownFindings(t *testing.T) {
 	ctrl.ApplyResourcesLoaded("s3", seeded, nil, false)
 
 	// Since the color-findings-conformance wave, colorS3 is
-	// colorFromAnyFinding-only (internal/aws/catalog_databases.go) — a
+	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — a
 	// SevBroken Finding resolves the row's whole-row color to "broken"
 	// directly (resolveListDecoratorFull's DecoratorError glyph branch only
-	// fires when ResolveColor()==ColorHealthy; see internal/app/list_columns.go
+	// fires when ResolveColor()==ColorHealthy; see core/app/list_columns.go
 	// and .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
 	// The stronger, correct check is ListRow.Color=="broken", not the glyph
 	// Decorator.
@@ -626,10 +626,10 @@ func TestSilentSwap_Wave1FindingNotCarriedOnResolve(t *testing.T) {
 	ctrl.ApplyResourcesLoaded("s3", seeded, nil, false)
 
 	// Since the color-findings-conformance wave, colorS3 is
-	// colorFromAnyFinding-only (internal/aws/catalog_databases.go) — a
+	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — a
 	// SevBroken Finding resolves the row's whole-row color to "broken"
 	// directly (resolveListDecoratorFull's DecoratorError glyph branch only
-	// fires when ResolveColor()==ColorHealthy; see internal/app/list_columns.go
+	// fires when ResolveColor()==ColorHealthy; see core/app/list_columns.go
 	// and .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
 	// The stronger, correct check is ListRow.Color=="broken", not the glyph
 	// Decorator.

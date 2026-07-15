@@ -33,7 +33,7 @@ import (
 )
 
 // ec2StateFinding returns the realistic Wave-1 Finding the real EC2 fetcher
-// (internal/aws/ec2.go) attaches for a given non-healthy lifecycle state —
+// (core/aws/ec2.go) attaches for a given non-healthy lifecycle state —
 // since the color-findings-conformance wave, colorEC2 is
 // colorFromAnyFinding-only (no raw-field fallback), so any synthetic EC2
 // fixture testing Color/IsIssue must carry this Finding to be meaningful.

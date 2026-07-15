@@ -13,7 +13,7 @@ import (
 )
 
 // TestWebDNSRebind_RejectsNonLoopbackHost guards the dnsRebindGuard middleware
-// introduced in internal/web/server.go. The guard must reject any request whose
+// introduced in core/web/server.go. The guard must reject any request whose
 // Host header is not a loopback address (127.x.x.x / ::1 / localhost), and any
 // request that carries a non-loopback Origin header. Without this guard a hostile
 // page whose DNS resolves to 127.0.0.1 could drive the local server.

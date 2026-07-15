@@ -1,7 +1,7 @@
 // qa_status_column_uniformity_test.go — the standing OWNER RULE gate: every
 // registered top-level list view must present exactly ONE status column,
 // uniformly titled "Status", whose cell the shared pipeline in
-// internal/app/list_columns.go (listExtractCellValue's isStatusCol cascade)
+// core/app/list_columns.go (listExtractCellValue's isStatusCol cascade)
 // renders. Per-type duplicates — ng/eks "Issues"/"Health Issues"
 // (key=health_issues), Key-less columns titled "State" (rather than
 // "Status"), sg-style "Risk" phrase columns, any "State Reason"-like cause
@@ -92,7 +92,7 @@ const (
 var duplicateCausePattern = regexp.MustCompile(`(?i)^(issues|health_issues|risk|state|state[_ ]?reason|status[0-9]+)$`)
 
 // isStatusQualifyingColumn mirrors listExtractCellValue's isStatusCol
-// predicate in internal/app/list_columns.go byte-for-byte (Key=="status" OR
+// predicate in core/app/list_columns.go byte-for-byte (Key=="status" OR
 // Key==lifecycleKey OR Title case-insensitively "status" or "state",
 // REGARDLESS of Key — the OWNER CONTRACT lets a keyed column like
 // {Key:"last_status", Title:"Status"} qualify too), operating on the
@@ -129,7 +129,7 @@ func isDuplicateCauseColumn(col app.ColumnDef) bool {
 // indices of every status-qualifying column and the indices of every
 // column (excluding the FIRST status-qualifying column, mirroring
 // resolveListStatusCol's own first-match-wins cascade in
-// internal/app/list_columns.go) that separately matches the duplicate/cause
+// core/app/list_columns.go) that separately matches the duplicate/cause
 // pattern.
 func statusColumnCensus(columns []app.ColumnDef, lifecycleKey string) (statusIdx []int, duplicateIdx []int) {
 	for i, col := range columns {

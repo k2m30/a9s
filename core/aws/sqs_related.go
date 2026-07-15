@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // sqs_related.go contains SQS queue related-resource checker functions.
 package aws
 

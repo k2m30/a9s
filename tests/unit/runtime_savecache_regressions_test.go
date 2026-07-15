@@ -1,5 +1,5 @@
 // runtime_savecache_regressions_test.go — regression pins for the
-// Codex+CodeRabbit fix wave on internal/runtime (branch feat/cache).
+// Codex+CodeRabbit fix wave on core/runtime (branch feat/cache).
 //
 // Covers, in order:
 //
@@ -194,7 +194,7 @@ func TestExecuteTask_FetchResources_ZeroProgressFollowUp_Terminates(t *testing.T
 // "dbi" — CachedListDepth must report the same depth whether queried by
 // "rds" or "dbi", and the on-disk file must be named dbi.yaml, never
 // rds.yaml. "rds" is a registered alias of "dbi" (see
-// internal/aws/catalog_databases.go ShortName:"dbi", Aliases includes "rds").
+// core/aws/catalog_databases.go ShortName:"dbi", Aliases includes "rds").
 func TestSaveProbeResourcesToTypeFiles_AliasCanonicalizes_OnDiskFileIsCanonical(t *testing.T) {
 	if resource.FindResourceType("rds") == nil {
 		t.Skip("no registered type has alias \"rds\" in this build; alias case not testable")

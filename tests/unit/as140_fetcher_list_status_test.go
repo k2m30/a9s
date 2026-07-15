@@ -34,7 +34,7 @@ import (
 // renders it — e.g. raw "ACTIVE"/"CREATE_COMPLETE" enums lowercase and
 // de-snake into "active"/"create complete"; an already-lowercase phrase like
 // "available" or "in-use" passes through unchanged). This regression-pins
-// the LifecycleKey: "status" declaration in internal/catalog/types_*.go for
+// the LifecycleKey: "status" declaration in core/catalog/types_*.go for
 // every type whose status column key is "status".
 func TestAS140_FetcherListPath_NonFindingStatusVisible(t *testing.T) {
 	ensureNoColor(t)

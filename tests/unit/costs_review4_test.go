@@ -8,7 +8,7 @@
 //
 // P2 (internal/tui/app.go:343-345): confirmed in source — `case
 // messages.CostsLoaded: m.ctrl.Handle(msg); return m, nil` discards BOTH of
-// Handle's return values. Handle (internal/app/handle.go:153) DOES capture
+// Handle's return values. Handle (core/app/handle.go:153) DOES capture
 // and return ApplyCostsLoaded's TaskRequest now (the N3 fallback re-fetch);
 // the TUI just throws it away, so the fallback is dead in the terminal app.
 //

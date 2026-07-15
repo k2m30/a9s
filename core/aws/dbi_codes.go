@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // dbi_codes.go — canonical FindingCode constants for the dbi resource type
 // (RDS DB instance). The fetcher writes Findings using
 // these codes; the dbi Color func reads wave1 Findings (Source == "wave1")

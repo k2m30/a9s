@@ -14,7 +14,7 @@ import (
 )
 
 // aws_ng_ebs_cache_join_test.go pins the target behavior for a rewrite of
-// checkNGEBS (internal/aws/ng_related.go:241) from a two-AWS-call checker
+// checkNGEBS (core/aws/ng_related.go:241) from a two-AWS-call checker
 // (autoscaling:DescribeAutoScalingGroups + ec2:DescribeInstances) to a
 // zero-call cache join mirroring checkNGEC2: scan the "ec2" cache entry,
 // match instances by tag "eks:nodegroup-name" (guarded by "eks:cluster-name"

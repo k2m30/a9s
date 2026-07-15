@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // iam_policy_issue_enrichment.go — Wave 2 issue enrichment for the policy resource type.
 package aws
 

@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // identity_store.go — session-scoped caller identity store interface and
 // thread-safe implementation.
 //
 // Replaces the package-globals that previously lived in
-// internal/aws/identity_cache.go.
+// core/aws/identity_cache.go.
 package session
 
 import "sync"
@@ -17,8 +19,8 @@ import "sync"
 // and skip the STS call rather than thrashing on a permission error every
 // related-check pass. Session.Rotate() clears both on profile/region switch.
 //
-// Safe for concurrent use. internal/aws consumes it via its own local
-// structural interface (identityStore in internal/aws/client.go) rather than
+// Safe for concurrent use. core/aws consumes it via its own local
+// structural interface (identityStore in core/aws/client.go) rather than
 // importing this type, so the method set below is the real contract.
 type identityStore struct {
 	mu        sync.RWMutex

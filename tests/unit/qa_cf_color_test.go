@@ -2,7 +2,7 @@ package unit
 
 // qa_cf_color_test.go — Behavioral tests for the CloudFront Distributions Color function.
 //
-// CodeRabbit PR-273 finding: internal/resource/types_dns_cdn.go:50-58 ignores the
+// CodeRabbit PR-273 finding: core/resource/types_dns_cdn.go:50-58 ignores the
 // "enabled" field entirely. docs/attention-signals.md specifies: Enabled==false → Dim,
 // regardless of status. The current colorer returns ColorHealthy for "Deployed" whether
 // or not enabled is set, and does not return ColorDim at all.

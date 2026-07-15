@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // ecs_svc_related.go contains ECS service related-resource checker functions.
 package aws
 

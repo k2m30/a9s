@@ -3,7 +3,7 @@
 // upcoming smoke walk.
 //
 // package unit_test (not unit): every item here is reachable via the
-// headless app.Controller / pure internal/costs package — no TUI-level
+// headless app.Controller / pure core/costs package — no TUI-level
 // helper is needed, so this file reuses costs_state_test.go's
 // newCostsController/topDrill/fixedCostsNow/monthRecord directly (same
 // package).

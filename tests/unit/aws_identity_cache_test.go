@@ -1,5 +1,5 @@
 // aws_identity_cache_test.go contains indirect coverage tests for
-// internal/aws/identity_cache.go.
+// core/aws/identity_cache.go.
 //
 // COVERAGE LIMITS:
 //   - accountIDFromClients: unexported; ServiceClients.STS is *sts.Client
@@ -12,7 +12,7 @@
 //     unset vs. set (observable via State: RelatedUnknown when region is the bottleneck).
 //
 // Direct white-box tests for these functions require a test file inside the
-// internal/aws package itself (internal/aws/identity_cache_test.go), which is
+// core/aws package itself (core/aws/identity_cache_test.go), which is
 // outside the QA agent's write scope.
 package unit_test
 

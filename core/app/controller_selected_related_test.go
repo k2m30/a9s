@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // controller_selected_related_test.go — regression test for SelectedRelatedRow,
 // the accessor the TUI Enter/yank path uses after the stack-lift removed the
 // right-column widget ResourceID sync. Related navigation must source

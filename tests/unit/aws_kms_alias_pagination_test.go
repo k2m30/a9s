@@ -2,7 +2,7 @@ package unit
 
 // aws_kms_alias_pagination_test.go — Failing tests for KMS alias full-pagination.
 //
-// CODER CHECKLIST — new export required from internal/aws/kms.go:
+// CODER CHECKLIST — new export required from core/aws/kms.go:
 //
 //   func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error)
 //
@@ -137,7 +137,7 @@ var _ awsclient.KMSAPI = (*kmsAliasPaginationFake)(nil)
 
 func TestFetchKMSKeysPage_FullyPaginatesListAliases(t *testing.T) {
 	// CODER NOTE: This test will fail to compile until FetchKMSKeysPage is
-	// exported from internal/aws/kms.go. That is intentional — TDD red phase.
+	// exported from core/aws/kms.go. That is intentional — TDD red phase.
 
 	const (
 		keyA   = "aaaa0000-0000-0000-0000-000000000001"

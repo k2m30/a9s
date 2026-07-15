@@ -105,8 +105,8 @@ func TestQA_ECSTasks_FetchSuccess(t *testing.T) {
 	//
 	// RETIRED the old "STOPPED emits no Finding" invariant (stop_code carries
 	// actionable info instead): since the color-findings-conformance wave,
-	// colorECSTask is colorFromAnyFinding-first (internal/aws/catalog_compute.go)
-	// and ecsTaskStructuralFindings (internal/aws/ecs_task_codes.go) now emits
+	// colorECSTask is colorFromAnyFinding-first (core/aws/catalog_compute.go)
+	// and ecsTaskStructuralFindings (core/aws/ecs_task_codes.go) now emits
 	// CodeECSTaskStateStopped/SevDim for a normal (empty/UserInitiated
 	// stop_code) STOPPED task — Color needs its own Finding to color from. See
 	// qa_color_findings_conformance_test.go for the standing architectural gate.

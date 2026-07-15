@@ -1,7 +1,7 @@
 // app_detail_attention_cursor_test.go — TDD red-phase pin for Finding A:
-// injectAttentionSectionDetail (internal/app/detail_body.go) sorts Attention
+// injectAttentionSectionDetail (core/app/detail_body.go) sorts Attention
 // entries by tier ("!" before "~") before rendering, but attentionPrependCount
-// (internal/app/detail_state.go ~line 71, called from applyFindingToState
+// (core/app/detail_state.go ~line 71, called from applyFindingToState
 // ~line 187) computes lastEntryBare from the ORIGINAL (unsorted) findings
 // order. When a "~" (warning) finding WITH Detail text is followed by a bare
 // "!" (broken) finding appended later:
@@ -14,7 +14,7 @@
 //
 // This mismatch makes attentionPrependCount return a value 1 LOWER than the
 // true prepend size, so applyFindingToState's cursor-delta adjustment
-// (internal/app/detail_state.go ~line 231-247) shifts FieldCursor by the wrong
+// (core/app/detail_state.go ~line 231-247) shifts FieldCursor by the wrong
 // amount after a wave-2 enrichment finding arrives, landing the cursor on the
 // wrong logical field row.
 package unit_test
@@ -138,9 +138,9 @@ func TestApplyDetailFinding_CursorStaysOnSameFieldAcrossMixedSeverityAttentionSo
 			"cursor did not stay on the same logical field after mixed-severity Attention sort:\n"+
 				"  before enrichment: FieldCursor=%d Key=%q Path=%q\n"+
 				"  after  enrichment: FieldCursor=%d Key=%q Path=%q\n"+
-				"attentionPrependCount (internal/app/detail_state.go) computed lastEntryBare from "+
+				"attentionPrependCount (core/app/detail_state.go) computed lastEntryBare from "+
 				"the UNSORTED findings order (last appended = bare broken finding -> lastEntryBare=true "+
-				"-> spacer omitted), but injectAttentionSectionDetail (internal/app/detail_body.go) "+
+				"-> spacer omitted), but injectAttentionSectionDetail (core/app/detail_body.go) "+
 				"sorts \"!\" before \"~\" before rendering, so the ACTUAL last rendered entry is the "+
 				"non-bare warning finding (spacer included). The prepend-count mismatch shifted "+
 				"FieldCursor by the wrong delta.",

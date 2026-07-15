@@ -3,10 +3,10 @@
 //
 // D17 (glyphs/Status blink, on restart AND mid-session): every Wave-1
 // sweep-completion save wrote pre-enrichment rows, and reconcileTypeFile's
-// "refreshed rows win" rule (rules 3/4, internal/runtime/probes.go:162) let
+// "refreshed rows win" rule (rules 3/4, core/runtime/probes.go:162) let
 // those bare rows strip Findings and enricher Fields (e.g. "status") from
 // the type file; the analogous in-memory write into session.ProbeResources
-// (handleAvailabilityChecked, internal/runtime/handlers_availability.go:278)
+// (handleAvailabilityChecked, core/runtime/handlers_availability.go:278)
 // blanked the visible list the same way until re-enrichment.
 //
 // C6b's fix: when an accepted rows-carrying observation lacks Wave-2 data
@@ -284,7 +284,7 @@ func TestReconcileTypeFile_Wave2SourcedObservation_ClearsCarriedData(t *testing.
 
 // ────────────────────────────────────────────────────────────────────────────
 // Test 3 — in-memory probe-store carry: handleAvailabilityChecked
-// (internal/runtime/handlers_availability.go) calls ObserveRows(canon,
+// (core/runtime/handlers_availability.go) calls ObserveRows(canon,
 // msg.Resources, ...) after carryWave2ForResources folds the previous
 // RowStore rows' Wave-2 data into the fresh probe result. A fresh bare
 // Wave-1 probe result (same IDs, no findings) must not blank the carried
@@ -412,11 +412,11 @@ func TestRestartSeed_S3_Wave2FindingAndStatusVisibleOnFirstRender(t *testing.T) 
 		t.Fatalf("Rows[0].ResourceID = %q, want %q", row.ResourceID, "s3-bucket-x")
 	}
 	// Since the color-findings-conformance wave, colorS3 is
-	// colorFromAnyFinding-only (internal/aws/catalog_databases.go) — the
+	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — the
 	// carried SevBroken Finding now resolves td.ResolveColor(r) to
 	// ColorBroken directly, so resolveListDecoratorFull's DecoratorError
 	// glyph branch (which only fires when ResolveColor()==ColorHealthy; see
-	// internal/app/list_columns.go) is skipped entirely. The row instead
+	// core/app/list_columns.go) is skipped entirely. The row instead
 	// renders as a full broken row via colorTag: Decorator==DecoratorNormal
 	// (no glyph prefix needed — the WHOLE row is colored) and
 	// Severity=="issue" (see resolveListDecoratorFull's IsIssue() branch).
@@ -429,7 +429,7 @@ func TestRestartSeed_S3_Wave2FindingAndStatusVisibleOnFirstRender(t *testing.T) 
 
 	// HandleNavigate's disk-store fallback (handlers_navigate.go:205-224) seeds
 	// the list SCREEN's own state directly via NavigateResult.CachedEntry
-	// (internal/app/navigate.go), not session.ResourceCache/ProbeResources —
+	// (core/app/navigate.go), not session.ResourceCache/ProbeResources —
 	// those session-level maps are only ever written by a live availability
 	// probe (handleAvailabilityChecked) or an enrichment rerun, neither of
 	// which ran this session. Body.List.Rows above is therefore the correct

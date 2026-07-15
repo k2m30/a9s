@@ -43,7 +43,7 @@
 //   - The wave-2 glyph-render step is Controller.ApplyEnrichmentState, NOT
 //     ctrl.Handle(messages.EnrichmentChecked{...}): that event only mutates
 //     runtime.Core's session-level ResourceCache/ProbeResources
-//     (internal/runtime/helpers.go's applyEnrichment) — a distinct cache in
+//     (core/runtime/helpers.go's applyEnrichment) — a distinct cache in
 //     a distinct package. ApplyEnrichmentState is the seam
 //     buildListBody's glyph rendering actually reads
 //     (c.enrichmentStore/listEnrichmentFindings), and is what the TUI's own
@@ -59,7 +59,7 @@
 // REAL FINDING (Scenario 3, not weakened per the dispatch's instruction):
 // TestCacheLifecycle_Scenario3_CachePresent_WorldChanged's "issue resolved"
 // case is RED at HEAD. applyResourcesLoaded's silent-swap finding-carry-
-// forward (internal/app/list_body.go, the `case len(resources[i].Findings)
+// forward (core/app/list_body.go, the `case len(resources[i].Findings)
 // == 0: resources[i].Findings = f` branch, DEF-8's contract) treats ANY
 // incoming resource with zero Findings as "not yet re-checked" and
 // unconditionally re-attaches its FULL prior finding set — including
@@ -199,11 +199,11 @@ func deliverVerifyFetch(ctrl *app.Controller, resources []resource.Resource, tru
 
 // deliverEnrichment applies wave-2 findings via Controller.ApplyEnrichmentState
 // — the seam buildListBody's glyph rendering actually reads from
-// (c.enrichmentStore, see internal/app/list_filter.go's
+// (c.enrichmentStore, see core/app/list_filter.go's
 // listEnrichmentFindings). This is NOT the same store
 // messages.EnrichmentChecked populates: that event only mutates
 // runtime.Core's session-level ResourceCache/ProbeResources
-// (internal/runtime/helpers.go's applyEnrichment) — a distinct cache in a
+// (core/runtime/helpers.go's applyEnrichment) — a distinct cache in a
 // distinct package from app.Controller's own resourceCache/enrichmentStore.
 // In production, ApplyEnrichmentState is called by the TUI's own
 // ResourceListModel (internal/tui/views/resourcelist.go) after it runs its
@@ -325,10 +325,10 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 		t.Fatal("ListBody.Rows missing bucket-s1-1 after the fetch landed")
 	}
 	// Since the color-findings-conformance wave, colorS3 is
-	// colorFromAnyFinding-only (internal/aws/catalog_databases.go) — a
+	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — a
 	// SevBroken Finding resolves the row's whole-row color to "broken"
 	// directly (resolveListDecoratorFull's DecoratorError glyph branch only
-	// fires when ResolveColor()==ColorHealthy; see internal/app/list_columns.go
+	// fires when ResolveColor()==ColorHealthy; see core/app/list_columns.go
 	// and .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
 	// ListRow.Color=="broken" is the stronger, correct check.
 	if row1.Color != "broken" {

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package aws — transfer.go: AWS Transfer Family server fetcher.
 //
 // docs/resources/transfer.md §0/§3: ListServers is informative for the

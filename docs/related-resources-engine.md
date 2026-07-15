@@ -45,7 +45,7 @@ type RelatedCheckResult struct {
 ```
 
 Two pure functions in
-[`internal/resource/related.go`](../internal/resource/related.go) are the **only**
+[`core/resource/related.go`](../core/resource/related.go) are the **only**
 deciders of how a row looks — called by the TUI right column, the
 controller/web `RelatedBlock`, and the cursor-skip alike, so the renderers can
 never drift:
@@ -115,7 +115,7 @@ always resolves.
 
 ## 5. Cache
 
-Session-scoped LRU (`internal/session/related_cache.go`, cap 500), keyed
+Session-scoped LRU (`core/session/related_cache.go`, cap 500), keyed
 `type:id`, holding the per-row results and replayed on re-entry so reopening a
 detail is instant. Dropped on profile/region switch; no disk persistence.
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package costs
 
 import (
@@ -48,7 +50,7 @@ type FallbackGate struct {
 // ResourceDrillWindowRetentionDays is the CE hard limit for
 // GetCostAndUsageWithResources: the queried range cannot start more than
 // this many days before now. Exported so callers outside this package (e.g.
-// internal/app/costs_state.go) reference the same single literal instead of
+// core/app/costs_state.go) reference the same single literal instead of
 // carrying their own mirrored copy.
 const ResourceDrillWindowRetentionDays = 14
 

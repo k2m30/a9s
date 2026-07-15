@@ -1,7 +1,7 @@
 // app_cache_first_disk_rows_test.go — RED tests for the CACHE-FIRST LIST UX
 // epic, Contract B (on-disk row cache + generic field materialization).
 //
-// Contract B: the on-disk cache (internal/cache) additionally persists, per
+// Contract B: the on-disk cache (core/cache) additionally persists, per
 // type, the last first-page rows (ID, Name, Fields map — NO RawStruct) and
 // the last enrichment findings per row. On a cold start with a valid cache
 // file, opening a list before probes complete seeds rows+findings from disk
@@ -21,17 +21,17 @@
 // AMBIGUITY RESOLUTIONS (stated, not deferred):
 //   - "Generic materialization step" is pinned as a new exported function
 //     app.MaterializeListFields(r resource.Resource, columns []app.ColumnDef)
-//     resource.Resource — placed in internal/app (same package as
+//     resource.Resource — placed in core/app (same package as
 //     extractListCells/resolveListColumnsForBuild in list_columns.go, which
 //     already do per-column Path/Key resolution) since Contract B explicitly
 //     scopes this to "controller/runtime layer, before caching/rendering",
-//     and internal/app.applyResourcesLoaded is that seam today. If the coder
-//     places it in internal/runtime instead, only the call site in this test
+//     and core/app.applyResourcesLoaded is that seam today. If the coder
+//     places it in core/runtime instead, only the call site in this test
 //     needs updating — the round-trip behavior pinned by
 //     TestMaterializeListFields_* is what matters.
 //   - Pinned with "ec2" because its "State" column is Path-based with an
 //     empty Key (Path: "State.Name", Key: "") in
-//     internal/config/defaults_compute.go — exactly the column shape the
+//     core/config/defaults_compute.go — exactly the column shape the
 //     contract calls out.
 package unit_test
 
@@ -121,7 +121,7 @@ func TestMaterializeListFields_CachedRowRendersIdenticallyToLive(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 	// Use the SAME column set list_body.go's buildListBody resolves for "ec2"
-	// (the real 9-column catalog from internal/config/defaults_compute.go),
+	// (the real 9-column catalog from core/config/defaults_compute.go),
 	// not a 2-column subset — otherwise Path-based columns outside the subset
 	// (e.g. Instance ID) are never materialized and the parity check is
 	// vacuous (both sides render "" for that cell instead of pinning a real
@@ -282,7 +282,7 @@ func TestCacheTypeFile_RowFindingsRoundTripThroughSaveLoad(t *testing.T) {
 // Ambiguity resolution: "seeds from disk" is modeled at the controller
 // level as the disk cache.TypeFile.Rows having already been loaded into
 // RowStore (OriginDisk) by the startup cache-load path (the same seam
-// LoadAvailabilityCache/SaveAvailabilityCache in internal/runtime/probes.go
+// LoadAvailabilityCache/SaveAvailabilityCache in core/runtime/probes.go
 // already uses for counts) — this test drives that outcome directly via
 // core.Session().RowStore.Observe rather than asserting on the startup
 // loader's internals, since the loader itself is not in this task's scope

@@ -1,5 +1,5 @@
 // detail_controller_scroll_follow_test.go — TDD red-phase pin for the
-// detail-view scroll-follows-cursor bug: applyDetailActions (internal/app/
+// detail-view scroll-follows-cursor bug: applyDetailActions (core/app/
 // detail_cursor.go) moves DetailState.FieldCursor on ActionMoveUp/MoveDown/
 // MoveBottom but never reconciles DetailState.ScrollY, so the highlighted
 // field can scroll off the bottom of the viewport. ActionMoveTop and

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // probes.go — platform-agnostic availability and Wave-2 enrichment probes.
 //
 // These are (c *Core) methods reading session state via c.session. The
@@ -613,7 +615,7 @@ func (c *Core) ProbeResourceAvailability(ctx context.Context, clients *awsclient
 			Err:          fmt.Errorf("AWS clients not initialized"),
 		}
 	}
-	// A registered AvailabilityFetcher (internal/resource.GetAvailabilityFetcher)
+	// A registered AvailabilityFetcher (core/resource.GetAvailabilityFetcher)
 	// is a cheaper probe-only alternative for types whose real list content
 	// is materially more expensive to resolve than an availability/count
 	// signal needs (e.g. "policy" skips IAM's per-group inline-policy

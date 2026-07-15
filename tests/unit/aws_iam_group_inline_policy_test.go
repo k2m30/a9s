@@ -1,7 +1,7 @@
 package unit
 
 // Tests for the IAM group related checker covering both managed (attached) and
-// inline group policies. See internal/aws/iam_groups_related.go:48.
+// inline group policies. See core/aws/iam_groups_related.go:48.
 //
 // Bug: checkGroupPolicy only calls ListAttachedGroupPolicies (managed policies).
 // Groups with only inline policies (ListGroupPolicies) show "IAM Policies (0)".
@@ -12,8 +12,8 @@ package unit
 // TestIAMGroup_InlinePoliciesOnly_RelatedCount — reveals the bug. WILL FAIL
 // until the coder:
 //  1. Adds ListGroupPolicies call to checkGroupPolicy (iam_groups_related.go:48)
-//  2. Adds InlineGroupPolicies map to IAMFixtures (internal/demo/fixtures/iam.go)
-//  3. Adds ListGroupPolicies method to IAMFake (internal/demo/fakes/iam.go)
+//  2. Adds InlineGroupPolicies map to IAMFixtures (core/demo/fixtures/iam.go)
+//  3. Adds ListGroupPolicies method to IAMFake (core/demo/fakes/iam.go)
 //  4. Populates inline policies for "readonly" group in buildIAMRelations
 
 import (
@@ -161,7 +161,7 @@ func TestIAMGroup_ManagedPolicies_RelatedCount(t *testing.T) {
 }
 
 // TestIAMGroup_InlinePoliciesOnly_RelatedCount reveals the missing ListGroupPolicies
-// call in checkGroupPolicy (internal/aws/iam_groups_related.go:48).
+// call in checkGroupPolicy (core/aws/iam_groups_related.go:48).
 //
 // The "readonly" fixture group has no attached managed policies. After the coder
 // adds InlineGroupPolicies support to fixtures/fakes and populates inline policies
@@ -177,7 +177,7 @@ func TestIAMGroup_InlinePoliciesOnly_RelatedCount(t *testing.T) {
 	if result.Result.Count <= 0 {
 		t.Errorf("readonly group (inline policies only) got Count=%d, want >0; "+
 			"BUG: checkGroupPolicy does not call ListGroupPolicies — "+
-			"inline policies are never counted (internal/aws/iam_groups_related.go:48)",
+			"inline policies are never counted (core/aws/iam_groups_related.go:48)",
 			result.Result.Count)
 	}
 }
@@ -192,7 +192,7 @@ func TestIAMGroup_InlinePoliciesOnly_RelatedCount(t *testing.T) {
 // calls ListGroupPolicies for each group and synthesises inline policy resources
 // with Fields["policy_type"] == "inline".
 //
-// Fixture inline policies (internal/demo/fixtures/iam.go):
+// Fixture inline policies (core/demo/fixtures/iam.go):
 //
 //	developers: ["AllowAssumeRole", "AllowChangeOwnPassword"]
 //	readonly:   ["DenyS3Delete"]
@@ -234,7 +234,7 @@ func TestIAMPolicyList_IncludesInlinePolicies(t *testing.T) {
 	if len(inlineNames) == 0 {
 		t.Errorf("policy list contains no resources with Fields[\"policy_type\"]==\"inline\"; "+
 			"BUG: FetchIAMPoliciesPage never calls ListGroupPolicies — "+
-			"inline policies are missing from the list (internal/aws/iam_policies.go); "+
+			"inline policies are missing from the list (core/aws/iam_policies.go); "+
 			"expected inline policies: %v", wantInline)
 		return
 	}
@@ -365,7 +365,7 @@ func callPolicyFetcher(t *testing.T, stub *stubGroupPolicyIAM) ([]resource.Resou
 	t.Helper()
 	fetcher := resource.GetPaginatedFetcher("policy")
 	if fetcher == nil {
-		t.Fatal("no paginated fetcher registered for 'policy' — internal/aws not imported?")
+		t.Fatal("no paginated fetcher registered for 'policy' — core/aws not imported?")
 	}
 	clients := &awsclient.ServiceClients{IAM: stub}
 	result, err := fetcher(context.Background(), clients, "")
@@ -481,7 +481,7 @@ func TestFetchInlineGroupPolicies_HappyPath(t *testing.T) {
 // TestInlinePolicy_DetailShowsParentGroup reveals that checkPolicyGroup returns
 // Count=0 for inline policies because policyARNFromResource returns "" for them
 // (inline policies have no ARN). The checker exits early at line 117 of
-// internal/aws/iam_policies_related.go without inspecting Fields["path"].
+// core/aws/iam_policies_related.go without inspecting Fields["path"].
 //
 // For an inline policy with Fields["path"] == "inline/developers", the related
 // panel must show "IAM Groups (1)" pointing to the developers group.
@@ -628,7 +628,7 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 		t.Errorf("inline policy 'AllowAssumeRole' (path=inline/developers) got IAM Groups Count=%d, want >=1; "+
 			"BUG: checkPolicyGroup returns early when ARN is empty — "+
 			"must extract group name from Fields[\"path\"] for inline policies "+
-			"(internal/aws/iam_policies_related.go:116-117)",
+			"(core/aws/iam_policies_related.go:116-117)",
 			groupResult.Result.Count)
 	}
 }

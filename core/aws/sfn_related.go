@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // sfn_related.go contains Step Functions related-resource checker functions.
 package aws
 

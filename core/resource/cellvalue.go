@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package resource provides the generic resource model used across all AWS
 // resource types in a9s.
 package resource

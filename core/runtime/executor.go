@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // executor.go — renderer-neutral task executor for runtime.Core.
 //
 // PR-B0 Pass A: adds Core.ExecuteTask as the single entry point for a
@@ -107,7 +109,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 
 	// --- enrichment probe (Wave 2) ---
 	// Demo clients are real *awsclient.ServiceClients backed by typed fakes
-	// (internal/demo.NewServiceClients), so Wave-2 enrichers run against them
+	// (core/demo.NewServiceClients), so Wave-2 enrichers run against them
 	// exactly as they run against live AWS clients — no demo-mode skip here.
 	case TaskKindProbeEnrich:
 		shortName := req.Key.Scope

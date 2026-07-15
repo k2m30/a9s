@@ -1,4 +1,6 @@
-// costs.go — Cost Explorer fetchers: SDK <-> internal/costs domain mapping,
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
+// costs.go — Cost Explorer fetchers: SDK <-> core/costs domain mapping,
 // pagination, and error classification. Read-only (FR-016): only Get*
 // operations are ever called.
 package aws
@@ -49,7 +51,7 @@ var (
 // classifyCostsError wraps err with the matching typed sentinel when it
 // carries a recognized CE error code; anything else passes through
 // unmodified so the caller can render/log the raw failure. Code-matching
-// delegates to ClassifyAWSError (internal/aws/errors.go), the shared
+// delegates to ClassifyAWSError (core/aws/errors.go), the shared
 // taxonomy — it recognizes both the bare "AccessDenied" code some AWS API
 // paths return and the "...Exception"-suffixed form, where this file's own
 // switch previously matched only the latter.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // sns_sub_related.go contains SNS subscription related-resource checker functions.
 package aws
 

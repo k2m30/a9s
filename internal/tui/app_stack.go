@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // app_stack.go — tui.Model renderer-state stack helpers.
 //
 // The view stack is now a []*rendererState slice: each entry carries only
@@ -35,7 +37,7 @@ func (m *Model) pushRS(rs *rendererState) {
 //
 // The list-count → menu-availability-badge sync-back (previously performed
 // here at depth 2, menu → list) now runs at the controller level in
-// internal/app/handle.go's handleResourcesLoadedEvent/syncExactTotalToMenu,
+// core/app/handle.go's handleResourcesLoadedEvent/syncExactTotalToMenu,
 // on every ResourcesLoaded for a top-level list — so both the TUI and the
 // web renderer get it, and it fires as soon as a fetch or load-more result
 // lands rather than only when the user pops back to the menu.
@@ -62,14 +64,14 @@ func (m *Model) popRSOnly() bool {
 //
 // ActionBack does not always pop a controller screen: a screen can absorb
 // Esc in place (e.g. the costs screen popping one drill frame while
-// drilled — internal/app/actions_nav.go's handleActionBack). The
+// drilled — core/app/actions_nav.go's handleActionBack). The
 // controller's own screen-stack depth is compared before/after ActionBack
 // so the TUI's rendererState stack only pops when the controller's did —
 // generic by construction, no per-screen-kind special case here.
 //
 // The returned tea.Cmd surfaces the TaskRequests ActionBack itself returns
 // (today, only ever a KindRelatedCheck re-dispatch — owner decision #38, see
-// handleActionBack in internal/app/actions_nav.go) translated into the TUI's
+// handleActionBack in core/app/actions_nav.go) translated into the TUI's
 // native trigger via relatedCheckStartedCmdFromTasks. The controller is the
 // single source of truth for "does revealing this screen need a
 // related-check recompute" — the TUI no longer independently re-derives that

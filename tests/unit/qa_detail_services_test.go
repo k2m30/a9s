@@ -227,7 +227,7 @@ func realisticIAMGroup() iamtypes.Group {
 }
 
 // realisticSESIdentity returns an sesv2types.IdentityInfo matching the type
-// produced by internal/aws/ses.go FetchSESIdentities.
+// produced by core/aws/ses.go FetchSESIdentities.
 func realisticSESIdentity() sesv2types.IdentityInfo {
 	return sesv2types.IdentityInfo{
 		IdentityName:       new("example.com"),

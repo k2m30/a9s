@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // trail_codes.go — canonical FindingCode constants for the trail resource
 // type. The fetcher writes Findings using these codes; colorTrail
 // (catalog_monitoring.go) reads the same underlying Fields to color rows —

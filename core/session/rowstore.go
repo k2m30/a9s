@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // rowstore.go — session-scoped, per-type row store (task #17, the row-store
 // unification effort). See docs/design/cache-requirements.md and the
 // row-store unification plan for the target design this file implements.
@@ -11,9 +13,9 @@
 // play independently.
 //
 // Semantics mirror the two in-memory reconciliation rules that already exist
-// independently for the per-screen ListState (internal/app/list_body.go:
+// independently for the per-screen ListState (core/app/list_body.go:
 // dedupAgainstExisting, isStaleReplace) and the on-disk TypeFile
-// (internal/runtime/probes.go: reconcileTypeFile, rowIDsAreSubset) so a
+// (core/runtime/probes.go: reconcileTypeFile, rowIDsAreSubset) so a
 // future caller can safely retire either without behavior drift. RowStore
 // does not implement C6b Wave-2 carry — that remains reconcileTypeFile's
 // concern at the disk chokepoint; a bare Observe/Amend here never inspects
@@ -142,17 +144,17 @@ func NewRowStore() *RowStore {
 	return &RowStore{types: make(map[string]TypeRows)}
 }
 
-// dedupAgainstExistingRows mirrors internal/app/list_body.go's
+// dedupAgainstExistingRows mirrors core/app/list_body.go's
 // dedupAgainstExisting: returns the subset of incoming whose ID is not
 // already present in existing, preserving incoming's order. Delegates to
 // resource.DedupByID, the single-source implementation shared with
-// internal/app (session already imports internal/resource; no new
+// core/app (session already imports core/resource; no new
 // dependency introduced).
 func dedupAgainstExistingRows(existing, incoming []resource.Resource) []resource.Resource {
 	return resource.DedupByID(existing, incoming)
 }
 
-// rowIDsAreSubsetRows mirrors internal/runtime/probes.go's rowIDsAreSubset:
+// rowIDsAreSubsetRows mirrors core/runtime/probes.go's rowIDsAreSubset:
 // reports whether every ID in candidate also appears in superset.
 func rowIDsAreSubsetRows(candidate, superset []resource.Resource) bool {
 	if len(candidate) == 0 {
@@ -192,7 +194,7 @@ func cloneRows(rows []resource.Resource) []resource.Resource {
 	return out
 }
 
-// isStaleReplaceRows mirrors internal/app/list_body.go's isStaleReplace: a
+// isStaleReplaceRows mirrors core/app/list_body.go's isStaleReplace: a
 // non-append replace is treated as a stale, out-of-order straggler only when
 // incoming is BOTH smaller than existing AND still truncated AND a strict ID
 // subset of existing — the same conservative, false-negative-biased shape
@@ -262,7 +264,7 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 
 	// C5/DEF-18 mechanism A: the stale-shaped-replace rejection below only
 	// applies while the EXISTING entry has not yet reached a confirmed exact
-	// total (mirrors internal/app/list_body.go's applyResourcesLoaded, which
+	// total (mirrors core/app/list_body.go's applyResourcesLoaded, which
 	// gates its own isStaleReplace call on !ls.HasPagination). A Ctrl+R full
 	// reset legitimately replays the exact same page-1 IDs with
 	// IsTruncated=true while the existing entry is ALSO still truncated

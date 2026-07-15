@@ -3,7 +3,7 @@ package unit
 // Tests for Bug P2: _ct.target must fall back to LookupEvents event.Resources
 // when the embedded CloudTrailEvent JSON has no resources[] (or is nil).
 //
-// The broken code at internal/aws/ct_events.go:224 calls:
+// The broken code at core/aws/ct_events.go:224 calls:
 //   target := ExtractCTTarget(parsed)
 // and uses ONLY the parsed JSON. When the JSON blob is absent or has an empty
 // resources[] array, ExtractCTTarget returns "(none)" — but the LookupEvents

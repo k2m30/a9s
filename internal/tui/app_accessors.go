@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // app_accessors.go — exported Model accessors for tests in tests/unit/
 // (package unit_test), which can't reach unexported fields from outside the
 // package. Production code does not call them; test callers reach session state
@@ -17,7 +19,7 @@ import (
 // Core returns the runtime-owned *runtime.Core handle. Test-only accessor
 // — production code uses m.core directly. Replaces the prior Session()
 // accessor whose session-typed return value forced the tui package to
-// import the internal/session package.
+// import the core/session package.
 func (m Model) Core() *runtime.Core {
 	return m.core
 }

@@ -2,7 +2,7 @@
 // menu-badge sync through the runtime.PatchResourceList intent.
 //
 // Defect: Controller.applyIntents' runtime.PatchResourceList case
-// (internal/app/intents.go) always calls
+// (core/app/intents.go) always calls
 // c.applyEnrichmentState(v.ResourceType, 0, false, v.Enrichment.Findings, ...)
 // — the issueCount and truncated arguments are hardcoded to 0/false,
 // discarding v.Issues (*runtime.IssueBadgePatch) carried in the very same

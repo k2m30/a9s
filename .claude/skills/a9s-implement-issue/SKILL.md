@@ -175,8 +175,8 @@ Read the codebase to determine exact file paths:
 1. **Which views are affected?** — grep for relevant types/functions in `internal/tui/views/`
 2. **Which styles change?** — check `internal/tui/styles/`
 3. **Which keys change?** — check `internal/tui/keys/keys.go`
-4. **Which messages change?** — check `internal/runtime/messages/`
-5. **Which config changes?** — check `internal/config/`
+4. **Which messages change?** — check `core/runtime/messages/`
+5. **Which config changes?** — check `core/config/`
 6. **Which tests exist?** — grep in `tests/unit/` for existing coverage
 7. **Which docs need updates?** — check `docs/shared/` for affected content
 

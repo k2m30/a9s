@@ -1,7 +1,7 @@
 package unit
 
 // Tests for the LambdaFake.ListEventSourceMappings ARN filter loop
-// (internal/demo/fakes/lambda.go:30-41).
+// (core/demo/fakes/lambda.go:30-41).
 //
 // The fixture has exactly one event source mapping:
 //   - function: process-orders

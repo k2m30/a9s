@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // ecs_svc_related_extra.go contains ECS service related-resource checkers
 // spilled out of ecs_svc_related.go — includes eb-rule/ecr/secrets/sfn and
 // any other overflow targets required by docs/related-resources.md.

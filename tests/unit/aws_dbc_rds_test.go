@@ -3,7 +3,7 @@ package unit
 // aws_dbc_rds_test.go — Regression pins for Issue 4 (P2):
 // RDS DescribeDBClusters returns Neptune / DocDB rows unfiltered.
 //
-// Bug location: internal/aws/dbc_rds.go:121-186 (FetchRDSDBClustersPage).
+// Bug location: core/aws/dbc_rds.go:121-186 (FetchRDSDBClustersPage).
 // The loop iterates output.DBClusters and emits ALL clusters as dbc resources.
 // Per AWS SDK docstring (rds@v1.116.3/api_op_DescribeDBClusters.go:19-28),
 // this API may return Neptune and DocDB rows alongside Aurora/Multi-AZ rows.

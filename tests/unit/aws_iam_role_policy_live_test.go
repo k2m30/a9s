@@ -132,7 +132,7 @@ func TestCheckRolePolicy_RawStructFallback(t *testing.T) {
 	if result.Count != 2 {
 		t.Errorf("Count = %d, want 2; RawStruct fallback must resolve RoleName from "+
 			"iamtypes.Role.RoleName when resource.ID is empty "+
-			"(internal/aws/iam_roles_related.go:149-153)",
+			"(core/aws/iam_roles_related.go:149-153)",
 			result.Count)
 	}
 	if result.Err != nil {

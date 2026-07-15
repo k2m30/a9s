@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // accessors.go — typed Core accessors.
 //
 // Exports a typed read/write surface on *Core for every session-state read or
@@ -9,7 +11,7 @@
 // The accessor list covers the field set the renderer actually touches.
 // Convenience constructors that internalise session.New() also live here so
 // the renderer's Model construction path does not need to import
-// internal/session.
+// core/session.
 package runtime
 
 import (
@@ -25,7 +27,7 @@ import (
 // Bootstrap constructs a fresh *Core seeded with a new session.Session
 // configured for the given profile/region pair. Used by the renderer's
 // model constructor (tui.New) so it can build the Core without importing
-// internal/session.
+// core/session.
 func Bootstrap(profile, region string, types []catalog.ResourceTypeDef) *Core {
 	s := session.New()
 	s.Profile = profile
@@ -130,7 +132,7 @@ func (c *Core) ClearCommand() { c.session.Command = "" }
 
 // Clients returns the active session-scoped AWS transport (set by
 // HandleClientsReady). The return type is the runtime-exported alias so
-// renderer adapters need not import internal/aws.
+// renderer adapters need not import core/aws.
 func (c *Core) Clients() *ServiceClients { return c.session.Clients }
 
 // PreSuppliedClients returns the bootstrap-channel transport supplied by

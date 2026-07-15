@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package resource
 
 // S3ObjectColumns returns the column definitions used when browsing inside

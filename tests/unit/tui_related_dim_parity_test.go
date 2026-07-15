@@ -12,7 +12,7 @@
 // that assigns styles.RowNormal (bright), diverging from the controller's
 // already-correct RelatedBlock.Actionable field (set via
 // isActionableDetailRow -> resource.IsRelatedActionable by
-// buildDetailRelatedBlocks, internal/app/detail_body.go:435-436). The fix
+// buildDetailRelatedBlocks, core/app/detail_body.go:435-436). The fix
 // under test makes the renderer derive rowStyle strictly from blk.Actionable
 // and the badge text from blk.CountDisplay, so the two renderers (TUI +
 // web template, which already reads .Actionable/.CountDisplay) cannot drift.

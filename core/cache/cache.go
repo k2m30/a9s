@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package cache provides per-profile+region, per-resource-type persistence
 // of what the menu and top-level list screens have learned from the AWS
 // API. See docs/design/cache-requirements.md for the full contract (C1-C10).
@@ -111,7 +113,7 @@ func Dir(profile, region string) string {
 
 // Root returns the cache root directory (~/.a9s/cache/), honoring the
 // A9S_CONFIG_FOLDER override used by tests. Exported so other on-disk cache
-// layouts sharing this root (e.g. internal/costs' per-profile cost cache)
+// layouts sharing this root (e.g. core/costs' per-profile cost cache)
 // derive it from the same single source instead of duplicating the
 // A9S_CONFIG_FOLDER/UserHomeDir resolution.
 func Root() string {

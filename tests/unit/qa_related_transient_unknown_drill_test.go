@@ -15,7 +15,7 @@
 //
 // Fixture pair: "ng" (node group) -> "ebs" (EBS Volumes), the SAME pair
 // related_unknown_badge_test.go and TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch
-// use. checkNGEBS (internal/aws/ng_related.go) returns
+// use. checkNGEBS (core/aws/ng_related.go) returns
 // resource.UnknownRelated("ebs") (State: RelatedUnknown, Count: 0) — no
 // FetchFilter, no RelatedIDs — whenever the "ec2" RowStore entry is cold, because it joins
 // against the EC2 cache by tag rather than issuing a live AWS call
@@ -28,7 +28,7 @@
 //
 // Registry scoping: "ng" registers NINE related defs in production
 // (catalog_containers.go). The real keyboard-cursor machinery
-// (detailSkipUnselectableRelated / stepToSelectable, internal/app/detail_cursor.go
+// (detailSkipUnselectableRelated / stepToSelectable, core/app/detail_cursor.go
 // + actions_nav.go) only stops the cursor on a row that is ALREADY
 // actionable — it can never land on a purely non-actionable row when no
 // actionable row exists anywhere in the panel (stepToSelectable returns the
@@ -59,12 +59,12 @@
 //     own RightColumnModel.rows) and gates on
 //     resource.IsRelatedActionable(row.State, row.Count, row.Truncated).
 //     For State: RelatedUnknown with no FetchFilter, IsRelatedActionable
-//     now returns true (internal/resource/related.go:290-306) — the owner's
+//     now returns true (core/resource/related.go:290-306) — the owner's
 //     2026-07-06 decision made this transient (no-filter, resolved-unknown)
 //     row actionable so Enter fires the RelatedNavigate dispatch.
 //
 //   - Pin 2 (RED today): even if Pin 1's gate is opened, ResolveRelatedNavigate
-//     (internal/runtime/handlers_related.go) resolves a RelatedNavigate with
+//     (core/runtime/handlers_related.go) resolves a RelatedNavigate with
 //     empty TargetID/RelatedIDs/FetchFilter to NavigationKindResourceList
 //     (its documented "otherwise" fallback, case 7). The TUI adapter's
 //     NavigationKindResourceList branch (internal/tui/runtime_adapter_related.go:392-406)
@@ -77,7 +77,7 @@
 //     the frame TITLE (app_view.go's frameTitle -> ctrl.ListFrameTitle(),
 //     rendered by layout.RenderFrameWithHints) must not carry the
 //     RelatedTitleSuffix, and the footer must not show the "esc Back" hint
-//     (internal/app/footer.go: buildListFooterHints only appends that hint
+//     (core/app/footer.go: buildListFooterHints only appends that hint
 //     when ls.EscPops is true) that every related/contextual list forces.
 //
 //   - Pin 3 (RED today): app_input.go's Escape handler pops a related-drill
@@ -256,7 +256,7 @@ func focusRelatedRow(m tui.Model) tui.Model {
 //   - The rendered footer must NOT show the "esc Back" hint: a
 //     related/contextual list always calls SetEscPops(true)
 //     (related_helpers.go), which is the ONLY thing that puts "esc Back" in
-//     the footer (internal/app/footer.go buildListFooterHints); a
+//     the footer (core/app/footer.go buildListFooterHints); a
 //     menu-driven TargetResourceList list leaves EscPops at its false
 //     default and never shows that hint.
 func TestTransientUnknownDrill_EnterResolvesInPlaceStaysOnDetail(t *testing.T) {

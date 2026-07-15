@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // tg_issue_enrichment.go — Wave 2 issue enrichment for the tg resource type.
 package aws
 

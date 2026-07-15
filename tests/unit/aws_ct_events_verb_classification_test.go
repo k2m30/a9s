@@ -7,7 +7,7 @@ package unit
 // Sign, ReEncrypt, GenerateDataKey*).
 //
 // Expected to FAIL for the bug-fix cases until the P1 coder updates ClassifyCTVerb
-// in internal/aws/ct_events.go (currently Batch* → W, Decrypt → W, etc.).
+// in core/aws/ct_events.go (currently Batch* → W, Decrypt → W, etc.).
 
 import (
 	"testing"

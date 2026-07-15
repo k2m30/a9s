@@ -8,7 +8,7 @@
 //	shows the badge.
 //
 // This file mirrors the live web lane's own construction sequence
-// (internal/web/construct.go newSession, live/non-demo branch) at the
+// (core/web/construct.go newSession, live/non-demo branch) at the
 // headless Controller level, matching the patterns already established by
 // app_web_lane_menu_badge_test.go (PatchResourceList Issues-discard defect)
 // and app_enrichment_menu_badge_test.go (ApplyEnrichmentState menu-sync
@@ -16,13 +16,13 @@
 // (ctrl.Handle(messages.EnrichmentChecked{...}) -> Core.handleEnrichmentChecked
 // -> PatchMenu/PatchResourceList intents -> Controller.applyIntents) instead
 // of calling ApplyEnrichmentState or ApplyIntents directly, so a defect
-// living anywhere in that chain (including internal/runtime's intent
-// construction, not just internal/app's intent consumption) would surface
+// living anywhere in that chain (including core/runtime's intent
+// construction, not just core/app's intent consumption) would surface
 // here too.
 //
 // Both a GREEN and a RED outcome are informative here: GREEN would mean the
 // bug does not reproduce at the Controller level and must live in
-// internal/web's session/HTTP layer; RED pins the Controller-level mechanism
+// core/web's session/HTTP layer; RED pins the Controller-level mechanism
 // precisely (which assertion fails, at which step, with which values).
 package unit_test
 
@@ -38,7 +38,7 @@ import (
 )
 
 // newLiveShapedBadgeReproController builds a *runtime.Core + *app.Controller
-// exactly the way internal/web/construct.go's newSession does for a LIVE
+// exactly the way core/web/construct.go's newSession does for a LIVE
 // (non-demo, no pre-supplied clients) web session: runtime.Bootstrap +
 // app.New + SetUIMode("web") — mirrors newLiveWebStyleController in
 // app_web_live_cold_boot_test.go, duplicated locally per that file's own
@@ -99,11 +99,11 @@ func liveShapedBadgeReproS3Resources(n int) []resource.Resource {
 // liveShapedBadgeReproWave2Findings builds n wave2-sourced findings keyed to
 // the first n bucket IDs from liveShapedBadgeReproS3Resources, matching the
 // shape EnrichmentChecked.Findings carries in production
-// (internal/runtime/handlers_availability.go handleEnrichmentChecked).
+// (core/runtime/handlers_availability.go handleEnrichmentChecked).
 //
 // Severity is deliberately domain.SevBroken, not SevWarn: the real
 // production menu-badge count for this path is computed by
-// unifiedIssueCount (internal/runtime/handlers_availability.go), which only
+// unifiedIssueCount (core/runtime/handlers_availability.go), which only
 // counts SevBroken findings toward the "!" badge — a SevWarn-only fixture
 // would silently produce a badge count of 0 regardless of the defect under
 // test, which is not what this repro is pinning.
@@ -141,7 +141,7 @@ func liveShapedBadgeReproMenuEntry(mb *app.MenuBody, shortName string) *app.Menu
 //  1. C1 disk-cache seed (readonly-profile session's pre-existing s3 cache:
 //     availability known/truncated, issues UNKNOWN) delivered via
 //     ctrl.Handle(runtime.CacheStoreToEvent(store)) — mirrors
-//     internal/web/construct.go's live-lane synchronous seed.
+//     core/web/construct.go's live-lane synchronous seed.
 //  2. ClientsReady delivered via ctrl.Handle — mirrors BootstrapLive's
 //     background connect completing.
 //  3. Navigate to the s3 list (ActionCommand "s3") and deliver

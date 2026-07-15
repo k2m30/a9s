@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // headless_drain_test.go — end-to-end gate: DrainSync populates list rows
 // without the manual ApplyResourcesLoaded seam.
 //

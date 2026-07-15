@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // ebs_codes.go — canonical FindingCode constants for the ebs and ebs-snap resource types.
 // The fetcher writes Findings using these codes; the
 // EBS Color func reads wave1 Findings (Source == "wave1") to color rows.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // probe_adapter.go — Bubble Tea adapter over runtime.Core probe methods. Each
 // method captures ctx and clients, delegates to the corresponding Core method,
 // and converts the result to TUI message types.
@@ -32,7 +34,7 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 // for shortName and converts the result to EnrichmentCheckedMsg.
 //
 // Demo clients are real *awsclient.ServiceClients backed by typed fakes
-// (internal/demo.NewServiceClients), so Wave-2 enrichers run against them the
+// (core/demo.NewServiceClients), so Wave-2 enrichers run against them the
 // same way they run against live AWS clients — no demo-mode skip here.
 func (m *Model) probeEnrichment(shortName string, gen domain.Gen) tea.Cmd {
 	ctx, clients := m.appCtx, m.core.Clients()

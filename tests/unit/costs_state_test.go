@@ -409,7 +409,7 @@ func TestCostsState_Pivot_Zero_ResetsToDefaultView(t *testing.T) {
 	}
 	// The active display metric is unblended: the awaited query carries
 	// unblended's NotEquals[RECORD_TYPE] filter, and invoiceMetricKey
-	// (internal/aws/costs.go) stores that shape's UnblendedCost under
+	// (core/aws/costs.go) stores that shape's UnblendedCost under
 	// Metrics[costs.MetricUnblended], not MetricInvoice — monthRecord's
 	// invoice-only Metrics map would leave the row valueless for this
 	// display metric, so the record is built inline instead.

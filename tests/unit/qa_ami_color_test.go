@@ -3,9 +3,9 @@ package unit
 // qa_ami_color_test.go — Color contract pin for AMIs.
 //
 // Since the color-findings-conformance wave (qa_color_findings_conformance_test.go),
-// colorAMI is colorFromAnyFinding-only (internal/aws/catalog_compute.go) — it
+// colorAMI is colorFromAnyFinding-only (core/aws/catalog_compute.go) — it
 // has NO raw-field fallback at all. Every non-healthy case here attaches a
-// Finding shaped exactly like the real fetcher (internal/aws/ami.go, wave1
+// Finding shaped exactly like the real fetcher (core/aws/ami.go, wave1
 // state/deprecation Findings, codes in ami_codes.go). Fields are kept for
 // realism/context only — they are no longer read by Color.
 //

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // screens_handlers_test.go — Core-direct unit tests for the five
 // view-stack handler ports added in Phase-05 PR-05a-h4-a (AS-650 / AS-769):
 //

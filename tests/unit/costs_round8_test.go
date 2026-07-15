@@ -3,7 +3,7 @@
 // disproofs during scoring).
 //
 // package unit_test (not unit): every finding here is reachable via the
-// headless app.Controller / pure internal/costs package surface — no TUI
+// headless app.Controller / pure core/costs package surface — no TUI
 // helper is needed, so this file reuses costs_state_test.go's
 // newCostsController/topDrill/fixedCostsNow/monthRecord and
 // costs_interaction_test.go's findFetchCostsTask/baseServiceQuery/
@@ -30,7 +30,7 @@ import (
 )
 
 // ===========================================================================
-// Item 1 (P1, internal/costs/store.go:~173 lookupPeriod) — a bucket cached
+// Item 1 (P1, core/costs/store.go:~173 lookupPeriod) — a bucket cached
 // while its period was OPEN must not become immutable the moment the
 // calendar rolls past the period's End. Traced precisely:
 //
@@ -117,11 +117,11 @@ func TestCostsRound8_Item1_OpenPeriodBucket_RefetchableUntilPostClosureFetch_The
 }
 
 // ===========================================================================
-// Item 2 (P2, internal/app/costs_state.go:~367 ensureCostsShapeFetched) —
+// Item 2 (P2, core/app/costs_state.go:~367 ensureCostsShapeFetched) —
 // distinct fetch shapes need distinct TaskKeys. Traced precisely:
 // ensureCostsShapeFetched hardcodes Key: runtime.TaskKey{Kind:
 // KindFetchCosts, Scope: "costs"} for EVERY query shape, and
-// internal/web/server.go's sessionEntry.inFlight (map[runtime.TaskKey]
+// core/web/server.go's sessionEntry.inFlight (map[runtime.TaskKey]
 // struct{}) silently drops any drainBackgroundTasks task whose Key is
 // already tracked (drainBackgroundTasks: "if _, running :=
 // entry.inFlight[t.Key]; running { continue }") — a shape switch mid-flight
@@ -165,7 +165,7 @@ func TestCostsRound8_Item2_DistinctFetchShapes_GetDistinctTaskKeys(t *testing.T)
 }
 
 // TestCostsRound8_Item2_WebDedupSimulation_DistinctShapesBothAdmitted
-// mirrors internal/web/server.go's drainBackgroundTasks dedup exactly
+// mirrors core/web/server.go's drainBackgroundTasks dedup exactly
 // (map[runtime.TaskKey]struct{} membership, "already running -> skip") —
 // that struct itself is unexported and unreachable from tests/unit, so this
 // simulates its documented algorithm against the REAL TaskKeys two
@@ -206,11 +206,11 @@ func TestCostsRound8_Item2_WebDedupSimulation_DistinctShapesBothAdmitted(t *test
 // precisely: applyCostsSelect's nextDim=="" branch only ever sets
 // cs.ResourceRowNote and returns nil — it never emits a navigation task.
 // The seam it must use (mirrors HandleRelatedNavigate's count-1
-// auto-navigate, internal/runtime/handlers_related.go:142-148):
+// auto-navigate, core/runtime/handlers_related.go:142-148):
 // runtime.TaskRequest{Key: TaskKey{Kind: KindFetchByIDDetail, Scope:
 // "ec2"}, Payload: FetchByIDDetailPayload{TargetType: "ec2", ID:
 // resourceID}}, gated by resource.GetFetchByIDs("ec2") != nil.
-// internal/aws/catalog_compute.go's EC2 ResourceTypeDef has no
+// core/aws/catalog_compute.go's EC2 ResourceTypeDef has no
 // FetchByIDs: entry today (confirmed directly — "ami"/"ebs-snap" in the
 // SAME file do), so this is a two-part fix: register EC2's FetchByIDs,
 // then wire applyCostsSelect to emit the task.
@@ -233,7 +233,7 @@ func TestCostsRound8_Item2_WebDedupSimulation_DistinctShapesBothAdmitted(t *test
 // drills SERVICE -> USAGE_TYPE -> RESOURCE_ID and seeds exactly the one
 // row this test needs.
 func TestCostsRound8_Item3_ResourceRowEnter_SupportedService_EmitsFetchByIDDetailTask(t *testing.T) {
-	const demoEC2InstanceID = "i-0a1b2c3d4e5f60001" // internal/demo/fixtures/ec2.go's "web-prod-01"
+	const demoEC2InstanceID = "i-0a1b2c3d4e5f60001" // core/demo/fixtures/ec2.go's "web-prod-01"
 	c := round5DrillToResourceRow(t, "Amazon Elastic Compute Cloud - Compute", demoEC2InstanceID)
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionSelect}) // Enter on the resource row
@@ -277,7 +277,7 @@ func TestCostsRound8_Item3_ResourceRowEnter_SupportedService_EmitsFetchByIDDetai
 // (newCostsController, then Enter immediately — never calling
 // EnsureCostsFetch/ensureCostsShapeFetched at all) is not reachable via any
 // production adapter. Traced precisely: internal/tui/
-// runtime_adapter_navigate.go's NavigateKindPushCosts case and internal/app/
+// runtime_adapter_navigate.go's NavigateKindPushCosts case and core/app/
 // navigate.go's applyNavResult NavigateKindPushCosts case (the TUI and
 // headless/web entry points respectively — the only two EnsureCostsState
 // call sites in the whole repo) BOTH call EnsureCostsState/ensureCostsState
@@ -296,7 +296,7 @@ func TestCostsRound8_Item3_ResourceRowEnter_SupportedService_EmitsFetchByIDDetai
 // indistinguishable: both show zero records for the shape. So the
 // reachable pivot-then-Enter-before-landing sequence below exercises the
 // SAME broken branch, and per applyCostsSelect's own doc comment
-// (internal/app/costs_state.go:684-689) this is an ACKNOWLEDGED, deliberately
+// (core/app/costs_state.go:684-689) this is an ACKNOWLEDGED, deliberately
 // unfixed gap pending a has-this-shape-ever-been-requested tri-state — this
 // test is EXPECTED to stay red, not a false positive.
 func TestCostsRound8_Item4_EnterWithNoSelectedRow_NoOps_LoadingShape(t *testing.T) {
@@ -381,7 +381,7 @@ func TestCostsRound8_Item4_EnterWithNoSelectedRow_NoOps_AllRowsDisplayFiltered(t
 // Controller.Apply(ActionCommand), not only the TUI's own colon path.
 // Traced precisely: resource.IsCostsCommand is referenced ONLY from
 // internal/tui/app_input.go:326 (the TUI's private colon-mode key
-// handler); Controller.handleActionCommand's switch (internal/app/
+// handler); Controller.handleActionCommand's switch (core/app/
 // actions_view.go) has no "costs"/"ce" case at all and falls through to
 // resource.FindResourceType(a.Arg), which correctly returns nil for the
 // synthetic "costs" entry (it is deliberately excluded from
@@ -466,7 +466,7 @@ func TestCostsDemo_ServiceLabels_UseRealCENames_NotShorthands(t *testing.T) {
 // which uses a root SERVICE-shaped query with the same ErrCostsAccessDenied
 // sentinel and asserts ErrorMsg gets set; that control is untouched here.
 //
-// Traced precisely: ApplyCostsLoaded (internal/app/costs_state.go) only
+// Traced precisely: ApplyCostsLoaded (core/app/costs_state.go) only
 // guards the FooterNote/pop path with
 // `isResourceDrillQuery(ev.Query) && errors.Is(ev.Err, awsclient.ErrCostsDataUnavailable)`
 // — ErrCostsAccessDenied falls through to the unconditional
@@ -545,7 +545,7 @@ func TestCostsRound8_ResourceDrillRefusal_SurfacesAsFooterNote_NotBlockingErrorM
 // smithy.OperationError -> aws-sdk-go-v2's own awshttp.ResponseError (its
 // Error() says "https response error", distinct from smithy's own
 // unexported-lookalike "http response error") -> smithy.GenericAPIError,
-// then wrapped exactly as internal/aws/costs.go's classifyCostsError wraps
+// then wrapped exactly as core/aws/costs.go's classifyCostsError wraps
 // it: fmt.Errorf("%w: %w", ErrCostsAccessDenied, err).
 func resourceDrillLiveShapedAccessDeniedErr(apiMessage string) error {
 	apiErr := &smithy.GenericAPIError{
@@ -573,7 +573,7 @@ func resourceDrillLiveShapedAccessDeniedErr(apiMessage string) error {
 // opt-in only feature...") rather than the raw %v-formatted error chain,
 // whose "operation error ..." / "https response error ..." wrapper prefixes
 // consume the footer line and truncate the actionable text away before it
-// is ever seen. costsResourceDrillRefusalNote (internal/app/costs_state.go)
+// is ever seen. costsResourceDrillRefusalNote (core/app/costs_state.go)
 // currently does exactly that: fmt.Sprintf("...: %v", err) on the full
 // chain — this test is RED against that.
 func TestCostsRound8_ResourceDrillRefusal_FooterNote_CarriesAPIMessage_NotWrapperNoise(t *testing.T) {
@@ -664,7 +664,7 @@ func TestCostsRound8_DataThrough_UnchangedByEmptyResult(t *testing.T) {
 // correctly at DAY granularity: a fully closed month's day columns must
 // carry no '*' at all, even though day-length periods are individually
 // much shorter-lived than the month they tile. Traced against
-// internal/app/costs_body.go:77's `Open: !p.Closed(cs.Now)` — this is
+// core/app/costs_body.go:77's `Open: !p.Closed(cs.Now)` — this is
 // granularity-agnostic by construction, so this is a permanent regression
 // guard against ever special-casing Open by Granularity instead of by each
 // period's own Closed(now).

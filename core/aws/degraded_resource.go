@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package aws — degraded_resource.go
 //
 // The single truth source for the "details denied"/"details unavailable"

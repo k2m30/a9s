@@ -547,13 +547,13 @@ func TestHandleEnrichmentChecked_DropsStaleTypeGen(t *testing.T) {
 // RERUN semantics (HandleResourcesLoaded's `ev.TypeGen != 0 &&
 // ev.TypeGen == c.session.EnrichmentTypeGen[...]` reseed/gen-match branch) —
 // while still allowing the separate, unconditional list-open Wave-2 dispatch
-// this defect fix added (internal/runtime/handlers_resources.go's
+// this defect fix added (core/runtime/handlers_resources.go's
 // `ev.TypeGen == 0 && ...` branch).
 //
 // Formerly "TypeGenZeroNeverTriggersRerun": that name and its body asserted
 // cmd must never resolve to messages.EnrichmentChecked at all on TypeGen=0.
 // That assertion is no longer correct — "ec2" DOES have a registered Wave-2
-// issue enricher (EnrichEC2InstanceStatus, internal/aws/catalog_compute.go;
+// issue enricher (EnrichEC2InstanceStatus, core/aws/catalog_compute.go;
 // several sibling comments in this file claiming otherwise predate/are stale
 // against that registration), so a plain list-open now legitimately
 // dispatches TaskKindProbeEnrich and its cmd legitimately resolves to

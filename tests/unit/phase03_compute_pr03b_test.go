@@ -8,7 +8,7 @@ package unit_test
 //   - Fetchers STOP writing Resource.Status for lifecycle states.
 //   - Fetchers EMIT canonical Finding entries (Source: "wave1") for non-healthy,
 //     non-terminal states.
-//   - Each type has a corresponding internal/aws/<svc>_codes.go with constants.
+//   - Each type has a corresponding core/aws/<svc>_codes.go with constants.
 //   - Each type's Color func reads Findings first, then falls back to structural fields.
 //
 // Per-type vocabulary (derived from Color func in types_compute.go /
@@ -337,7 +337,7 @@ func TestPR03b_ASGFetcher_HealthyEmitsNoFinding(t *testing.T) {
 // "Delete in progress" status emits one SevWarn Finding with CodeASGStateDeleting.
 //
 // NOTE: "Delete in progress" takes precedence over the underprovisioned check
-// in the fetcher's switch (see internal/aws/asg.go), so a deleting ASG with
+// in the fetcher's switch (see core/aws/asg.go), so a deleting ASG with
 // MinSize/DesiredCapacity both 0 emits only CodeASGStateDeleting, not
 // CodeASGUnderprovisioned.
 func TestPR03b_ASGFetcher_DeletingEmitsWarnFinding(t *testing.T) {
@@ -926,7 +926,7 @@ func (m *pr03bEBSSnapMock) DescribeSnapshots(
 //
 // Since the color-findings-conformance wave, colorLambda is
 // colorFromAnyFinding-only (no raw-field fallback) — the real fetcher
-// (internal/aws/lambda.go) enforces precedence itself via a single switch
+// (core/aws/lambda.go) enforces precedence itself via a single switch
 // that emits exactly ONE Finding (last-update-failed > deprecated-runtime >
 // lifecycle state > no-DLQ), so "deprecated runtime overrides wave1 SevWarn"
 // is now pinned by attaching the CodeLambdaDeprecatedRuntime /
@@ -1049,13 +1049,13 @@ func TestPR03b_ENIFetcher_AvailableNonRequesterEmitsFinding(t *testing.T) {
 // TestPR03b_EBFetcher_EmitsHealthAsWave1Finding pins the CURRENT (correct)
 // contract: the EB fetcher DOES emit a wave1 Finding for Yellow/Red/Grey
 // health, because colorEB is now colorFromAnyFinding-first
-// (internal/aws/catalog_compute.go) — it needs a Finding to color from, not
+// (core/aws/catalog_compute.go) — it needs a Finding to color from, not
 // a bare Fields["health"] read.
 //
 // RETIRED the old "must not emit health as wave1 Finding" invariant this
 // test used to pin (TestPR03b_EBFetcher_DoesNotEmitHealthAsWave1Finding):
 // that was the pre-color-findings-conformance contract (structural-only
-// Color classification). Since ebEnvironmentFindings (internal/aws/eb_codes.go)
+// Color classification). Since ebEnvironmentFindings (core/aws/eb_codes.go)
 // was added to mirror colorEB's own precedence, emitting the health Finding
 // is the correct, current behavior — see
 // qa_color_findings_conformance_test.go for the standing architectural gate.

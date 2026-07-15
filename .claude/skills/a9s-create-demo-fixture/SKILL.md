@@ -1,6 +1,6 @@
 ---
 name: a9s-create-demo-fixture
-description: Create or update the single-source fixture file for a resource type under `internal/demo/fixtures/<shortName>.go`. Use when the coder is given a fixture-creation task during phase 6 of `a9s-implement-resource`, or any time a resource type needs new demo/test data (new states, new edge cases, new spec coverage). Takes a plain-language fixture list (typically from `docs/resources/<shortName>-impl-plan.md` §2) and produces realistic, graph-connected AWS SDK typed fakes that both `./a9s --demo` and the unit test suite import. Cross-references sibling fixture files so every related-panel pivot renders a non-zero count. Never creates orphan fixtures — a DB instance fixture without matching KMS keys, security groups, alarms, and CloudTrail events is a bug, not a feature. Adversarial / malformed fixtures (nil pointers, error cases) stay inline in tests and are explicitly out of scope for this skill.
+description: Create or update the single-source fixture file for a resource type under `core/demo/fixtures/<shortName>.go`. Use when the coder is given a fixture-creation task during phase 6 of `a9s-implement-resource`, or any time a resource type needs new demo/test data (new states, new edge cases, new spec coverage). Takes a plain-language fixture list (typically from `docs/resources/<shortName>-impl-plan.md` §2) and produces realistic, graph-connected AWS SDK typed fakes that both `./a9s --demo` and the unit test suite import. Cross-references sibling fixture files so every related-panel pivot renders a non-zero count. Never creates orphan fixtures — a DB instance fixture without matching KMS keys, security groups, alarms, and CloudTrail events is a bug, not a feature. Adversarial / malformed fixtures (nil pointers, error cases) stay inline in tests and are explicitly out of scope for this skill.
 argument-hint: <shortName>
 allowed-tools:
   - Read
@@ -17,7 +17,7 @@ allowed-tools:
 
 # a9s Demo Fixture Skill
 
-Take a plain-language fixture list and produce a **realistic, graph-connected** demo fixture file under `internal/demo/fixtures/<shortName>.go` that both `./a9s --demo` and the unit test suite import from. One file per service. No duplication between demo and test data.
+Take a plain-language fixture list and produce a **realistic, graph-connected** demo fixture file under `core/demo/fixtures/<shortName>.go` that both `./a9s --demo` and the unit test suite import from. One file per service. No duplication between demo and test data.
 
 ## Why this skill exists
 
@@ -40,10 +40,10 @@ Writing the fixture blind is not the hard part. The hard part is:
 **Required:**
 - `docs/resources/<shortName>.md` — spec, for state coverage and §2 related-panel targets.
 - `docs/resources/<shortName>-impl-plan.md` — fixture list is authoritative for what fixtures to produce.
-- `internal/aws/<shortName>_related.go` — related checkers, to know exactly which fields each pivot reads.
-- `internal/demo/fixtures/<shortName>.go` — the existing fixture file for this service, if any (read it so we extend rather than duplicate).
-- `internal/demo/fixtures/<peer>.go` for every related-panel target — to check whether the IDs/ARNs this fixture references already exist and to plan sibling updates.
-- `internal/demo/handlers.go` — to confirm whether a new handler branch is needed or the typed-fake path covers this service.
+- `core/aws/<shortName>_related.go` — related checkers, to know exactly which fields each pivot reads.
+- `core/demo/fixtures/<shortName>.go` — the existing fixture file for this service, if any (read it so we extend rather than duplicate).
+- `core/demo/fixtures/<peer>.go` for every related-panel target — to check whether the IDs/ARNs this fixture references already exist and to plan sibling updates.
+- `core/demo/handlers.go` — to confirm whether a new handler branch is needed or the typed-fake path covers this service.
 
 **Forbidden to read:**
 - `tests/**` — test files never influence demo fixture design.
@@ -85,7 +85,7 @@ func New<Service>Fixtures() *<Service>Fixtures {
 
 Rules:
 
-- **One file per service**, at `internal/demo/fixtures/<shortName>.go`. No `_fixtures` suffix. Fold any existing `<shortName>_fixtures.go` into it.
+- **One file per service**, at `core/demo/fixtures/<shortName>.go`. No `_fixtures` suffix. Fold any existing `<shortName>_fixtures.go` into it.
 - **Raw SDK types only** (e.g. `rdstypes.DBInstance`, not `resource.Resource`). The demo app runs the real fetcher over these; tests feed them into fetchers directly. Single source of truth.
 - **Exported stable IDs/ARNs as `const`** so sibling fixture files reference them by symbol, not by string literal. When the ID needs to change, one rename ripples through.
 - **Each state variant is its own element** in the slice — one row per state the spec demos. Prefer a `baseline*()` helper + mutator functions (`withStatus`, `withPendingModifiedClass`, etc.) so shared fields stay in one place.
@@ -107,7 +107,7 @@ If the impl-plan §2 includes any of these, leave them as inline constructions i
 
 Confirm `docs/resources/<shortName>-impl-plan.md` §2 exists. Confirm `docs/resources/<shortName>.md` §2 (related targets) is readable.
 
-List the contents of `internal/demo/fixtures/` to see which sibling files exist. Note any missing peers the related panel needs.
+List the contents of `core/demo/fixtures/` to see which sibling files exist. Note any missing peers the related panel needs.
 
 ### Phase 1 — Build the coverage matrix
 
@@ -117,19 +117,19 @@ From the impl-plan §2, list each fixture with:
 - The state bucket it represents (Healthy / Warning / Broken / Transitional).
 - Whether it is adversarial (excluded from this skill's scope).
 
-From the spec §2, list every related-panel target for this resource. For each, read the corresponding checker in `internal/aws/<shortName>_related.go` and record the exact AWS field the checker reads (e.g. `DBInstance.VpcSecurityGroups[].VpcSecurityGroupId` for `sg`).
+From the spec §2, list every related-panel target for this resource. For each, read the corresponding checker in `core/aws/<shortName>_related.go` and record the exact AWS field the checker reads (e.g. `DBInstance.VpcSecurityGroups[].VpcSecurityGroupId` for `sg`).
 
 ### Phase 2 — Graph plan (cross-file references)
 
 For each non-adversarial fixture, walk its related-panel targets. For each target:
 
-- Read the sibling `internal/demo/fixtures/<target>.go`.
+- Read the sibling `core/demo/fixtures/<target>.go`.
 - Check whether the ID/ARN the fixture references exists in the sibling's `New<Target>Fixtures()` output.
 - If not, plan a sibling update: append one realistic entry that matches this fixture's reference.
 
 Example for a dbi fixture with `VpcSecurityGroups=[{VpcSecurityGroupId="sg-rds-prod"}]`:
 
-- Read `internal/demo/fixtures/ec2.go` (or wherever SGs live).
+- Read `core/demo/fixtures/ec2.go` (or wherever SGs live).
 - If `sg-rds-prod` is absent, plan to append `SecurityGroup{GroupId:"sg-rds-prod", ...}` with a matching VPC reference.
 
 Do this for **every** pivot in the spec §2, not just the ones the checker currently passes. Missing a pivot = demo renders 0 = silent breakage.
@@ -141,14 +141,14 @@ Record the plan in a new §"Demo fixture coverage" subsection appended to `docs/
 
 ### Phase 3 — Write the fixture file
 
-Write or rewrite `internal/demo/fixtures/<shortName>.go`:
+Write or rewrite `core/demo/fixtures/<shortName>.go`:
 
 - Package `fixtures`, exported struct `<Service>Fixtures`, constructor `New<Service>Fixtures()`.
 - Exported `const` block for every ID/ARN this fixture defines (for sibling files to reference by symbol).
 - Baseline constructor + mutator helpers per the impl-plan §2 grouping.
 - One entry per non-adversarial fixture in the coverage matrix.
 - NO adversarial fixtures (they belong inline in tests).
-- Fold any existing `internal/demo/fixtures/<shortName>_fixtures.go` into this file and delete the old file.
+- Fold any existing `core/demo/fixtures/<shortName>_fixtures.go` into this file and delete the old file.
 
 ### Phase 4 — Sibling file updates
 
@@ -164,7 +164,7 @@ Apply the phase-2 plan. For each sibling file:
 
 If the service already relies on typed fakes (the common case), no `handlers.go` change is needed — `registerAllHandlers` only wires STS.
 
-If the service needs a new route (rare — only when the SDK path doesn't use the typed-fake transport), add the handler to `internal/demo/handlers.go` and register it from `registerAllHandlers`. Document the reason in a comment.
+If the service needs a new route (rare — only when the SDK path doesn't use the typed-fake transport), add the handler to `core/demo/handlers.go` and register it from `registerAllHandlers`. Document the reason in a comment.
 
 ### Phase 6 — Sanity check (cheap, local)
 
@@ -173,7 +173,7 @@ This skill does not run the final visual render gate — that is phase 8 of `a9s
 Phase 6 is a cheap local sanity check so the skill doesn't hand off a broken fixture graph:
 
 1. `make build` — the fixture file and every sibling update must compile.
-2. `go test -count=1 ./internal/demo/...` — the demo package's own tests (fixture loaders, handler shape) pass.
+2. `go test -count=1 ./core/demo/...` — the demo package's own tests (fixture loaders, handler shape) pass.
 3. Self-audit — print the graph plan from phase 2 with each pivot's expected count vs the sibling file's actual entries. If any pivot's sibling fixture is missing or has the wrong ID, loop back to phase 4 and fix.
 
 The authoritative gate (rendered output matches spec §4 + §7 + §8) runs in `a9s-implement-resource` phase 8 via `tests/integration/scenario_<shortName>_visual_test.go`. This skill is only responsible for making sure the data this test will see is coherent.
@@ -186,7 +186,7 @@ Emit one block:
 <shortName> fixtures: <N> written (<K> non-adversarial in demo, <A> adversarial left inline in tests).
 Sibling updates: <alarm:N, ct-events:N, kms:N, sg:N, subnet:N, vpc:N, ...>.
 Demo render verified: resource list rows=<N>, related-panel pivots non-zero=<M>/<total>.
-File: internal/demo/fixtures/<shortName>.go
+File: core/demo/fixtures/<shortName>.go
 ```
 
 ## What this skill never does

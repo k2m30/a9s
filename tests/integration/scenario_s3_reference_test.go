@@ -17,7 +17,7 @@ import (
 	demofixtures "github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
 
-// s3SortProbeBucket is a namedBuckets fixture from internal/demo/fixtures/s3.go,
+// s3SortProbeBucket is a namedBuckets fixture from core/demo/fixtures/s3.go,
 // lexicographically after the a9s-demo-* buckets so a Bucket Name sort toggle
 // provably reorders it relative to the healthy graph-root bucket.
 const s3SortProbeBucket = "webapp-assets-prod"
@@ -68,7 +68,7 @@ func TestScenario_S3ReferenceSurfaces(t *testing.T) {
 		scenario.ExpectCurrentResourceID(s3SortProbeBucket)
 		scenario.Back()
 		// Esc on a list with an active filter clears the filter instead of
-		// popping the view (per-screen esc semantics, internal/app/actions_nav.go).
+		// popping the view (per-screen esc semantics, core/app/actions_nav.go).
 		scenario.Back()
 		scenario.ExpectFrameContains("s3(" + strconv.Itoa(expectedS3))
 
@@ -108,7 +108,7 @@ func TestScenario_S3ReferenceSurfaces(t *testing.T) {
 		fresh.ExpectNoAPIError()
 		rows := fresh.DrillRelated("CloudTrail Trails")
 		if len(rows) == 0 {
-			t.Fatalf("drill into %q from %q landed on an empty list (graph fixtures: internal/demo/fixtures/s3.go + cloudtrail fixtures)",
+			t.Fatalf("drill into %q from %q landed on an empty list (graph fixtures: core/demo/fixtures/s3.go + cloudtrail fixtures)",
 				"CloudTrail Trails", demofixtures.HealthyBucketName)
 		}
 		fresh.ExpectNoAPIError()
@@ -122,7 +122,7 @@ func TestScenario_S3ReferenceSurfaces(t *testing.T) {
 		scenario.ApplySearch(demofixtures.HealthyBucketARN)
 		scenario.ExpectHeaderContains("matches")
 		// Esc first clears the active text search, only the second pops the
-		// YAML view (per-view esc semantics, internal/app/actions_nav.go).
+		// YAML view (per-view esc semantics, core/app/actions_nav.go).
 		scenario.Back()
 		scenario.Back() // yaml → filtered list
 	})
@@ -139,14 +139,14 @@ func TestScenario_S3ReferenceSurfaces(t *testing.T) {
 
 	t.Run("cache_roundtrip", func(t *testing.T) {
 		// Core().ResourceCache is gated to FULL, fetch-origin entries
-		// (internal/runtime/accessors.go), so ok==true is itself the
+		// (core/runtime/accessors.go), so ok==true is itself the
 		// "full fetch-origin entry exists" assertion.
 		entry, ok := scenario.model.Core().ResourceCache("s3")
 		if !ok || entry == nil {
-			t.Fatalf("no full fetch-origin cache entry for s3 after list load (internal/runtime/accessors.go ResourceCache)")
+			t.Fatalf("no full fetch-origin cache entry for s3 after list load (core/runtime/accessors.go ResourceCache)")
 		}
 		if got := len(entry.Resources); got != expectedS3 {
-			t.Fatalf("s3 cache entry rows = %d, expected %d per internal/demo/fixtures/counts.go ExpectedTopLevelCounts",
+			t.Fatalf("s3 cache entry rows = %d, expected %d per core/demo/fixtures/counts.go ExpectedTopLevelCounts",
 				got, expectedS3)
 		}
 		scenario.Back() // list → menu
@@ -161,14 +161,14 @@ func TestScenario_S3ReferenceSurfaces(t *testing.T) {
 
 // expectRenderedOrder asserts that the row for first renders above the row
 // for second in the current view. Both names are fixture buckets from
-// internal/demo/fixtures/s3.go.
+// core/demo/fixtures/s3.go.
 func expectRenderedOrder(t *testing.T, s *fullIntegrationScenario, first, second string) {
 	t.Helper()
 	view := s.currentView()
 	fi := strings.Index(view, first)
 	si := strings.Index(view, second)
 	if fi < 0 || si < 0 {
-		t.Fatalf("sort check: bucket rows %q / %q not both rendered (internal/demo/fixtures/s3.go)\nview:\n%s",
+		t.Fatalf("sort check: bucket rows %q / %q not both rendered (core/demo/fixtures/s3.go)\nview:\n%s",
 			first, second, view)
 	}
 	if fi > si {

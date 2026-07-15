@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // issue_enrichment.go owns Wave 2 issue-enrichment shared types and helpers:
 // the IssueEnricher metadata struct, InFetcherWave2Sentinel, the result/func
 // contracts, and truly-shared helpers used by more than one enricher file.
@@ -21,7 +23,7 @@ import (
 // Priority controls Wave 2 dispatch order: lower values run first.
 // The default priority is 100; batchable (cheap) enrichers use 10.
 //
-// Distinct from resource.DetailEnricher (internal/resource/enricher.go) which
+// Distinct from resource.DetailEnricher (core/resource/enricher.go) which
 // is the on-demand detail-view enricher contract.
 type IssueEnricher struct {
 	Fn       IssueEnricherFunc
@@ -109,7 +111,7 @@ func formatDate(t interface{ Format(string) string }) string {
 // to r.Findings[resourceID] rather than overwriting it — every
 // independently-evaluated condition survives as its own Finding, with its
 // own Phrase/Detail/Code, never demoted into another finding's supporting
-// row. ApplyWave2ToRow (internal/runtime/helpers.go) folds the whole slice
+// row. ApplyWave2ToRow (core/runtime/helpers.go) folds the whole slice
 // onto domain.Resource.Findings, and colorFromAnyFinding/buildAttentionEntries/
 // listPhraseFromFindings already read the whole slice for worst-severity
 // color, one Attention entry per issue-severity finding, and the stacked
@@ -248,12 +250,12 @@ type IssueEnricherResult struct {
 // (e.g. dbi-snap reads cache["dbi"] to detect orphan/past-retention signals).
 // Non-cross-ref enrichers ignore the cache via `_ resource.ResourceCache`.
 // This is the Wave 2 issue-enrichment contract; distinct from on-demand DetailEnricher
-// (internal/resource/enricher.go) which enriches a single resource for detail views.
+// (core/resource/enricher.go) which enriches a single resource for detail views.
 //
 // Cache invariant — read-only shallow snapshot:
 // The TUI dispatcher (internal/tui/probe_adapter.go probeEnrichment tea.Cmd wrapper)
 // invokes (*Core).ProbeEnrichment, which builds the cache once at dispatch time via
-// (*Core).BuildResourceCacheSnapshot in internal/runtime/probes.go and passes the
+// (*Core).BuildResourceCacheSnapshot in core/runtime/probes.go and passes the
 // resulting map by value. The map and its ResourceCacheEntry structs are
 // freshly allocated, but the .Resources slice header is COPIED — its backing
 // array is shared with the live m.resourceCache / m.probeResources / m.lazyResourceCache

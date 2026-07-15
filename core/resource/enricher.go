@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package resource
 
 import (
@@ -8,7 +10,7 @@ import (
 )
 
 // DetailEnricher is the function signature for on-demand detail enrichers.
-// Declaration lives in internal/domain/contracts.go; this alias keeps
+// Declaration lives in core/domain/contracts.go; this alias keeps
 // existing consumers compiling.
 type DetailEnricher = domain.DetailEnricher
 

@@ -4,20 +4,20 @@
 // mechanism, not today's (broken) behavior. Fictional data only (account
 // 123456789012).
 //
-// Pin 1 — internal/session/rowstore.go Observe: a probe replace must not
+// Pin 1 — core/session/rowstore.go Observe: a probe replace must not
 // shrink an existing Fetch-origin row set (append=false, smaller incoming).
-// Pin 2 — internal/runtime/handlers_availability.go (~line 124): a disk seed
+// Pin 2 — core/runtime/handlers_availability.go (~line 124): a disk seed
 // WITH real rows but a C6a-style larger Count must still land the larger
 // TotalCount, not silently drop it to len(rows).
-// Pin 3 — internal/runtime/accessors.go ResourceCacheKeys / a new
+// Pin 3 — core/runtime/accessors.go ResourceCacheKeys / a new
 // origin-gated FetchOriginCacheKeys: the related-freshness key set must
 // exclude Disk/Probe-origin entries, matching HasResourceCache's own
 // Origin==OriginFetch gate. This pin defines the fix's contract: a
 // FetchOriginCacheKeys accessor does not exist yet (red = missing symbol).
-// Pin 4 — internal/runtime/helpers.go ApplyWave2ToRow: the in-place
+// Pin 4 — core/runtime/helpers.go ApplyWave2ToRow: the in-place
 // compaction of r.Findings mutates the input row's backing array, so any
 // other domain.Resource value sharing that slice header is corrupted too.
-// Pin 5 — internal/aws/related_common.go
+// Pin 5 — core/aws/related_common.go
 // lambdaEventSourceMappingLambdaCheck: when only SOME ListEventSourceMappings
 // FunctionArns are present in the lambda ResourceCache, the checker must
 // union the cache-matched IDs with ARN-parsed IDs for the cache-missing
@@ -196,7 +196,7 @@ func TestRowStoreControllerPin_AvailabilityCacheLoaded_RealDiskRowsWithLargerCou
 // -----------------------------------------------------------------------
 
 // TestCore_FetchOriginCacheKeys_ExcludesDiskAndProbeOrigin pins the review
-// finding: internal/runtime/accessors.go's ResourceCacheKeys (backing
+// finding: core/runtime/accessors.go's ResourceCacheKeys (backing
 // executor.go's mainCacheKeys, which gates RelatedDef.NeedsTargetCache
 // freshness) filters SnapshotAll(false) only on Partial, never on Origin —
 // so a Disk- or Probe-origin, non-Partial, rows-carrying entry is
@@ -204,7 +204,7 @@ func TestRowStoreControllerPin_AvailabilityCacheLoaded_RealDiskRowsWithLargerCou
 // unlike HasResourceCache which explicitly requires
 // tr.Origin == session.OriginFetch. This pin names the fix's intended
 // contract as a NEW accessor, FetchOriginCacheKeys, origin-gated identically
-// to HasResourceCache — red because internal/runtime.Core has no such method
+// to HasResourceCache — red because core/runtime.Core has no such method
 // yet (compile-time missing symbol).
 func TestCore_FetchOriginCacheKeys_ExcludesDiskAndProbeOrigin(t *testing.T) {
 	s := session.New()
@@ -312,7 +312,7 @@ func (f *fakeLambdaListEventSourceMappingsUnionPin) ListEventSourceMappings(_ co
 
 // TestKinesis_Related_Lambda_PartialCacheMatch_UnionsCachedAndUncachedIDs
 // pins the review finding in lambdaEventSourceMappingLambdaCheck
-// (internal/aws/related_common.go): when the API returns TWO distinct
+// (core/aws/related_common.go): when the API returns TWO distinct
 // FunctionArns and the lambda ResourceCache entry exists (not truncated) but
 // only resolves ONE of them by Fields["arn"], today's code only appends
 // cache-matched IDs (entry.Resources loop) and drops the cache-missing ARN

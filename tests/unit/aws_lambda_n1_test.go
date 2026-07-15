@@ -73,7 +73,7 @@ func newLambdaClientWithCountingTransport(transport *countingLambdaRoundTripper)
 func TestLambdaPaginatedFetcher_DoesNotCallEventSourceAPI(t *testing.T) {
 	fetcher := resource.GetPaginatedFetcher("lambda")
 	if fetcher == nil {
-		t.Fatal("paginated fetcher for 'lambda' not registered — ensure internal/aws package is imported")
+		t.Fatal("paginated fetcher for 'lambda' not registered — ensure core/aws package is imported")
 	}
 
 	listJSON := `{

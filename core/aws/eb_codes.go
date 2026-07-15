@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // eb_codes.go — canonical FindingCode constants for the eb (Elastic
 // Beanstalk) resource type. The fetcher writes Findings using these codes;
 // the eb Color func reads them (any Finding, wave1 or wave2) to color rows.

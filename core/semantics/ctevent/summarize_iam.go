@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package ctevent
 
 import (
@@ -7,7 +9,7 @@ import (
 // SummarizeIAM summarizes the REQUEST section for IAM events.
 // It receives cleaned params with TARGET-lifted fields already removed.
 // policyArn fields are marked navigable to "policy" (registered ShortName in
-// internal/resource/types_security.go).
+// core/resource/types_security.go).
 func SummarizeIAM(_ string, params map[string]any) []Row {
 	rows := []Row{}
 	if len(params) == 0 {

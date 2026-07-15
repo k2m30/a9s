@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package aws
 
 import (
@@ -31,7 +33,7 @@ func orphanUnattachedPolicyFinding(attachmentCount string, isAttachable bool) []
 }
 
 // iamPolicyStore is the subset of session.PolicyStore consumed by this file.
-// Defined locally to avoid an import cycle (internal/session imports internal/aws).
+// Defined locally to avoid an import cycle (core/session imports core/aws).
 // session.PolicyStore satisfies this interface via Go's structural typing.
 type iamPolicyStore interface {
 	Lookup(key string) (resource.Resource, bool)
@@ -430,7 +432,7 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resou
 	var mu sync.Mutex
 	var groupFailures []string
 
-	// Bounded fan-out (ForEachParallel, internal/aws/parallel.go — the same
+	// Bounded fan-out (ForEachParallel, core/aws/parallel.go — the same
 	// mechanism issue-enrichment fetchers use): sequential per-group calls
 	// cannot finish a wide account (49+ groups) inside any shared deadline
 	// (the probe's 10s budget, or a real list-open's own timeout); unbounded

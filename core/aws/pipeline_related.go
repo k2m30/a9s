@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // pipeline_related.go contains CodePipeline pipeline related-resource checker functions.
 //
 // All pipeline→* checkers here use Pattern C: a single GetPipeline call per checker

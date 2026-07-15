@@ -5,7 +5,7 @@
 // runtime.TaskKindSaveCache and calls the TUI-local m.saveAvailabilityCache()
 // (internal/tui/probe_adapter.go — counts-only, sourced from the controller's
 // MenuState), bypassing the shared executor path
-// (internal/runtime/executor.go's TaskKindSaveCache case) which additionally
+// (core/runtime/executor.go's TaskKindSaveCache case) which additionally
 // calls saveProbeResourcesToTypeFiles to persist per-type rows/findings from
 // the dispatch-time *SaveCachePayload snapshot. A live TUI session therefore
 // persists ~/.a9s cache type files with a correct Count/Issues header but
@@ -208,7 +208,7 @@ func TestTUISaveCache_AvailabilityCountsStillPersist(t *testing.T) {
 	}
 	// Issues is intentionally NOT asserted here: post-fix, TaskKindSaveCache's
 	// issue count is derived from c.session.ResourceCache via
-	// availabilityFromResourceCache (internal/runtime/executor.go), which
+	// availabilityFromResourceCache (core/runtime/executor.go), which
 	// classifies issues through the s3 catalog's own domain.Color function —
 	// a synthetic single-field fixture built purely for this cache-routing
 	// test does not reliably trigger that per-type classification, and a

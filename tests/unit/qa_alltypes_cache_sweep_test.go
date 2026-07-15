@@ -16,9 +16,9 @@
 //     ActionCommand, Arg: shortName}) as the real navigation entry point,
 //     and ctrl.Snapshot().Body.List for the resulting ListBody.
 //
-// Per-assertion mechanism (traced against internal/runtime/handlers_navigate.go
+// Per-assertion mechanism (traced against core/runtime/handlers_navigate.go
 // HandleNavigate's NavigateTargetResourceList branch and
-// internal/app/navigate.go's applyNavResult):
+// core/app/navigate.go's applyNavResult):
 //
 //  1. CachedRenderMarkedStale: a fresh Controller/Core has never observed the
 //     type this session (session.ProbeResources[canon] absent), so

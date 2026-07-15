@@ -6,7 +6,7 @@
 //
 // Both legacy files drive views.NewResourceList(...).Update(...).View() —
 // dead code in production (the controller/ViewState render path is the only
-// live consumer of internal/app/list_columns.go's listExtractCellValue,
+// live consumer of core/app/list_columns.go's listExtractCellValue,
 // exactly as wave3_list_ports_test.go's header already documents for the
 // filter/checker-carry/marker-col pins). This file re-pins every RawStruct/
 // Humanize assertion the two legacy files made, driven instead through the
@@ -497,7 +497,7 @@ func TestWave3ListRawStruct_FieldsFallbackWhenNoRawStruct(t *testing.T) {
 // domain.HumanizeStatusPhrase when RawStruct is nil and the raw AWS enum is
 // only reachable via the title-match Fields fallback (a cache-warm row:
 // RawStruct stripped, value materialized into Fields). "transfer"'s Endpoint/
-// Identity Provider columns (internal/config/defaults_networking.go) are
+// Identity Provider columns (core/config/defaults_networking.go) are
 // real, registered Key-less/Path-based Humanize:true columns — the title-
 // match loop (list_columns.go's listExtractCellValue) looks them up by their
 // OWN title-derived key ("endpoint", "identity_provider"), which is what a

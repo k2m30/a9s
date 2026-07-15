@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package resource
 
 import (
@@ -6,10 +8,10 @@ import (
 
 // WireProjection wires the resource-registry callbacks into the generic projector
 // so that projection.Generic can access navigable-field definitions, ID
-// resolvers, and field-alias normalisers without importing internal/resource
+// resolvers, and field-alias normalisers without importing core/resource
 // (which would create an import cycle).
 //
-// `internal/resource/` deliberately contains zero `func init()`.
+// `core/resource/` deliberately contains zero `func init()`.
 // WireProjection replaces the former package init() and is
 // explicitly called from cmd/a9s/main.go and from every TestMain that needs
 // a wired projector. Idempotent: callers may invoke it multiple times safely.

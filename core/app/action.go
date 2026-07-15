@@ -1,5 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package app is the headless controller layer that sits between the
-// platform-agnostic runtime core (internal/runtime) and any renderer
+// platform-agnostic runtime core (core/runtime) and any renderer
 // (TUI, web, test). It owns the screen stack, per-screen view state,
 // the semantic Action vocabulary, and the serialisable ViewState snapshot.
 //

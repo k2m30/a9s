@@ -10,7 +10,7 @@ package unit
 // — i.e. the enricher's IssueCount is a lower bound. Enrichers that emit only
 // "~" (informational) findings, like iam-group, MUST leave Truncated false
 // regardless of TruncatedIDs: a coverage gap in informational-only data never
-// lower-bounds the issue badge (see internal/aws/issue_enrichment.go
+// lower-bounds the issue badge (see core/aws/issue_enrichment.go
 // IssueEnricherResult.Truncated godoc).
 //
 // Tests use existing fake infrastructure from aws_iam_group_enricher_test.go
@@ -53,7 +53,7 @@ type iamGroupErrorOnSecondFake struct {
 	awsclient.IAMAPI
 
 	// mu guards callOrder, which is written concurrently: EnrichIAMGroup fans
-	// out GetGroup calls per resource via internal/aws.ForEachParallel
+	// out GetGroup calls per resource via core/aws.ForEachParallel
 	// (EnrichmentParallelism goroutines).
 	mu sync.Mutex
 	// callOrder records the order of GetGroup calls by group name.

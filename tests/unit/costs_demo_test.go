@@ -1,14 +1,14 @@
 // costs_demo_test.go — Cost Explorer Phase 2: demo transport serves CE data
 // (specs/021-cost-explorer/spec.md SC-001, FR-003).
 //
-// Phase-1 production code (already landed, used as-is): internal/costs,
-// internal/aws.FetchCostAndUsage/FetchCostAnomalies, and
-// internal/demo.NewDemoAWSConfig (routes any *costexplorer.Client through
+// Phase-1 production code (already landed, used as-is): core/costs,
+// core/aws.FetchCostAndUsage/FetchCostAnomalies, and
+// core/demo.NewDemoAWSConfig (routes any *costexplorer.Client through
 // the demo transport, exactly like tests/unit/demo_app_test.go's pattern
-// for other services via internal/aws.CreateServiceClients).
+// for other services via core/aws.CreateServiceClients).
 //
 // Phase-2, not yet landed (RED until the coder registers "ce:GetCostAndUsage"
-// / "ce:GetAnomalies" handlers backed by internal/demo/fixtures/costs.go):
+// / "ce:GetAnomalies" handlers backed by core/demo/fixtures/costs.go):
 // every assertion below currently fails with a 501 "no handler for ce:*"
 // transport error, not a compile error — this file compiles clean today
 // against Phase-1 symbols alone.

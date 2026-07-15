@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package demo
 
 import (
@@ -9,9 +11,9 @@ import (
 // registerAllHandlers registers all demo handlers onto t.
 // STS and Cost Explorer are the only services still routed through the HTTP
 // transport; every other service is covered by typed fakes
-// (internal/demo/fakes). Cost Explorer has no typed-fake path — costs.Store/
+// (core/demo/fakes). Cost Explorer has no typed-fake path — costs.Store/
 // Query are shaped around SDK JSON responses, not a Go client interface —
-// so it is served here like STS (see internal/demo/costs_handlers.go).
+// so it is served here like STS (see core/demo/costs_handlers.go).
 func registerAllHandlers(t *Transport) {
 	registerSTSHandlers(t)
 	registerCostExplorerHandlers(t)

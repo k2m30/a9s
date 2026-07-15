@@ -56,9 +56,9 @@ import (
 
 // rsnsRelatedTypes is the set of related result/row type names whose
 // composite literals may not carry a negative Count sentinel. Verified real
-// on 2026-07-07: RelatedCheckResult (internal/domain/contracts.go:122 and
-// internal/runtime/messages/event.go:112), DetailRelatedRow
-// (internal/app/screenstate.go:132), RelatedBlock (internal/app/viewstate.go:226),
+// on 2026-07-07: RelatedCheckResult (core/domain/contracts.go:122 and
+// core/runtime/messages/event.go:112), DetailRelatedRow
+// (core/app/screenstate.go:132), RelatedBlock (core/app/viewstate.go:226),
 // rightColumnRow (internal/tui/views/rightcolumn.go:17, field spelled "count").
 var rsnsRelatedTypes = map[string]bool{
 	"RelatedCheckResult": true,

@@ -4,7 +4,7 @@ package unit
 // the shared bounded-concurrency helper Wave-2 issue enrichers will use to
 // replace their current sequential per-resource AWS calls.
 //
-// Contract under test (internal/aws/parallel.go, not yet implemented):
+// Contract under test (core/aws/parallel.go, not yet implemented):
 //
 //	func ForEachParallel(ctx context.Context, n, limit int, fn func(i int)) error
 //

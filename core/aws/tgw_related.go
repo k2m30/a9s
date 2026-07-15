@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // tgw_related.go contains related-resource checker functions for Transit Gateways.
 package aws
 

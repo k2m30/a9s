@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package styles
 
 import (
@@ -69,7 +71,7 @@ func NoColorActive() bool {
 // Respects NO_COLOR (returns an empty style when active).
 //
 // Takes domain.Color (the renderer-free health enum) rather than the
-// internal/resource compatibility alias, so styles depends only on the
+// core/resource compatibility alias, so styles depends only on the
 // zero-dependency domain leaf.
 func ColorStyle(c domain.Color) lipgloss.Style {
 	if NoColorActive() {

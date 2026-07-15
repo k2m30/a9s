@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // eni_related.go contains Network Interface related-resource checker functions.
 package aws
 

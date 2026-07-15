@@ -2,9 +2,9 @@ package unit
 
 // qa_acm_color_test.go — Behavioral tests for the ACM Certificates Color function.
 //
-// CodeRabbit PR-273 finding: internal/resource/types_dns_cdn.go:73-85 returns
+// CodeRabbit PR-273 finding: core/resource/types_dns_cdn.go:73-85 returns
 // ColorHealthy for all ISSUED certs, ignoring days_left and in_use fields that
-// the fetcher at internal/aws/acm.go:113 already writes.
+// the fetcher at core/aws/acm.go:113 already writes.
 //
 // Expected behavior per docs/attention-signals.md:
 //   - ISSUED, in_use=false → ColorWarning (orphan cert).

@@ -37,7 +37,7 @@ Is the value already on the SDK list-API response (RawStruct path)?
          │        ├─ Edit/add Wave-2 enricher to populate
          │        │  IssueEnricherResult.FieldUpdates[resourceID][<key>]
          │        ├─ Wire via the catalog literal's Wave2 + IssueEnricherFieldKeys
-         │        │  fields in internal/aws/catalog_<category>.go
+         │        │  fields in core/aws/catalog_<category>.go
          │        └─ Add column with Key: in defaults_*.go
          └─ Multi-line text body? → Tier C: detail-only via DetailField{Key: ..., Label: ...}
 ```
@@ -54,7 +54,7 @@ The architect's job is to eliminate per-step rediscovery. Provide:
 
 ## Tier A — Path or Key already populated
 
-### File: `internal/config/defaults_<group>.go`
+### File: `core/config/defaults_<group>.go`
 
 Find the `<shortName>` entry's `List []ListColumn` slice. Insert the new column AFTER the primary status column:
 
@@ -85,7 +85,7 @@ func TestFetch<Type>_<Field>_Populated(t *testing.T) {
 
 ## Tier B-fetcher — Wave-1 computed at fetch time
 
-### File: `internal/aws/<short>.go`
+### File: `core/aws/<short>.go`
 
 Find the resource construction site. Add the computed field to the `Fields:` literal:
 
@@ -96,7 +96,7 @@ Fields: map[string]string{
 },
 ```
 
-Add `<key>` to the type's `FieldKeys` slice on its catalog literal (`internal/aws/catalog_<category>.go`).
+Add `<key>` to the type's `FieldKeys` slice on its catalog literal (`core/aws/catalog_<category>.go`).
 
 ### Then defaults_*.go and viewsgen as Tier A.
 
@@ -115,14 +115,14 @@ Don't test the trivial round-trip; test the logic.
 
 ## Tier B-enricher — Wave-2 via FieldUpdates
 
-### File: `internal/aws/<short>_issue_enrichment.go`
+### File: `core/aws/<short>_issue_enrichment.go`
 
 Types with Wave 2 signals have an `_issue_enrichment.go` file; a type with no Wave 2 signal simply omits the `Wave2` field on its catalog literal — create the file if it's missing.
 
-Mirror the existing `EnrichDynamoDBPITR` / `EnrichKMSRotation` / `EnrichRedisReplicationGroup` pattern. Wiring is declarative on the catalog literal in `internal/aws/catalog_<category>.go` (no `init()`, no `register*` calls):
+Mirror the existing `EnrichDynamoDBPITR` / `EnrichKMSRotation` / `EnrichRedisReplicationGroup` pattern. Wiring is declarative on the catalog literal in `core/aws/catalog_<category>.go` (no `init()`, no `register*` calls):
 
 ```go
-// internal/aws/catalog_<category>.go — on the type's ResourceTypeDef literal:
+// core/aws/catalog_<category>.go — on the type's ResourceTypeDef literal:
 Wave2:                  IssueEnricher{Fn: Enrich<Name>, Priority: 100},
 IssueEnricherFieldKeys: []string{"<key>"},
 ```
@@ -164,7 +164,7 @@ If the enricher walks paginated results (e.g. ListPackages, ListSubscriptionsByT
 
 ### Wire via the catalog literal
 
-Set `Wave2: IssueEnricher{Fn: <fn>, Priority: <priority>}` on the type's `ResourceTypeDef` literal in `internal/aws/catalog_<category>.go`. Exactly one `Wave2` per type — the field is the registration; there is no `init()`/`register*` path. `Wave2EnricherFor(shortName)` (internal/aws/wave2.go) resolves it; `tests/unit/architecture_conformance_test.go` pins that every declared Wave2 resolves.
+Set `Wave2: IssueEnricher{Fn: <fn>, Priority: <priority>}` on the type's `ResourceTypeDef` literal in `core/aws/catalog_<category>.go`. Exactly one `Wave2` per type — the field is the registration; there is no `init()`/`register*` path. `Wave2EnricherFor(shortName)` (core/aws/wave2.go) resolves it; `tests/unit/architecture_conformance_test.go` pins that every declared Wave2 resolves.
 
 ### Then defaults_*.go and viewsgen as Tier A.
 

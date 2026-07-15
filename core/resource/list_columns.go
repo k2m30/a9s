@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package resource
 
 import "github.com/k2m30/a9s/v3/core/config"
@@ -10,9 +12,9 @@ import "github.com/k2m30/a9s/v3/core/config"
 // Path/Humanize from the defaults by title match), else the raw built-in
 // defaults.
 //
-// Single source of truth for the column-set cascade: internal/app's
+// Single source of truth for the column-set cascade: core/app's
 // resolveListColumnsForBuild (session-view-config-aware, used for rendering)
-// and internal/runtime's resolveSaveColumns (always vc=nil, used for the
+// and core/runtime's resolveSaveColumns (always vc=nil, used for the
 // cache-save fallback lane) both delegate here so the two packages can never
 // disagree about which columns a resource type renders.
 func ResolveListColumnCascade(vc *config.ViewsConfig, typeName string, td *ResourceTypeDef) []config.ListColumn {

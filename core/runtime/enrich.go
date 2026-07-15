@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package runtime — see orchestrator.go for the package overview.
 //
 // enrich.go owns the on-demand detail-view enrichment dispatch policy. The

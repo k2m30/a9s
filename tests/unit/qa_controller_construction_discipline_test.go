@@ -36,7 +36,7 @@
 // test from reintroducing the leak by hand-rolling its own construction
 // instead of calling a blessed helper. This gate is a SOURCE-SCAN ratchet
 // (the same construction as count_minus_one_guard_test.go's AST guard over
-// internal/aws/*_related*.go, and the same allowlist semantics as
+// core/aws/*_related*.go, and the same allowlist semantics as
 // knownStatusColumnDebt / knownVisibilityGaps / knownStateCoverageGaps /
 // knownDisconnectedPivots in the sibling qa_*_test.go gates):
 //

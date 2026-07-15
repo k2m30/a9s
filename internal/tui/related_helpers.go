@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // related_helpers.go — BT-coupled related-navigation helpers that stay in
 // the tui package because they reference views.ResourceList and tea.Cmd.
 package tui

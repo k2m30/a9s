@@ -5,12 +5,12 @@ import { readServer } from "./server";
 // "Status" column rendering finding phrases (else the humanized state), row
 // colors derive from findings, and the detail shows an Attention section
 // listing causes. The TUI and unit suites already pin this; the web lane
-// renders the same controller ViewState (internal/app) through
-// internal/web/templates, so this spec asserts the same doctrine against the
+// renders the same controller ViewState (core/app) through
+// core/web/templates, so this spec asserts the same doctrine against the
 // REAL browser DOM in --demo mode.
 //
 // DOM mechanism (inspected, not assumed): the list template
-// (internal/web/templates/list.html) stamps each <tr> with the shared
+// (core/web/templates/list.html) stamps each <tr> with the shared
 // ListRow.Color tag as a `row-<tag>` class — row-healthy / row-warning /
 // row-broken / row-dim — which page.html's CSS maps to var(--ok)/var(--warn)/
 // var(--err)/var(--dim). "Issue row color" therefore means class
@@ -77,7 +77,7 @@ async function openFlaggedS3Detail(page: Page): Promise<void> {
 // child view.
 //
 // KNOWN PARITY GAP (reachability): the tg_health child view is registered
-// under trigger key "enter" (internal/aws/catalog_networking.go), and the web
+// under trigger key "enter" (core/aws/catalog_networking.go), and the web
 // footer advertises "enter Target Health" — but app.js maps Enter to the
 // generic "select" action (which always opens the detail) and its child-view
 // key set only covers e/L/s. So no keyboard key reaches an "enter"-registered
@@ -167,7 +167,7 @@ test.describe("presentation doctrine — web parity (demo fixtures)", () => {
   test("s3 flagged bucket detail: Attention section present with the cause sentence", async ({ page }) => {
     await openFlaggedS3Detail(page);
 
-    // The shared detail body builder (internal/app/detail_body.go's
+    // The shared detail body builder (core/app/detail_body.go's
     // injectAttentionSectionDetail) renders Attention as a field SECTION at
     // the top of .detail-fields — the same layout the TUI shows — not via the
     // separate .attention-block template branch.

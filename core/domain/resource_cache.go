@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package domain — see contracts.go for the package overview.
 //
 // resource_cache.go owns the platform-agnostic list-view cache entry shape
 // used to restore a top-level resource list when the user re-enters it
 // from the main menu. The concrete store (session.Session.RowStore) lives
-// in internal/session and is mutated by runtime handlers (via
+// in core/session and is mutated by runtime handlers (via
 // Core.SetResourceCache and friends); this file owns the per-entry value
 // type so renderer adapters and the session package can both reference it
 // without an import cycle.

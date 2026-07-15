@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // detail_enrichment.go defines the composite context passed to on-demand
 // detail enrichers. It separates pure AWS transport (*ServiceClients) from
 // session-scoped caches (e.g. *PolicyDocumentCache) so cache ownership lives

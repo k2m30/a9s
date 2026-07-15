@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // detail_render.go contains YAML/plain content generation and config-driven rendering for DetailModel.
 // Specifically: RawYAML, PlainContent, renderContent, computeKeyWidth, renderFromConfig.
 package views

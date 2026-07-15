@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // handlers_related_test.go — unit tests for the runtime-side related-navigation
 // dispatch (PR-05a-h4 / AS-150 NEEDS CHANGES finding #2).
 //

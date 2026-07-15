@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package aws
 
 import (
@@ -12,10 +14,10 @@ import (
 // Shared helpers used by the per-category catalog data files
 // (catalog_<cat>.go) for color classification and status-phrase parsing.
 //
-// These helpers live here (not internal/catalog) so the catalog data slices
+// These helpers live here (not core/catalog) so the catalog data slices
 // can live in the same package as the fetchers and transports they describe.
 // The intrinsic ResolveColor fallback used by
-// catalog.ResourceTypeDef.ResolveColor stays in internal/catalog.
+// catalog.ResourceTypeDef.ResolveColor stays in core/catalog.
 
 // colorFromSeverity maps a domain.Severity to the corresponding display Color.
 func colorFromSeverity(sev domain.Severity) domain.Color {

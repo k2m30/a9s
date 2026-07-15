@@ -57,7 +57,7 @@ reviews:
       instructions: |
         This is a Bubble Tea v2 TUI application. Key rules:
         - No blocking I/O in Update() — all I/O must be in tea.Cmd closures
-        - Views communicate via typed messages only (internal/runtime/messages/{cmd,event}.go)
+        - Views communicate via typed messages only (core/runtime/messages/{cmd,event}.go)
         - Views must never import each other
         - Async results (related checks, enrichment) must include a Generation field
           and be validated against relatedGen/enrichGen to discard stale results
@@ -66,7 +66,7 @@ reviews:
         - Every new view must implement SetSize and propagate it on WindowSizeMsg
         - Use lipgloss.Width() not len() for measuring styled strings
 
-    - path: "internal/aws/**"
+    - path: "core/aws/**"
       instructions: |
         AWS fetcher layer. Key rules:
         - a9s is read-only by design — flag ANY write API call (Put*, Create*,
@@ -81,7 +81,7 @@ reviews:
           *ServiceClients. resetForSessionSwitch rotates them on profile/region
           switch; no package-global cache state is allowed.
 
-    - path: "internal/resource/**"
+    - path: "core/resource/**"
       instructions: |
         Resource model and registry layer. Key rules:
         - Registries (fetchers, enrichers, related, navigable fields) are
@@ -90,7 +90,7 @@ reviews:
         - New registry patterns must follow the existing Register/Get/Has/Unregister
           convention (see enricher.go, registry.go)
 
-    - path: "internal/demo/**"
+    - path: "core/demo/**"
       instructions: |
         Demo mode fixtures and fakes. Key rules:
         - Fakes must implement the full aggregate interface (e.g., IAMAPI)
@@ -112,7 +112,7 @@ reviews:
           get independent caches automatically, no global cleanup needed
         - Never use real AWS account IDs or profile names in test data
 
-    - path: "internal/config/**"
+    - path: "core/config/**"
       instructions: |
         View configuration system. Key rules:
         - defaults_*.go files define built-in view configs per service category

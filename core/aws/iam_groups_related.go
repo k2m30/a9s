@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // iam_groups_related.go contains IAM Group related-resource checker functions.
 package aws
 

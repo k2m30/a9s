@@ -77,7 +77,7 @@ import (
 // intentionally modeled healthy so the rest of the demo fleet has a
 // non-degraded sending identity to reference. The distress shapes for
 // account-shutdown / account-probation / quota-high are constructed inline
-// in QA tests instead (see internal/demo/fixtures/ses.go's own doc comment).
+// in QA tests instead (see core/demo/fixtures/ses.go's own doc comment).
 var knownUnwitnessedFindings = map[string]bool{
 	"ses:ses.account-shutdown":  true,
 	"ses:ses.account-probation": true,

@@ -134,10 +134,10 @@ Rules:
 After finding a mismatch, inspect relevant code to explain it.
 
 Typical files:
-- `internal/aws/ec2.go`
-- `internal/aws/ami.go`
+- `core/aws/ec2.go`
+- `core/aws/ami.go`
 - `internal/tui/app_dispatch.go` / `internal/tui/runtime_adapter_*.go` (adapter handlers)
-- `internal/app/` + `internal/runtime/` (shared controller / core logic)
+- `core/app/` + `core/runtime/` (shared controller / core logic)
 - `internal/tui/views/detail.go`
 - `internal/tui/views/rightcolumn.go`
 - `internal/tui/views/help.go`

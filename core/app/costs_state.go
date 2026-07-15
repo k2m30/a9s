@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package app
 
 import (
@@ -778,7 +780,7 @@ func (c *Controller) applyCostsSelect(cs *CostsState) *runtime.TaskRequest {
 		return nil
 	case screen.OpenResource:
 		// The SAME lane-neutral by-ID seam the related panel's own
-		// single-target drill uses (internal/app/navigate.go's
+		// single-target drill uses (core/app/navigate.go's
 		// applyRelatedNavResult, NavigationKindFilteredList's TargetID
 		// branch): push a placeholder ScreenResourceList flagged
 		// AutoOpenSingle so autoOpenSingleDetail (handle.go) replaces it
@@ -853,7 +855,7 @@ func costsAncestorRowDims(stack []costs.DrillLevel) []costs.Dimension {
 // callback: the a9s catalog mapping (costsResourceRowTargetType) AND
 // FetchByIDs registration folded into one check, so a service resolving
 // to a shortName with no FetchByIDs registered refuses exactly like an
-// unmapped service — screen package cannot import internal/resource, so
+// unmapped service — screen package cannot import core/resource, so
 // this closure is injected instead.
 func costsResourceTypeForService(service string) (string, bool) {
 	shortName := costsResourceRowTargetType(costs.Filter{Equals: map[costs.Dimension][]string{
@@ -901,7 +903,7 @@ func isClassifiedResourceDrillRefusal(err error) bool {
 // resource-level opt-in refusal (FR-007-shaped: an honest, human-readable
 // explanation, not a silent no-op). Extracts the underlying API error
 // MESSAGE via errors.As(err, *smithy.APIError) — the same clean
-// extraction internal/aws/errors.go's ClassifyAWSError already does —
+// extraction core/aws/errors.go's ClassifyAWSError already does —
 // rather than %v-ing the full chain, whose "operation error ..."/"https
 // response error ..." wrapper prefixes would otherwise consume the footer
 // line and truncate the actionable AWS text away before it is ever seen.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // ami_related_extra.go contains additional AMI related-resource checkers
 // required by docs/related-resources.md.
 package aws

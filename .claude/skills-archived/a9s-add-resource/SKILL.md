@@ -163,7 +163,7 @@ if ng.ScalingConfig != nil {
 
 # CODER STEPS (1-8) — a9s-coder agent only
 
-### 1. Fetcher: `internal/aws/{type}.go` (NEW FILE)
+### 1. Fetcher: `core/aws/{type}.go` (NEW FILE)
 
 **IMPORTANT:** Module path is `github.com/k2m30/a9s/v3/...` (the `/v3` suffix is required).
 
@@ -246,7 +246,7 @@ func Fetch{TypeName}Page(ctx context.Context, api {InterfaceName}, continuationT
 }
 ```
 
-### 2. Interface: `internal/aws/<service>_interfaces.go` (APPEND to the service's existing file)
+### 2. Interface: `core/aws/<service>_interfaces.go` (APPEND to the service's existing file)
 
 ```go
 // {TypeName}{APICall}API defines the interface for the {Service} {APICall} operation.
@@ -255,7 +255,7 @@ type {TypeName}{APICall}API interface {
 }
 ```
 
-### 3. Client field: `internal/aws/client.go` (ADD TO ServiceClients + CreateServiceClients)
+### 3. Client field: `core/aws/client.go` (ADD TO ServiceClients + CreateServiceClients)
 
 **If the service is NEW** (not already in ServiceClients), add field and constructor:
 
@@ -273,7 +273,7 @@ Add import if new service.
 
 **If the service already exists** (Pattern B), skip this step.
 
-### 4. Resource type def: `internal/resource/types_{category}.go` (APPEND to category function)
+### 4. Resource type def: `core/resource/types_{category}.go` (APPEND to category function)
 
 The type definitions are split by category. Append to the correct file:
 - Compute: `types_compute.go` → `computeResourceTypes()`
@@ -302,7 +302,7 @@ The type definitions are split by category. Append to the correct file:
 },
 ```
 
-### 5. Default view config: `internal/config/defaults_{category}.go` (ADD to category function)
+### 5. Default view config: `core/config/defaults_{category}.go` (ADD to category function)
 
 The defaults are split by category. Append to the matching `defaults_{category}.go` file's `{category}DefaultViews()` map:
 
@@ -334,11 +334,11 @@ Add import if new service types package.
 
 Every resource type needs demo mode fixtures. All services use typed fakes — there is no legacy fixture store.
 
-Add fixture data to `internal/demo/fixtures/<service>.go` and extend the matching fake in `internal/demo/fakes/<service>.go`. If the service already has a fake, add new SDK-typed fixture objects to the existing fixture struct and implement any new methods on the fake. If the service is new, create both files following the EC2 pattern.
+Add fixture data to `core/demo/fixtures/<service>.go` and extend the matching fake in `core/demo/fakes/<service>.go`. If the service already has a fake, add new SDK-typed fixture objects to the existing fixture struct and implement any new methods on the fake. If the service is new, create both files following the EC2 pattern.
 
-Wire the new fake into `internal/demo/client.go` (`NewServiceClients()`) if it's a new service.
+Wire the new fake into `core/demo/client.go` (`NewServiceClients()`) if it's a new service.
 
-**Reference:** See `internal/demo/fixtures/ec2.go` for the canonical fixture pattern and `internal/demo/fakes/ec2.go` for the fake pattern.
+**Reference:** See `core/demo/fixtures/ec2.go` for the canonical fixture pattern and `core/demo/fakes/ec2.go` for the fake pattern.
 
 ---
 

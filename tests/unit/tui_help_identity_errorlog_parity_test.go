@@ -3,7 +3,7 @@
 //
 // The original wave-4a dispatch assumed HelpBody/IdentityBody and the
 // ScreenRegion selector mapping were still gaps. They are NOT: verified at
-// HEAD (branch feat/cache), internal/app/snapshot.go already has
+// HEAD (branch feat/cache), core/app/snapshot.go already has
 // buildHelpBody() (L110-163), (*Controller).buildIdentityBody() (L169-193),
 // and bodyKindForScreen already maps ScreenProfileSelector/ScreenRegion/
 // ScreenTheme to BodyKindSelector (L92). Those three are pinned only as
@@ -13,7 +13,7 @@
 //
 // The REAL wave-4a work (verified against HEAD before writing these tests):
 //
-//  1. Help-table parity: buildHelpBody() (internal/app/snapshot.go) is a
+//  1. Help-table parity: buildHelpBody() (core/app/snapshot.go) is a
 //     hardcoded copy of views.HelpModel.mainMenuGroups() that ALWAYS returns
 //     Context:"main-menu" content — it does not branch on what screen is
 //     beneath the help screen the way HelpModel.buildGroups() branches on
@@ -47,10 +47,10 @@
 //     swap).
 //
 //  3. Error-log dual-store: internal/tui/app.go's m.errorHistory
-//     ([]errorEntry) and internal/app/controller.go's c.errorHistory
+//     ([]errorEntry) and core/app/controller.go's c.errorHistory
 //     ([]controllerErrorEntry) are two independently-maintained stores fed
 //     by hand-synced switch cases (internal/tui/runtime_adapter.go L98-102
-//     mirrors internal/app/intents.go L231-234 per that file's own comment,
+//     mirrors core/app/intents.go L231-234 per that file's own comment,
 //     "mirror the headless applyIntents case"). TestErrorLog_TUIViewMatches
 //     ControllerErrorHistoryExactCount drives messages.APIError through the
 //     TUI's real Update() loop (which appends to m.errorHistory via
@@ -63,7 +63,7 @@
 // Harness: mirrors tui_stack_sync_test.go / qa_help_context_test.go (TUI
 // lane: rootApplyMsg/newRootSizedModel/rootViewContent/stripANSI) and
 // tui_detail_parity_test.go (headless lane: directly-constructed
-// *app.Controller + *runtime.Core, package unit importing internal/app
+// *app.Controller + *runtime.Core, package unit importing core/app
 // alongside the TUI helpers in the same file).
 package unit
 
@@ -260,7 +260,7 @@ func TestOverlayParity_Identity_RoundTripStaysInSync(t *testing.T) {
 
 func TestOverlayParity_ErrorLog_NoErrors_RoundTripStaysInSync(t *testing.T) {
 	// With zero recorded errors, '!' flashes "No errors this session" instead
-	// of pushing an overlay (internal/app/actions_view.go handleActionOpenErrorLog
+	// of pushing an overlay (core/app/actions_view.go handleActionOpenErrorLog
 	// mirrors this: len(errorHistory)==0 -> flash, no push). StackInSync must
 	// stay true since no rendererState was pushed at all.
 	m := newRootSizedModel()
@@ -352,7 +352,7 @@ func TestErrorLog_TUIViewMatchesControllerErrorHistoryExactCount(t *testing.T) {
 
 // errParityError is a minimal error constructor so the dispatched
 // messages.APIError.Err.Error() text is EXACTLY the marker string with no
-// AWS-classification prefix (internal/runtime/handlers.go HandleAPIError
+// AWS-classification prefix (core/runtime/handlers.go HandleAPIError
 // falls back to ev.Err.Error() verbatim when ClassifyAWSError finds no
 // recognised AWS error code).
 type errParityErrorType string

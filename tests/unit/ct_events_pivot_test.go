@@ -12,7 +12,7 @@ package unit
 //      (authoritative) with a Fields["resource_name"] text fallback.
 //   4. Return Count=-1 when cache is truncated or errored; Count=N otherwise.
 //
-// The fix introduces a BuildCTEventsPivotChecker factory in internal/aws that
+// The fix introduces a BuildCTEventsPivotChecker factory in core/aws that
 // parameterizes this pattern so future resource types can register a ct-events
 // pivot checker without copy-paste.
 //

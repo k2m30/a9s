@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package tui
 
 // probe_enrichment_cache_test.go — pin that probeEnrichment passes a cache

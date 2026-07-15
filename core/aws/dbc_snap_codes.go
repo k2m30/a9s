@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // dbc_snap_codes.go — canonical FindingCode constants for the dbc-snap
 // resource type (DocumentDB + Aurora DB cluster snapshot).
 package aws

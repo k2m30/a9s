@@ -123,7 +123,7 @@ func TestCTDetailSummarizeIAM_PassRole(t *testing.T) {
 // TestCTDetailSummarizeIAM_PolicyArnNavigability verifies the navigability contract
 // specifically for policyArn rows: IsNavigable true implies TargetType "policy",
 // and IsNavigable false implies TargetType "". "policy" is the registered ShortName
-// in internal/resource/types_security.go.
+// in core/resource/types_security.go.
 func TestCTDetailSummarizeIAM_PolicyArnNavigability(t *testing.T) {
 	cases := []struct {
 		eventName string

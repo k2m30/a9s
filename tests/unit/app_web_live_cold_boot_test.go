@@ -43,7 +43,7 @@
 // is referenced anywhere in this file anymore. This is deliberately a
 // COMPILE-RED pass: the new cache package symbols do not exist in
 // production code yet, so this entire file will fail to build until the
-// coder implements internal/cache's round-2 surface — exactly like any
+// coder implements core/cache's round-2 surface — exactly like any
 // other TDD red phase, just at package-compile granularity instead of a
 // single assertion.
 //
@@ -89,7 +89,7 @@
 //     controller level using the existing session.NoCache flag.
 //   - C7a chokepoint audit -> UPDATED (not rewritten from scratch): now
 //     scans for cache.Dir(...) references and os.* primitives fed a
-//     cache.Dir(...)-derived path, outside internal/cache.
+//     cache.Dir(...)-derived path, outside core/cache.
 //   - C7a format-marker pin -> UPDATED: TypeFile.Version (not
 //     cache.File.Version) is the pinned first field.
 //
@@ -121,7 +121,7 @@ import (
 )
 
 // newLiveWebStyleController builds a Controller the same way
-// internal/web/construct.go newSession does for a LIVE (non-demo) session:
+// core/web/construct.go newSession does for a LIVE (non-demo) session:
 // runtime.Bootstrap + app.New + SetUIMode("web") — no pre-supplied clients,
 // no synchronous demo handshake, s.NoCache left false (the live default).
 func newLiveWebStyleController(t *testing.T, profile, region string) (*runtime.Core, *app.Controller) {
@@ -192,9 +192,9 @@ func TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu(t *testing
 // ExecuteTask(TaskKindLoadAvailCache) produces) through Controller.Handle,
 // exactly as DrainSyncProgress does for BootstrapLive's returned tasks.
 //
-// internal/app/menu.go's menuRefreshing() (task #17 wave 1 stage 2 re-point,
+// core/app/menu.go's menuRefreshing() (task #17 wave 1 stage 2 re-point,
 // per its own doc comment — "Flagged for Stage 3 to fold into whatever
-// internal/app's own RowStore migration does") reports true only for a type
+// core/app's own RowStore migration does") reports true only for a type
 // RowStore.ProbeOriginTypeNames() names, which itself requires
 // len(Rows) > 0 for that type's OriginProbe/OriginDisk entry. A counts-only
 // AvailabilityCacheLoaded entry with no real per-type disk file (C6a: never
@@ -328,7 +328,7 @@ func TestWebBoot_ColdListOpen_ControllerLevel_ReturnsLoadingShellAndFetchTask(t 
 	}
 
 	if app.IsBackgroundTaskKind(runtime.KindFetchResources) {
-		t.Error("IsBackgroundTaskKind(KindFetchResources) = true, want false — documents today's classification (always blocking); internal/web handleAction drains this synchronously before writing the response even though the snapshot above already shows a renderable Loading shell, which is Contract C's actual (unreachable-hermetically) red")
+		t.Error("IsBackgroundTaskKind(KindFetchResources) = true, want false — documents today's classification (always blocking); core/web handleAction drains this synchronously before writing the response even though the snapshot above already shows a renderable Loading shell, which is Contract C's actual (unreachable-hermetically) red")
 	}
 }
 
@@ -937,7 +937,7 @@ func TestAncientTypeFile_SeedsNormally_NoAgeDiscard(t *testing.T) {
 var cacheDiskAccessAllowlist = map[string]bool{}
 
 // cacheDiskPrimitives are the os-level calls C7a forbids outside
-// internal/cache — direct filesystem access to a cache file's bytes or
+// core/cache — direct filesystem access to a cache file's bytes or
 // path bypasses the single encode/decode chokepoint C7a requires.
 var cacheDiskPrimitives = map[string]bool{
 	"ReadFile": true, "WriteFile": true, "Open": true,
@@ -951,11 +951,11 @@ var cacheDiskPrimitives = map[string]bool{
 // encode/decode pair inside the cache module — no other code touches their
 // bytes or paths". Source-grep AST audit (repo precedent:
 // TestNoSingleCallListAPIEnrichers) over every internal/ .go file
-// (excluding internal/cache and _test.go files) for:
+// (excluding core/cache and _test.go files) for:
 //  1. any os.<primitive>(...) call whose argument expression textually
 //     references "cache." (catches os.ReadFile(cache.Dir(...)+...) and
 //     similar path-construction-then-raw-I/O patterns), and
-//  2. any direct reference to cache.Dir at all outside internal/cache —
+//  2. any direct reference to cache.Dir at all outside core/cache —
 //     resolving the per-pair directory path is itself the seam violation
 //     C7a rules out; only cache.LoadDir/(*Store).SaveType may do it.
 func TestCacheFileIO_OnlyThroughCachePackage_NoDirectDiskAccessElsewhere(t *testing.T) {
@@ -1021,7 +1021,7 @@ func TestCacheFileIO_OnlyThroughCachePackage_NoDirectDiskAccessElsewhere(t *test
 				if !cacheDiskAccessAllowlist[key] {
 					line := fset.Position(call.Pos()).Line
 					violations = append(violations, baseName+":"+itoaColdBoot(line)+
-						": calls cache.Dir() outside internal/cache — only cache.LoadDir/(*Store).SaveType may resolve a cache directory path (C7a single chokepoint)")
+						": calls cache.Dir() outside core/cache — only cache.LoadDir/(*Store).SaveType may resolve a cache directory path (C7a single chokepoint)")
 				}
 				return true
 			}
@@ -1048,14 +1048,14 @@ func TestCacheFileIO_OnlyThroughCachePackage_NoDirectDiskAccessElsewhere(t *test
 			if flagged {
 				line := fset.Position(call.Pos()).Line
 				violations = append(violations, baseName+":"+itoaColdBoot(line)+
-					": os."+sel.Sel.Name+"() called with a cache-path-derived argument outside internal/cache — C7a requires all cache-file disk I/O to flow through cache.LoadDir/(*Store).SaveType")
+					": os."+sel.Sel.Name+"() called with a cache-path-derived argument outside core/cache — C7a requires all cache-file disk I/O to flow through cache.LoadDir/(*Store).SaveType")
 			}
 			return true
 		})
 	}
 
 	if len(violations) > 0 {
-		t.Errorf("found %d cache-file disk-access violation(s) outside internal/cache:\n\n  %s\n\nAll cache-file reads/writes must flow through cache.LoadDir/(*Store).SaveType (C7a).",
+		t.Errorf("found %d cache-file disk-access violation(s) outside core/cache:\n\n  %s\n\nAll cache-file reads/writes must flow through cache.LoadDir/(*Store).SaveType (C7a).",
 			len(violations), strings.Join(violations, "\n  "))
 	}
 }

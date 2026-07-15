@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // r53_related.go contains Route 53 hosted-zone related-resource checker functions.
 // Each checker makes at most one route53:ListResourceRecordSets call for the
 // current zone and extracts the target type from the resulting record set's

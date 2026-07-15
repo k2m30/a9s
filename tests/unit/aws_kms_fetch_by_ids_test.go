@@ -1,7 +1,7 @@
 package unit
 
 // aws_kms_fetch_by_ids_test.go — pin tests for FetchKMSKeysByIDs
-// (internal/aws/kms.go:166). Production code is already correct;
+// (core/aws/kms.go:166). Production code is already correct;
 // these tests prevent regressions in the bypass-filter, alias-lookup,
 // and per-ID error-swallow behaviour.
 

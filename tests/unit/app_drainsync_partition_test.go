@@ -1,7 +1,7 @@
 // app_drainsync_partition_test.go — RED-phase pin for app.DrainSyncPartition.
 //
 // TDD RED: app.DrainSyncPartition does not exist yet. This file is
-// compile-red until the web detail-latency fix adds it to internal/app.
+// compile-red until the web detail-latency fix adds it to core/app.
 //
 // Contract (per the fix task spec):
 //
@@ -37,7 +37,7 @@
 //     one more resource type makes TaskKindProbeAvailability's execution
 //     deterministically emit a TaskKindSaveCache follow-up once the queue and
 //     AvailChecked/AvailTotal counters drain to equal (see
-//     internal/runtime/handlers_availability.go:216-239). ProbeResourceAvailability
+//     core/runtime/handlers_availability.go:216-239). ProbeResourceAvailability
 //     tolerates nil session.Clients (returns an Err-populated result, no
 //     network, no panic), so this is fully hermetic like the rest of the
 //     DrainSync suite.

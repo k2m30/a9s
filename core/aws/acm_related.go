@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // acm_related.go contains ACM certificate related-resource checker functions.
 package aws
 

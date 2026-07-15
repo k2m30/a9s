@@ -6,10 +6,10 @@
 // Root cause: syncMenuIssueCount's truncation-clear arm
 // (`case newIssues == curIssues && curIssueTrunc && !newTrunc`) fires
 // whenever an equal-count, untruncated observation lands — but
-// syncExactTotalToMenu (internal/app/handle.go) computes newTrunc from
+// syncExactTotalToMenu (core/app/handle.go) computes newTrunc from
 // `ls.HasPagination`, which reflects the LIST'S OWN fetch pagination, not
 // whether the enrichment scan that produced newIssues (via
-// c.listIssueCount, internal/app/list_body.go) covered every row. A list
+// c.listIssueCount, core/app/list_body.go) covered every row. A list
 // can hold an exact (untruncated) page of 55 rows while the type's Wave-2
 // enrichment cap (e.g. 50 rows scanned) only confirmed issues among the
 // first 50 — the exact row-fetch says "this IS the whole list" but says
@@ -50,7 +50,7 @@ func newCountTruncationDriftController(t *testing.T) *app.Controller {
 
 // s3BrokenFindings builds n Wave-1-shaped (non-wave2-sourced), SevBroken
 // findings for distinct fake S3 bucket IDs — matching the shape
-// listHasBadgeFinding (internal/app/list_body.go) counts unconditionally at
+// listHasBadgeFinding (core/app/list_body.go) counts unconditionally at
 // any issue severity, so each row bumps listIssueCount by exactly one.
 func s3BrokenFindings(n int) []domain.Finding {
 	out := make([]domain.Finding, n)

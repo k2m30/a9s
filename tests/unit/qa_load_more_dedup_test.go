@@ -6,7 +6,7 @@
 // grows 50+ -> 100+, row IDs repeat consecutively, the More hint persists.
 // The persisted per-type cache file then carries Count:100 with only 50
 // distinct rows — a mismatched pair the DEF-4b matched-pair rule in
-// Core.SaveResourceListCache (internal/runtime/probes.go) forbids.
+// Core.SaveResourceListCache (core/runtime/probes.go) forbids.
 //
 // A coder is root-causing the mechanism in parallel. These pins target the
 // symptom at four seams:
@@ -282,7 +282,7 @@ func def17DrainOneLevel(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestLoadMore_TokenPresent_AfterColdOpen pins Controller.GetListPaginationCursor
-// (internal/app/list_state.go) — the exact accessor
+// (core/app/list_state.go) — the exact accessor
 // internal/tui/views/resourcelist.go's LoadMore branch calls
 // (m.ctrl.GetListPaginationCursor()) to build messages.LoadMore.ContinuationToken.
 // After a cold s3 open lands page 1 (NextToken="p2"), the cursor must equal
@@ -329,7 +329,7 @@ func TestLoadMore_TokenPresent_AfterColdOpen(t *testing.T) {
 // shape observed live — page 1 landing, then an append call that (as if by
 // the DEF-17 bug) resends page 1's own rows instead of page 2's.
 //
-// RED today: internal/app/list_body.go's applyResourcesLoaded appends
+// RED today: core/app/list_body.go's applyResourcesLoaded appends
 // unconditionally (`ls.Rows = append(ls.Rows, resources...)`) with no ID
 // dedup, so a poisoned append lands 100 rows (50 originals + 50 duplicates)
 // instead of the intended distinct set.
@@ -396,7 +396,7 @@ func TestLoadMore_AppendDedup_Backstop(t *testing.T) {
 //
 // Note on the DEF-4b matched-pair rule cited in the dispatch: Count and Rows
 // are ALWAYS written as len(ls.Rows)/ls.Rows together (maybeSaveResourceListCache,
-// internal/app/handle.go), so Count==len(Rows) holds by construction even
+// core/app/handle.go), so Count==len(Rows) holds by construction even
 // when ls.Rows itself has been poisoned with duplicate IDs — a bare
 // Count-vs-len(Rows) check can never catch that shape of corruption. The
 // live-observed "count:100 with 50 rows" symptom must instead mean 100

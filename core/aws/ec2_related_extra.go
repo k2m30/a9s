@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // ec2_related_extra.go contains additional EC2 related-resource checkers
 // required by docs/related-resources.md beyond the core set in ec2_related.go.
 package aws

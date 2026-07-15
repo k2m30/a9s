@@ -3,7 +3,7 @@ package unit
 // aws_related_fetch_empty_test.go — pins the FIX 1 contract: a successfully
 // fetched EMPTY target population must render "(0)", not a blank/unknown row.
 //
-// FetchRelatedTarget (internal/aws/related_fetch.go:27), on a cache miss with
+// FetchRelatedTarget (core/aws/related_fetch.go:27), on a cache miss with
 // a registered paginated fetcher, must turn a successful zero-result fetch
 // into a non-nil length-0 slice — never the bare nil that reverse-scan
 // checkers interpret as "the fetch never ran" (UnknownRelated). The no-fetcher

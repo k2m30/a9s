@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package aws
 
 import (
@@ -25,13 +27,13 @@ func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 	}
 }
 
-// Install loads the AWS resource catalog into internal/catalog. MUST be called
+// Install loads the AWS resource catalog into core/catalog. MUST be called
 // exactly once at program start (main() / TestMain) before any
 // catalog.Find / catalog.All call.
 //
-// The per-category catalog data lives in internal/aws so Install can populate
-// the catalog without forcing internal/catalog to import internal/aws (which
-// would close a cycle: internal/aws already depends on internal/catalog through
+// The per-category catalog data lives in core/aws so Install can populate
+// the catalog without forcing core/catalog to import core/aws (which
+// would close a cycle: core/aws already depends on core/catalog through
 // this file and issue_enrichment.go).
 //
 // Install is idempotent on identical input — calling it twice produces no

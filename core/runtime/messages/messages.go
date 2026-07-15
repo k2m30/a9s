@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package messages defines the platform-agnostic command and event taxonomy
 // shared by the app core and the renderer adapter.
 //
@@ -35,7 +37,7 @@ const (
 	AspectConnect             // session.ConnectGen
 )
 
-// GenSource is implemented by the session (internal/session.Session) and
+// GenSource is implemented by the session (core/session.Session) and
 // exposes current generation counters without the messages package importing
 // the session package (which would create a cycle).
 type GenSource interface {

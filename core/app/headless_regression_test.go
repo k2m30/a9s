@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // headless_regression_test.go — regression tests for four headless-controller
 // bugs fixed in commit 56910d32.
 //

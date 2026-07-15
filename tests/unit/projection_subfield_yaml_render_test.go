@@ -13,7 +13,7 @@ package unit_test
 //	indent + "" + ": " + "  keyId: arn:..."  →  ":   keyId: arn:..."
 //
 // Fix: domainItemToFieldItem (and its live-path mirror,
-// domainItemToFieldItemDetail in internal/app/detail_body.go) must detect
+// domainItemToFieldItemDetail in core/app/detail_body.go) must detect
 // ItemSubfield with empty Label and copy Value into Key (Key == Value), so
 // the renderer takes the plain-line branch instead.
 //

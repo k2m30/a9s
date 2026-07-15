@@ -103,7 +103,7 @@ Transcribed from `docs/attention-signals.md`.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
-- **Signal**: `DefaultCacheBehavior.ViewerProtocolPolicy == allow-all` (no HTTPS redirect) or any origin with `CustomOriginConfig.OriginProtocolPolicy == http-only` (origin without TLS). Emitted by `EnrichCloudFrontDistribution` (`internal/aws/cf_issue_enrichment.go`) as the single `cf.insecure-protocol` finding — distinct from the Wave 1 weak-TLS `MinimumProtocolVersion` signal above.
+- **Signal**: `DefaultCacheBehavior.ViewerProtocolPolicy == allow-all` (no HTTPS redirect) or any origin with `CustomOriginConfig.OriginProtocolPolicy == http-only` (origin without TLS). Emitted by `EnrichCloudFrontDistribution` (`core/aws/cf_issue_enrichment.go`) as the single `cf.insecure-protocol` finding — distinct from the Wave 1 weak-TLS `MinimumProtocolVersion` signal above.
   - **State bucket**: Healthy (informational `~` finding on a green row).
   - **API call**: `GetDistributionConfig` — one call per distribution.
   - **Cost shape**: per-resource.

@@ -3,7 +3,7 @@
 // suffix shows "36+" after a truncated page-1 fetch lands over a wider
 // already-known TotalCount.
 //
-// Root cause: RowStore.Observe (internal/session/rowstore.go) unconditionally
+// Root cause: RowStore.Observe (core/session/rowstore.go) unconditionally
 // sets `next.TotalCount = len(newRows)` on every accepted rows-carrying
 // write, regardless of the existing entry's TotalCount. C6a already
 // documents "a counts-only observation updates TotalCount without touching
@@ -14,7 +14,7 @@
 // rows-carrying Observe lands — even a truncated page that is explicitly NOT
 // claiming to be the whole list. This is the same "never shrink a known
 // count on a non-exact result" principle already enforced for the root menu
-// badge in Controller.syncExactTotalToMenu (internal/app/handle.go) and for
+// badge in Controller.syncExactTotalToMenu (core/app/handle.go) and for
 // the MenuState.Availability guard, just missing at the RowStore layer.
 package unit_test
 

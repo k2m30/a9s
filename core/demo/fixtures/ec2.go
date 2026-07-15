@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package fixtures provides EC2 fixture data for the EC2 fake.
 package fixtures
 
@@ -43,7 +45,7 @@ type EC2Fixtures struct {
 	FlowLogsByResourceID map[string][]ec2types.FlowLog
 }
 
-// shared constants (mirrors internal/demo/constants_shared.go — no import allowed)
+// shared constants (mirrors core/demo/constants_shared.go — no import allowed)
 const (
 	fixtProdVPCID              = "vpc-0abc123def456789a"
 	fixtStagingVPCID           = "vpc-0def456789abc123d"
@@ -76,7 +78,7 @@ const (
 )
 
 // AMIEBSKmsKeyID / AMIEBSKmsKeyARN back the ami→kms related-panel pivot.
-// checkAMIKMS (internal/aws/ami_related_extra.go) passes the raw
+// checkAMIKMS (core/aws/ami_related_extra.go) passes the raw
 // BlockDeviceMappings[].Ebs.KmsKeyId ARN through as the navigation ID
 // unmodified (unlike checkS3KMS/checkDdbKMS, which strip the ARN to a bare
 // key ID first). Real DescribeKey-by-ARN always reports the true bare KeyId
@@ -3243,7 +3245,7 @@ func buildImages() []ec2types.Image {
 		},
 		// ami-0eks111111111111a — pinned by the EC2 fake's
 		// DescribeLaunchTemplateVersions(lt-0eks111111111111a) response (see
-		// internal/demo/fakes/ec2.go), which the EKS general-pool nodegroup's
+		// core/demo/fakes/ec2.go), which the EKS general-pool nodegroup's
 		// LaunchTemplate resolves to via FetchNodeGroups. Required so the AMI
 		// this nodegroup actually launches from exists as a real fixture,
 		// closing the ami→ng and eks→ami related-panel pivots.

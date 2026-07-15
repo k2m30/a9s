@@ -3,7 +3,7 @@
 // disproofs).
 //
 // package unit_test (not unit): every finding here is reachable via the
-// headless app.Controller / pure internal/costs / internal/app package
+// headless app.Controller / pure core/costs / core/app package
 // surface — no TUI-level helper is needed, so this file reuses
 // costs_state_test.go's newCostsController/topDrill/fixedCostsNow/
 // monthRecord and costs_interaction_test.go's findFetchCostsTask directly
@@ -93,7 +93,7 @@ func round7FullDailyRecords(t *testing.T, window []costs.Period, rowKey string, 
 }
 
 // ===========================================================================
-// Item 1 (P2, internal/app/costs_state.go:~221 ForceRefreshCosts) — Ctrl+R
+// Item 1 (P2, core/app/costs_state.go:~221 ForceRefreshCosts) — Ctrl+R
 // on a warm WEEK view must actually refresh: ExpireOpenPeriod receives the
 // DISPLAY window's week-length periods, but the store keys native DAY-
 // length periods for week granularity (APIGranularity()=="DAILY"), so the
@@ -135,7 +135,7 @@ func TestCostsRound7_Item1_ForceRefreshCosts_WarmWeekView_ExpiresNativeDailyPeri
 }
 
 // ===========================================================================
-// Item 2 (P2, internal/costs/drill.go:~76 ResourceDrillAllowed) — the gate
+// Item 2 (P2, core/costs/drill.go:~76 ResourceDrillAllowed) — the gate
 // must require the pinned SERVICE to be exactly "Amazon Elastic Compute
 // Cloud - Compute" (CE's hard requirement for GetCostAndUsageWithResources),
 // not merely one service.
@@ -169,7 +169,7 @@ func TestCostsRound7_Item2_ResourceDrillAllowed_RequiresExactlyEC2_NotAnySingleS
 }
 
 // ===========================================================================
-// Item 3 (P2, internal/app/costs_state.go:~727 ApplyCostsLoaded/DataThrough)
+// Item 3 (P2, core/app/costs_state.go:~727 ApplyCostsLoaded/DataThrough)
 // — for open/estimated periods the inclusive data-through date caps at
 // cs.Now's date, not the bucket's exclusive-end-minus-one. Closed periods
 // are unchanged (kept exact via the reconciled D3 tests above).
@@ -208,7 +208,7 @@ func TestCostsRound7_Item3_DataThrough_ClosedPeriod_StillUsesExclusiveEndMinusOn
 }
 
 // ===========================================================================
-// Item 4 (P2, internal/web/static/app.js + internal/app/viewstate.go:72) —
+// Item 4 (P2, core/web/static/app.js + core/app/viewstate.go:72) —
 // the web costs screen must wire what its own footer hints
 // (CostsFooterHintsFor("web")) advertise: b/+/-/0-9 posting the costs
 // actions, and R triggering ForceRefreshCosts, not the generic list
@@ -225,10 +225,10 @@ func TestCostsRound7_Item3_DataThrough_ClosedPeriod_StillUsesExclusiveEndMinusOn
 //      routes to the generic handleActionRefresh, never
 //      ForceRefreshCosts — which is currently reachable ONLY from
 //      internal/tui/runtime_adapter_navigate.go, a TUI-only call site with
-//      no equivalent in internal/web/handlers.go's handleAction. This is a
+//      no equivalent in core/web/handlers.go's handleAction. This is a
 //      controller-level proxy for "the web POST route never reaches the
 //      costs handlers" — handleAction itself is unexported with zero
-//      existing internal/web unit tests, so the actual HTTP layer is
+//      existing core/web unit tests, so the actual HTTP layer is
 //      untestable from tests/unit (as item 1 of round6 already
 //      established for a sibling web gap).
 // ===========================================================================
@@ -332,7 +332,7 @@ func TestCostsRound7_Item5_KindFetchCosts_ClassifiedLikeKindFetchResources(t *te
 }
 
 // ===========================================================================
-// Item 6 (P2, internal/app/costs_body.go:~122 + costs_state.go) — hiding
+// Item 6 (P2, core/app/costs_body.go:~122 + costs_state.go) — hiding
 // zero rows must keep SELECTION aligned, not just the highlight.
 //
 // Root cause traced precisely: applyCostsMoveRow/applyCostsSelect both
@@ -428,7 +428,7 @@ func TestCostsRound7_Item6_HiddenRowAbove_SelectionStaysAlignedWithDisplayedHigh
 }
 
 // ===========================================================================
-// Item 7 (P3, internal/costs/drill.go:~50 ClampResourceDrillWindow) — the
+// Item 7 (P3, core/costs/drill.go:~50 ClampResourceDrillWindow) — the
 // 14-day retention cutoff must truncate now to the start of its day: a
 // period starting exactly 14 days ago at date level survives regardless of
 // time-of-day.

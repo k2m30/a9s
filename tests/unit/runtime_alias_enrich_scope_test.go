@@ -3,7 +3,7 @@
 // ProbeEnrich task under the CANONICAL short name, not the raw alias the
 // event carried.
 //
-// "buckets" is a real registered alias for s3 (internal/aws/catalog_databases.go
+// "buckets" is a real registered alias for s3 (core/aws/catalog_databases.go
 // Aliases: []string{"s3", "buckets"}), and s3 has a registered Wave2 issue
 // enricher (Wave2: IssueEnricher{Fn: EnrichS3PublicAccessBlock, ...}) — so
 // c.HasIssueEnricher("buckets") resolves true via the same alias lookup and
@@ -97,7 +97,7 @@ func TestHandleResourcesLoaded_AliasOpenedList_ProbeEnrichScopedToCanonical(t *t
 // canonical short name when the rerun event carries the alias — the rerun
 // branch builds its TaskKey the same unguarded way as the list-open branch.
 // session.EnrichmentTypeGen is written and read elsewhere exclusively under
-// the canonical ShortName (e.g. internal/runtime/executor.go's
+// the canonical ShortName (e.g. core/runtime/executor.go's
 // snap.EnrichmentTypeGen[shortName]), so the gen-guard map is seeded here
 // under the canonical key "s3" — matching that convention — while the event
 // itself still carries the alias "buckets", exercising the handler's own

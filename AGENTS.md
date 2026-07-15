@@ -4,12 +4,12 @@
 
 - `cmd/` contains entrypoints and helper binaries: `cmd/a9s` (main app), `cmd/refgen`, and preview tools.
 - `internal/` holds production code:
-  - `internal/aws/` read-only AWS fetchers and service clients.
+  - `core/aws/` read-only AWS fetchers and service clients.
   - `internal/tui/` Bubble Tea UI (views, layout, keys, styles, messages).
-  - `internal/catalog/` + per-category `internal/aws/catalog_*.go` the resource registry (`ResourceTypeDef` literals).
-  - `internal/resource/` backward-compat alias layer over `internal/catalog` (types + pagination metadata).
-  - `internal/config/` default and user view configuration loading.
-  - `internal/demo/` synthetic fixtures used by `--demo` mode.
+  - `core/catalog/` + per-category `core/aws/catalog_*.go` the resource registry (`ResourceTypeDef` literals).
+  - `core/resource/` backward-compat alias layer over `core/catalog` (types + pagination metadata).
+  - `core/config/` default and user view configuration loading.
+  - `core/demo/` synthetic fixtures used by `--demo` mode.
 - `tests/unit/` is the primary regression suite; `tests/integration/` covers integration-tagged flows.
 - `docs/`, `website/`, and `releases/` hold product docs and release notes.
 
@@ -30,7 +30,7 @@
 - Formatting is enforced with `gofmt` (`make fmt`); do not hand-format.
 - `.editorconfig`: tabs for `*.go`, 2-space indentation for YAML/Markdown/JSON.
 - Keep naming aligned with existing patterns:
-  - AWS fetchers in `internal/aws/<service>.go`.
+  - AWS fetchers in `core/aws/<service>.go`.
   - Tests as `*_test.go`, often scoped by feature (example: `qa_pagination_view_test.go`).
 - Follow read-only architecture: no mutating AWS operations in runtime code.
 

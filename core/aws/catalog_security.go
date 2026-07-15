@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package aws
 
 import (
@@ -142,11 +144,11 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			// first page only. Appending on every continuation token would
 			// duplicate the same inline rows across pages. fetchInlineGroupPolicies
 			// itself fans the per-group ListGroupPolicies sweep out with bounded
-			// concurrency (internal/aws/iam_policies.go) so this stays well inside
+			// concurrency (core/aws/iam_policies.go) so this stays well inside
 			// any real list-open caller's deadline. The availability/count probe
 			// never reaches this sweep at all — see AvailabilityFetcher below,
 			// registered specifically to keep the probe on the cheap managed-only
-			// path (internal/runtime/probes.go's ProbeResourceAvailability).
+			// path (core/runtime/probes.go's ProbeResourceAvailability).
 			if continuationToken != "" {
 				return result, nil
 			}
@@ -163,7 +165,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			return result, inlineErr
 		}),
 		// AvailabilityFetcher is the cheap, managed-only probe path
-		// (internal/runtime/probes.go's ProbeResourceAvailability, via
+		// (core/runtime/probes.go's ProbeResourceAvailability, via
 		// resource.GetAvailabilityFetcher): managed policies alone are
 		// sufficient for an availability/count signal, so this never reaches
 		// fetchInlineGroupPolicies's per-group IAM sweep — the live symptom

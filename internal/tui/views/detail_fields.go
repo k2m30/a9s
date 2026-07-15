@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // detail_fields.go contains field list construction and field-list-based rendering for DetailModel.
 // Specifically: buildFieldList and renderFromFieldList.
 package views
@@ -222,7 +224,7 @@ func (m *DetailModel) injectAttentionSection() {
 	// Richer entries (Detail present, or rows present) keep the spacer as the
 	// visual separator from subsequent identity/AWS fields.
 	//
-	// Mirrored in internal/app/detail_body.go injectAttentionSectionDetail —
+	// Mirrored in core/app/detail_body.go injectAttentionSectionDetail —
 	// keep both in lockstep (TestDetailRenderParity requires byte-identical
 	// output between View() and RenderDetail()).
 	lastEntryBare := false

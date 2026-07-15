@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package fixtures
 
 import (
@@ -125,7 +127,7 @@ func countCustomerManagedKMSKeys(f *KMSFixtures) int {
 }
 
 // countRedisEngineReplicationGroups mirrors the redis fetcher's engine filter
-// (internal/aws/redis.go uses strings.EqualFold): RGs with Engine != "redis"
+// (core/aws/redis.go uses strings.EqualFold): RGs with Engine != "redis"
 // (e.g. valkey, memcached fixtures) are excluded from the top-level list. The
 // oracle must apply the same case-insensitive filter so the main-menu count
 // matches what the fetcher renders regardless of casing in fixture or live
@@ -154,7 +156,7 @@ func countCustomerManagedIAMPolicies(f *IAMFixtures) int {
 }
 
 // countTopLevelIAMPolicies mirrors the policy fetcher's output shape (see
-// internal/aws/iam_policies.go): customer-managed policies plus every inline
+// core/aws/iam_policies.go): customer-managed policies plus every inline
 // group policy surfaced by ListGroupPolicies. The oracle must include both so
 // the main-menu count matches what operators see.
 func countTopLevelIAMPolicies(f *IAMFixtures) int {

@@ -48,7 +48,7 @@ TEST: wave3_anti                no CloudWatch metric strings; UserCount==0 produ
                                 (with structured logs present) produces no finding
 ```
 
-## 2. Fixture list (`internal/demo/fixtures/transfer.go`; synthetic account 123456789012)
+## 2. Fixture list (`core/demo/fixtures/transfer.go`; synthetic account 123456789012)
 
 ```text
 prod-as2-gateway     (GRAPH ROOT) ONLINE, Protocols [AS2], Domain S3, EndpointType VPC
@@ -92,16 +92,16 @@ Menu badge: OFFLINE, STARTING, STOPPING, STOP_FAILED, legacy, no-logging, multi,
 
 | File | Owner |
 |---|---|
-| internal/demo/fixtures/transfer.go (+sibling touches: logs/role/acm/lambda/vpc-graph refs) | 6a coder |
-| internal/demo/fakes/transfer.go (ListServers/DescribeServer/ListAgreements/DescribeAgreement/ListProfiles?/DescribeProfile/ListCertificates/DescribeCertificate — denial for the denied id) | 6a coder |
-| internal/demo/client.go (`clients.Transfer = fakes.NewTransfer()`) | 6a coder |
-| internal/aws/transfer.go — fetcher (in-fetcher N+1, rich degraded) | 7 coder |
-| internal/aws/transfer_interfaces.go — TransferAPI narrow | 6a stub / 7 extend |
-| internal/aws/transfer_related.go — 8 checkers (field-driven; display names: "ACM Certificates", "Lambda Functions", "Log Groups", "IAM Roles", "Subnets", "VPC", "VPC Endpoints", ct-events) | 7 coder |
-| internal/aws/transfer_children.go or in catalog — agreements ChildFetcher (ListAgreements+DescribeAgreement N+1; inline profile/cert resolution on agreement detail via DetailEnrich) | 7 coder |
-| internal/aws/client.go — Transfer field + NewFromConfig | 6a stub / 7 verify |
-| internal/aws/catalog_networking.go — ResourceTypeDef (Category NETWORKING, Aliases [transfer sftp as2 ftps] — uniqueness gate), Children (Agreements), Findings incl. DetailsDeniedFindingDef("transfer") | 7 coder |
-| internal/config/defaults_networking.go — columns: Server Id, Status, Domain, Endpoint, Identity Provider, Users, Created? (per §3.1: ServerId State Domain EndpointType IdentityProviderType UserCount) | 7 coder |
+| core/demo/fixtures/transfer.go (+sibling touches: logs/role/acm/lambda/vpc-graph refs) | 6a coder |
+| core/demo/fakes/transfer.go (ListServers/DescribeServer/ListAgreements/DescribeAgreement/ListProfiles?/DescribeProfile/ListCertificates/DescribeCertificate — denial for the denied id) | 6a coder |
+| core/demo/client.go (`clients.Transfer = fakes.NewTransfer()`) | 6a coder |
+| core/aws/transfer.go — fetcher (in-fetcher N+1, rich degraded) | 7 coder |
+| core/aws/transfer_interfaces.go — TransferAPI narrow | 6a stub / 7 extend |
+| core/aws/transfer_related.go — 8 checkers (field-driven; display names: "ACM Certificates", "Lambda Functions", "Log Groups", "IAM Roles", "Subnets", "VPC", "VPC Endpoints", ct-events) | 7 coder |
+| core/aws/transfer_children.go or in catalog — agreements ChildFetcher (ListAgreements+DescribeAgreement N+1; inline profile/cert resolution on agreement detail via DetailEnrich) | 7 coder |
+| core/aws/client.go — Transfer field + NewFromConfig | 6a stub / 7 verify |
+| core/aws/catalog_networking.go — ResourceTypeDef (Category NETWORKING, Aliases [transfer sftp as2 ftps] — uniqueness gate), Children (Agreements), Findings incl. DetailsDeniedFindingDef("transfer") | 7 coder |
+| core/config/defaults_networking.go — columns: Server Id, Status, Domain, Endpoint, Identity Provider, Users, Created? (per §3.1: ServerId State Domain EndpointType IdentityProviderType UserCount) | 7 coder |
 | .a9s/views/transfer.yaml (viewsgen) | 7 coder |
 | tests/unit/aws_transfer_test.go + aws_transfer_related_test.go (+child/agreement tests) | 6b QA |
 | tests/integration/scenario_transfer_visual_test.go + drillThroughFixtures row + counts pins (menu 68→69, filter tests, smoke scripts resource-types(69)) | runner |

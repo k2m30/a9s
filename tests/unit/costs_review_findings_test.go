@@ -21,10 +21,10 @@
 //     wiring, following the IdentityError precedent this file does not
 //     itself need to reference.
 //
-// Everything else drives fixes into EXISTING surface: internal/costs/store.go
-// (#1), internal/runtime/executor.go's KindFetchCosts case (#2),
-// internal/tui/app_input.go's generic Esc path (#3), internal/app/costs_state.go
-// (#4, #6), internal/aws/costs.go's buildFilterExpression (#5).
+// Everything else drives fixes into EXISTING surface: core/costs/store.go
+// (#1), core/runtime/executor.go's KindFetchCosts case (#2),
+// internal/tui/app_input.go's generic Esc path (#3), core/app/costs_state.go
+// (#4, #6), core/aws/costs.go's buildFilterExpression (#5).
 package unit
 
 import (
@@ -648,7 +648,7 @@ func newCostsDemoModel(t *testing.T) tui.Model {
 }
 
 func TestCostsReview_ResourceRowEnter_TUI_NavigatesToEC2Detail_NotStuckOnCostsScreen(t *testing.T) {
-	const demoEC2InstanceID = "i-0a1b2c3d4e5f60001" // internal/demo/fixtures/ec2.go's "web-prod-01"
+	const demoEC2InstanceID = "i-0a1b2c3d4e5f60001" // core/demo/fixtures/ec2.go's "web-prod-01"
 	m := newCostsDemoModel(t)
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})

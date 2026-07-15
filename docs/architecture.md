@@ -16,8 +16,8 @@ For the target "no legacy / no lazy compromise" architecture and the migration p
 Latest target-architecture additions in the refactor docs:
 
 - cross-cutting capabilities (logs, investigation, cost, future actions) stay separate from the resource catalog
-- shared query-contract types live in `internal/domain`
-- shared selector/matcher logic lives in `internal/semantics/selector`
+- shared query-contract types live in `core/domain`
+- shared selector/matcher logic lives in `core/semantics/selector`
 - runtime owns screen descriptors and background-task contracts
 - new capabilities must be test-bounded, not validated by unbounded full-account crawls
 
@@ -50,8 +50,8 @@ Important interaction rules:
 - `Update()` must not block; AWS/network work goes in `tea.Cmd`.
 - Old async results are dropped if the user refreshed or switched profile/region.
 - Cache lifetime follows the session; switching account or region must rotate session state.
-- On `main` today, behavior is driven by the declarative catalog (`internal/catalog` + `internal/aws/catalog_*.go`), not by `init()`/`Register*` wiring. `runtime.Core` owns the active session (`session.Session`) and the app-core dispatch; the Phase-05 extraction has **landed**. The renderer-agnostic boundary holds: `internal/domain`, `internal/runtime`, `internal/session`, `internal/aws`, `internal/catalog`, and `internal/semantics/*` compile with zero Bubble Tea / Lipgloss dependencies (verified transitively, not just by direct import). Theme YAML is validated in the TUI adapter and handed to the runtime as a domain-safe `ParseErr`.
-- The target patterns are in place: an explicit catalog, shared selectors (`internal/semantics/selector`), the canonical `Finding` model, and runtime-owned screen/task contracts. Of the cross-cutting capability modules, **cost is implemented**: the Cost Explorer lives as a pure domain state machine (`internal/costs` for records/store/grid/windows, `internal/costs/screen` for fetch planning, drill transitions, and the computed view) consumed by a thin `internal/app` adapter — typed outcomes, fetch results that carry their own authority, and one computed view shared by cursor movement, rendering, and Enter. Its invariants are specified in [`specs/021-cost-explorer/architecture.md`](../specs/021-cost-explorer/architecture.md) and enforced by a delivery-matrix table test, a TUI/web lane-parity harness, and two AST discipline gates. Logs and CloudTrail scan keep their declarative contracts (`domain.CapabilityID`, `QuerySpec`, `ScreenRegistry`) as a follow-on workstream.
+- On `main` today, behavior is driven by the declarative catalog (`core/catalog` + `core/aws/catalog_*.go`), not by `init()`/`Register*` wiring. `runtime.Core` owns the active session (`session.Session`) and the app-core dispatch; the Phase-05 extraction has **landed**. The renderer-agnostic boundary holds: `core/domain`, `core/runtime`, `core/session`, `core/aws`, `core/catalog`, and `core/semantics/*` compile with zero Bubble Tea / Lipgloss dependencies (verified transitively, not just by direct import). Theme YAML is validated in the TUI adapter and handed to the runtime as a domain-safe `ParseErr`.
+- The target patterns are in place: an explicit catalog, shared selectors (`core/semantics/selector`), the canonical `Finding` model, and runtime-owned screen/task contracts. Of the cross-cutting capability modules, **cost is implemented**: the Cost Explorer lives as a pure domain state machine (`core/costs` for records/store/grid/windows, `core/costs/screen` for fetch planning, drill transitions, and the computed view) consumed by a thin `core/app` adapter — typed outcomes, fetch results that carry their own authority, and one computed view shared by cursor movement, rendering, and Enter. Its invariants are specified in [`specs/021-cost-explorer/architecture.md`](../specs/021-cost-explorer/architecture.md) and enforced by a delivery-matrix table test, a TUI/web lane-parity harness, and two AST discipline gates. Logs and CloudTrail scan keep their declarative contracts (`domain.CapabilityID`, `QuerySpec`, `ScreenRegistry`) as a follow-on workstream.
 
 ## What is a9s?
 
@@ -68,13 +68,13 @@ The codebase has a clean separation of concerns. The 020-architecture-refactor h
 ### Current Layer Boundaries On `main`
 
 - **`cmd/a9s`** — bootstrap only: parse flags, validate startup inputs, load config/theme, wire clients and options, start Bubble Tea.
-- **`internal/tui`** — UI shell and adapter: view stack, global key handling, message routing, sizing, and transient UI state. Holds a `*runtime.Core` and reaches session-scoped state through typed `m.core.*` accessors. As the renderer adapter it legitimately imports `internal/session` and `internal/aws` (to supply clients and translate runtime `TaskRequest`s into `tea.Cmd`s); the shared core never imports back into `internal/tui`.
-- **`internal/runtime`** — platform-agnostic app core: `runtime.Core` owns the active `*session.Session` and the catalog snapshot, dispatches inbound `messages.Event`s to handlers, and returns `UIIntent` / `TaskRequest` lists for adapters to apply. It compiles with zero Bubble Tea / Lipgloss dependencies (verified transitively via `go list -deps`). The cmd/event message taxonomy and screen-builder registry have landed; `HandleEvent` takes the typed `messages.Event` interface.
-- **`internal/session`** — session-scoped state container (Phase 02 deliverable, **done**): `session.Session` owns per-profile/region orchestration state — the `RowStore` (the single session-scoped per-type row store; see Caching Layers), `RelatedCache`, the enrichment queues and per-type maps, every generation counter (all typed `domain.Gen` after Phase 05a-gens), and the capability stores (`PolicyStore`, `IdentityStore`, `RuleSetStore`) that replaced the deleted `internal/aws/` package globals (`allPoliciesMu`, `identityCacheMu`, `sesRuleSetCacheMu`). `Session.Rotate()` is the single point that invalidates all of it on profile/region switch.
-- **`internal/resource`** — backward-compat alias layer (type aliases + thin wrapper funcs) over `internal/catalog`. The canonical declarative registry is `internal/catalog` (`ResourceTypeDef` and friends), populated by the per-category `internal/aws/catalog_*.go` literals: resource types, child-view metadata, related defs, navigable fields, and fetcher/enricher registration.
-- **`internal/aws`** — primarily the adapter layer: call AWS SDK APIs, transform responses into `resource.Resource`, and host a few non-UI helper subsystems that have not yet been split out. This layer should not know about Bubble Tea views.
-- **`internal/cache`** — persistence only: on-disk availability cache and TTL rules.
-- **`internal/demo`** — injected fake transport for development and tests, not a parallel feature architecture.
+- **`internal/tui`** — UI shell and adapter: view stack, global key handling, message routing, sizing, and transient UI state. Holds a `*runtime.Core` and reaches session-scoped state through typed `m.core.*` accessors. As the renderer adapter it legitimately imports `core/session` and `core/aws` (to supply clients and translate runtime `TaskRequest`s into `tea.Cmd`s); the shared core never imports back into `internal/tui`.
+- **`core/runtime`** — platform-agnostic app core: `runtime.Core` owns the active `*session.Session` and the catalog snapshot, dispatches inbound `messages.Event`s to handlers, and returns `UIIntent` / `TaskRequest` lists for adapters to apply. It compiles with zero Bubble Tea / Lipgloss dependencies (verified transitively via `go list -deps`). The cmd/event message taxonomy and screen-builder registry have landed; `HandleEvent` takes the typed `messages.Event` interface.
+- **`core/session`** — session-scoped state container (Phase 02 deliverable, **done**): `session.Session` owns per-profile/region orchestration state — the `RowStore` (the single session-scoped per-type row store; see Caching Layers), `RelatedCache`, the enrichment queues and per-type maps, every generation counter (all typed `domain.Gen` after Phase 05a-gens), and the capability stores (`PolicyStore`, `IdentityStore`, `RuleSetStore`) that replaced the deleted `core/aws/` package globals (`allPoliciesMu`, `identityCacheMu`, `sesRuleSetCacheMu`). `Session.Rotate()` is the single point that invalidates all of it on profile/region switch.
+- **`core/resource`** — backward-compat alias layer (type aliases + thin wrapper funcs) over `core/catalog`. The canonical declarative registry is `core/catalog` (`ResourceTypeDef` and friends), populated by the per-category `core/aws/catalog_*.go` literals: resource types, child-view metadata, related defs, navigable fields, and fetcher/enricher registration.
+- **`core/aws`** — primarily the adapter layer: call AWS SDK APIs, transform responses into `resource.Resource`, and host a few non-UI helper subsystems that have not yet been split out. This layer should not know about Bubble Tea views.
+- **`core/cache`** — persistence only: on-disk availability cache and TTL rules.
+- **`core/demo`** — injected fake transport for development and tests, not a parallel feature architecture.
 
 ### Architectural Invariants
 
@@ -83,17 +83,17 @@ if it "works" — the gen guards, registry completeness checks, and related
 validators in `tests/unit/architecture_conformance_test.go` fail loudly when
 any of these drift.
 
-These are **current-state invariants**. The 020-architecture-refactor that produced them has landed: the embedded-`sessionRuntime` model is gone (session state lives in `internal/session`), package-`init()` + `Register*` feature wiring is replaced by the declarative catalog (`internal/catalog` + `internal/aws/catalog_*.go`; zero feature-wiring `init()`, enforced by `make verify-zero-init`), the `Status`/`Issues` resource model is replaced by the canonical `Finding` model, markdown is generated (not input), shared selectors live in `internal/semantics/selector/`, and screen/task boundaries are runtime-owned. Of the cross-cutting capability modules, cost is implemented (the Cost Explorer domain state machine in `internal/costs` + `internal/costs/screen`); logs and CloudTrail scan keep their declarative contracts (`domain.CapabilityID`, `QuerySpec`, `ScreenRegistry`) as a follow-on workstream.
+These are **current-state invariants**. The 020-architecture-refactor that produced them has landed: the embedded-`sessionRuntime` model is gone (session state lives in `core/session`), package-`init()` + `Register*` feature wiring is replaced by the declarative catalog (`core/catalog` + `core/aws/catalog_*.go`; zero feature-wiring `init()`, enforced by `make verify-zero-init`), the `Status`/`Issues` resource model is replaced by the canonical `Finding` model, markdown is generated (not input), shared selectors live in `core/semantics/selector/`, and screen/task boundaries are runtime-owned. Of the cross-cutting capability modules, cost is implemented (the Cost Explorer domain state machine in `core/costs` + `core/costs/screen`); logs and CloudTrail scan keep their declarative contracts (`domain.CapabilityID`, `QuerySpec`, `ScreenRegistry`) as a follow-on workstream.
 
 1. **One root application model owns session state and orchestration.**
    `tui.Model` owns the UI shell; the session state container
    (`session.Session`) lives in `runtime.Core` and is reached through
    typed `m.core.*` accessors. The renderer-agnostic boundary holds: the
-   shared core (`internal/domain`, `internal/runtime`, `internal/session`,
-   `internal/aws`, `internal/catalog`, `internal/semantics/*`) compiles
+   shared core (`core/domain`, `core/runtime`, `core/session`,
+   `core/aws`, `core/catalog`, `core/semantics/*`) compiles
    with zero Bubble Tea / Lipgloss dependencies, verified transitively via
    `go list -deps`. As the renderer adapter, `internal/tui` legitimately
-   imports `internal/session` and `internal/aws`; nothing imports back into
+   imports `core/session` and `core/aws`; nothing imports back into
    `internal/tui` from the core.
 2. **Views render state and emit typed messages.** Views never call AWS
    directly. `m.clients` is passed to tea.Cmds created by the root model,
@@ -101,12 +101,12 @@ These are **current-state invariants**. The 020-architecture-refactor that produ
 3. **The catalog is the declarative source of truth.** Supported resource
    types, related defs, navigable fields, fetchers, detail enrichers, and
    Wave 2 issue enrichers are declared as `catalog.ResourceTypeDef` struct
-   literals in `internal/aws/catalog_*.go`, installed once at startup via
+   literals in `core/aws/catalog_*.go`, installed once at startup via
    `aws.Install()` + `catalog.SetTypes(...)` — no package `init()` or
    `Register*` wiring (enforced by `make verify-zero-init`). There is no
    hand-maintained allowlist in dispatch code — background systems iterate
    catalog state and sort by declarative priority metadata.
-4. **`internal/aws` stays non-UI.** It primarily translates SDK types into
+4. **`core/aws` stays non-UI.** It primarily translates SDK types into
    `resource.Resource` and hosts a few helper subsystems, but it does not
    own navigation or Bubble Tea policy. It does not import `internal/tui`.
 5. **Every async result carries enough identity to reject stale updates.**
@@ -121,10 +121,10 @@ These are **current-state invariants**. The 020-architecture-refactor that produ
    caches live on `session.Session` (owned by `runtime.Core`) and reach
    detail enrichers via `*awsclient.DetailEnrichmentCtx`. Phase 02
    (`docs/historical/refactor/landed/02-session-owner.md`) deleted the legacy package-global
-   caches in `internal/aws/` — `allPoliciesMu` (IAM policies),
+   caches in `core/aws/` — `allPoliciesMu` (IAM policies),
    `identityCacheMu` (caller identity), and `sesRuleSetCacheMu` (SES rule
    sets) — and replaced them with `PolicyStore` / `IdentityStore` /
-   `RuleSetStore` capabilities owned by `session.Session`. `internal/aws/`
+   `RuleSetStore` capabilities owned by `session.Session`. `core/aws/`
    is now globals-free.
 8. **Global keys are order-sensitive.** `Esc` is the back/dismiss key. `q`
    is the quit key in normal mode; it is not a navigation primitive.
@@ -154,9 +154,9 @@ User Input → Update(msg) → (Model, Cmd) → View() → Terminal
 
 ### Messages
 
-Views communicate exclusively via typed messages (`internal/runtime/messages/`, with `cmd.go` for UI→core commands, `event.go` for core→UI events, and `messages.go` carrying the `Cmd` / `Event` / `GenStamped` marker interfaces). Views never import each other. The root `Model.Update()` routes messages to the appropriate handler.
+Views communicate exclusively via typed messages (`core/runtime/messages/`, with `cmd.go` for UI→core commands, `event.go` for core→UI events, and `messages.go` carrying the `Cmd` / `Event` / `GenStamped` marker interfaces). Views never import each other. The root `Model.Update()` routes messages to the appropriate handler.
 
-Key messages (the canonical taxonomy lives in `internal/runtime/messages/{cmd,event}.go` as suffixless `Cmd`/`Event` types — e.g. `AvailabilityChecked`, `EnrichmentChecked`; the `*Msg` names below are the TUI-adapter/legacy forms):
+Key messages (the canonical taxonomy lives in `core/runtime/messages/{cmd,event}.go` as suffixless `Cmd`/`Event` types — e.g. `AvailabilityChecked`, `EnrichmentChecked`; the `*Msg` names below are the TUI-adapter/legacy forms):
 
 | Message | Purpose |
 |---------|---------|
@@ -229,7 +229,7 @@ internal/
   aws/           # AWS service clients, resource fetchers, related checkers, enrichers
   buildinfo/     # version resolution (ldflags at build time)
   cache/         # on-disk availability cache with TTL (see Caching Layers)
-  catalog/       # canonical resource catalog: static `var ResourceTypes`, type defs in `internal/aws/catalog_*.go`, installed via `aws.Install()` + `catalog.SetTypes(...)`. The sole source of truth; the legacy `Register*` registry is gone.
+  catalog/       # canonical resource catalog: static `var ResourceTypes`, type defs in `core/aws/catalog_*.go`, installed via `aws.Install()` + `catalog.SetTypes(...)`. The sole source of truth; the legacy `Register*` registry is gone.
   config/        # YAML config loading, built-in defaults per service
   costs/         # Cost Explorer domain state machine (records/store/grid/windows); costs/screen for fetch planning + drill
   demo/          # synthetic fixture data for --demo mode
@@ -237,7 +237,7 @@ internal/
     fakes/       #   per-service fake API implementations
   domain/        # leaf type-declaration package: Resource, Type, Severity, FindingCode, Finding, AttentionDetail, Color, Gen, plus query-contract types. Introduced in Phase 01 (`docs/historical/refactor/landed/01-projection-hook.md`); `Gen` added in Phase 05a-gens.
   fieldpath/     # struct field extraction via reflection (frozen — don't modify)
-  resource/      # backward-compat alias layer — `resource.Resource`, `resource.ResourceTypeDef`, `resource.Color` re-export `internal/domain` / `internal/catalog`; registry-style getters now read the catalog
+  resource/      # backward-compat alias layer — `resource.Resource`, `resource.ResourceTypeDef`, `resource.Color` re-export `core/domain` / `core/catalog`; registry-style getters now read the catalog
   runtime/       # platform-agnostic app core: Core (orchestrator.go), handlers.go, screens.go, tasks.go, state.go, intent.go (zero Bubble Tea/Lipgloss deps)
     messages/    #   typed Cmd/Event message taxonomy (cmd.go, event.go, messages.go marker interfaces)
   session/       # session.Session — all session-scoped mutable state + capability stores; Rotate() invalidates in-flight gens
@@ -264,8 +264,8 @@ tests/
 This section describes the current resource model on `main`. It is intentionally conservative: it explains the struct the codebase uses today, not the canonical finding model planned in [`docs/historical/refactor/03-finding-model.md`](historical/refactor/03-finding-model.md).
 
 ```go
-// internal/domain/resource.go   (Phase 01 moved the struct out of internal/resource;
-//                                internal/resource/resource.go is a thin alias file:
+// core/domain/resource.go   (Phase 01 moved the struct out of core/resource;
+//                                core/resource/resource.go is a thin alias file:
 //                                `type Resource = domain.Resource` plus the DedupByID helper.)
 type Resource struct {
     ID               string                          // primary identifier (instance ID, ARN, name)
@@ -279,19 +279,19 @@ type Resource struct {
 ```
 
 - **Type** — short-name field added in Phase 01 (`docs/historical/refactor/landed/01-projection-hook.md`) so that downstream packages (semantics, projection) can route by type without re-deriving it.
-- **Findings** — the canonical resource-health surface (`domain.Finding{Code, Phrase, Detail, Severity, Source}`; Phrase = short S4 cause, Detail = optional richer S5 sentence). Drives row coloring, list-view status display, menu issue badges, and the ctrl+z attention filter. Wave 1 entries carry `Source = "wave1"`; Wave 2 entries carry `Source = "wave2:<short>"` and are written by `applyEnrichment` in `internal/tui/app_enrich_fold.go`. The legacy `Status string` / `Issues []string` fields and the per-enricher `Bump/StripFindingSuffix` algebra are gone; the `(+N)` multi-finding suffix is derived centrally from `Findings` by `listPhraseFromFindings` (`internal/app/list_columns.go`).
+- **Findings** — the canonical resource-health surface (`domain.Finding{Code, Phrase, Detail, Severity, Source}`; Phrase = short S4 cause, Detail = optional richer S5 sentence). Drives row coloring, list-view status display, menu issue badges, and the ctrl+z attention filter. Wave 1 entries carry `Source = "wave1"`; Wave 2 entries carry `Source = "wave2:<short>"` and are written by `applyEnrichment` in `internal/tui/app_enrich_fold.go`. The legacy `Status string` / `Issues []string` fields and the per-enricher `Bump/StripFindingSuffix` algebra are gone; the `(+N)` multi-finding suffix is derived centrally from `Findings` by `listPhraseFromFindings` (`core/app/list_columns.go`).
 - **AttentionDetails** — supporting facts (rows shown in the detail-view Attention section) keyed by stable `FindingCode`. `FindingCode` is never displayed.
 - **Fields** — flat key-value pairs populated by each fetcher. Used for list table columns and simple detail rendering. Keys are snake_case (e.g., `"instance_id"`, `"vpc_id"`).
 - **RawStruct** — the actual AWS SDK struct (e.g., `ec2types.Instance`, `s3types.Bucket`). Used by detail/YAML/JSON views via reflection for deep field path traversal (e.g., `"State.Name"`, `"Placement.AvailabilityZone"`).
 
 ### Resource Type Registration
 
-Resource types are registered declaratively through the catalog: each type is one `catalog.ResourceTypeDef` struct literal in a per-category `internal/aws/catalog_*.go` file, aggregated by `internal/catalog` and installed once at startup via `aws.Install()` + `catalog.SetTypes(...)`. There is no `init()`/`Register*` feature wiring — fetchers, enrichers, related defs, navigable fields, field keys, and aliases are all direct fields on the struct literal (see the `ResourceTypeDef` shape below). Adding a resource type is the mechanical four-file change described in [`docs/historical/refactor/00-overview.md`](historical/refactor/00-overview.md) (catalog literal + transport + demo fixture + tests); `make verify-zero-init` enforces zero feature-wiring `init()`.
+Resource types are registered declaratively through the catalog: each type is one `catalog.ResourceTypeDef` struct literal in a per-category `core/aws/catalog_*.go` file, aggregated by `core/catalog` and installed once at startup via `aws.Install()` + `catalog.SetTypes(...)`. There is no `init()`/`Register*` feature wiring — fetchers, enrichers, related defs, navigable fields, field keys, and aliases are all direct fields on the struct literal (see the `ResourceTypeDef` shape below). Adding a resource type is the mechanical four-file change described in [`docs/historical/refactor/00-overview.md`](historical/refactor/00-overview.md) (catalog literal + transport + demo fixture + tests); `make verify-zero-init` enforces zero feature-wiring `init()`.
 
 ### Resource Type Definitions
 
 ```go
-// internal/catalog/types.go    (canonical home; `internal/resource/types.go`
+// core/catalog/types.go    (canonical home; `core/resource/types.go`
 //                               re-exports as `type ResourceTypeDef = catalog.ResourceTypeDef`
 //                               for backward compat until PR-04n.)
 type ResourceTypeDef struct {
@@ -315,7 +315,7 @@ type ResourceTypeDef struct {
 
 `Color func(domain.Resource) domain.Color` is part of the type definition and drives row classification. Classifiers resolve color findings-first via `colorFromAnyFinding` (worst finding severity wins, wave1 or wave2); raw-field branches survive only as fallback for rows that carry no findings. Color, the Status cell text and the detail Attention block therefore share one source — the row's findings — which is enforced by the color-vs-findings conformance gate (`tests/unit/qa_color_findings_conformance_test.go`, empty allowlist). The function returns the renderer-free `domain.Color` health enum; the TUI maps it to a concrete style via `styles.ColorStyle` at render time.
 
-Resource types are installed once at startup via `aws.Install()` + `catalog.SetTypes(...)`, aggregating the per-category `internal/aws/catalog_*.go` literals. Categories map to type definition files:
+Resource types are installed once at startup via `aws.Install()` + `catalog.SetTypes(...)`, aggregating the per-category `core/aws/catalog_*.go` literals. Categories map to type definition files:
 
 | File | Category |
 |------|----------|
@@ -336,7 +336,7 @@ Resource types are installed once at startup via `aws.Install()` + `catalog.SetT
 
 ## Fetcher Patterns
 
-All registered via `catalog.ResourceTypeDef` literals in `internal/aws/catalog_*.go`, implemented in `internal/aws/*.go`:
+All registered via `catalog.ResourceTypeDef` literals in `core/aws/catalog_*.go`, implemented in `core/aws/*.go`:
 
 | Pattern | Signature | Use Case |
 |---------|-----------|----------|
@@ -349,7 +349,7 @@ All registered via `catalog.ResourceTypeDef` literals in `internal/aws/catalog_*
 
 Each fetcher takes `clients any` and type-asserts to `*aws.ServiceClients` internally. This allows tests to inject mocks.
 
-**Throttling protection** (`internal/aws/retry.go`): `RetryOnThrottle[T any](ctx, cfg, fn)` wraps an AWS API call with exponential backoff for `ThrottlingException` / `Throttling` / `RequestLimitExceeded` errors. Fetchers and enrichers that iterate per-resource (e.g., `EnrichTargetGroupHealth` calling `DescribeTargetHealth` once per TG) wrap each call in `RetryOnThrottle` so a throttled slice still completes instead of returning a half-populated result. Non-throttling errors are returned immediately without retry.
+**Throttling protection** (`core/aws/retry.go`): `RetryOnThrottle[T any](ctx, cfg, fn)` wraps an AWS API call with exponential backoff for `ThrottlingException` / `Throttling` / `RequestLimitExceeded` errors. Fetchers and enrichers that iterate per-resource (e.g., `EnrichTargetGroupHealth` calling `DescribeTargetHealth` once per TG) wrap each call in `RetryOnThrottle` so a throttled slice still completes instead of returning a half-populated result. Non-throttling errors are returned immediately without retry.
 
 ### Wave 2 Issue Enrichment Pipeline
 
@@ -358,12 +358,12 @@ Some resource types hide problems behind extra API calls (e.g., EC2 with impaire
 This section documents the current Wave 2 implementation on `main`. The refactor plan in [`docs/historical/refactor/03-finding-model.md`](historical/refactor/03-finding-model.md) and [`docs/historical/refactor/04-catalog.md`](historical/refactor/04-catalog.md) replaces this registry-and-markdown-driven model with canonical findings and catalog-owned metadata.
 
 **Architecture:**
-- `internal/aws/issue_enrichment.go` — Wave 2 shared types and helpers: `NoOpIssueEnricher`, `IssueEnricher` struct, `IssueEnricherFunc` / `IssueEnricherResult` types, shared helpers, `EnrichmentCap` / `PerParentPageCap`. As of AS-795n, the package-init `IssueEnricherRegistry` map and `registerIssueEnricher` helper are gone — registrations now live on each `catalog.ResourceTypeDef` literal's `Wave2` field.
-- `internal/aws/wave2.go` — read API over the catalog: `Wave2EnricherFor(shortName) (IssueEnricher, bool)` and `AllWave2() []Wave2Entry`. Also exposes `SetWave2EnricherForTest` / `DeleteWave2EnricherForTest` for the test-override map used by `tests/unit/`.
-- `internal/aws/catalog_*.go` — per-category catalog literals. Each entry's `Wave2` field carries an `IssueEnricher{Fn:..., Priority:...}`, and `IssueEnricherFieldKeys` lists the `Fields` keys the enricher writes via `IssueEnricherResult.FieldUpdates`. Types with `NoOpIssueEnricher` are explicit placeholders for in-fetcher Wave 2 work.
-- `internal/runtime/probes.go` — `(*Core).BuildEnrichQueue()` (queue construction lives on `runtime.Core`).
+- `core/aws/issue_enrichment.go` — Wave 2 shared types and helpers: `NoOpIssueEnricher`, `IssueEnricher` struct, `IssueEnricherFunc` / `IssueEnricherResult` types, shared helpers, `EnrichmentCap` / `PerParentPageCap`. As of AS-795n, the package-init `IssueEnricherRegistry` map and `registerIssueEnricher` helper are gone — registrations now live on each `catalog.ResourceTypeDef` literal's `Wave2` field.
+- `core/aws/wave2.go` — read API over the catalog: `Wave2EnricherFor(shortName) (IssueEnricher, bool)` and `AllWave2() []Wave2Entry`. Also exposes `SetWave2EnricherForTest` / `DeleteWave2EnricherForTest` for the test-override map used by `tests/unit/`.
+- `core/aws/catalog_*.go` — per-category catalog literals. Each entry's `Wave2` field carries an `IssueEnricher{Fn:..., Priority:...}`, and `IssueEnricherFieldKeys` lists the `Fields` keys the enricher writes via `IssueEnricherResult.FieldUpdates`. Types with `NoOpIssueEnricher` are explicit placeholders for in-fetcher Wave 2 work.
+- `core/runtime/probes.go` — `(*Core).BuildEnrichQueue()` (queue construction lives on `runtime.Core`).
 - `internal/tui/probe_adapter.go` — `(*Model).probeEnrichment()` — the TUI-side `tea.Cmd` wrapper that dispatches enrichers and emits `EnrichmentChecked` messages.
-- `internal/runtime/handlers_availability.go` — `(*Core).startEnrichment()` (builds the queue, returns probe tasks) and `(*Core).handleEnrichmentChecked()` (applies one Wave-2 result with the only-increase guard).
+- `core/runtime/handlers_availability.go` — `(*Core).startEnrichment()` (builds the queue, returns probe tasks) and `(*Core).handleEnrichmentChecked()` (applies one Wave-2 result with the only-increase guard).
 
 **Flow:**
 
@@ -379,9 +379,9 @@ Wave 1 probes complete
 
 **Registry**: Wave 2 capability is declared on each `catalog.ResourceTypeDef` literal's `Wave2` field (`IssueEnricher{Fn, Priority}`); a type with no Wave 2 signal simply omits the field — `Wave2EnricherFor` returns `ok=false` for it. Some types without a `Wave2` enricher still perform in-fetcher Wave 2 work — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`; since v3.50.x this list-then-describe-each shape is the standard for new types whose pivots live on the describe response: mwaa `GetEnvironment` per environment, transfer `DescribeServer` per server, lt one `DescribeLaunchTemplateVersions("$Default")` per template).
 
-**Honest degradation (details denied)**: when the list API names a resource but the per-item describe fails (IAM denial, nil response), the row is KEPT — never dropped — through one shared implementation (`internal/aws/degraded_resource.go`: `DetailsDeniedCode`/`DetailsDeniedFindingDef`/`DegradedDetailsDenied`). The row carries a `details denied` Warning finding; rich variants (transfer, lt) keep every list-borne field, name-only variants (mwaa, eks, ng, ddb, opensearch) keep the identity. Per-item failures aggregate into the E3 composite error alongside the partial rows (E5). Every new type with a describe step must adopt this contract — see the extension guide.
+**Honest degradation (details denied)**: when the list API names a resource but the per-item describe fails (IAM denial, nil response), the row is KEPT — never dropped — through one shared implementation (`core/aws/degraded_resource.go`: `DetailsDeniedCode`/`DetailsDeniedFindingDef`/`DegradedDetailsDenied`). The row carries a `details denied` Warning finding; rich variants (transfer, lt) keep every list-borne field, name-only variants (mwaa, eks, ng, ddb, opensearch) keep the identity. Per-item failures aggregate into the E3 composite error alongside the partial rows (E5). Every new type with a describe step must adopt this contract — see the extension guide.
 
-**Cache-scan enrichers (zero-API Wave 2)**: a second enricher shape derives findings by scanning a SIBLING type's already-loaded cache instead of calling AWS — `snapshot_cross_ref.go` (dbi-snap/dbc-snap orphan and past-retention), `lt_issue_enrichment.go` (deprecated AMI via the ami cache), `vpcpeer_issue_enrichment.go` (missing/blackholed routes via the rtb cache). They read the cache through the shared `cachedTypedRows[T]` helper (internal/aws/related_common.go) under the same tri-state contract as cache-scan related checkers, and emit findings through the normal `IssueEnricherResult` path. Guard rule: an absent or truncated sibling cache produces NO findings — never a guess.
+**Cache-scan enrichers (zero-API Wave 2)**: a second enricher shape derives findings by scanning a SIBLING type's already-loaded cache instead of calling AWS — `snapshot_cross_ref.go` (dbi-snap/dbc-snap orphan and past-retention), `lt_issue_enrichment.go` (deprecated AMI via the ami cache), `vpcpeer_issue_enrichment.go` (missing/blackholed routes via the rtb cache). They read the cache through the shared `cachedTypedRows[T]` helper (core/aws/related_common.go) under the same tri-state contract as cache-scan related checkers, and emit findings through the normal `IssueEnricherResult` path. Guard rule: an absent or truncated sibling cache produces NO findings — never a guess.
 
 **Priority order** (`(*Core).BuildEnrichQueue`): Batchable enrichers that make account-wide calls are dispatched first (e.g., RDS/DocDB maintenance, EC2 instance status). Per-resource enrichers (e.g., DynamoDB PITR, KMS rotation, S3 PAB) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50). The registry key for each enricher must match the `ShortName` Wave 1 uses when observing rows into the `RowStore` — a mismatch silently skips the enricher. Queue membership comes from the store: a type enriches if its entry was observed at all (`TypeRows.Gen != 0` — observed-empty types still enrich); `Partial`-only entries never enter the queue.
 
@@ -397,11 +397,11 @@ Wave 1 probes complete
 
 After Wave 2 issue enrichment runs, findings are surfaced in list and detail views.
 
-**Types:** the canonical carrier is `domain.Finding` (`internal/domain/finding.go`) — `Code` (stable `FindingCode`, never displayed), `Phrase` (short S4 cause), `Detail` (optional S5 operator sentence), `Severity` (`domain.Severity`), `Source` (`"wave1"` | `"wave2:<short>"`) — with supporting rows in `domain.AttentionDetail`.
+**Types:** the canonical carrier is `domain.Finding` (`core/domain/finding.go`) — `Code` (stable `FindingCode`, never displayed), `Phrase` (short S4 cause), `Detail` (optional S5 operator sentence), `Severity` (`domain.Severity`), `Source` (`"wave1"` | `"wave2:<short>"`) — with supporting rows in `domain.AttentionDetail`.
 
 **List view integration:**
 - `ResourceListModel.SetEnrichmentState(issueCount int, truncated bool, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail)` — stores Wave 2 results; called on arrival and with zeroed args on Ctrl+R rerun start (`internal/tui/runtime_adapter_navigate.go`).
-- Findings reach the visible row through the S2/S4 surfaces: row **color** and the Status-cell **phrase** (with its `(+N)` multi-finding suffix) — both derived from the row's `Findings` slice by the shared controller (`listPhraseFromFindings` et al., `internal/app/list_columns.go` / `list_body.go`) and consumed by both TUI and web. Row color is the worst severity across **all** findings (the color-findings-conformance rule, `tests/unit/qa_color_findings_conformance_test.go`), so any `!`/`~` finding colors the row off-green rather than annotating a green row; the `!`/`~` glyph is the per-entry marker inside the detail-view Attention section (S5), not a live list-row surface. There is no banner and no row-marker dot — those surfaces were removed with the S1–S5 visualization contract (`docs/attention-signals.md` §Visualization Surfaces).
+- Findings reach the visible row through the S2/S4 surfaces: row **color** and the Status-cell **phrase** (with its `(+N)` multi-finding suffix) — both derived from the row's `Findings` slice by the shared controller (`listPhraseFromFindings` et al., `core/app/list_columns.go` / `list_body.go`) and consumed by both TUI and web. Row color is the worst severity across **all** findings (the color-findings-conformance rule, `tests/unit/qa_color_findings_conformance_test.go`), so any `!`/`~` finding colors the row off-green rather than annotating a green row; the `!`/`~` glyph is the per-entry marker inside the detail-view Attention section (S5), not a live list-row surface. There is no banner and no row-marker dot — those surfaces were removed with the S1–S5 visualization contract (`docs/attention-signals.md` §Visualization Surfaces).
 
 **Detail view integration:**
 - `DetailModel.SetEnrichmentFinding(f *domain.Finding, ad *domain.AttentionDetail)` (`internal/tui/views/detail_helpers.go`) — injects (or, with `nil`, clears) the finding in the unified detail-view Attention section (`injectAttentionSection`, `internal/tui/views/detail_fields.go`).
@@ -411,7 +411,7 @@ After Wave 2 issue enrichment runs, findings are surfaced in list and detail vie
 
 **Current-state ownership (Phase-05, AS-237)**: Session-scoped state lives exclusively in `session.Session`, owned by `runtime.Core` and accessed from `tui.Model` via `m.core.Session()`. The `tui.Model` struct holds only pure UI-shell state (view stack, input mode, flash, tab completion). Profile/region switches call `m.core.Session().Rotate()` which bumps every generation counter and rebuilds the maps — in-flight async messages tagged with the pre-switch gens are then rejected by the handlers' gen guards.
 
-Representative fields on `session.Session` (`internal/session/session.go`):
+Representative fields on `session.Session` (`core/session/session.go`):
 - `EnrichmentRan map[string]bool` — banner visibility signal; `true` only after Wave 2 completed for that type.
 - `EnrichmentTypeGen map[string]domain.Gen` — per-type Wave 2 generation counter; bumped on Ctrl+R rerun to invalidate stale in-flight results.
 - `EnrichmentTruncatedIDs map[string]map[string]bool` — per-type set of resource IDs the enricher had to skip due to API truncation.
@@ -419,7 +419,7 @@ Representative fields on `session.Session` (`internal/session/session.go`):
 - `RowStore *session.RowStore` — the single session-scoped per-type row store (see Caching Layers); `RelatedCache` — the related-check LRU. Both cleared on `Rotate()`.
 - Sparse related-panel lazy adds — a checker emits IDs outside the top-level fetcher's scope filter (e.g. AWS-managed KMS key, public AMI, IAM `AdministratorAccess`) — land as `Partial` `RowStore` entries via `ObservePartial`. `handleRelatedNavigate` reads one store entry per type (full-beats-partial is a flag on the entry, not a two-map merge), and partial-only entries are visible to related checkers — that is their purpose — but NEVER eligible for the main-menu top-level list, the enrich queue, navigation seeds, or disk saves.
 
-**Wave 2 findings (where they live):** PR-03a-fold deleted the parallel `EnrichmentFindings map[string]map[string]resource.EnrichmentFinding` map from `session.Session`. Wave 2 findings are now written onto each cached `resource.Resource.Findings` slice (with `Source` prefix `wave2:`) and `r.AttentionDetails`, via `applyEnrichment` in `internal/tui/app_enrich_fold.go`, which folds them into the `RowStore` through `Core.AmendRows`' copy-on-write mutation — findings and field updates apply exactly once, at the store. Reads use `findingFromResource` / `findingsFromRows` against the cached rows. The runtime's view-ready snapshot surface (`runtime.RuntimeState.EnrichmentFindings`, `internal/runtime/state.go`) and the `PatchDetail.EnrichmentFindings` intent payload (`internal/runtime/intent.go`) carry per-resource findings out to adapters, but neither replaces the cached-row authority — they are derived from it.
+**Wave 2 findings (where they live):** PR-03a-fold deleted the parallel `EnrichmentFindings map[string]map[string]resource.EnrichmentFinding` map from `session.Session`. Wave 2 findings are now written onto each cached `resource.Resource.Findings` slice (with `Source` prefix `wave2:`) and `r.AttentionDetails`, via `applyEnrichment` in `internal/tui/app_enrich_fold.go`, which folds them into the `RowStore` through `Core.AmendRows`' copy-on-write mutation — findings and field updates apply exactly once, at the store. Reads use `findingFromResource` / `findingsFromRows` against the cached rows. The runtime's view-ready snapshot surface (`runtime.RuntimeState.EnrichmentFindings`, `core/runtime/state.go`) and the `PatchDetail.EnrichmentFindings` intent payload (`core/runtime/intent.go`) carry per-resource findings out to adapters, but neither replaces the cached-row authority — they are derived from it.
 
 ---
 
@@ -469,8 +469,8 @@ The main menu shows `issues:N` badges per resource type, counting resources in w
 - `resource.Color` enum: `ColorHealthy` (green), `ColorWarning` (yellow), `ColorBroken` (red), `ColorDim` (grey).
 - `(Color).IsIssue() bool` — returns true for `ColorWarning` and `ColorBroken`. Used by both the attention filter and issue-count badges.
 - `ResourceTypeDef.Color func(Resource) Color` — per-type classification function. Classifiers resolve findings-first via `colorFromAnyFinding` (worst finding severity wins, wave1 or wave2-merged); the raw-field branches that remain are fallbacks for rows without findings (e.g., ad-hoc test doubles, states whose finding is still being emitted upstream). The conformance gate (`qa_color_findings_conformance_test.go`) pins color == findings-derived across the demo bench with an empty allowlist. REQUIRED for all registered types.
-- `ResourceTypeDef.ResolveColor(r domain.Resource) domain.Color` (`internal/catalog/types.go`) — dispatcher: calls `d.Color(r)` when non-nil, falls back to `colorFallback(r.Fields["status"])` for ad-hoc test doubles that omit `Color`.
-- `colorFallback(status string) domain.Color` (`internal/catalog`) — status-string fallback covering common AWS vocabulary; used only when `Color` is nil (test doubles).
+- `ResourceTypeDef.ResolveColor(r domain.Resource) domain.Color` (`core/catalog/types.go`) — dispatcher: calls `d.Color(r)` when non-nil, falls back to `colorFallback(r.Fields["status"])` for ad-hoc test doubles that omit `Color`.
+- `colorFallback(status string) domain.Color` (`core/catalog`) — status-string fallback covering common AWS vocabulary; used only when `Color` is nil (test doubles).
 - `styles.ColorStyle(c domain.Color) lipgloss.Style` — maps `domain.Color` to a palette foreground style for row rendering.
 
 **`TierColorStyle`** (`styles.TierColorStyle(tier string) lipgloss.Style`): Maps detail-view tier strings to palette foreground styles. Tiers: `"ok"`, `"!"` (broken), `"~"` (warning/scheduled), `"impaired"`, `"initializing"`, `"ct-danger"`, `"ct-attention"`, `"ct-info"`.
@@ -573,7 +573,7 @@ The detail view has a right-column panel showing related resources.
 > against the golden table. Drift has already happened once — do not repeat it.
 
 ```go
-// internal/resource/related.go
+// core/resource/related.go
 type RelatedDef struct {
     TargetType       string         // e.g., "vpc"
     DisplayName      string         // e.g., "VPCs"
@@ -586,9 +586,9 @@ type RelatedDef struct {
 - **Live API** (`NeedsTargetCache: false`): Calls AWS directly (e.g., `DescribeTargetHealth`). Fast, specific.
 - **Cache scan** (`NeedsTargetCache: true`): Reads a `RowStore.SnapshotAll(true)` snapshot — one entry per type, `Partial` (lazy-add) entries included, and observed-empty types stay present in the snapshot. The dispatcher pre-fetches the target type if absent.
 
-`(*Core).HandleRelatedCheckStarted` (`internal/runtime/related.go`; TUI adapter `handleRelatedCheckStarted` in `internal/tui/runtime_adapter_related.go`) fans out one goroutine per `RelatedDef`, capped by `MaxConcurrentProbes`. Results carry a generation to discard stale results after Ctrl+R or profile/region switch.
+`(*Core).HandleRelatedCheckStarted` (`core/runtime/related.go`; TUI adapter `handleRelatedCheckStarted` in `internal/tui/runtime_adapter_related.go`) fans out one goroutine per `RelatedDef`, capped by `MaxConcurrentProbes`. Results carry a generation to discard stale results after Ctrl+R or profile/region switch.
 
-**Truncated-cache contract (`Truncated=true`)**: cache-scan checkers that can't see the full universe — because the target cache's `IsTruncated=true` after its first page — must signal the undercount rather than silently rendering `0`. `relatedResultTrunc(target, ids, truncated)` (internal/aws/related_common.go) returns a sentinel `RelatedCheckResult{Count:0, Truncated:true}` used when a truncated cache yielded no matches yet later pages may contain some. File-local `truncatedResult*` helpers (in `ddb_related.go`, `s3_related.go`, `ses_related.go`, `redis_related.go`) produce the same shape when matches were found but the cache was still truncated. The UI renders these as `(N+)` or `(0+)` so operators know the real count is at least N.
+**Truncated-cache contract (`Truncated=true`)**: cache-scan checkers that can't see the full universe — because the target cache's `IsTruncated=true` after its first page — must signal the undercount rather than silently rendering `0`. `relatedResultTrunc(target, ids, truncated)` (core/aws/related_common.go) returns a sentinel `RelatedCheckResult{Count:0, Truncated:true}` used when a truncated cache yielded no matches yet later pages may contain some. File-local `truncatedResult*` helpers (in `ddb_related.go`, `s3_related.go`, `ses_related.go`, `redis_related.go`) produce the same shape when matches were found but the cache was still truncated. The UI renders these as `(N+)` or `(0+)` so operators know the real count is at least N.
 
 ### Navigable Fields
 
@@ -601,9 +601,9 @@ type NavigableField struct {
 
 In the detail view, navigable fields are underlined. Pressing Enter on one emits `RelatedNavigateMsg`, which pushes a filtered list of the target resource type.
 
-**ID-format normalization**: Some navigable fields carry ARNs (KMS `KeyArn`, IAM `RoleArn`, ECS `ClusterArn`, Lambda `FunctionArn`, CloudWatch `LogGroupArn`) while the target resource's `Resource.ID` is a bare name or alias. `resource.NavIDFromValue(targetType, value)` (in `internal/resource/related.go`) is a central registry that normalizes these values into bare IDs at navigation time. Target types with registered extractors: `kms`, `role`, `ecs`, `logs`, `s3`, `iam-user`. Other target types pass through unchanged. `buildFieldList` in `internal/tui/views/detail_fields.go` applies this transform to every scalar navigable item before rendering so the resolved bare ID matches `Resource.ID` on the target's list.
+**ID-format normalization**: Some navigable fields carry ARNs (KMS `KeyArn`, IAM `RoleArn`, ECS `ClusterArn`, Lambda `FunctionArn`, CloudWatch `LogGroupArn`) while the target resource's `Resource.ID` is a bare name or alias. `resource.NavIDFromValue(targetType, value)` (in `core/resource/related.go`) is a central registry that normalizes these values into bare IDs at navigation time. Target types with registered extractors: `kms`, `role`, `ecs`, `logs`, `s3`, `iam-user`. Other target types pass through unchanged. `buildFieldList` in `internal/tui/views/detail_fields.go` applies this transform to every scalar navigable item before rendering so the resolved bare ID matches `Resource.ID` on the target's list.
 
-**List-typed scalar extraction**: `fieldpath.ExtractFirstListScalar(obj, dotPath)` (in `internal/fieldpath/extract.go`) walks slice-valued dotted paths to pull a scalar from the first element, enabling navigable fields on fields like `Subnets.SubnetId` without hand-rolled traversal. Returns an empty string when the path is empty, the slice is empty, or any intermediate step is nil — unlike `ExtractScalar`, which only walks struct fields and pointers.
+**List-typed scalar extraction**: `fieldpath.ExtractFirstListScalar(obj, dotPath)` (in `core/fieldpath/extract.go`) walks slice-valued dotted paths to pull a scalar from the first element, enabling navigable fields on fields like `Subnets.SubnetId` without hand-rolled traversal. Returns an empty string when the path is empty, the slice is empty, or any intermediate step is nil — unlike `ExtractScalar`, which only walks struct fields and pointers.
 
 ---
 
@@ -611,8 +611,8 @@ In the detail view, navigable fields are underlined. Pressing Enter on one emits
 
 a9s has two distinct enrichment pipelines with disjoint contracts:
 
-1. **Detail enrichment** (on-demand) — `resource.DetailEnricher` in `internal/resource/enricher.go`. Fetches additional data when a user opens a detail/YAML/JSON view (e.g., IAM policy documents). See below.
-2. **Wave 2 issue enrichment** (background) — `awsclient.IssueEnricherFunc` declared on each `catalog.ResourceTypeDef.Wave2` field and accessed via `awsclient.Wave2EnricherFor(shortName)` / `awsclient.AllWave2()` (shared types in `internal/aws/issue_enrichment.go`; read API in `internal/aws/wave2.go`; per-resource enricher bodies live in `*_issue_enrichment.go` files per short name). Discovers hidden issues via additional API calls after Wave 1 probes complete. See "Wave 2 Issue Enrichment Pipeline" under Fetcher Patterns.
+1. **Detail enrichment** (on-demand) — `resource.DetailEnricher` in `core/resource/enricher.go`. Fetches additional data when a user opens a detail/YAML/JSON view (e.g., IAM policy documents). See below.
+2. **Wave 2 issue enrichment** (background) — `awsclient.IssueEnricherFunc` declared on each `catalog.ResourceTypeDef.Wave2` field and accessed via `awsclient.Wave2EnricherFor(shortName)` / `awsclient.AllWave2()` (shared types in `core/aws/issue_enrichment.go`; read API in `core/aws/wave2.go`; per-resource enricher bodies live in `*_issue_enrichment.go` files per short name). Discovers hidden issues via additional API calls after Wave 1 probes complete. See "Wave 2 Issue Enrichment Pipeline" under Fetcher Patterns.
 
 ### On-Demand Detail Enhancement
 
@@ -650,7 +650,7 @@ View opens (detail, YAML, or JSON)
 Child views are drill-down lists from a parent resource (e.g., IAM Role → Role Policies).
 
 ```go
-// internal/resource/types.go
+// core/resource/types.go
 type ChildViewDef struct {
     ChildType         string               // "role_policies"
     Key               string               // trigger key: "p"
@@ -681,21 +681,21 @@ One session field is deliberately EXEMPT from `Rotate()`'s clean-slate rule: `Se
 
 | Cache | Location | Scope | Invalidation |
 |-------|----------|-------|-------------|
-| **Disk availability cache** | `internal/cache/` | Persisted at `~/.a9s/cache/<profile>--<region>.yaml` | TTL of 1 hour; file replaced atomically |
+| **Disk availability cache** | `core/cache/` | Persisted at `~/.a9s/cache/<profile>--<region>.yaml` | TTL of 1 hour; file replaced atomically |
 | **Row store** | `session.Session.RowStore` (owned by `runtime.Core`) | In-memory `map[string]session.TypeRows` — one entry per canonical resource type | Cleared on profile/region switch via `session.Rotate()` |
 | **Related cache** | `session.Session.RelatedCache` | In-memory LRU with fixed capacity | Cleared on `Rotate()`; entry deleted on Ctrl+R |
 | **Detail-enricher caches** | Feature-specific cache on `session.Session`, delivered to enrichers via `*awsclient.DetailEnrichmentCtx` (current example: `PolicyDocumentCache`) | In-memory, session-scoped | Rotated by `session.Rotate()` on profile/region switch |
 | **Enrichment visibility state** | `EnrichmentRan`, `EnrichmentTypeGen`, `EnrichmentTruncatedIDs`, `EnrichmentGen` on `session.Session` (Wave 2 progress/control); per-resource findings are folded into `resource.Resource.Findings` on cached rows — see "Wave 2 findings (where they live)" above | In-memory, session-scoped | Cleared per-type on Ctrl+R rerun start; cleared entirely on `Rotate()` |
 
-**Disk availability cache** (`internal/cache/cache.go`): Tracks which resource types have resources, their counts, and issue counts. Loaded on startup to instantly grey-out empty types and show issue badges in the main menu. Structure: `File{Profile, Region, CheckedAt, Resources map[string]Entry}` where `Entry{HasResources, Count, Truncated, Issues, IssuesTruncated, IssuesKnown}`. The `IssuesKnown` bool distinguishes "probed and found zero issues" from "not yet probed" (both unmarshal as int 0 without this flag). When caching is enabled (not `--no-cache`), the cache is saved after Wave 1 probes complete and again after Wave 2 enrichment completes, so enriched issue counts persist across restarts. When `--no-cache` is active, `saveAvailabilityCache()` is a no-op.
+**Disk availability cache** (`core/cache/cache.go`): Tracks which resource types have resources, their counts, and issue counts. Loaded on startup to instantly grey-out empty types and show issue badges in the main menu. Structure: `File{Profile, Region, CheckedAt, Resources map[string]Entry}` where `Entry{HasResources, Count, Truncated, Issues, IssuesTruncated, IssuesKnown}`. The `IssuesKnown` bool distinguishes "probed and found zero issues" from "not yet probed" (both unmarshal as int 0 without this flag). When caching is enabled (not `--no-cache`), the cache is saved after Wave 1 probes complete and again after Wave 2 enrichment completes, so enriched issue counts persist across restarts. When `--no-cache` is active, `saveAvailabilityCache()` is a no-op.
 
-**Row store** (`internal/session/rowstore.go`): The single source of truth for every cached resource-list row the session has observed. One `TypeRows` entry per canonical short name carries: `Rows` (immutable once stored — every change produces a new slice, so snapshots can never be invalidated by a later write), `Pagination` (nil is never exact — conservatively treated as truncated, C5), `TotalCount` (may exceed `len(Rows)`), `Origin` (`disk|probe|fetch` — which lane last accepted a rows-carrying write), `Partial` (sparse `FetchByIDs` lazy adds; a full observe clears it — full-beats-partial — and a sparse add never downgrades a full entry), `Gen` (increments on every accepted write; `Gen != 0` makes "observed empty" first-class, distinct from "never observed"), and `ViewState` (filter/sort/cursor/h-scroll, so a warm re-entry restores the exact view the user left). Writes go through `Observe` (full rows), `ObservePartial` (sparse adds), `ObserveCount` (counts-only — never touches rows), and `Amend` (copy-on-write content mutation — the enrichment fold and finding patches apply exactly once, here); reads are defensive-copy `Snapshot`/`SnapshotAll`. Reconciliation rules: appends dedup by ID; a stale truncated ID-subset replace is rejected once an entry is exact; a disk seed never overwrites live probe/fetch rows. The store is pair-scoped — `Rotate()` clears it on profile/region switch (C9).
+**Row store** (`core/session/rowstore.go`): The single source of truth for every cached resource-list row the session has observed. One `TypeRows` entry per canonical short name carries: `Rows` (immutable once stored — every change produces a new slice, so snapshots can never be invalidated by a later write), `Pagination` (nil is never exact — conservatively treated as truncated, C5), `TotalCount` (may exceed `len(Rows)`), `Origin` (`disk|probe|fetch` — which lane last accepted a rows-carrying write), `Partial` (sparse `FetchByIDs` lazy adds; a full observe clears it — full-beats-partial — and a sparse add never downgrades a full entry), `Gen` (increments on every accepted write; `Gen != 0` makes "observed empty" first-class, distinct from "never observed"), and `ViewState` (filter/sort/cursor/h-scroll, so a warm re-entry restores the exact view the user left). Writes go through `Observe` (full rows), `ObservePartial` (sparse adds), `ObserveCount` (counts-only — never touches rows), and `Amend` (copy-on-write content mutation — the enrichment fold and finding patches apply exactly once, here); reads are defensive-copy `Snapshot`/`SnapshotAll`. Reconciliation rules: appends dedup by ID; a stale truncated ID-subset replace is rejected once an entry is exact; a disk seed never overwrites live probe/fetch rows. The store is pair-scoped — `Rotate()` clears it on profile/region switch (C9).
 
 The legacy accessor names survive on `runtime.Core` as store-backed views: `Core.ResourceCache(rt)` reports a hit only for a FULL, `OriginFetch` entry — this gates navigation's cache-hit promotion (a probe- or disk-origin entry seeds the list but still verifies with a live fetch, per C1: cached content renders before any AWS activity, then is verified); `Core.LazyResourceCache(rt)` reads `Partial` entries; `Core.AnyOriginResourceCache(rt)` serves related-navigate's any-origin (full-lane) cache hits; `Core.AnyLaneResources(rt)` returns a type's rows from EITHER lane (full or `Partial`) and is the render-time row source for a related-**filtered** list — the `RelatedIDSet` scopes it, so surfacing the lazy/by-ID `Partial` lane is safe and a cache-hit filtered list renders without a fetch on both the TUI and the web (`Controller.seedRelatedExactRows`, the single seed both renderers share).
 
 **Per-screen views**: the headless controller's `ListState.Rows` is a per-screen VIEW adopted from the store's accepted rows for the canonical top-level list — the store reconciles, the screen adopts, and `ListState.RowsGen` pins the store generation the rows were adopted at. Child, related, and filtered screens stay screen-local (the C6 scope boundary) — their rows never route through the store. There is no controller-side row mirror; field updates and finding patches reach every screen through the store's `Amend`.
 
-**One save lane**: every per-type disk save goes through `Core.SaveTypeRows` (`internal/runtime/probes.go`), which resolves save columns via a view-config-aware resolver injected with `SetSaveColumns` and hands the rows to `reconcileTypeFile` — the on-disk reconciliation rules are unchanged, now reachable from exactly one chokepoint (the former sweep/list two-materializer split persisted different field sets for the same row under user-reordered columns).
+**One save lane**: every per-type disk save goes through `Core.SaveTypeRows` (`core/runtime/probes.go`), which resolves save columns via a view-config-aware resolver injected with `SetSaveColumns` and hands the rows to `reconcileTypeFile` — the on-disk reconciliation rules are unchanged, now reachable from exactly one chokepoint (the former sweep/list two-materializer split persisted different field sets for the same row under user-reordered columns).
 
 The numbered rules above (C1, C5, C6, C9) are the cache contract in [`design/cache-requirements.md`](design/cache-requirements.md).
 
@@ -730,9 +730,9 @@ detail:
 1. `<configDir>/views/{shortname}.yaml` (user global config)
 2. `.a9s/views/{shortname}.yaml` (per-project CWD overrides)
 
-The base config directory defaults to `~/.a9s/` but can be overridden via the `A9S_CONFIG_FOLDER` environment variable (`internal/config/config.go:ConfigDir()`).
+The base config directory defaults to `~/.a9s/` but can be overridden via the `A9S_CONFIG_FOLDER` environment variable (`core/config/config.go:ConfigDir()`).
 
-Missing configs fall back to built-in defaults in `internal/config/defaults_*.go` (one file per service category).
+Missing configs fall back to built-in defaults in `core/config/defaults_*.go` (one file per service category).
 
 **Column Path vs Key:**
 - `Path` — dot-notation SDK struct field path resolved by reflection (e.g., `"State.Name"`)
@@ -749,9 +749,9 @@ Styles live in `internal/tui/styles/`. The default theme is Tokyo Night Dark. Th
 `./a9s --demo` runs with synthetic fixture data — no AWS credentials needed.
 
 **Architecture:**
-- `internal/demo/fixtures/` — per-service Go files returning hardcoded SDK response objects
-- `internal/demo/fakes/` — per-service fake API implementations backed by fixtures
-- `internal/demo/transport.go` — fake HTTP transport for STS (the only service without a typed fake interface)
+- `core/demo/fixtures/` — per-service Go files returning hardcoded SDK response objects
+- `core/demo/fakes/` — per-service fake API implementations backed by fixtures
+- `core/demo/transport.go` — fake HTTP transport for STS (the only service without a typed fake interface)
 - `demo.NewServiceClients()` wires fakes into a `*aws.ServiceClients` struct
 
 The `isDemo` flag controls whether Wave 2 enrichment runs — demo mode skips it (no real AWS to query), while `--no-cache` on live AWS preserves full functionality.
@@ -765,8 +765,8 @@ Demo mode is the primary way to develop and test the TUI without AWS access.
 `./a9s --web` (or `A9S_MODE=web`) runs an HTTP server instead of the TUI — unpublished for now, internal-only.
 
 **Architecture:**
-- `internal/web/` — `server.go`, `handlers.go`, `render.go`, `construct.go`, plus `templates/` and `static/`
-- The server renders the same headless-controller state (`internal/app.Controller`) the TUI consumes — list/detail/menu/cost bodies are produced once in `internal/app` and adapter-rendered per surface
+- `core/web/` — `server.go`, `handlers.go`, `render.go`, `construct.go`, plus `templates/` and `static/`
+- The server renders the same headless-controller state (`core/app.Controller`) the TUI consumes — list/detail/menu/cost bodies are produced once in `core/app` and adapter-rendered per surface
 - `--web-addr` sets the listen address; `--web-allow-reveal` gates secret reveal over HTTP
 - Integration coverage lives in `tests/integration/web/`; snapshot-driven e2e in `docs/testing/snapshot-web-e2e.md`
 
@@ -814,8 +814,8 @@ The steps below describe how to extend the current `main` architecture. They are
 ### Adding a New Resource Type
 
 1. Add or update the `ResourceTypeDef` and built-in default view config.
-2. Implement the fetcher in `internal/aws/` so it returns stable `resource.Resource` values with meaningful `ID`, `Name`, `Status`, `Issues`, `Fields`, and `RawStruct` for the current resource model on `main`. If the fetcher makes per-item describe calls, adopt the honest-degradation contract (`DetailsDeniedFindingDef` — a listed resource whose describe is denied stays as a `details denied` row; see §Wave 2 Issue Enrichment Pipeline).
-3. Register the resource behavior in `internal/resource/`:
+2. Implement the fetcher in `core/aws/` so it returns stable `resource.Resource` values with meaningful `ID`, `Name`, `Status`, `Issues`, `Fields`, and `RawStruct` for the current resource model on `main`. If the fetcher makes per-item describe calls, adopt the honest-degradation contract (`DetailsDeniedFindingDef` — a listed resource whose describe is denied stays as a `details denied` row; see §Wave 2 Issue Enrichment Pipeline).
+3. Register the resource behavior in `core/resource/`:
    - paginated fetcher
    - child fetchers, if any
    - related defs, if any
@@ -910,7 +910,7 @@ Two mock layers serve different purposes:
 | Layer | Location | When to Use |
 |-------|----------|-------------|
 | **Interface mocks** | `tests/unit/mocks_test.go` | Testing a single fetcher function in isolation |
-| **Demo fakes** | `internal/demo/fakes/*.go` | Testing TUI behavior — full app wired together |
+| **Demo fakes** | `core/demo/fakes/*.go` | Testing TUI behavior — full app wired together |
 
 **Interface mocks** are minimal: single-method structs with `output` + `err` fields. Each implements one narrow AWS API interface (e.g., `EC2DescribeInstancesAPI`). Use when testing data transformation in a fetcher.
 

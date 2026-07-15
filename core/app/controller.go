@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package app
 
 import (
@@ -86,7 +88,7 @@ type Controller struct {
 
 	// identityResult holds the resolved caller identity received via
 	// messages.IdentityLoaded so snapshot can build IdentityBody without
-	// importing internal/aws or touching the TUI view stack.
+	// importing core/aws or touching the TUI view stack.
 	identityResult *domain.CallerIdentity
 
 	// identityLoading is true from ActionOpenIdentity dispatch until either
@@ -110,7 +112,7 @@ type Controller struct {
 	showErrorHint bool
 
 	// uiMode is the renderer mode surfaced as Header.Mode ("" = TUI, "web").
-	// Set once via SetUIMode after construction (e.g. internal/web/construct.go
+	// Set once via SetUIMode after construction (e.g. core/web/construct.go
 	// for web sessions). The TUI never calls SetUIMode, so it stays "". This is
 	// independent of core.IsDemo() — a demo session is still a TUI or web
 	// session and carries its own Header.Mode value ("demo") set elsewhere.
@@ -191,7 +193,7 @@ func New(core *runtime.Core) *Controller {
 // so a save persists exactly the columns the render path would show,
 // including any per-session view-config override — then narrows the result
 // to the config.ListColumn shape SaveTypeRows shares with the built-in-only
-// fallback (resolveSaveColumns in internal/runtime/probes.go).
+// fallback (resolveSaveColumns in core/runtime/probes.go).
 //
 // Reads c.viewConfig/c.fallbackTypeDefs live (not a value captured at
 // construction time) since SetViewConfig/RegisterFallbackTypeDef are called
@@ -240,7 +242,7 @@ func (c *Controller) SetViewConfig(vc *config.ViewsConfig) {
 
 // SetUIMode sets the renderer mode surfaced as Header.Mode ("" = TUI, "web").
 // Called once after construction by hosts that render outside a terminal —
-// internal/web/construct.go's newSession calls SetUIMode("web"). The TUI
+// core/web/construct.go's newSession calls SetUIMode("web"). The TUI
 // never calls this, so its Header.Mode stays "".
 func (c *Controller) SetUIMode(mode string) {
 	c.mu.Lock()

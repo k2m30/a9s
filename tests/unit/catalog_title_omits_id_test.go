@@ -16,7 +16,7 @@ package unit
 //	}
 //
 // and set TitleOmitsID: true on the "log_events" and
-// "lambda_invocation_logs" child-type catalog entries (internal/aws install
+// "lambda_invocation_logs" child-type catalog entries (core/aws install
 // site — wherever those ChildViewDef/ResourceTypeDef entries are built).
 //
 // There is no clean, already-exported unit seam for the actual
@@ -26,7 +26,7 @@ package unit
 // tests/unit without further production plumbing (e.g. exposing a
 // Controller-level DetailFrameTitle that consults catalog.TitleOmitsID,
 // analogous to the existing (unrelated) Controller.DetailFrameTitle at
-// internal/app/detail_state.go:412, which today returns bare Name/ID with no
+// core/app/detail_state.go:412, which today returns bare Name/ID with no
 // "detail -- " prefix and no ID-suppression logic at all).
 //
 // This skeleton pins the catalog-level contract (the part of the fix that

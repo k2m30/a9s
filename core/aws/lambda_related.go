@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // lambda_related.go contains Lambda function related-resource checker functions.
 package aws
 

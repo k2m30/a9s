@@ -3,7 +3,7 @@ package unit
 // Tests for §3 (FormatCTTimestamp) and §5 (FormatCTTarget) format helpers.
 //
 // FormatCTTimestamp and FormatCTTarget are NEW exports to be added by the P1 coder
-// in internal/aws/ct_events.go. These tests will FAIL TO COMPILE until they are
+// in core/aws/ct_events.go. These tests will FAIL TO COMPILE until they are
 // added. That is expected — the tests are written first (TDD).
 
 import (

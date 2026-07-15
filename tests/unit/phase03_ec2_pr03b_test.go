@@ -8,7 +8,7 @@ package unit_test
 //     non-healthy, non-terminal lifecycle states.
 //   - EC2 Color func reads Findings[0].Severity first, falling back to
 //     structural-field logic when Findings is empty.
-//   - New file internal/aws/ec2_codes.go declares FindingCode constants.
+//   - New file core/aws/ec2_codes.go declares FindingCode constants.
 //
 // These tests are RED until the coder implements the migration.
 
@@ -34,7 +34,7 @@ import (
 // compile until the constants are introduced.
 func TestEC2Codes_ConstantsExist(t *testing.T) {
 	t.Helper()
-	// These will not compile until internal/aws/ec2_codes.go is created.
+	// These will not compile until core/aws/ec2_codes.go is created.
 	var _ domain.FindingCode = awsclient.CodeEC2StatePending
 	var _ domain.FindingCode = awsclient.CodeEC2StateStopping
 	var _ domain.FindingCode = awsclient.CodeEC2StateStopped
@@ -232,13 +232,13 @@ func TestEC2Fetcher_StoppedUserEmitsWarnFinding(t *testing.T) {
 // TestEC2Fetcher_TerminatedEmitsDimFinding pins the CURRENT (correct)
 // contract: a terminated instance emits exactly one SevDim Finding
 // (CodeEC2StateTerminated), because colorEC2 is now
-// colorFromAnyFinding-only (internal/aws/catalog_compute.go) — it needs a
+// colorFromAnyFinding-only (core/aws/catalog_compute.go) — it needs a
 // Finding to color from, not a bare Fields["state"] read.
 //
 // RETIRED the old "terminated emits no Finding" invariant this test used to
 // pin (TestEC2Fetcher_TerminatedEmitsNoFinding): that was the
 // pre-color-findings-conformance contract. Since the fetcher
-// (internal/aws/ec2.go) now emits a SevDim Finding for the terminated
+// (core/aws/ec2.go) now emits a SevDim Finding for the terminated
 // branch, "no Finding" is no longer true — terminated is no longer a silent
 // state. See qa_color_findings_conformance_test.go for the standing
 // architectural gate.
@@ -329,7 +329,7 @@ func TestEC2Color_ReadsFindingsFirst(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestEC2Color_HealthyWhenFindingsEmpty pins the CURRENT (correct) contract:
-// colorEC2 is colorFromAnyFinding-only (internal/aws/catalog_compute.go, no
+// colorEC2 is colorFromAnyFinding-only (core/aws/catalog_compute.go, no
 // raw-field fallback at all) — a stopped+Server.* instance with Findings
 // empty/nil now resolves ColorHealthy, not ColorBroken, because Color no
 // longer reads Fields["state"]/Fields["state_reason_code"] at all.

@@ -147,7 +147,7 @@ func TestFetchCloudTrailTrails_NilBoolFields(t *testing.T) {
 // stores the log file validation flag under the key "log_file_validation_enabled",
 // which is exactly the key the colorer in types_monitoring.go:113 reads.
 //
-// CodeRabbit PR-273 finding: internal/aws/trail.go:111 writes key "log_validation"
+// CodeRabbit PR-273 finding: core/aws/trail.go:111 writes key "log_validation"
 // but the colorer at types_monitoring.go:113 reads "log_file_validation_enabled" —
 // they never match in production, so the colorer always sees "" and skips the check.
 // This test will FAIL until trail.go uses the correct key name.

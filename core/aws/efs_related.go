@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // efs_related.go contains EFS related-resource checker functions.
 package aws
 

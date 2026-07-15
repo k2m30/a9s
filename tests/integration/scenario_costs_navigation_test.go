@@ -13,13 +13,13 @@ import (
 
 // TestCostsScenario_GridPivotDrillAndBackToMenu is the Cost Explorer's first
 // tests/integration/ scenario-harness coverage: `make integration` (the
-// release gate) previously exercised internal/costs, internal/costs/screen
-// and internal/app/costs_*.go only via tests/unit, never end-to-end through
+// release gate) previously exercised core/costs, core/costs/screen
+// and core/app/costs_*.go only via tests/unit, never end-to-end through
 // the real tui.Model.Update() loop the way every other resource screen is
 // covered here.
 //
 // Walks: open Cost Explorer via the same Navigate{Target: TargetCosts}
-// message the ":costs"/":ce" colon-command dispatches (internal/app/
+// message the ":costs"/":ce" colon-command dispatches (core/app/
 // actions_view.go, internal/tui/app_input.go) -> assert the SERVICE grid
 // renders with the planted growth-story anomaly cell -> pivot to REGION and
 // back to SERVICE via digit keys -> drill the anomaly cell down to
@@ -29,7 +29,7 @@ import (
 func TestCostsScenario_GridPivotDrillAndBackToMenu(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 
-	// growthLabel mirrors stripCostsServiceVendorPrefix (internal/app/
+	// growthLabel mirrors stripCostsServiceVendorPrefix (core/app/
 	// costs_body.go): the SERVICE row label strips the "Amazon "/"AWS "
 	// vendor prefix a real Cost Explorer SERVICE dimension value carries.
 	growthLabel := strings.TrimPrefix(fixtures.CostsGrowthService, "Amazon ")
@@ -122,7 +122,7 @@ func TestCostsScenario_GridPivotDrillAndBackToMenu(t *testing.T) {
 	scenario.ExpectCurrentResourceType("ec2")
 	scenario.ExpectCurrentResourceID(target.ResourceID)
 	// The detail frame title renders Resource.Name when present, falling
-	// back to the raw ID only when Name is empty (internal/app/
+	// back to the raw ID only when Name is empty (core/app/
 	// detail_state.go's detailFrameTitleLocked) — the fixture instance
 	// always carries a Name, so the frame title itself shows the name, not
 	// the "i-..." string; ExpectCurrentResourceID above pins the exact

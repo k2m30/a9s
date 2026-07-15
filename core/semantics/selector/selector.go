@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package selector holds shared resource-selection predicates used by
 // related-checkers and coverage logic.
 package selector

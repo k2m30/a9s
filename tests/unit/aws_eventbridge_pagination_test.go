@@ -46,7 +46,7 @@ type ebPaginatedFake struct {
 
 	// mu guards callCounts, which is written concurrently:
 	// EnrichEventBridgeRuleTargets fans out ListTargetsByRule calls per
-	// resource via internal/aws.ForEachParallel (EnrichmentParallelism
+	// resource via core/aws.ForEachParallel (EnrichmentParallelism
 	// goroutines).
 	mu sync.Mutex
 	// callCounts tracks how many times ListTargetsByRule was called per rule.

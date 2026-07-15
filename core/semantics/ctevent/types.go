@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package ctevent implements the CloudTrail event detail view data model.
 // See specs/013-ct-event-detail-v2/data-model.md for the full type specification
 // and specs/013-ct-event-detail-v2/contracts/ctevent-api.md for the public API contracts.
@@ -53,11 +55,11 @@ type Event struct {
 	InsightDetails *InsightDetails
 
 	// Verb classification (computed once during Parse via existing
-	// internal/aws/ct_events_severity.go ClassifyCTVerb)
+	// core/aws/ct_events_severity.go ClassifyCTVerb)
 	Verb string // "R" | "W" | "D" | "S" | "I" | "N" | "?"
 
 	// Status is the severity tier computed from the event by
-	// internal/aws/ct_events.go#computeCTStatus and written to
+	// core/aws/ct_events.go#computeCTStatus and written to
 	// resource.Resource.Fields["status"].
 	// One of "ct-info" | "ct-attention" | "ct-danger".
 	Status string

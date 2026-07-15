@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package fixtures provides RDS Snapshot fixture data for the RDS fake.
 package fixtures
 

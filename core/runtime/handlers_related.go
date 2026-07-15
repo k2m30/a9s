@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // handlers_related.go — RelatedNavigateEvent dispatch (platform-agnostic; no
 // Bubble Tea imports).
 //

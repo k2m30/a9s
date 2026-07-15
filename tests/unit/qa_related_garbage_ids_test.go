@@ -9,7 +9,7 @@ package unit_test
 // the live KMS API with keyId="s3", which AWS rejected with
 // NotFoundException "Invalid keyId 's3'".
 //
-// The fix (internal/aws/related_common.go's kmsKeyIDFromField(raw, srcType))
+// The fix (core/aws/related_common.go's kmsKeyIDFromField(raw, srcType))
 // now guards every *_related.go KMS checker registry-wide: an extracted
 // keyID equal to the source resource's own type short name is treated as
 // fabricated/garbage and dropped rather than handed to DescribeKey/FetchByIDs.
@@ -141,7 +141,7 @@ func thinSeededResourceOf(shortName string) resource.Resource {
 // candidate resource under EVERY registered target type across the whole
 // registry. Each candidate's ID equals its own target type's short name, and
 // its Fields carry the same value under every common cache-scan match-key
-// used across internal/aws/*_related.go (resource_arn, resources,
+// used across core/aws/*_related.go (resource_arn, resources,
 // event_pattern, s3website_alias_names, result_output_location, stack_name)
 // PLUS the thin source resource's own bare ID/placeholder string — so any
 // cache-scan checker whose string-matching logic degrades to a loose/
@@ -186,7 +186,7 @@ func poisonedTargetCache(sourceShortName string, sourceID string) resource.Resou
 // yields a ResourceID equal to that source type's own short name.
 //
 // COVERAGE BOUNDARY (honest disclosure): clients=nil is hermetic — every
-// AWS-calling checker in internal/aws guards with
+// AWS-calling checker in core/aws guards with
 // `c, ok := clients.(*ServiceClients); if !ok || c == nil`, so with nil
 // clients those checkers short-circuit to State: RelatedUnknown (or a resolved 0) BEFORE reaching their
 // vulnerable ID-extraction logic, regardless of the cache. Of the 605

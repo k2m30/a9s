@@ -8,7 +8,7 @@ package unit
 //
 // These tests assert Resource.Fields["_ct.actor"] values after FetchCloudTrailEventsPage.
 // They are expected to FAIL until the P1 coder updates computeCTActor in
-// internal/aws/ct_events.go (currently uses "[cross] " prefix at line ~369).
+// core/aws/ct_events.go (currently uses "[cross] " prefix at line ~369).
 
 import (
 	"context"

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package views
 
 import (
@@ -196,7 +198,7 @@ type helpGroup struct {
 
 // buildGroups returns the column groups appropriate for the current context,
 // sourced from the shared domain.HelpGroupsFor table (single source of truth
-// for help-overlay key/description content; see internal/domain/helpkeys.go).
+// for help-overlay key/description content; see core/domain/helpkeys.go).
 func (m HelpModel) buildGroups() []helpGroup {
 	sections := domain.HelpGroupsFor(m.context.domainContext(), m.keys.ToggleAttentionOnly.Help().Key)
 	groups := make([]helpGroup, len(sections))

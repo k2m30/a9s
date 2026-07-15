@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // lt_related.go contains Launch Template related-resource checker functions.
 //
 // Four checkers (ami, kms, sg, subnet) are Pattern F: the fetcher's

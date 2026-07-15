@@ -253,7 +253,7 @@ func TestEnrichWAFLogging_EmptyScopeDefaultsToREGIONAL(t *testing.T) {
 
 // scopeCaptureFake wraps wafFullFake and records the Scope argument passed to
 // GetWebACL. mu guards scopeCapture/capturedScope: EnrichWAFLogging fans out
-// GetWebACL calls per resource via internal/aws.ForEachParallel
+// GetWebACL calls per resource via core/aws.ForEachParallel
 // (EnrichmentParallelism goroutines), so concurrent writers are possible even
 // though the tests in this file currently drive it with a single resource.
 type scopeCaptureFake struct {

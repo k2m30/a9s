@@ -905,7 +905,7 @@ var _ awsclient.ELBv2API = (*elbWave3Fake)(nil)
 // 8555b124 ("elb enricher stops promoting warn to broken") — both flags
 // missing at once is the AWS create-load-balancer default and must not
 // escalate to SevBroken (see EnrichELBAttributes' own doc comment in
-// internal/aws/elb_issue_enrichment.go), or every freshly-created,
+// core/aws/elb_issue_enrichment.go), or every freshly-created,
 // unhardened LB would render red.
 //
 // RETIRED the old "both-missing promotion rule" invariant this test used to

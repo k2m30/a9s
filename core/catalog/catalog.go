@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package catalog
 
 import "strings"
@@ -6,7 +8,7 @@ import "strings"
 // SetTypes (called from aws.Install at program start / TestMain). All Find /
 // All / AllShortNames lookups read from this slice.
 //
-// The per-category catalog data lives in internal/aws/ (not here) to break the
+// The per-category catalog data lives in core/aws/ (not here) to break the
 // `catalog → aws` cycle that direct fetcher references would otherwise force.
 // The data slice is installed at startup via aws.Install() rather than
 // computed at package-init time in this file.

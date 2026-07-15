@@ -13,7 +13,7 @@
 // singleflight is in place.
 //
 // NOTE TO CODER: This test requires the following exported test helper to be added
-// to internal/aws/ses_related.go (or a new ses_related_export_test.go file):
+// to core/aws/ses_related.go (or a new ses_related_export_test.go file):
 //
 //	// SESActiveReceiptRuleSetForTest is a test-only export of sesActiveReceiptRuleSet.
 //	func SESActiveReceiptRuleSetForTest(ctx context.Context, c *ServiceClients) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
@@ -366,7 +366,7 @@ func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
 //
 // This test calls the unexported sesActiveReceiptRuleSet via the exported
 // test wrapper SESActiveReceiptRuleSetForTest. The coder MUST add that
-// wrapper to internal/aws/ses_related.go (see the package-level NOTE at the
+// wrapper to core/aws/ses_related.go (see the package-level NOTE at the
 // top of this file). Until the wrapper exists the test fails to compile —
 // that IS the intended red light for Plan B.
 

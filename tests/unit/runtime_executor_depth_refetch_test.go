@@ -10,8 +10,8 @@ package unit_test
 // previously-cached depth (Core.CachedListDepth) before returning
 // messages.ResourcesLoaded.
 //
-// See internal/runtime/executor.go KindFetchResources and
-// internal/runtime/probes.go CachedListDepth.
+// See core/runtime/executor.go KindFetchResources and
+// core/runtime/probes.go CachedListDepth.
 
 import (
 	"context"
@@ -60,7 +60,7 @@ func newDepthExecutorCore(t *testing.T, noCache bool) *runtime.Core {
 
 // seedCachedRows writes a TypeFile with N rows for shortName under the
 // A9S_CONFIG_FOLDER-scoped cache dir for (depthTestProfile, depthTestRegion),
-// mirroring the production Put/SaveType seam in internal/cache/cache.go.
+// mirroring the production Put/SaveType seam in core/cache/cache.go.
 func seedCachedRows(t *testing.T, shortName string, count int, exact bool) {
 	t.Helper()
 	store := cache.LoadDir(depthTestProfile, depthTestRegion)
@@ -281,7 +281,7 @@ func TestExecuteTask_FetchResources_NoCachedDepth_SinglePageUnchanged(t *testing
 
 // TestExecuteTask_FetchResources_FollowUpPageError_PartialWithErr pins the
 // partial-success contract (HandleResourcesLoaded, existing behavior at
-// internal/runtime/handlers_resources.go:84-89): when the depth-loop's
+// core/runtime/handlers_resources.go:84-89): when the depth-loop's
 // follow-up FetchMoreResources call errors, the executor must still return
 // the resources accumulated so far (page 1's 50) with Err set — never an
 // messages.APIError, since some resources DID make it back.
@@ -357,7 +357,7 @@ func TestCachedListDepth_StoredRows_ReturnsCount(t *testing.T) {
 
 // TestCachedListDepth_AliasResolvesToCanonical pins alias canonicalization:
 // "rds" is a registered alias of the "dbi" resource type (see
-// internal/aws/catalog_databases.go ShortName:"dbi", Aliases includes "rds").
+// core/aws/catalog_databases.go ShortName:"dbi", Aliases includes "rds").
 // A TypeFile persisted under the canonical name "dbi" must be found when
 // CachedListDepth is called with the alias "rds".
 func TestCachedListDepth_AliasResolvesToCanonical(t *testing.T) {

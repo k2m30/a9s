@@ -1,5 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package jsonyaml holds renderer-free JSON→YAML text helpers shared by the
-// app core (internal/semantics/projection) and the TUI views. It lives outside
+// app core (core/semantics/projection) and the TUI views. It lives outside
 // internal/tui so shared-core packages can use it without transitively pulling
 // in lipgloss (SC-009): the lipgloss-dependent text helpers stay in
 // internal/tui/text.

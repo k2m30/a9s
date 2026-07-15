@@ -63,7 +63,7 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 	})
 
 	// Step 2: Load RDS resources. Fields key is "db_identifier" (the dbi
-	// type's DisplayNameKey, internal/aws/catalog_databases.go) — a stale
+	// type's DisplayNameKey, core/aws/catalog_databases.go) — a stale
 	// "db_instance_id" key here left the identity column blank, silently
 	// masked before because the old assertion only checked for the literal
 	// "! " glyph text (present regardless of an empty identity cell), never
@@ -123,10 +123,10 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 	//
 	// Checked via ctrl+z survival, not the literal "! " glyph text: since the
 	// color-findings-conformance wave, colorDBI prefers colorFromAnyFinding
-	// (internal/aws/catalog_databases.go) — once the SevBroken Finding is
+	// (core/aws/catalog_databases.go) — once the SevBroken Finding is
 	// applied, resolveListDecoratorFull's glyph branch is skipped entirely
 	// (only fires when ResolveColor()==ColorHealthy; see
-	// internal/app/list_columns.go and
+	// core/app/list_columns.go and
 	// .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
 	_, ctrlZVisible := isVisibleUnderCtrlZ(m, "db-stacked-a-001")
 	if !ctrlZVisible {

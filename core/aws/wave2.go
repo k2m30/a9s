@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // wave2.go — Wave 2 enricher accessors over the catalog struct literals.
 //
 // Wave 2 enricher registrations live as the catalog.ResourceTypeDef.Wave2

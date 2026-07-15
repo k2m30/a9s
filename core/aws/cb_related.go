@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // cb_related.go contains CodeBuild related-resource checker functions.
 package aws
 

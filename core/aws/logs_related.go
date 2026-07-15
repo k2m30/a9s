@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // logs_related.go contains CloudWatch Log Group related-resource checker functions.
 package aws
 

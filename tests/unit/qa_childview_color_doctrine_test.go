@@ -2,7 +2,7 @@
 // qa_color_findings_conformance_test.go ("color derives from findings") to
 // CHILD views, which that gate never covers (it only walks
 // resource.AllResourceTypes(), the top-level catalog — resource.AllChildTypes()
-// is a separate registry entirely, see internal/resource/accessors.go's
+// is a separate registry entirely, see core/resource/accessors.go's
 // GetChildType/AllChildTypes).
 //
 // OWNER BUG (acme-dev screenshot, tg_health child view): 7 of 8 targets are
@@ -10,21 +10,21 @@
 // Reason cell shows the raw dotted enum verbatim. Root cause, traced end to
 // end:
 //
-//  1. internal/aws/tg_health.go's convertTargetHealth (the tg_health
+//  1. core/aws/tg_health.go's convertTargetHealth (the tg_health
 //     ChildFetcher's row converter) never populates Resource.Findings and
 //     never sets Fields["status"] (only Fields["health"]).
-//  2. internal/aws/catalog_networking.go's tg_health ResourceTypeDef entry
+//  2. core/aws/catalog_networking.go's tg_health ResourceTypeDef entry
 //     (networkingChildTypes) has no Color func at all.
-//  3. catalog.ResourceTypeDef.ResolveColor (internal/catalog/types.go) falls
+//  3. catalog.ResourceTypeDef.ResolveColor (core/catalog/types.go) falls
 //     back to colorFallback(r.Fields["status"]) whenever Color is nil.
-//  4. colorFallback (internal/catalog/color_helpers.go) matches "" (the
+//  4. colorFallback (core/catalog/color_helpers.go) matches "" (the
 //     never-set status field) against none of its known-bad buckets and
 //     falls through every case to `return domain.ColorHealthy` — every
 //     tg_health row renders green regardless of TargetHealth.State.
 //  5. The raw SDK enum "Target.FailedHealthChecks" (elbv2types.
 //     TargetHealthReasonEnumFailedHealthChecks stringified) is copied
 //     verbatim into Fields["reason"], which the tg_health list/detail column
-//     config (internal/config/defaults_networking.go) renders directly —
+//     config (core/config/defaults_networking.go) renders directly —
 //     no humanization layer exists for child-view enum fields.
 //
 // This file pins the ARCHITECTURAL CONTRACT (owner doctrine extended to
@@ -98,7 +98,7 @@ func childListRowFor(t *testing.T, c *app.Controller, shortName string, fixtures
 // convertTargetHealth. This is deliberately NOT a hand-built resource.Resource
 // — it is today's actual fetcher output for the ELB fixture bench's
 // acme-web-tg target group (2 healthy + 1 unhealthy/Target.FailedHealthChecks,
-// internal/demo/fixtures/elb.go's buildTargetHealth), so a RED failure here
+// core/demo/fixtures/elb.go's buildTargetHealth), so a RED failure here
 // indicts production code, not a test fixture.
 func fetchTargetHealthDemoResources(t *testing.T) []resource.Resource {
 	t.Helper()
@@ -109,7 +109,7 @@ func fetchTargetHealthDemoResources(t *testing.T) []resource.Resource {
 		t.Fatalf("FetchTargetHealth(acme-web-tg): unexpected error: %v", err)
 	}
 	if len(result.Resources) != 3 {
-		t.Fatalf("FetchTargetHealth(acme-web-tg): got %d resources, want 3 (2 healthy + 1 unhealthy) — demo fixture in internal/demo/fixtures/elb.go's buildTargetHealth changed shape, update this test's assumptions", len(result.Resources))
+		t.Fatalf("FetchTargetHealth(acme-web-tg): got %d resources, want 3 (2 healthy + 1 unhealthy) — demo fixture in core/demo/fixtures/elb.go's buildTargetHealth changed shape, update this test's assumptions", len(result.Resources))
 	}
 	return result.Resources
 }
@@ -120,7 +120,7 @@ func fetchTargetHealthDemoResources(t *testing.T) []resource.Resource {
 // Phrase names the cause (owner: "lowercase, names the cause, e.g. contains
 // 'health check'") — not silently drop the signal into Fields only.
 //
-// RED today: convertTargetHealth (internal/aws/tg_health.go) never appends to
+// RED today: convertTargetHealth (core/aws/tg_health.go) never appends to
 // Resource.Findings at all; every tg_health resource has Findings == nil
 // regardless of TargetHealth.State.
 func TestChildViewColorDoctrine_TGHealth_UnhealthyTargetCarriesWave1Finding(t *testing.T) {
@@ -169,12 +169,12 @@ func TestChildViewColorDoctrine_TGHealth_UnhealthyTargetCarriesWave1Finding(t *t
 // ScreenChildList (RegisterFallbackTypeDef + PushChildListScreen, exactly as
 // views.NewChildResourceList does for the live TUI), an unhealthy target row
 // must carry the broken/warning row color via the SAME render seam every
-// top-level list uses — internal/app/list_columns.go's
+// top-level list uses — core/app/list_columns.go's
 // resolveListDecoratorFull, which is td.ResolveColor(r) fed through
 // colorToTag into ListRow.Color, and IsIssue() fed into ListRow.Severity.
 // A healthy sibling row in the SAME child list must stay default/healthy.
 //
-// RED today: tg_health's ResourceTypeDef.Color is nil (internal/aws/
+// RED today: tg_health's ResourceTypeDef.Color is nil (core/aws/
 // catalog_networking.go's networkingChildTypes has no Color: entry for
 // tg_health), so ResolveColor falls back to colorFallback(r.Fields["status"])
 // — and Fields["status"] is never set by convertTargetHealth (only
@@ -228,7 +228,7 @@ func TestChildViewColorDoctrine_TGHealth_UnhealthyTargetRendersBrokenRow(t *test
 	}
 }
 
-// colorFromTag inverts internal/app/list_columns.go's colorToTag so this test
+// colorFromTag inverts core/app/list_columns.go's colorToTag so this test
 // can reuse domain.Color.IsIssue() on the string tag observed on ListRow.Color
 // without duplicating IsIssue's severity table. "" (colorToTag's fallthrough)
 // maps to ColorHealthy, matching colorToTag's own default branch.
@@ -358,8 +358,8 @@ var knownColorlessChildTypes = map[string]bool{
 // issue-severity FindingDef in its catalog Findings table, the type's Color
 // func must be non-nil (i.e. capable of deriving color from Findings at all
 // — ResolveColor's fallback path, colorFallback(Fields["status"]), never
-// consults Findings by construction, see internal/catalog/types.go and
-// internal/catalog/color_helpers.go).
+// consults Findings by construction, see core/catalog/types.go and
+// core/catalog/color_helpers.go).
 //
 // RATCHET semantics (identical contract to knownColorDivergence /
 // knownVisibilityGaps):

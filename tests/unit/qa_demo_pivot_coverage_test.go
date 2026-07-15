@@ -41,7 +41,7 @@
 //
 // RATCHET: at the time this test was written, s3's fixture graph was
 // disconnected for 9 of its registered pivots (a coder was rebuilding
-// internal/demo/fixtures/s3.go in parallel). That fix landed and s3 is now
+// core/demo/fixtures/s3.go in parallel). That fix landed and s3 is now
 // fully connected. Every OTHER disconnected pivot and issue-coverage gap
 // found at that time is pinned below in knownDisconnectedPivots /
 // knownIssueCoverageGaps — the documented burn-down backlog. The gate is a
@@ -93,7 +93,7 @@ import (
 // fixture graph could ever produce a witness, unlike s3's gap, which was a
 // fixable fixture problem. Rather than carry 20 permanent burn-down entries
 // that could never burn down, each checker and its RegisterRelated entry was
-// deleted outright (see internal/aws/catalog_dns_cdn.go, catalog_data.go,
+// deleted outright (see core/aws/catalog_dns_cdn.go, catalog_data.go,
 // catalog_networking.go, catalog_secrets.go). resource.GetRelated no longer
 // returns these TargetTypes for their owning types, so this loop never visits
 // their keys again — do not re-add them; a genuinely new structurally-

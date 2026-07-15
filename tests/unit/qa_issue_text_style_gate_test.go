@@ -25,7 +25,7 @@
 //     DetailRow, or a fetcher/materialize path that writes a raw
 //     Fields["status"] value which a Key-less, Path-based Status column
 //     then surfaces verbatim (see listExtractCellValue's title-match
-//     fallback in internal/app/list_columns.go — the humanize call only
+//     fallback in core/app/list_columns.go — the humanize call only
 //     guards the col.Key=="status" branch, not this fallback).
 //
 // EXEMPTIONS (isExemptStyleToken): a token matching the raw-enum shape
@@ -124,7 +124,7 @@ var awsAccessKeyIDPattern = regexp.MustCompile(`^A(KIA|SIA)[A-Z0-9]{12,}$`)
 // below was confirmed stale by reading current production source directly:
 //   - The 11 "rendered:<type>:prod-<type>-healthy:list-status" entries named
 //     resource IDs (prod-eks-healthy, prod-ng-healthy, prod-ecs-healthy, ...)
-//     that do not exist anywhere in internal/demo/ — dead keys that can never
+//     that do not exist anywhere in core/demo/ — dead keys that can never
 //     match a real subtest.
 //   - The 4 "rendered:*:detail-attention[0]" entries (cb, ecr, glue, sfn) and
 //     the 3 "phrase:*" entries (ecr.vulnerabilities, ses.account-shutdown,
@@ -406,8 +406,8 @@ func detailAttentionValuesFor(t *testing.T, res resource.Resource, shortName str
 // (e.g. sg's Risk column showing "WIDE_OPEN"/"PORTS:22" via
 // Fields["risk_summary"], or ng's Issues column showing
 // "EC2LaunchTemplateVersionMismatch,AutoScalingGroupInvalidConfiguration" via
-// Fields["health_issues"] — see internal/aws/sg.go computeSGRiskFields and
-// internal/aws/ng.go's issueCodes join). Unlike the Status/Attention gates,
+// Fields["health_issues"] — see core/aws/sg.go computeSGRiskFields and
+// core/aws/ng.go's issueCodes join). Unlike the Status/Attention gates,
 // a plain column has no domain.HumanizeStatusPhrase chokepoint at all today —
 // this is new coverage, not a re-check of an existing conversion point.
 // ---------------------------------------------------------------------------
@@ -574,8 +574,8 @@ func findWholeCellEnumViolation(cell, resourceID, resourceName string, col app.C
 // (or a follow-up PR) must fix. sg's Risk column ("WIDE_OPEN") and ng's
 // Status/Issues columns ("CREATE_FAILED", "InsufficientFreeAddresses") were
 // the two verified-RED violations this gate's extension was written to
-// catch (see internal/aws/sg.go's sgWideOpenPhrase/sgDangerousPortsPhrase
-// and internal/aws/ng.go's domain.HumanizeStatusPhrase(string(issue.Code))
+// catch (see core/aws/sg.go's sgWideOpenPhrase/sgDangerousPortsPhrase
+// and core/aws/ng.go's domain.HumanizeStatusPhrase(string(issue.Code))
 // fix) — neither entry below is that pair; both were already fixed at
 // write time and never needed allowlisting.
 var cellStyleGateAllowlist = map[string]string{
@@ -733,17 +733,17 @@ func isVacuousPhrase(text string) bool {
 // SEEDED 2026-07-07 (this gate's first run): four catalog FindingDef.Phrase
 // literals are the bare word "error"/"unhealthy" with no cause text at all —
 // all four are production-owned classifier literals
-// (internal/aws/ebs.go/ebs_snap state-error branches, ecs_task_codes.go's
+// (core/aws/ebs.go/ebs_snap state-error branches, ecs_task_codes.go's
 // health-unhealthy branch, efs.go's error branch), not test fixtures, so
 // fixing them is out of QA's write scope. Three of the four also surface on
 // the rendered list-status column via a real demo fixture (efs's "error"
 // finding never becomes the sole/first Finding on any current efs fixture,
 // so it produces no rendered hit today).
 var vacuousPhraseAllowlist = map[string]string{ //nolint:gochecknoglobals // burn-down allowlist, see doc comment
-	"phrase:ebs:ebs.state.error":                             "colorEBS's state=error branch (internal/aws/ebs.go) sets Phrase: \"error\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix (e.g. \"error: volume unusable\").",
-	"phrase:ebs-snap:ebs-snap.state.error":                   "colorEBSSnap's state=error branch (internal/aws/ebs.go) sets Phrase: \"error\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix.",
-	"phrase:ecs-task:ecs-task.health.unhealthy":              "ecsTaskStructuralFindings' health-check branch (internal/aws/ecs_task_codes.go) sets Phrase: \"unhealthy\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix (e.g. \"unhealthy: container health check failing\").",
-	"phrase:efs:efs.broken.error":                            "EFS's error branch (internal/aws/efs.go) sets Phrase: \"error\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix.",
+	"phrase:ebs:ebs.state.error":                             "colorEBS's state=error branch (core/aws/ebs.go) sets Phrase: \"error\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix (e.g. \"error: volume unusable\").",
+	"phrase:ebs-snap:ebs-snap.state.error":                   "colorEBSSnap's state=error branch (core/aws/ebs.go) sets Phrase: \"error\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix.",
+	"phrase:ecs-task:ecs-task.health.unhealthy":              "ecsTaskStructuralFindings' health-check branch (core/aws/ecs_task_codes.go) sets Phrase: \"unhealthy\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix (e.g. \"unhealthy: container health check failing\").",
+	"phrase:efs:efs.broken.error":                            "EFS's error branch (core/aws/efs.go) sets Phrase: \"error\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix.",
 	"rendered:ebs:vol-0error00000000b2:list-status":          "same production gap as phrase:ebs:ebs.state.error — the demo fixture's rendered list-status cell shows the bare literal verbatim; fixing the FindingDef.Phrase fixes this row too.",
 	"rendered:ebs-snap:snap-error000000000b:list-status":     "same production gap as phrase:ebs-snap:ebs-snap.state.error — the demo fixture's rendered list-status cell shows the bare literal verbatim; fixing the FindingDef.Phrase fixes this row too.",
 	"rendered:ecs-task:a7b8c9d0e1f2a7b8c9d0e1f2:list-status": "same production gap as phrase:ecs-task:ecs-task.health.unhealthy — the demo fixture's rendered list-status cell shows the bare literal verbatim; fixing the FindingDef.Phrase fixes this row too.",

@@ -2,7 +2,7 @@ package unit_test
 
 // aws_mwaa_related_test.go — related-resource checker tests for mwaa
 // (docs/resources/mwaa.md §2, docs/resources/mwaa-impl-plan.md §1
-// "related_targets"). Checkers live in internal/aws/mwaa_related.go.
+// "related_targets"). Checkers live in core/aws/mwaa_related.go.
 //
 // kms/logs/role/s3/sg/subnet are field-driven (read a field on the
 // Environment, no API call) — these are exercised against the REAL

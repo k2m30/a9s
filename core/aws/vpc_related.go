@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // vpc_related.go contains VPC related-resource checker functions.
 package aws
 

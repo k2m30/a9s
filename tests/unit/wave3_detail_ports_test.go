@@ -199,7 +199,7 @@ func TestWave3_FooterHints_Detail_NavigableFieldHint(t *testing.T) {
 // the real TUI key route (root tui.Model -> app_stack.go's Enter case) for a
 // navigable field, unlike TestWave3_FooterHints_Detail_NavigableFieldHint
 // above, which only proves the footer HINT text and never presses Enter.
-// internal/app/field_select_byid_test.go covers the controller/web seam but
+// core/app/field_select_byid_test.go covers the controller/web seam but
 // also never presses Enter through app_stack.go — no existing test drives
 // this dispatch, so this closes that gap (issue140_scenarios_golden_test.go's
 // citation is repointed to this test below).
@@ -1084,7 +1084,7 @@ func TestWave3_DetailFooterHints_PlainField_WithRelated(t *testing.T) {
 // PreservesCursorIdentity (round 4, specs/022-codebase-cleanup, item 7):
 // DetailModel.SetEnrichmentFinding/.fieldCursor/.fieldList are dead white-box
 // internals. The live equivalent mechanism is Controller.applyFindingToState's
-// FieldCursor delta-adjustment (internal/app/detail_state.go), already pinned
+// FieldCursor delta-adjustment (core/app/detail_state.go), already pinned
 // for the ADD direction by app_detail_attention_cursor_test.go's
 // TestApplyDetailFinding_CursorStaysOnSameFieldAcrossMixedSeverityAttentionSort
 // (same package — reuses its fieldRowAt helper). This ports the CLEAR/shrink

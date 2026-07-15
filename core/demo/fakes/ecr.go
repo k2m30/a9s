@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package fakes
 
 import (
@@ -57,7 +59,7 @@ func (f *ECRFake) ListImages(_ context.Context, input *ecr.ListImagesInput, _ ..
 
 // GetRepositoryPolicy returns fixture policy JSON for the requested
 // repository. checkECRRole now reduces the policy's Principal.AWS role ARNs
-// to bare RoleName before returning (internal/aws/ecr_related_extra.go), so
+// to bare RoleName before returning (core/aws/ecr_related_extra.go), so
 // the fixture policy's role resolves cleanly via FetchRolesByIDs.
 func (f *ECRFake) GetRepositoryPolicy(_ context.Context, input *ecr.GetRepositoryPolicyInput, _ ...func(*ecr.Options)) (*ecr.GetRepositoryPolicyOutput, error) {
 	var repoName string

@@ -3,8 +3,8 @@
 // while the main menu's cursor skips over dimmed (confirmed-empty) entries.
 // The two surfaces must behave identically.
 //
-// Menu-skip semantics (read from internal/app/menu.go:113-143,
-// menuSkipUnavailable, and internal/app/actions_nav.go's callers):
+// Menu-skip semantics (read from core/app/menu.go:113-143,
+// menuSkipUnavailable, and core/app/actions_nav.go's callers):
 //   - ActionMoveDown/Up move ms.Cursor by ±1, then menuSkipUnavailable scans
 //     forward in `direction` for the first entry where the item is NOT
 //     confirmed-empty (known && count==0 && !truncated is the skip
@@ -23,11 +23,11 @@
 //     (shared Enter/click-select path) blocks navigation because
 //     ms.Availability[key] is known, count==0, and not truncated.
 //
-// Dim predicate for the related panel (internal/app/detail_cursor.go:217,
+// Dim predicate for the related panel (core/app/detail_cursor.go:217,
 // isActionableDetailRow) delegates to the single shared predicate
 // resource.IsRelatedActionable(state, count, truncated) — the SAME
 // predicate buildDetailRelatedBlocks uses to set RelatedBlock.Actionable
-// (internal/app/detail_body.go:435). A row is dimmed (non-actionable) when:
+// (core/app/detail_body.go:435). A row is dimmed (non-actionable) when:
 // State is RelatedLoading or RelatedError, or State is RelatedResolved with
 // Count==0. It is actionable when State is RelatedDeferred or RelatedUnknown,
 // or State is RelatedResolved with Count>0 (or Truncated with Count>0).

@@ -116,10 +116,10 @@ func TestRowMarker_HiddenWhenIdentityColumnScrolledOff(t *testing.T) {
 // whether needle is visible, then toggles it back off (returning the
 // original model so callers can keep making assertions without ctrl+z
 // bleeding into later checks). Since the color-findings-conformance wave,
-// colorEC2 is colorFromAnyFinding-only (internal/aws/catalog_compute.go) —
+// colorEC2 is colorFromAnyFinding-only (core/aws/catalog_compute.go) —
 // once a SevBroken/SevWarn Finding is applied, resolveListDecoratorFull's
 // "! "/"~ " glyph prefix branch is skipped entirely (it only fires when
-// ResolveColor()==ColorHealthy; see internal/app/list_columns.go and
+// ResolveColor()==ColorHealthy; see core/app/list_columns.go and
 // .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
 // The renderer-agnostic, stronger check for "is this row an applied issue"
 // is ctrl+z survival, not the literal glyph text.

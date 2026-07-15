@@ -178,7 +178,7 @@ func TestDBISnap_Enricher_AutomatedPastRetention_BasicCase(t *testing.T) {
 	enricher := dbiSnapEnricher(t)
 
 	// "prod-dbi-retention-parent" is the value of fixtures.WarnDbiPastRetentionParentID
-	// (defined in internal/demo/fixtures/dbi.go by the coder). Using the literal here
+	// (defined in core/demo/fixtures/dbi.go by the coder). Using the literal here
 	// so this test does not create a circular compile dependency on an in-flight constant.
 	const parentID = "prod-dbi-retention-parent"
 	// Snapshot: automated, 30 days old, parent has 7-day retention.

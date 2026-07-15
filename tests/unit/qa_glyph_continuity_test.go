@@ -17,7 +17,7 @@
 //     test func for exactly what is and is not claimed.
 //
 //  2. Swap_MergesWave2ForWave1CarryingRows: applyResourcesLoaded's carry-
-//     forward (internal/app/list_body.go:80-89) only re-applies a prior
+//     forward (core/app/list_body.go:80-89) only re-applies a prior
 //     row's findings onto the incoming replacement when the incoming row
 //     itself carries ZERO findings (`if len(resources[i].Findings) > 0 {
 //     continue }`). A row that already has a fresh Wave-1 finding on the
@@ -29,8 +29,8 @@
 //     Controller.enrichmentStore for a resource type is NOT wiped by
 //     anything reachable from a profile/region rotation
 //     (MenuClearAvailabilityIntent only clears MenuState fields — see
-//     internal/app/intents.go's MenuClearAvailabilityIntent case; Session.
-//     Rotate in internal/session/session.go bumps gens but never touches
+//     core/app/intents.go's MenuClearAvailabilityIntent case; Session.
+//     Rotate in core/session/session.go bumps gens but never touches
 //     Controller.enrichmentStore). A stale enrichmentStore entry surviving
 //     a rotation would let a same-ID collision (or a reopened list of the
 //     same type) resurrect a dead profile's glyphs. RED at HEAD: nothing in
@@ -116,10 +116,10 @@ func hasDecoratorForID(ctrl *app.Controller, id string, want app.RowDecorator) b
 // TestRerunStart_KeepsVisibleFindingsUntilReplaced uses ctrl+z survival as
 // the "is this finding applied" check, not the literal "! " glyph text.
 // Since the color-findings-conformance wave, colorEC2 is
-// colorFromAnyFinding-only (internal/aws/catalog_compute.go) — once a
+// colorFromAnyFinding-only (core/aws/catalog_compute.go) — once a
 // SevBroken Finding is applied, resolveListDecoratorFull's glyph branch is
 // skipped entirely (only fires when ResolveColor()==ColorHealthy; see
-// internal/app/list_columns.go and
+// core/app/list_columns.go and
 // .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
 // isVisibleUnderCtrlZ (qa_enrichment_review_fixes_test.go) is the
 // renderer-agnostic, stronger replacement.
@@ -176,7 +176,7 @@ func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────
 
 // TestSwap_MergesWave2ForWave1CarryingRows pins the narrow gap in
-// applyResourcesLoaded's carry-forward (internal/app/list_body.go:80-89):
+// applyResourcesLoaded's carry-forward (core/app/list_body.go:80-89):
 // the guard `if len(resources[i].Findings) > 0 { continue }` treats ANY
 // non-zero incoming Findings as "already fresh, do not touch" — but a row
 // that legitimately carries a Wave-1 finding on the incoming side (e.g. a
@@ -254,9 +254,9 @@ func TestSwap_MergesWave2ForWave1CarryingRows(t *testing.T) {
 // (internal/tui constructs exactly one Controller for the process
 // lifetime — internal/tui/app.go's New() calls app.New(core) once).
 // MenuClearAvailabilityIntent (fired by both HandleProfileSelected and
-// HandleRegionSelected in internal/runtime/handlers.go) only clears
-// MenuState fields (internal/app/intents.go); nothing clears
-// Controller.enrichmentStore. Session.Rotate (internal/session/session.go)
+// HandleRegionSelected in core/runtime/handlers.go) only clears
+// MenuState fields (core/app/intents.go); nothing clears
+// Controller.enrichmentStore. Session.Rotate (core/session/session.go)
 // bumps generation counters but never reaches into the Controller.
 //
 // This test drives the closest Controller-observable analogue of a
@@ -285,7 +285,7 @@ func TestProfileSwitch_StillClearsFindings(t *testing.T) {
 
 	// Simulate the ONLY rotation-adjacent clear that production code actually
 	// fires: MenuClearAvailabilityIntent (menu-state only — see
-	// internal/app/intents.go). Then the new profile/region's list opens and
+	// core/app/intents.go). Then the new profile/region's list opens and
 	// re-fetches — an unrelated instance that happens to reuse the same
 	// resource ID (a real risk: EC2 instance IDs and other identifiers are
 	// not globally unique across accounts/regions).

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package config handles loading and parsing of view configuration from YAML files.
 package config
 

@@ -1,9 +1,9 @@
 // app_enrichment_menu_badge_test.go — RED pins for the missing menu-badge
-// sync-back on Controller.ApplyEnrichmentState (internal/app/list_filter.go).
+// sync-back on Controller.ApplyEnrichmentState (core/app/list_filter.go).
 //
 // Defect: visiting the s3 list in the WEB session runs Wave-2 enrichment and
 // flags rows, but after Escape back to the menu the s3 row shows no issue
-// badge. Root cause: applyEnrichmentState (internal/app/list_filter.go)
+// badge. Root cause: applyEnrichmentState (core/app/list_filter.go)
 // receives issueCount/truncated and stores per-resource findings for the
 // list, but discards issueCount (`_ = issueCount`) and never touches
 // MenuState.IssueCounts/IssueKnown/IssueTruncated. The web lane runs no
@@ -12,7 +12,7 @@
 // ONLY chance the menu badge has to learn the in-session Wave-2 result.
 //
 // The menu-sync semantics pinned here mirror the monotonic guard already
-// pinned for the sweep lane in syncExactTotalToMenu (internal/app/handle.go):
+// pinned for the sweep lane in syncExactTotalToMenu (core/app/handle.go):
 // only raise the count, set Known once any count is observed, and clear a
 // stale truncated flag once an equal-count exact (untruncated) observation
 // lands.
@@ -161,9 +161,9 @@ func TestApplyEnrichmentState_MenuBadge_ClearsTruncationAtEqualCount(t *testing.
 // internal/tui/views/resourcelist.go), but the menu-sync chokepoint must
 // still resolve an alias variant to the canonical key, mirroring
 // handleResourcesLoadedEvent's "Resolve canonical short name (handles
-// aliases like ...)" step (internal/app/handle.go) and menuActiveKey's own
-// alias-resolution contract (internal/app/menu.go). "workgroups" is a real,
-// registered alias of the "athena" resource type (internal/aws/catalog_data.go).
+// aliases like ...)" step (core/app/handle.go) and menuActiveKey's own
+// alias-resolution contract (core/app/menu.go). "workgroups" is a real,
+// registered alias of the "athena" resource type (core/aws/catalog_data.go).
 func TestApplyEnrichmentState_MenuBadge_CanonicalizesAlias(t *testing.T) {
 	c := newEnrichmentMenuBadgeController(t)
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package fixtures provides ElastiCache Redis fixture data.
 // This is the single-source fixture file for the redis resource type.
 // Both ./a9s --demo and the unit test suite import from here.

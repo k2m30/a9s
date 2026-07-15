@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package views — RightColumnModel renders the RELATED panel in the detail view.
 package views
 

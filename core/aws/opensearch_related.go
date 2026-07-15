@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // opensearch_related.go contains OpenSearch Domain related-resource checker functions.
 package aws
 

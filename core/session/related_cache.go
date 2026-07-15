@@ -1,10 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // related_cache.go — LRU cache for related-resource check results.
 //
 // The bounded LRU and the per-row payload type live here because
 // session.Session owns the cache instance (RelatedCacheLRU field). The
-// RelatedCacheKey / RelatedCacheReplay free helpers live in internal/runtime
+// RelatedCacheKey / RelatedCacheReplay free helpers live in core/runtime
 // so renderer adapters can resolve cache keys without importing
-// internal/session; tests and runtime code reach them via
+// core/session; tests and runtime code reach them via
 // runtime.RelatedCacheKey / runtime.RelatedCacheReplay. There is no
 // session-side re-export, so the two copies can never drift.
 package session

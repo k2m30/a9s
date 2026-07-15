@@ -403,7 +403,7 @@
 
     // "enter"-registered child views (tg_health, s3 objects, lambda
     // invocations, …) advertise themselves via a footer hint with key
-    // "enter" (internal/app's buildListFooterHints), the same footer the e/L/s
+    // "enter" (core/app's buildListFooterHints), the same footer the e/L/s
     // hints above come from. Mirror the TUI's precedence (resourcelist.go:
     // handleChildKey("enter", …) is tried before the row opens its detail):
     // on a list screen with a registered enter-child hint, Enter opens it;

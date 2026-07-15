@@ -5,7 +5,7 @@ package unit_test
 //
 // This is the most visible regression risk in PR-01: ct-events detail is the only
 // resource type that already had a custom rendering path. The move from
-// internal/aws/ctdetail/ to internal/semantics/ctevent/ plus the wrapper to
+// core/aws/ctdetail/ to core/semantics/ctevent/ plus the wrapper to
 // []domain.Section must not change a single byte of rendered output for any
 // ct-event fixture.
 //

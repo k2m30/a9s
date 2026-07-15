@@ -3,7 +3,7 @@ package unit
 // qa_ami_fetch_by_ids_deprecated_test.go — Regression pin for FetchAMIsByIDs
 // including deprecated AMIs (Group I).
 //
-// Contract (internal/aws/ami.go:96-99):
+// Contract (core/aws/ami.go:96-99):
 //   FetchAMIsByIDs must pass IncludeDeprecated=true in the DescribeImages call.
 //   Without this flag, deprecated AMIs silently vanish from batch lookups — a
 //   drill from a related-panel pivot (ec2→ami, asg→ami) that references a

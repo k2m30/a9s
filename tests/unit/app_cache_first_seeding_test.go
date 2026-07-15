@@ -17,8 +17,8 @@
 // AMBIGUITY RESOLUTIONS (stated, not deferred):
 //   - Seeding source: driven via core.Session().RowStore.Observe(type, rows,
 //     ..., session.OriginProbe, false) directly. Session() and RowStore are
-//     already public/exported today (internal/runtime.Core.Session,
-//     internal/session.Session.RowStore) — only the NEW ListBody.Refreshing
+//     already public/exported today (core/runtime.Core.Session,
+//     core/session.Session.RowStore) — only the NEW ListBody.Refreshing
 //     field and the seed-on-open behavior are red.
 //   - List-open trigger: app.Action{Kind: app.ActionCommand, Arg: shortName}
 //     is the existing, precedented list-open path (see

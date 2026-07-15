@@ -844,7 +844,7 @@ AWS API: <https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapsh
 > Note: `dbc` is intentionally absent. Real AWS rejects `CreateDBSnapshot` on
 > Aurora cluster members; Aurora cluster snapshots live in `dbc-snap`
 > (`DBClusterSnapshot`). A registered `dbi-snap → dbc` pivot would always
-> resolve `Count=0`, which is dead UX. See `internal/aws/dbi_snap.go` for the
+> resolve `Count=0`, which is dead UX. See `core/aws/dbi_snap.go` for the
 > structural exclusion comment.
 
 ### `redis`

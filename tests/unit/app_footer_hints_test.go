@@ -1,7 +1,7 @@
 // app_footer_hints_test.go — TDD red-phase pin for Finding C: footer hints
 // must be renderer-mode-aware.
 //
-// New contract (internal/app/viewstate.go): MenuFooterHints() is replaced by
+// New contract (core/app/viewstate.go): MenuFooterHints() is replaced by
 //
 //	func MenuFooterHintsFor(mode string) []KeyHint
 //
@@ -14,7 +14,7 @@
 //   - web (mode == "web")                    -> {ctrl+z Issues only, R Refresh}
 //
 // This function does not exist yet on the `app` package — every test in this
-// file fails to COMPILE until internal/app/viewstate.go defines
+// file fails to COMPILE until core/app/viewstate.go defines
 // MenuFooterHintsFor. That compile failure is the expected red-phase signal.
 package unit_test
 

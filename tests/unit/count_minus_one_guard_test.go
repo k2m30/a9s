@@ -1,7 +1,7 @@
 package unit
 
 // count_minus_one_guard_test.go — originally an AST-based guard ensuring that
-// raw `Count: -1` struct literals in internal/aws/*_related*.go only appeared
+// raw `Count: -1` struct literals in core/aws/*_related*.go only appeared
 // in legitimately-guarded positions (nil checks, error checks, type-assertion
 // failures, or FetchFilter-navigation paths); any `Count: -1` NOT inside one
 // of those guards was the anti-pattern purged in Batch B.
@@ -12,7 +12,7 @@ package unit
 // LoadingRelated) — there are no more `RelatedCheckResult{Count: -1}`
 // literals left in production code to scan for. The AST guard this file used
 // to carry (TestNoCountMinusOneInReverseScanCheckers, scoped narrowly to
-// truncated-condition Count:-1 in internal/aws/*_related*.go) is fully
+// truncated-condition Count:-1 in core/aws/*_related*.go) is fully
 // subsumed by the comprehensive gate in qa_related_state_no_sentinel_gate_test.go,
 // which scans ALL of internal/ for a negative Count/count literal on any of
 // the four related result/row types (RelatedCheckResult / DetailRelatedRow /

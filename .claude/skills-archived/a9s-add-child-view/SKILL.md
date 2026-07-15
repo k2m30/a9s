@@ -25,7 +25,7 @@ The main session reads the design spec and parent fetcher, then produces **two s
 
 ### Scoping must determine:
 
-1. **Parent analysis** — read `internal/aws/{parent}.go`:
+1. **Parent analysis** — read `core/aws/{parent}.go`:
    - What is `Resource.ID`? (often a name, NOT an ARN)
    - What Fields keys exist? Does the parent store the ARN? If not, add it.
    - Which `ServiceClients` field is needed? Already exists?
@@ -67,24 +67,24 @@ DETAIL PATHS:
 
 ### CODER TASK:
 Files to create:
-  internal/aws/{child_type}.go — child fetcher + init() with RegisterChildType/RegisterPaginatedChild/RegisterFieldKeys
+  core/aws/{child_type}.go — child fetcher + init() with RegisterChildType/RegisterPaginatedChild/RegisterFieldKeys
 Files to modify:
-  internal/aws/{service}_interfaces.go — append {InterfaceName} narrow interface AND embed it on the aggregate {Service}API in the same file
+  core/aws/{service}_interfaces.go — append {InterfaceName} narrow interface AND embed it on the aggregate {Service}API in the same file
     Append point: after last narrow interface, before the aggregate {Service}API
-  internal/resource/types.go — add Children to {parent}, add {ChildType}Columns()
+  core/resource/types.go — add Children to {parent}, add {ChildType}Columns()
     Append point: grep "{parent_shortname}" in resourceTypes
-  internal/config/defaults.go — add "{child_shortname}" entry
+  core/config/defaults.go — add "{child_shortname}" entry
     Append point: last entry in defaultViews.Views map
   .a9s/views/{child_shortname}.yaml — regenerate via viewsgen
   cmd/refgen/main.go — append entry (if SDK struct)
     Append point: last entry in resources slice
-  internal/demo/fixtures/<service>.go — add child fixture data to the parent service's fixture file
+  core/demo/fixtures/<service>.go — add child fixture data to the parent service's fixture file
     Append point: last fixture builder function in the service file
-  internal/demo/fakes/<service>.go — extend the fake to serve the child data
+  core/demo/fakes/<service>.go — extend the fake to serve the child data
     Append point: last method on the fake struct
 Context files (read-only):
-  internal/aws/{parent}.go — parent fetcher for ContextKeys verification
-  internal/aws/ec2.go — canonical example
+  core/aws/{parent}.go — parent fetcher for ContextKeys verification
+  core/aws/ec2.go — canonical example
 
 ### QA TASK:
 Test files to create:
@@ -110,8 +110,8 @@ What to test:
   - Nil fields: no panic
   - Parent context: verify correct key used
 Context files (read-only):
-  internal/aws/{service}_interfaces.go — interface definition (after coder adds it)
-  internal/resource/types.go — column keys
+  core/aws/{service}_interfaces.go — interface definition (after coder adds it)
+  core/resource/types.go — column keys
 ```
 
 ## Phase 2: Tests (a9s-qa agent)
@@ -153,16 +153,16 @@ The coder receives the scoped coder task and makes all tests pass.
 
 ### Checklist (order matters):
 
-**1. Interface:** `internal/aws/<service>_interfaces.go` (APPEND to the service's per-service file; also embed on the aggregate `<Service>API` in the same file)
+**1. Interface:** `core/aws/<service>_interfaces.go` (APPEND to the service's per-service file; also embed on the aggregate `<Service>API` in the same file)
 ```go
 type {InterfaceName} interface {
     {APICall}(ctx context.Context, params *{service}.{APICall}Input, optFns ...func(*{service}.Options)) (*{service}.{APICall}Output, error)
 }
 ```
 
-**2. Client field** (IF new service): `internal/aws/client.go`
+**2. Client field** (IF new service): `core/aws/client.go`
 
-**3. Child fetcher:** `internal/aws/{child_type}.go` (CREATE)
+**3. Child fetcher:** `core/aws/{child_type}.go` (CREATE)
 - `init()` registers: `RegisterFieldKeys`, `RegisterPaginatedChild`, `RegisterChildType`
 - Fetcher function with proper formatting:
   - Timestamps: `formatEpochMillis(*field)` — NEVER `fmt.Sprintf("%d", *field)`
@@ -171,12 +171,12 @@ type {InterfaceName} interface {
 - For paginated APIs: cap at reasonable limit (e.g., `const maxResults = 500`)
 - Column function returns `[]resource.Column` with proper widths
 
-**4. Parent wiring:** `internal/resource/types.go` (EDIT)
+**4. Parent wiring:** `core/resource/types.go` (EDIT)
 - Add/append `Children` on parent type
 - Add column function
 - **ContextKeys must map to actual data** — if API needs ARN, use Fields key that has ARN
 
-**5. Config:** `internal/config/defaults.go` (ADD)
+**5. Config:** `core/config/defaults.go` (ADD)
 - List columns: use `Key:` for computed fields, `Path:` only for string SDK fields
 - Detail paths: include all relevant fields
 
@@ -188,10 +188,10 @@ type {InterfaceName} interface {
 
 **8. Demo fixtures:**
 
-**Hybrid fixture pattern (014-demo-transport-mock).** Demo mode has two layers: the legacy HTTP transport (`internal/demo/transport.go` + `handlers.go`) is the base for all services, and per-service typed fakes (`internal/demo/fakes/<service>.go`) override individual services. Currently only EC2 uses a typed fake.
+**Hybrid fixture pattern (014-demo-transport-mock).** Demo mode has two layers: the legacy HTTP transport (`core/demo/transport.go` + `handlers.go`) is the base for all services, and per-service typed fakes (`core/demo/fakes/<service>.go`) override individual services. Currently only EC2 uses a typed fake.
 
-- **Preferred (migrated services):** add fixture data to `internal/demo/fixtures/<service>.go` and extend the matching fake in `internal/demo/fakes/<service>.go`.
-- **Legacy (non-migrated services):** add fixture data to the matching `internal/demo/fixtures_*.go` category file and (if needed) extend handlers in `internal/demo/handlers.go`.
+- **Preferred (migrated services):** add fixture data to `core/demo/fixtures/<service>.go` and extend the matching fake in `core/demo/fakes/<service>.go`.
+- **Legacy (non-migrated services):** add fixture data to the matching `core/demo/fixtures_*.go` category file and (if needed) extend handlers in `core/demo/handlers.go`.
 
 When adding a new child view, match the parent service's current layer. Do not mix layers for the same service.
 
@@ -253,6 +253,6 @@ go run ./cmd/refgen/ > .a9s/views_reference.yaml    # if SDK struct added to ref
 
 8. **Deprecated AWS fields** — `StoredBytes` on LogStream is deprecated (always 0). Check AWS docs before adding fields.
 
-9. **formatBytes/formatFloat are shared utilities** in `internal/aws/log_streams.go` — reuse them, never delete.
+9. **formatBytes/formatFloat are shared utilities** in `core/aws/log_streams.go` — reuse them, never delete.
 
 10. **Sort by age** — `getAgeField` matches field keys containing: time, date, launch, creation, event, start, timestamp. Name new time fields accordingly.

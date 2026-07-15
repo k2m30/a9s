@@ -28,7 +28,7 @@ import (
 //
 // AWS docs (CodePipeline resource ARN format): a pipeline's ARN is
 // arn:aws:codepipeline:<region>:<account>:<pipelineName> — there is NO
-// "pipeline/" segment (unlike, e.g., IAM policy ARNs). internal/aws/pipeline.go
+// "pipeline/" segment (unlike, e.g., IAM policy ARNs). core/aws/pipeline.go
 // (fetchCodePipelinesPage, ~line 99) currently constructs
 // arn:aws:codepipeline:<region>:<account>:pipeline/<name>, which is wrong.
 // This test drives the real production fetch path
@@ -73,7 +73,7 @@ func TestPipeline_Fetch_ArnHasNoPipelineSegment(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Finding 2 — cold-cache Lambda triggers must not report a definitive zero.
 //
-// internal/aws/related_common.go (lambdaEventSourceMappingLambdaCheck,
+// core/aws/related_common.go (lambdaEventSourceMappingLambdaCheck,
 // ~lines 150-154): when lambda:ListEventSourceMappings returns a mapping but
 // the lambda ResourceCache entry is not loaded ("cache[\"lambda\"]" absent),
 // the checker returns RelatedCheckResult{TargetType:"lambda"} — Count:0,
@@ -186,7 +186,7 @@ func TestMSK_Related_Lambda_ColdCache_NotDefinitiveZero(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Finding 3 — GetVpcLinks pagination.
 //
-// internal/aws/apigw_related.go (checkApigwELB, ~line 390) calls
+// core/aws/apigw_related.go (checkApigwELB, ~line 390) calls
 // apigatewayv2:GetVpcLinks exactly once with an empty input, ignoring
 // NextToken. GetVpcLinksOutput.NextToken (AWS SDK Go v2 apigatewayv2 API)
 // means the wanted VpcLink can be on any page — a single-page read misses

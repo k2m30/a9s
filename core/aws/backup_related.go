@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // backup_related.go contains AWS Backup related-resource checker functions.
 package aws
 

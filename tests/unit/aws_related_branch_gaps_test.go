@@ -2,13 +2,13 @@ package unit_test
 
 // aws_related_branch_gaps_test.go closes branch-coverage gaps on checkers
 // that already execute in the suite but have <70% branch coverage:
-//   - checkASGSG            internal/aws/asg_related_extra.go:81  (50.0%)
-//   - checkCbSecrets        internal/aws/cb_related.go:309        (68.4%)
-//   - checkDbcSnapVPC       internal/aws/dbc_snap_related.go:83   (66.7%)
-//   - checkEIPECSTask       internal/aws/eip_related.go:233       (63.6%)
-//   - checkEIPECSSvc        internal/aws/eip_related.go:254       (64.7%)
-//   - checkEIPECS           internal/aws/eip_related.go:283       (64.7%)
-//   - checkVPCELogs         internal/aws/vpce_related.go:149      (66.7%)
+//   - checkASGSG            core/aws/asg_related_extra.go:81  (50.0%)
+//   - checkCbSecrets        core/aws/cb_related.go:309        (68.4%)
+//   - checkDbcSnapVPC       core/aws/dbc_snap_related.go:83   (66.7%)
+//   - checkEIPECSTask       core/aws/eip_related.go:233       (63.6%)
+//   - checkEIPECSSvc        core/aws/eip_related.go:254       (64.7%)
+//   - checkEIPECS           core/aws/eip_related.go:283       (64.7%)
+//   - checkVPCELogs         core/aws/vpce_related.go:149      (66.7%)
 //
 // Pins existing behavior (these are GREEN on write, not RED regressions).
 
@@ -32,7 +32,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// checkASGSG (internal/aws/asg_related_extra.go:81) — 50.0% branch coverage.
+// checkASGSG (core/aws/asg_related_extra.go:81) — 50.0% branch coverage.
 // No prior test in the suite invokes asgCheckerByTarget(t, "sg") at all.
 // Branches: wrong RawStruct(-1); nil/non-*ServiceClients clients(-1);
 // LaunchConfigurationName set -> DescribeLaunchConfigurations path (success,
@@ -263,7 +263,7 @@ func TestRelated_ASGSG_LaunchTemplateVersionsError(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkCbSecrets (internal/aws/cb_related.go:309) — 68.4% branch coverage.
+// checkCbSecrets (core/aws/cb_related.go:309) — 68.4% branch coverage.
 // Existing tests only cover a plain (non-ARN) secret name and the "no
 // SECRETS_MANAGER vars" case. Uncovered: wrong RawStruct(-1); nil
 // Environment(0); ARN-form values with ":secret:" segment (with and without
@@ -363,7 +363,7 @@ func TestRelated_CbSecrets_NilValueSkipped(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkDbcSnapVPC (internal/aws/dbc_snap_related.go:83) — 66.7% branch coverage.
+// checkDbcSnapVPC (core/aws/dbc_snap_related.go:83) — 66.7% branch coverage.
 // Existing tests (qa_related_field_extraction_test.go) cover only the
 // docdbtypes.DBClusterSnapshot branch (with and without VpcId) and the
 // no-RawStruct fallthrough. The rdstypes.DBClusterSnapshot branch (with and
@@ -400,7 +400,7 @@ func TestRelated_DbcSnapVPC_RDSType_NilVpcID_ReturnsZero(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkEIPECSTask / checkEIPECSSvc / checkEIPECS (internal/aws/eip_related.go)
+// checkEIPECSTask / checkEIPECSSvc / checkEIPECS (core/aws/eip_related.go)
 // Existing tests cover only the empty-EIP-ID (Count 0) and no-ENI (Count 0)
 // early returns. Uncovered: eipMatchingECSTask error propagation (-1, Err
 // set); truncated-cache no-match (TruncatedResult); a genuine match resolving
@@ -597,7 +597,7 @@ func TestRelated_EIPECS_MatchedTaskNilClusterArn_ReturnsZero(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkVPCELogs (internal/aws/vpce_related.go:149) — 66.7% branch coverage.
+// checkVPCELogs (core/aws/vpce_related.go:149) — 66.7% branch coverage.
 // Existing tests cover nil-clients(-1) and empty-ID(0). Uncovered: the
 // success path (LogGroupName direct hit; LogDestination ARN parsing via
 // ":log-group:" segment with and without a trailing colon; dedup by name)

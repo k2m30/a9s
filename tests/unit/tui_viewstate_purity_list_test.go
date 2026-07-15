@@ -283,7 +283,7 @@ func TestViewStatePurity_List_MarkerColSelectsPrefixedColumn(t *testing.T) {
 // so RenderList can consume the status-column index instead of re-resolving
 // it via the lifecycleColumnKey/title-fallback cascade at resourcelist.go
 // ~line 594-617. This test references body.StatusCol, which does not compile
-// against the current app.ListBody struct (internal/app/viewstate.go ~line
+// against the current app.ListBody struct (core/app/viewstate.go ~line
 // 137-156 has no StatusCol field). This is INTENTIONAL compile-red: the
 // architect must add the field before this file compiles.
 //

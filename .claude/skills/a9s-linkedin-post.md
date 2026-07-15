@@ -181,7 +181,7 @@ go test -tags integration ./tests/integration/ -run TestLinkedInPostScenario -co
 
 **If anything is missing or broken:**
 
-1. Fix fixtures in `internal/demo/fixtures/` — add missing data, fix format mismatches
+1. Fix fixtures in `core/demo/fixtures/` — add missing data, fix format mismatches
 2. Rebuild: `make build`
 3. Re-run the scenario test to confirm the fix
 4. Document what you fixed in the Step 7 report

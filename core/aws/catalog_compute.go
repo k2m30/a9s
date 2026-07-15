@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package aws
 
 import (
@@ -318,7 +320,7 @@ func ec2StatusCheckTier(status string) string {
 
 // CostExplorerServiceNameEC2 is the exact Cost Explorer SERVICE dimension
 // value EC2's billed usage is reported under. Exported so the demo fixture
-// dataset (internal/demo/fixtures/costs.go's CostsResourceRowsByService) can
+// dataset (core/demo/fixtures/costs.go's CostsResourceRowsByService) can
 // key off the same symbol as the catalog entry below, instead of a
 // duplicated string literal that could silently drift.
 const CostExplorerServiceNameEC2 = "Amazon Elastic Compute Cloud - Compute"

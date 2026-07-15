@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // lambda_related_extra.go contains additional Lambda related-resource
 // checkers required by docs/related-resources.md beyond the core set in
 // lambda_related.go. Most are reverse-cache-scans (target cache → Lambda ARN

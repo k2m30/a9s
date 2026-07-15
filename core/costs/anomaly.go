@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package costs
 
 // AnomalyMark is one CE cost anomaly overlaid on grid cells that fall

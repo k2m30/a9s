@@ -365,7 +365,7 @@ func TestWiring_ClientsReady_DemoMode_NoCache_SkipsAvailability(t *testing.T) {
 // AvailTotal with the queue NOT yet empty (each message that finds
 // len(AvailQueue)>0 dequeues one more and returns before reaching the
 // ClearFlash branch — see handleAvailabilityChecked's queue-then-total
-// check order in internal/runtime/handlers_availability.go) — one message
+// check order in core/runtime/handlers_availability.go) — one message
 // short of ever emitting ClearFlash. Sending ClientsReady first (dequeuing
 // 4) restores the real production sequence: the cache-loaded handler
 // dispatches nothing, ClientsReady dequeues 4, and exactly

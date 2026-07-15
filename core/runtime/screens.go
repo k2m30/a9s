@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package runtime owns the platform-agnostic app core: session ownership,
 // app-core dispatch, fetcher invocation, selectors, queries, tasks, and
 // generation stamping. It MUST NOT import Bubble Tea, Lipgloss, Bubbles, or
@@ -57,7 +59,7 @@ const (
 	ScreenErrorLog ScreenID = "error-log"
 
 	// ScreenCosts is the Cost Explorer grid screen pushed by
-	// NavigateKindPushCosts. CostsState (internal/app) holds the drill
+	// NavigateKindPushCosts. CostsState (core/app) holds the drill
 	// stack, pivot, metric, and session API-call counter.
 	ScreenCosts ScreenID = "costs"
 )

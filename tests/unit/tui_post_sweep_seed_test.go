@@ -1,7 +1,7 @@
 // tui_post_sweep_seed_test.go — RED regression tests for DEF-15 (C1
 // systemic follow-on to DEF-12).
 //
-// Root cause: handleEnrichmentChecked (internal/runtime/handlers_availability.go,
+// Root cause: handleEnrichmentChecked (core/runtime/handlers_availability.go,
 // "All enrichment done" branch, ~L494-507) nils c.session.ProbeResources /
 // c.session.ProbeTruncated once Wave-2 enrichment completes (EnrichChecked >=
 // EnrichTotal), AFTER snapshotting them for the cache save. HandleNavigate's
@@ -492,7 +492,7 @@ func TestPairSwitch_PostSweep_NoStaleSeed(t *testing.T) {
 // this session must NOT fall back to stale disk-store rows.
 //
 // Storage-shape finding (dispatch item 3): handleAvailabilityChecked
-// (internal/runtime/handlers_availability.go L233-274) stores into
+// (core/runtime/handlers_availability.go L233-274) stores into
 // session.ProbeResources[canonType] whenever "msg.Err == nil ||
 // len(msg.Resources) > 0" (L240). For a genuinely-empty type the live probe
 // sends Err=nil, Resources=nil/empty, HasResources=false, Count=0 — Err==nil

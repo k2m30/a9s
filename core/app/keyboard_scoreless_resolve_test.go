@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // keyboard_scoreless_resolve_test.go — regression pin: a truncated "(0+)"
 // related row navigates to a SCOPED list exactly like "(N+)". It is a lower
 // bound, not a dead end: pressing Enter opens the target list seeded with the

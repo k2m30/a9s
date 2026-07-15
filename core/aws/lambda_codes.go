@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // lambda_codes.go — canonical FindingCode constants for the lambda resource type.
 // The fetcher writes Findings using these codes; the
 // lambda Color func reads wave1 Findings (Source == "wave1") to color rows.

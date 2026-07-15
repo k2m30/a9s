@@ -4,7 +4,7 @@
 // dead-end (e.g. "EBS Volumes (0)" on a KMS key detail). The existing skip
 // logic (detailSkipUnselectableRelated, see app_related_cursor_skip_test.go)
 // only runs on movement actions (MoveUp/Down/Top/Bottom) — ActionToggleFocus
-// (internal/app/detail_cursor.go:162-168, the Tab handler) does nothing but
+// (core/app/detail_cursor.go:162-168, the Tab handler) does nothing but
 // flip ds.RelatedFocus, so RelatedCursor is left wherever it last was
 // (typically 0, its zero value) with no skip applied.
 //

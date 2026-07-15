@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // costs.go — Cost Explorer grid renderer (RenderCosts). Thin per
 // CostsBody's doc comment: every amount, delta bucket, and open-period
-// marker is pre-resolved by internal/app.buildCostsBody; this file only
+// marker is pre-resolved by core/app.buildCostsBody; this file only
 // lays out and colors what it is given — no grid math, no aggregation.
 package views
 

@@ -2,7 +2,7 @@ package unit
 
 // bug_cfn_key_collision_test.go — Test revealing the CFN key collision bug.
 //
-// Bug: internal/resource/types_cicd.go:19 defines the cfn_resources ChildViewDef
+// Bug: core/resource/types_cicd.go:19 defines the cfn_resources ChildViewDef
 // with Key: "r" (lowercase). keys.go:108 also binds ToggleRelated to "r".
 // Both bindings fire on the same key, causing silent shadowing on CFN detail views.
 //

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // trail_related.go contains CloudTrail trail related-resource checker functions.
 package aws
 

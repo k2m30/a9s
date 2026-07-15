@@ -134,7 +134,7 @@ func TestResourceTypeDef_AllHaveNavigableFields(t *testing.T) {
 			continue
 		}
 		t.Errorf("resource type %q has 0 NavigableFields and is not in the allow-list — "+
-			"add SetNavigableFieldsForTest in internal/aws/<type>.go init() or document "+
+			"add SetNavigableFieldsForTest in core/aws/<type>.go init() or document "+
 			"why this type needs no navigable fields in noNavFieldsAllowList", td.ShortName)
 	}
 }

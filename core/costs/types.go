@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package costs is the pure domain layer for the Cost Explorer feature:
 // query/record/period types, cache-key derivation, grid aggregation, and
-// drill-chain rules consumed by internal/aws (SDK mapping) and internal/app
+// drill-chain rules consumed by core/aws (SDK mapping) and core/app
 // (view-state assembly). No AWS SDK or TUI imports — see
 // specs/021-cost-explorer/data-model.md for the full contract.
 package costs
@@ -129,7 +131,7 @@ const dateLayout = "2006-01-02"
 
 // ParseDate parses s as a9s's period-boundary date format. The single point
 // every date-only Period.Start/End string in this package (and
-// internal/app's costs consumers) is parsed through, so a layout change
+// core/app's costs consumers) is parsed through, so a layout change
 // only ever touches dateLayout.
 func ParseDate(s string) (time.Time, error) {
 	return time.Parse(dateLayout, s)
@@ -162,7 +164,7 @@ type Record struct {
 // Filter is a normalized subset of the CE Expression tree sufficient for
 // this feature: AND of dimension equals-any-of clauses, plus AND of
 // dimension not-equals-any-of clauses (mapped to CE Not{Dimensions{...}}
-// by internal/aws.buildFilterExpression).
+// by core/aws.buildFilterExpression).
 type Filter struct {
 	Equals    map[Dimension][]string `yaml:"eq,omitempty"`
 	NotEquals map[Dimension][]string `yaml:"neq,omitempty"`
@@ -201,7 +203,7 @@ func (q Query) CacheKey() string {
 
 // Identity returns the deterministic identity of ONE fetch request: its
 // result shape (CacheKey) plus the exact period range requested. THE single
-// source both ensureCostsShapeFetched's TaskKey.Scope (internal/app/
+// source both ensureCostsShapeFetched's TaskKey.Scope (core/app/
 // costs_state.go — distinct fetch shapes/ranges must get distinct TaskKeys,
 // or the web transport's in-flight dedup silently drops the second one) and
 // ApplyCostsLoaded's awaited-result matching consume, rather than each

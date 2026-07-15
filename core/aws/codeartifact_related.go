@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // codeartifact_related.go contains CodeArtifact repository related-resource checker functions.
 //
 // CodeArtifact RepositorySummary carries only Name, AdministratorAccount,

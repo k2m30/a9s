@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package domain
 
 // HelpContext identifies which screen opened the help overlay so the
@@ -62,7 +64,7 @@ func commandsSection() HelpSection {
 //
 // This is the single source of the help-overlay key/description content: the
 // TUI's internal/tui/views/help.go renders these sections directly, and
-// internal/app/snapshot.go's buildHelpBody consumes the same table for the
+// core/app/snapshot.go's buildHelpBody consumes the same table for the
 // web renderer's HelpBody. Do not re-list these bindings anywhere else.
 func HelpGroupsFor(ctx HelpContext, toggleAttentionKey string) []HelpSection {
 	switch ctx {

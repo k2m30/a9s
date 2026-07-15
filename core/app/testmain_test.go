@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package app_test
 
 import (
@@ -8,7 +10,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestMain installs the AWS catalog before any internal/app test runs.
+// TestMain installs the AWS catalog before any core/app test runs.
 // See tests/unit/testmain_test.go for the rationale, including the
 // hermetic A9S_CONFIG_FOLDER default applied below.
 func TestMain(m *testing.M) {

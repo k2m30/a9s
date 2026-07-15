@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // redis_related.go contains ElastiCache Redis related-resource checker functions.
 // The resource row represents a single elasticachetypes.ReplicationGroup (list API:
 // DescribeReplicationGroups). Checkers that need fields only on individual member

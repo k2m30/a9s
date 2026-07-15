@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package runtime
 
 // handlers_availability.go — app-core availability + Wave-2 enrichment handlers.

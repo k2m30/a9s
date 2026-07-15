@@ -87,7 +87,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 
 ## Interfaces
 
-- [ ] AWS service interfaces are single-method, defined in the per-service file `internal/aws/<service>_interfaces.go` (one file per AWS service; `interfaces.go` itself holds only the package doc)
+- [ ] AWS service interfaces are single-method, defined in the per-service file `core/aws/<service>_interfaces.go` (one file per AWS service; `interfaces.go` itself holds only the package doc)
 - [ ] Each interface wraps exactly one SDK operation (e.g., `EC2DescribeInstancesAPI`)
 - [ ] Functions return concrete types, accept interfaces
 - [ ] The `View` interface in `views/view.go` is the only view-level interface
@@ -144,7 +144,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ## Message Contracts
 
 - [ ] Messages are data-only structs — no methods, no behavior
-- [ ] Messages defined in `internal/runtime/messages/` (`cmd.go` + `event.go`) with zero upward imports
+- [ ] Messages defined in `core/runtime/messages/` (`cmd.go` + `event.go`) with zero upward imports
 - [ ] `NavigateMsg` carries a `ViewTarget` enum + optional resource/type data
 - [ ] `PopViewMsg` is an empty struct — the root model handles stack manipulation
 - [ ] Flash messages use a generation counter to prevent stale clears
@@ -163,12 +163,12 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 
 ## AWS Resource Types
 
-- [ ] Each resource type has a `ResourceTypeDef` in `internal/resource/types.go`
+- [ ] Each resource type has a `ResourceTypeDef` in `core/resource/types.go`
 - [ ] Each fetcher registered via `resource.RegisterPaginated()` in an `init()` function
 - [ ] Fetcher signature is `func(ctx context.Context, clients interface{}, continuationToken string) (FetchResult, error)`
 - [ ] Fetcher type-asserts `clients` to `*awsclient.ServiceClients` internally
 - [ ] Column keys in `ResourceTypeDef` match the field keys populated by the fetcher
-- [ ] Default view definitions in `internal/config/defaults.go` exist for every resource type
+- [ ] Default view definitions in `core/config/defaults.go` exist for every resource type
 - [ ] `views.yaml` entries are optional overrides — defaults always work standalone
 - [ ] `refgen` tool can regenerate `views_reference.yaml` from SDK struct reflection
 
@@ -235,8 +235,8 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 
 ## init() Functions
 
-- [ ] `init()` in `internal/aws/*.go` is acceptable — registers fetchers in the resource registry
-- [ ] `init()` in `internal/demo/*.go` is acceptable — registers fixture generators in the demo data map
+- [ ] `init()` in `core/aws/*.go` is acceptable — registers fetchers in the resource registry
+- [ ] `init()` in `core/demo/*.go` is acceptable — registers fixture generators in the demo data map
 - [ ] `init()` in `internal/tui/styles/` is acceptable — initializes computed style values
 - [ ] No other `init()` functions exist outside these three locations
 - [ ] Each `init()` contains only simple registrations — no complex logic

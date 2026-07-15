@@ -55,7 +55,7 @@ type iamGroupPaginatedFake struct {
 
 	// mu guards the call counters below, which are written concurrently:
 	// EnrichIAMGroup fans out GetGroup/ListAttachedGroupPolicies/
-	// ListGroupPolicies calls per resource via internal/aws.ForEachParallel
+	// ListGroupPolicies calls per resource via core/aws.ForEachParallel
 	// (EnrichmentParallelism goroutines).
 	mu sync.Mutex
 

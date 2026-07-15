@@ -26,8 +26,8 @@ section "FILE SIZE (>500 lines, excluding tests and demo fixtures)"
 # ============================================================================
 
 # File length is a soft quality smell, not a correctness invariant, so this is
-# a WARN. Declarative data files are excluded: demo fixtures (internal/demo/
-# fixtures/*.go) and catalog literals (internal/aws/catalog_*.go) are inherently
+# a WARN. Declarative data files are excluded: demo fixtures (core/demo/
+# fixtures/*.go) and catalog literals (core/aws/catalog_*.go) are inherently
 # large by their nature (one struct literal per resource type / fixture).
 large_files=$(find internal cmd -name "*.go" \
   ! -name "*_test.go" \
@@ -119,7 +119,7 @@ else
 fi
 
 # messages must not import tui/
-msgs_tui=$(grep -rn '".*tui/' internal/runtime/messages/ 2>/dev/null | grep -v '_test.go' || true)
+msgs_tui=$(grep -rn '".*tui/' core/runtime/messages/ 2>/dev/null | grep -v '_test.go' || true)
 if [ -z "$msgs_tui" ]; then
   pass "messages/ does not import tui/"
 else
@@ -136,13 +136,13 @@ else
   while IFS= read -r line; do detail "$line"; done <<< "$layout_bad"
 fi
 
-# styles may import only the zero-dependency internal/domain leaf (for the
+# styles may import only the zero-dependency core/domain leaf (for the
 # domain.Color → lipgloss style mapping); no other internal/ packages.
-styles_bad=$(grep -rn '".*internal/' internal/tui/styles/ 2>/dev/null | grep -v '_test.go' | grep -v 'internal/domain' || true)
+styles_bad=$(grep -rn '".*internal/' internal/tui/styles/ 2>/dev/null | grep -v '_test.go' | grep -v 'core/domain' || true)
 if [ -z "$styles_bad" ]; then
-  pass "styles/ imports only stdlib + lipgloss + internal/domain leaf"
+  pass "styles/ imports only stdlib + lipgloss + core/domain leaf"
 else
-  fail "styles/ imports non-leaf internal/ packages (allowed: stdlib + lipgloss + internal/domain)"
+  fail "styles/ imports non-leaf internal/ packages (allowed: stdlib + lipgloss + core/domain)"
   while IFS= read -r line; do detail "$line"; done <<< "$styles_bad"
 fi
 
@@ -172,14 +172,14 @@ fi
 section "init() LOCATION VIOLATIONS"
 # ============================================================================
 
-# init() allowed only in: internal/demo/, internal/tui/styles/.
-# Post-refactor (SC-002, enforced by `make verify-zero-init`) internal/aws/ must
+# init() allowed only in: core/demo/, internal/tui/styles/.
+# Post-refactor (SC-002, enforced by `make verify-zero-init`) core/aws/ must
 # contain zero init() — the catalog migration removed all of them — so aws/ is no
 # longer on the allowlist. The `^[[:space:]]*func init()` anchor matches real
 # declarations only, not prose like the "`func init()`" reference in
-# internal/resource/projection_init.go's doc comment.
+# core/resource/projection_init.go's doc comment.
 bad_init=$(grep -rnE '^[[:space:]]*func init\(\)' internal/ 2>/dev/null \
-  | grep -v 'internal/demo/' \
+  | grep -v 'core/demo/' \
   | grep -v 'internal/tui/styles/' \
   | grep -v '_test.go' \
   || true)
@@ -196,8 +196,8 @@ section "ERROR HANDLING"
 # ============================================================================
 
 # Bare error returns in fetchers (no fmt.Errorf wrapping)
-bare_err=$(grep -rn 'return nil, err$' internal/aws/*.go 2>/dev/null || true)
-bare_fetch_err=$(grep -rn 'return resource\.FetchResult{}, err$' internal/aws/*.go 2>/dev/null || true)
+bare_err=$(grep -rn 'return nil, err$' core/aws/*.go 2>/dev/null || true)
+bare_fetch_err=$(grep -rn 'return resource\.FetchResult{}, err$' core/aws/*.go 2>/dev/null || true)
 bare_all="$bare_err"$'\n'"$bare_fetch_err"
 bare_all=$(echo "$bare_all" | grep -v '^$' || true)
 
@@ -271,7 +271,7 @@ multi_method_aws=$(awk '
     in_iface = 0
   }
   in_iface && /^\t[A-Z]/ { methods++ }
-' internal/aws/*_interfaces.go 2>/dev/null || true)
+' core/aws/*_interfaces.go 2>/dev/null || true)
 
 # Single-method AWS interfaces are an ISP ideal, not a project rule: a9s
 # deliberately defines one multi-method test-seam interface per service
@@ -442,7 +442,7 @@ section "PACKAGE EXPORT COUNT (>15 symbols, excluding resource and messages)"
 # ============================================================================
 
 high_export_pkgs=""
-for pkg_dir in internal/tui/keys internal/tui/layout internal/tui/styles internal/tui/views internal/config internal/fieldpath internal/buildinfo; do
+for pkg_dir in internal/tui/keys internal/tui/layout internal/tui/styles internal/tui/views core/config core/fieldpath core/buildinfo; do
   if [ -d "$pkg_dir" ]; then
     exports=$(grep -rh '^func [A-Z]\|^type [A-Z]\|^var [A-Z]\|^const [A-Z]' "$pkg_dir"/*.go 2>/dev/null \
       | grep -v '_test.go' \
@@ -530,11 +530,11 @@ section "RESOURCE TYPE CONSISTENCY"
 
 # Count catalog-registered resource types. Post-refactor (SC-002/SC-003) the
 # legacy resource.Register()/init() wiring is gone; catalog ShortName entries in
-# internal/aws/catalog_*.go are the source of truth for registered types. The
+# core/aws/catalog_*.go are the source of truth for registered types. The
 # `|| true` guard keeps a zero-match grep from aborting the script under pipefail.
-reg_count=$({ grep -rh 'ShortName:' internal/aws/catalog_*.go 2>/dev/null || true; } | wc -l | awk '{print $1+0}')
+reg_count=$({ grep -rh 'ShortName:' core/aws/catalog_*.go 2>/dev/null || true; } | wc -l | awk '{print $1+0}')
 # Count default view definition map keys across all defaults files
-def_count=$({ grep -rch '^\t\t"[a-z]' internal/config/defaults_*.go 2>/dev/null || true; } | awk '{s+=$1} END {print s+0}')
+def_count=$({ grep -rch '^\t\t"[a-z]' core/config/defaults_*.go 2>/dev/null || true; } | awk '{s+=$1} END {print s+0}')
 
 detail "Catalog-registered resource types (ShortName in catalog_*.go): $reg_count"
 detail "Default view definitions (map keys in defaults_*.go): $def_count"

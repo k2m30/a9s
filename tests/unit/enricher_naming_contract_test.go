@@ -17,7 +17,7 @@ import (
 )
 
 // TestNamingContract_DetailEnricher_IsFunc verifies the detail enricher
-// contract lives in internal/resource as a function type with the
+// contract lives in core/resource as a function type with the
 // (ctx, clients, Resource) -> (Resource, error) signature.
 func TestNamingContract_DetailEnricher_IsFunc(t *testing.T) {
 	var fn resource.DetailEnricher = func(_ context.Context, _ any, r resource.Resource) (resource.Resource, error) {

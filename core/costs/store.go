@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package costs
 
 import (
@@ -16,7 +18,7 @@ import (
 )
 
 // schemaVersion is the current on-disk format marker (mirrors
-// internal/cache.SchemaVersion's role: a single chokepoint for the encode/
+// core/cache.SchemaVersion's role: a single chokepoint for the encode/
 // decode format, bumped only when the shape below changes). A file whose
 // stored version does not match this constant is set aside to .bak via
 // LoadStore's alien-version recovery instead of being misparsed.
@@ -153,10 +155,10 @@ func (s *Store) Revision() int { return s.revision }
 
 // CachePath returns the on-disk cache file path for one profile's cost
 // data: <cache root>/<profile>--costs.yaml. Cost data is account-scoped,
-// not region-scoped (data-model.md), so — unlike internal/cache's
+// not region-scoped (data-model.md), so — unlike core/cache's
 // per-profile+region directories — there is exactly one file per profile.
-// Root resolution and filename sanitization come from internal/cache
-// (Root/SanitizePathElem) — the same single source internal/cache.Dir uses.
+// Root resolution and filename sanitization come from core/cache
+// (Root/SanitizePathElem) — the same single source core/cache.Dir uses.
 func CachePath(profile string) string {
 	root := cache.Root()
 	if root == "" {
@@ -555,7 +557,7 @@ func (s *Store) ApplyFetchResult(r FetchResult, now time.Time) {
 }
 
 // Save persists the Store to CachePath(profile) via atomic temp-write +
-// rename, mirroring internal/cache's save convention.
+// rename, mirroring core/cache's save convention.
 func (s *Store) Save() error {
 	if s.path == "" {
 		return fmt.Errorf("costs: no cache path resolved for profile %q", s.profile)

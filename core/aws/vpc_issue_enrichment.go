@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // vpc_issue_enrichment.go — Wave 2 issue enrichment for the vpc resource type.
 package aws
 

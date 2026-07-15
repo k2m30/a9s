@@ -7,7 +7,7 @@ package unit
 // Resource.Status matches the expected value from §1.2.
 //
 // These tests are expected to FAIL until the P1 coder rewrites buildCTResource
-// in internal/aws/ct_events.go to implement the three-tier severity model.
+// in core/aws/ct_events.go to implement the three-tier severity model.
 
 import (
 	"context"
@@ -293,7 +293,7 @@ func TestCTSeverity_AwsServiceEventIsInfo(t *testing.T) {
 // TestCTSeverity_AllowlistEntries_AreSensitiveAttention is a property test
 // that locks the membership of the §1.3 sensitive-reads allowlist. It builds
 // the expected list inline (the source of truth lives in
-// internal/aws/ct_events.go::isSensitiveRead) and asserts each entry yields
+// core/aws/ct_events.go::isSensitiveRead) and asserts each entry yields
 // ct-attention when surrounded by a plain non-escalating context.
 //
 // Replaces 40 individual subtests that mirrored each switch case 1:1.

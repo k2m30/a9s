@@ -3,21 +3,21 @@
 // convention as costs_review2_test.go/costs_selfreview_test.go.
 //
 // package unit_test: every finding here is reachable via the exported
-// internal/aws.FetchEC2InstancesByIDs surface, the pure internal/costs.Store/
+// core/aws.FetchEC2InstancesByIDs surface, the pure core/costs.Store/
 // screen.BuildViewModel surface, or the headless app.Controller surface —
 // no TUI helper needed. Reuses newCostsController/topDrill/fixedCostsNow/
 // fullMetricRecord/findFetchCostsTask (costs_state_test.go/
 // costs_interaction_test.go) and selfReviewAPIError/strPtrSelfReview
 // (costs_selfreview_test.go), all defined in this same package.
 //
-// R1 (P1, internal/aws/ec2_by_ids.go:~68): confirmed in source — when EVERY
+// R1 (P1, core/aws/ec2_by_ids.go:~68): confirmed in source — when EVERY
 // requested ID is named bad, `retry` ends up empty (len 0), and the guard
 // `len(bad) == 0 || len(retry) == len(requested)` does not fire (bad is
 // non-empty, retry is empty and not equal to requested), so the code falls
 // through and calls fetchEC2InstancesByIDsOnce with an EMPTY id slice —
 // DescribeInstances with no InstanceIds is an ACCOUNT-WIDE describe.
 //
-// R2 (internal/costs/screen/screen.go PlanFetch + internal/costs/store.go
+// R2 (core/costs/screen/screen.go PlanFetch + core/costs/store.go
 // Store.Anomalies): confirmed in source — Store.Anomalies(now) is TTL-only
 // (anomalyBucket carries FetchedAt/Marks, no covered-range field), and
 // PlanFetch's Anomalies half derives purely from that TTL check regardless
@@ -27,7 +27,7 @@
 // trailing-12-months range is wrongly treated as covering a materially
 // wider (e.g. year-zoom) range too.
 //
-// R3 (internal/costs/store.go:~309, MergeCoverage): confirmed in source and
+// R3 (core/costs/store.go:~309, MergeCoverage): confirmed in source and
 // DISTINCT from the existing TestCostsReview2_R2_ZeroRecordPeriod_
 // MergeCoverage_NotReportedMissing (costs_review2_test.go) coverage — that
 // test only covers a period NEVER before seen (no bucket exists yet, so
@@ -47,16 +47,16 @@
 // range must never be re-stamped) is pinned separately below and stays
 // exactly as-is.
 //
-// R4 (internal/app/costs_state.go:~159, ensureCostsState): confirmed in
+// R4 (core/app/costs_state.go:~159, ensureCostsState): confirmed in
 // source — costs.LoadStore(profile) is called unconditionally, with no
 // c.core.NoCache() check anywhere in ensureCostsState or in Handle's
 // dirtyStore.Save() flush, unlike every OTHER cache in the codebase
-// (internal/session/session.go's own NoCache-gated EnsureCacheStore family,
-// internal/runtime/handlers.go, internal/runtime/probes.go). Demo mode
+// (core/session/session.go's own NoCache-gated EnsureCacheStore family,
+// core/runtime/handlers.go, core/runtime/probes.go). Demo mode
 // (--demo sets NoCache=true) silently reads and writes a real
 // ~/.a9s/cache/<profile>--costs.yaml file.
 //
-// R5 (internal/costs/grid.go BuildGrid + internal/costs/screen/screen.go
+// R5 (core/costs/grid.go BuildGrid + core/costs/screen/screen.go
 // BuildViewModel): confirmed as an explicit spec violation —
 // specs/021-cost-explorer/data-model.md:91 ("sorted desc by row total over
 // VISIBLE window") and spec.md:83/90 ("Row sort is descending by row total

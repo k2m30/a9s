@@ -32,10 +32,10 @@
 // by hand before this file was written; corrections to the originating
 // dispatch's claims are called out inline per gate):
 //
-//	GATE 1 (4 violations): internal/runtime/intent.go:36
-//	(ListEnrichmentPatch.Findings), internal/runtime/state.go:18
-//	(RuntimeState.EnrichmentFindings), internal/app/viewstate.go:148
-//	(ListBody.EnrichmentFindings), internal/runtime/messages/event.go:244
+//	GATE 1 (4 violations): core/runtime/intent.go:36
+//	(ListEnrichmentPatch.Findings), core/runtime/state.go:18
+//	(RuntimeState.EnrichmentFindings), core/app/viewstate.go:148
+//	(ListBody.EnrichmentFindings), core/runtime/messages/event.go:244
 //	(EnrichmentChecked.Findings). Dispatch cited intent.go:31 and
 //	state.go:16 — both are the doc-comment lines directly above the real
 //	field declarations (31 is ListEnrichmentPatch's struct-level doc start;
@@ -44,16 +44,16 @@
 //	(mirrors the same dispatch-cites-the-comment-not-the-code pattern noted
 //	in qa_enricher_finding_builder_discipline_test.go's own header).
 //
-//	GATE 2 (2 violations): internal/runtime/intent.go:37
-//	(ListEnrichmentPatch.AttentionDetails), internal/runtime/state.go:22
+//	GATE 2 (2 violations): core/runtime/intent.go:37
+//	(ListEnrichmentPatch.AttentionDetails), core/runtime/state.go:22
 //	(RuntimeState.EnrichmentAttentionDetails).
 //
-//	GATE 3 (2 violations): internal/aws/snapshot_cross_ref.go:217
+//	GATE 3 (2 violations): core/aws/snapshot_cross_ref.go:217
 //	(result.Findings[res.ID] = ...) and
-//	internal/aws/snapshot_cross_ref.go:224
+//	core/aws/snapshot_cross_ref.go:224
 //	(result.AttentionDetails[res.ID] = ...) — both inside
 //	EnrichSnapshotCrossRef. Zero violations found in any
-//	internal/aws/*_issue_enrichment.go file — the append-only builder
+//	core/aws/*_issue_enrichment.go file — the append-only builder
 //	discipline is already clean there (matches
 //	qa_enricher_finding_builder_discipline_test.go's own green census after
 //	the MSK fix landed), verified by grep before writing this gate rather
@@ -71,7 +71,7 @@
 //	finding per resource", in findingsFromRows and attentionDetailsFromRows
 //	respectively).
 //	CORRECTION to the originating dispatch: it also named
-//	internal/aws/issue_enrichment.go and "others" as carrying these
+//	core/aws/issue_enrichment.go and "others" as carrying these
 //	phrases, and named two more literal patterns — "worse-severity wins the
 //	slot" and "attach to first finding". A case-insensitive scan of the
 //	whole internal/ tree (non-test files) at HEAD found ZERO occurrences of
@@ -380,8 +380,8 @@ func mfnlScanFileForDirectWrite(fset *token.FileSet, path string) ([]mfnlWriteVi
 }
 
 // TestMultiFindingNoLegacyGate3_NoDirectResultFieldWriteOutsideBuilder is
-// GATE 3: no internal/aws/*_issue_enrichment.go enricher, and no
-// internal/aws/snapshot_cross_ref.go cross-ref enricher, may assign
+// GATE 3: no core/aws/*_issue_enrichment.go enricher, and no
+// core/aws/snapshot_cross_ref.go cross-ref enricher, may assign
 // directly into a "*.Findings[id]" or "*.AttentionDetails[id]" index
 // expression. setWave2Finding is today's sole append-only builder for both
 // fields; this gate does not require a specific replacement name (the
@@ -440,7 +440,7 @@ func TestMultiFindingNoLegacyGate3_NoDirectResultFieldWriteOutsideBuilder(t *tes
 	sort.Strings(lines)
 	t.Errorf(
 		"GATE 3 — %d direct IssueEnricherResult field write(s) found outside the builder:\n%s\n\n"+
-			"Route every write through setWave2Finding (internal/aws/issue_enrichment.go) or an "+
+			"Route every write through setWave2Finding (core/aws/issue_enrichment.go) or an "+
 			"equivalent append-only builder instead of assigning result.Findings[id]/"+
 			"result.AttentionDetails[id] directly.",
 		len(violations), strings.Join(lines, "\n"),

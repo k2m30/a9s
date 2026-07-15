@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package fixtures provides MWAA (Managed Airflow) fixture data for the MWAA fake.
 package fixtures
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package aws — vpcpeer.go: EC2 VPC Peering Connection fetcher.
 //
 // docs/resources/vpc-peer.md §1: DescribeVpcPeeringConnections is the ONLY

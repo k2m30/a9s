@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // secrets_related.go contains Secrets Manager related-resource checker functions.
 package aws
 

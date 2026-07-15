@@ -92,8 +92,8 @@ func TestFetchEBEnvironments_ParsesMultipleEnvironments(t *testing.T) {
 
 	// Second env (Yellow health): RETIRED the old "no Status, no wave1
 	// Finding" invariant — since the color-findings-conformance wave, colorEB
-	// is colorFromAnyFinding-first (internal/aws/catalog_compute.go) and
-	// ebEnvironmentFindings (internal/aws/eb_codes.go) now emits
+	// is colorFromAnyFinding-first (core/aws/catalog_compute.go) and
+	// ebEnvironmentFindings (core/aws/eb_codes.go) now emits
 	// CodeEBHealthYellow/SevWarn for a Yellow-health environment, because
 	// Color needs its own Finding to color from. See
 	// qa_color_findings_conformance_test.go for the standing architectural

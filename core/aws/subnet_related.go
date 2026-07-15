@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // subnet_related.go contains Subnet related-resource checker functions.
 package aws
 

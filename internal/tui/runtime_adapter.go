@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // runtime_adapter.go is the Bubble Tea adapter glue for the platform-
 // agnostic runtime.Core. It owns:
 //
@@ -102,7 +104,7 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 	case runtime.SetErrorHintIntent:
 		m.showErrorHint = v.Show
 	case runtime.AppendErrorHistoryIntent:
-		// The controller (internal/app/controller.go) is the single source of
+		// The controller (core/app/controller.go) is the single source of
 		// truth for session error history as of goal-4 wave 4a — Header.
 		// ErrorHintVisible, HasErrorHistory, and the ctrl-backed ScreenErrorLog
 		// text screen all read c.errorHistory. This adapter has no local copy to
@@ -124,7 +126,7 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 	case runtime.PopSelectorIntent:
 		// Controller-first (goal 4): forward so the controller applies its own
 		// type-checked gate (pop only when top.ID is a selector screen —
-		// internal/app/intents.go) BEFORE the renderer decides whether to drop
+		// core/app/intents.go) BEFORE the renderer decides whether to drop
 		// its own rendererState. Previously this case gated on rs.kind==
 		// rsKindSelector alone and popped via popRS() (which re-derives its own
 		// ActionBack-driven controller pop) — two independently-maintained
@@ -142,7 +144,7 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 		}
 	case runtime.PushScreen:
 		// Controller-first (goal 4): forward the intent so the controller's
-		// Screen{ID, Ctx} push (internal/app/intents.go) lands before the
+		// Screen{ID, Ctx} push (core/app/intents.go) lands before the
 		// renderer constructs its rendererState half. pushScreen only calls
 		// m.pushRS — it never touches m.ctrl — so this cannot double-push.
 		m.ctrl.ApplyIntents([]runtime.UIIntent{v})

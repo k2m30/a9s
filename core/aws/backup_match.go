@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // backup_match.go — AWS Backup plan coverage logic.
 package aws
 

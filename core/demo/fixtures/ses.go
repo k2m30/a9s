@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package fixtures
 
 import (
@@ -31,7 +33,7 @@ const (
 
 	// SESFirehoseStreamName is the Kinesis Firehose delivery stream for SES events.
 	//
-	// Note: the kinesis fetcher (internal/aws/kinesis.go) lists Kinesis Data Streams,
+	// Note: the kinesis fetcher (core/aws/kinesis.go) lists Kinesis Data Streams,
 	// not Firehose delivery streams. The SES→kinesis pivot (checkSESKinesis) collects
 	// the DeliveryStreamArn directly from GetConfigurationSetEventDestinations — it does
 	// NOT cross-reference the kinesis resource cache. Therefore SESFirehoseStreamARN

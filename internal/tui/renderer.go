@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // renderer.go — per-screen renderer state and free render functions.
 //
 // rendererState holds ONLY renderer-local values: viewport, search widget,

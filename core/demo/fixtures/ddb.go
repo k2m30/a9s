@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package fixtures provides DynamoDB fixture data for the DynamoDB fake.
 package fixtures
 

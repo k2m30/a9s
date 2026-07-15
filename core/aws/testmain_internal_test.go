@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package aws
 
 import (
@@ -11,8 +13,8 @@ import (
 // Internal tests reach into resource.GetPaginatedFetcher (and other catalog-
 // backed accessors), which panic until SetTypes has been called.
 //
-// We don't import internal/aws here — we're already in it. Install is local.
-// WireProjection replaces the legacy internal/resource init() per AS-731.
+// We don't import core/aws here — we're already in it. Install is local.
+// WireProjection replaces the legacy core/resource init() per AS-731.
 // See tests/unit/testmain_test.go for the hermetic A9S_CONFIG_FOLDER
 // default applied below.
 func TestMain(m *testing.M) {

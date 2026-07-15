@@ -1,6 +1,6 @@
 // tui_intent_parity_test.go — parity pins for the Wave-1 convergence of
 // internal/tui/app_dispatch.go's applyIntents onto the headless controller's
-// Controller.applyIntents (internal/app/intents.go).
+// Controller.applyIntents (core/app/intents.go).
 //
 // Wave-1 change under pin: applyIntents forwards the ENTIRE intent slice to
 // m.ctrl.ApplyIntents in one call (Controller.applyIntents already handles
@@ -27,7 +27,7 @@
 // Harness: mirrors tests/unit/tui_savecache_routing_test.go — a sized
 // tui.Model driven via rootApplyMsg (tuitest.Step) is the ONLY reachable
 // seam into internal/tui.Model's unexported applyIntents; the headless
-// comparison side drives internal/app.Controller directly (mirrors
+// comparison side drives core/app.Controller directly (mirrors
 // tests/unit/app_patch_cache_intents_test.go's newTestControllerAndCore and
 // tests/unit/app_menu_test.go's newMenuController). Both lanes are driven
 // through the SAME entry-point shape their respective production code
@@ -248,7 +248,7 @@ func TestIntentParity_CachePatches_RepeatedApply_StaysAdditiveOnce(t *testing.T)
 
 // availabilityPrefetchedParityEvent produces both PatchMenuAvailability and
 // PatchMenu in one HandleEvent call (handleAvailabilityPrefetched,
-// internal/runtime/handlers_availability.go), reached identically by the
+// core/runtime/handlers_availability.go), reached identically by the
 // TUI lane (m.coreUpdate) and the headless lane (Controller.Handle) since
 // both call HandleEvent -> applyIntents. Gen is set to 1 to match
 // session.New()'s seeded AvailabilityGen (AvailabilityPrefetched.AcceptZeroGen()

@@ -315,13 +315,13 @@ func TestDemoColdCacheCtEvents_NoDemoShortcut(t *testing.T) {
 
 // TestDemoColdCacheACM_HasLiveFetcher is a T012b verification stub.
 // ACM has a live fetcher (FetchACMCertificates / FetchACMCertificatesPage in
-// internal/aws/acm.go backed by ACMListCertificatesAPI). It migrates to the
+// core/aws/acm.go backed by ACMListCertificatesAPI). It migrates to the
 // typed-fake pattern normally under T028 (no special case needed here).
 // This test is intentionally a no-op placeholder so the T012b requirement is
 // visible in the test suite.
 func TestDemoColdCacheACM_HasLiveFetcher(t *testing.T) {
 	t.Parallel()
-	// T012b: ACM has a live fetcher (FetchACMCertificates in internal/aws/acm.go).
+	// T012b: ACM has a live fetcher (FetchACMCertificates in core/aws/acm.go).
 	// Typed-fake implementation tracked in T028. No skip needed.
 	t.Log("T012b: ACM live fetcher confirmed — migration to typed fake tracked under T028")
 }

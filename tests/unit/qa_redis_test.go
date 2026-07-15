@@ -273,7 +273,7 @@ func TestQA_Redis_ListFilter(t *testing.T) {
 	// (Controller.listIssueCount reads c.listScreenResources, not the
 	// filtered/visible set) — so it renders identically whether or not a text
 	// filter narrows what's on screen. Of the 3 multiStatusRedisFixtures rows,
-	// colorRedis (internal/aws/catalog_databases.go) classifies "redis-creating"
+	// colorRedis (core/aws/catalog_databases.go) classifies "redis-creating"
 	// (Fields["status"]="creating — new group") and "redis-deleting"
 	// (Fields["status"]="deleting — teardown") as ColorWarning (both match the
 	// explicit Warning-phrase switch cases); "redis-available"

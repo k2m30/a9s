@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // kinesis_related.go contains Kinesis Data Stream related-resource checker functions.
 package aws
 

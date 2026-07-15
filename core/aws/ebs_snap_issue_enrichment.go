@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // ebs_snap_issue_enrichment.go — Wave 1 cross-ref enricher for ebs-snap.
 //
 // Thin wrapper around EnrichSnapshotCrossRef (snapshot_cross_ref.go) configured

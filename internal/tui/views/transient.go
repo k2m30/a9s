@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // transient.go — zero-storage transient constructors and accessor methods
 // used by the renderer-side free render functions (renderer.go). These allow
 // the renderer to create short-lived view model instances from rendererState

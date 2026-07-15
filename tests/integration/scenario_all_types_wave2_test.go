@@ -37,7 +37,7 @@ import (
 // the fetcher emitted ID = bare name and the enricher passed r.ID as an ARN
 // param), this test fails with the resource type and error message.
 //
-// Combined with strict demo fakes (internal/demo/fakes/*.go reject non-ARN
+// Combined with strict demo fakes (core/demo/fakes/*.go reject non-ARN
 // input on *Arn params, mirroring real AWS validation), this test is the
 // end-to-end guard that would have caught tg / sfn / elb / acm / msk before
 // they shipped.

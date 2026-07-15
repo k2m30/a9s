@@ -38,7 +38,7 @@ type ecrDescribeImagesFake struct {
 	errByRepo map[string]error
 
 	// mu guards callsPerRepo, which is written concurrently: the enricher
-	// fans out DescribeImages calls per repo via internal/aws.ForEachParallel
+	// fans out DescribeImages calls per repo via core/aws.ForEachParallel
 	// (EnrichmentParallelism goroutines).
 	mu           sync.Mutex
 	callsPerRepo map[string]int

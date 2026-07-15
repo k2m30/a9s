@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // handlers_test.go — unit tests for the 6 handlers ported from
 // internal/tui in Phase-05 PR-05a-h3 (AS-324).
 //

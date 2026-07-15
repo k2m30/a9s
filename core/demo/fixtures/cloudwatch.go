@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package fixtures
 
 import (
@@ -1081,7 +1083,7 @@ func NewCloudWatchFixtures() *CloudWatchFixtures {
 // The two StateUpdate items carry HistoryData JSON matching their
 // HistorySummary — real DescribeAlarmHistory always populates HistoryData
 // with an {"oldState":...,"newState":...} payload for StateUpdate items;
-// alarmHistoryFindings (internal/aws/alarm_history.go) parses this field to
+// alarmHistoryFindings (core/aws/alarm_history.go) parses this field to
 // classify the ALARM transition as broken, mirroring colorAlarm's live-alarm
 // classification.
 func minimalAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {

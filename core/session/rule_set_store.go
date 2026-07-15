@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // rule_set_store.go — session-scoped SES receipt rule set cache.
 //
 // Replaces the package-level globals that previously lived in
-// internal/aws/ses_related.go (sesRuleSetCacheMu, sesRuleSetCaches map keyed
+// core/aws/ses_related.go (sesRuleSetCacheMu, sesRuleSetCaches map keyed
 // by *ServiceClients pointer).
 package session
 
@@ -24,12 +26,12 @@ import (
 // locking the session for its lifetime. Session.Rotate() Clears the store on
 // profile/region switch.
 //
-// The stored value is `any` so internal/session does not import the AWS
-// SES SDK; the consumer (internal/aws/ses_related.go) does the type
+// The stored value is `any` so core/session does not import the AWS
+// SES SDK; the consumer (core/aws/ses_related.go) does the type
 // assertion at the call site.
 //
-// Safe for concurrent use. internal/aws consumes it via its own local
-// structural interface (ruleSetStore in internal/aws/ses_related.go) rather
+// Safe for concurrent use. core/aws consumes it via its own local
+// structural interface (ruleSetStore in core/aws/ses_related.go) rather
 // than importing this type, so the method set below is the real contract.
 type ruleSetStore struct {
 	mu      sync.RWMutex

@@ -2,12 +2,12 @@ package unit
 
 // aws_apigw_v1_rest_test.go — Failing tests for v1 REST API Gateway merge behavior.
 //
-// CODER CHECKLIST — new exports required from internal/aws/:
+// CODER CHECKLIST — new exports required from core/aws/:
 //
 //   1. Add go.mod dependency:
 //      go get github.com/aws/aws-sdk-go-v2/service/apigateway
 //
-//   2. Interface in internal/aws/interfaces_apigateway.go:
+//   2. Interface in core/aws/interfaces_apigateway.go:
 //      import "github.com/aws/aws-sdk-go-v2/service/apigateway"
 //
 //      type APIGatewayV1GetRestApisAPI interface {
@@ -17,16 +17,16 @@ package unit
 //          APIGatewayV1GetRestApisAPI
 //      }
 //
-//   3. New field in ServiceClients (internal/aws/client.go):
+//   3. New field in ServiceClients (core/aws/client.go):
 //      APIGatewayV1 APIGatewayV1API
 //
-//   4. New exported function in internal/aws/apigw.go:
+//   4. New exported function in core/aws/apigw.go:
 //      // FetchAPIGatewaysPageMerged fetches a single page of API Gateways from both
 //      // APIGateway V2 (HTTP/WEBSOCKET) and APIGateway V1 (REST), merging results.
 //      // v1 REST APIs are returned with Fields["protocol"] == "REST".
 //      func FetchAPIGatewaysPageMerged(ctx context.Context, clients *ServiceClients, continuationToken string) (resource.FetchResult, error)
 //
-//   5. Update init() registration in internal/aws/apigw.go to call
+//   5. Update init() registration in core/aws/apigw.go to call
 //      FetchAPIGatewaysPageMerged instead of FetchAPIGatewaysPage.
 //
 //   6. v1 SDK types used in the test:

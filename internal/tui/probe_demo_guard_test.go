@@ -1,10 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package tui
 
 // probe_demo_guard_test.go — AS-658 / AS-648-h3 P2.
 //
 // Pins the contract that `Model.probeEnrichment` treats demo mode exactly like
 // live mode: demo clients are real *awsclient.ServiceClients backed by typed
-// fakes (internal/demo.NewServiceClients), so Wave-2 enrichers dispatch
+// fakes (core/demo.NewServiceClients), so Wave-2 enrichers dispatch
 // against them the same way they dispatch against live AWS clients. There is
 // no demo-mode skip, and dispatch stays lazy — the enricher Fn runs only when
 // the returned tea.Cmd executes, never at arm time.

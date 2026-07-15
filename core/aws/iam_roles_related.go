@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // iam_roles_related.go contains IAM Role related-resource checker functions.
 // Role is a reverse-lookup hub: other resources (Lambda, Glue, Node Groups) store
 // role ARNs in their RawStruct. The checkers here search those target caches.

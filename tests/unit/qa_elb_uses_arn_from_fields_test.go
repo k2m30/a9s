@@ -26,7 +26,7 @@ import (
 // strictELBv2Fake mirrors AWS: rejects DescribeLoadBalancerAttributes when
 // LoadBalancerArn is not a valid ARN. mu guards calledWith, which is written
 // concurrently: EnrichELBAttributes fans out DescribeLoadBalancerAttributes
-// calls per resource via internal/aws.ForEachParallel (EnrichmentParallelism
+// calls per resource via core/aws.ForEachParallel (EnrichmentParallelism
 // goroutines).
 type strictELBv2Fake struct {
 	awsclient.ELBv2API

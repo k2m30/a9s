@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // codebuild_related.go contains CodeBuild project related-resource checker functions
 // that supplement cb_related.go. Kept separate to avoid exceeding 400 LOC in the
 // primary file.

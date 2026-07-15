@@ -9,7 +9,7 @@ package integration
 // "arn:aws:iam::123456789012:role/service-role/acme-lambda-execution").
 // Pressing Enter on that field is supposed to drill straight to the role's
 // detail view. Root cause of the bug: the "role" resource type has no
-// registered FetchByIDs (see internal/aws/catalog_security.go), so on a COLD
+// registered FetchByIDs (see core/aws/catalog_security.go), so on a COLD
 // cache (the role list has never been opened this session) the single-ID
 // navigation path in HandleRelatedNavigate cannot dispatch the
 // KindFetchByIDDetail task and instead resolves through a different fallback
@@ -25,9 +25,9 @@ package integration
 // Fix direction (confirmed, not yet implemented): register a FetchByIDs for
 // "role" (GetRole by name, path-safe) mirroring the "policy" registration.
 // Once fixed, FollowNavigableField("Role") must land exactly on the demo
-// fixture role named "acme-lambda-execution" (internal/demo/fixtures/iam.go),
+// fixture role named "acme-lambda-execution" (core/demo/fixtures/iam.go),
 // which is the execution role referenced by every demo lambda fixture via
-// lambdaProdRoleARN (internal/demo/fixtures/lambda.go).
+// lambdaProdRoleARN (core/demo/fixtures/lambda.go).
 
 import (
 	"strings"
@@ -61,7 +61,7 @@ func TestScenario_LambdaRoleNavigableField_ColdCache_LandsOnExecutionRole(t *tes
 		t.Errorf(`FollowNavigableField("Role") landed on Resource{ID: %q, Name: %q}, want ID == %q (the demo lambda's execution role, whose ARN carries an IAM path "/service-role/" but whose bare RoleName is %q).
 
 This is BUG 5: the "role" resource type has no registered FetchByIDs
-(internal/aws/catalog_security.go), so single-ID navigation from the Lambda
+(core/aws/catalog_security.go), so single-ID navigation from the Lambda
 detail view's "Role:" field cannot drill directly to the role and instead
 mis-resolves to an unrelated resource instead of the one actually referenced.`,
 			got.ID, got.Name, wantRoleName, wantRoleName)

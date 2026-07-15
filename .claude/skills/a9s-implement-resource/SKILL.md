@@ -50,15 +50,15 @@ Three beliefs anchor everything below:
 - `docs/resources/<shortName>.md` — the contract.
 
 **Contract surface (read all four if present — some resources don't have all):**
-- `internal/aws/<shortName>_interfaces.go` — AWS SDK mock-interface abstractions.
-- `internal/aws/<shortName>_related.go` (plus `<shortName>_related_extra.go` if present) — related-target registrations.
-- `internal/aws/<shortName>_issue_enrichment.go` — Wave 2 enricher registration and function signature.
-- `internal/aws/<shortName>_detail_enrichment.go` — detail-view enricher (may not exist for every resource; that's fine).
+- `core/aws/<shortName>_interfaces.go` — AWS SDK mock-interface abstractions.
+- `core/aws/<shortName>_related.go` (plus `<shortName>_related_extra.go` if present) — related-target registrations.
+- `core/aws/<shortName>_issue_enrichment.go` — Wave 2 enricher registration and function signature.
+- `core/aws/<shortName>_detail_enrichment.go` — detail-view enricher (may not exist for every resource; that's fine).
 
 **Forbidden to read:**
 - `tests/**` — anything under tests. The new tests come from the pseudocode spec (phase 3), not from legacy tests.
-- `internal/aws/<shortName>.go` — the fetcher body itself. The interface file and the spec doc define the contract; reading the old fetcher leaks buggy shape into the new design.
-- Any demo fixture under `internal/demo/`. The new fixtures come from phase 4, not from what was there before.
+- `core/aws/<shortName>.go` — the fetcher body itself. The interface file and the spec doc define the contract; reading the old fetcher leaks buggy shape into the new design.
+- Any demo fixture under `core/demo/`. The new fixtures come from phase 4, not from what was there before.
 
 You may skim other files (message definitions, registry shape) to ground type signatures, but only the spec and the four surface files are load-bearing.
 
@@ -74,9 +74,9 @@ Run in order. Phases 0–5 are analysis and planning done by the skill runner. P
 
 **Wave 2 = None check.** If spec §3.2 says `No Wave 2 signals`, then the issue-enrichment file and the enricher test file are NOT part of the approved scope for this run. Note this in the impl-plan so phases 6b, 7, and 7.5 skip them.
 
-**Fetcher file location.** The fetcher may live at `internal/aws/<shortName>.go` OR in a shared `internal/aws/<service>.go` when several resource types share an AWS service (e.g. `redis` lives in `elasticache.go`; `dbi` in `rds.go`; `ng` in `eks.go`). Locate it using the Grep tool (pattern `RegisterPaginated\("<shortName>"`, glob `internal/aws/*.go`, output `files_with_matches`) — do NOT invoke `grep` or `rg` as a Bash command per project shell rules.
+**Fetcher file location.** The fetcher may live at `core/aws/<shortName>.go` OR in a shared `core/aws/<service>.go` when several resource types share an AWS service (e.g. `redis` lives in `elasticache.go`; `dbi` in `rds.go`; `ng` in `eks.go`). Locate it using the Grep tool (pattern `RegisterPaginated\("<shortName>"`, glob `core/aws/*.go`, output `files_with_matches`) — do NOT invoke `grep` or `rg` as a Bash command per project shell rules.
 
-Record the actual path. Phase 7 scope will reference THIS file, not a hypothetical `<shortName>.go`. If the fetcher lives in a shared service file, phase 7 extends (not creates) that file; phase 7.5's approved union includes `internal/aws/<service>.go` in place of `internal/aws/<shortName>.go`.
+Record the actual path. Phase 7 scope will reference THIS file, not a hypothetical `<shortName>.go`. If the fetcher lives in a shared service file, phase 7 extends (not creates) that file; phase 7.5's approved union includes `core/aws/<service>.go` in place of `core/aws/<shortName>.go`.
 
 The renderer already wires all five UI surfaces:
 
@@ -96,7 +96,7 @@ These rules are invariant across all resource types. They are enforced by phase 
 
 - The list view carries ONE Status column (S4). Always one. Never split across two or more columns.
 - No parallel "flags" / "policy" / "CIS" / "Issues" / jargon-code columns. All Wave 1 warnings ride in the Status column per spec §4 precedence.
-- Column definitions live in `internal/config/defaults.go` → generated into `.a9s/views/<shortName>.yaml` via `go run ./cmd/viewsgen/`. That is the single authority; the spec does not restate columns.
+- Column definitions live in `core/config/defaults.go` → generated into `.a9s/views/<shortName>.yaml` via `go run ./cmd/viewsgen/`. That is the single authority; the spec does not restate columns.
 - Identity / metadata columns (name, engine, version, region, etc.) are per-resource and declared in defaults.go.
 
 **Visual rendering**
@@ -113,8 +113,8 @@ These rules are invariant across all resource types. They are enforced by phase 
 
    **Every registered related pivot AND every registered navigable field must drill to a non-empty landing.** The phase-8 scenario harness includes a drill-through test that opens the graph-root instance's detail view, follows each related pivot via `DrillRelated`, follows each navigable field via `FollowNavigableField`, and asserts every landing is non-empty. IDs returned by checkers must match the target resource type's `Resource.ID` format. When AWS returns ARNs but the target indexes on bare names/UUIDs:
 
-   - **Navigable fields** route through the central `resource.NavIDFromValue` registry in `internal/resource/related.go`. Target types `kms`, `role`, `ecs`, `logs`, `s3`, `iam-user` already have extractors; add new target types there — NOT per-field.
-   - **Related-pivot checkers** extract inline (the checker has full control over what it returns). The canonical pattern is `lambdaARNToName` in `internal/aws/ses_related.go` — split by `:function:`, strip any version suffix. Return bare names/UUIDs that match the target resource's `Resource.ID`. If the registered path does not resolve against the fetcher's RawStruct at all (structurally invalid — e.g. docdb DBCluster.DBSubnetGroup is `*string`, not a struct), REMOVE the registration and route navigation through the related-panel checker instead.
+   - **Navigable fields** route through the central `resource.NavIDFromValue` registry in `core/resource/related.go`. Target types `kms`, `role`, `ecs`, `logs`, `s3`, `iam-user` already have extractors; add new target types there — NOT per-field.
+   - **Related-pivot checkers** extract inline (the checker has full control over what it returns). The canonical pattern is `lambdaARNToName` in `core/aws/ses_related.go` — split by `:function:`, strip any version suffix. Return bare names/UUIDs that match the target resource's `Resource.ID`. If the registered path does not resolve against the fetcher's RawStruct at all (structurally invalid — e.g. docdb DBCluster.DBSubnetGroup is `*string`, not a struct), REMOVE the registration and route navigation through the related-panel checker instead.
 6. **Detail view (S5) renders findings through the unified `Attention (N)` section** — one section, at the top of the detail view, with a count in the header. There are NO per-type section names (`Pending Maintenance`, `Latest Build`, `Target Health`, etc. — those existed before 2026-04-22 and were collapsed into the single Attention section). Every issue-severity entry of `Resource.Findings` (Wave-1 and Wave-2 alike) renders inside it. The renderer (`injectAttentionSection` in `internal/tui/views/detail_fields.go`) handles this universally — no per-resource code required. Entry presentation: each primary entry is `<glyph> <phrase>` with the first letter capitalized for readability (data stays canonical lowercase; the capitalization is purely visual via `capitalizeFirst`). Rows render indented beneath the primary entry as `Label: Value` pairs.
 7. **Multiple findings on the same instance remain individually visible across S2–S5.** S1 and S3 aggregate to one per instance (one count, one glyph — `!` beats `~`, color picks worst severity). But no finding may silently disappear. When an instance carries more than one finding:
    - **S4** renders the highest-precedence phrase plus a `(+N)` suffix when others exist on the same row — e.g. `storage-full (+2)`. The operator sees there is more to open for.
@@ -128,7 +128,7 @@ These rules are invariant across all resource types. They are enforced by phase 
 
 ## Wave 2 enricher output contract
 
-Every Wave 2 enricher returns an `IssueEnricherResult` whose `Findings` map carries `domain.Finding` entries per resource ID. The contract is codified in the doc comment on `IssueEnricherResult` in `internal/aws/issue_enrichment.go` (finding shape: `internal/domain/finding.go`); the skill restates it here because violating it produces visible duplication in the Attention section.
+Every Wave 2 enricher returns an `IssueEnricherResult` whose `Findings` map carries `domain.Finding` entries per resource ID. The contract is codified in the doc comment on `IssueEnricherResult` in `core/aws/issue_enrichment.go` (finding shape: `core/domain/finding.go`); the skill restates it here because violating it produces visible duplication in the Attention section.
 
 - **`Finding.Phrase` is the short S4 phrase.** Lowercase, ≈1–4 words, matching a §4-style phrase (e.g. `"pending maintenance"`, `"unhealthy targets 2/5"`, `"latest build failed"`). This is what renders in the S4 Status cell and beside the glyph on the Attention primary entry row. `Finding.Detail` is the optional full S5 operator sentence for the detail view; empty ⇒ callers fall back to Phrase.
 - **`AttentionDetails` rows are the structured facts that support Phrase.** Concrete values — the specific Action, Description, Earliest Target, failing-target names, failure timestamp — go in `AttentionDetails[id][code].Rows` as `Label: Value` pairs. Rows render beneath the primary entry as indented context.
@@ -139,7 +139,7 @@ Phase 6b QA must include a test per enricher that asserts both `Phrase == <short
 
 ## Error handling and throttle rules (apply to every AWS call)
 
-These rules are universal — every fetcher, checker, enricher, and FetchByIDs function in `internal/aws/` must comply. Violating them produces silent operator-invisible failures: pivot counts go wrong, Attention sections go blank, drill-throughs return empty lists. The operator has no way to know an API call failed.
+These rules are universal — every fetcher, checker, enricher, and FetchByIDs function in `core/aws/` must comply. Violating them produces silent operator-invisible failures: pivot counts go wrong, Attention sections go blank, drill-throughs return empty lists. The operator has no way to know an API call failed.
 
 ### Rule E1 — Every AWS call is wrapped in `RetryOnThrottle`
 
@@ -151,7 +151,7 @@ out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*svc.DescribeXOut
 })
 ```
 
-No exceptions. Paginated top-level fetchers, per-item describes inside a checker loop, enrichment probes, FetchByIDs batches — all wrapped. The canonical examples are in `internal/aws/kms_related.go:238-255`, `internal/aws/pipeline_related.go:32`, `internal/aws/r53_related.go:43`. Copy one of those call sites verbatim.
+No exceptions. Paginated top-level fetchers, per-item describes inside a checker loop, enrichment probes, FetchByIDs batches — all wrapped. The canonical examples are in `core/aws/kms_related.go:238-255`, `core/aws/pipeline_related.go:32`, `core/aws/r53_related.go:43`. Copy one of those call sites verbatim.
 
 Phase 7.5 scope-diff gate greps new code for unwrapped SDK calls. Any `api.Describe*` / `api.Get*` / `api.List*` call not enclosed in a `RetryOnThrottle(...)` closure is a coder reject.
 
@@ -190,7 +190,7 @@ When a function iterates a list of IDs and each item may fail independently, the
 3. After the loop, if `len(failures) > 0`, build a composite error with `fmt.Errorf("%s failed for %d of %d items: %s", opName, len(failures), total, strings.Join(failures, "; "))`.
 4. Return `(partialResources, compositeError)`. Callers get both the partial results AND the error detail.
 
-The canonical helper lives in `internal/aws/partial_errors.go` (create if absent). Use it instead of inlining the format in every file.
+The canonical helper lives in `core/aws/partial_errors.go` (create if absent). Use it instead of inlining the format in every file.
 
 ### Rule E4 — Surfacing path per function category
 
@@ -199,7 +199,7 @@ Different function categories surface errors through different channels. All cha
 | Category | Signature | Error field | Where FlashMsg fires |
 |----------|-----------|-------------|----------------------|
 | **Paginated top-level fetcher** | `func(ctx, clients, token) (FetchResult, error)` | Top-level `error` return | `app.go` `ResourcesLoadedMsg` handler → `FlashMsg{IsError:true}` |
-| **FetchByIDs (lazy-add)** | `func(ctx, clients, ids) ([]Resource, error)` | Top-level `error` return (composite per E3) | `(*Core).HandleRelatedCheckStarted` (`internal/runtime/related.go`) sets the lazy-add error; the TUI adapter (`internal/tui/runtime_adapter_related.go` `handleRelatedCheckStarted`) converts to a flash |
+| **FetchByIDs (lazy-add)** | `func(ctx, clients, ids) ([]Resource, error)` | Top-level `error` return (composite per E3) | `(*Core).HandleRelatedCheckStarted` (`core/runtime/related.go`) sets the lazy-add error; the TUI adapter (`internal/tui/runtime_adapter_related.go` `handleRelatedCheckStarted`) converts to a flash |
 | **Related checker** | `func(ctx, clients, src, cache) RelatedCheckResult` | `Result.Err` field on `RelatedCheckResult` | rightcolumn / app.go surfaces `Result.Err` as FlashMsg |
 | **Wave-2 issue enricher** | `func(ctx, clients, res) (IssueEnricherResult, error)` | **BOTH** `IssueEnricherResult.Truncated` + `IssueEnricherResult.TruncatedIDs[id]` (per-row `?` marker) **AND** the top-level `error` return (composite via `AggregateFailures`) | `EnrichmentCheckedMsg.Err` → `handleEnrichmentChecked` → FlashMsg |
 | **Detail enricher** | per-type signature | `DetailEnrichmentResult.Err` | app.go detail-enrichment handler → FlashMsg |
@@ -240,7 +240,7 @@ This rule exists because three bugs of identical shape shipped unnoticed (tg 202
 
 - **Unit test regression pin** per enricher / checker that takes an ARN param: use a **strict fake** that rejects non-ARN values (`strings.HasPrefix(got, "arn:aws:")` → return `ValidationError` / `InvalidArn`). The existing `strictELBv2Fake`, `strictSFNFake`, `strictACMFake`, `strictMSKFake` in `tests/unit/` are the pattern to copy.
 - **Static guard** `TestNoIDAsARN_StaticGuard` in `tests/unit/qa_no_id_as_arn_static_test.go` scans every `_issue_enrichment.go` / `_detail_enrichment.go` / `_related.go` / `_related_extra.go` file and flags direct (`Arn: aws.String(r.ID)`) and indirect (`local := r.ID` flowing into an `*Arn:` field) anti-patterns. Any addition of a new resource type must keep this test green.
-- **Strict demo fakes.** Every demo fake under `internal/demo/fakes/` validates `*Arn` input parameters and returns `ValidationError` / `InvalidArn` on non-ARN input, mirroring real AWS. This is what forces the echo chamber open: a unit or integration test that constructs a `Resource` with the wrong shape produces an enricher error instead of a silent empty result.
+- **Strict demo fakes.** Every demo fake under `core/demo/fakes/` validates `*Arn` input parameters and returns `ValidationError` / `InvalidArn` on non-ARN input, mirroring real AWS. This is what forces the echo chamber open: a unit or integration test that constructs a `Resource` with the wrong shape produces an enricher error instead of a silent empty result.
 - **Scenario harness assertion.** `fullIntegrationScenario.AssertNoEnrichmentErrors()` inspects every `EnrichmentCheckedMsg` drained during the scenario and fails on any non-nil `.Err`. Every scenario test that opens a resource list with wave-2 enrichment must call it before returning. Missing scenarios must be added for every resource type with a registered enricher.
 
 ### Enforcement
@@ -276,7 +276,7 @@ Phase 3's "one case per signal" is NECESSARY but NOT SUFFICIENT. Rule 7 (`(+N)` 
 | **U12** | **Partial AWS failure surfaces a FlashMsg with `IsError=true`** | **1 fixture: N items total; describe/get call errors on 2 of them (AccessDenied / NotFound)** | **scenario test: (a) list renders N−2 rows, (b) `FlashMsg` with `IsError=true` was emitted, (c) `errorHistory` contains a composite error naming the 2 failed IDs and reasons** |
 | **U13** | **Every SDK call is wrapped in `RetryOnThrottle`** | **n/a — static audit** | **phase-5 + phase-7.5 grep: zero matches of unwrapped `api.Describe*` / `api.Get*` / `api.List*` in new code** |
 | **U14** | **No enricher / related checker passes `r.ID` as an ARN-typed param when the fetcher emits `ID = bare name`** | **1 fixture in real fetcher shape** | **unit test: `qa_<short>_uses_arn_from_fields_test.go` with a strict fake that rejects non-ARN input; PLUS `TestNoIDAsARN_StaticGuard` must stay green after adding the enricher/checker** |
-| **U15** | **Demo fake for every AWS operation accepting `*Arn` rejects non-ARN input** | **fake implementation** | **any test that constructs a `Resource` with the wrong ID shape (e.g. ID = bare name where fetcher actually emits ID = ARN) sees a `ValidationError` from the fake instead of silent success; new fakes must follow the pattern in `internal/demo/fakes/sfn.go` `validateSFNArn` / `internal/demo/fakes/elb.go` / etc.** |
+| **U15** | **Demo fake for every AWS operation accepting `*Arn` rejects non-ARN input** | **fake implementation** | **any test that constructs a `Resource` with the wrong ID shape (e.g. ID = bare name where fetcher actually emits ID = ARN) sees a `ValidationError` from the fake instead of silent success; new fakes must follow the pattern in `core/demo/fakes/sfn.go` `validateSFNArn` / `core/demo/fakes/elb.go` / etc.** |
 | **U16** | **Scenario test for the resource type asserts `AssertNoEnrichmentErrors` after draining wave-2** | **1 scenario file `tests/integration/scenario_<short>_visual_test.go`** | **scenario calls `sc.AssertNoEnrichmentErrors()` before returning; this is the integration-level guard that makes `make test` fail if any enricher emits an error against real demo fakes** |
 
 Demo mode runs Wave 2 enrichment end-to-end against typed fakes (the `!m.isDemo` guard was removed 2026-04-22 after it was caught hiding the `(+N)` / `~` / "maintenance scheduled" rendering in the actual demo). Every row in this table is therefore reachable via the scripted scenario harness without message injection, provided the harness drains the `AvailabilityPrefetchedMsg` → `EnrichmentCheckedMsg` chain (it does as of 2026-04-22).
@@ -406,7 +406,7 @@ Read the four files listed above. From each, extract only:
 - **`<shortName>_issue_enrichment.go`**: the registered enricher function signature, the AWS API it calls, whether it's registered at package init. Compare to §3.2 of the spec.
 - **`<shortName>_detail_enrichment.go`** (if present): same shape as issue enrichment but for detail-view fields. If absent, note that.
 
-Also read **`.a9s/views/<shortName>.yaml`** and **`internal/config/defaults.go`** (the `defaultViews` section for this shortName) and audit each declared column against the universal column rules (see "Universal UI rules" in phase 0):
+Also read **`.a9s/views/<shortName>.yaml`** and **`core/config/defaults.go`** (the `defaultViews` section for this shortName) and audit each declared column against the universal column rules (see "Universal UI rules" in phase 0):
 
 - **Exactly one Status column (S4)** — backing key `status`, carrying phrases derived per spec §4. If absent, coder must add. If present twice or split, coder must merge.
 - **No jargon columns** — any column whose name or backing key looks like an encoded flag set (`CIS`, `Flags`, `Policy`, `Issues`, `NOBKP`, `UNENC`, etc.) is invented UI. It goes on the coder's delete list. Its data belongs in the Status column per §4 precedence.
@@ -420,11 +420,11 @@ Record any column delta in the impl-plan's "Contract surface gap analysis" secti
 Phase 6 has two sub-steps, **6a** (fixtures, blocking) and **6b** (QA tests, parallel with phase 7). Phase 7 is a peer phase, NOT a sub-step of phase 6 — but 6a must complete before either 6b or phase 7 can start. Read this phase and phase 7 together; dispatch 6a first, then 6b and 7 in parallel.
 
 Rationale for the sequencing:
-- **Fixtures are a single asset**, not two. `internal/demo/fixtures/<shortName>.go` feeds BOTH `./a9s --demo` (showcase) AND the unit test suite (6 test files in the tree currently import from here, and counting). Tests import raw SDK-shape fixtures from this file; inline construction in tests is the anti-pattern we are retiring.
+- **Fixtures are a single asset**, not two. `core/demo/fixtures/<shortName>.go` feeds BOTH `./a9s --demo` (showcase) AND the unit test suite (6 test files in the tree currently import from here, and counting). Tests import raw SDK-shape fixtures from this file; inline construction in tests is the anti-pattern we are retiring.
 - **Exception: adversarial fixtures** (nil pointers, malformed AWS responses, API error paths, anything the spec marks out of scope) corrupt the demo and stay inline in the QA test file. The `a9s-create-demo-fixture` skill enforces this boundary.
-- **6a blocks 6b**: tests reference fixture symbols; without the file on disk QA's tests don't compile (QA cannot write under `internal/`).
+- **6a blocks 6b**: tests reference fixture symbols; without the file on disk QA's tests don't compile (QA cannot write under `core/` or `internal/`).
 - **6a blocks 7**: if the coder rewrote the fixture file after 6b wrote tests against it, every test would break. Fixtures are written once in 6a and never rewritten inside this skill invocation.
-- **6b and 7 do NOT block each other**: QA writes only `tests/unit/*`; coder in phase 7 writes only `internal/aws/<shortName>*.go`. No file overlap, no runtime dependency.
+- **6b and 7 do NOT block each other**: QA writes only `tests/unit/*`; coder in phase 7 writes only `core/aws/<shortName>*.go`. No file overlap, no runtime dependency.
 
 Before dispatching 6a, delete the exact stale test files that 6b will rewrite:
 
@@ -445,7 +445,7 @@ phase 6 blocked: Agent dispatch unavailable. Re-invoke the skill from the main C
 
 #### 6a. Coder — fixtures only (blocks 6b and 7)
 
-Dispatch `Agent(a9s-coder)` with a narrow, fixture-only task. The coder uses the `a9s-create-demo-fixture` skill to build a graph-connected fixture file at `internal/demo/fixtures/<shortName>.go` (single file per service — no `_fixtures` suffix; fold any existing `<shortName>_fixtures.go`).
+Dispatch `Agent(a9s-coder)` with a narrow, fixture-only task. The coder uses the `a9s-create-demo-fixture` skill to build a graph-connected fixture file at `core/demo/fixtures/<shortName>.go` (single file per service — no `_fixtures` suffix; fold any existing `<shortName>_fixtures.go`).
 
 ```text
 ## CODER TASK: <shortName> demo fixtures (phase 6a)
@@ -455,11 +455,11 @@ Parallelization: sequential (blocks 6b QA and phase 7 coder implementation)
 Skill: a9s-create-demo-fixture with argument <shortName>. Follow the skill end-to-end.
 
 ### Files to create or overwrite:
-- internal/demo/fixtures/<shortName>.go — single source for demo + tests, raw SDK types
-- internal/demo/fixtures/<peer>.go — targeted sibling updates per the skill's phase 2 graph plan (alarm, kms, sg, subnet, vpc, dbi-snap, role, secrets, ct-events, logs, and any other §2 pivot target that needs a matching entry for this fixture's references)
+- core/demo/fixtures/<shortName>.go — single source for demo + tests, raw SDK types
+- core/demo/fixtures/<peer>.go — targeted sibling updates per the skill's phase 2 graph plan (alarm, kms, sg, subnet, vpc, dbi-snap, role, secrets, ct-events, logs, and any other §2 pivot target that needs a matching entry for this fixture's references)
 
 ### Files to delete:
-- internal/demo/fixtures/<shortName>_fixtures.go (if present — folded into <shortName>.go)
+- core/demo/fixtures/<shortName>_fixtures.go (if present — folded into <shortName>.go)
 
 ### Expected exports (QA will import these by exact name):
 - `<ShortName>Fixtures` struct + `New<ShortName>Fixtures()` constructor, where `<ShortName>` is Go-idiomatic Pascal-case with AWS-style acronyms preserved UPPERCASE. Key on the SHORTNAME, not the AWS service name — `redis` gets `RedisFixtures`, not `ElastiCacheFixtures`; `dbi` gets `DBIFixtures`, not `RDSFixtures`; `ng` gets `NGFixtures`, not `EKSFixtures`; `msk` gets `MSKFixtures`.
@@ -474,13 +474,13 @@ Skill: a9s-create-demo-fixture with argument <shortName>. Follow the skill end-t
 ### Context files (read-only):
 - docs/resources/<shortName>.md (§2 related targets)
 - docs/resources/<shortName>-impl-plan.md (§2 fixture list — authoritative)
-- internal/aws/<shortName>_related.go (which fields each pivot reads)
-- internal/demo/fixtures/<peer>.go for every §2 target
-- internal/demo/handlers.go (confirm typed-fake path suffices)
+- core/aws/<shortName>_related.go (which fields each pivot reads)
+- core/demo/fixtures/<peer>.go for every §2 target
+- core/demo/handlers.go (confirm typed-fake path suffices)
 
 ### Verify before reporting complete:
 - `make build` succeeds.
-- `rg -n '^func New|^const ' internal/demo/fixtures/<shortName>.go` lists every exported symbol.
+- `rg -n '^func New|^const ' core/demo/fixtures/<shortName>.go` lists every exported symbol.
 - The skill's phase 6 "graph renders" checks pass (row count, pivot non-zero counts — reported as a single block).
 ```
 
@@ -509,7 +509,7 @@ Parallelization: parallel-safe with phase 7 (both run after 6a)
 - tests/unit/aws_<shortName>_related_test.go — related-target discovery tests per §2
 
 ### Fixture usage rule:
-Tests import from internal/demo/fixtures/<shortName>.go (single source of truth).
+Tests import from core/demo/fixtures/<shortName>.go (single source of truth).
 The phase 6a output exports these exact symbols — call them by name:
 <paste the symbol list from 6a>
 
@@ -524,15 +524,15 @@ in the test file — the demo fixture never carries these because they corrupt t
 
 ### Forbidden inputs:
 - Do not read existing tests/unit/*<shortName>*.go — rewrite from the pseudocode spec.
-- Do not read internal/aws/<shortName>.go — you are testing the contract.
+- Do not read core/aws/<shortName>.go — you are testing the contract.
 - Do not write under internal/.
 
 ### Context files (read-only):
 - docs/resources/<shortName>.md
 - docs/resources/<shortName>-impl-plan.md
-- internal/demo/fixtures/<shortName>.go (symbols and state coverage)
-- internal/aws/<shortName>_interfaces.go (mock signatures)
-- internal/resource/resource.go, internal/domain/finding.go, internal/aws/issue_enrichment.go (IssueEnricherResult doc comment)
+- core/demo/fixtures/<shortName>.go (symbols and state coverage)
+- core/aws/<shortName>_interfaces.go (mock signatures)
+- core/resource/resource.go, core/domain/finding.go, core/aws/issue_enrichment.go (IssueEnricherResult doc comment)
 ```
 
 QA replies `SCORE: <N> — <rationale>`. Accept or rework. On accept, re-dispatch same scope with `Mode: execute` and `Confirmed score: <N>`.
@@ -550,16 +550,16 @@ Coder task shape:
 Parallelization: parallel-safe with 6b QA (both run after 6a)
 
 ### Files to create or overwrite (closed set — adding any file not in this list is a scope violation caught in phase 7.5):
-- **Fetcher** — either `internal/aws/<shortName>.go` OR `internal/aws/<service>.go` if the fetcher lives in a shared service file (phase 0 located it). Exactly one of the two.
-- internal/aws/<shortName>_interfaces.go — add any missing narrow interface
-- internal/aws/<shortName>_related.go — RegisterRelated for every target in §2
-- internal/aws/<shortName>_issue_enrichment.go — Wave 2 enricher per §3.2. ONLY include this file when §3.2 has signals; if the spec says `No Wave 2 signals`, omit this file entirely. All enricher body lives here — do NOT spin off `<shortName>_maintenance.go` / `<shortName>_overdue.go` / similar helper files.
-- internal/aws/<shortName>_detail_enrichment.go — only if spec §3.2 ("detail text" column) requires fields/API calls beyond what the list fetcher already has. Detail-enrichment is NOT about §2 (related panel) — that's covered by `_related.go` checkers.
-- .a9s/views/<shortName>.yaml — regenerate via `go run ./cmd/viewsgen/` AFTER amending `internal/config/defaults.go` (the yaml is generated, never hand-edited)
-- internal/config/defaults.go — update the `defaultViews` entry for this shortName per the universal column rules in phase 0 (exactly one Status column, no jargon columns, identity/metadata per-resource)
+- **Fetcher** — either `core/aws/<shortName>.go` OR `core/aws/<service>.go` if the fetcher lives in a shared service file (phase 0 located it). Exactly one of the two.
+- core/aws/<shortName>_interfaces.go — add any missing narrow interface
+- core/aws/<shortName>_related.go — RegisterRelated for every target in §2
+- core/aws/<shortName>_issue_enrichment.go — Wave 2 enricher per §3.2. ONLY include this file when §3.2 has signals; if the spec says `No Wave 2 signals`, omit this file entirely. All enricher body lives here — do NOT spin off `<shortName>_maintenance.go` / `<shortName>_overdue.go` / similar helper files.
+- core/aws/<shortName>_detail_enrichment.go — only if spec §3.2 ("detail text" column) requires fields/API calls beyond what the list fetcher already has. Detail-enrichment is NOT about §2 (related panel) — that's covered by `_related.go` checkers.
+- .a9s/views/<shortName>.yaml — regenerate via `go run ./cmd/viewsgen/` AFTER amending `core/config/defaults.go` (the yaml is generated, never hand-edited)
+- core/config/defaults.go — update the `defaultViews` entry for this shortName per the universal column rules in phase 0 (exactly one Status column, no jargon columns, identity/metadata per-resource)
 
 ### Do NOT touch:
-- internal/demo/fixtures/<shortName>.go — written in 6a; rewriting breaks QA's test compile.
+- core/demo/fixtures/<shortName>.go — written in 6a; rewriting breaks QA's test compile.
 - Any file not in the list above. If you think you need a new helper file, reply REJECT with scope expansion request to the skill runner.
 
 ### Expected behavior:
@@ -571,20 +571,20 @@ Parallelization: parallel-safe with 6b QA (both run after 6a)
 
 ### Rule-7 implementation (multi-finding `(+N)` suffix) — framework-derived:
 
-Rule 7 IS wired by universal infrastructure: `listPhraseFromFindings` (`internal/app/list_columns.go`) derives the S4 cell from the row's merged `Findings` slice — one finding → `"<phrase>"`, N≥2 → `"<top phrase> (+N-1)"`. NOBODY hand-appends `(+N)`; a fetcher or enricher that writes the suffix itself double-stacks it. The per-resource work is feeding the Findings slice correctly:
+Rule 7 IS wired by universal infrastructure: `listPhraseFromFindings` (`core/app/list_columns.go`) derives the S4 cell from the row's merged `Findings` slice — one finding → `"<phrase>"`, N≥2 → `"<top phrase> (+N-1)"`. NOBODY hand-appends `(+N)`; a fetcher or enricher that writes the suffix itself double-stacks it. The per-resource work is feeding the Findings slice correctly:
 
 1. **Fetcher — emit ALL coexisting Wave-1 findings**: when the resource has multiple §3.1 conditions that can coexist (e.g. `available` + `BackupRetentionPeriod=0` + `PubliclyAccessible=true`), populate `Resource.Findings` with one `domain.Finding` per active condition (`Source: "wave1"`), in §4 precedence order:
    - 0 conditions → empty slice (Healthy silence, blank S4).
    - N conditions → N entries; the first-in-precedence renders as the top phrase, the rest count into the `(+N-1)` suffix.
-   Never collapse silently to just the top finding when >1 condition exists — the framework needs the full list to render the count and to surface each entry in the detail Attention section. The common pattern is a `<shortName>StatusFindings(raw) []domain.Finding` helper beside the fetcher (see `acmStatusFindings` in `internal/aws/acm.go`).
+   Never collapse silently to just the top finding when >1 condition exists — the framework needs the full list to render the count and to surface each entry in the detail Attention section. The common pattern is a `<shortName>StatusFindings(raw) []domain.Finding` helper beside the fetcher (see `acmStatusFindings` in `core/aws/acm.go`).
 
 2. **Enricher — emit Findings, never touch the suffix**: each Wave-2 condition is one `domain.Finding` (Source `"wave2:<short>"`) in `IssueEnricherResult.Findings[id]`. The framework merges it into the row's slice and re-derives the S4 cell; severity precedence is handled by the shared reducer `domain.WorstSeverityFinding`. Do NOT write a `(+N)` suffix into `FieldUpdates["status"]` — `FieldUpdates` is only for Wave-2-derived field values that list columns or Color funcs need.
 
-3. **Color function (`internal/aws/catalog_<category>.go`) — MUST strip `(+N)` before matching**: use the package-local `stripFindingSuffix` helper or the shared `colorFromWave1` / `colorFromAnyFinding` helpers (`internal/aws/catalog_color_helpers.go`) — do NOT reinvent. Every per-type Color func that pattern-matches on `Resource.Fields["status"]` MUST strip the suffix first, OR match phrase prefix. Failing this, `"publicly accessible (+1)"` falls through all Warning switches and color-buckets Healthy — a spec-§4 violation.
+3. **Color function (`core/aws/catalog_<category>.go`) — MUST strip `(+N)` before matching**: use the package-local `stripFindingSuffix` helper or the shared `colorFromWave1` / `colorFromAnyFinding` helpers (`core/aws/catalog_color_helpers.go`) — do NOT reinvent. Every per-type Color func that pattern-matches on `Resource.Fields["status"]` MUST strip the suffix first, OR match phrase prefix. Failing this, `"publicly accessible (+1)"` falls through all Warning switches and color-buckets Healthy — a spec-§4 violation.
 
 4. **Wave-2 short-cause phrase must NOT be in the Warning color switch**: a Wave-2 `~` finding renders on a HEALTHY (green) row. If the Color func lists `"maintenance scheduled"` among Warning phrases, the row turns yellow and the glyph is suppressed — spec rule 3 violation. The enricher sets the Status phrase; the Color func must treat it as Healthy (the row color is driven by the Wave-1 bucket, not by the Wave-2 phrase).
 
-5. **Cross-ref Wave-1 phrases go through the enricher's Findings channel too** — signals that need sibling-cache access (orphan-style or retention-style) are emitted by the IssueEnricher as `domain.Finding` entries in `IssueEnricherResult.Findings[id]`, exactly like Wave-2 conditions. Routing through Findings is idempotent on re-runs and automatically visible to S4 and S5. **The canonical cross-ref-enricher pattern is the parameterized helper at `internal/aws/snapshot_cross_ref.go`** (`EnrichSnapshotCrossRef(SnapshotCrossRefConfig{...})`) — `dbi-snap` and `dbc-snap` are both ~60-line config wrappers around it. When adding a new cross-ref enricher, prefer extending or instantiating this helper over copying the body.
+5. **Cross-ref Wave-1 phrases go through the enricher's Findings channel too** — signals that need sibling-cache access (orphan-style or retention-style) are emitted by the IssueEnricher as `domain.Finding` entries in `IssueEnricherResult.Findings[id]`, exactly like Wave-2 conditions. Routing through Findings is idempotent on re-runs and automatically visible to S4 and S5. **The canonical cross-ref-enricher pattern is the parameterized helper at `core/aws/snapshot_cross_ref.go`** (`EnrichSnapshotCrossRef(SnapshotCrossRefConfig{...})`) — `dbi-snap` and `dbc-snap` are both ~60-line config wrappers around it. When adding a new cross-ref enricher, prefer extending or instantiating this helper over copying the body.
 
    Dropping fetcher-local Findings population leaves `Resource.Findings` empty; the row renders Healthy, the S4 cell falls back to the raw lifecycle field, and the detail view hides every warning. This is the bug class that leaked through on 2026-04-22 — spec rule 7 violation revealed when the user opened a row that listed `(+3)` on the list but showed no individual issues in detail. The integration test `TestScenario_DBIVisual_DetailSurfacesAllIssues` is the regression pin for fetcher-local; `TestScenario_DBISnapVisual_DetailSurfacesAllIssues` is the pin for cross-ref-via-Findings.
 
@@ -603,8 +603,8 @@ Delete every stub, commented-out block, or "pretend-to-work" fallback related to
 ### Context files (read-only):
 - docs/resources/<shortName>.md — the contract
 - docs/resources/<shortName>-impl-plan.md — pseudocode + fixtures + contract-surface gap analysis
-- internal/aws/<shortName>_interfaces.go — current mock surface
-- internal/domain/resource.go + internal/domain/finding.go — Resource struct, Finding, AttentionDetail
+- core/aws/<shortName>_interfaces.go — current mock surface
+- core/domain/resource.go + core/domain/finding.go — Resource struct, Finding, AttentionDetail
 - AWS SDK Go v2 types via `go doc github.com/aws/aws-sdk-go-v2/service/<svc>/types.<Shape>`
 ```
 
@@ -615,14 +615,14 @@ The coder agent cannot be fully trusted to stay inside the approved file list �
 Run:
 
 ```bash
-git status --porcelain -- internal/aws/<shortName>*.go internal/demo/fixtures/<shortName>*.go .a9s/views/<shortName>.yaml internal/config/defaults.go tests/unit/aws_<shortName>*.go
+git status --porcelain -- core/aws/<shortName>*.go core/demo/fixtures/<shortName>*.go .a9s/views/<shortName>.yaml core/config/defaults.go tests/unit/aws_<shortName>*.go
 ```
 
 Parse the output. Build the set of files touched. Diff against the approved-scope union:
 
-- Phase 6a approved: `internal/demo/fixtures/<shortName>.go` + any sibling files listed in the 6a graph plan.
+- Phase 6a approved: `core/demo/fixtures/<shortName>.go` + any sibling files listed in the 6a graph plan.
 - Phase 6b approved: `tests/unit/aws_<shortName>_test.go`, `tests/unit/aws_<shortName>_related_test.go`, `tests/unit/aws_<shortName>_issue_enrichment_test.go` (ONLY if §3.2 has Wave 2 signals), `tests/unit/aws_<shortName>_detail_enrichment_test.go` (ONLY if §2 demands a detail enricher).
-- Phase 7 approved: the fetcher (either `internal/aws/<shortName>.go` OR the shared `internal/aws/<service>.go` located in phase 0 — not both), `internal/aws/<shortName>_interfaces.go`, `internal/aws/<shortName>_related.go`, `internal/aws/<shortName>_issue_enrichment.go` (ONLY if §3.2 has Wave 2 signals), `internal/aws/<shortName>_detail_enrichment.go` (ONLY if §2 demands a detail enricher), `.a9s/views/<shortName>.yaml`, `internal/config/defaults.go`.
+- Phase 7 approved: the fetcher (either `core/aws/<shortName>.go` OR the shared `core/aws/<service>.go` located in phase 0 — not both), `core/aws/<shortName>_interfaces.go`, `core/aws/<shortName>_related.go`, `core/aws/<shortName>_issue_enrichment.go` (ONLY if §3.2 has Wave 2 signals), `core/aws/<shortName>_detail_enrichment.go` (ONLY if §2 demands a detail enricher), `.a9s/views/<shortName>.yaml`, `core/config/defaults.go`.
 
 Any file in the `git status` output that is NOT in this union = SCOPE VIOLATION. Do not run phase 8. Return the list to the coder agent with:
 
@@ -695,7 +695,7 @@ If `scenario.ExpectRowStatusBlank` / `ExpectRowNamePrefix` / `ExpectMenuIssueCou
 
 - `make test` — no red in the full unit test suite.
 - `make lint` — no issues.
-- `rg -n 'TODO|FIXME|stub|fake' internal/aws/<shortName>*.go` — nothing except legitimate comments.
+- `rg -n 'TODO|FIXME|stub|fake' core/aws/<shortName>*.go` — nothing except legitimate comments.
 
 #### 8.3 Report
 
@@ -717,7 +717,7 @@ If `scenario.ExpectRowStatusBlank` / `ExpectRowNamePrefix` / `ExpectMenuIssueCou
 - Wave-2 native in demo:         yes (enrichment chain drains end-to-end)
 - unit tests: <N> passing, 0 failing
 - stubs: 0 / TBDs resolved: <N> / deferred: <N> / out-of-scope: <N>
-Implementation approved — ready for review at internal/aws/<shortName>*.go and tests/integration/scenario_<shortName>_visual_test.go.
+Implementation approved — ready for review at core/aws/<shortName>*.go and tests/integration/scenario_<shortName>_visual_test.go.
 ```
 
 Rule-7 lines are **required** — "N/A" is only valid when the spec has at most one §3.1 signal AND no Wave-2 signals (extremely rare). Omitting them = render-gate FAIL.
@@ -815,7 +815,7 @@ FAIL if `TestScenario_RelatedDrillThrough_All/<label>` does not PASS — a Count
 
 FAIL if navigable fields are registered and `TestScenario_NavigableFieldDrillThrough_All/<label>` does not PASS — options:
 
-- `NavIDFromValue` (in `internal/resource/related.go`) has no extractor for the target type, or the wrong extractor is registered — add/fix the entry.
+- `NavIDFromValue` (in `core/resource/related.go`) has no extractor for the target type, or the wrong extractor is registered — add/fix the entry.
 - The registered `FieldPath` does not resolve against the fetcher's RawStruct at all (as with dbc's `DBSubnetGroup.VpcId` against a docdb DBCluster whose DBSubnetGroup is `*string`, or redis's `SecurityGroups.SecurityGroupId` against a ReplicationGroup that has no such field) — REMOVE the stale entry from `RegisterNavigableFields(...)` and route navigation through the related-panel checker instead. Do not work around structurally-invalid paths with harness hacks.
 
 #### 9.5 Detail view surfaces every finding — with a test
@@ -851,11 +851,11 @@ This is the closeout audit for Rules E1–E6 (`## Error handling and throttle ru
 Files in scope (replace `<short>`):
 
 ```text
-internal/aws/<short>.go
-internal/aws/<short>_related.go
-internal/aws/<short>_related_extra.go         (if present)
-internal/aws/<short>_issue_enrichment.go      (if not NoOp)
-internal/aws/<short>_detail_enrichment.go     (if present)
+core/aws/<short>.go
+core/aws/<short>_related.go
+core/aws/<short>_related_extra.go         (if present)
+core/aws/<short>_issue_enrichment.go      (if not NoOp)
+core/aws/<short>_detail_enrichment.go     (if present)
 ```
 
 ##### 9.6.a Static throttle-wrap audit (E1 + U13)
@@ -865,8 +865,8 @@ Every `api.Describe*` / `api.Get*` / `api.List*` / `api.Lookup*` call MUST be in
 ```bash
 # Inside any of the in-scope files: lines that name an SDK method but do NOT
 # already sit inside a RetryOnThrottle closure body.
-for f in internal/aws/<short>.go internal/aws/<short>_related*.go \
-         internal/aws/<short>_*_enrichment.go; do
+for f in core/aws/<short>.go core/aws/<short>_related*.go \
+         core/aws/<short>_*_enrichment.go; do
   [ -f "$f" ] || continue
   awk '
     /RetryOnThrottle\(/ { in_retry = 1; depth = 0 }
@@ -876,7 +876,7 @@ for f in internal/aws/<short>.go internal/aws/<short>_related*.go \
 done
 ```
 
-Expected output: **empty**. Any line printed is an unwrapped SDK call → coder reject; loop back to phase 7. Add the `RetryOnThrottle(...)` closure verbatim from `internal/aws/kms_related.go:238-255`.
+Expected output: **empty**. Any line printed is an unwrapped SDK call → coder reject; loop back to phase 7. Add the `RetryOnThrottle(...)` closure verbatim from `core/aws/kms_related.go:238-255`.
 
 Report:
 
@@ -889,8 +889,8 @@ Report:
 The four banned patterns from Rule E2 must NOT appear in the new files:
 
 ```bash
-for f in internal/aws/<short>.go internal/aws/<short>_related*.go \
-         internal/aws/<short>_*_enrichment.go; do
+for f in core/aws/<short>.go core/aws/<short>_related*.go \
+         core/aws/<short>_*_enrichment.go; do
   [ -f "$f" ] || continue
   # Pattern: `if err != nil {` followed within 3 lines by `continue` /
   # `break` / `return nil` / bare `return` / `_ = err`, with NO preceding
@@ -922,11 +922,11 @@ For every function category present in the new files, confirm the error reaches 
 
 | Category | Where the error must be set | Verification command |
 |---|---|---|
-| Paginated top-level fetcher | `RegisterPaginated` closure returns `(FetchResult, err)` where `err` is the composite | `grep -n "AggregateFailures" internal/aws/<short>.go` |
-| FetchByIDs | `RegisterFetchByIDs` closure returns `([]Resource, err)` composite | `grep -n "AggregateFailures\|AggregateMissing" internal/aws/<short>.go` |
-| Related checker | `RelatedCheckResult{... Err: <composite>}` on every API-error path | `grep -n "Err:" internal/aws/<short>_related*.go` |
-| Wave-2 enricher | `IssueEnricherResult{... TruncatedIDs: ..., Truncated: ...}` AND top-level `error` return | `grep -n "TruncatedIDs\[" internal/aws/<short>_issue_enrichment.go` and `grep -n "AggregateFailures" internal/aws/<short>_issue_enrichment.go` |
-| Detail enricher | `DetailEnrichmentResult.Err` set on failure path | `grep -n "Err:" internal/aws/<short>_detail_enrichment.go` |
+| Paginated top-level fetcher | `RegisterPaginated` closure returns `(FetchResult, err)` where `err` is the composite | `grep -n "AggregateFailures" core/aws/<short>.go` |
+| FetchByIDs | `RegisterFetchByIDs` closure returns `([]Resource, err)` composite | `grep -n "AggregateFailures\|AggregateMissing" core/aws/<short>.go` |
+| Related checker | `RelatedCheckResult{... Err: <composite>}` on every API-error path | `grep -n "Err:" core/aws/<short>_related*.go` |
+| Wave-2 enricher | `IssueEnricherResult{... TruncatedIDs: ..., Truncated: ...}` AND top-level `error` return | `grep -n "TruncatedIDs\[" core/aws/<short>_issue_enrichment.go` and `grep -n "AggregateFailures" core/aws/<short>_issue_enrichment.go` |
+| Detail enricher | `DetailEnrichmentResult.Err` set on failure path | `grep -n "Err:" core/aws/<short>_detail_enrichment.go` |
 
 If any present category has no surfacing path: FAIL. Either add the surfacing field per E4 or — if no error can ever happen here — add a one-line comment justifying it (e.g. `// no AWS call; pure RawStruct extraction — no Err field needed`).
 

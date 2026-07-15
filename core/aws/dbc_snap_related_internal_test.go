@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package aws
 
 // dbc_snap_related_internal_test.go — internal package tests for checkDbcSnapBackup.
 //
-// checkDbcSnapBackup is unexported, so these tests must live in the internal/aws
+// checkDbcSnapBackup is unexported, so these tests must live in the core/aws
 // package. Two cases pin the truncated-dbc-cache contract:
 //
 //  1. TruncatedDBCCacheReturnsUnknown: dbc cache is truncated AND the parent

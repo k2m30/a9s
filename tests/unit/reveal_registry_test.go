@@ -1,7 +1,7 @@
 package unit
 
 // reveal_registry_test.go tests the reveal registry functions that will be
-// added to internal/resource/registry.go as part of issue #104.
+// added to core/resource/registry.go as part of issue #104.
 // These tests will FAIL until the coder adds SetRevealFetcherForTest,
 // GetRevealFetcher, CleanupRevealFetcherForTest, HasRevealFetcher to registry.go
 // and updates secrets.go and ssm.go to register reveal fetchers in init().
@@ -10,7 +10,7 @@ import (
 	"context"
 	"testing"
 
-	// Import internal/aws to trigger init() registrations for "secrets" and "ssm".
+	// Import core/aws to trigger init() registrations for "secrets" and "ssm".
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -118,7 +118,7 @@ func TestRevealRegistry_Unregister(t *testing.T) {
 // TestRevealRegistry_SecretsRegistered
 // ---------------------------------------------------------------------------
 
-// TestRevealRegistry_SecretsRegistered verifies that importing internal/aws
+// TestRevealRegistry_SecretsRegistered verifies that importing core/aws
 // causes the "secrets" type to have a reveal fetcher registered via init().
 func TestRevealRegistry_SecretsRegistered(t *testing.T) {
 	if !resource.HasRevealFetcher("secrets") {
@@ -133,7 +133,7 @@ func TestRevealRegistry_SecretsRegistered(t *testing.T) {
 // TestRevealRegistry_SSMRegistered
 // ---------------------------------------------------------------------------
 
-// TestRevealRegistry_SSMRegistered verifies that importing internal/aws
+// TestRevealRegistry_SSMRegistered verifies that importing core/aws
 // causes the "ssm" type to have a reveal fetcher registered via init().
 func TestRevealRegistry_SSMRegistered(t *testing.T) {
 	if !resource.HasRevealFetcher("ssm") {

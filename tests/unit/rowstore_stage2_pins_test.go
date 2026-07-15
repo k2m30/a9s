@@ -356,7 +356,7 @@ func TestStage2Pin_DEF21_D16_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *t
 	// The list lane's own save already fired as a side effect of the load-more
 	// ResourcesLoaded Handle call above: Controller.handleResourcesLoadedEvent
 	// -> syncExactTotalToMenu -> maybeSaveResourceListCache persists ls.Rows
-	// unconditionally on every ResourcesLoaded delivery (internal/app/
+	// unconditionally on every ResourcesLoaded delivery (core/app/
 	// handle.go), not just on list-close — so no separate save call is needed
 	// here.
 	listLaneTF := stage2PinReadTypeFile(t, s.Profile, s.Region, "s3")
@@ -404,8 +404,8 @@ func TestStage2Pin_DEF21_D16_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *t
 	}
 }
 
-// caseInsensitiveGrepSyncProbeResourcesForTypeCallers scans internal/runtime
-// and internal/app production Go source (*.go, excluding *_test.go) for any
+// caseInsensitiveGrepSyncProbeResourcesForTypeCallers scans core/runtime
+// and core/app production Go source (*.go, excluding *_test.go) for any
 // remaining CODE reference to the identifier "SyncProbeResourcesForType" —
 // its own declaration, per the plan, must be deleted alongside every call
 // site. Returns a "path:line: text" report of every match found (empty when
@@ -413,7 +413,7 @@ func TestStage2Pin_DEF21_D16_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *t
 //
 // Pure comment lines (first non-whitespace characters "//") are skipped: the
 // migration itself leaves explanatory comments naming the deleted function
-// (e.g. internal/app/handle.go's doc comment on the ObserveRows call that
+// (e.g. core/app/handle.go's doc comment on the ObserveRows call that
 // replaced it) so future readers can find what a call site used to do — that
 // is explanatory prose, not a surviving caller or declaration, and asserting
 // against it would make this pin permanently unsatisfiable rather than

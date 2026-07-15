@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package fakes provides in-process fake implementations of AWS service
 // interfaces for use in demo mode and tests.
 package fakes

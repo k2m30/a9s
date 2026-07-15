@@ -19,8 +19,8 @@ Quick reference:
 
 - Go 1.26+, Bubble Tea v2.0.6, Lipgloss v2.0.3, Bubbles v2.1.0 (all under `charm.land/*/v2`), AWS SDK Go v2 (one service module per supported AWS service), yaml.v3, clipboard
 - YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`); YAML cache on disk (`~/.a9s/cache/<profile>--<region>.yaml`)
-- Session-scoped in-memory state owned by `internal/session.Session` (RowStore, capability stores, generation counters; cleared on profile/region `Rotate()`)
-- In-process demo fixture store (per resource type, typed fakes in `internal/demo/fixtures/` + `fakes/`, loaded at startup)
+- Session-scoped in-memory state owned by `core/session.Session` (RowStore, capability stores, generation counters; cleared on profile/region `Rotate()`)
+- In-process demo fixture store (per resource type, typed fakes in `core/demo/fixtures/` + `fakes/`, loaded at startup)
 
 ## Project Structure
 
@@ -29,12 +29,12 @@ cmd/
   a9s/           # main binary (TUI, --demo, --web)
   readmegen/     # README.md generator from docs/README.tmpl.md + docs/shared/
   refgen/        # views_reference.yaml generator
-  viewsgen/      # .a9s/views/*.yaml generator from internal/config defaults
+  viewsgen/      # .a9s/views/*.yaml generator from core/config defaults
   preview/       # static TUI design mockups (no AWS)
   catalogen/     # catalog codegen
   snapshot/      # web-e2e snapshot collector
   checklist/     # web-e2e checklist oracle
-internal/
+core/            # platform-agnostic core — importable by external modules; dual-licensed (GPL-3.0-or-later OR commercial)
   app/           # headless controller — shared list/detail/menu/cost state+render for tui/ and web/
   aws/           # AWS service clients, fetchers, related checkers, enrichers, catalog_<category>.go type defs
   buildinfo/     # version resolution from ldflags / go install
@@ -50,12 +50,13 @@ internal/
   runtime/       # platform-agnostic app core (Core) + messages/ Cmd/Event taxonomy
   semantics/     # projection, ctevent, selector helpers
   session/       # session.Session — session-scoped state, RowStore, Rotate()
-  tui/           # Bubble Tea adapter shell
+  web/           # web mode HTTP server (internal-only)
+internal/
+  tui/           # Bubble Tea adapter shell — GPL-3.0-or-later only
     keys/        # key bindings (including child-view triggers: e, L, r, s)
     layout/      # frame rendering
     styles/      # Tokyo Night Dark palette + themes/*.yaml
     views/       # view models (menu, list, detail, yaml, help, etc.)
-  web/           # web mode HTTP server (internal-only)
 tests/
   unit/          # unit tests
   integration/   # integration tests
@@ -119,13 +120,13 @@ specs/           # feature specifications
 | `a9s-implement-issue` | Orchestrator | End-to-end: analyze → QA stories → design → scope → implement → verify → docs → release |
 | `a9s-resource-spec` | Main session | Generate `docs/resources/<shortName>.md` implementation-blind from the four golden docs |
 | `a9s-implement-resource` | Main session (orchestrator) | Implement resource from its spec: TBDs → impl-plan → fixtures → QA + coder handoff |
-| `a9s-create-demo-fixture` | Fixtures | Build the single-source fixture file at `internal/demo/fixtures/<shortName>.go` — graph-connected, demo + tests share it |
+| `a9s-create-demo-fixture` | Fixtures | Build the single-source fixture file at `core/demo/fixtures/<shortName>.go` — graph-connected, demo + tests share it |
 
 ## Agents
 
 | Agent | Role | Writes to | Rejects without |
 |-------|------|-----------|-----------------|
-| `a9s-coder` | Implementation only — no tests | `internal/`, `cmd/`, `.a9s/` | Exact file scope |
+| `a9s-coder` | Implementation only — no tests | `core/`, `internal/`, `cmd/`, `.a9s/` | Exact file scope |
 | `a9s-qa` | Tests only — no production code | `tests/unit/` | Exact file scope |
 | `a9s-qa-stories` | Given/when/then stories from design spec (no source code) | Nothing (read-only) | N/A |
 | `a9s-devops` | AWS practitioner — resource priorities, feature advice | All | N/A |
@@ -139,36 +140,36 @@ Agents MUST use targeted file access — never broad globs on large directories.
 ### DO
 
 - Use Explore agent wherever reasonable
-- `Glob("internal/aws/{resource}*.go")` — find a specific fetcher
+- `Glob("core/aws/{resource}*.go")` — find a specific fetcher
 - `Glob("tests/unit/*{resource}*")` — find tests for a specific resource
 - `Grep("mock.*{InterfaceName}", "tests/unit/mocks_test.go")` — find a specific mock
-- `Glob("internal/demo/fixtures/*.go")` — find a per-service fixture file
-- `Glob("internal/demo/fakes/*.go")` — find a typed-fake implementation
+- `Glob("core/demo/fixtures/*.go")` — find a per-service fixture file
+- `Glob("core/demo/fakes/*.go")` — find a typed-fake implementation
 - `Grep("func Test.*{Resource}", "tests/unit/qa_yaml_child_views_test.go")` — find append point
 
 ### DON'T
 
 - `Glob("tests/unit/*.go")` — returns 800 files, most irrelevant
-- `Glob("internal/aws/*.go")` — returns 377 files, most irrelevant
-- `Glob("internal/demo/*.go")` — only 4 files remain (client.go, handlers.go, costs_handlers.go, transport.go)
+- `Glob("core/aws/*.go")` — returns 377 files, most irrelevant
+- `Glob("core/demo/*.go")` — only 4 files remain (client.go, handlers.go, costs_handlers.go, transport.go)
 - Reading entire cross-cutting files (mocks_test.go, qa_detail_test.go) — grep for the section first
 
 ### Delegate to Explore for broad investigations
 
 When a single task would require reading 5+ files totaling >500 lines, OR when you need to trace a feature across multiple packages (fetcher → view → related → test), dispatch an `Explore` agent and ask for a summarized report rather than reading everything into main context. Direct Grep/Glob/Read remain correct for targeted lookups (known file, specific symbol, < 3 queries). This protects the main context window for synthesis and decision-making.
 
-#### Per-service fixture files are here (`internal/demo/fixtures/`)
+#### Per-service fixture files are here (`core/demo/fixtures/`)
 
 ## Rules
 
-- ALWAYS rebuild binary (`make build`) after ANY code change — version is resolved at build time via `internal/buildinfo`
+- ALWAYS rebuild binary (`make build`) after ANY code change — version is resolved at build time via `core/buildinfo`
 - Do not make any changes until you have 95%+ confidence in what you need to build. Ask me follow up questions until you reach that confidence
 - TDD is non-negotiable: scope the QA and coder tasks up front; `a9s-qa` writes tests, `a9s-coder` writes implementation. For rigid patterns (resource types, child views) they run in parallel. For novel features, QA goes first.
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
 - NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment. If a linter rule produces widespread false positives, fix the rule in `.golangci.yml`.
 - NEVER make multiple push-and-check cycles. Get it right locally, push once.
 - NEVER commit real environment identifiers — real AWS account IDs, profile names, secret/bucket/DNS names, personal emails. Use synthetic values (`123456789012`, `example-readonly`) or `<placeholders>`. Enforced by `scripts/check-no-real-data.sh`: a generic account-ID-in-ARN heuristic (committed — a pattern, no real value stored) plus the exact terms from the local, git-ignored `.githooks/sensitive_patterns.txt` (never committed — not even hashed; a 12-digit ID or short name is brute-forced from a hash in seconds). Term enforcement is on NEW content only. Modes: tree (`make ready-to-push`), `--staged` (`.githooks/pre-commit`), `--diff` (`.githooks/pre-push`, aborts the push before it reaches the remote), `--audit` (hunt existing leaks). CI is deliberately NOT used — it runs after the push, and a push to a public repo exposes the data immediately. Run `make install-hooks` once per clone. New real term → add it to your local `.githooks/sensitive_patterns.txt`.
-- BEFORE any push, the canonical gate is **`make ready-to-push`** — see [`docs/development-process.md`](docs/development-process.md) §"Stage 6 — Pre-push Validation" for the gate contents and the `internal/aws/` live-integration sub-rule. Review the diff first (Stage 5): `a9s-consistency-checker` for cross-file drift, direct BT v2 / security / coverage review, and CodeRabbit / Codex as external passes.
+- BEFORE any push, the canonical gate is **`make ready-to-push`** — see [`docs/development-process.md`](docs/development-process.md) §"Stage 6 — Pre-push Validation" for the gate contents and the `core/aws/` live-integration sub-rule. Review the diff first (Stage 5): `a9s-consistency-checker` for cross-file drift, direct BT v2 / security / coverage review, and CodeRabbit / Codex as external passes.
 - BEFORE any release, the canonical gate is **`make ready-to-release`** — see [`docs/development-process.md`](docs/development-process.md) §"Stage 7 — Merge & Release" for the manual checklist (`CHANGELOG.md`, `releases/vX.Y.Z.md`, `docs/architecture.md` alignment, busywork audit on tests added/modified in the release).
 - **Exception**: Docs-only changes (`*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICENSE`) skip `ready-to-push`; `make mdlint` is required.
 
@@ -190,7 +191,7 @@ When code changes affect any of the following, update the shared source and rege
 
 ## Recent Changes
 
-- 020-architecture-refactor: declarative catalog (`internal/catalog` + `internal/aws/catalog_*.go`), headless controller (`internal/app`), runtime core (`internal/runtime`), session state (`internal/session`), web mode (`internal/web`)
+- 020-architecture-refactor: declarative catalog (`core/catalog` + `core/aws/catalog_*.go`), headless controller (`core/app`), runtime core (`core/runtime`), session state (`core/session`), web mode (`core/web`)
 
 ## graphify
 

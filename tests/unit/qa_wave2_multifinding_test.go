@@ -24,7 +24,7 @@
 //     r.Findings, the worst severity drives td.ResolveColor, the detail
 //     Attention block lists both phrases, and the list Status cell shows the
 //     worst finding's phrase stacked with "(+1)" — this suffix is NOT
-//     speculative: internal/app/list_columns.go's listPhraseFromFindings
+//     speculative: core/app/list_columns.go's listPhraseFromFindings
 //     already renders "<top phrase> (+N)" for any len(findings)>1 row
 //     (verified by reading its source, and independently exercised GREEN by
 //     this file's own Section 2 carry tests, which seed r.Findings directly
@@ -35,7 +35,7 @@
 //     wave2-sourced domain.Finding entries. VERIFIED EMPIRICALLY (not
 //     assumed from the dispatch): cache.Row.Findings and domain.Resource.
 //     Findings are plain []domain.Finding slices — carryWave2/
-//     carryWave2ForRows/wave2FindingsOf (internal/runtime/wave2_carry.go)
+//     carryWave2ForRows/wave2FindingsOf (core/runtime/wave2_carry.go)
 //     iterate and copy the WHOLE slice, with no per-resource cap — so the
 //     C6b carry path (disk reconcile + restart seed) is already
 //     multi-finding-safe and touches NO part of the #52 seam
@@ -180,14 +180,14 @@ func TestFold_TwoWave2FindingsSameResource_DetailAttentionListsBothPhrases(t *te
 		}
 	}
 	// Case-insensitive: buildAttentionEntries renders through
-	// capitalizeFirstDetail (internal/app/detail_body.go), which upper-cases
+	// capitalizeFirstDetail (core/app/detail_body.go), which upper-cases
 	// the first letter for display ("deployment failed" -> "Deployment
 	// failed"). The contract this pins is that BOTH findings' phrases survive
 	// the fold and each surfaces as its own Attention entry — not the exact
 	// casing of a display convention.
 	joined := strings.ToLower(strings.Join(attentionText, " | "))
 	if !strings.Contains(joined, multiFindingBang.Phrase) {
-		t.Errorf("detail Attention block missing bang phrase %q — buildAttentionEntries (internal/app/detail_body.go) builds one entry per issue-severity r.Findings element with its OWN Phrase/Detail; this fails only if ApplyWave2ToRow still drops a finding during the fold (#52); got Attention rows: %v", multiFindingBang.Phrase, attentionText)
+		t.Errorf("detail Attention block missing bang phrase %q — buildAttentionEntries (core/app/detail_body.go) builds one entry per issue-severity r.Findings element with its OWN Phrase/Detail; this fails only if ApplyWave2ToRow still drops a finding during the fold (#52); got Attention rows: %v", multiFindingBang.Phrase, attentionText)
 	}
 	if !strings.Contains(joined, multiFindingTilde.Phrase) {
 		t.Errorf("detail Attention block missing tilde phrase %q; got Attention rows: %v", multiFindingTilde.Phrase, attentionText)
@@ -226,7 +226,7 @@ func TestFold_TwoWave2FindingsSameResource_ListStatusCellShowsWorstPhrase(t *tes
 	}
 
 	// "(+1)" is the REAL render rule, not a guess: listPhraseFromFindings
-	// (internal/app/list_columns.go) already renders "<top phrase> (+N)" for
+	// (core/app/list_columns.go) already renders "<top phrase> (+N)" for
 	// any row whose r.Findings has more than one entry, and picks the FIRST
 	// issue-severity entry as <top phrase> — bang is ordered first in
 	// buildFoldedMultiFindingRow's slice AND is the worse severity, so both
@@ -314,7 +314,7 @@ func TestRestartSeed_MultiFinding_BothFindingsVisibleOnFirstRender(t *testing.T)
 	// newTestControllerWithCore constructs via runtime.New(session, nil) —
 	// functionally identical to the runtime.Bootstrap(profile, region, nil)
 	// this test used before (Bootstrap is a thin New(sessionWithPairSet, ...)
-	// wrapper — internal/runtime/accessors.go). Neither touches disk at
+	// wrapper — core/runtime/accessors.go). Neither touches disk at
 	// construction time; EnsureCacheStore's first call is what triggers
 	// cache.LoadDir, and that first call happens below, AFTER the helper's
 	// t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) has already pinned this
@@ -388,7 +388,7 @@ func TestRestartSeed_MultiFinding_BothFindingsVisibleOnFirstRender(t *testing.T)
 
 // opensearchMultiUpdateForcedCode and opensearchMultiEncryptionOffCode mirror
 // the unexported opensearchCodeUpdateForced / opensearchCodeEncryptionOff
-// constants in internal/aws/opensearch_issue_enrichment.go.
+// constants in core/aws/opensearch_issue_enrichment.go.
 const (
 	opensearchMultiUpdateForcedCode  domain.FindingCode = "opensearch.update-forced"
 	opensearchMultiEncryptionOffCode domain.FindingCode = "opensearch.encryption-off"
@@ -397,7 +397,7 @@ const (
 // opensearchUpdateForcedOperatorSentence and
 // opensearchEncryptionOffOperatorSentence mirror the unexported
 // opensearchUpdateForcedDetail / opensearchEncryptionOffDetail constants in
-// internal/aws/opensearch_issue_enrichment.go — the S5 operator sentences
+// core/aws/opensearch_issue_enrichment.go — the S5 operator sentences
 // that must stay reachable on each condition's OWN Finding.Detail even when
 // both fire on the same domain.
 const (

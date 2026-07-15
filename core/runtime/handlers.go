@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // handlers.go — shell-level handler bodies for the platform-agnostic Core.
 //
 // Each handler is a (c *Core) Handle* method that consumes a typed
@@ -516,7 +518,7 @@ type ThemeFileReadEvent struct {
 	Err   error
 	// ParseErr is the renderer-side theme-validation result, computed by the
 	// adapter (which owns the styles package) before handing the event to the
-	// runtime. Keeping the parse in the adapter is what lets internal/runtime
+	// runtime. Keeping the parse in the adapter is what lets core/runtime
 	// stay renderer-agnostic (SC-009): the runtime branches on a domain-safe
 	// error instead of importing internal/tui/styles. Non-nil ⇒ malformed YAML.
 	ParseErr error
@@ -611,7 +613,7 @@ func (c *Core) HandleThemeSelected(ev ThemeSelectedEvent) ([]UIIntent, []TaskReq
 //  2. Read OK, parse failure → single "Bad theme YAML: <err>" error flash,
 //     no apply, no pop, no save. The selector stays open so the user can
 //     retry. Validation is performed by the adapter (which owns the styles
-//     package) and surfaced to the runtime as ev.ParseErr, so internal/runtime
+//     package) and surfaced to the runtime as ev.ParseErr, so core/runtime
 //     never imports a renderer package (SC-009).
 //  3. Read OK, parse OK → four results in order: ApplyThemeIntent (carries
 //     the YAML Bytes; the adapter re-parses via styles.ThemeFromYAML),

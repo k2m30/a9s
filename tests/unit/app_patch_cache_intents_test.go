@@ -3,23 +3,23 @@
 //
 //  3. Patch*Cache intents (PatchRelatedCache / PatchResourceCache /
 //     PatchLazyResourceCache) currently no-op in Controller.applyIntents
-//     (internal/app/intents.go:193-197, default case `_ = v`), so the headless
+//     (core/app/intents.go:193-197, default case `_ = v`), so the headless
 //     RelatedCache/ResourceCache/LazyResourceCache never fill. Reopening the
 //     same detail after popping re-runs the full related-check fan-out
 //     instead of hitting the cache-hit replay path at
-//     internal/app/controller.go:209-257 (openSelectedListDetail).
+//     core/app/controller.go:209-257 (openSelectedListDetail).
 //
 //  4. KindEnrichDetail is dispatched by internal/tui/runtime_adapter.go's
 //     handleEnrichDetail but NEVER by the headless controller —
-//     internal/app/navigate.go's applyNavResult (NavigateKindPushDetail case,
+//     core/app/navigate.go's applyNavResult (NavigateKindPushDetail case,
 //     lines 115-132) reads res.DispatchRelated but never res.DispatchEnrich,
 //     even though runtime.HandleNavigate already sets DispatchEnrich=true
-//     (internal/runtime/handlers_navigate.go:195) whenever the resource type
+//     (core/runtime/handlers_navigate.go:195) whenever the resource type
 //     has a registered detail enricher. Web details never get Wave-2
 //     enrichment.
 //
 //  5. Staleness hazards around RelatedCheckBatch delivery (Controller.Handle,
-//     internal/app/handle.go:68-70 -> handleRelatedCheckBatch). These may
+//     core/app/handle.go:68-70 -> handleRelatedCheckBatch). These may
 //     already be green; pinned here regardless per the fix task spec, with
 //     each test's status noted in its doc comment.
 //
@@ -142,7 +142,7 @@ func TestApplyIntents_PatchRelatedCache_WritesSessionRelatedCache(t *testing.T) 
 // ─────────────────────────────────────────────────────────────────────────
 
 // TestOpenSelectedListDetail_SecondOpen_CacheHit_NoRelatedCheckTask drives
-// the real cache-hit replay path at internal/app/controller.go's
+// the real cache-hit replay path at core/app/controller.go's
 // openSelectedListDetail: open a detail (miss -> KindRelatedCheck dispatched),
 // feed back a RelatedCheckBatch result (which — once contract 3 is fixed —
 // writes through to session.RelatedCache via PatchRelatedCache), pop back to
@@ -333,7 +333,7 @@ func TestHandle_RelatedCheckBatch_AfterDetailPopped_NoPanic_TopScreenUnchanged(t
 //
 // Generation 0 is NOT usable to pin staleness here:
 // messages.RelatedCheckBatch.AcceptZeroGen() returns true by design
-// (internal/runtime/messages/event.go:164), because real batches are always
+// (core/runtime/messages/event.go:164), because real batches are always
 // stamped with a non-zero generation captured at dispatch time. This test
 // captures the real dispatch-time generation, bumps RelatedGen past it, and
 // delivers a batch stamped with that now-stale non-zero generation.

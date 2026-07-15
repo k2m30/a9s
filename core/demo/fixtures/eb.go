@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Package fixtures provides Elastic Beanstalk fixture data for the EB fake.
 package fixtures
 

@@ -97,7 +97,7 @@ func TestRelated_EFS_Alarm_CacheMissNilClients(t *testing.T) {
 // an EC2 instance to the EFS filesystems it mounts — mount-target ENIs are
 // RequesterManaged with no Attachment.InstanceId, and mounting itself happens
 // at the guest OS layer via DNS. A registered pivot that always returns zero
-// is a U9 violation; see internal/aws/efs_related.go.
+// is a U9 violation; see core/aws/efs_related.go.
 
 // --- checkEFSENI (scans eni cache for ENIs with fsID in description) ---
 

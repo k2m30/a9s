@@ -72,7 +72,7 @@ const dangerCTJSON = `{
 
 // buildCTEventsResource builds a resource.Resource whose RawStruct is a
 // cloudtrailtypes.Event (the AWS SDK type), exactly as buildCTResource does in
-// internal/aws/ct_events.go. The CloudTrailEvent field holds the raw JSON blob.
+// core/aws/ct_events.go. The CloudTrailEvent field holds the raw JSON blob.
 func buildCTEventsResource(id, eventName, status, rawJSON string) resource.Resource {
 	ct := cloudtrailtypes.Event{
 		EventId:         new(id),
@@ -624,7 +624,7 @@ func TestDetailViewCTEvents_Regression_FrameBorder(t *testing.T) {
 // This test catches that regression.
 //
 // Precondition: SetRelatedForTest("ct-events", ...) must be called in
-// internal/aws/ct_events.go init — verified by the GetRelated sanity check.
+// core/aws/ct_events.go init — verified by the GetRelated sanity check.
 func TestDetailViewCTEvents_Regression_RelatedRightColumn(t *testing.T) {
 	ensureNoColor(t)
 

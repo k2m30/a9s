@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 package catalog
 
 import "github.com/k2m30/a9s/v3/core/domain"
@@ -6,13 +8,13 @@ import "github.com/k2m30/a9s/v3/core/domain"
 // It is the single source of truth: identity, display, fetchers, enrichers,
 // related-panel definitions, and finding codes all live here.
 //
-// Boundary rule: ResourceTypeDef references types from internal/domain only.
+// Boundary rule: ResourceTypeDef references types from core/domain only.
 // Fetcher function signatures use `any` for the clients parameter (the
-// concrete *aws.ServiceClients type lives in internal/aws, which must NOT
-// be imported from internal/catalog).
+// concrete *aws.ServiceClients type lives in core/aws, which must NOT
+// be imported from core/catalog).
 //
 // Wave2 carries the Wave 2 issue-enricher for this type. The concrete type is
-// internal/aws.IssueEnricher (a struct with Fn + Priority), stored as `any`
+// core/aws.IssueEnricher (a struct with Fn + Priority), stored as `any`
 // here to avoid an import cycle. Per-category PRs (04b–04m) will cast to the
 // concrete type when populating catalog entries.
 type ResourceTypeDef struct {
@@ -64,7 +66,7 @@ type ResourceTypeDef struct {
 	// Fetcher is the Wave 1 paginated fetcher for this resource type.
 	Fetcher domain.PaginatedFetcher
 	// AvailabilityFetcher is an optional, cheaper alternative to Fetcher used
-	// ONLY by the availability/count probe (internal/runtime/probes.go's
+	// ONLY by the availability/count probe (core/runtime/probes.go's
 	// Core.ProbeResourceAvailability). nil means the probe falls back to
 	// Fetcher unchanged. Exists for types whose real list content is
 	// materially more expensive to resolve than a mere availability/count
@@ -76,7 +78,7 @@ type ResourceTypeDef struct {
 	// Concrete type is aws.IssueEnricher (value type); stored as any to
 	// avoid import cycle. A zero IssueEnricher with Fn == nil behaves
 	// identically to a nil any — both bypass Wave 2 dispatch via the
-	// AllWave2 filter in internal/aws/wave2.go.
+	// AllWave2 filter in core/aws/wave2.go.
 	Wave2 any
 	// Project is an optional custom DetailProjector. When nil,
 	// projection.Generic is used as the fallback projector.

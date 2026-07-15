@@ -1,7 +1,7 @@
 package unit
 
 // Tests for CloudTrailFake.LookupEvents + matchesLookupAttributes
-// (internal/demo/fakes/cloudtrail.go:29-88).
+// (core/demo/fakes/cloudtrail.go:29-88).
 //
 // matchesLookupAttributes has 6 attribute-key branches:
 //   Username, EventName, EventSource, ResourceName, ResourceType, AccessKeyId

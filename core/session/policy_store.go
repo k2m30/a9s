@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // policy_store.go — session-scoped IAM policy resource cache with per-phase
 // build memoization.
 //
 // Replaces the package-level globals that previously lived in
-// internal/aws/iam_policies.go.
+// core/aws/iam_policies.go.
 package session
 
 import (
@@ -19,8 +21,8 @@ import (
 // Scope=All) and inline (ListGroups + ListGroupPolicies) — so a transient
 // failure during inline enumeration does NOT poison managed-policy lookups.
 //
-// Safe for concurrent use. internal/aws consumes it via its own local
-// structural interface (iamPolicyStore in internal/aws/iam_policies.go)
+// Safe for concurrent use. core/aws consumes it via its own local
+// structural interface (iamPolicyStore in core/aws/iam_policies.go)
 // rather than importing this type, so the method set below is the real
 // contract.
 type policyStore struct {

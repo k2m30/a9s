@@ -88,7 +88,7 @@ func TestFetchLambdaFunctions_ParsesMultipleFunctions(t *testing.T) {
 	}
 	// Post-fold contract: fetcher stops writing Status (runtime is in Fields["runtime"], not Status).
 	// go1.x is a deprecated Lambda runtime, so the structural classifier now emits a
-	// wave1 Finding for it (see internal/aws/lambda.go isDeprecatedLambdaRuntime).
+	// wave1 Finding for it (see core/aws/lambda.go isDeprecatedLambdaRuntime).
 	if len(r0.Findings) != 1 {
 		t.Errorf("resource[0].Findings: expected 1 (deprecated go1.x runtime) for Active function, got %d", len(r0.Findings))
 	}

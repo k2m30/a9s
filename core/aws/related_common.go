@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // Generic helpers shared by every *_related.go checker (moved out of ec2_related.go — they are not EC2-specific).
 package aws
 

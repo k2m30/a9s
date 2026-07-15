@@ -12,16 +12,16 @@
 // RelatedUnknown.
 //
 // These pins are RED against the current cache-miss branches:
-//   - checkCbPipeline        (internal/aws/codebuild_related.go:36)
-//   - checkECRPipeline       (internal/aws/ecr_related_extra.go:98)
-//   - checkSecretsEB         (internal/aws/secrets_related_extra.go:88)
-//   - checkKinesisDDB        (internal/aws/kinesis_related.go:179)
-//   - checkECSSvcSFN         (internal/aws/ecs_svc_related_extra.go:397)
+//   - checkCbPipeline        (core/aws/codebuild_related.go:36)
+//   - checkECRPipeline       (core/aws/ecr_related_extra.go:98)
+//   - checkSecretsEB         (core/aws/secrets_related_extra.go:88)
+//   - checkKinesisDDB        (core/aws/kinesis_related.go:179)
+//   - checkECSSvcSFN         (core/aws/ecs_svc_related_extra.go:397)
 //
 // Round 2 (hyphenated cache keys missed by the first sweep):
-//   - checkSecretsECSTask    (internal/aws/secrets_related_extra.go:167, cache["ecs-task"])
-//   - checkECREbRule         (internal/aws/ecr_related.go:193, cache["eb-rule"])
-//   - checkECSSvcEbRule      (internal/aws/ecs_svc_related_extra.go:157, cache["eb-rule"])
+//   - checkSecretsECSTask    (core/aws/secrets_related_extra.go:167, cache["ecs-task"])
+//   - checkECREbRule         (core/aws/ecr_related.go:193, cache["eb-rule"])
+//   - checkECSSvcEbRule      (core/aws/ecs_svc_related_extra.go:157, cache["eb-rule"])
 package unit_test
 
 import (
@@ -36,7 +36,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// --- 1. cb -> pipeline (checkCbPipeline, internal/aws/codebuild_related.go:36) ---
+// --- 1. cb -> pipeline (checkCbPipeline, core/aws/codebuild_related.go:36) ---
 
 // TestRelated_Cb_Pipeline_CacheMiss_ReturnsUnknown verifies that when the
 // "pipeline" cache key is entirely absent, checkCbPipeline returns
@@ -74,7 +74,7 @@ func TestRelated_Cb_Pipeline_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.
 	}
 }
 
-// --- 2. ecr -> pipeline (checkECRPipeline, internal/aws/ecr_related_extra.go:98) ---
+// --- 2. ecr -> pipeline (checkECRPipeline, core/aws/ecr_related_extra.go:98) ---
 
 // TestRelated_ECR_Pipeline_CacheMiss_ReturnsUnknown verifies that when the
 // "pipeline" cache key is entirely absent, checkECRPipeline returns
@@ -128,7 +128,7 @@ func TestRelated_ECR_Pipeline_PresentEmptyCache_ReturnsDefinitiveZero(t *testing
 	}
 }
 
-// --- 3. secrets -> eb (checkSecretsEB, internal/aws/secrets_related_extra.go:88) ---
+// --- 3. secrets -> eb (checkSecretsEB, core/aws/secrets_related_extra.go:88) ---
 
 // TestRelated_Secrets_EB_CacheMiss_ReturnsUnknown verifies that when the
 // "eb" cache key is entirely absent, checkSecretsEB returns
@@ -175,7 +175,7 @@ func TestRelated_Secrets_EB_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.T
 	}
 }
 
-// --- 4. kinesis -> ddb (checkKinesisDDB, internal/aws/kinesis_related.go:179) ---
+// --- 4. kinesis -> ddb (checkKinesisDDB, core/aws/kinesis_related.go:179) ---
 
 // TestRelated_Kinesis_DDB_CacheMiss_ReturnsUnknown verifies that when the
 // "ddb" cache key is entirely absent, checkKinesisDDB returns
@@ -221,7 +221,7 @@ func TestRelated_Kinesis_DDB_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.
 	}
 }
 
-// --- 5. ecs-svc -> sfn (checkECSSvcSFN, internal/aws/ecs_svc_related_extra.go:397) ---
+// --- 5. ecs-svc -> sfn (checkECSSvcSFN, core/aws/ecs_svc_related_extra.go:397) ---
 
 // TestRelated_ECSSvc_SFN_CacheMiss_ReturnsUnknown verifies that when the
 // "sfn" cache key is entirely absent, checkECSSvcSFN returns
@@ -259,7 +259,7 @@ func TestRelated_ECSSvc_SFN_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.T
 	}
 }
 
-// --- 6. secrets -> ecs-task (checkSecretsECSTask, internal/aws/secrets_related_extra.go:167) ---
+// --- 6. secrets -> ecs-task (checkSecretsECSTask, core/aws/secrets_related_extra.go:167) ---
 
 // TestRelated_Secrets_ECSTask_CacheMiss_ReturnsUnknown verifies that when the
 // "ecs-task" cache key is entirely absent, checkSecretsECSTask returns
@@ -306,7 +306,7 @@ func TestRelated_Secrets_ECSTask_PresentEmptyCache_ReturnsDefinitiveZero(t *test
 	}
 }
 
-// --- 7. ecr -> eb-rule (checkECREbRule, internal/aws/ecr_related.go:193) ---
+// --- 7. ecr -> eb-rule (checkECREbRule, core/aws/ecr_related.go:193) ---
 
 // ecrEbRuleSourceResource returns an ECR repository source resource with the
 // given name — the shape checkECREbRule expects (assertStruct[ecrtypes.Repository]).
@@ -357,7 +357,7 @@ func TestRelated_ECR_EbRule_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.T
 	}
 }
 
-// --- 8. ecs-svc -> eb-rule (checkECSSvcEbRule, internal/aws/ecs_svc_related_extra.go:157) ---
+// --- 8. ecs-svc -> eb-rule (checkECSSvcEbRule, core/aws/ecs_svc_related_extra.go:157) ---
 
 // TestRelated_ECSSvc_EbRule_CacheMiss_ReturnsUnknown verifies that when the
 // "eb-rule" cache key is entirely absent, checkECSSvcEbRule returns

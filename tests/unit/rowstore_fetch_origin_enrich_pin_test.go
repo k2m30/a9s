@@ -1,5 +1,5 @@
 // rowstore_fetch_origin_enrich_pin_test.go — regression pin for the
-// fetch-origin blind-spot in Core.ProbeResources (internal/runtime/
+// fetch-origin blind-spot in Core.ProbeResources (core/runtime/
 // accessors.go). Before the fix, ProbeResources gated its RowStore read on
 // tr.Origin being OriginProbe or OriginDisk, so a type whose ONLY retained
 // entry carried OriginFetch (the exact shape produced by a `-c <type>`

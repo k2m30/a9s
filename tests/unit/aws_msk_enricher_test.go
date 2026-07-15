@@ -301,7 +301,7 @@ func TestEnrichMSKCluster_OutdatedVersionAndPlaintextEncryption_ProducesBothFind
 		t.Errorf("result.Findings[%q] missing Code \"msk.broker-outdated\" — test fixture assumption broken; got %+v", mskName1, fs)
 	}
 	if !haveEncryptionNotTLS {
-		t.Errorf(`BUG: result.Findings[%q] missing Code "msk.encryption-not-tls" (%d entries, want 2) — EnrichMSKCluster's encryption-in-transit check is gated behind "if _, alreadyFound := result.Findings[r.ID]; !alreadyFound" (internal/aws/msk_issue_enrichment.go), so once the broker-outdated check appends its finding first, the encryption check short-circuits and never runs, even though setWave2Finding is append-style (#52) and both conditions independently hold. Got %+v`, mskName1, len(fs), fs)
+		t.Errorf(`BUG: result.Findings[%q] missing Code "msk.encryption-not-tls" (%d entries, want 2) — EnrichMSKCluster's encryption-in-transit check is gated behind "if _, alreadyFound := result.Findings[r.ID]; !alreadyFound" (core/aws/msk_issue_enrichment.go), so once the broker-outdated check appends its finding first, the encryption check short-circuits and never runs, even though setWave2Finding is append-style (#52) and both conditions independently hold. Got %+v`, mskName1, len(fs), fs)
 	}
 }
 

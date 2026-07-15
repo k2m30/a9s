@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // identity_cache.go provides a session-scoped lookup for the caller's AWS
 // account ID. Used by related-panel Pattern C checkers that need to construct
 // resource ARNs for APIs like Backup ListRecoveryPointsByResource and Glue
@@ -21,9 +23,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
-// identityStore is the unexported shape internal/aws expects from a
+// identityStore is the unexported shape core/aws expects from a
 // per-Session identity cache. session.IdentityStore() satisfies this via
-// duck-typing — internal/aws cannot import internal/session without a cycle,
+// duck-typing — core/aws cannot import core/session without a cycle,
 // so the local interface mirrors the methods needed here.
 type identityStore interface {
 	AccountID() string

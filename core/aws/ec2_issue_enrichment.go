@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // ec2_issue_enrichment.go — Wave 2 issue enrichment for the ec2 resource type.
 package aws
 

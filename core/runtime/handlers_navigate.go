@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // handlers_navigate.go — NavigateEvent dispatch.
 //
 //	HandleNavigate — resolves the navigation kind for the requested target,
@@ -366,7 +368,7 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		// No unconditional fetch here (SC-002): the adapter's PushCosts
 		// handling seeds CostsState via EnsureCostsState, then the shared
 		// ensureCostsShapeFetched decides — a warm cache opens with zero CE
-		// calls, a cold one fetches. See internal/app/navigate.go and
+		// calls, a cold one fetches. See core/app/navigate.go and
 		// internal/tui/runtime_adapter_navigate.go's NavigateKindPushCosts cases.
 		return NavigateResult{Kind: NavigateKindPushCosts}, nil
 	}

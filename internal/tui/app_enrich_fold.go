@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package tui
 
 // app_enrich_fold.go — Wave-2 enrichment helpers that mutate cached row
@@ -27,7 +29,7 @@ import (
 // clearAllWave2 but scoped to one canonical type. Both production call sites
 // (handleRefresh's pre-fetch cleanup) pass no finding data of their own: the
 // actual Wave-2 fold that appends fresh findings back onto cached rows lives
-// entirely on runtime.Core.applyEnrichment (internal/runtime/helpers.go),
+// entirely on runtime.Core.applyEnrichment (core/runtime/helpers.go),
 // reached via handleEnrichmentChecked → AmendRows once the fresh
 // EnrichmentChecked result lands.
 //
@@ -62,7 +64,7 @@ func (m *Model) applyEnrichment(resourceType string) {
 // for wiring into detail views via Controller.ApplyDetailEnrichmentForResource,
 // whose signature carries exactly one Finding + one AttentionDetail — a
 // legitimate render-boundary derivation, not a compat shim: no production
-// DetailEnricher (internal/aws's enrichPolicy/enrichRolePolicy) emits more
+// DetailEnricher (core/aws's enrichPolicy/enrichRolePolicy) emits more
 // than one wave2 Finding on its returned resource today, and the multi-
 // finding detail contract (every independently-evaluated condition reaching
 // an already-open detail) is carried by the PatchDetail plural apply
@@ -127,8 +129,8 @@ func wave2FindingsByID(rows []resource.Resource) map[string][]domain.Finding {
 // wave2DetailsByID mirrors wave2FindingsByID: it rebuilds a per-resource,
 // per-FindingCode domain.AttentionDetail map from every row's wave2-sourced
 // findings, keyed first by Resource.ID and then by Finding.Code — the same
-// nested shape setWave2Finding (internal/aws/issue_enrichment.go) and
-// runtime.ApplyWave2ToRow (internal/runtime/helpers.go) produce, and the
+// nested shape setWave2Finding (core/aws/issue_enrichment.go) and
+// runtime.ApplyWave2ToRow (core/runtime/helpers.go) produce, and the
 // shape the runtime→adapter PatchResourceList contract
 // (ListEnrichmentPatch.AttentionDetails) and Controller.ApplyEnrichmentState's
 // plural storage layer both require. A row with more than one

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // athena_related.go contains Athena WorkGroup related-resource checker functions.
 package aws
 

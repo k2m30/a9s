@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package views
 
 // IsActionableRowForTest is a test-only entry point for isActionableRow.

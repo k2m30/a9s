@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // eks_related.go contains EKS cluster related-resource checker functions.
 package aws
 

@@ -64,7 +64,7 @@ func TestScenario_AllTypesReferenceSurfaces(t *testing.T) {
 			}
 			count, ok := counts[shortName]
 			if !ok {
-				t.Fatalf("no ExpectedTopLevelCounts entry for %q — every top-level type needs a demo count oracle (internal/demo/fixtures/counts.go)", shortName)
+				t.Fatalf("no ExpectedTopLevelCounts entry for %q — every top-level type needs a demo count oracle (core/demo/fixtures/counts.go)", shortName)
 			}
 
 			t.Run("menu", func(t *testing.T) {
@@ -172,7 +172,7 @@ func TestScenario_AllTypesReferenceSurfaces(t *testing.T) {
 				if !sawCountable {
 					t.Skipf("%s: every pivot returned a non-Resolved state (Unknown/Deferred/Error) with no FetchFilter witness across %d sampled row(s) — budget-excluded-only type (cf. knownDisconnectedPivots in tests/unit/qa_demo_pivot_coverage_test.go)", shortName, sampled)
 				}
-				t.Errorf("%s: countable pivots exist but no witness (count>0 or fetch-filter pivot) among %d of %d fixture row(s) — fixture graph gap (internal/demo/fixtures/, contract docs/related-resources.md)", shortName, sampled, len(rows))
+				t.Errorf("%s: countable pivots exist but no witness (count>0 or fetch-filter pivot) among %d of %d fixture row(s) — fixture graph gap (core/demo/fixtures/, contract docs/related-resources.md)", shortName, sampled, len(rows))
 			})
 
 			t.Run("yaml", func(t *testing.T) {
@@ -203,17 +203,17 @@ func TestScenario_AllTypesReferenceSurfaces(t *testing.T) {
 				sc.ExpectFrameContains(frameTitle)
 				sc.Back()
 				// The list visit synced the exact total to the menu row
-				// (internal/app/handle.go syncExactTotalToMenu).
+				// (core/app/handle.go syncExactTotalToMenu).
 				sc.ExpectViewContains(fmt.Sprintf("%s (%d)", rt.Name, count))
 			})
 
 			t.Run("cache", func(t *testing.T) {
 				entry, ok := sc.model.Core().ResourceCache(shortName)
 				if !ok || entry == nil {
-					t.Fatalf("no full fetch-origin cache entry for %s after list load (internal/runtime/accessors.go ResourceCache)", shortName)
+					t.Fatalf("no full fetch-origin cache entry for %s after list load (core/runtime/accessors.go ResourceCache)", shortName)
 				}
 				if got := len(entry.Resources); got != count {
-					t.Fatalf("%s cache entry rows = %d, expected %d per internal/demo/fixtures/counts.go ExpectedTopLevelCounts", shortName, got, count)
+					t.Fatalf("%s cache entry rows = %d, expected %d per core/demo/fixtures/counts.go ExpectedTopLevelCounts", shortName, got, count)
 				}
 			})
 		})

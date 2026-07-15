@@ -53,7 +53,7 @@ func TestLogsColor(t *testing.T) {
 			want: resource.ColorWarning,
 		},
 		{
-			// CodeRabbit PR-273 finding: internal/resource/types_monitoring.go:68-69
+			// CodeRabbit PR-273 finding: core/resource/types_monitoring.go:68-69
 			// currently returns ColorWarning when kms_key_id is empty, but
 			// docs/attention-signals.md only raises a KMS issue when the referenced
 			// key is PendingDeletion (a cross-ref check). Missing KMS alone is not

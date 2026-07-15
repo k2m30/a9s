@@ -12,7 +12,7 @@
 // the re-dispatch (a messages.RelatedCheckStarted-equivalent) was wired ONLY
 // into the TUI's Escape handler (internal/tui/app_stack.go's
 // recomputeRelatedOnReveal, invoked from app_input.go). The renderer-agnostic
-// Back path — internal/app/actions_nav.go's handleActionBack, the ONLY Back
+// Back path — core/app/actions_nav.go's handleActionBack, the ONLY Back
 // handler for web/headless — just pops the screen:
 //
 //	func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskRequest) {
@@ -34,8 +34,8 @@
 // return via app.ActionBack (the renderer-agnostic counterpart of Esc),
 // asserting on the TaskRequest a real Core.HandleRelatedCheckStarted-shaped
 // re-dispatch would produce (runtime.KindRelatedCheck, Scope "ng/<id>") —
-// exactly what internal/runtime/related.go's HandleRelatedCheckStarted
-// returns, and what openRelatedDetail (internal/app/navigate.go) returns
+// exactly what core/runtime/related.go's HandleRelatedCheckStarted
+// returns, and what openRelatedDetail (core/app/navigate.go) returns
 // on a cache-miss fresh detail open, so a real fix would make this
 // assertion pass without inventing a new task shape.
 package unit_test

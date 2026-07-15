@@ -15,7 +15,7 @@ package unit_test
 // -> handleResourcesLoaded.
 //
 // "asg" is deliberately not "ami": it registers neither FetchByIDs nor a
-// StubCreator (only "ami" registers one — internal/aws/catalog_compute.go),
+// StubCreator (only "ami" registers one — core/aws/catalog_compute.go),
 // so a TargetID cache-miss followed by an empty ResourcesLoaded must leave
 // the operator on the related list/flash, never synthesize a detail.
 

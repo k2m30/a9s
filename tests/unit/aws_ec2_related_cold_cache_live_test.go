@@ -198,7 +198,7 @@ func TestEC2RelatedColdCache_FirstPageOnly_CFN(t *testing.T) {
 
 // T005: verifies that when the paginated fetcher returns a truncated first page with
 // zero matches for the given EC2 instance, the checker returns {Count: 0, Truncated: true}
-// (the TruncatedResult honest-lower-bound contract from internal/resource/related.go).
+// (the TruncatedResult honest-lower-bound contract from core/resource/related.go).
 // This ensures partial pages are not treated as conclusive negatives but ALSO preserve
 // the honest lower bound instead of dropping it as Count=-1 (unknown).
 func TestEC2RelatedColdCache_TruncatedZeroMatch_IsApproximate(t *testing.T) {

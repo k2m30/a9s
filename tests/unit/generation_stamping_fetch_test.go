@@ -2,7 +2,7 @@
 // guards on ResourcesLoaded / APIError / IdentityLoaded / IdentityError / ValueRevealed.
 //
 // These tests FAIL TO COMPILE on main (before AS-657 lands) because the five
-// message types in internal/runtime/messages/event.go do not yet carry a Gen
+// message types in core/runtime/messages/event.go do not yet carry a Gen
 // field. Once Coder adds:
 //   - Gen domain.Gen on each of the five types
 //   - GenStamp() / GenAspect() / AcceptZeroGen() methods

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
+
 // s3_related.go contains S3 bucket related-resource checker functions.
 package aws
 

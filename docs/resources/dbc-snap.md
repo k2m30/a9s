@@ -38,8 +38,8 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
   `Resource.ID` with first-occurrence-wins. The DocDB-side row is therefore preserved
   on collisions, which is the engine-correct one for detail enrichment and the
   `dbc-snap → dbc` related-panel pivot (`DBClusterSnapshot.DBClusterIdentifier` read
-  via the docdb-typed `RawStruct`). See `internal/aws/dbc_snap.go` (concat region)
-  and the package-private `dedupResourcesByID` helper in `internal/aws/dbc.go` for
+  via the docdb-typed `RawStruct`). See `core/aws/dbc_snap.go` (concat region)
+  and the package-private `dedupResourcesByID` helper in `core/aws/dbc.go` for
   the implementation; this dedup behavior is part of the fetcher contract — do not
   remove it.
 

@@ -1,6 +1,6 @@
 package unit
 
-// Tests for internal/resource/lifecycle.go — StandardLifecycleColor.
+// Tests for core/resource/lifecycle.go — StandardLifecycleColor.
 // Covers the common AWS lifecycle vocabulary and edge cases.
 
 import (

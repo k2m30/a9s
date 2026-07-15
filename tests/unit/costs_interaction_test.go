@@ -4,7 +4,7 @@
 // never fetch dispatch or window anchoring). Contract sources:
 // specs/021-cost-explorer/spec.md FR-004/FR-005/FR-010/FR-011/FR-017,
 // data-model.md, and the current production code in
-// internal/app/costs_state.go + internal/costs/window.go.
+// core/app/costs_state.go + core/costs/window.go.
 //
 // New API this file assumes (none of it exists on disk yet — the whole
 // file is a compile-red TDD pin until the coder adds it):
@@ -12,7 +12,7 @@
 //   - Controller.SetCostsViewportCols(n int) — the D4/D5 renderer-supplied
 //     visible-column-count seam, named and shaped after the existing
 //     DetailState.ViewportHeight / Controller.SetDetailViewportHeight
-//     precedent (internal/app/screenstate.go, internal/app/detail_state.go).
+//     precedent (core/app/screenstate.go, core/app/detail_state.go).
 //     Reconciling CostsBody.ScrollX against CursorCol once ViewportCols is
 //     known mirrors detail_cursor.go's reconcileDetailScrollToCursor.
 //

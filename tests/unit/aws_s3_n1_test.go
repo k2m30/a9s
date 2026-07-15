@@ -81,7 +81,7 @@ func newS3ClientWithCountingTransport(transport *countingS3RoundTripper) *s3sdk.
 func TestS3PaginatedFetcher_FetchesNotificationsPerBucket(t *testing.T) {
 	fetcher := resource.GetPaginatedFetcher("s3")
 	if fetcher == nil {
-		t.Fatal("paginated fetcher for 's3' not registered — ensure internal/aws package is imported")
+		t.Fatal("paginated fetcher for 's3' not registered — ensure core/aws package is imported")
 	}
 
 	listXML := `<?xml version="1.0" encoding="UTF-8"?>

@@ -4,7 +4,7 @@
 // elsewhere and are NOT repeated here).
 //
 // package unit_test (not unit): every finding here is reachable via the
-// headless app.Controller / pure internal/costs package — no TUI-level
+// headless app.Controller / pure core/costs package — no TUI-level
 // helper is needed, so this file reuses costs_state_test.go's
 // newCostsController/topDrill/fixedCostsNow/monthRecord and
 // costs_interaction_test.go's findFetchCostsTask directly (same package).
@@ -303,7 +303,7 @@ func TestCostsRound5_D_DemoTransport_ServesGetCostAndUsageWithResources_RealFixt
 		t.Fatal("FetchCostAndUsageWithResources returned zero records against the demo transport")
 	}
 
-	// internal/demo/fixtures/ec2.go's "web-prod-01" instance — a real demo
+	// core/demo/fixtures/ec2.go's "web-prod-01" instance — a real demo
 	// EC2 entity, not a synthetic never-referenced ID.
 	const demoEC2InstanceID = "i-0a1b2c3d4e5f60001"
 	found := false

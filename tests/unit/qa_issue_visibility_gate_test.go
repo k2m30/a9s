@@ -270,7 +270,7 @@ func newVisibilityDetailController(t *testing.T) *app.Controller {
 // detailHasAttentionFor drives the REAL detail body build (Controller.EnsureDetailState
 // + Snapshot().Body.Detail) for a single resource and reports whether the
 // Attention block (FieldRow.Path=="Attention") is non-empty. EnsureDetailState
-// seeds DetailState.Findings from res.Findings directly (internal/app/detail_state.go),
+// seeds DetailState.Findings from res.Findings directly (core/app/detail_state.go),
 // so a resource carrying Wave-1/merged-Wave-2 Findings surfaces them here
 // without any extra enrichment call.
 func detailHasAttentionFor(t *testing.T, res resource.Resource, shortName string) bool {
@@ -294,7 +294,7 @@ func detailHasAttentionFor(t *testing.T, res resource.Resource, shortName string
 // IsIssue()==true (domain.Color.IsIssue: Warning/Broken), OR at least one
 // issue-severity Finding (domain.Severity.IsIssue: SevWarn/SevBroken) —
 // Wave-1 seeded or Wave-2 merged. A glyph decorator (resolveListDecoratorFull
-// in internal/app/list_columns.go) only ever fires from that same
+// in core/app/list_columns.go) only ever fires from that same
 // issue-severity Finding check (the "healthy color + hidden issue-severity
 // Finding" case), so it is already covered by the Finding leg above and is
 // not a separate condition to test here.

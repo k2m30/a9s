@@ -141,7 +141,7 @@ a9s is read-only by design and never makes mutating AWS API calls. See [SECURITY
 
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE).
+<!-- INCLUDE: licensing.md -->
 
 ## Acknowledgments
 

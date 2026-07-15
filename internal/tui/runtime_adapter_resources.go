@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // runtime_adapter_resources.go — Bubble Tea adapter glue for runtime.Core's
 // resource-flow handlers. Each resolves adapter-only state, delegates the
 // platform-agnostic work (wave-1 derive, cache writes, error flash) to

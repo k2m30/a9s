@@ -40,7 +40,7 @@ package unit_test
 // true given that setup: D1/D3 tasks are guaranteed non-empty precisely
 // because nothing is pre-cached. TargetType is verified via
 // TaskRequest.Key.Scope (set to ev.TargetType at every task construction
-// site in internal/runtime/handlers_related.go and internal/app/navigate.go).
+// site in core/runtime/handlers_related.go and core/app/navigate.go).
 
 import (
 	"context"
@@ -58,7 +58,7 @@ import (
 // ctEventsRealCheckerResults runs all registered ct-events real checkers against
 // the given resource and demo resource cache. ct-events checkers are pure
 // field-readers (no AWS calls) so they work correctly with in-memory demo data.
-// Source of truth: real checkers in internal/aws/ct_events_related.go.
+// Source of truth: real checkers in core/aws/ct_events_related.go.
 func ctEventsRealCheckerResults(res resource.Resource, cache resource.ResourceCache) []resource.RelatedCheckResult {
 	defs := resource.GetRelated("ct-events")
 	results := make([]resource.RelatedCheckResult, 0, len(defs))
@@ -136,7 +136,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 
 	// ct-events has no demo override: the real checkers are pure field-readers
 	// and produce correct results when given a cache populated from demo fixtures.
-	// Source of truth: internal/aws/ct_events_related.go.
+	// Source of truth: core/aws/ct_events_related.go.
 	cache := buildFakeResourceCache(t)
 
 	for _, fixture := range fixtures {

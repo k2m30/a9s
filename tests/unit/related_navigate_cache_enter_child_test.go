@@ -119,7 +119,7 @@ func TestRelatedNavigate_CacheHit_SingleRelatedID_S3_OpensDetail(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Pin: RelatedNavigateMsg with TargetID on s3 (cache hit) also opens detail.
 // Covers the TargetID path of the NavigationKindDetail branch
-// (internal/runtime/handlers_related.go) in addition to the single-RelatedID path.
+// (core/runtime/handlers_related.go) in addition to the single-RelatedID path.
 // ---------------------------------------------------------------------------
 
 func TestRelatedNavigate_CacheHit_TargetID_S3_OpensDetail(t *testing.T) {

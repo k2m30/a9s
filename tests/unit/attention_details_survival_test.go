@@ -2,14 +2,14 @@
 // AttentionDetails-drop defect: structured detail rows under a resource's
 // Attention section were silently dropped in two lanes:
 //
-//  1. Controller re-apply (internal/app/list_body.go's applyResourcesLoaded):
+//  1. Controller re-apply (core/app/list_body.go's applyResourcesLoaded):
 //     when a fresh (findings-less) ResourcesLoaded result replaces a screen's
 //     rows, the re-apply-from-enrichment-store step
 //     (c.listEnrichmentFindings/c.listEnrichmentDetails ->
 //     c.applyRowFindings) must re-attach BOTH the stored Wave-2 finding AND
 //     its companion AttentionDetail rows onto the surviving RowStore-backed
 //     cache entry — not just the finding.
-//  2. Probe-lane carry (internal/runtime/wave2_carry.go's
+//  2. Probe-lane carry (core/runtime/wave2_carry.go's
 //     carryWave2ForResources): when a fresh bare Wave-1 availability-probe
 //     result lacks its own Wave-2 finding for a resource ID, the prior
 //     RowStore row's wave2-sourced Finding AND its matching AttentionDetails
@@ -38,7 +38,7 @@ import (
 //
 // Readback seam: Core.ResourceCache(shortName) — the exported,
 // RowStore-backed cache entry that applyRowFindings' c.core.AmendRows writes
-// into (internal/app/list_body.go's applyRowFindings). ListRow (the
+// into (core/app/list_body.go's applyRowFindings). ListRow (the
 // Snapshot().Body.List projection) carries no AttentionDetails field, so the
 // in-memory RowStore-backed cache is the correct (and only) exported seam for
 // this assertion — chosen per the dispatch's fallback instruction after
@@ -126,7 +126,7 @@ func TestControllerReapply_AttentionDetails_SurviveFreshFetchReplace(t *testing.
 	}, details)
 
 	// ApplyEnrichmentState alone only populates the controller's own
-	// enrichmentStore/enrichmentDetails maps (internal/app/list_filter.go) —
+	// enrichmentStore/enrichmentDetails maps (core/app/list_filter.go) —
 	// it does not itself touch the RowStore-backed cache entry. The
 	// RowStore-backed row only picks up the finding/details on the NEXT
 	// ResourcesLoaded delivery, via applyResourcesLoaded's
@@ -207,7 +207,7 @@ func findDomainResource(rows []domain.Resource, id string) (domain.Resource, boo
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Pin (b) — probe-lane carry: carryWave2ForResources (internal/runtime/
+// Pin (b) — probe-lane carry: carryWave2ForResources (core/runtime/
 // wave2_carry.go) must carry AttentionDetails alongside the Wave-2 Finding
 // it already carries. Mirrors
 // TestHandleAvailabilityChecked_Wave2Carry_ProbeResourcesKeepFindingAndStatus
