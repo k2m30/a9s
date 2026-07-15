@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.53.0] - 2026-07-15
+
+### Added
+
+- New resource type: **VPC Peering (`vpc-peer`, aliases `pcx`, `peering`)**
+  — the 70th type (main menu 71), closing the four-type series started in
+  v3.50.0. One paginated call carries the whole story. Status phrases per
+  lifecycle state, including the actionable countdown `pending acceptance:
+  expires in <N>d` (AWS expires unaccepted requests at 7 days — the number
+  IS the escalation) and verbatim `Status.Message` causes for rejected /
+  failed connections. An active-only IPv4 CIDR-overlap warning names the
+  clashing ranges; CIDR fields are nil on every non-active state per the
+  API contract and render nil-safe.
+- **Two zero-API route checks** ride the route-table cache as `~`
+  background annotations: `no local route to peer` (an accepted tunnel
+  nobody routes into) and `route to peer blackholed` (the other side tore
+  down; your route eats packets). An absent or truncated route-table list
+  produces no verdict — never a guess.
+- **Related panel**: the route tables that actually route to the peer
+  (truncated lists render the honest `N+` lower bound), the local VPC
+  through a symmetric membership gate — the cross-account remote side
+  renders as plain OwnerId/VpcId facts, a9s never pretends to see the
+  other account — and the CloudTrail audit trail ("who accepted this").
+
+### Fixed
+
+- The web-UI e2e error-log expectation caught up with the v3.51.0
+  honest-degradation contract: the demo session legitimately carries the
+  denied-witness composite errors, so `!` opens the error-log screen.
+
 ## [3.52.0] - 2026-07-15
 
 ### Added
