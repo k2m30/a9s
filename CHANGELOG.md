@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.53.2] - 2026-07-15
+
+### Fixed
+
+- Degraded "details denied" rows now distinguish a genuine authorization
+  denial from a non-auth failure. A nil/empty describe response, a throttle,
+  a cancellation, or a row absent from a batch response renders the neutral
+  "details unavailable" instead of falsely reporting an IAM denial; EC2's
+  `UnauthorizedOperation` code (used by Launch Templates) is now correctly
+  classified as a denial. Applies to MWAA, Transfer, Launch Templates,
+  DynamoDB, OpenSearch, EKS clusters, and node groups. Row color, menu
+  counts, and severity are unchanged.
+
 ## [3.53.1] - 2026-07-15
 
 ### Changed
