@@ -185,21 +185,21 @@ func TestRelated_Transfer_PublicEndpointConditionalPivotsAbsent(t *testing.T) {
 // without static addresses) must resolve to a clean 0, and a degraded
 // ListedServer row (no DescribeServer access) must resolve to
 // RelatedUnknown, not panic.
+//
+// SftpUsersProdID (PUBLIC endpoint) is covered by the {"eip", 0} case in
+// TestRelated_Transfer_PublicEndpointConditionalPivotsAbsent — only the VPC
+// endpoint shape (SftpLambdaAuthID) is unique here.
 // ---------------------------------------------------------------------------
 
 func TestRelated_Transfer_EIP_ZeroOnFixturesWithoutAddressAllocation(t *testing.T) {
-	for _, id := range []string{fixtures.SftpUsersProdID, fixtures.SftpLambdaAuthID} {
-		t.Run(id, func(t *testing.T) {
-			res := transferResourceByID(t, id)
-			checker := checkerByTarget(t, "transfer", "eip")
-			result := checker(context.Background(), nil, res, resource.ResourceCache{})
-			if result.Count != 0 {
-				t.Errorf("Count = %d, want 0 (no EndpointDetails.AddressAllocationIds on %s)", result.Count, id)
-			}
-			if result.Err != nil {
-				t.Errorf("Err = %v, want nil", result.Err)
-			}
-		})
+	res := transferResourceByID(t, fixtures.SftpLambdaAuthID)
+	checker := checkerByTarget(t, "transfer", "eip")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no EndpointDetails.AddressAllocationIds on %s)", result.Count, fixtures.SftpLambdaAuthID)
+	}
+	if result.Err != nil {
+		t.Errorf("Err = %v, want nil", result.Err)
 	}
 }
 

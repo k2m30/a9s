@@ -699,18 +699,13 @@ func TestTransferAgreementDetailEnrich_CertExpiry(t *testing.T) {
 // enrichTransferAgreement's resolved As2Id values actually reach the rendered
 // detail content, not just Resource.Fields.
 //
-// BUG: enrichTransferAgreement writes the resolved As2Id into
-// Fields["local_profile"]/Fields["partner_profile"] (the same keys
-// buildTransferAgreementResource's list-column uses), but the Detail config
+// Regression origin: enrichTransferAgreement writes the resolved As2Id into
+// Fields["local_profile"]/Fields["partner_profile"], while the Detail config
 // path is "LocalProfileId"/"PartnerProfileId". fieldpath.ExtractFieldList
-// (the function projection.GenericWithConfig — and so DetailModel.
-// buildFieldList — actually calls) looks up a Fields-map hit by case-
-// insensitive exact match first, then by fieldpath.ToSnakeCase(path): for
-// "LocalProfileId" that is "local_profile_id" (WITH a trailing "_id"), which
-// never matches the enricher's "local_profile" key. So the Fields-map lookup
-// misses, ExtractFieldList falls back to reflecting RawStruct.LocalProfileId
-// directly — the ORIGINAL, unresolved bare profile id ("lp-1") — and the
-// resolved As2Id ("ACME-LOCAL") the enricher computed is never shown.
+// resolves that path to a different Fields-map key ("local_profile_id", with
+// a trailing "_id") than the enricher populates, so the lookup used to miss
+// and fall back to the unresolved RawStruct value. Fixed — this test pins
+// that the resolved As2Id, not the bare profile id, reaches the render path.
 func TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail(t *testing.T) {
 	childShortName := transferAgreementsChildShortName(t)
 	enrich := resource.GetDetailEnricher(childShortName)
@@ -794,15 +789,14 @@ func newTestController(t *testing.T) *app.Controller {
 // `ApplyDetailEnrichmentForResource(msg.ResourceType, msg.ResourceID,
 // msg.EnrichedRes, ef, ad)`.
 //
-// BUG: primaryWave2Finding (internal/tui/app_enrich_fold.go) only recognizes
-// findings whose Source has the "wave2:" prefix, and folds to the single
-// WORST one. The agreement's cert findings are Source "wave1"
-// (transfer_children.go's transferCertificateFinding), so
-// primaryWave2Finding(enriched) computes (nil, nil) for this exact resource —
-// reproduced verbatim below. ApplyDetailEnrichmentForResource then wraps that
-// nil pair via singleFindingSlice/singleAttentionDetailMap into empty
-// slices/maps, so NEITHER cert finding — not even the Broken "expired" one —
-// ever reaches ds.Findings, even though enriched.Findings already holds both.
+// Regression origin: primaryWave2Finding (internal/tui/app_enrich_fold.go)
+// used to only recognize findings whose Source has the "wave2:" prefix,
+// folding to a single worst one. The agreement's cert findings are Source
+// "wave1" (transfer_children.go's transferCertificateFinding), so it computed
+// (nil, nil) for this exact resource and neither cert finding — not even the
+// Broken "expired" one — reached ds.Findings, even though enriched.Findings
+// already held both. Fixed — this test pins that both findings survive the
+// same fold+apply sequence internal/tui's on-demand path actually runs.
 func TestTransferAgreementDetailEnrich_BothCertFindingsReachOpenDetailAttention(t *testing.T) {
 	childShortName := transferAgreementsChildShortName(t)
 	enrich := resource.GetDetailEnricher(childShortName)

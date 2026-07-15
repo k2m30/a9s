@@ -1,10 +1,10 @@
 // qa_sweep_once_per_session_test.go — pins the "availability sweep runs once
-// per session per profile--region pair" contract (live defect 2026-07-14:
-// `:profile` switching re-ran the FULL availability sweep, all types plus
-// Wave-2 enrichment, on EVERY switch instead of once per pair).
+// per session per profile--region pair" contract (fixed defect, landed
+// 2026-07-14: `:profile` switching used to re-run the FULL availability
+// sweep, all types plus Wave-2 enrichment, on EVERY switch instead of once
+// per pair).
 //
-// Pinned production contract under test (none of this exists yet — every
-// test below is expected to fail to compile until the coder lands it):
+// Pinned production contract under test:
 //
 //	Session gains SweptPairs map[string]bool keyed profile+"--"+region, plus
 //	MarkPairSwept()/PairSwept() bool operating on the CURRENT pair under the

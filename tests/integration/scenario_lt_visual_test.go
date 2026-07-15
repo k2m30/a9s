@@ -79,11 +79,9 @@ func TestScenario_LTVisual(t *testing.T) {
 	// The trap witness: MetadataOptions nil defaults to optional — same finding.
 	scenario.ExpectRowStatusEquals(ltNameIMDSv1Default, ltPhraseIMDSv1)
 	scenario.ExpectRowStatusEquals(ltNameUnencrypted, ltPhraseUnencrypted)
-	// The enricher-borne background check: green row + phrase. The `~`
-	// glyph is specified by S3 but does not render for ANY type when the
-	// list opens after the sweep (dbi maintenance witness included) —
-	// tracked as https://github.com/k2m30/a9s/issues/458; pin the glyph
-	// here once that lands.
+	// The enricher-borne background check: Warning-colored row + phrase
+	// (owner ruling 2026-07-15 — color derives from findings uniformly;
+	// the `~` class only keeps it out of the S1 badge).
 	scenario.ExpectRowStatusEquals(ltNameDeprecatedAMI, ltPhraseDeprecatedAMI)
 
 	// Listed-but-denied template: rich degraded row — list fields kept,
@@ -93,9 +91,8 @@ func TestScenario_LTVisual(t *testing.T) {
 	// Rule 7 — two findings stack: first-in-precedence phrase + (+1).
 	scenario.ExpectRowStatusEquals(ltNameMulti, ltPhraseMultiP1)
 
-	// Glyph rules: the color-bearing fetcher findings carry NO glyph (the
-	// color is the signal); healthy rows are also glyph-free. Only the
-	// deprecated-AMI `~` background check (asserted above) wears one.
+	// Glyph rules: every finding is color-bearing — no row wears a glyph
+	// (the color is the signal); healthy rows are also glyph-free.
 	for _, name := range []string{
 		ltNameProdWeb,
 		ltNameEKSNode,
@@ -103,6 +100,7 @@ func TestScenario_LTVisual(t *testing.T) {
 		ltNameIMDSv1,
 		ltNameIMDSv1Default,
 		ltNameUnencrypted,
+		ltNameDeprecatedAMI,
 		ltNameMulti,
 		ltNameDenied,
 	} {

@@ -8,10 +8,10 @@ package integration
 // docs/resources/vpc-peer.md.
 //
 // vpc-peer is a single-call type (DescribeVpcPeeringConnections carries the
-// whole story — no N+1, no degraded rows). State findings are fetcher-written
-// and color-bearing; the two derived route checks (no-local-route,
-// blackholed) are `~` background checks from the zero-API rtb cache-scan
-// enricher — green rows carrying the S4 phrase, no menu-badge bump.
+// whole story — no N+1, no degraded rows). Every finding is color-bearing
+// (the fleet color invariant); the two derived route checks (no-local-route,
+// blackholed) come from the zero-API rtb cache-scan enricher as `~`-class
+// findings — Warning-colored rows that deliberately do not bump the S1 badge.
 
 import (
 	"testing"
@@ -77,10 +77,9 @@ func TestScenario_VpcPeerVisual(t *testing.T) {
 	// Config-derived warning: active-only CIDR overlap.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnPeerOverlapID, vpcPeerPhraseOverlap)
 
-	// The two `~` route background checks: green rows carrying the phrase.
-	// (The S3 `~` glyph does not render fleet-wide when a list opens after
-	// the sweep — tracked as https://github.com/k2m30/a9s/issues/458; pin
-	// the glyph here once that lands.)
+	// The two `~`-class route background checks: Warning-colored rows
+	// carrying the phrase (owner ruling 2026-07-15 — color derives from
+	// findings uniformly; the `~` class only keeps them out of the S1 badge).
 	scenario.ExpectRowStatusEquals(demofixtures.WarnPeerNoRouteID, vpcPeerPhraseNoRoute)
 	scenario.ExpectRowStatusEquals(demofixtures.WarnPeerBlackholeID, vpcPeerPhraseBlackhole)
 
@@ -114,6 +113,22 @@ func TestScenario_VpcPeerVisual(t *testing.T) {
 	scenario.OpenDetailResource("vpc-peer", blackhole)
 	scenario.ExpectNoAPIError()
 	scenario.ExpectViewContains(vpcPeerDetailBlackhole)
+
+	scenario.Back()
+
+	// The no-route `~` check surfaces in its row's detail too.
+	noRoute := selectVpcPeerByID(t, scenario, demofixtures.WarnPeerNoRouteID)
+	scenario.OpenDetailResource("vpc-peer", noRoute)
+	scenario.ExpectNoAPIError()
+	scenario.ExpectViewContains(vpcPeerDetailNoRoute)
+
+	scenario.Back()
+
+	// The CIDR-overlap warning's detail names the finding and the ranges.
+	overlap := selectVpcPeerByID(t, scenario, demofixtures.WarnPeerOverlapID)
+	scenario.OpenDetailResource("vpc-peer", overlap)
+	scenario.ExpectNoAPIError()
+	scenario.ExpectViewContains(vpcPeerDetailOverlap)
 
 	scenario.AssertNoEnrichmentErrors()
 }

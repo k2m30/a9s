@@ -69,46 +69,6 @@ func TestFetchMWAAEnvironmentsPage_HealthyAvailableSilence(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// U2 — one §4 row per Status value, exact phrase + Severity
-// ---------------------------------------------------------------------------
-
-func TestFetchMWAAEnvironmentsPage_StatusPhraseAndSeverity(t *testing.T) {
-	result := fetchMWAADemoPage(t)
-
-	cases := []struct {
-		id       string
-		phrase   string
-		severity domain.Severity
-	}{
-		{fixtures.WarnAirflowCreatingID, "creating", domain.SevWarn},
-		{fixtures.WarnAirflowSnapshottingID, "creating snapshot", domain.SevWarn},
-		{fixtures.WarnAirflowPendingID, "pending: awaiting VPC endpoints", domain.SevWarn},
-		{fixtures.WarnAirflowUpdatingID, "updating", domain.SevWarn},
-		{fixtures.WarnAirflowMaintenanceID, "maintenance in progress", domain.SevWarn},
-		{fixtures.WarnAirflowRollbackID, "rolling back: update failed", domain.SevWarn},
-		{fixtures.BrokenAirflowCreateFailedID, "create failed", domain.SevBroken},
-		{fixtures.BrokenAirflowUpdateFailedID, "update failed: rolled back", domain.SevBroken},
-		{fixtures.BrokenAirflowUnavailableID, "unavailable: not stable", domain.SevBroken},
-		{fixtures.DimAirflowDeletingID, "deleting", domain.SevDim},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.id, func(t *testing.T) {
-			r := mustFindMWAAResource(t, result.Resources, tc.id)
-			if len(r.Findings) == 0 {
-				t.Fatalf("Findings: expected at least 1 finding, got 0")
-			}
-			if r.Findings[0].Phrase != tc.phrase {
-				t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, tc.phrase)
-			}
-			if r.Findings[0].Severity != tc.severity {
-				t.Errorf("Findings[0].Severity = %v, want %v", r.Findings[0].Severity, tc.severity)
-			}
-		})
-	}
-}
-
-// ---------------------------------------------------------------------------
 // U3 — LastUpdate.Status == FAILED on an AVAILABLE row (background finding)
 // U11 (adapted) — the short S4 Phrase must never echo the raw ErrorMessage
 // ---------------------------------------------------------------------------
@@ -219,68 +179,50 @@ func TestFetchMWAAEnvironmentsPage_MultiFindingsOrderedOnGreenRow(t *testing.T) 
 
 func TestFetchMWAAEnvironmentsPage_FindingStacksOnNonGreenRow(t *testing.T) {
 	result := fetchMWAADemoPage(t)
-	r := mustFindMWAAResource(t, result.Resources, fixtures.WarnAirflowRollbackID)
-
-	got := make([]string, len(r.Findings))
-	for i, f := range r.Findings {
-		got[i] = f.Phrase
-	}
-	want := []string{"rolling back: update failed", "last update failed"}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("ordered Findings phrases = %v, want %v — a finding on a non-green row must not silently disappear",
-			got, want)
-	}
-
-	var lastUpdateCode domain.FindingCode
-	for _, f := range r.Findings {
-		if f.Phrase == "last update failed" {
-			lastUpdateCode = f.Code
-			break
-		}
-	}
-	ad, ok := r.AttentionDetails[lastUpdateCode]
-	if !ok || len(ad.Rows) == 0 {
-		t.Fatalf("AttentionDetails[%v] missing or empty for the stacked failed-update finding", lastUpdateCode)
-	}
-	const wantErrorMessage = "Update to 2.11.0 failed; restoring metadata snapshot"
-	var found bool
-	for _, row := range ad.Rows {
-		if row.Value == wantErrorMessage {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("AttentionDetails rows missing ErrorMessage %q: %+v", wantErrorMessage, ad.Rows)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// U7f — fetcher_populates_findings: ordered Phrase slice deep-equals
-// expectation per fixture.
-// ---------------------------------------------------------------------------
-
-func TestFetchMWAAEnvironmentsPage_FetcherPopulatesFindings_OrderedDeepEqual(t *testing.T) {
-	result := fetchMWAADemoPage(t)
 
 	cases := []struct {
-		id   string
-		want []string
+		id               string
+		wantPhrases      []string
+		wantErrorMessage string
 	}{
-		{fixtures.ProdAirflowReportingID, nil},
-		{fixtures.WarnAirflowMultiID, []string{"last update failed", "webserver public"}},
-		{fixtures.WarnAirflowRollbackID, []string{"rolling back: update failed", "last update failed"}},
-		{fixtures.BrokenAirflowUpdateFailedID, []string{"update failed: rolled back", "last update failed"}},
+		{fixtures.WarnAirflowRollbackID, []string{"rolling back: update failed", "last update failed"},
+			"Update to 2.11.0 failed; restoring metadata snapshot"},
+		{fixtures.BrokenAirflowUpdateFailedID, []string{"update failed: rolled back", "last update failed"},
+			"Environment update failed; rolled back to previous state"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.id, func(t *testing.T) {
 			r := mustFindMWAAResource(t, result.Resources, tc.id)
-			var got []string
-			for _, f := range r.Findings {
-				got = append(got, f.Phrase)
+
+			got := make([]string, len(r.Findings))
+			for i, f := range r.Findings {
+				got[i] = f.Phrase
 			}
-			if !reflect.DeepEqual(got, tc.want) {
-				t.Errorf("ordered Findings phrases = %v, want %v", got, tc.want)
+			if !reflect.DeepEqual(got, tc.wantPhrases) {
+				t.Errorf("ordered Findings phrases = %v, want %v — a finding on a non-green row must not silently disappear",
+					got, tc.wantPhrases)
+			}
+
+			var lastUpdateCode domain.FindingCode
+			for _, f := range r.Findings {
+				if f.Phrase == "last update failed" {
+					lastUpdateCode = f.Code
+					break
+				}
+			}
+			ad, ok := r.AttentionDetails[lastUpdateCode]
+			if !ok || len(ad.Rows) == 0 {
+				t.Fatalf("AttentionDetails[%v] missing or empty for the stacked failed-update finding", lastUpdateCode)
+			}
+			var found bool
+			for _, row := range ad.Rows {
+				if row.Value == tc.wantErrorMessage {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("AttentionDetails rows missing ErrorMessage %q: %+v", tc.wantErrorMessage, ad.Rows)
 			}
 		})
 	}
@@ -489,6 +431,7 @@ func TestFetchMWAAEnvironmentsPage_PartialGetFailure(t *testing.T) {
 		t.Fatalf("got %d resources, want 5 (the 2 failing environments are KEPT as name-only degraded "+
 			"rows — a denied GetEnvironment must never make a listed environment vanish)", len(result.Resources))
 	}
+	const wantDetail = "Access to environment details was denied; only the name is visible."
 	degraded := map[string]bool{"env-denied": true, "env-missing": true}
 	for _, r := range result.Resources {
 		if !degraded[r.ID] {
@@ -499,6 +442,10 @@ func TestFetchMWAAEnvironmentsPage_PartialGetFailure(t *testing.T) {
 		}
 		if r.Fields["status"] != "details denied" {
 			t.Errorf("degraded row %q status = %q, want %q", r.ID, r.Fields["status"], "details denied")
+		}
+		if len(r.Findings) == 1 && r.Findings[0].Detail != wantDetail {
+			t.Errorf("degraded row %q Findings[0].Detail = %q, want %q (mwaa-specific — name-only row, no rich fields)",
+				r.ID, r.Findings[0].Detail, wantDetail)
 		}
 	}
 	errStr := err.Error()

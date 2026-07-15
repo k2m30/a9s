@@ -22,6 +22,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -171,6 +172,32 @@ func TestFetchVpcPeeringConnectionsPage_StatePhrase_PendingAcceptance(t *testing
 	const wantPrefix = "The peer has not accepted; AWS expires the request on "
 	if !strings.HasPrefix(f.Detail, wantPrefix) || !strings.HasSuffix(f.Detail, ".") {
 		t.Errorf("Detail = %q, want prefix %q and a trailing period (S5 template + the actual expiration date)", f.Detail, wantPrefix)
+	}
+}
+
+// pending_acceptance_rounding_boundary — the demo fixture above only pins the
+// evergreen 3d case (72h out); this isolated-fake witness pins the ceiling
+// behavior at a non-whole-day boundary: 30h remaining must round UP to 2d
+// (math.Ceil(30/24) == 2), neither truncating to 1d nor rounding-nearest to 1d.
+func TestFetchVpcPeeringConnectionsPage_StatePhrase_PendingAcceptance_RoundsUpAtDayBoundary(t *testing.T) {
+	const id = "pcx-0boundary000001a"
+	out := vpcPeerConnWithStatus(id, ec2types.VpcPeeringConnectionStateReasonCodePendingAcceptance)
+	expiration := time.Now().Add(30 * time.Hour)
+	out.VpcPeeringConnections[0].ExpirationTime = &expiration
+
+	fake := &vpcPeerEC2Fake{listOut: out}
+	result, err := awsclient.FetchVpcPeeringConnectionsPage(context.Background(), fake, "")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	r := mustFindVpcPeerResource(t, result.Resources, id)
+	if len(r.Findings) != 1 {
+		t.Fatalf("Findings: expected exactly 1, got %d: %+v", len(r.Findings), r.Findings)
+	}
+	f := r.Findings[0]
+	const wantPhrase = "pending acceptance: expires in 2d"
+	if f.Phrase != wantPhrase {
+		t.Errorf("Phrase = %q, want %q (30h remaining rounds UP to 2d, not truncated to 1d)", f.Phrase, wantPhrase)
 	}
 }
 

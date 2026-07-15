@@ -44,6 +44,12 @@ const (
 // ValidationException ("Member must have value less than or equal to 25").
 const mwaaListPageSize = 25
 
+// mwaaDetailsDeniedDetail is mwaa's own §4 S5 sentence for the
+// details-denied finding — deliberately NOT the generic degraded_resource.go
+// text, matching transferDetailsDeniedDetail/ltDetailsDeniedDetail's
+// precedent.
+const mwaaDetailsDeniedDetail = "Access to environment details was denied; only the name is visible."
+
 // FetchMWAAEnvironmentsPage fetches a single page of MWAA environments.
 // ListEnvironments returns names only (docs/resources/mwaa.md §3.1 — no Wave
 // 1 signal), so every field and every Finding comes from a per-name
@@ -75,12 +81,12 @@ func FetchMWAAEnvironmentsPage(ctx context.Context, c *ServiceClients, continuat
 		})
 		if getErr != nil {
 			failures = append(failures, fmt.Sprintf("%s: %s", name, getErr.Error()))
-			resources = append(resources, DegradedDetailsDenied("mwaa", name, &mwaatypes.Environment{Name: aws.String(name)}))
+			resources = append(resources, buildMWAADegradedResource(name))
 			continue
 		}
 		if getOutput.Environment == nil {
 			failures = append(failures, fmt.Sprintf("%s: nil environment in response", name))
-			resources = append(resources, DegradedDetailsDenied("mwaa", name, &mwaatypes.Environment{Name: aws.String(name)}))
+			resources = append(resources, buildMWAADegradedResource(name))
 			continue
 		}
 		resources = append(resources, buildMWAAResource(name, getOutput.Environment))
@@ -183,6 +189,31 @@ func buildMWAAResource(name string, env *mwaatypes.Environment) resource.Resourc
 		RawStruct:        env,
 		Findings:         findings,
 		AttentionDetails: attentionDetails,
+	}
+}
+
+// buildMWAADegradedResource builds the name-only degraded row for an
+// environment whose GetEnvironment call failed. ListEnvironments returns
+// names only (docs/resources/mwaa.md §3.1), so unlike transfer/lt's rich
+// degradation there are no list fields to carry forward — the shared
+// details-denied finding is appended with mwaa's own §4 sentence rather than
+// the generic degraded_resource.go text.
+func buildMWAADegradedResource(name string) resource.Resource {
+	return resource.Resource{
+		ID:   name,
+		Name: name,
+		Fields: map[string]string{
+			"name":   name,
+			"status": detailsDeniedPhrase,
+		},
+		RawStruct: &mwaatypes.Environment{Name: aws.String(name)},
+		Findings: []domain.Finding{{
+			Code:     DetailsDeniedCode("mwaa"),
+			Phrase:   detailsDeniedPhrase,
+			Detail:   mwaaDetailsDeniedDetail,
+			Severity: domain.SevWarn,
+			Source:   "wave1",
+		}},
 	}
 }
 

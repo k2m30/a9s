@@ -114,7 +114,7 @@ forbid() {
 	fi
 }
 
-# Menu: full catalog present. 66 registered resource types
+# Menu: full catalog present. 70 registered resource types
 # (resource.AllResourceTypes()) plus the synthetic Cost Explorer pseudo-entry
 # (internal/app/menu.go's menuAllItems() appends costsMenuTypeDef, which is
 # deliberately excluded from AllResourceTypes() itself).

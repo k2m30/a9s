@@ -377,7 +377,11 @@ Wave 1 probes complete
   → all done: save cache with enriched counts (when caching enabled); the RowStore retains the enriched rows for the session
 ```
 
-**Registry**: Wave 2 capability is declared on each `catalog.ResourceTypeDef` literal's `Wave2` field (`IssueEnricher{Fn, Priority}`); a type with no Wave 2 signal simply omits the field — `Wave2EnricherFor` returns `ok=false` for it. Some types without a `Wave2` enricher still perform in-fetcher Wave 2 work — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`).
+**Registry**: Wave 2 capability is declared on each `catalog.ResourceTypeDef` literal's `Wave2` field (`IssueEnricher{Fn, Priority}`); a type with no Wave 2 signal simply omits the field — `Wave2EnricherFor` returns `ok=false` for it. Some types without a `Wave2` enricher still perform in-fetcher Wave 2 work — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`; since v3.50.x this list-then-describe-each shape is the standard for new types whose pivots live on the describe response: mwaa `GetEnvironment` per environment, transfer `DescribeServer` per server, lt one `DescribeLaunchTemplateVersions("$Default")` per template).
+
+**Honest degradation (details denied)**: when the list API names a resource but the per-item describe fails (IAM denial, nil response), the row is KEPT — never dropped — through one shared implementation (`internal/aws/degraded_resource.go`: `DetailsDeniedCode`/`DetailsDeniedFindingDef`/`DegradedDetailsDenied`). The row carries a `details denied` Warning finding; rich variants (transfer, lt) keep every list-borne field, name-only variants (mwaa, eks, ng, ddb, opensearch) keep the identity. Per-item failures aggregate into the E3 composite error alongside the partial rows (E5). Every new type with a describe step must adopt this contract — see the extension guide.
+
+**Cache-scan enrichers (zero-API Wave 2)**: a second enricher shape derives findings by scanning a SIBLING type's already-loaded cache instead of calling AWS — `snapshot_cross_ref.go` (dbi-snap/dbc-snap orphan and past-retention), `lt_issue_enrichment.go` (deprecated AMI via the ami cache), `vpcpeer_issue_enrichment.go` (missing/blackholed routes via the rtb cache). They read the cache through the shared `cachedTypedRows[T]` helper (internal/aws/related_common.go) under the same tri-state contract as cache-scan related checkers, and emit findings through the normal `IssueEnricherResult` path. Guard rule: an absent or truncated sibling cache produces NO findings — never a guess.
 
 **Priority order** (`(*Core).BuildEnrichQueue`): Batchable enrichers that make account-wide calls are dispatched first (e.g., RDS/DocDB maintenance, EC2 instance status). Per-resource enrichers (e.g., DynamoDB PITR, KMS rotation, S3 PAB) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50). The registry key for each enricher must match the `ShortName` Wave 1 uses when observing rows into the `RowStore` — a mismatch silently skips the enricher. Queue membership comes from the store: a type enriches if its entry was observed at all (`TypeRows.Gen != 0` — observed-empty types still enrich); `Partial`-only entries never enter the queue.
 
@@ -673,6 +677,8 @@ The app has four distinct caches plus one enrichment-visibility state store:
 
 The row-store unification (task #17) landed: every in-memory per-type row copy — Wave-1 probe retention (`ProbeResources`/`ProbeTruncated`), the list cache (`ResourceCache`), lazy related adds (`LazyResourceCache`), and the controller-side row mirror — collapsed into the single `session.RowStore`. Those maps are gone; a type's rows live in exactly one entry regardless of which lane wrote them.
 
+One session field is deliberately EXEMPT from `Rotate()`'s clean-slate rule: `Session.SweptPairs` (v3.51.0) memoizes, per `profile--region` pair, that the availability sweep ran to COMPLETION this process lifetime — switching back to an already-swept pair skips the full re-probe (the menu seeds from the disk cache that sweep wrote), an interrupted sweep is not memoized, and `Ctrl+R` on the main menu clears the current pair's memo to force a re-sweep. It is the only cache-adjacent state that must survive profile switches by design.
+
 | Cache | Location | Scope | Invalidation |
 |-------|----------|-------|-------------|
 | **Disk availability cache** | `internal/cache/` | Persisted at `~/.a9s/cache/<profile>--<region>.yaml` | TTL of 1 hour; file replaced atomically |
@@ -808,7 +814,7 @@ The steps below describe how to extend the current `main` architecture. They are
 ### Adding a New Resource Type
 
 1. Add or update the `ResourceTypeDef` and built-in default view config.
-2. Implement the fetcher in `internal/aws/` so it returns stable `resource.Resource` values with meaningful `ID`, `Name`, `Status`, `Issues`, `Fields`, and `RawStruct` for the current resource model on `main`.
+2. Implement the fetcher in `internal/aws/` so it returns stable `resource.Resource` values with meaningful `ID`, `Name`, `Status`, `Issues`, `Fields`, and `RawStruct` for the current resource model on `main`. If the fetcher makes per-item describe calls, adopt the honest-degradation contract (`DetailsDeniedFindingDef` — a listed resource whose describe is denied stays as a `details denied` row; see §Wave 2 Issue Enrichment Pipeline).
 3. Register the resource behavior in `internal/resource/`:
    - paginated fetcher
    - child fetchers, if any

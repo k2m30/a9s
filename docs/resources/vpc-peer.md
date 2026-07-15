@@ -90,7 +90,7 @@ No API-calling Wave 2 exists (no per-connection describe). Two derived zero-API 
 
 ## 4. Issue Visualization
 
-Surfaces S1–S5 per `docs/attention-signals.md` §Visualization Surfaces; wave→surface mapping as standard. State signals and the config-derived warnings are color-bearing; the two cache-scan checks take the established `~`-on-Healthy treatment (dbi maintenance / lt deprecated-AMI precedent).
+Surfaces S1–S5 per `docs/attention-signals.md` §Visualization Surfaces; wave→surface mapping as standard. Every signal is color-bearing — the fleet color invariant ("color derives from findings", the conformance-gate owner rule) applies to the two cache-scan route checks too: their rows render Warning-colored like any other finding. Their `~` class affects only the S1 aggregation (no badge bump) and S5 ordering.
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
@@ -103,15 +103,15 @@ Surfaces S1–S5 per `docs/attention-signals.md` §Visualization Surfaces; wave�
 | deleting | 1 | Warning | n/a | S2, S4 | `deleting` | `Peering connection is being deleted.` |
 | deleted | 1 | Dim | n/a | S2, S4 | `deleted` | `AWS keeps deleted connections listed for a window.` |
 | CIDR overlap (active) | 1 | Warning | n/a | S2, S4, S5 | `CIDR overlap with peer` | `Requester and accepter CIDR ranges overlap: <ranges>; overlapping subsets blackhole.` |
-| no local route (active) | 2 | Healthy + background check | `~` | S3, S4, S5 | `no local route to peer` | `No loaded route table routes to this peering connection.` |
-| route blackholed | 2 | Healthy + background check | `~` | S3, S4, S5 | `route to peer blackholed` | `A route references this connection but its state is blackhole.` |
+| no local route (active) | 2 | Warning (background `~` class: no S1 bump) | n/a | S2, S4, S5 | `no local route to peer` | `No loaded route table routes to this peering connection.` |
+| route blackholed | 2 | Warning (background `~` class: no S1 bump) | n/a | S2, S4, S5 | `route to peer blackholed` | `A route references this connection but its state is blackhole.` |
 
 Notes:
 
 - No raw AWS enum reaches a rendered surface.
 - Multiple findings stack with the framework `(+N)` suffix; S5 enumerates each.
 - pending-acceptance escalation: wording carries the countdown; under 48h the S4 phrase stays the same with the smaller `<N>` — the number IS the escalation.
-- Both derived route checks ship as `~` background checks (the lt deprecated-AMI treatment): the cache-scan enrichment layer annotates green rows, it does not recolor them — the S4 phrase plus the S5 sentence carry the cause. Amended 2026-07-15 from an earlier color-bearing plan for blackholed, matching the fold's actual capability.
+- Both derived route checks ship as `~`-class background checks: Warning-colored rows per the fleet color invariant, excluded from the S1 badge (the badge counts state rows and `!`-class checks) — the color plus the S4 phrase carry the cause. Owner ruling 2026-07-15: no glyph-on-green special path exists; color derives from findings uniformly.
 
 ## 4.1 UX review (two sentences)
 
