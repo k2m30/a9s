@@ -172,6 +172,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Code: mwaaCodeLastUpdateFailed, Phrase: "last update failed", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: mwaaCodeWebserverPublic, Phrase: "webserver public", Severity: domain.SevWarn, Source: "wave1"},
 			DetailsDeniedFindingDef("mwaa"),
+			DetailsUnavailableFindingDef("mwaa"),
 		},
 	},
 }

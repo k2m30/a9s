@@ -102,10 +102,10 @@ func FetchLaunchTemplatesPage(ctx context.Context, api EC2FetchLaunchTemplatesAP
 		switch {
 		case versionErr != nil:
 			failures = append(failures, fmt.Sprintf("%s: %s", id, versionErr.Error()))
-			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{detailsDeniedFinding("lt", ltDetailsDeniedDetail)}))
+			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{degradedDetailsFinding("lt", versionErr, ltDetailsDeniedDetail, detailsUnavailableDetail)}))
 		case len(versionOutput.LaunchTemplateVersions) == 0:
 			failures = append(failures, fmt.Sprintf("%s: no $Default version in DescribeLaunchTemplateVersions response", id))
-			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{detailsDeniedFinding("lt", ltDetailsDeniedDetail)}))
+			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{degradedDetailsFinding("lt", nil, ltDetailsDeniedDetail, detailsUnavailableDetail)}))
 		default:
 			ver := versionOutput.LaunchTemplateVersions[0]
 			resources = append(resources, ltResource(tpl, ver, computeLTFindings(ver)))

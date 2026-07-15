@@ -134,6 +134,7 @@ Notes:
 - AccessDenied on `ec2:DescribeLaunchTemplates`: menu row shows the error state, never `0`.
 - Healthy templates (IMDSv2 required, no explicit-off encryption, current AMI) render green with a blank Status — the normal case for a well-run account is a silent list.
 - The deprecated-AMI check does not bump the `issues:N` badge (S1 counts urgent findings only) — the template still launches; the Warning-colored row plus the Status phrase flag it for the next maintenance window.
+- `DescribeLaunchTemplateVersions` denied: an authorization failure renders `details denied`; a non-authorization describe failure (nil body, transient error, no `$Default` version in the response) renders the neutral `details unavailable`.
 
 ## 4.1 UX review (two sentences)
 

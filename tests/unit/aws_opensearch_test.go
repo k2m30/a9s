@@ -8,13 +8,13 @@ package unit
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
 	ostypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
+	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	domainpkg "github.com/k2m30/a9s/v3/internal/domain"
@@ -656,7 +656,10 @@ func TestOpenSearch_Fetch_DescribeDomainsBatchError_KeepsListedDomainsAsDegraded
 		},
 	}
 	describeMock := &mockOSDescribeDomainsAPI{
-		err: errors.New("AccessDeniedException: User is not authorized to perform: es:DescribeDomains"),
+		// A real es:DescribeDomains denial is a typed AccessDenied API error;
+		// the shared DegradedDetails classifier renders "details denied" for it
+		// (a plain non-typed error would instead render "details unavailable").
+		err: &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "User is not authorized to perform: es:DescribeDomains"},
 	}
 
 	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)

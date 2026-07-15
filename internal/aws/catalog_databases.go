@@ -596,6 +596,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDDBArchiving, Phrase: "archiving", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: ddbCodePITROff, Phrase: "point-in-time recovery disabled", Severity: domain.SevWarn, Source: "wave2"},
 			DetailsDeniedFindingDef("ddb"),
+			DetailsUnavailableFindingDef("ddb"),
 		},
 	},
 	{
@@ -656,6 +657,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: opensearchCodeUpdateForced, Phrase: "software update forced soon", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: opensearchCodeEncryptionOff, Phrase: "encryption at rest off", Severity: domain.SevWarn, Source: "wave2"},
 			DetailsDeniedFindingDef("opensearch"),
+			DetailsUnavailableFindingDef("opensearch"),
 		},
 	},
 	{

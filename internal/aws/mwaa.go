@@ -81,12 +81,12 @@ func FetchMWAAEnvironmentsPage(ctx context.Context, c *ServiceClients, continuat
 		})
 		if getErr != nil {
 			failures = append(failures, fmt.Sprintf("%s: %s", name, getErr.Error()))
-			resources = append(resources, buildMWAADegradedResource(name))
+			resources = append(resources, buildMWAADegradedResource(name, getErr))
 			continue
 		}
 		if getOutput.Environment == nil {
 			failures = append(failures, fmt.Sprintf("%s: nil environment in response", name))
-			resources = append(resources, buildMWAADegradedResource(name))
+			resources = append(resources, buildMWAADegradedResource(name, nil))
 			continue
 		}
 		resources = append(resources, buildMWAAResource(name, getOutput.Environment))
@@ -189,17 +189,20 @@ func buildMWAAResource(name string, env *mwaatypes.Environment) resource.Resourc
 // buildMWAADegradedResource builds the name-only degraded row for an
 // environment whose GetEnvironment call failed — ListEnvironments returns
 // names only (docs/resources/mwaa.md §3.1), so there are no list fields to
-// carry forward.
-func buildMWAADegradedResource(name string) resource.Resource {
+// carry forward. err is the GetEnvironment call's error (nil for a nil
+// Environment body); it decides whether the row renders mwaa's own "details
+// denied" sentence or the neutral "details unavailable" one.
+func buildMWAADegradedResource(name string, err error) resource.Resource {
+	finding := degradedDetailsFinding("mwaa", err, mwaaDetailsDeniedDetail, detailsUnavailableDetail)
 	return resource.Resource{
 		ID:   name,
 		Name: name,
 		Fields: map[string]string{
 			"name":   name,
-			"status": detailsDeniedPhrase,
+			"status": finding.Phrase,
 		},
 		RawStruct: &mwaatypes.Environment{Name: aws.String(name)},
-		Findings:  []domain.Finding{detailsDeniedFinding("mwaa", mwaaDetailsDeniedDetail)},
+		Findings:  []domain.Finding{finding},
 	}
 }
 

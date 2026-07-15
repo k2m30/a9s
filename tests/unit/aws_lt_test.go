@@ -491,11 +491,16 @@ func TestFetchLaunchTemplatesPage_PartialDescribe(t *testing.T) {
 		t.Fatalf("got %d resources, want 5 — a denied/missing describe must never make a listed template vanish", len(result.Resources))
 	}
 
-	degraded := map[string]bool{"lt-partial-denied": true, "lt-partial-missing": true}
+	// lt-partial-denied → UnauthorizedOperation (EC2's authorization-denied
+	// code) → "details denied"; lt-partial-missing → InvalidLaunchTemplateId.
+	// NotFound (non-auth) → the neutral "details unavailable". A not-found
+	// template must never read as an IAM denial, and EC2 denials do not use
+	// the "AccessDenied" code (docs/resources/lt.md §4; DegradedDetails split).
+	wantPhrase := map[string]string{"lt-partial-denied": "details denied", "lt-partial-missing": "details unavailable"}
 	for _, r := range result.Resources {
-		if degraded[r.ID] {
-			if len(r.Findings) != 1 || r.Findings[0].Phrase != "details denied" {
-				t.Errorf("degraded row %q must carry exactly the %q finding, got %+v", r.ID, "details denied", r.Findings)
+		if phrase, ok := wantPhrase[r.ID]; ok {
+			if len(r.Findings) != 1 || r.Findings[0].Phrase != phrase {
+				t.Errorf("degraded row %q must carry exactly the %q finding, got %+v", r.ID, phrase, r.Findings)
 			}
 			continue
 		}

@@ -217,7 +217,11 @@ func TestFetchEKSClusters_DescribeFailureSurfacesError(t *testing.T) {
 			},
 		},
 		errByName: map[string]error{
-			"cluster-bad": fmt.Errorf("eks: DescribeCluster: AccessDeniedException"),
+			// A plain (non-typed) transport-class error — not an authorization
+			// denial — so the shared DegradedDetails classifier renders the
+			// neutral "details unavailable" row (denied is covered by the typed
+			// AccessDenied cases in mwaa/transfer and the classifier contract test).
+			"cluster-bad": fmt.Errorf("eks: DescribeCluster: internal server error"),
 		},
 	}
 
@@ -236,7 +240,7 @@ func TestFetchEKSClusters_DescribeFailureSurfacesError(t *testing.T) {
 		t.Errorf("composite error must contain the failing cluster name \"cluster-bad\", got: %q", errStr)
 	}
 
-	// Both clusters appear: the successful one in full, the denied one as a
+	// Both clusters appear: the successful one in full, the failed one as a
 	// name-only degraded row (a listed cluster must never vanish).
 	if len(result.Resources) != 2 {
 		t.Fatalf(
@@ -255,7 +259,7 @@ func TestFetchEKSClusters_DescribeFailureSurfacesError(t *testing.T) {
 	if !ok {
 		t.Fatalf("denied cluster \"cluster-bad\" must remain as a degraded row, got %v", result.Resources)
 	}
-	if got := bad.Fields["status"]; got != "details denied" {
-		t.Errorf("degraded row status = %q, want %q", got, "details denied")
+	if got := bad.Fields["status"]; got != "details unavailable" {
+		t.Errorf("degraded row status = %q, want %q", got, "details unavailable")
 	}
 }

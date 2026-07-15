@@ -157,6 +157,7 @@ Notes:
 - No raw AWS enum reaches a rendered surface (`START_FAILED` → `start failed`, etc.).
 - Multiple findings stack with the framework `(+N)` suffix; S5 enumerates each.
 - AccessDenied on `transfer:ListServers`: menu row shows the error state, never `0`.
+- `DescribeServer` denied: an authorization failure renders `details denied`; a non-authorization describe failure (nil body, transient error) renders the neutral `details unavailable`.
 
 ## 4.1 UX review (two sentences)
 

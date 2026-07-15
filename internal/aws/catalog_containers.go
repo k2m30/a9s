@@ -124,6 +124,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{Code: CodeEKSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeEKSHealthIssue, Phrase: "issue: <Issue.Code>", Severity: domain.SevWarn, Source: "wave1"},
 			DetailsDeniedFindingDef("eks"),
+			DetailsUnavailableFindingDef("eks"),
 		},
 	},
 	{
@@ -175,6 +176,7 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeNGStateDegraded, Phrase: "degraded", Severity: domain.SevBroken, Source: "wave1"},
 			DetailsDeniedFindingDef("ng"),
+			DetailsUnavailableFindingDef("ng"),
 		},
 	},
 }
@@ -242,12 +244,12 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 			})
 			if descErr != nil {
 				failures = append(failures, fmt.Sprintf("%s/%s: %s", cluster, ngName, descErr.Error()))
-				resources = append(resources, DegradedDetailsDenied("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}))
+				resources = append(resources, DegradedDetails("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}, descErr))
 				continue
 			}
 			if descOutput.Nodegroup == nil {
 				failures = append(failures, fmt.Sprintf("%s/%s: nil nodegroup in response", cluster, ngName))
-				resources = append(resources, DegradedDetailsDenied("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}))
+				resources = append(resources, DegradedDetails("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}, nil))
 				continue
 			}
 			res := buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup)

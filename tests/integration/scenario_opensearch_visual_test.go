@@ -60,8 +60,10 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	//   - UpdateAvailableDomain     (Healthy + `!`)
 	//   - MultiBackgroundDomain     (Healthy + `!`)
 	// DeletingDomain (Dim) does not count; `~` never bumps.
-	// Plus the listed-but-denied witness (warn-os-details-denied): the
-	// degraded name-only row is Warning-colored, so it bumps the badge.
+	// Plus the listed-but-unavailable witness (absent from the DescribeDomains
+	// response — a non-auth degradation, "details unavailable", not an IAM
+	// denial): the degraded name-only row is Warning-colored, so it bumps the
+	// badge.
 	// -----------------------------------------------------------------
 	scenario.ExpectMenuIssueCount("opensearch", 6)
 

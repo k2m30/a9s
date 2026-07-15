@@ -431,21 +431,28 @@ func TestFetchMWAAEnvironmentsPage_PartialGetFailure(t *testing.T) {
 		t.Fatalf("got %d resources, want 5 (the 2 failing environments are KEPT as name-only degraded "+
 			"rows — a denied GetEnvironment must never make a listed environment vanish)", len(result.Resources))
 	}
-	const wantDetail = "Access to environment details was denied; only the name is visible."
-	degraded := map[string]bool{"env-denied": true, "env-missing": true}
+	// env-denied → AccessDenied (auth) → "details denied" with mwaa's own §4
+	// sentence; env-missing → ResourceNotFound (non-auth) → the neutral
+	// "details unavailable". A not-found environment must never read as an
+	// IAM denial (docs/resources/mwaa.md §4; the shared DegradedDetails split).
+	wantByID := map[string]struct{ phrase, detail string }{
+		"env-denied":  {"details denied", "Access to environment details was denied; only the name is visible."},
+		"env-missing": {"details unavailable", "Details could not be retrieved; only the name is visible."},
+	}
 	for _, r := range result.Resources {
-		if !degraded[r.ID] {
+		want, ok := wantByID[r.ID]
+		if !ok {
 			continue
 		}
-		if len(r.Findings) != 1 || r.Findings[0].Phrase != "details denied" {
-			t.Errorf("degraded row %q must carry exactly the %q finding, got %+v", r.ID, "details denied", r.Findings)
+		if len(r.Findings) != 1 || r.Findings[0].Phrase != want.phrase {
+			t.Errorf("degraded row %q must carry exactly the %q finding, got %+v", r.ID, want.phrase, r.Findings)
+			continue
 		}
-		if r.Fields["status"] != "details denied" {
-			t.Errorf("degraded row %q status = %q, want %q", r.ID, r.Fields["status"], "details denied")
+		if r.Fields["status"] != want.phrase {
+			t.Errorf("degraded row %q status = %q, want %q", r.ID, r.Fields["status"], want.phrase)
 		}
-		if len(r.Findings) == 1 && r.Findings[0].Detail != wantDetail {
-			t.Errorf("degraded row %q Findings[0].Detail = %q, want %q (mwaa-specific — name-only row, no rich fields)",
-				r.ID, r.Findings[0].Detail, wantDetail)
+		if r.Findings[0].Detail != want.detail {
+			t.Errorf("degraded row %q Findings[0].Detail = %q, want %q", r.ID, r.Findings[0].Detail, want.detail)
 		}
 	}
 	errStr := err.Error()
@@ -489,8 +496,9 @@ func TestFetchMWAAEnvironmentsPage_NilEnvironmentInGetEnvironmentOutput(t *testi
 	if len(result.Resources) != 1 {
 		t.Fatalf("Resources: expected 1 degraded name-only row, got %d", len(result.Resources))
 	}
-	if got := result.Resources[0].Fields["status"]; got != "details denied" {
-		t.Errorf("degraded row status = %q, want %q", got, "details denied")
+	// nil Environment is not an authorization denial → "details unavailable".
+	if got := result.Resources[0].Fields["status"]; got != "details unavailable" {
+		t.Errorf("degraded row status = %q, want %q", got, "details unavailable")
 	}
 }
 

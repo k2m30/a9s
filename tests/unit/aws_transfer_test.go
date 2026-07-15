@@ -478,11 +478,14 @@ func TestFetchTransferServersPage_PartialDescribe(t *testing.T) {
 		t.Fatalf("got %d resources, want 5 — a denied/missing DescribeServer must never make a listed server vanish", len(result.Resources))
 	}
 
-	degraded := map[string]bool{"server-denied": true, "server-missing": true}
+	// server-denied → AccessDenied (auth) → "details denied";
+	// server-missing → ResourceNotFound (non-auth) → the neutral "details
+	// unavailable". A not-found server must never read as an IAM denial.
+	wantPhrase := map[string]string{"server-denied": "details denied", "server-missing": "details unavailable"}
 	for _, r := range result.Resources {
-		if degraded[r.ID] {
-			if len(r.Findings) != 1 || r.Findings[0].Phrase != "details denied" {
-				t.Errorf("degraded row %q must carry exactly the %q finding, got %+v", r.ID, "details denied", r.Findings)
+		if phrase, ok := wantPhrase[r.ID]; ok {
+			if len(r.Findings) != 1 || r.Findings[0].Phrase != phrase {
+				t.Errorf("degraded row %q must carry exactly the %q finding, got %+v", r.ID, phrase, r.Findings)
 			}
 			continue
 		}

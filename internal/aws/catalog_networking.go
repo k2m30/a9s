@@ -742,6 +742,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: transferCodeLegacyPolicy, Phrase: "legacy security policy", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: transferCodeNoLogging, Phrase: "no activity logging", Severity: domain.SevWarn, Source: "wave1"},
 			DetailsDeniedFindingDef("transfer"),
+			DetailsUnavailableFindingDef("transfer"),
 		},
 	},
 	{

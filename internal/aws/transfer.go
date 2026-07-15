@@ -92,10 +92,10 @@ func FetchTransferServersPage(ctx context.Context, c *ServiceClients, continuati
 		switch {
 		case describeErr != nil:
 			failures = append(failures, fmt.Sprintf("%s: %s", id, describeErr.Error()))
-			resources = append(resources, buildTransferDegradedResource(listed))
+			resources = append(resources, buildTransferDegradedResource(listed, describeErr))
 		case describeOutput.Server == nil:
 			failures = append(failures, fmt.Sprintf("%s: nil server in DescribeServer response", id))
-			resources = append(resources, buildTransferDegradedResource(listed))
+			resources = append(resources, buildTransferDegradedResource(listed, nil))
 		default:
 			resources = append(resources, buildTransferResource(describeOutput.Server))
 		}
@@ -219,21 +219,23 @@ func transferStateFinding(state transfertypes.State) (domain.Finding, bool) {
 
 // buildTransferDegradedResource builds the RICH degraded row for a server
 // whose DescribeServer call failed: the row is kept using the ListedServer
-// fields (including the state finding), then the shared details-denied
-// finding is appended with transfer's own §4 sentence — never the generic
-// degraded_resource.go text, since this row keeps far more than just the
-// name. RawStruct is the *ListedServer pointer (the fallback shape §0
-// specifies), so every related checker's Pattern F read against
-// *DescribedServer type-asserts cleanly to "not found" here rather than
-// panicking.
-func buildTransferDegradedResource(listed transfertypes.ListedServer) resource.Resource {
+// fields (including the state finding), then the classified details finding
+// is appended — transfer's own "details denied" sentence for an
+// authorization failure, the neutral "details unavailable" one otherwise —
+// never the generic degraded_resource.go denied text, since this row keeps
+// far more than just the name. err is the DescribeServer call's error (nil
+// for a nil Server body). RawStruct is the *ListedServer pointer (the
+// fallback shape §0 specifies), so every related checker's Pattern F read
+// against *DescribedServer type-asserts cleanly to "not found" here rather
+// than panicking.
+func buildTransferDegradedResource(listed transfertypes.ListedServer, err error) resource.Resource {
 	id := aws.ToString(listed.ServerId)
 
 	var findings []domain.Finding
 	if f, ok := transferStateFinding(listed.State); ok {
 		findings = append(findings, f)
 	}
-	findings = append(findings, detailsDeniedFinding("transfer", transferDetailsDeniedDetail))
+	findings = append(findings, degradedDetailsFinding("transfer", err, transferDetailsDeniedDetail, detailsUnavailableDetail))
 	statusPhrase := phraseFromFindings(findings)
 
 	raw := listed

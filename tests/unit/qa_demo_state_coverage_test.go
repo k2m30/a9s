@@ -102,18 +102,33 @@ import (
 //     regression the allowlist was never told about.
 var knownStateCoverageGaps = map[string]bool{
 	// Reason class: "demo witness would corrupt the showroom" — these
-	// findings fire in production (degraded name-only row on a denied
-	// per-item describe, shared DegradedDetailsDenied contract) and are
-	// unit-tested with inline stubs
-	// (TestFetchEKSClusters_DescribeFailureSurfacesError,
+	// findings fire in production (degraded row on a failed per-item
+	// describe, shared DegradedDetails contract, which classifies the error:
+	// an authorization failure → details_denied, any other failure or a
+	// nil/empty body → details_unavailable) and are unit-tested with inline
+	// stubs (TestFetchEKSClusters_DescribeFailureSurfacesError,
 	// TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow), but a
-	// listed-but-denied cluster/ng in the DEMO leaks into every related
+	// listed-but-degraded cluster/ng in the DEMO leaks into every related
 	// checker that enumerates clusters or fans out DescribeNodegroup
 	// (ec2/asg/ami/eks/subnet/role pivots), flashing an error on each
-	// detail open. mwaa/ddb/opensearch keep real demo witnesses — nothing
-	// fans out to them per-item.
-	"ng:ng.warn.details_denied":   true,
-	"eks:eks.warn.details_denied": true,
+	// detail open.
+	"ng:ng.warn.details_denied":        true,
+	"eks:eks.warn.details_denied":      true,
+	"ng:ng.warn.details_unavailable":   true,
+	"eks:eks.warn.details_unavailable": true,
+	// The non-auth degraded path (nil/empty body, transient error →
+	// details_unavailable) is production-only for the types whose demo
+	// witness models the AUTH path (an AccessDenied fake → details_denied):
+	// mwaa/transfer/lt/ddb. Their details_unavailable is unit-tested with
+	// inline nil-body/non-auth stubs, not the showroom.
+	"mwaa:mwaa.warn.details_unavailable":         true,
+	"transfer:transfer.warn.details_unavailable": true,
+	"lt:lt.warn.details_unavailable":             true,
+	"ddb:ddb.warn.details_unavailable":           true,
+	// opensearch is the inverse: its demo witness is the absent-from-response
+	// case (describeErr nil → details_unavailable), so the AUTH details_denied
+	// path is the production-only one (unit-tested by the batch-denial stub).
+	"opensearch:opensearch.warn.details_denied": true,
 
 	// --- bucket gaps: type never resolves to this domain.Color via td.ResolveColor ---
 	//

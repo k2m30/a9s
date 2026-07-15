@@ -171,6 +171,7 @@ Notes:
 - When `LastUpdate.Status == FAILED` coincides with another signal row (e.g. `ROLLING_BACK`), S4 keeps the state cause with the `(+N)` suffix; the failed-update sentence still appears in S5.
 - No raw AWS enum ever reaches a rendered surface — `ErrorCode` and `WebserverAccessMode` values are humanized (`INCORRECT_CONFIGURATION` → `Incorrect configuration`) per the issue-text style gate.
 - AccessDenied on `mwaa:ListEnvironments`: the main-menu row carries the error state, never `0` — "you can't see it" must be distinguishable from "it isn't there".
+- `GetEnvironment` denied: an authorization failure renders `details denied`; a non-authorization describe failure (nil body, transient error) renders the neutral `details unavailable`.
 
 ## 4.1 UX review (two sentences)
 

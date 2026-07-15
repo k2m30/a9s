@@ -86,14 +86,16 @@ const (
 type OpenSearchFixtures struct {
 	Domains []ostypes.DomainStatus
 	// DeniedNames are returned by ListDomainNames but OMITTED from the
-	// batched DescribeDomains response (the IAM-denial shape for the batch
-	// API) — the fetcher keeps a name-only `details denied` row (finding
-	// opensearch.warn.details_denied).
+	// batched DescribeDomains response with NO error (describeErr is nil) —
+	// the absent-from-response shape, not an IAM denial — so the fetcher
+	// keeps a name-only `details unavailable` row (finding
+	// opensearch.warn.details_unavailable).
 	DeniedNames []string
 }
 
-// WarnOpenSearchDetailsDeniedID is the listed-but-denied coverage-gate witness.
-const WarnOpenSearchDetailsDeniedID = "warn-os-details-denied"
+// WarnOpenSearchDetailsUnavailableID is the listed-but-absent-from-response
+// coverage-gate witness.
+const WarnOpenSearchDetailsUnavailableID = "warn-os-details-denied"
 
 // NewOpenSearchFixtures constructs OpenSearchFixtures from the canonical demo data.
 // Fixture order matches the spec §2.1 list exactly:
@@ -113,7 +115,7 @@ var sharedOpenSearchFixtures = sync.OnceValue(func() *OpenSearchFixtures {
 			osIsolatedBroken(),
 			osDeletingDim(),
 		},
-		DeniedNames: []string{WarnOpenSearchDetailsDeniedID},
+		DeniedNames: []string{WarnOpenSearchDetailsUnavailableID},
 	}
 })
 

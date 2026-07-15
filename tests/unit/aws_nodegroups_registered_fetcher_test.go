@@ -316,13 +316,14 @@ func TestRegisteredNGFetcher_ImageIDEmptyWhenLaunchTemplateResolveFails(t *testi
 var errNGTestLTNotFound = fmt.Errorf("EC2 API error: launch template not found")
 
 // TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow pins the shared
-// degraded-row contract (DegradedDetailsDenied) on the registered "ng"
-// fetcher: a node group the list names but the describe cannot deliver (nil
-// body here; an AccessDeniedException behaves identically) is KEPT as a
-// name-only `details denied` row and the failure aggregates into the
-// composite error. There is deliberately NO demo witness for
-// ng.warn.details_denied (see knownUnwitnessedFindings) — this test is its
-// coverage.
+// degraded-row contract (DegradedDetails) on the registered "ng" fetcher: a
+// node group the list names but the describe cannot deliver is KEPT as a
+// name-only degraded row and the failure aggregates into the composite
+// error. A nil body is a NON-auth failure → the neutral `details unavailable`
+// row (an AccessDeniedException would instead render `details denied` — the
+// two facts no longer share a phrase). There is deliberately NO demo witness
+// for either ng degraded finding (see knownUnwitnessedFindings) — this test
+// is the nil-body (unavailable) coverage.
 func TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow(t *testing.T) {
 	pf := resource.GetPaginatedFetcher("ng")
 	if pf == nil {
@@ -361,10 +362,10 @@ func TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow(t *testing.T) {
 	if ghost == nil {
 		t.Fatalf("degraded row ng-ghost must remain, got %v", result.Resources)
 	}
-	if ghost.Fields["status"] != "details denied" {
-		t.Errorf("degraded row status = %q, want %q", ghost.Fields["status"], "details denied")
+	if ghost.Fields["status"] != "details unavailable" {
+		t.Errorf("degraded row status = %q, want %q", ghost.Fields["status"], "details unavailable")
 	}
-	if len(ghost.Findings) != 1 || ghost.Findings[0].Code != awsclient.DetailsDeniedCode("ng") {
-		t.Errorf("degraded row must carry the ng details-denied finding, got %+v", ghost.Findings)
+	if len(ghost.Findings) != 1 || ghost.Findings[0].Code != awsclient.DetailsUnavailableCode("ng") {
+		t.Errorf("degraded row must carry the ng details-unavailable finding, got %+v", ghost.Findings)
 	}
 }

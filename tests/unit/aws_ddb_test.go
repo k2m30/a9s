@@ -304,8 +304,10 @@ func TestDDB_Fetch_NilTable_SkipDoNotCrash(t *testing.T) {
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 degraded name-only row for nil table, got %d", len(result.Resources))
 	}
-	if got := result.Resources[0].Fields["status"]; got != "details denied" {
-		t.Errorf("degraded row status = %q, want %q", got, "details denied")
+	// nil TableDescription is not an authorization denial — the shared
+	// DegradedDetails classifier renders the neutral "details unavailable".
+	if got := result.Resources[0].Fields["status"]; got != "details unavailable" {
+		t.Errorf("degraded row status = %q, want %q", got, "details unavailable")
 	}
 }
 

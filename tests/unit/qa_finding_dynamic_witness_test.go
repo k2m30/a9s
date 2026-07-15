@@ -82,13 +82,26 @@ var knownUnwitnessedFindings = map[string]bool{
 	"ses:ses.account-shutdown":  true,
 	"ses:ses.account-probation": true,
 	"ses:ses.quota-high":        true,
-	// Fire in production (shared DegradedDetailsDenied degraded-row path,
+	// Fire in production (shared DegradedDetails degraded-row path, which
+	// classifies the error into details_denied for an authorization failure
+	// vs details_unavailable for any other failure or a nil/empty body;
 	// unit-tested with inline stubs) but a demo witness would leak into
 	// every cluster-enumerating / DescribeNodegroup-fanning related checker
 	// and flash an error on each detail open — see knownStateCoverageGaps
 	// for the full reason.
-	"ng:ng.warn.details_denied":   true,
-	"eks:eks.warn.details_denied": true,
+	"ng:ng.warn.details_denied":        true,
+	"eks:eks.warn.details_denied":      true,
+	"ng:ng.warn.details_unavailable":   true,
+	"eks:eks.warn.details_unavailable": true,
+	// Non-auth degraded path is production-only for the auth-witnessed types
+	// (mwaa/transfer/lt/ddb demo their AccessDenied → details_denied case);
+	// opensearch is the inverse (demo witnesses the absent-from-response →
+	// details_unavailable case, so its details_denied is production-only).
+	"mwaa:mwaa.warn.details_unavailable":         true,
+	"transfer:transfer.warn.details_unavailable": true,
+	"lt:lt.warn.details_unavailable":             true,
+	"ddb:ddb.warn.details_unavailable":           true,
+	"opensearch:opensearch.warn.details_denied":  true,
 }
 
 // TestFindingDynamicWitness_EveryRegisteredCodeFiresOnDemoFixtures is the

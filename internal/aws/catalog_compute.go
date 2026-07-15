@@ -920,6 +920,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: ltCodeUnencrypted, Phrase: "EBS encryption disabled", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: ltCodeDeprecatedAMI, Phrase: "deprecated AMI", Severity: domain.SevWarn, Source: "wave2"},
 			DetailsDeniedFindingDef("lt"),
+			DetailsUnavailableFindingDef("lt"),
 		},
 	},
 }
