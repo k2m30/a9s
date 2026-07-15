@@ -19,18 +19,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // fakeELBv2Full embeds fakeELBv2Batch2 (satisfies ELBv2API) plus DescribeTags
 // (ELBv2DescribeTagsAPI) and GetWebACLForResource is on a separate WAF fake.
 type fakeELBv2Full struct {
 	fakeELBv2Batch2
-	describeTagsFn           func(*elbv2.DescribeTagsInput) (*elbv2.DescribeTagsOutput, error)
-	describeLBAttributesFn   func(*elbv2.DescribeLoadBalancerAttributesInput) (*elbv2.DescribeLoadBalancerAttributesOutput, error)
+	describeTagsFn         func(*elbv2.DescribeTagsInput) (*elbv2.DescribeTagsOutput, error)
+	describeLBAttributesFn func(*elbv2.DescribeLoadBalancerAttributesInput) (*elbv2.DescribeLoadBalancerAttributesOutput, error)
 }
 
 func (f *fakeELBv2Full) DescribeTags(_ context.Context, input *elbv2.DescribeTagsInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeTagsOutput, error) {
@@ -81,8 +81,8 @@ func (f *fakeWAFv2ForResource) GetLoggingConfiguration(_ context.Context, _ *waf
 func TestRelated_ELB_SG_Found(t *testing.T) {
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abcdef1234567890"
 	source := resource.Resource{
-		ID:   "prod-alb",
-		Name: "prod-alb",
+		ID:     "prod-alb",
+		Name:   "prod-alb",
 		Fields: map[string]string{"load_balancer_arn": elbARN},
 		RawStruct: elbv2types.LoadBalancer{
 			LoadBalancerName: aws.String("prod-alb"),
@@ -105,8 +105,8 @@ func TestRelated_ELB_SG_NLBHasNoSGs(t *testing.T) {
 	// NLBs have no security groups
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/prod-nlb/1234567890abcdef"
 	source := resource.Resource{
-		ID:   "prod-nlb",
-		Name: "prod-nlb",
+		ID:     "prod-nlb",
+		Name:   "prod-nlb",
 		Fields: map[string]string{"load_balancer_arn": elbARN},
 		RawStruct: elbv2types.LoadBalancer{
 			LoadBalancerName: aws.String("prod-nlb"),
@@ -136,8 +136,8 @@ func TestRelated_ELB_SG_WrongRawStruct(t *testing.T) {
 
 func TestRelated_ELB_VPC_Found(t *testing.T) {
 	source := resource.Resource{
-		ID:   "prod-alb",
-		Name: "prod-alb",
+		ID:     "prod-alb",
+		Name:   "prod-alb",
 		Fields: map[string]string{"vpc_id": "vpc-prod001"},
 	}
 	checker := elbCheckerByTarget(t, "vpc")
@@ -430,8 +430,8 @@ func TestRelated_ELB_ENI_Found(t *testing.T) {
 
 func TestRelated_ELB_ENI_WrongRequester(t *testing.T) {
 	source := resource.Resource{
-		ID:   "prod-alb",
-		Name: "prod-alb",
+		ID:     "prod-alb",
+		Name:   "prod-alb",
 		Fields: map[string]string{"name": "prod-alb"},
 	}
 	eniRes := resource.Resource{
@@ -524,8 +524,8 @@ func TestRelated_ELB_S3_LogsNotEnabled(t *testing.T) {
 func TestRelated_ELB_Subnet_Found(t *testing.T) {
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abcdef1234567890"
 	source := resource.Resource{
-		ID:   "prod-alb",
-		Name: "prod-alb",
+		ID:     "prod-alb",
+		Name:   "prod-alb",
 		Fields: map[string]string{"load_balancer_arn": elbARN},
 		RawStruct: elbv2types.LoadBalancer{
 			LoadBalancerName: aws.String("prod-alb"),
@@ -548,8 +548,8 @@ func TestRelated_ELB_Subnet_DeduplicatesSubnets(t *testing.T) {
 	// Unlikely but guard against duplicate subnet IDs.
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abcdef1234567890"
 	source := resource.Resource{
-		ID:   "prod-alb",
-		Name: "prod-alb",
+		ID:     "prod-alb",
+		Name:   "prod-alb",
 		Fields: map[string]string{"load_balancer_arn": elbARN},
 		RawStruct: elbv2types.LoadBalancer{
 			LoadBalancerName: aws.String("prod-alb"),

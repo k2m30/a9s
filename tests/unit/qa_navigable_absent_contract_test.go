@@ -44,8 +44,8 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/fieldpath"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/fieldpath"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // TestNavigableAbsent_AbsentFields_NotNavigable iterates every registered

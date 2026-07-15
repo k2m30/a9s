@@ -15,8 +15,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // F.3 — Resource deleted between list load and detail open: app renders without panic.
@@ -29,8 +29,8 @@ func TestQa67_F3_ResourceDeletedBeforeDetailOpen_NoPanic(t *testing.T) {
 	})
 	resources := []resource.Resource{
 		{
-			ID:     "i-deleted-later",
-			Name:   "soon-deleted",
+			ID:   "i-deleted-later",
+			Name: "soon-deleted",
 			Fields: map[string]string{
 				"instance_id": "i-deleted-later",
 				"name":        "soon-deleted",
@@ -78,8 +78,8 @@ func TestQa67_F4_ResourceDeletedBeforeChildView_ShowsError(t *testing.T) {
 	})
 	buckets := []resource.Resource{
 		{
-			ID:     "deleted-bucket",
-			Name:   "deleted-bucket",
+			ID:   "deleted-bucket",
+			Name: "deleted-bucket",
 			Fields: map[string]string{
 				"name":          "deleted-bucket",
 				"region":        "us-east-1",
@@ -130,8 +130,8 @@ func TestQa67_F6_RapidEscPresses_DoNotPanic(t *testing.T) {
 	})
 	resources := []resource.Resource{
 		{
-			ID:     "i-deep",
-			Name:   "deep-nav-instance",
+			ID:   "i-deep",
+			Name: "deep-nav-instance",
 			Fields: map[string]string{
 				"instance_id": "i-deep",
 				"name":        "deep-nav-instance",
@@ -218,8 +218,8 @@ func TestQa67_F5_RefreshAfterStateChange_ShowsUpdatedData(t *testing.T) {
 	// Load initial state: instance is running
 	initial := []resource.Resource{
 		{
-			ID:     "i-state-change",
-			Name:   "changeable-instance",
+			ID:   "i-state-change",
+			Name: "changeable-instance",
 			Fields: map[string]string{
 				"instance_id": "i-state-change",
 				"name":        "changeable-instance",
@@ -244,8 +244,8 @@ func TestQa67_F5_RefreshAfterStateChange_ShowsUpdatedData(t *testing.T) {
 
 	updated := []resource.Resource{
 		{
-			ID:     "i-state-change",
-			Name:   "changeable-instance",
+			ID:   "i-state-change",
+			Name: "changeable-instance",
 			Fields: map[string]string{
 				"instance_id": "i-state-change",
 				"name":        "changeable-instance",

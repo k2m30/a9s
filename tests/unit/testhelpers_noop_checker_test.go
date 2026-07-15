@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // noopChecker is a RelatedChecker that returns zero results. Use it in

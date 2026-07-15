@@ -21,9 +21,9 @@ import (
 	"strings"
 	"testing"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/catalog"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // Test 1 — Smoke: Install() makes catalog.Find("ec2") return a non-nil entry.
@@ -104,7 +104,7 @@ func TestCatalogInstall_GoldenParity(t *testing.T) {
 		{"ec2", "ec2", "EC2 Instances", "COMPUTE"},
 		{"eks", "eks", "EKS Clusters", "CONTAINERS"},
 		{"vpc", "vpc", "VPCs", "NETWORKING"},
-		{"rds", "dbi", "DB Instances", "DATABASES & STORAGE"},  // "rds" is an alias for ShortName "dbi"
+		{"rds", "dbi", "DB Instances", "DATABASES & STORAGE"}, // "rds" is an alias for ShortName "dbi"
 		{"alarm", "alarm", "CloudWatch Alarms", "MONITORING"},
 		{"sns", "sns", "SNS Topics", "MESSAGING"},
 		{"secrets", "secrets", "Secrets Manager", "SECRETS & CONFIG"},

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/core/catalog"
 )
 
 // TestCatalog_AliasUniqueness walks the full installed top-level catalog and

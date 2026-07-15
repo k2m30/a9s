@@ -8,7 +8,7 @@
 // single call-site fix is not a structural guarantee against a fourth.
 //
 // This is a standing ratchet, not a burn-down: it scans every *.go file
-// under internal/app (excluding tests) for a `return c.snapshot(), X` (or
+// under core/app (excluding tests) for a `return c.snapshot(), X` (or
 // 3-value `return c.snapshot(), X, Y`) statement whose second operand X is
 // itself a method call on the SAME receiver (`<recv>.method(...)`) rather
 // than an already-computed value (a bare identifier, nil, or a literal) —
@@ -32,7 +32,7 @@ import (
 
 // knownSnapshotOrderDebt allowlists sites already reported/tracked outside
 // this gate (none as of this gate's introduction — Q4's own finding,
-// internal/app/actions_list.go:170's forceRefreshCostsLocked call, and its
+// core/app/actions_list.go:170's forceRefreshCostsLocked call, and its
 // sibling activeListRefreshTasks call at line ~206, are both left
 // unallowlisted so the coder sees both go red until fixed).
 var knownSnapshotOrderDebt = map[string]bool{}
@@ -147,7 +147,7 @@ func sodSiteKey(site sodSite) string {
 }
 
 // TestSnapshotOrderDiscipline_NoInlineMutatingCallAfterSnapshot is the Q4
-// gate: every `return c.snapshot(), <call>` statement under internal/app
+// gate: every `return c.snapshot(), <call>` statement under core/app
 // must not evaluate a receiver method call as its second operand — Go's
 // left-to-right return-operand evaluation would run the snapshot BEFORE
 // that call's own mutation, returning a stale ViewState. Zero allowlist by
@@ -158,8 +158,8 @@ func TestSnapshotOrderDiscipline_NoInlineMutatingCallAfterSnapshot(t *testing.T)
 	if !ok {
 		t.Fatal("runtime.Caller(0) failed — cannot locate test file")
 	}
-	// tests/unit/qa_snapshot_order_discipline_test.go -> ../../internal/app
-	appDir := filepath.Join(filepath.Dir(thisFile), "..", "..", "internal", "app")
+	// tests/unit/qa_snapshot_order_discipline_test.go -> ../../core/app
+	appDir := filepath.Join(filepath.Dir(thisFile), "..", "..", "core", "app")
 
 	pattern := filepath.Join(appDir, "*.go")
 	files, err := filepath.Glob(pattern)

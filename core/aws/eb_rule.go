@@ -1,0 +1,103 @@
+package aws
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
+
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
+)
+
+// FetchEventBridgeRulesPage fetches a single page of EventBridge rules.
+func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &eventbridge.ListRulesInput{
+		Limit: aws.Int32(DefaultPageSize),
+	}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	output, err := api.ListRules(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching EventBridge rules: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, rule := range output.Rules {
+		name := ""
+		if rule.Name != nil {
+			name = *rule.Name
+		}
+
+		state := string(rule.State)
+
+		description := ""
+		if rule.Description != nil {
+			description = *rule.Description
+		}
+
+		eventBus := ""
+		if rule.EventBusName != nil {
+			eventBus = *rule.EventBusName
+		}
+
+		schedule := ""
+		if rule.ScheduleExpression != nil {
+			schedule = *rule.ScheduleExpression
+		}
+
+		eventPattern := ""
+		if rule.EventPattern != nil {
+			eventPattern = *rule.EventPattern
+		}
+
+		var findings []domain.Finding
+		if strings.EqualFold(state, "DISABLED") {
+			findings = []domain.Finding{{Code: CodeEBRuleDisabled, Phrase: "disabled", Severity: domain.SevDim, Source: "wave1"}}
+		}
+
+		r := resource.Resource{
+			ID:   name,
+			Name: name,
+			Fields: map[string]string{
+				"name":          name,
+				"state":         state,
+				"description":   description,
+				"event_bus":     eventBus,
+				"schedule":      schedule,
+				"event_pattern": eventPattern,
+			},
+			Findings:  findings,
+			RawStruct: rule,
+		}
+
+		resources = append(resources, r)
+	}
+
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
+}

@@ -29,7 +29,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/cache"
+	"github.com/k2m30/a9s/v3/core/cache"
 )
 
 // writeTypeFileRaw writes raw bytes directly to a per-type file path (for

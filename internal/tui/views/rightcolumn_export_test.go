@@ -5,7 +5,7 @@ func IsActionableRowForTest(count int, truncated bool, fetchFilter map[string]st
 	return isActionableRow(rightColumnRow{
 		targetType:  targetType,
 		count:       count,
-		truncated: truncated,
+		truncated:   truncated,
 		fetchFilter: fetchFilter,
 		loading:     loading,
 		err:         err,

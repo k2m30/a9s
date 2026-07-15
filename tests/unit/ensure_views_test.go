@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/core/config"
 )
 
 func TestGenerateViewYAML_ListOnly(t *testing.T) {

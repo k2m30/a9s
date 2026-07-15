@@ -13,8 +13,8 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------

@@ -33,8 +33,8 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // buildEC2SyntheticSections returns a []domain.Section that mirrors what
@@ -220,7 +220,7 @@ func TestAugmentEC2StatusChecks_TolerateSpacerInStateBlock(t *testing.T) {
 			Items: []domain.Item{
 				{Kind: domain.ItemField, Label: "InstanceId", Value: "i-spacer000000001"},
 				{Kind: domain.ItemHeader, Label: "State"},
-				{Kind: domain.ItemSpacer},                                     // spacer between header and subfields
+				{Kind: domain.ItemSpacer}, // spacer between header and subfields
 				{Kind: domain.ItemSubfield, Label: "Name", Value: "running"},
 				{Kind: domain.ItemSubfield, Label: "Code", Value: "16"},
 				{Kind: domain.ItemField, Label: "InstanceType", Value: "t3.medium"},

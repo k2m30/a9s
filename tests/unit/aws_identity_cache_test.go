@@ -21,11 +21,11 @@ import (
 	"os"
 	"testing"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	_ "github.com/k2m30/a9s/v3/core/aws"
 )
 
 // Note: ebsCheckerByTarget is declared in aws_ebs_related_test.go (same package).

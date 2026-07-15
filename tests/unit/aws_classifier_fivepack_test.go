@@ -60,10 +60,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ func TestColorKMS_RealFetcherReachesDocumentedBuckets(t *testing.T) {
 // TestColorIAMUser_ConsoleUserWithoutMFAClassifiesBroken drives the real
 // FetchIAMUsersPage against the demo IAM fixtures (alice.johnson: a console
 // user with PasswordLastUsed set and zero registered MFA devices — see
-// internal/demo/fixtures/iam.go) and the real Wave-2 EnrichIAMUserMFA
+// core/demo/fixtures/iam.go) and the real Wave-2 EnrichIAMUserMFA
 // enricher, then asserts the real td.ResolveColor("iam-user") lands
 // alice.johnson in the Broken bucket per docs/resources/iam-user.md §3.2
 // ("GetLoginProfile(UserName) returns a profile AND ListMFADevices(UserName)
@@ -233,7 +233,7 @@ func TestColorIAMUser_ConsoleUserWithoutMFAClassifiesBroken(t *testing.T) {
 	}
 	if alice == nil {
 		t.Fatal("demo IAM fixtures missing expected console-user-without-MFA fixture \"alice.johnson\" " +
-			"(internal/demo/fixtures/iam.go ConsoleUsers)")
+			"(core/demo/fixtures/iam.go ConsoleUsers)")
 	}
 
 	enricher, ok := awsclient.Wave2EnricherFor("iam-user")
@@ -254,7 +254,7 @@ func TestColorIAMUser_ConsoleUserWithoutMFAClassifiesBroken(t *testing.T) {
 	alice.Findings = append(alice.Findings, finding)
 
 	// Mirror production's field-update application (Controller.ApplyListFieldUpdates
-	// -> applyFieldUpdatesToSlice in internal/app/list_body.go): FieldUpdates is a
+	// -> applyFieldUpdatesToSlice in core/app/list_body.go): FieldUpdates is a
 	// distinct merge step from the Findings append above, keyed by resource ID.
 	if kv, ok := enrichResult.FieldUpdates[alice.ID]; ok {
 		if alice.Fields == nil {
@@ -367,7 +367,7 @@ func TestColorLambda_RealFetcherReachesDimAndHealthy(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestColorRedis_NoUnreachableDeletedBranch is a source-scan pin: it parses
-// internal/aws/catalog_databases.go's colorRedis function body and asserts
+// core/aws/catalog_databases.go's colorRedis function body and asserts
 // it never compares a phrase/status string against the literal "deleted".
 // docs/resources/redis.md §3.1, §3.2, and §5 document no deleted/dim state
 // for redis anywhere — real ElastiCache simply stops returning a torn-down
@@ -383,7 +383,7 @@ func TestColorRedis_NoUnreachableDeletedBranch(t *testing.T) {
 		t.Fatal("runtime.Caller(0) failed — cannot locate test file")
 	}
 	repoRoot := filepath.Join(filepath.Dir(thisFile), "..", "..")
-	targetFile := filepath.Join(repoRoot, "internal", "aws", "catalog_databases.go")
+	targetFile := filepath.Join(repoRoot, "core", "aws", "catalog_databases.go")
 
 	fset := token.NewFileSet()
 	src, err := parser.ParseFile(fset, targetFile, nil, 0)
@@ -422,7 +422,7 @@ func TestColorRedis_NoUnreachableDeletedBranch(t *testing.T) {
 	})
 
 	if hasDeletedLiteral {
-		t.Errorf("colorRedis (internal/aws/catalog_databases.go) still compares a status/phrase string "+
+		t.Errorf("colorRedis (core/aws/catalog_databases.go) still compares a status/phrase string "+
 			"against the literal \"deleted\", but docs/resources/redis.md §3.1/§3.2/§5 document no "+
 			"deleted/dim state for redis — real ElastiCache never reports a \"deleted\" status "+
 			"(torn-down replication groups simply stop appearing in DescribeReplicationGroups), and "+
@@ -435,7 +435,7 @@ func TestColorRedis_NoUnreachableDeletedBranch(t *testing.T) {
 // Bug 5 — EnrichRDSDocDBMaintenance is dead: wired to no catalog Wave2 field.
 // ---------------------------------------------------------------------------
 
-// TestNoOrphanedIssueEnrichmentFunctions walks every internal/aws/
+// TestNoOrphanedIssueEnrichmentFunctions walks every core/aws/
 // *_issue_enrichment.go Enrich* top-level function declaration and asserts
 // each one is reachable from at least one registered
 // catalog.ResourceTypeDef.Wave2 field (cast to awsclient.IssueEnricher) via
@@ -467,12 +467,12 @@ func TestNoOrphanedIssueEnrichmentFunctions(t *testing.T) {
 	}
 	repoRoot := filepath.Join(filepath.Dir(thisFile), "..", "..")
 
-	matches, err := filepath.Glob(filepath.Join(repoRoot, "internal", "aws", "*_issue_enrichment.go"))
+	matches, err := filepath.Glob(filepath.Join(repoRoot, "core", "aws", "*_issue_enrichment.go"))
 	if err != nil {
 		t.Fatalf("filepath.Glob failed: %v", err)
 	}
 	if len(matches) == 0 {
-		t.Fatal("filepath.Glob returned zero matches for internal/aws/*_issue_enrichment.go — check repo layout")
+		t.Fatal("filepath.Glob returned zero matches for core/aws/*_issue_enrichment.go — check repo layout")
 	}
 
 	// Build the set of directly registered Wave2.Fn names, keyed by bare
@@ -566,7 +566,7 @@ func TestNoOrphanedIssueEnrichmentFunctions(t *testing.T) {
 	}
 
 	if len(orphans) > 0 {
-		t.Errorf("orphaned Enrich* function(s) in internal/aws/*_issue_enrichment.go — implemented but not "+
+		t.Errorf("orphaned Enrich* function(s) in core/aws/*_issue_enrichment.go — implemented but not "+
 			"reachable (directly or via a one-level combiner call) from any registered "+
 			"catalog.ResourceTypeDef.Wave2 field: %v. Either wire the function to a catalog entry's Wave2 "+
 			"field (directly or via a combiner) or delete it (and its dedicated tests) — dead enrichment "+

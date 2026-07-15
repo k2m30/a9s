@@ -94,7 +94,7 @@ func FindChild(name string) *ResourceTypeDef { /* read childRegistry */ }
 // internal/aws/install.go (new in AS-795a)
 package aws
 
-import "github.com/k2m30/a9s/v3/internal/catalog"
+import "github.com/k2m30/a9s/v3/core/catalog"
 
 // Install loads the AWS resource catalog into internal/catalog. MUST be called
 // once at program start (main() / TestMain) before any catalog.Find/All call.

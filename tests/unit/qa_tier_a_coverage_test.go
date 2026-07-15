@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/core/config"
 )
 
 // attentionColumnCase describes one expected attention column in a resource list view.

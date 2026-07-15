@@ -28,13 +28,13 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	smithy "github.com/aws/smithy-go"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	a9saws "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/costs"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/session"
+	"github.com/k2m30/a9s/v3/core/app"
+	a9saws "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/costs"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // ===========================================================================

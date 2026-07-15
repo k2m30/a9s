@@ -42,8 +42,8 @@ import (
 	ec2sdk "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -637,7 +637,7 @@ var nonPaginatedAPIs = []string{
 	"ListResourcesForWebACL",
 }
 
-// TestNoSingleCallListAPIEnrichers walks internal/aws/*_issue_enrichment.go via
+// TestNoSingleCallListAPIEnrichers walks core/aws/*_issue_enrichment.go via
 // go/ast and flags any Enrich* function that:
 //
 //  1. Contains a 3-level selector call (clients.X.Op(...)) to an AWS SDK
@@ -660,12 +660,12 @@ func TestNoSingleCallListAPIEnrichers(t *testing.T) {
 	// two levels up -> repo root
 	repoRoot := filepath.Join(filepath.Dir(thisFile), "..", "..")
 
-	matches, err := filepath.Glob(filepath.Join(repoRoot, "internal", "aws", "*_issue_enrichment.go"))
+	matches, err := filepath.Glob(filepath.Join(repoRoot, "core", "aws", "*_issue_enrichment.go"))
 	if err != nil {
 		t.Fatalf("filepath.Glob failed: %v", err)
 	}
 	if len(matches) == 0 {
-		t.Fatal("filepath.Glob returned zero matches for internal/aws/*_issue_enrichment.go — check repo layout")
+		t.Fatal("filepath.Glob returned zero matches for core/aws/*_issue_enrichment.go — check repo layout")
 	}
 
 	// Build a skip-set from nonPaginatedAPIs for O(1) lookup.

@@ -32,7 +32,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/core/domain"
 )
 
 // warnOnlyFindings builds a Wave-2 findings map where every resource ID in

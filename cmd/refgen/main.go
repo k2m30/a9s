@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/k2m30/a9s/v3/internal/fieldpath"
+	"github.com/k2m30/a9s/v3/core/fieldpath"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"

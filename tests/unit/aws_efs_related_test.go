@@ -16,17 +16,17 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo/fakes"
-	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo/fakes"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -531,10 +531,10 @@ var (
 // Verify that NewKMSFixtures, NewCFNFixtures, NewEC2Fixtures, NewLambdaFixtures
 // are not nil (compile-time check that these constructors are importable).
 var (
-	_ *kmstypes.KeyMetadata     = nil
-	_ *cfntypes.Stack           = nil
-	_ *ec2types.NetworkInterface = nil
-	_ *cwtypes.MetricAlarm      = nil
+	_ *kmstypes.KeyMetadata              = nil
+	_ *cfntypes.Stack                    = nil
+	_ *ec2types.NetworkInterface         = nil
+	_ *cwtypes.MetricAlarm               = nil
 	_ *lambdatypes.FunctionConfiguration = nil
 	_ *efstypes.FileSystemDescription    = nil
 )

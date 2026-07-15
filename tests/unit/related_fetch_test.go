@@ -11,9 +11,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/aws"
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/aws"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // TestFetchRelatedTarget_CacheHit verifies that FetchRelatedTarget returns

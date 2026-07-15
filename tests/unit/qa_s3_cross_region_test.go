@@ -35,8 +35,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	smithy "github.com/aws/smithy-go"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // s3CrossRegionFake returns PermanentRedirect for one bucket and a successful
@@ -63,11 +63,11 @@ func (f *s3CrossRegionFake) GetPublicAccessBlock(
 		}
 		if opts.Region == region {
 			return &s3.GetPublicAccessBlockOutput{
-				PublicAccessBlockConfiguration: nil, // NoSuchPublicAccessBlockConfiguration shape
-			}, &smithy.GenericAPIError{
-				Code:    "NoSuchPublicAccessBlockConfiguration",
-				Message: "no PAB config",
-			}
+					PublicAccessBlockConfiguration: nil, // NoSuchPublicAccessBlockConfiguration shape
+				}, &smithy.GenericAPIError{
+					Code:    "NoSuchPublicAccessBlockConfiguration",
+					Message: "no PAB config",
+				}
 		}
 		return nil, &smithy.GenericAPIError{
 			Code:    "PermanentRedirect",

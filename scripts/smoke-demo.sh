@@ -116,7 +116,7 @@ forbid() {
 
 # Menu: full catalog present. 70 registered resource types
 # (resource.AllResourceTypes()) plus the synthetic Cost Explorer pseudo-entry
-# (internal/app/menu.go's menuAllItems() appends costsMenuTypeDef, which is
+# (core/app/menu.go's menuAllItems() appends costsMenuTypeDef, which is
 # deliberately excluded from AllResourceTypes() itself).
 expect menu.txt "resource-types(71)" "menu shows the full catalog"
 

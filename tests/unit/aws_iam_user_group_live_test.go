@@ -14,9 +14,9 @@ import (
 	"context"
 	"testing"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 func iamUserGroupChecker(t *testing.T) resource.RelatedChecker {

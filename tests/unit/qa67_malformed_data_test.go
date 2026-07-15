@@ -17,8 +17,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // C.1 — Nil optional fields in resource do not cause panic in list render.
@@ -31,8 +31,8 @@ func TestQa67_C1_NilOptionalFields_ListRenderDoesNotPanic(t *testing.T) {
 	// Resource with many empty/nil-equivalent fields
 	resources := []resource.Resource{
 		{
-			ID:     "i-niltest01",
-			Name:   "",
+			ID:   "i-niltest01",
+			Name: "",
 			Fields: map[string]string{
 				"instance_id": "i-niltest01",
 				"name":        "",
@@ -98,8 +98,8 @@ func TestQa67_C2_EmptyID_RowStillRendersAndSelectable(t *testing.T) {
 	})
 	resources := []resource.Resource{
 		{
-			ID:     "",
-			Name:   "",
+			ID:   "",
+			Name: "",
 			Fields: map[string]string{
 				"instance_id": "",
 				"name":        "",
@@ -112,8 +112,8 @@ func TestQa67_C2_EmptyID_RowStillRendersAndSelectable(t *testing.T) {
 			},
 		},
 		{
-			ID:     "i-normal",
-			Name:   "normal-instance",
+			ID:   "i-normal",
+			Name: "normal-instance",
 			Fields: map[string]string{
 				"instance_id": "i-normal",
 				"name":        "normal-instance",
@@ -145,8 +145,8 @@ func TestQa67_C3_UnknownEnum_RendersAsPlainText(t *testing.T) {
 	})
 	resources := []resource.Resource{
 		{
-			ID:     "i-unknown-state",
-			Name:   "unusual-instance",
+			ID:   "i-unknown-state",
+			Name: "unusual-instance",
 			Fields: map[string]string{
 				"instance_id": "i-unknown-state",
 				"name":        "unusual-instance",
@@ -178,8 +178,8 @@ func TestQa67_C4_MalformedARN_RendersWithoutPanic(t *testing.T) {
 	malformedARN := "arn:aws::::::malformed::extra::colons::everywhere"
 	resources := []resource.Resource{
 		{
-			ID:     malformedARN,
-			Name:   "malformed-arn-secret",
+			ID:   malformedARN,
+			Name: "malformed-arn-secret",
 			Fields: map[string]string{
 				"name":               "malformed-arn-secret",
 				"arn":                malformedARN,
@@ -218,8 +218,8 @@ func TestQa67_C5_UnicodeNames_DoNotCorruptLayout(t *testing.T) {
 	var resources []resource.Resource
 	for _, u := range unicodeNames {
 		resources = append(resources, resource.Resource{
-			ID:     u.id,
-			Name:   u.name,
+			ID:   u.id,
+			Name: u.name,
 			Fields: map[string]string{
 				"instance_id": u.id,
 				"name":        u.name,
@@ -249,8 +249,8 @@ func TestQa67_C6_ZeroTimestamp_DoesNotPanic(t *testing.T) {
 	})
 	resources := []resource.Resource{
 		{
-			ID:     "i-zero-time",
-			Name:   "zero-time-instance",
+			ID:   "i-zero-time",
+			Name: "zero-time-instance",
 			Fields: map[string]string{
 				"instance_id": "i-zero-time",
 				"name":        "zero-time-instance",
@@ -301,8 +301,8 @@ func TestQa67_C8_LongTagValue_DoesNotBreakListLayout(t *testing.T) {
 	})
 	resources := []resource.Resource{
 		{
-			ID:     "i-long-tag",
-			Name:   "long-tag-instance",
+			ID:   "i-long-tag",
+			Name: "long-tag-instance",
 			Fields: map[string]string{
 				"instance_id": "i-long-tag",
 				"name":        "long-tag-instance",
@@ -329,8 +329,8 @@ func TestQa67_C8_LongTagValue_DoesNotBreakListLayout(t *testing.T) {
 func TestQa67_C9_AllNilFields_DetailViewRendersAvailableFields(t *testing.T) {
 	m := newRootSizedModel()
 	res := &resource.Resource{
-		ID:     "minimal-resource",
-		Name:   "minimal",
+		ID:   "minimal-resource",
+		Name: "minimal",
 		Fields: map[string]string{
 			"db_identifier":  "minimal-resource",
 			"engine":         "mysql",

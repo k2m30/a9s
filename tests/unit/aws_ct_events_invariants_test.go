@@ -21,8 +21,8 @@ import (
 	cloudtrail "github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 )
 
 // TestSensitiveReads_AreReadVerbs is a cross-cutting invariant: every entry

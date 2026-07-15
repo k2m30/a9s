@@ -39,15 +39,15 @@ func RealNodeGroups() []ekstypes.Nodegroup {
 
 	return []ekstypes.Nodegroup{
 		{
-			NodegroupName: aws.String("gpu-20250101120000000000000001"),
-			NodegroupArn:  aws.String("arn:aws:eks:us-east-1:123456789012:nodegroup/test-cluster-1/gpu-20250101120000000000000001/78cb8e0e-6400-fea1-9939-803bc27e4134"),
-			ClusterName:   aws.String("test-cluster-1"),
-			Version:       aws.String("1.31"),
+			NodegroupName:  aws.String("gpu-20250101120000000000000001"),
+			NodegroupArn:   aws.String("arn:aws:eks:us-east-1:123456789012:nodegroup/test-cluster-1/gpu-20250101120000000000000001/78cb8e0e-6400-fea1-9939-803bc27e4134"),
+			ClusterName:    aws.String("test-cluster-1"),
+			Version:        aws.String("1.31"),
 			ReleaseVersion: aws.String("1.31.7-20250519"),
-			CreatedAt:     &gpuCreatedAt,
-			ModifiedAt:    &gpuModifiedAt,
-			Status:        ekstypes.NodegroupStatusCreateFailed,
-			CapacityType:  ekstypes.CapacityTypesOnDemand,
+			CreatedAt:      &gpuCreatedAt,
+			ModifiedAt:     &gpuModifiedAt,
+			Status:         ekstypes.NodegroupStatusCreateFailed,
+			CapacityType:   ekstypes.CapacityTypesOnDemand,
 			ScalingConfig: &ekstypes.NodegroupScalingConfig{
 				MinSize:     &gpuMinSize,
 				MaxSize:     &gpuMaxSize,
@@ -168,7 +168,7 @@ func RealNodeGroups() []ekstypes.Nodegroup {
 			NodeRole: aws.String("arn:aws:iam::123456789012:role/system-eks-node-group-role"),
 			Labels: map[string]string{
 				"karpenter.sh/controller": "true",
-				"group":                  "system",
+				"group":                   "system",
 			},
 			Resources: &ekstypes.NodegroupResources{
 				AutoScalingGroups: []ekstypes.AutoScalingGroup{

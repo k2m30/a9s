@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // testBinary is the path to the compiled a9s binary for CLI tests.

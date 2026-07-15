@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/costs"
+	"github.com/k2m30/a9s/v3/core/costs"
 )
 
 const testBlendedMetric = costs.Metric("blended")

@@ -1,6 +1,6 @@
 // qa_enricher_finding_builder_discipline_test.go — Codex build-contract gate
 // for the v3.47.0 multi-finding work: setWave2Finding is documented as the
-// append-only builder for IssueEnricherResult.Findings (internal/aws/
+// append-only builder for IssueEnricherResult.Findings (core/aws/
 // issue_enrichment.go, func at line 129 — its "Append-style:" doc paragraph
 // starts at line 105, which is what the originating dispatch cited; the
 // dispatch's line 105 points at that paragraph, not the func signature,
@@ -8,7 +8,7 @@
 // the builder and reading r.Findings back directly. That is exactly what
 // dropped a finding in production:
 //
-//	internal/aws/msk_issue_enrichment.go:85
+//	core/aws/msk_issue_enrichment.go:85
 //	    if _, alreadyFound := result.Findings[r.ID]; !alreadyFound {
 //
 // (the dispatch cited line 84 for this guard — that is the comment line
@@ -22,8 +22,8 @@
 // but the guard collapses them into "at most one finding, whichever fires
 // first."
 //
-// SCAN SHAPE: this gate parses every internal/aws/*_issue_enrichment.go file
-// with go/ast (the glob deliberately does not match internal/aws/
+// SCAN SHAPE: this gate parses every core/aws/*_issue_enrichment.go file
+// with go/ast (the glob deliberately does not match core/aws/
 // issue_enrichment.go itself — "issue_enrichment.go" is shorter than the
 // "_issue_enrichment.go" suffix the pattern requires, so setWave2Finding's
 // own legitimate r.Findings[resourceID] index-write at issue_enrichment.go:
@@ -37,7 +37,7 @@
 // below for the census that shaped this boundary).
 //
 // CENSUS AT SEEDING (2026-07-07, this exact scanner against HEAD): five
-// direct .Findings index/range sites exist under internal/aws/
+// direct .Findings index/range sites exist under core/aws/
 // *_issue_enrichment.go:
 //
 //   - msk_issue_enrichment.go:85 (EnrichMSKCluster) — the gate-a-second-emit
@@ -83,10 +83,10 @@ import (
 )
 
 // efbdFindingsFieldName is the exact struct field name this gate watches.
-// IssueEnricherResult.Findings (internal/aws/issue_enrichment.go:197) is the
+// IssueEnricherResult.Findings (core/aws/issue_enrichment.go:197) is the
 // only field this gate scans for — AttentionDetails has no enricher-side
 // direct-access violations today (verified: `grep -rn "\.AttentionDetails\b"
-// internal/aws/*_issue_enrichment.go` returns zero matches), so it is out of
+// core/aws/*_issue_enrichment.go` returns zero matches), so it is out of
 // this gate's scope.
 const efbdFindingsFieldName = "Findings"
 
@@ -238,12 +238,12 @@ func efbdSiteKey(site efbdSite, occurrence int) string {
 
 // TestEnricherFindingBuilderDisciplineGate is the standing ratchet: every
 // direct index/range access to a "*.Findings" selector under
-// internal/aws/*_issue_enrichment.go must either be pinned in
+// core/aws/*_issue_enrichment.go must either be pinned in
 // knownFindingMapInspectionDebt (pre-existing, vetted-benign) or the gate
 // fails. See the file-level doc comment for full census and ratchet-shape
 // rationale.
 func TestEnricherFindingBuilderDisciplineGate(t *testing.T) {
-	root, err := filepath.Abs("../../internal/aws")
+	root, err := filepath.Abs("../../core/aws")
 	if err != nil {
 		t.Fatalf("filepath.Abs: %v", err)
 	}
@@ -312,7 +312,7 @@ func TestEnricherFindingBuilderDisciplineGate(t *testing.T) {
 				t.Errorf(
 					"NEW VIOLATION (not allowlisted): %s:%d func=%q kind=%s — %q — direct .Findings %s "+
 						"access defeats setWave2Finding's append-only builder contract (setWave2Finding, "+
-						"internal/aws/issue_enrichment.go:129, is the legitimate access path — every "+
+						"core/aws/issue_enrichment.go:129, is the legitimate access path — every "+
 						"independently-evaluated condition must call it, never read r.Findings back to "+
 						"decide whether to call it again). Route through setWave2Finding unconditionally "+
 						"for each independently-evaluated condition instead; or, if this is vetted "+

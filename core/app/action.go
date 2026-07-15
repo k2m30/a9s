@@ -1,0 +1,134 @@
+// Package app is the headless controller layer that sits between the
+// platform-agnostic runtime core (internal/runtime) and any renderer
+// (TUI, web, test). It owns the screen stack, per-screen view state,
+// the semantic Action vocabulary, and the serialisable ViewState snapshot.
+//
+// Renderers translate native input (keystroke, HTTP POST, test call) into
+// an Action, call Apply/Handle, and render the returned ViewState. The TUI
+// and web share this controller as the single source of truth for screen
+// state and action availability.
+package app
+
+// ActionKind is the semantic verb that a renderer translates its native
+// input (keystroke, HTTP POST, test call) into before handing it to the
+// controller. Using a named string makes the set greppable and
+// round-trips cleanly through JSON without an iota → string map.
+type ActionKind string
+
+const (
+	ActionMoveUp     ActionKind = "move-up"
+	ActionMoveDown   ActionKind = "move-down"
+	ActionMoveTop    ActionKind = "move-top"
+	ActionMoveBottom ActionKind = "move-bottom"
+	ActionPageUp     ActionKind = "page-up"
+	ActionPageDown   ActionKind = "page-down"
+
+	ActionSelect ActionKind = "select"
+	ActionBack   ActionKind = "back"
+
+	// ActionSelectIndex atomically selects the visible row at index N (see
+	// Action.N) on the current screen — resource/child list, main menu, or
+	// selector (profile/region/theme) — and then performs the same logic as
+	// ActionSelect. N is the same visible index the renderer's template used
+	// to iterate the screen (ListBody.Rows / MenuBody.Entries /
+	// SelectorBody.Items), so template index == controller index by
+	// definition; the controller does not need to replay cursor-movement
+	// semantics (e.g. the menu's skip-unavailable stepping) to reach it.
+	// Used by the web UI's row/entry click path, replacing a move-top +
+	// N×move-down + select round-trip chain that could land on the wrong
+	// row whenever cursor movement skips entries (e.g. the main menu's
+	// confirmed-empty resource types).
+	ActionSelectIndex ActionKind = "select-index"
+
+	ActionOpenDetail   ActionKind = "open-detail"
+	ActionOpenYAML     ActionKind = "open-yaml"
+	ActionOpenJSON     ActionKind = "open-json"
+	ActionOpenHelp     ActionKind = "open-help"
+	ActionOpenIdentity ActionKind = "open-identity"
+
+	ActionReveal ActionKind = "reveal"
+
+	// ActionSetFilter carries the filter string in Arg.
+	ActionSetFilter ActionKind = "set-filter"
+
+	// ActionSort carries the column key in Arg.
+	ActionSort ActionKind = "sort"
+
+	// ActionSearch carries the query string in Arg.
+	ActionSearch      ActionKind = "search"
+	ActionSearchNext  ActionKind = "search-next"
+	ActionSearchPrev  ActionKind = "search-prev"
+	ActionSearchClear ActionKind = "search-clear"
+
+	ActionCopy ActionKind = "copy"
+
+	ActionToggleRelated ActionKind = "toggle-related"
+	// ActionRelatedSelect navigates to the related row at the visible index
+	// carried in Arg (decimal integer). Used by the web UI click path; it sets
+	// RelatedFocus + RelatedCursor then runs the same HandleRelatedNavigate
+	// logic as the keyboard Enter path in ActionSelect.
+	ActionRelatedSelect ActionKind = "related-select"
+	// ActionFieldSelect navigates to the resource linked by the navigable
+	// detail field at the visible index carried in Arg (decimal integer). Used
+	// by the web UI click path; mirrors the TUI's Enter-on-navigable-field path
+	// (TargetType + NavID/Value → HandleRelatedNavigate).
+	ActionFieldSelect     ActionKind = "field-select"
+	ActionToggleFocus     ActionKind = "toggle-focus"
+	ActionToggleWrap      ActionKind = "toggle-wrap"
+	ActionToggleAttention ActionKind = "toggle-attention"
+
+	// ActionCloudTrail navigates to the CloudTrail Events list filtered to the
+	// currently selected/active resource. Mirrors the TUI's 't' key handler
+	// (BuildCloudTrailFilter → RelatedNavigate to "ct-events"). No-ops when the
+	// resource type has no CloudTrailKey or no resource is active.
+	ActionCloudTrail ActionKind = "cloudtrail"
+
+	// ActionChildView carries the trigger key in Arg (e, L, r, s, Enter).
+	ActionChildView ActionKind = "child-view"
+
+	// ActionScrollLeft / ActionScrollRight move the horizontal column viewport.
+	ActionScrollLeft  ActionKind = "scroll-left"
+	ActionScrollRight ActionKind = "scroll-right"
+
+	ActionLoadMore ActionKind = "load-more"
+	ActionRefresh  ActionKind = "refresh"
+
+	// ActionCommand carries the resource short-name in Arg (from the -c flag path).
+	ActionCommand ActionKind = "command"
+
+	// ActionSelectProfile carries the profile name in Arg.
+	ActionSelectProfile ActionKind = "select-profile"
+	// ActionSelectRegion carries the region name in Arg.
+	ActionSelectRegion ActionKind = "select-region"
+	// ActionSelectTheme carries the theme name in Arg.
+	ActionSelectTheme ActionKind = "select-theme"
+
+	ActionQuit ActionKind = "quit"
+
+	// ActionOpenErrorLog opens the session error log as a text viewer.
+	// Mirrors the TUI's '!' key (keys.ErrorLog). Emits a flash when no errors
+	// have been recorded this session.
+	ActionOpenErrorLog ActionKind = "open-error-log"
+
+	// Cost Explorer screen actions. Cursor movement reuses ActionMoveUp/Down
+	// (row axis) and ActionScrollLeft/Right (time-column axis); Enter/Esc
+	// reuse ActionSelect/ActionBack (data-model.md).
+	ActionCostZoomIn  ActionKind = "cost-zoom-in"  // +/=
+	ActionCostZoomOut ActionKind = "cost-zoom-out" // -/_
+	ActionCostMetric  ActionKind = "cost-metric"   // b — cycle display metric
+	// ActionCostPivot carries the pressed digit (0-9) in Action.N.
+	ActionCostPivot ActionKind = "cost-pivot"
+)
+
+// Action is a single semantic input from a renderer to the controller.
+// Arg carries the string parameter for parameterised actions (SetFilter,
+// Sort, Search, ChildView, Command, SelectProfile, SelectRegion); it is
+// empty for zero-arity actions.
+type Action struct {
+	Kind ActionKind `json:"kind"`
+	Arg  string     `json:"arg,omitempty"`
+	// N carries a numeric parameter. Currently the renderer's page size for
+	// PageUp/PageDown, so page movement tracks the live viewport height instead
+	// of a constant. Zero means "use the controller default".
+	N int `json:"n,omitempty"`
+}

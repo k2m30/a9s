@@ -3,7 +3,7 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/buildinfo"
+	"github.com/k2m30/a9s/v3/core/buildinfo"
 )
 
 func TestResolveVersion_LdflagsSet(t *testing.T) {

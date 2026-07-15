@@ -3,7 +3,7 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/fieldpath"
+	"github.com/k2m30/a9s/v3/core/fieldpath"
 )
 
 // TestToSnakeCase_CharacterizationPinnedBehavior pins the current PascalCase→snake_case

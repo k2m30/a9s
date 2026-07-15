@@ -10,7 +10,7 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
+	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 )
 
 // summarizerTestEvent returns an Event with the minimum fields set to produce a
@@ -18,12 +18,12 @@ import (
 // UserIdentity.ARN is set so the ACTOR section emits rows (non-service event path).
 func summarizerTestEvent(source, name string, params map[string]any) *ctevent.Event {
 	return &ctevent.Event{
-		EventSource:    source,
-		EventName:      name,
-		EventCategory:  "Management",
-		EventType:      "AwsApiCall",
-		AWSRegion:      "us-east-1",
-		AccountID:      "111122223333",
+		EventSource:   source,
+		EventName:     name,
+		EventCategory: "Management",
+		EventType:     "AwsApiCall",
+		AWSRegion:     "us-east-1",
+		AccountID:     "111122223333",
 		UserIdentity: ctevent.UserIdentity{
 			Type: "IAMUser",
 			ARN:  "arn:aws:iam::111122223333:user/test-user",

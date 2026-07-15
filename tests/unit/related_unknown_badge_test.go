@@ -18,9 +18,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
@@ -96,7 +96,7 @@ func TestRenderRelatedPanel_TransientUnknownNoFilter_ShowsNoBadge(t *testing.T) 
 		Name:         "EBS Volumes",
 		State:        domain.RelatedUnknown,
 		Count:        0,
-		Truncated:  false,
+		Truncated:    false,
 		FetchFilter:  nil,
 		TargetType:   "ebs",
 		Actionable:   resource.IsRelatedActionable(domain.RelatedUnknown, 0, false),
@@ -141,7 +141,7 @@ func TestRenderRelatedPanel_ResolvedUnknownWithFilter_NoQuestionMarkBadge(t *tes
 				Name:         "CloudTrail Events",
 				State:        domain.RelatedDeferred,
 				Count:        0,
-				Truncated:  false,
+				Truncated:    false,
 				FetchFilter:  filter,
 				TargetType:   "ct-events",
 				Actionable:   resource.IsRelatedActionable(domain.RelatedDeferred, 0, false),

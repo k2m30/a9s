@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // ═══════════════════════════════════════════════════════════════════════════

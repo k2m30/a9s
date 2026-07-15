@@ -66,10 +66,10 @@ import (
 	"sort"
 	"testing"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // knownDisconnectedPivots pins the exact (type, pivot) inventory captured at

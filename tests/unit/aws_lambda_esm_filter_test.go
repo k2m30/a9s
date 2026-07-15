@@ -19,7 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 
-	"github.com/k2m30/a9s/v3/internal/demo/fakes"
+	"github.com/k2m30/a9s/v3/core/demo/fakes"
 )
 
 const fixtSQSOrdersARN = "arn:aws:sqs:us-east-1:123456789012:order-processing-queue"

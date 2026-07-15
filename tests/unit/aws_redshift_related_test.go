@@ -1,19 +1,22 @@
 // aws_redshift_related_test.go — Related-panel checker unit tests for Redshift.
 //
 // One positive + one negative test per pivot:
-//   alarm, cfn, kms, logs (multi-export), role, s3, secrets, sg, subnet, vpc.
+//
+//	alarm, cfn, kms, logs (multi-export), role, s3, secrets, sg, subnet, vpc.
 //
 // Checkers that call DescribeLoggingStatus or DescribeClusterSubnetGroups use
 // an inline fakeRedshiftClient (implements the full RedshiftAPI interface) so
 // we can control the typed-fake responses without hitting AWS.
 //
 // Pattern for Pattern-C checkers (logs, s3, subnet):
-//   construct a *awsclient.ServiceClients{Redshift: &fakeRedshiftClient{...}}
-//   and pass it as the `clients` argument to the checker.
+//
+//	construct a *awsclient.ServiceClients{Redshift: &fakeRedshiftClient{...}}
+//	and pass it as the `clients` argument to the checker.
 //
 // Pattern for Pattern-F / Pattern-R checkers (sg, vpc, role, kms, secrets, cfn, alarm):
-//   build resource.Resource with RawStruct=redshifttypes.Cluster and pass
-//   clients=nil (they do not call any API).
+//
+//	build resource.Resource with RawStruct=redshifttypes.Cluster and pass
+//	clients=nil (they do not call any API).
 package unit
 
 import (
@@ -21,14 +24,14 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
 	redshifttypes "github.com/aws/aws-sdk-go-v2/service/redshift/types"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------

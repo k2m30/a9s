@@ -9,16 +9,16 @@ on:
   push:
     branches: [main]
     paths:
-      - 'internal/web/**'
-      - 'internal/app/**'
+      - 'core/web/**'
+      - 'core/app/**'
       - 'cmd/a9s/**'
       - 'tests/e2e/**'
       - '.github/workflows/e2e.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'internal/web/**'
-      - 'internal/app/**'
+      - 'core/web/**'
+      - 'core/app/**'
       - 'cmd/a9s/**'
       - 'tests/e2e/**'
       - '.github/workflows/e2e.yml'

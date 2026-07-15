@@ -33,7 +33,7 @@ import (
 	"strings"
 	"testing"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	_ "github.com/k2m30/a9s/v3/core/aws"
 )
 
 // TestScenario_LambdaRoleNavigableField_ColdCache_LandsOnExecutionRole drives

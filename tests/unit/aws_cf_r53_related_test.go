@@ -20,8 +20,8 @@ import (
 
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws" // trigger init() registrations
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws" // trigger init() registrations
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // cfR53Checker retrieves the checkCfR53 function from the "cf" related registry.

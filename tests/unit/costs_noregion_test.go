@@ -20,10 +20,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/costs"
-	"github.com/k2m30/a9s/v3/internal/costs/screen"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/costs"
+	"github.com/k2m30/a9s/v3/core/costs/screen"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // ===========================================================================

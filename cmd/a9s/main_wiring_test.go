@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// Regression guard: main must import internal/aws AND call aws.Install() so
+// Regression guard: main must import core/aws AND call aws.Install() so
 // the catalog (and any remaining init()-driven registry side effects) is wired
 // before the TUI starts.
 //
@@ -23,7 +23,7 @@ func TestMain_ImportsAWSRegistrySideEffects(t *testing.T) {
 		t.Fatalf("parse main.go: %v", err)
 	}
 
-	want := "github.com/k2m30/a9s/v3/internal/aws"
+	want := "github.com/k2m30/a9s/v3/core/aws"
 	foundImport := false
 	for _, imp := range file.Imports {
 		if imp.Path == nil {

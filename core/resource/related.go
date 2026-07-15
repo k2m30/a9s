@@ -1,0 +1,737 @@
+package resource
+
+import (
+	"context"
+	"fmt"
+	"maps"
+	"strings"
+	"sync"
+
+	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/domain"
+)
+
+// RelatedDef defines one related resource class for a given resource type.
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling.
+type RelatedDef = domain.RelatedDef
+
+// NavigableField associates a detail view field path with a target resource type.
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling.
+type NavigableField = domain.NavigableField
+
+// NavIDFromValue returns the bare resource ID suitable for target lookup,
+// given a raw field value. When the value is an AWS ARN and the target
+// resource type indexes on a bare name/UUID (not the ARN), this extracts
+// the correct lookup key so Enter navigation lands on the matching row.
+//
+// When no extractor is registered for the target type, or the value is
+// already bare (no "/" or ":" segment to strip), the value is returned
+// unchanged — the caller should fall back to the raw value.
+//
+// Registered extractors cover the target types where AWS consistently
+// emits ARNs in describe-response fields but a9s indexes on the bare
+// id/name. For target types whose IDs ARE ARNs (sns, for example), no
+// extractor is registered — navigation works directly.
+func NavIDFromValue(targetType, value string) string {
+	if value == "" {
+		return ""
+	}
+	if f, ok := navIDExtractors[targetType]; ok {
+		if extracted := f(value); extracted != "" {
+			return extracted
+		}
+	}
+	return value
+}
+
+// navIDExtractors maps target resource types to extractors that derive
+// the bare lookup ID from a raw field value (typically an ARN).
+var navIDExtractors = map[string]func(string) string{
+	"kms":      arnLastSlashSegment,
+	"role":     arnLastSlashSegment,
+	"ecs":      arnLastSlashSegment,
+	"logs":     arnLastColonSegment,
+	"s3":       s3BucketFromARN,
+	"iam-user": arnLastSlashSegment,
+	"lambda":   LambdaNameFromARN,
+}
+
+// arnLastSlashSegment returns the substring after the last "/".
+// Example: "arn:aws:kms:us-east-1:123:key/UUID" → "UUID".
+// Returns "" if the input has no "/" or if "/" is the final character.
+func arnLastSlashSegment(s string) string {
+	i := strings.LastIndex(s, "/")
+	if i < 0 || i == len(s)-1 {
+		return ""
+	}
+	return s[i+1:]
+}
+
+// arnLastColonSegment returns the substring after the last ":".
+// Example: "arn:aws:logs:us-east-1:123:log-group:/aws/lambda/fn" → "/aws/lambda/fn".
+// Returns "" if the input has no ":" or if ":" is the final character.
+func arnLastColonSegment(s string) string {
+	i := strings.LastIndex(s, ":")
+	if i < 0 || i == len(s)-1 {
+		return ""
+	}
+	return s[i+1:]
+}
+
+// LambdaNameFromARN extracts the bare function name from a Lambda ARN — the
+// canonical ":function:" split with the trailing version/alias segment
+// stripped. Example: "arn:aws:lambda:us-east-1:123:function:fn:v1" → "fn".
+// Returns "" when the value carries no ":function:" marker (a plain bare
+// name), so NavIDFromValue's caller falls back to the raw value unchanged.
+func LambdaNameFromARN(s string) string {
+	const marker = ":function:"
+	_, tail, found := strings.Cut(s, marker)
+	if !found {
+		return ""
+	}
+	if colon := strings.Index(tail, ":"); colon >= 0 {
+		tail = tail[:colon]
+	}
+	return tail
+}
+
+// s3BucketFromARN extracts the bucket name from an S3 bucket ARN.
+// Example: "arn:aws:s3:::my-bucket" → "my-bucket". "arn:aws:s3:::" → "".
+// Input without the "arn:aws:s3:::" prefix is returned unchanged so a bare
+// bucket name (the common case) passes through.
+func s3BucketFromARN(s string) string {
+	const prefix = "arn:aws:s3:::"
+	if rest, ok := strings.CutPrefix(s, prefix); ok {
+		return rest
+	}
+	return s
+}
+
+// RelatedCheckResult is returned by a RelatedChecker and carries all state
+// needed by the right-column panel to display a row and navigate on Enter.
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling.
+//
+// Semantics (FR-008 / FR-014):
+//
+//   - State == RelatedResolved (zero value): Count (0..N) is authoritative.
+//   - State == RelatedUnknown: the checker could not determine a count.
+//   - State == RelatedLoading: no checker result has arrived yet — set only
+//     by row-mirror producers, never returned by a checker itself.
+//   - State == RelatedError: the checker (or a prerequisite lookup) failed.
+//   - State == RelatedDeferred: navigation uses FetchFilter's server-side
+//     filtered fetch instead of a local count.
+//   - Truncated == true: Count was derived from a truncated cache page;
+//     only meaningful when State == RelatedResolved.
+//   - FetchFilter non-nil: navigation should use a server-side filtered fetcher.
+type RelatedCheckResult = domain.RelatedCheckResult
+
+// ResourceCacheEntry holds a snapshot of one resource type's list plus
+// truncation state. Declaration lives in internal/domain/contracts.go; this
+// alias keeps existing consumers compiling.
+type ResourceCacheEntry = domain.ResourceCacheEntry
+
+// ResourceCache is a read-only snapshot of already-loaded resource lists,
+// keyed by resource short name. Declaration lives in internal/domain/contracts.go;
+// this alias keeps existing consumers compiling.
+type ResourceCache = domain.ResourceCache
+
+// RelatedChecker returns a count of related resources of a specific type.
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling.
+type RelatedChecker = domain.RelatedChecker
+
+// ValidateRelatedResult sanity-checks that a checker's result is internally
+// consistent with its declared TargetType. Catches bugs where a checker
+// scans the wrong cache (e.g., returning ecs-task IDs as TargetType "ecs").
+//
+// Returns the first violation as an error, or nil if the result is consistent.
+// Currently checks:
+//   - TargetType is non-empty
+//   - When Count > 0, ResourceIDs is non-empty
+//   - When State != RelatedResolved, Count must be 0 and ResourceIDs empty
+//   - When Truncated is true, State must be RelatedResolved
+//
+// This is intended for test invariants and optional debug-mode runtime checks,
+// not for production error returns.
+//
+// For cross-checking that returned IDs match the target type's canonical
+// Resource.ID, use ValidateRelatedResultAgainstCache.
+func ValidateRelatedResult(r RelatedCheckResult) error {
+	if r.TargetType == "" {
+		return fmt.Errorf("RelatedCheckResult: empty TargetType")
+	}
+	if r.Count > 0 && len(r.ResourceIDs) == 0 {
+		return fmt.Errorf("RelatedCheckResult[%s]: Count=%d but no ResourceIDs", r.TargetType, r.Count)
+	}
+	if r.State != domain.RelatedResolved {
+		if r.Count != 0 {
+			return fmt.Errorf("RelatedCheckResult[%s]: State=%s but Count=%d (must be 0)", r.TargetType, r.State, r.Count)
+		}
+		if len(r.ResourceIDs) > 0 {
+			return fmt.Errorf("RelatedCheckResult[%s]: State=%s but %d ResourceIDs present", r.TargetType, r.State, len(r.ResourceIDs))
+		}
+	}
+	if r.Truncated && r.State != domain.RelatedResolved {
+		return fmt.Errorf("RelatedCheckResult[%s]: Truncated=true but State=%s (must be RelatedResolved)", r.TargetType, r.State)
+	}
+	return nil
+}
+
+// ValidateRelatedResultAgainstCache enforces the canonical-target-identity
+// contract (#279): every ResourceID returned by a checker for a given
+// TargetType MUST match the canonical Resource.ID that the TargetType's
+// fetcher emits. We prove this by cross-checking the returned IDs against the
+// target-type's cache entry.
+//
+// The check is deliberately opportunistic: it only runs when the cache has
+// a non-truncated entry for the target type. A truncated cache could miss a
+// legitimate ID, so we skip the check rather than produce false positives. If
+// the target type has no cache entry at all, the check also skips (nothing to
+// compare against). Shape invariants from ValidateRelatedResult are enforced
+// regardless.
+//
+// This is the hard contract that catches bugs where a checker returns an ARN,
+// name, or adjacent ID kind instead of the target type's canonical Resource.ID
+// — the class of drill-in regressions called out in the architecture audit.
+func ValidateRelatedResultAgainstCache(r RelatedCheckResult, cache ResourceCache) error {
+	if err := ValidateRelatedResult(r); err != nil {
+		return err
+	}
+	if len(r.ResourceIDs) == 0 {
+		return nil
+	}
+	entry, ok := cache[r.TargetType]
+	if !ok {
+		return nil
+	}
+	if entry.IsTruncated {
+		return nil
+	}
+	known := make(map[string]struct{}, len(entry.Resources))
+	for _, res := range entry.Resources {
+		known[res.ID] = struct{}{}
+	}
+	for _, id := range r.ResourceIDs {
+		if _, seen := known[id]; !seen {
+			return fmt.Errorf(
+				"RelatedCheckResult[%s]: ResourceID %q is not a canonical Resource.ID for target type %q "+
+					"(not found in target-type cache of %d resources); "+
+					"checker likely returned an ARN/name/adjacent-ID kind instead of the target's canonical ID",
+				r.TargetType, id, r.TargetType, len(entry.Resources),
+			)
+		}
+	}
+	return nil
+}
+
+// UnknownRelated returns a RelatedCheckResult representing "the checker
+// could not determine the count because a prerequisite lookup failed". The
+// most common case is a two-hop checker (snapshot → source DB instance →
+// cluster) where the SOURCE was not found in a truncated intermediate cache,
+// so the hop to the TARGET was never attempted. Renders as the fourth visible
+// state — a blank, navigable row (no count, drill in) — never "(?)".
+func UnknownRelated(targetType string) RelatedCheckResult {
+	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedUnknown}
+}
+
+// ErrorRelated returns a RelatedCheckResult representing "the checker (or a
+// prerequisite AWS call) returned an error". Renders blank (no count — "(?)"
+// is forbidden) AND dimmed: unlike UnknownRelated it is a dead end, not
+// navigable, because drilling into data that never resolved is misleading.
+// The failure is surfaced separately through a Flash{IsError:true} + the "!"
+// error log (Golden Contract rule 6); the user retries with Ctrl+R.
+func ErrorRelated(targetType string, err error) RelatedCheckResult {
+	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedError, Err: err}
+}
+
+// DeferredRelated returns a RelatedCheckResult representing "the count is not
+// resolved locally; Enter should drill in via a server-side FetchFilter fetch
+// instead". Renders with a blank count badge and is always actionable.
+func DeferredRelated(targetType string, filter map[string]string) RelatedCheckResult {
+	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedDeferred, FetchFilter: filter}
+}
+
+// LoadingRelated returns a RelatedCheckResult representing "no checker result
+// has arrived yet". A checker call is synchronous, so a checker itself never
+// returns this state; it exists for row-mirror producers (and tests) that
+// need a placeholder RelatedCheckResult value.
+func LoadingRelated(targetType string) RelatedCheckResult {
+	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedLoading}
+}
+
+// IsRelatedActionable is the single source of truth for "can the user drill into
+// this related-resource pivot". It is consumed by the TUI right column
+// (isActionableRow), the headless controller (ActionRelatedSelect +
+// RelatedBlock.Actionable), and — via that ViewState field — the web template,
+// so the rule cannot drift between renderers.
+//
+// A related row's final disposition is one of (never "(?)", which is forbidden):
+//  1. "(N)"        — an exact count                     (actionable)
+//  2. "(N+)"/"(0+)"— a lower bound                      (actionable)
+//  3. dimmed "(0)" — a proven zero                      (NOT actionable — dead end)
+//  4. blank        — "we aren't counting this, drill in" (actionable: Unknown/Deferred)
+//  5. blank dimmed — the checker errored                (NOT actionable — dead end)
+//
+// RelatedError is a dead end like a proven zero: an error is surfaced through a
+// Flash{IsError:true} + the "!" error log (Golden Contract rule 6), and the user
+// retries with Ctrl+R rather than drilling into data that never resolved.
+// RelatedLoading is the transient in-progress spinner and resolves into one of
+// the above.
+func IsRelatedActionable(state domain.RelatedRowState, count int, truncated bool) bool {
+	switch state {
+	case domain.RelatedLoading, domain.RelatedError:
+		// Loading: transient spinner. Error: dead end — surfaced via flash + log,
+		// recovered with Ctrl+R, never navigable.
+		return false
+	case domain.RelatedDeferred, domain.RelatedUnknown:
+		// The blank-navigable state: no number, drill in to find out.
+		return true
+	default: // RelatedResolved
+		// Only a PROVEN zero — a complete (non-truncated) scan that found
+		// nothing — is a dead end (state 3). An truncated lower bound
+		// ("N+"/"0+") stays actionable (state 2): the user drills in to see
+		// the rest.
+		if count == 0 && !truncated {
+			return false
+		}
+		return true
+	}
+}
+
+// RelatedEnterAction classifies what pressing Enter on a related row does. It is
+// derived from the SAME (state, count, truncated) inputs as IsRelatedActionable /
+// FormatRelatedCount, so every Enter path (live TUI app_stack, headless
+// keyboard/click actions) and the Tab drillable-cursor predicate share one rule
+// and can never drift. Critically, a truncated lower bound is ALWAYS
+// RelatedResolved (ValidateRelatedResult enforces it), so "(0+)" and "(N+)"
+// produce the IDENTICAL action — there is no count-based special case for the
+// zero lower bound.
+type RelatedEnterAction int
+
+const (
+	// RelatedEnterDeadEnd — not actionable (proven "(0)", error, loading). No-op.
+	RelatedEnterDeadEnd RelatedEnterAction = iota
+	// RelatedEnterResolveInPlace — an actionable but scope-less row: the blank
+	// RelatedUnknown state, which has no count, no IDs, and no server-side
+	// filter. Enter re-dispatches the source's related checks so the row firms
+	// up in place (it does NOT open the target type's plain unfiltered list).
+	RelatedEnterResolveInPlace
+	// RelatedEnterNavigate — open the scoped destination: a filtered list of the
+	// found IDs (one ID → its detail), a Deferred server-side filtered fetch, or
+	// — for a truncated scan with zero IDs found so far ("(0+)") — a scoped list
+	// with zero rows and a "more" affordance, exactly like "(N+)".
+	RelatedEnterNavigate
+)
+
+// RelatedEnter is the single source of truth for a related row's Enter action.
+// "(0+)" and "(N+)" are both RelatedResolved+Truncated, so they map to the same
+// RelatedEnterNavigate — no site may branch on the count to decide navigate vs
+// resolve-in-place.
+func RelatedEnter(state domain.RelatedRowState, count int, truncated bool) RelatedEnterAction {
+	if !IsRelatedActionable(state, count, truncated) {
+		return RelatedEnterDeadEnd
+	}
+	if state == domain.RelatedUnknown {
+		// The only actionable row with nothing to scope by (no count, no IDs,
+		// no filter). A truncated "(0+)" is RelatedResolved, not Unknown, so it
+		// falls through to Navigate alongside "(N+)".
+		return RelatedEnterResolveInPlace
+	}
+	return RelatedEnterNavigate
+}
+
+// FormatRelatedCount is the single source of truth for the count BADGE text on a
+// related-resource row. It is consumed by the TUI right column and — via
+// RelatedBlock.CountDisplay computed in the controller — the web template, so
+// the displayed count cannot drift.
+//
+//   - RelatedResolved, exact       → "(N)"
+//   - RelatedResolved, truncated → "(N+)" — a lower bound from a truncated
+//     target scan; the real count is at least N and more may exist on later
+//     pages. "(0+)" is the honest form of "scanned one page, found none yet".
+//   - everything else (RelatedDeferred / RelatedUnknown / RelatedError /
+//     RelatedLoading) → "" — NO number. RelatedDeferred/RelatedUnknown are the
+//     "we aren't giving a count, drill in" rows; RelatedError is a blank dead
+//     end (dimmed, not navigable); RelatedLoading shows a spinner. "(?)" is
+//     FORBIDDEN and is never produced.
+func FormatRelatedCount(state domain.RelatedRowState, count int, truncated bool) string {
+	if state == domain.RelatedResolved {
+		if truncated {
+			return fmt.Sprintf("(%d+)", count)
+		}
+		return fmt.Sprintf("(%d)", count)
+	}
+	return ""
+}
+
+// NoopChecker is a stub RelatedChecker suitable for tests that exercise
+// registry wiring (SetRelatedForTest / AppendRelated / GetRelated) without
+// exercising real related-resource logic. Production code MUST NOT use it:
+// SetRelatedForTest panics if any RelatedDef is registered with a nil Checker,
+// but production tests using this explicit stub satisfy the guard while
+// remaining free of test-specific behavior.
+func NoopChecker(_ context.Context, _ any, _ Resource, _ ResourceCache) RelatedCheckResult {
+	return RelatedCheckResult{}
+}
+
+// relatedRegistryMu guards relatedRegistry and relatedRegistryPrevious. All
+// reads and writes to those two maps must hold this mutex.
+var relatedRegistryMu sync.RWMutex
+
+// relatedRegistry maps resource short names to their related resource definitions.
+var relatedRegistry = map[string][]RelatedDef{}
+
+// relatedRegistryPrevious is a stack (per short name) of registration snapshots
+// saved before each SetRelatedForTest / AppendRelated call. CleanupRelatedForTest pops
+// the top entry to restore the previous state. Using a stack (instead of a single
+// slot) prevents nested Register calls — typical when production init() registers
+// once and a test then re-registers — from losing the original production
+// registration past the second Unregister.
+//
+// A nil entry on the stack means "no previous registration existed" and Unregister
+// should delete the active entry rather than restore.
+var relatedRegistryPrevious = map[string][][]RelatedDef{}
+
+// navigableFieldMu guards navigableFieldRegistry and navigableFieldPrevious.
+// All reads and writes to those two maps must hold this mutex.
+var navigableFieldMu sync.RWMutex
+
+// navigableFieldRegistry maps resource short names to their active navigable
+// field definitions. This is the mutable "session" registry: it starts empty
+// and is populated only by explicit SetNavigableFieldsForTest calls (from tests
+// or from BootstrapActiveNavFields at app startup). This keeps unit tests that
+// do not call SetNavigableFieldsForTest isolated from production init-time defaults.
+var navigableFieldRegistry = map[string][]NavigableField{}
+
+// navigableFieldPrevious is a stack (per short name) of registration snapshots
+// saved before each SetNavigableFieldsForTest call. CleanupNavigableFieldsForTest pops
+// the top entry to restore the previous state. Using a stack (instead of a single
+// slot) prevents nested Register calls from losing the original default-registered
+// state past the second Unregister.
+var navigableFieldPrevious = map[string][][]NavigableField{}
+
+// defaultNavFieldMu guards defaultNavFieldRegistry. Reads can happen from
+// any goroutine after startup.
+var defaultNavFieldMu sync.RWMutex
+
+// defaultNavFieldRegistry is an immutable-by-convention registry, currently
+// always empty (nothing writes to it). GetDefaultNavFields falls through to
+// the catalog Navigable defaults below. NavFieldsProvider (used by
+// projection.Generic) reads from this registry. DetailModel reads from the
+// mutable navigableFieldRegistry so that tests can construct models without
+// any nav field registrations.
+var defaultNavFieldRegistry = map[string][]NavigableField{}
+
+// SetRelatedForTest stores related definitions for the given resource short
+// name. Panics at init-time if any RelatedDef has a nil Checker or empty
+// TargetType — a nil Checker is a structural bug, not a supported stub state.
+//
+// The current value for shortName (which may be nil) is pushed onto a per-key
+// stack in relatedRegistryPrevious so that subsequent CleanupRelatedForTest calls
+// restore the previous registration instead of destroying it. This is critical
+// for tests: production init() registers production defs once, and tests that
+// override-then-cleanup must not nuke the production registration for the rest
+// of the test process.
+func SetRelatedForTest(shortName string, defs []RelatedDef) {
+	for _, d := range defs {
+		if d.Checker == nil {
+			panic(fmt.Sprintf("SetRelatedForTest(%q): nil Checker for target %q — every RelatedDef must have a real checker", shortName, d.TargetType))
+		}
+		if d.TargetType == "" {
+			panic(fmt.Sprintf("SetRelatedForTest(%q): empty TargetType — every RelatedDef must name a target", shortName))
+		}
+	}
+	relatedRegistryMu.Lock()
+	defer relatedRegistryMu.Unlock()
+	existing := relatedRegistry[shortName] // nil when not yet set
+	relatedRegistryPrevious[shortName] = append(relatedRegistryPrevious[shortName], existing)
+	relatedRegistry[shortName] = defs
+}
+
+// GetRelated returns the related definitions for the given resource short name.
+// Legacy-first: reads the mutable runtime map so SetRelatedForTest / AppendRelated
+// overrides (test helpers, zzz_ct_events_all_related.go) take precedence over
+// the catalog source slice. The catalog acts as the read-only fallback when a
+// type's init() body is gone but the runtime map was not populated by either
+// a sibling init() or aws.Install's bridgeCatalogToLegacy pass.
+func GetRelated(shortName string) []RelatedDef {
+	relatedRegistryMu.RLock()
+	if defs, ok := relatedRegistry[shortName]; ok {
+		relatedRegistryMu.RUnlock()
+		return defs
+	}
+	relatedRegistryMu.RUnlock()
+	if ct := catalog.Find(shortName); ct != nil && len(ct.Related) > 0 {
+		return ct.Related
+	}
+	return nil
+}
+
+// CleanupRelatedForTest restores the previous registration for the given short name
+// (or deletes the entry entirely if no previous registration existed). Used only
+// in tests for cleanup.
+//
+// Pops the most recently pushed snapshot from the per-key stack in
+// relatedRegistryPrevious. If the popped snapshot is nil (the key had no entry
+// before the most recent Register/Append call), the active-registry entry is
+// deleted entirely. If the stack is empty (Unregister called without a matching
+// Register/Append), the entry is deleted as a safe fallback — preserving the
+// historical destructive semantics for test-only types like `test_append`,
+// `srcType`, and `resizeTestType` that were never registered before the test.
+func CleanupRelatedForTest(shortName string) {
+	relatedRegistryMu.Lock()
+	defer relatedRegistryMu.Unlock()
+	stack := relatedRegistryPrevious[shortName]
+	if len(stack) == 0 {
+		delete(relatedRegistry, shortName)
+		return
+	}
+	prev := stack[len(stack)-1]
+	relatedRegistryPrevious[shortName] = stack[:len(stack)-1]
+	if prev == nil {
+		delete(relatedRegistry, shortName)
+	} else {
+		relatedRegistry[shortName] = prev
+	}
+}
+
+// FetchByIDsFunc fetches specific resource instances by ID, bypassing any
+// filter the top-level paginated fetcher applies.
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling.
+type FetchByIDsFunc = domain.FetchByIDsFunc
+
+// fetchByIDsRegistry maps target resource short name to its FetchByIDs helper.
+var fetchByIDsRegistry = map[string]FetchByIDsFunc{}
+
+// SetFetchByIDsForTest stores the FetchByIDs helper for the given target short
+// name. Replaces any existing entry. Safe to call from an init() alongside
+// SetPaginatedForTest.
+func SetFetchByIDsForTest(shortName string, fn FetchByIDsFunc) {
+	fetchByIDsRegistry[shortName] = fn
+}
+
+// GetFetchByIDs returns the FetchByIDs helper for the target short name.
+// Catalog-backed: falls through to the legacy map (catalog does not carry
+// FetchByIDs separately). Legacy-first:
+// test overrides via SetFetchByIDsForTest take effect; otherwise reads the
+// catalog FetchByIDs field.
+func GetFetchByIDs(shortName string) FetchByIDsFunc {
+	if fn, ok := fetchByIDsRegistry[shortName]; ok {
+		return fn
+	}
+	if ct := catalog.Find(shortName); ct != nil && ct.FetchByIDs != nil {
+		return ct.FetchByIDs
+	}
+	return nil
+}
+
+// CleanupFetchByIDsForTest removes the FetchByIDs helper for the given short
+// name. Parity with CleanupRelatedForTest — used only in tests for cleanup,
+// never from production code.
+func CleanupFetchByIDsForTest(shortName string) {
+	delete(fetchByIDsRegistry, shortName)
+}
+
+// SetNavigableFieldsForTest stores navigable field definitions for the given
+// resource short name. Replaces any existing entry.
+//
+// The current value for shortName (which may be nil) is pushed onto a per-key
+// stack in navigableFieldPrevious so that nested Register calls can all be
+// rolled back in order by successive CleanupNavigableFieldsForTest calls.
+//
+// Contract: every Register MUST be paired with an Unregister, otherwise the
+// per-key snapshot stack grows unbounded for the lifetime of the process. In
+// practice every test that registers also unregisters via t.Cleanup; production
+// callers register once at init and never unregister.
+func SetNavigableFieldsForTest(shortName string, fields []NavigableField) {
+	navigableFieldMu.Lock()
+	defer navigableFieldMu.Unlock()
+	existing := navigableFieldRegistry[shortName] // nil when not yet set
+	navigableFieldPrevious[shortName] = append(navigableFieldPrevious[shortName], existing)
+	navigableFieldRegistry[shortName] = fields
+}
+
+// GetNavigableFields returns the navigable field definitions for the given
+// resource short name from the active registry. If the active registry has no
+// entry for shortName, it falls back to the default (init-time) registry,
+// then to the catalog. Returns nil only when no entry exists anywhere.
+//
+// Catalog-backed: catalog is checked after the active and default registries.
+func GetNavigableFields(shortName string) []NavigableField {
+	navigableFieldMu.RLock()
+	if fields := navigableFieldRegistry[shortName]; len(fields) > 0 {
+		navigableFieldMu.RUnlock()
+		return fields
+	}
+	if fields := defaultNavFieldRegistry[shortName]; len(fields) > 0 {
+		navigableFieldMu.RUnlock()
+		return fields
+	}
+	navigableFieldMu.RUnlock()
+	// Catalog fallback — active during 04b–04m for migrated types.
+	if ct := catalog.Find(shortName); ct != nil && len(ct.Navigable) > 0 {
+		return ct.Navigable
+	}
+	return nil
+}
+
+// GetActiveNavigableFields returns the navigable field definitions for the
+// given resource short name from the active registry ONLY. Unlike
+// GetNavigableFields, this function does NOT fall back to the default registry.
+// Returns nil when no explicit SetNavigableFieldsForTest call has been made for
+// shortName.
+//
+// Used by DetailModel.buildFieldList so that navigable affordances in the
+// detail view require an explicit registration (from tests or from
+// BootstrapActiveNavFields at app startup). This prevents init-time default
+// entries from being visible in test models that deliberately omit nav fields.
+func GetActiveNavigableFields(shortName string) []NavigableField {
+	navigableFieldMu.RLock()
+	defer navigableFieldMu.RUnlock()
+	return navigableFieldRegistry[shortName]
+}
+
+// IsFieldNavigable returns the NavigableField for the given field path, or nil if not registered.
+func IsFieldNavigable(shortName, fieldPath string) *NavigableField {
+	for _, f := range GetNavigableFields(shortName) {
+		if f.FieldPath == fieldPath {
+			return &f
+		}
+	}
+	return nil
+}
+
+// CleanupNavigableFieldsForTest removes the navigable field registration for the
+// given short name. Used only in tests for cleanup.
+//
+// Pops the most recently pushed snapshot from the per-key stack in
+// navigableFieldPrevious. If the popped snapshot is nil (the key had no entry
+// before the most recent Register call), the active-registry entry is deleted
+// entirely. If the stack is empty (Unregister called without a matching
+// Register), the entry is deleted as a safe fallback.
+func CleanupNavigableFieldsForTest(shortName string) {
+	navigableFieldMu.Lock()
+	defer navigableFieldMu.Unlock()
+	stack := navigableFieldPrevious[shortName]
+	if len(stack) == 0 {
+		delete(navigableFieldRegistry, shortName)
+		return
+	}
+	prev := stack[len(stack)-1]
+	navigableFieldPrevious[shortName] = stack[:len(stack)-1]
+	if prev == nil {
+		delete(navigableFieldRegistry, shortName)
+	} else {
+		navigableFieldRegistry[shortName] = prev
+	}
+}
+
+// GetDefaultNavFields returns the default (init-time) navigable field definitions
+// for the given resource short name. Returns nil if none were registered at init.
+// Used by NavFieldsProvider so that projection.Generic always sees the canonical
+// nav fields regardless of the active-registry state.
+func GetDefaultNavFields(shortName string) []NavigableField {
+	defaultNavFieldMu.RLock()
+	if fields, ok := defaultNavFieldRegistry[shortName]; ok && len(fields) > 0 {
+		defaultNavFieldMu.RUnlock()
+		return fields
+	}
+	defaultNavFieldMu.RUnlock()
+	if ct := catalog.Find(shortName); ct != nil && len(ct.Navigable) > 0 {
+		return ct.Navigable
+	}
+	return nil
+}
+
+// BootstrapActiveNavFields copies all entries from the default nav field
+// registry into the active registry. Called once at app startup (from
+// cmd/a9s/main.go) so that DetailModel navigability works in production.
+// Must be called after all init() functions have run (i.e. inside main()).
+// Noop in test binaries that never call this function.
+func BootstrapActiveNavFields() {
+	defaultNavFieldMu.RLock()
+	snapshot := make(map[string][]NavigableField, len(defaultNavFieldRegistry))
+	maps.Copy(snapshot, defaultNavFieldRegistry)
+	defaultNavFieldMu.RUnlock()
+
+	navigableFieldMu.Lock()
+	defer navigableFieldMu.Unlock()
+	for k, v := range snapshot {
+		// Only populate entries that have not already been explicitly set via
+		// SetNavigableFieldsForTest. This preserves test-supplied overrides when
+		// BootstrapActiveNavFields is called inside tui.New (e.g. by golden
+		// scenario helpers that register custom nav fields before constructing
+		// the TUI model).
+		if _, exists := navigableFieldRegistry[k]; !exists {
+			navigableFieldRegistry[k] = v
+		}
+	}
+}
+
+// AppendRelated adds a single RelatedDef to the existing registration for shortName.
+// If the target type is already present, it is a no-op (prevents duplicates).
+// If no registration exists yet, it creates a new one. Panics at init-time if
+// def.Checker is nil or def.TargetType is empty — a nil Checker is a
+// structural bug, not a supported stub state.
+//
+// Like SetRelatedForTest, the pre-append value is pushed onto the per-key
+// snapshot stack so that a subsequent CleanupRelatedForTest restores the previous
+// state (or deletes the entry, if no prior value existed). A duplicate-target
+// no-op does NOT push a snapshot — Unregister has nothing to undo.
+func AppendRelated(shortName string, def RelatedDef) {
+	if def.Checker == nil {
+		panic(fmt.Sprintf("AppendRelated(%q): nil Checker for target %q — every RelatedDef must have a real checker", shortName, def.TargetType))
+	}
+	if def.TargetType == "" {
+		panic(fmt.Sprintf("AppendRelated(%q): empty TargetType — every RelatedDef must name a target", shortName))
+	}
+	relatedRegistryMu.Lock()
+	defer relatedRegistryMu.Unlock()
+	existing := relatedRegistry[shortName]
+	for _, d := range existing {
+		if d.TargetType == def.TargetType {
+			return // already registered, skip duplicate
+		}
+	}
+	relatedRegistryPrevious[shortName] = append(relatedRegistryPrevious[shortName], existing)
+	relatedRegistry[shortName] = append(existing, def)
+}
+
+// BuildCloudTrailFilter returns the CloudTrail LookupEvents filter for a resource.
+// The filter is determined by the resource type's CloudTrailKey field, not by heuristics.
+// Returns nil when the resource type has no CloudTrail support (empty CloudTrailKey).
+func BuildCloudTrailFilter(res Resource, resourceType string) map[string]string {
+	rt := FindResourceType(resourceType)
+	if rt == nil || rt.CloudTrailKey == "" {
+		return nil
+	}
+	return buildFilterFromKey(res, rt.CloudTrailKey)
+}
+
+func buildFilterFromKey(res Resource, ctKey string) map[string]string {
+	parts := strings.SplitN(ctKey, ":", 2)
+	if len(parts) != 2 {
+		return nil
+	}
+	attr, source := parts[0], parts[1]
+
+	var val string
+	switch source {
+	case "ID":
+		val = res.ID
+	case "Name":
+		val = res.Name
+	default:
+		if key, ok := strings.CutPrefix(source, "Fields."); ok {
+			val = res.Fields[key]
+		}
+	}
+	if val == "" {
+		return nil
+	}
+	return map[string]string{attr: val}
+}

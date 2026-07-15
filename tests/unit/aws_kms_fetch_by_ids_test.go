@@ -15,15 +15,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
 // fakeKMSByIDs implements awsclient.KMSAPI.
 // Only ListAliases and DescribeKey carry real test behaviour;
 // the remaining four methods return zero-value outputs and nil errors.
 type fakeKMSByIDs struct {
-	listAliasesFunc func(ctx context.Context, params *kms.ListAliasesInput, optFns ...func(*kms.Options)) (*kms.ListAliasesOutput, error)
-	describeKeyFunc func(ctx context.Context, params *kms.DescribeKeyInput, optFns ...func(*kms.Options)) (*kms.DescribeKeyOutput, error)
+	listAliasesFunc  func(ctx context.Context, params *kms.ListAliasesInput, optFns ...func(*kms.Options)) (*kms.ListAliasesOutput, error)
+	describeKeyFunc  func(ctx context.Context, params *kms.DescribeKeyInput, optFns ...func(*kms.Options)) (*kms.DescribeKeyOutput, error)
 	listAliasesCalls int
 }
 

@@ -1,0 +1,111 @@
+package aws
+
+import (
+	"context"
+	"fmt"
+	"strconv"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sesv2"
+	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
+
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
+)
+
+// FetchSESIdentitiesPage fetches a single page of SES email identities.
+func FetchSESIdentitiesPage(ctx context.Context, api SESv2ListEmailIdentitiesAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &sesv2.ListEmailIdentitiesInput{
+		PageSize: aws.Int32(DefaultPageSize),
+	}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	output, err := api.ListEmailIdentities(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching SES identities: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, identity := range output.EmailIdentities {
+		identityName := ""
+		if identity.IdentityName != nil {
+			identityName = *identity.IdentityName
+		}
+
+		identityType := string(identity.IdentityType)
+		sendingEnabled := strconv.FormatBool(identity.SendingEnabled)
+		verificationStatus := string(identity.VerificationStatus)
+
+		findings := sesIdentityFindings(identity)
+		topPhrase := sesTopPhrase(findings)
+
+		r := resource.Resource{
+			ID:       identityName,
+			Name:     identityName,
+			Findings: findings,
+			Fields: map[string]string{
+				"identity_name":       identityName,
+				"identity_type":       identityType,
+				"sending_enabled":     sendingEnabled,
+				"verification_status": verificationStatus,
+				"status":              topPhrase,
+			},
+			RawStruct: identity,
+		}
+
+		resources = append(resources, r)
+	}
+
+	nextToken := ""
+	isTruncated := false
+	if output.NextToken != nil {
+		nextToken = *output.NextToken
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
+}
+
+func sesIdentityFindings(identity sesv2types.IdentityInfo) []domain.Finding {
+	var findings []domain.Finding
+	switch identity.VerificationStatus {
+	case sesv2types.VerificationStatusFailed:
+		findings = append(findings, domain.Finding{Code: CodeSESVerificationFailed, Phrase: "verification failed", Severity: domain.SevBroken, Source: "wave1"})
+	case sesv2types.VerificationStatusTemporaryFailure:
+		findings = append(findings, domain.Finding{Code: CodeSESVerificationTempFail, Phrase: "verify: temp failure", Severity: domain.SevBroken, Source: "wave1"})
+	case sesv2types.VerificationStatusNotStarted:
+		findings = append(findings, domain.Finding{Code: CodeSESVerificationNotStarted, Phrase: "verification not started", Severity: domain.SevBroken, Source: "wave1"})
+	case sesv2types.VerificationStatusPending:
+		findings = append(findings, domain.Finding{Code: CodeSESVerificationPending, Phrase: "pending verification", Severity: domain.SevWarn, Source: "wave1"})
+	}
+	if !identity.SendingEnabled {
+		findings = append(findings, domain.Finding{Code: CodeSESSendingDisabled, Phrase: "sending disabled", Severity: domain.SevWarn, Source: "wave1"})
+	}
+	return findings
+}
+
+func sesTopPhrase(findings []domain.Finding) string {
+	if len(findings) == 0 {
+		return ""
+	}
+	if len(findings) == 1 {
+		return string(findings[0].Phrase)
+	}
+	return fmt.Sprintf("%s (+%d)", findings[0].Phrase, len(findings)-1)
+}

@@ -10,10 +10,10 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // dbcCheckerByTarget returns the RelatedChecker for the given target type
@@ -52,15 +52,15 @@ func TestRelated_DBC_Registered(t *testing.T) {
 		hasChecker  bool
 	}
 	expected := map[string]expectation{
-		"sg":         {"Security Groups", true},
-		"alarm":      {"CloudWatch Alarms", true},
-		"logs":       {"Log Groups", true},
-		"kms":        {"KMS Key", true},
-		"secrets":    {"Secrets Manager", true},
-		"dbi":        {"RDS Instances", true},
+		"sg":       {"Security Groups", true},
+		"alarm":    {"CloudWatch Alarms", true},
+		"logs":     {"Log Groups", true},
+		"kms":      {"KMS Key", true},
+		"secrets":  {"Secrets Manager", true},
+		"dbi":      {"RDS Instances", true},
 		"dbc-snap": {"DB Cluster Snapshots", true},
-		"subnet":     {"Subnets", true},
-		"vpc":        {"VPC", true},
+		"subnet":   {"Subnets", true},
+		"vpc":      {"VPC", true},
 	}
 
 	for target, want := range expected {

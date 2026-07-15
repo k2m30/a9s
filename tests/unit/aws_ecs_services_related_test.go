@@ -14,10 +14,10 @@ import (
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	sfnsvc "github.com/aws/aws-sdk-go-v2/service/sfn"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 func ecsSvcCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
@@ -458,7 +458,6 @@ func TestRelated_ECSSvc_EbRule_Empty(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (no rules reference this service)", result.Count)
 	}
 }
-
 
 // TestRelated_ECSSvc_EbRule_FetchFilter verifies that the checker does NOT populate
 // FetchFilter — reverse-scan checkers must not set FetchFilter (Fix 3).

@@ -20,9 +20,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/fieldpath"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/fieldpath"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // TestFetchCloudFrontDistributions_WAFColumnResolves verifies that the WAF

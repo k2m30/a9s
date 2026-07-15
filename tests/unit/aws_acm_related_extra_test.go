@@ -19,8 +19,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // acmDescribeCertMock implements awsclient.ACMAPI for related-checker tests.
@@ -253,8 +253,8 @@ func TestRelated_ACM_APIGW_NoMatchARN(t *testing.T) {
 // with the zone name in Fields["name"] (as read by checkACMR53).
 func makeACMR53Zone(id, zoneName string) resource.Resource {
 	return resource.Resource{
-		ID:   id,
-		Name: zoneName,
+		ID:     id,
+		Name:   zoneName,
 		Fields: map[string]string{"name": zoneName},
 	}
 }

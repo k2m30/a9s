@@ -10,10 +10,10 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 func ngCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
@@ -805,4 +805,3 @@ func TestRelated_NG_EC2_TruncatedCacheNoMatch(t *testing.T) {
 		t.Errorf("Truncated = false, want true (truncated cache, no match)")
 	}
 }
-

@@ -5,7 +5,7 @@ package webintegration
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/core/app"
 )
 
 // TestWebRelatedNavigate_SingleTarget_SeedsDetailFromCache guards the

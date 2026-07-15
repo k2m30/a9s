@@ -20,9 +20,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // H.1 — Terminal exactly 60 columns wide: renders normally (no "too narrow").
@@ -126,8 +126,8 @@ func TestQa67_H6_ResizeFromAboveToBelowMinimum_ShowsError(t *testing.T) {
 func TestQa67_H7_ResizeDuringDetailView_NoCrash(t *testing.T) {
 	m := newRootSizedModel()
 	res := &resource.Resource{
-		ID:     "i-detail-resize",
-		Name:   "resize-test-instance",
+		ID:   "i-detail-resize",
+		Name: "resize-test-instance",
 		Fields: map[string]string{
 			"instance_id": "i-detail-resize",
 			"name":        "resize-test-instance",
@@ -213,8 +213,8 @@ func TestQa67_H10_ResizeDuringChildView_NoCrash(t *testing.T) {
 	})
 	buckets := []resource.Resource{
 		{
-			ID:     "resize-bucket",
-			Name:   "resize-bucket",
+			ID:   "resize-bucket",
+			Name: "resize-bucket",
 			Fields: map[string]string{
 				"name":          "resize-bucket",
 				"region":        "us-east-1",

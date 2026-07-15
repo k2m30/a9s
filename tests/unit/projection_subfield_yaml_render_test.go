@@ -36,10 +36,10 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 

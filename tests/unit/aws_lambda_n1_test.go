@@ -19,11 +19,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	lambdasdk "github.com/aws/aws-sdk-go-v2/service/lambda"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 
 	// Side-effect import: triggers init() which calls resource.SetPaginatedForTest("lambda", …)
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	_ "github.com/k2m30/a9s/v3/core/aws"
 )
 
 // countingLambdaRoundTripper wraps the HTTP transport and counts calls to

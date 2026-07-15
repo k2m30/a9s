@@ -81,8 +81,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/k2m30/a9s/v3/internal/costs"
-	"github.com/k2m30/a9s/v3/internal/costs/screen"
+	"github.com/k2m30/a9s/v3/core/costs"
+	"github.com/k2m30/a9s/v3/core/costs/screen"
 )
 
 // ===========================================================================

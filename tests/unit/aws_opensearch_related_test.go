@@ -19,11 +19,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
 	ostypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -189,8 +189,8 @@ func TestRelated_OpenSearch_ACM(t *testing.T) {
 
 func TestRelated_OpenSearch_Alarm(t *testing.T) {
 	alarmA := resource.Resource{
-		ID:   "acme-logs-cluster-red",
-		Name: "acme-logs-cluster-red",
+		ID:     "acme-logs-cluster-red",
+		Name:   "acme-logs-cluster-red",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
 			AlarmName: aws.String("acme-logs-cluster-red"),
@@ -201,8 +201,8 @@ func TestRelated_OpenSearch_Alarm(t *testing.T) {
 		},
 	}
 	alarmB := resource.Resource{
-		ID:   "acme-logs-freestorage-low",
-		Name: "acme-logs-freestorage-low",
+		ID:     "acme-logs-freestorage-low",
+		Name:   "acme-logs-freestorage-low",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
 			AlarmName: aws.String("acme-logs-freestorage-low"),
@@ -213,8 +213,8 @@ func TestRelated_OpenSearch_Alarm(t *testing.T) {
 		},
 	}
 	unrelated := resource.Resource{
-		ID:   "unrelated-alarm",
-		Name: "unrelated-alarm",
+		ID:     "unrelated-alarm",
+		Name:   "unrelated-alarm",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
 			AlarmName:  aws.String("unrelated-alarm"),

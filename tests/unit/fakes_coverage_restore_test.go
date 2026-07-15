@@ -9,13 +9,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
 	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
-	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
-	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
+	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
 // ---------------------------------------------------------------------------
@@ -140,10 +140,10 @@ var _ awsclient.EventBridgeAPI = (*fakeEventBridgeCR)(nil)
 // ---------------------------------------------------------------------------
 
 type fakeRedshiftCR struct {
-	loggingOutput    *redshift.DescribeLoggingStatusOutput
-	loggingErr       error
-	subnetOutput     *redshift.DescribeClusterSubnetGroupsOutput
-	subnetErr        error
+	loggingOutput *redshift.DescribeLoggingStatusOutput
+	loggingErr    error
+	subnetOutput  *redshift.DescribeClusterSubnetGroupsOutput
+	subnetErr     error
 }
 
 func (f *fakeRedshiftCR) DescribeClusters(_ context.Context, _ *redshift.DescribeClustersInput, _ ...func(*redshift.Options)) (*redshift.DescribeClustersOutput, error) {
@@ -178,8 +178,8 @@ var _ awsclient.RedshiftAPI = (*fakeRedshiftCR)(nil)
 // ---------------------------------------------------------------------------
 
 type fakeELBv2CR struct {
-	describeTagsOutput       *elbv2.DescribeTagsOutput
-	describeTagsErr          error
+	describeTagsOutput         *elbv2.DescribeTagsOutput
+	describeTagsErr            error
 	describeTargetHealthOutput *elbv2.DescribeTargetHealthOutput
 	describeTargetHealthErr    error
 }

@@ -16,7 +16,7 @@ package unit_test
 import (
 	"testing"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	_ "github.com/k2m30/a9s/v3/core/aws"
 )
 
 // TestCtEventsDemoRightColumnHidesZeroPivotRows asserts that, once the demo

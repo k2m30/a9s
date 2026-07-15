@@ -7,9 +7,9 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // handleKeyMsg processes all keyboard input: force-quit, input modes, global
@@ -371,5 +371,3 @@ func (m Model) executeCommand(cmd string) (tea.Model, tea.Cmd) {
 		}
 	}
 }
-
-

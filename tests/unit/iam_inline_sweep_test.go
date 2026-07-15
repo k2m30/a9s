@@ -6,33 +6,33 @@ package unit
 //
 // Verified root-cause chain (traced against the code at HEAD, not assumed):
 //
-//  1. internal/runtime/probes.go:630-649 (Core.ProbeResourceAvailability)
+//  1. core/runtime/probes.go:630-649 (Core.ProbeResourceAvailability)
 //     resolves pf := resource.GetPaginatedFetcher("policy"), opens a 10s
 //     context.WithTimeout at line 644, and calls pf(probeCtx, clients, "")
 //     — i.e. the FIRST PAGE of the "policy" fetcher, continuationToken="".
-//  2. internal/aws/catalog_security.go:144-169 registers that exact Fetcher
+//  2. core/aws/catalog_security.go:144-169 registers that exact Fetcher
 //     closure for ShortName "policy". On the first page (continuationToken
 //     == "") it calls FetchIAMPoliciesPage (cheap, ListPolicies Scope=Local
 //     only) and THEN unconditionally calls fetchInlineGroupPolicies(ctx,
 //     c.IAM) before returning — so the probe's cheap managed-only intent is
 //     defeated: it always also runs the full per-group inline sweep.
-//  3. internal/aws/iam_policies.go:420-462 (fetchInlineGroupPolicies) lists
+//  3. core/aws/iam_policies.go:420-462 (fetchInlineGroupPolicies) lists
 //     ALL IAM groups via ListGroups, then loops them SEQUENTIALLY, issuing
 //     one ListGroupPolicies per group, each wrapped in RetryOnThrottle
-//     (internal/aws/retry.go:38). On a profile with many groups this burns
+//     (core/aws/retry.go:38). On a profile with many groups this burns
 //     the probe's shared 10s deadline; groups whose call lands after the
 //     deadline fail with a non-retryable ctx error (context errors are not
-//     smithy.APIError, so ClassifyAWSError — internal/aws/errors.go:11 —
+//     smithy.APIError, so ClassifyAWSError — core/aws/errors.go:11 —
 //     always returns retryable=false for them, so RetryOnThrottle does not
 //     even get a backoff cycle to make things worse, it just fails fast).
 //  4. Per-group failures are collected into one composite via
-//     internal/aws/partial_errors.go:33 AggregateFailures("ListGroupPolicies",
+//     core/aws/partial_errors.go:33 AggregateFailures("ListGroupPolicies",
 //     failures, total), which joins EVERY failing ID with no cap — on the
 //     reported profile (49 IAM groups, 36 timed out) this produced the
 //     single unbounded flash line:
 //     "availability policy: ListGroupPolicies failed for 36 of 49 IDs: <36
 //     joined per-group reasons>" (formatted by
-//     internal/runtime/handlers_availability.go:317).
+//     core/runtime/handlers_availability.go:317).
 //
 // Three independent, behavior-level regressions are pinned below, each
 // against the real seam a fix must touch.
@@ -47,7 +47,7 @@ package unit
 // for real list-opens. Per the repo's stated preference for deterministic
 // per-type config over signal-guessing, item 1 now pins an EXPLICIT new
 // registry seam instead, following the existing per-type registration
-// family in internal/resource (SetPaginatedForTest / GetPaginatedFetcher /
+// family in core/resource (SetPaginatedForTest / GetPaginatedFetcher /
 // CleanupPaginatedForTest in accessors.go; SetFetchByIDsForTest /
 // GetFetchByIDs / CleanupFetchByIDsForTest in related.go):
 //
@@ -55,12 +55,12 @@ package unit
 //     resource.GetAvailabilityFetcher(shortName) /
 //     resource.CleanupAvailabilityFetcherForTest(shortName) — a new registry,
 //     same PaginatedFetcher shape, NOT YET IMPLEMENTED as of this test file.
-//   - internal/runtime/probes.go's Core.ProbeResourceAvailability must call
+//   - core/runtime/probes.go's Core.ProbeResourceAvailability must call
 //     resource.GetAvailabilityFetcher(shortName) first and use it WHEN
 //     REGISTERED, falling back to resource.GetPaginatedFetcher(shortName)
 //     otherwise — zero behavior change for the other 66 types that never
 //     register one.
-//   - internal/aws must register a cheap managed-only availability fetcher
+//   - core/aws must register a cheap managed-only availability fetcher
 //     for "policy" (e.g. alongside the Fetcher closure in
 //     catalog_security.go) that never calls ListGroupPolicies.
 //
@@ -92,7 +92,7 @@ package unit
 //   - The three AggregateFailures tests pin (4): the composite builder must
 //     cap per-ID enumeration and summarize the remainder instead of joining
 //     an unbounded list. RED today (current implementation joins every
-//     failure with no cap — see internal/aws/partial_errors.go:33-39).
+//     failure with no cap — see core/aws/partial_errors.go:33-39).
 //
 // Timing values below are scaled down from the reported 200ms/10s numbers
 // to keep this file fast (whole-file wall time budget: a few seconds), while
@@ -111,11 +111,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/catalog"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/session"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // ---------------------------------------------------------------------------
@@ -169,10 +169,10 @@ func (s *inlineSweepIAM) ListGroupPolicies(ctx context.Context, in *iam.ListGrou
 	if s.failListGroupPolicies {
 		s.t.Helper()
 		s.t.Fatalf("ListGroupPolicies(%s) called on the availability-probe seam; "+
-			"the probe's first-page fetch (internal/runtime/probes.go:644, "+
+			"the probe's first-page fetch (core/runtime/probes.go:644, "+
 			"resource.GetPaginatedFetcher(\"policy\")) must stay on the cheap "+
 			"managed-only path and never reach the per-group inline sweep "+
-			"(internal/aws/catalog_security.go:159, internal/aws/iam_policies.go:425)",
+			"(core/aws/catalog_security.go:159, core/aws/iam_policies.go:425)",
 			aws.ToString(in.GroupName))
 	}
 
@@ -300,13 +300,13 @@ func newInlineSweepGroups(n int) []iamtypes.Group {
 
 // callInlineSweepPolicyFetcher drives the registered "policy" paginated
 // fetcher — the same function resource.GetPaginatedFetcher("policy") hands
-// to Core.ProbeResourceAvailability (internal/runtime/probes.go:637-649) —
+// to Core.ProbeResourceAvailability (core/runtime/probes.go:637-649) —
 // with continuationToken="" (first page), exactly as the probe calls it.
 func callInlineSweepPolicyFetcher(t *testing.T, ctx context.Context, stub *inlineSweepIAM) ([]resource.Resource, error) {
 	t.Helper()
 	fetcher := resource.GetPaginatedFetcher("policy")
 	if fetcher == nil {
-		t.Fatal("no paginated fetcher registered for 'policy' — internal/aws not imported?")
+		t.Fatal("no paginated fetcher registered for 'policy' — core/aws not imported?")
 	}
 	clients := &awsclient.ServiceClients{IAM: stub}
 	result, err := fetcher(ctx, clients, "")
@@ -413,7 +413,7 @@ func TestProbeResourceAvailability_FallsBackWithoutRegisteredAvailabilityFetcher
 }
 
 // TestPolicyAvailabilityFetcher_RegisteredForPolicy_ManagedOnly pins the
-// third piece: internal/aws must actually register a cheap, managed-only
+// third piece: core/aws must actually register a cheap, managed-only
 // availability fetcher for "policy" (not just leave the registry mechanism
 // unused). Fetches it directly via resource.GetAvailabilityFetcher("policy")
 // — bypassing SetAvailabilityFetcherForTest entirely — so this exercises the
@@ -421,8 +421,8 @@ func TestProbeResourceAvailability_FallsBackWithoutRegisteredAvailabilityFetcher
 func TestPolicyAvailabilityFetcher_RegisteredForPolicy_ManagedOnly(t *testing.T) {
 	fetcher := resource.GetAvailabilityFetcher("policy")
 	if fetcher == nil {
-		t.Fatal("no availability fetcher registered for \"policy\"; internal/aws must register one " +
-			"(e.g. alongside the Fetcher closure in internal/aws/catalog_security.go) so the " +
+		t.Fatal("no availability fetcher registered for \"policy\"; core/aws must register one " +
+			"(e.g. alongside the Fetcher closure in core/aws/catalog_security.go) so the " +
 			"availability probe never falls back to the full paginated fetcher and its inline sweep")
 	}
 
@@ -500,7 +500,7 @@ func TestFetchInlineGroupPolicies_SequentialSweepMissesDeadline(t *testing.T) {
 	} else {
 		t.Errorf("RED: only %d/%d groups' inline policies were recovered within a %v deadline "+
 			"(sequential worst case is %d * %v = %v > %v deadline); err=%v; "+
-			"internal/aws/iam_policies.go:425 fetchInlineGroupPolicies must fan the "+
+			"core/aws/iam_policies.go:425 fetchInlineGroupPolicies must fan the "+
 			"per-group ListGroupPolicies sweep out with bounded concurrency instead "+
 			"of looping sequentially",
 			inlineCount, numGroups, deadline, numGroups, perCallSleep, numGroups*perCallSleep, deadline, err)
@@ -555,7 +555,7 @@ func TestFetchInlineGroupPolicies_ConcurrencyStaysBounded(t *testing.T) {
 	if got := stub.maxConcurrency(); got > maxAllowedInFlight {
 		t.Errorf("fetchInlineGroupPolicies ran %d ListGroupPolicies calls concurrently, want <= %d; "+
 			"unbounded goroutine fan-out risks IAM throttling on real accounts "+
-			"(internal/aws/iam_policies.go:425)",
+			"(core/aws/iam_policies.go:425)",
 			got, maxAllowedInFlight)
 	}
 }
@@ -566,7 +566,7 @@ func TestFetchInlineGroupPolicies_ConcurrencyStaysBounded(t *testing.T) {
 
 // syntheticGroupFailures builds n realistic "<group>: <reason>" failure
 // strings in the exact shape fetchInlineGroupPolicies feeds to
-// AggregateFailures (internal/aws/iam_policies.go:444).
+// AggregateFailures (core/aws/iam_policies.go:444).
 func syntheticGroupFailures(n, startIdx int) []string {
 	failures := make([]string, 0, n)
 	for i := 0; i < n; i++ {
@@ -580,7 +580,7 @@ func syntheticGroupFailures(n, startIdx int) []string {
 // exact reported scenario (49 groups, 36 failing) and pins that the
 // composite error names at most 5 IDs and summarizes the remainder, instead
 // of joining all 36 into one unbounded line. RED today — AggregateFailures
-// (internal/aws/partial_errors.go:33) joins every failure with no cap.
+// (core/aws/partial_errors.go:33) joins every failure with no cap.
 func TestAggregateFailures_CapsPerIDEnumeration_36of49GroupSweep(t *testing.T) {
 	const total = 49
 	const failCount = 36
@@ -605,7 +605,7 @@ func TestAggregateFailures_CapsPerIDEnumeration_36of49GroupSweep(t *testing.T) {
 	}
 	if named > capLimit {
 		t.Errorf("composite error names %d of %d failing IDs verbatim, want at most %d; "+
-			"AggregateFailures (internal/aws/partial_errors.go:33) must cap per-ID "+
+			"AggregateFailures (core/aws/partial_errors.go:33) must cap per-ID "+
 			"enumeration and summarize the remainder (e.g. \"and %d more\") — a "+
 			"36-of-49 IAM group sweep currently produces one unbounded log line\ngot: %s",
 			named, failCount, capLimit, failCount-capLimit, msg)
@@ -685,7 +685,7 @@ func TestAggregateFailures_CapsEnumeration_AllIDsFailing(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // C7 (self-review, regression from this branch) — the "policy" availability
-// fetcher (internal/aws/catalog_security.go's AvailabilityFetcher) is JUST
+// fetcher (core/aws/catalog_security.go's AvailabilityFetcher) is JUST
 // FetchIAMPoliciesPage — a direct pass-through of ListPolicies' own
 // IsTruncated flag. On an inline-only account (zero managed policies,
 // inline policies live entirely on groups this cheap probe deliberately
@@ -732,7 +732,7 @@ func TestPolicyAvailabilityFetcher_InlineOnlyAccount_NeverConfirmedEmpty(t *test
 // C8 (self-review) — fetchInlineGroupPolicies must surface ctx cancellation
 // honestly: a deadline expiring mid-sweep must yield a composite error
 // naming the unswept remainder, never nil-error-with-partial-rows. Traced
-// precisely: fetchInlineGroupPolicies (internal/aws/iam_policies.go)
+// precisely: fetchInlineGroupPolicies (core/aws/iam_policies.go)
 // discards ForEachParallel's own return value (`_ =
 // ForEachParallel(ctx, n, ..., func(i int) {...})`), and groupFailures is
 // only appended to by a group's OWN ListGroupPolicies call actually

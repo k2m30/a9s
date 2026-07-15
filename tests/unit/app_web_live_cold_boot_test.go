@@ -111,13 +111,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/cache"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/session"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // newLiveWebStyleController builds a Controller the same way
@@ -964,31 +964,32 @@ func TestCacheFileIO_OnlyThroughCachePackage_NoDirectDiskAccessElsewhere(t *test
 		t.Fatal("runtime.Caller(0) failed — cannot locate test file")
 	}
 	repoRoot := filepath.Join(filepath.Dir(thisFile), "..", "..")
-	internalRoot := filepath.Join(repoRoot, "internal")
-	cachePkgDir := filepath.Join(internalRoot, "cache")
+	cachePkgDir := filepath.Join(repoRoot, "core", "cache")
 
 	var goFiles []string
-	walkErr := filepath.WalkDir(internalRoot, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
+	for _, scanRoot := range []string{filepath.Join(repoRoot, "core"), filepath.Join(repoRoot, "internal")} {
+		walkErr := filepath.WalkDir(scanRoot, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			if filepath.Dir(path) == cachePkgDir {
+				return nil
+			}
+			goFiles = append(goFiles, path)
 			return nil
+		})
+		if walkErr != nil {
+			t.Fatalf("filepath.WalkDir(%s): %v", scanRoot, walkErr)
 		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		if filepath.Dir(path) == cachePkgDir {
-			return nil
-		}
-		goFiles = append(goFiles, path)
-		return nil
-	})
-	if walkErr != nil {
-		t.Fatalf("filepath.WalkDir(%s): %v", internalRoot, walkErr)
 	}
 	if len(goFiles) == 0 {
-		t.Fatal("filepath.WalkDir found zero internal/ .go files — check repo layout")
+		t.Fatal("filepath.WalkDir found zero core/+internal/ .go files — check repo layout")
 	}
 
 	fset := token.NewFileSet()

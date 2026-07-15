@@ -24,10 +24,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -374,11 +374,11 @@ func TestDDB_Related_KMS_NilSSEDescription(t *testing.T) {
 // with no "/" returns Count=0, not Count=-1.
 func TestDDB_Related_KMS_MalformedARN_NoSlash(t *testing.T) {
 	table := &ddbtypes.TableDescription{
-		TableName:  aws.String("inline-malformed-kms"),
-		TableArn:   aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/inline-malformed-kms"),
+		TableName:   aws.String("inline-malformed-kms"),
+		TableArn:    aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/inline-malformed-kms"),
 		TableStatus: ddbtypes.TableStatusActive,
 		SSEDescription: &ddbtypes.SSEDescription{
-			SSEType:         ddbtypes.SSETypeKms,
+			SSEType: ddbtypes.SSETypeKms,
 			// Malformed: no "/" separator — key ID cannot be extracted.
 			KMSMasterKeyArn: aws.String("malformed-arn-no-slash"),
 		},
@@ -591,7 +591,7 @@ func TestDDB_Related_VPCE_S3ServiceName_CountZero(t *testing.T) {
 		"vpce": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
 				{
-					ID:   "vpce-s3-0001",
+					ID: "vpce-s3-0001",
 					Fields: map[string]string{
 						"service_name": "com.amazonaws.us-east-1.s3",
 						"type":         "Gateway",
@@ -617,7 +617,7 @@ func TestDDB_Related_VPCE_InterfaceType_CountZero(t *testing.T) {
 		"vpce": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
 				{
-					ID:   "vpce-ddb-interface-0002",
+					ID: "vpce-ddb-interface-0002",
 					Fields: map[string]string{
 						"service_name": "com.amazonaws.us-east-1.dynamodb",
 						"type":         "Interface",

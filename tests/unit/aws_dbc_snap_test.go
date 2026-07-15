@@ -23,7 +23,7 @@ package unit
 //
 // Import path for the function under test:
 //
-//	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+//	awsclient "github.com/k2m30/a9s/v3/core/aws"
 
 import (
 	"context"
@@ -36,8 +36,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // TestComputeDBCSnapStatusAndIssues pins the §4 phrase output and Issues slice
@@ -48,10 +48,10 @@ func TestComputeDBCSnapStatusAndIssues(t *testing.T) {
 	age10d := now.Add(-10 * 24 * time.Hour)
 
 	cases := []struct {
-		name        string
-		snap        docdbtypes.DBClusterSnapshot
-		wantStatus  string
-		wantIssues  []string
+		name       string
+		snap       docdbtypes.DBClusterSnapshot
+		wantStatus string
+		wantIssues []string
 	}{
 		{
 			name: "healthy_available",

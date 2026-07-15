@@ -16,7 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
 // recordingEBTargetsClient records every rule name it was called with for

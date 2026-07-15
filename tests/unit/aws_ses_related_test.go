@@ -27,12 +27,12 @@ import (
 	sestypes "github.com/aws/aws-sdk-go-v2/service/ses/types"
 	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/session"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // sesCheckerByTarget returns the RelatedChecker for the given target type registered
@@ -572,10 +572,10 @@ func TestCheckSESLambda_ScopesByRecipient(t *testing.T) {
 	checker := sesCheckerByTarget(t, "lambda")
 
 	subtests := []struct {
-		name          string
-		resource      resource.Resource
-		wantNames     []string
-		unwantedName  string
+		name         string
+		resource     resource.Resource
+		wantNames    []string
+		unwantedName string
 	}{
 		{
 			name: "support@acme.com → global + support-router only",

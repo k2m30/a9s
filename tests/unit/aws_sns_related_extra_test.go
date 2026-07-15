@@ -9,10 +9,10 @@ import (
 
 	snssvc "github.com/aws/aws-sdk-go-v2/service/sns"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // fakeSNSFull implements the full SNSAPI for ServiceClients.SNS.
@@ -332,7 +332,7 @@ func TestRelated_SNS_Alarm_OKActions(t *testing.T) {
 		Fields: map[string]string{"topic_arn": topicARN},
 	}
 	alarmRes := resource.Resource{
-		ID: "alarm-ok-action",
+		ID:        "alarm-ok-action",
 		RawStruct: resource.ResourceCacheEntry{}, // wrong type — should skip
 	}
 	_ = alarmRes

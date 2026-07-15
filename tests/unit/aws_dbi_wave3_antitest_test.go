@@ -27,8 +27,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	rdsv2 "github.com/aws/aws-sdk-go-v2/service/rds"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
 
 // ---------------------------------------------------------------------------
@@ -40,8 +40,8 @@ import (
 // The test checks callMade after the operation under test.
 type recordingCWClient struct {
 	awsclient.CloudWatchAPI // embed nil — panics if any unoverridden method is called
-	calls    []string
-	callMade bool
+	calls                   []string
+	callMade                bool
 }
 
 func (m *recordingCWClient) DescribeAlarms(

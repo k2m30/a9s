@@ -1,0 +1,98 @@
+package aws
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+
+	"github.com/k2m30/a9s/v3/core/resource"
+)
+
+// FetchTargetGroupsPage fetches a single page of target groups.
+func FetchTargetGroupsPage(ctx context.Context, api ELBv2DescribeTargetGroupsAPI, continuationToken string) (resource.FetchResult, error) {
+	input := &elbv2.DescribeTargetGroupsInput{
+		PageSize: aws.Int32(DefaultPageSize),
+	}
+	if continuationToken != "" {
+		input.Marker = &continuationToken
+	}
+
+	output, err := api.DescribeTargetGroups(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("fetching target groups: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, tg := range output.TargetGroups {
+		tgName := ""
+		if tg.TargetGroupName != nil {
+			tgName = *tg.TargetGroupName
+		}
+
+		port := ""
+		if tg.Port != nil {
+			port = fmt.Sprintf("%d", *tg.Port)
+		}
+
+		protocol := string(tg.Protocol)
+
+		vpcID := ""
+		if tg.VpcId != nil {
+			vpcID = *tg.VpcId
+		}
+
+		targetType := string(tg.TargetType)
+
+		healthCheckPath := ""
+		if tg.HealthCheckPath != nil {
+			healthCheckPath = *tg.HealthCheckPath
+		}
+
+		tgArn := ""
+		if tg.TargetGroupArn != nil {
+			tgArn = *tg.TargetGroupArn
+		}
+
+		r := resource.Resource{
+			ID:   tgName,
+			Name: tgName,
+			Fields: map[string]string{
+				"target_group_name": tgName,
+				"target_group_arn":  tgArn,
+				"port":              port,
+				"protocol":          protocol,
+				"vpc_id":            vpcID,
+				"target_type":       targetType,
+				"health_check_path": healthCheckPath,
+			},
+			RawStruct: tg,
+		}
+
+		resources = append(resources, r)
+	}
+
+	nextToken := ""
+	isTruncated := false
+	if output.NextMarker != nil {
+		nextToken = *output.NextMarker
+		isTruncated = true
+	}
+
+	totalHint := len(resources)
+	if isTruncated {
+		totalHint = -1
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   totalHint,
+		},
+	}, nil
+}

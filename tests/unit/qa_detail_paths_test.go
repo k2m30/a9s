@@ -7,9 +7,9 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 
-	"github.com/k2m30/a9s/v3/internal/config"
-	"github.com/k2m30/a9s/v3/internal/fieldpath"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/config"
+	"github.com/k2m30/a9s/v3/core/fieldpath"
+	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )

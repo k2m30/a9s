@@ -5,7 +5,7 @@ import (
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // fixtureS3Buckets returns sanitized S3 bucket data for testing.
@@ -13,8 +13,8 @@ import (
 func fixtureS3Buckets() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "test-app-state",
-			Name:   "test-app-state",
+			ID:   "test-app-state",
+			Name: "test-app-state",
 			Fields: map[string]string{
 				"name":          "test-app-state",
 				"bucket_name":   "test-app-state",
@@ -22,8 +22,8 @@ func fixtureS3Buckets() []resource.Resource {
 			},
 		},
 		{
-			ID:     "cdn-logs.example.com",
-			Name:   "cdn-logs.example.com",
+			ID:   "cdn-logs.example.com",
+			Name: "cdn-logs.example.com",
 			Fields: map[string]string{
 				"name":          "cdn-logs.example.com",
 				"bucket_name":   "cdn-logs.example.com",
@@ -31,8 +31,8 @@ func fixtureS3Buckets() []resource.Resource {
 			},
 		},
 		{
-			ID:     "cdn-website.example.com",
-			Name:   "cdn-website.example.com",
+			ID:   "cdn-website.example.com",
+			Name: "cdn-website.example.com",
 			Fields: map[string]string{
 				"name":          "cdn-website.example.com",
 				"bucket_name":   "cdn-website.example.com",
@@ -40,8 +40,8 @@ func fixtureS3Buckets() []resource.Resource {
 			},
 		},
 		{
-			ID:     "dev-fileshare",
-			Name:   "dev-fileshare",
+			ID:   "dev-fileshare",
+			Name: "dev-fileshare",
 			Fields: map[string]string{
 				"name":          "dev-fileshare",
 				"bucket_name":   "dev-fileshare",
@@ -49,8 +49,8 @@ func fixtureS3Buckets() []resource.Resource {
 			},
 		},
 		{
-			ID:     "dev-loki-chunks",
-			Name:   "dev-loki-chunks",
+			ID:   "dev-loki-chunks",
+			Name: "dev-loki-chunks",
 			Fields: map[string]string{
 				"name":          "dev-loki-chunks",
 				"bucket_name":   "dev-loki-chunks",
@@ -65,8 +65,8 @@ func fixtureS3Buckets() []resource.Resource {
 func fixtureS3Objects() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "dev/terraform.tfstate",
-			Name:   "dev/terraform.tfstate",
+			ID:   "dev/terraform.tfstate",
+			Name: "dev/terraform.tfstate",
 			Fields: map[string]string{
 				"key":           "dev/terraform.tfstate",
 				"size":          "61.9 KB",
@@ -82,8 +82,8 @@ func fixtureS3Objects() []resource.Resource {
 func fixtureEC2Instances() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "i-0aaa111111111111a",
-			Name:   "",
+			ID:   "i-0aaa111111111111a",
+			Name: "",
 			Fields: map[string]string{
 				"instance_id":     "i-0aaa111111111111a",
 				"name":            "",
@@ -98,8 +98,8 @@ func fixtureEC2Instances() []resource.Resource {
 			},
 		},
 		{
-			ID:     "i-0bbb222222222222b",
-			Name:   "VPN",
+			ID:   "i-0bbb222222222222b",
+			Name: "VPN",
 			Fields: map[string]string{
 				"instance_id":     "i-0bbb222222222222b",
 				"name":            "VPN",
@@ -114,8 +114,8 @@ func fixtureEC2Instances() []resource.Resource {
 			},
 		},
 		{
-			ID:     "i-0ccc333333333333c",
-			Name:   "kafka",
+			ID:   "i-0ccc333333333333c",
+			Name: "kafka",
 			Fields: map[string]string{
 				"instance_id":     "i-0ccc333333333333c",
 				"name":            "kafka",
@@ -131,8 +131,8 @@ func fixtureEC2Instances() []resource.Resource {
 		},
 		{
 			// No status check fields — represents API error fallback, no indicator expected.
-			ID:     "i-0ddd444444444444d",
-			Name:   "monitoring",
+			ID:   "i-0ddd444444444444d",
+			Name: "monitoring",
 			Fields: map[string]string{
 				"instance_id": "i-0ddd444444444444d",
 				"name":        "monitoring",
@@ -145,8 +145,8 @@ func fixtureEC2Instances() []resource.Resource {
 			},
 		},
 		{
-			ID:     "i-0eee555555555555e",
-			Name:   "apps-on-demand",
+			ID:   "i-0eee555555555555e",
+			Name: "apps-on-demand",
 			Fields: map[string]string{
 				"instance_id":     "i-0eee555555555555e",
 				"name":            "apps-on-demand",
@@ -162,8 +162,8 @@ func fixtureEC2Instances() []resource.Resource {
 		},
 		{
 			// No status check fields — non-running, no indicator expected.
-			ID:     "i-0fff666666666666f",
-			Name:   "apps",
+			ID:   "i-0fff666666666666f",
+			Name: "apps",
 			Fields: map[string]string{
 				"instance_id": "i-0fff666666666666f",
 				"name":        "apps",
@@ -183,8 +183,8 @@ func fixtureEC2Instances() []resource.Resource {
 func fixtureRDSInstances() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "test-docdb-1",
-			Name:   "test-docdb-1",
+			ID:   "test-docdb-1",
+			Name: "test-docdb-1",
 			Fields: map[string]string{
 				"db_identifier":  "test-docdb-1",
 				"engine":         "dbc",
@@ -196,8 +196,8 @@ func fixtureRDSInstances() []resource.Resource {
 			},
 		},
 		{
-			ID:     "test-rds-1",
-			Name:   "test-rds-1",
+			ID:   "test-rds-1",
+			Name: "test-rds-1",
 			Fields: map[string]string{
 				"db_identifier":  "test-rds-1",
 				"engine":         "aurora-postgresql",
@@ -217,8 +217,8 @@ func fixtureRDSInstances() []resource.Resource {
 func fixtureRedisClusters() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "test-redis-1",
-			Name:   "test-redis-1",
+			ID:   "test-redis-1",
+			Name: "test-redis-1",
 			Fields: map[string]string{
 				"cluster_id": "test-redis-1",
 				"node_type":  "cache.t2.micro",
@@ -249,8 +249,8 @@ func fixtureRedisClusters() []resource.Resource {
 func fixtureDocDBClusters() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "test-docdb-cluster",
-			Name:   "test-docdb-cluster",
+			ID:   "test-docdb-cluster",
+			Name: "test-docdb-cluster",
 			Fields: map[string]string{
 				"cluster_id":     "test-docdb-cluster",
 				"engine_version": "5.0.0",
@@ -269,8 +269,8 @@ func fixtureDocDBClusters() []resource.Resource {
 			},
 		},
 		{
-			ID:     "test-rds-cluster",
-			Name:   "test-rds-cluster",
+			ID:   "test-rds-cluster",
+			Name: "test-rds-cluster",
 			Fields: map[string]string{
 				"cluster_id":     "test-rds-cluster",
 				"engine_version": "16.8",
@@ -296,8 +296,8 @@ func fixtureDocDBClusters() []resource.Resource {
 func fixtureEKSClusters() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "test-cluster-1",
-			Name:   "test-cluster-1",
+			ID:   "test-cluster-1",
+			Name: "test-cluster-1",
 			Fields: map[string]string{
 				"cluster_name":     "test-cluster-1",
 				"version":          "1.31",
@@ -314,8 +314,8 @@ func fixtureEKSClusters() []resource.Resource {
 func fixtureSecrets() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "test/integration",
-			Name:   "test/integration",
+			ID:   "test/integration",
+			Name: "test/integration",
 			Fields: map[string]string{
 				"secret_name":      "test/integration",
 				"description":      "",
@@ -325,8 +325,8 @@ func fixtureSecrets() []resource.Resource {
 			},
 		},
 		{
-			ID:     "test/github-app",
-			Name:   "test/github-app",
+			ID:   "test/github-app",
+			Name: "test/github-app",
 			Fields: map[string]string{
 				"secret_name":      "test/github-app",
 				"description":      "",
@@ -336,8 +336,8 @@ func fixtureSecrets() []resource.Resource {
 			},
 		},
 		{
-			ID:     "test/docdb-credentials",
-			Name:   "test/docdb-credentials",
+			ID:   "test/docdb-credentials",
+			Name: "test/docdb-credentials",
 			Fields: map[string]string{
 				"secret_name":      "test/docdb-credentials",
 				"description":      "",
@@ -347,8 +347,8 @@ func fixtureSecrets() []resource.Resource {
 			},
 		},
 		{
-			ID:     "test/redis-credentials",
-			Name:   "test/redis-credentials",
+			ID:   "test/redis-credentials",
+			Name: "test/redis-credentials",
 			Fields: map[string]string{
 				"secret_name":      "test/redis-credentials",
 				"description":      "",
@@ -358,8 +358,8 @@ func fixtureSecrets() []resource.Resource {
 			},
 		},
 		{
-			ID:     "test/rds-credentials",
-			Name:   "test/rds-credentials",
+			ID:   "test/rds-credentials",
+			Name: "test/rds-credentials",
 			Fields: map[string]string{
 				"secret_name":      "test/rds-credentials",
 				"description":      "",
@@ -376,8 +376,8 @@ func fixtureSecrets() []resource.Resource {
 func fixtureSSMParameters() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "/app/db/password",
-			Name:   "/app/db/password",
+			ID:   "/app/db/password",
+			Name: "/app/db/password",
 			Fields: map[string]string{
 				"name":          "/app/db/password",
 				"type":          "SecureString",
@@ -387,8 +387,8 @@ func fixtureSSMParameters() []resource.Resource {
 			},
 		},
 		{
-			ID:     "/app/api-key",
-			Name:   "/app/api-key",
+			ID:   "/app/api-key",
+			Name: "/app/api-key",
 			Fields: map[string]string{
 				"name":          "/app/api-key",
 				"type":          "SecureString",

@@ -32,9 +32,9 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -156,7 +156,7 @@ func TestRelatedDim_TruncatedResult_BrightAndActionable(t *testing.T) {
 				Name:         "Trail Events",
 				State:        domain.RelatedResolved,
 				Count:        0,
-				Truncated:  true,
+				Truncated:    true,
 				TargetType:   "ct-events",
 				Actionable:   resource.IsRelatedActionable(domain.RelatedResolved, 0, true),
 				CountDisplay: resource.FormatRelatedCount(domain.RelatedResolved, 0, true),
@@ -165,7 +165,7 @@ func TestRelatedDim_TruncatedResult_BrightAndActionable(t *testing.T) {
 				Name:         "Backup Plans",
 				State:        domain.RelatedResolved,
 				Count:        0,
-				Truncated:  false,
+				Truncated:    false,
 				TargetType:   "backup",
 				Actionable:   resource.IsRelatedActionable(domain.RelatedResolved, 0, false),
 				CountDisplay: resource.FormatRelatedCount(domain.RelatedResolved, 0, false),
@@ -252,7 +252,7 @@ func relatedDimParitySweepCases() []relatedDimParityCase {
 			Name:        name,
 			State:       state,
 			Count:       count,
-			Truncated: truncated,
+			Truncated:   truncated,
 			FetchFilter: filter,
 			Loading:     loading,
 			Err:         hasErr,
@@ -389,7 +389,7 @@ func relatedRowApprox(targetType string, count int, truncated bool) app.DetailRe
 		TargetType:  targetType,
 		DisplayName: targetType,
 		Count:       count,
-		Truncated: truncated,
+		Truncated:   truncated,
 	}
 }
 

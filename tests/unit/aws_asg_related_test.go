@@ -14,10 +14,10 @@ import (
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // TestRelated_ASG_Registered verifies all 11 related defs are registered with correct checker presence.
@@ -1086,7 +1086,7 @@ func TestRelated_ASG_ELB_MatchByTargetGroupARNs(t *testing.T) {
 			return &elbv2.DescribeTargetGroupsOutput{
 				TargetGroups: []elbv2types.TargetGroup{
 					{
-						TargetGroupArn:  aws.String(tgARN),
+						TargetGroupArn:   aws.String(tgARN),
 						LoadBalancerArns: []string{lbARN},
 					},
 				},

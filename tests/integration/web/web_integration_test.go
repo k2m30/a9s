@@ -32,11 +32,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/config"
-	"github.com/k2m30/a9s/v3/internal/demo"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/web"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/config"
+	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/web"
 )
 
 // bgctx is a package-level background context used in place of context.Background()
@@ -1299,7 +1299,7 @@ func TestWebRelated_ToggleFocus_SetsRelatedFocused(t *testing.T) {
 		t.Fatal("Body.Detail is nil after toggle-focus")
 	}
 	if !vs.Body.Detail.RelatedFocused {
-		t.Errorf("Body.Detail.RelatedFocused=false after ActionToggleFocus — "+
+		t.Errorf("Body.Detail.RelatedFocused=false after ActionToggleFocus — " +
 			"toggle-focus must move focus to the related panel")
 	}
 }
@@ -1376,7 +1376,7 @@ func TestWebRelated_SelectFocusedRow_NavigatesStack(t *testing.T) {
 	if vs.Body.Kind == app.BodyKindDetail && vs.Body.Detail != nil && vs.Body.Detail.RelatedFocused {
 		// Still on the same detail screen with focus still on related panel
 		// means navigation was a no-op — that is the broken state.
-		t.Errorf("ActionSelect on related panel did not navigate: still on detail with RelatedFocused=true — "+
+		t.Errorf("ActionSelect on related panel did not navigate: still on detail with RelatedFocused=true — " +
 			"HandleRelatedNavigate must produce a non-Unknown NavigationKind for dbi's related rows")
 	}
 	// The resulting Kind should be list or detail (never menu/text/help).

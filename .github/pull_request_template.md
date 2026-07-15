@@ -25,7 +25,7 @@
 - [ ] **Stage 4 Implementation**: only files in scope were touched; binary rebuilt with `make build`.
 - [ ] **Stage 5 Review**: diff reviewed (`a9s-consistency-checker` for cross-file drift; BT v2 / security / coverage review; CodeRabbit / Codex).
 - [ ] **Stage 6 Pre-push**: `make ready-to-push` green locally (or docs-only — `make mdlint` green).
-- [ ] **Live integration** (only if `internal/aws/` real-account behavior changed): `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -run TestFullRelatedViewValidation -count=1 -v -timeout 600s` green.
+- [ ] **Live integration** (only if `core/aws/` real-account behavior changed): `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -run TestFullRelatedViewValidation -count=1 -v -timeout 600s` green.
 
 ### Definition of Done
 

@@ -9,8 +9,8 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // countIssueRowsForType counts resources where td.Color(r).IsIssue() returns true,

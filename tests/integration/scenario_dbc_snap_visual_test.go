@@ -13,8 +13,8 @@ package integration
 import (
 	"testing"
 
-	demofixtures "github.com/k2m30/a9s/v3/internal/demo/fixtures"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	demofixtures "github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // TestScenario_DBCSnapVisual_CrossRefSignals pins the orphan and past-retention
@@ -130,9 +130,9 @@ func TestScenario_DBCSnapVisual_AuroraBackupPivot(t *testing.T) {
 // TestScenario_DBCSnapVisual_FailedPlusManualOldStacks pins the multi-signal
 // visual rendering for WarnDBCSnapFailedAndManualOldID:
 //
-//   Status="failed" + SnapshotType="manual" + age=400d + parent="deleted-legacy-cluster"
-//   → two Wave-1 signals: failed (Broken) + orphan (Warning); manual-age is suppressed
-//   → rendered status column: "failed (+1)"
+//	Status="failed" + SnapshotType="manual" + age=400d + parent="deleted-legacy-cluster"
+//	→ two Wave-1 signals: failed (Broken) + orphan (Warning); manual-age is suppressed
+//	→ rendered status column: "failed (+1)"
 //
 // Broken (failed) wins precedence; the manual-age Warning is suppressed;
 // the orphan cross-ref still stacks → 'failed (+1)'.
@@ -175,12 +175,11 @@ func TestScenario_DBCSnapVisual_FailedPlusManualOldStacks(t *testing.T) {
 
 	// "Failed" (Broken) and the orphan cross-ref appear; "manual, unused" does not.
 	expectAttentionSection(t, detailView, []string{
-		"Failed",                        // Broken phrase (capitalized by injectAttentionSection)
+		"Failed",                         // Broken phrase (capitalized by injectAttentionSection)
 		"Orphan: source cluster deleted", // cross-ref finding Summary (capitalized by injectAttentionSection)
-		"deleted-legacy-cluster",        // orphan parent identifier in the Source Cluster row
+		"deleted-legacy-cluster",         // orphan parent identifier in the Source Cluster row
 	})
 
 	scenario.Back()
 	t.Log("\n" + scenario.currentView())
 }
-

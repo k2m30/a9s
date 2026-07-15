@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // TestCostsScenario_GridPivotDrillAndBackToMenu is the Cost Explorer's first

@@ -6,9 +6,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -212,8 +212,8 @@ func TestQA_EC2_A4_StatusColoring_StoppedRowHasANSI(t *testing.T) {
 	})
 
 	stoppedInstance := resource.Resource{
-		ID:     "i-stopped123",
-		Name:   "stopped-instance",
+		ID:   "i-stopped123",
+		Name: "stopped-instance",
 		Fields: map[string]string{
 			"name":  "stopped-instance",
 			"state": "stopped",
@@ -1012,8 +1012,8 @@ func TestQA_EC2_C3_SyntaxColoring_HasANSI(t *testing.T) {
 func TestQA_EC2_C3_SyntaxColoring_KeysVsValues(t *testing.T) {
 	// Verify coloring through a YAML model with known data.
 	r := resource.Resource{
-		ID:     "i-colortest",
-		Name:   "colortest",
+		ID:   "i-colortest",
+		Name: "colortest",
 		Fields: map[string]string{
 			"instance_id": "i-colortest",
 			"state":       "running",
@@ -1086,8 +1086,8 @@ func TestQA_EC2_YAML_AllFixtureInstances(t *testing.T) {
 
 func TestQA_EC2_YAML_FieldsMapRendersCorrectly(t *testing.T) {
 	r := resource.Resource{
-		ID:     "i-test123",
-		Name:   "test-instance",
+		ID:   "i-test123",
+		Name: "test-instance",
 		Fields: map[string]string{
 			"instance_id": "i-test123",
 			"state":       "running",

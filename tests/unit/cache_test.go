@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/k2m30/a9s/v3/internal/cache"
+	"github.com/k2m30/a9s/v3/core/cache"
 )
 
 // ---------------------------------------------------------------------------

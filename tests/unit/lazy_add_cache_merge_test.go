@@ -57,9 +57,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // efsCheckerByTarget returns the registered related checker for "efs" that
@@ -165,15 +165,15 @@ func TestLazyAdd_MergesIntoExistingCacheEntry_DedupByID(t *testing.T) {
 	// Tasks carry efs_file_system_ids that reference our EFS source ID, so
 	// the checker will count them.
 	taskA := resource.Resource{
-		ID:     "task-existing-001",
-		Name:   "task-existing-001",
+		ID:   "task-existing-001",
+		Name: "task-existing-001",
 		Fields: map[string]string{
 			"efs_file_system_ids": efsSource.ID, // matches source
 		},
 	}
 	taskB := resource.Resource{
-		ID:     "task-existing-002",
-		Name:   "task-existing-002",
+		ID:   "task-existing-002",
+		Name: "task-existing-002",
 		Fields: map[string]string{
 			"efs_file_system_ids": efsSource.ID, // also matches source
 		},
@@ -193,15 +193,15 @@ func TestLazyAdd_MergesIntoExistingCacheEntry_DedupByID(t *testing.T) {
 
 	// Step 2: Dispatch LazyAddedResources with one new task and one duplicate.
 	taskNew := resource.Resource{
-		ID:     "task-lazy-003",
-		Name:   "task-lazy-003",
+		ID:   "task-lazy-003",
+		Name: "task-lazy-003",
 		Fields: map[string]string{
 			"efs_file_system_ids": efsSource.ID, // matches source
 		},
 	}
 	taskDup := resource.Resource{
-		ID:     "task-existing-001", // duplicate of taskA
-		Name:   "task-existing-001",
+		ID:   "task-existing-001", // duplicate of taskA
+		Name: "task-existing-001",
 		Fields: map[string]string{
 			"efs_file_system_ids": efsSource.ID,
 		},
@@ -281,8 +281,8 @@ func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 
 	// Dispatch LazyAddedResources with a single task.
 	lazyTask := resource.Resource{
-		ID:     "task-lazy-only-001",
-		Name:   "task-lazy-only-001",
+		ID:   "task-lazy-only-001",
+		Name: "task-lazy-only-001",
 		Fields: map[string]string{
 			"efs_file_system_ids": efsSource.ID,
 		},

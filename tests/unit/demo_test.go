@@ -3,7 +3,7 @@ package unit
 import (
 	"testing"
 
-	demo "github.com/k2m30/a9s/v3/internal/demo"
+	demo "github.com/k2m30/a9s/v3/core/demo"
 )
 
 func TestDemoConstants(t *testing.T) {

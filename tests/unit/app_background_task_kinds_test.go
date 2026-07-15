@@ -23,8 +23,8 @@ package unit_test
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/runtime"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
 func TestIsBackgroundTaskKind_TableAllKnownKinds(t *testing.T) {

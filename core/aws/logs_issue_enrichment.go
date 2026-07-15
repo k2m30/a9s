@@ -1,0 +1,153 @@
+// logs_issue_enrichment.go — Wave 2 issue enrichment for the logs resource type.
+package aws
+
+import (
+	"context"
+	"fmt"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	cwlogssvc "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
+)
+
+// logs canonical FindingCodes.
+const (
+	logsCodeMissingMetricFilters domain.FindingCode = "logs.missing-metric-filters"
+)
+
+// EnrichLogsMetricFilters calls DescribeMetricFilters per CloudTrail log group
+// (capped at EnrichmentCap) to detect audit log groups without metric filters.
+// It also writes last_event_at for all log groups via DescribeLogStreams.
+//
+// Findings:
+//   - CloudTrail log group (prefix "/aws/cloudtrail/") with no metric filters → "~"
+//     finding "audit log group missing metric filters"
+//
+// IssueCount stays 0 (severity "~" only).
+// Skip when clients.CloudWatchLogs == nil or does not implement CWLogsDescribeMetricFiltersAPI.
+func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
+	result := IssueEnricherResult{
+		Findings:     make(map[string][]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
+	if clients.CloudWatchLogs == nil {
+		return result, nil
+	}
+	metricFiltersAPI, ok := clients.CloudWatchLogs.(CWLogsDescribeMetricFiltersAPI)
+	if !ok {
+		return result, nil
+	}
+	// CWLogsAPI already embeds CWLogsDescribeLogStreamsAPI, so the type assertion
+	// always succeeds for valid clients. However, test fakes that embed the interface
+	// as a nil zero value will panic at call time — safeDescribeLogStreams recovers.
+	logStreamsAPI, hasStreams := clients.CloudWatchLogs.(CWLogsDescribeLogStreamsAPI)
+
+	var failures []string
+	total := 0
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
+		logGroupName := r.Fields["log_group_name"]
+		if logGroupName == "" {
+			logGroupName = r.ID
+		}
+		if logGroupName == "" {
+			return
+		}
+		mu.Lock()
+		total++
+		mu.Unlock()
+
+		// Compute last_event_at by fetching the most-recently-written stream.
+		// safeDescribeLogStreams is best-effort — errors (including panic-recoveries from
+		// test fakes) are silently skipped so the metric filter check below still runs.
+		if hasStreams {
+			streamsOut, streamsErr := safeDescribeLogStreams(ctx, logStreamsAPI, logGroupName)
+			if streamsErr == nil && len(streamsOut.LogStreams) > 0 {
+				s := streamsOut.LogStreams[0]
+				if s.LastEventTimestamp != nil {
+					t := time.UnixMilli(*s.LastEventTimestamp)
+					dur := time.Since(t)
+					var rel string
+					switch {
+					case dur < time.Hour:
+						rel = fmt.Sprintf("%dm ago", int(dur.Minutes()))
+					case dur < 24*time.Hour:
+						rel = fmt.Sprintf("%dh ago", int(dur.Hours()))
+					case dur < 7*24*time.Hour:
+						rel = fmt.Sprintf("%dd ago", int(dur.Hours()/24))
+					default:
+						rel = t.Format("2006-01-02")
+					}
+					mu.Lock()
+					if result.FieldUpdates[r.ID] == nil {
+						result.FieldUpdates[r.ID] = make(map[string]string)
+					}
+					result.FieldUpdates[r.ID]["last_event_at"] = rel
+					mu.Unlock()
+				}
+			}
+		}
+
+		// Only inspect audit (CloudTrail) log groups for metric filter findings.
+		if !strings.HasPrefix(logGroupName, "/aws/cloudtrail/") {
+			return
+		}
+
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cwlogssvc.DescribeMetricFiltersOutput, error) {
+			return metricFiltersAPI.DescribeMetricFilters(ctx, &cwlogssvc.DescribeMetricFiltersInput{
+				LogGroupName: aws.String(logGroupName),
+			})
+		})
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			result.TruncatedIDs[r.ID] = true
+			return
+		}
+
+		if len(out.MetricFilters) > 0 {
+			return
+		}
+
+		setWave2Finding(&result, r.ID, logsCodeMissingMetricFilters, "audit log group missing metric filters", "~", "logs", []domain.DetailRow{
+			{Label: "Log Group", Value: logGroupName, Tier: "~"},
+			{Label: "Metric Filters", Value: "none", Tier: "~"},
+		}, "")
+	})
+	sort.Strings(failures)
+	// Metric filter findings are severity "~" (informational); IssueCount stays 0.
+	result.IssueCount = 0
+	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
+	result.Truncated = false
+	return result,
+		AggregateFailures("logs-enrich: DescribeMetricFilters", failures, total)
+}
+
+// safeDescribeLogStreams calls DescribeLogStreams on api and recovers from any panic
+// that would arise if the api value is a nil-embedded interface (e.g. in test fakes
+// that embed CWLogsAPI without overriding DescribeLogStreams). On panic it returns
+// an empty output and a sentinel error so the caller can skip the log-stream step.
+func safeDescribeLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGroupName string) (out *cwlogssvc.DescribeLogStreamsOutput, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			out = &cwlogssvc.DescribeLogStreamsOutput{}
+			err = fmt.Errorf("DescribeLogStreams panicked: %v", r)
+		}
+	}()
+	return api.DescribeLogStreams(ctx, &cwlogssvc.DescribeLogStreamsInput{
+		LogGroupName: aws.String(logGroupName),
+		OrderBy:      "LastEventTime",
+		Descending:   aws.Bool(true),
+		Limit:        aws.Int32(1),
+	})
+}

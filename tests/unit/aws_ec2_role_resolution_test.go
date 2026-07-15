@@ -7,6 +7,7 @@
 //   - otherwise one iam:GetInstanceProfile call resolving Roles[].RoleName.
 //   - API error -> State: RelatedError, Err set, no panic.
 //   - zero roles on the profile -> Count:0.
+//
 // ---------------------------------------------------------------------------
 package unit_test
 
@@ -21,9 +22,9 @@ import (
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ec2RoleCheckerByTarget returns the ec2->role RelatedChecker via the

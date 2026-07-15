@@ -40,11 +40,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/costs"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/costs"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // round7FullWindowRecords tiles every period in window with one
@@ -234,7 +234,7 @@ func TestCostsRound7_Item3_DataThrough_ClosedPeriod_StillUsesExclusiveEndMinusOn
 // ===========================================================================
 
 func TestCostsRound7_Item4A_WebAppJS_KeyMapMissingCostsActions(t *testing.T) {
-	raw, err := os.ReadFile("../../internal/web/static/app.js")
+	raw, err := os.ReadFile("../../core/web/static/app.js")
 	if err != nil {
 		t.Fatalf("reading app.js: %v", err)
 	}

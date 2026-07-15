@@ -12,7 +12,7 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/semantics/selector"
+	"github.com/k2m30/a9s/v3/core/semantics/selector"
 )
 
 func TestMatchARN(t *testing.T) {

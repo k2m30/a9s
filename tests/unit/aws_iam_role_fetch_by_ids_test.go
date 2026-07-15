@@ -22,9 +22,9 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/resource"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws" // registers the security-catalog resource types, incl. "role" and "policy"
+	_ "github.com/k2m30/a9s/v3/core/aws" // registers the security-catalog resource types, incl. "role" and "policy"
 )
 
 // TestGetFetchByIDs_Role_IsRegistered pins the fix target directly: the

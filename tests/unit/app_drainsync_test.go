@@ -33,8 +33,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/runtime"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
 // TestDrainSync_RealExecutableTask_TerminatesWithoutHanging verifies that

@@ -7,9 +7,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ===========================================================================
@@ -19,8 +19,8 @@ import (
 func fixtureLogStreams() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "2024/03/22/[$LATEST]abcdef1234567890",
-			Name:   "2024/03/22/[$LATEST]abcdef1234567890",
+			ID:   "2024/03/22/[$LATEST]abcdef1234567890",
+			Name: "2024/03/22/[$LATEST]abcdef1234567890",
 			Fields: map[string]string{
 				"stream_name": "2024/03/22/[$LATEST]abcdef1234567890",
 				"last_event":  "2024-03-23 00:00",
@@ -37,8 +37,8 @@ func fixtureLogStreams() []resource.Resource {
 func fixtureLogEvents() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "evt-1711065600000-0",
-			Name:   "ERROR NullPointerException in com.example.App.main",
+			ID:   "evt-1711065600000-0",
+			Name: "ERROR NullPointerException in com.example.App.main",
 			Fields: map[string]string{
 				"timestamp":      "2024-03-22 00:00",
 				"message":        "ERROR NullPointerException in com.example.App.main",
@@ -121,8 +121,8 @@ func TestQA_YAML_LogEvents_RawContentUncolored(t *testing.T) {
 func fixtureTargetHealth() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "i-0abc1234def56789a",
-			Name:   "i-0abc1234def56789a",
+			ID:   "i-0abc1234def56789a",
+			Name: "i-0abc1234def56789a",
 			Fields: map[string]string{
 				"target_id":   "i-0abc1234def56789a",
 				"port":        "8080",
@@ -175,8 +175,8 @@ func TestQA_YAML_TargetHealth_RawContentUncolored(t *testing.T) {
 func fixtureLambdaInvocations() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "12345678-1234-1234-1234-123456789012",
-			Name:   "12345678-1234-1234-1234-123456789012",
+			ID:   "12345678-1234-1234-1234-123456789012",
+			Name: "12345678-1234-1234-1234-123456789012",
 			Fields: map[string]string{
 				"request_id":  "12345678-1234-1234-1234-123456789012",
 				"timestamp":   "2024-03-22 00:00",
@@ -229,8 +229,8 @@ func TestLambdaInvocationsYAMLNoANSI(t *testing.T) {
 func fixtureLambdaInvocationLogs() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "log-001",
-			Name:   "INFO Processing request for user abc-123",
+			ID:   "log-001",
+			Name: "INFO Processing request for user abc-123",
 			Fields: map[string]string{
 				"timestamp": "2024-03-22 00:00",
 				"message":   "INFO Processing request for user abc-123",
@@ -279,8 +279,8 @@ func TestLambdaInvocationLogsYAMLNoANSI(t *testing.T) {
 func fixtureEcsSvcEvents() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "evt-yaml-001",
-			Name:   "(service web-service) has reached a steady state.",
+			ID:   "evt-yaml-001",
+			Name: "(service web-service) has reached a steady state.",
 			Fields: map[string]string{
 				"timestamp": "2024-03-22 10:00",
 				"message":   "(service web-service) has reached a steady state.",
@@ -329,8 +329,8 @@ func TestQA_YAML_EcsSvcEvents_RawContentUncolored(t *testing.T) {
 func fixtureEcsSvcTasks() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "abc123def456",
-			Name:   "abc123def456",
+			ID:   "abc123def456",
+			Name: "abc123def456",
 			Fields: map[string]string{
 				"task_id_short":  "abc123def456",
 				"status":         "RUNNING",
@@ -383,8 +383,8 @@ func TestQA_YAML_EcsSvcTasks_RawContentUncolored(t *testing.T) {
 func fixtureEcsSvcLogs() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "evt-svc-log-001",
-			Name:   "INFO Starting application server on port 8080",
+			ID:   "evt-svc-log-001",
+			Name: "INFO Starting application server on port 8080",
 			Fields: map[string]string{
 				"timestamp":    "2024-03-21 16:00",
 				"stream_short": "web/abc123de",
@@ -434,8 +434,8 @@ func TestQA_YAML_EcsSvcLogs_RawContentUncolored(t *testing.T) {
 func fixtureCfnEvents() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "evt-yaml-cfn-001",
-			Name:   "2024-03-22 10:00",
+			ID:   "evt-yaml-cfn-001",
+			Name: "2024-03-22 10:00",
 			Fields: map[string]string{
 				"timestamp":              "2024-03-22 10:00",
 				"logical_resource_id":    "MyBucket",
@@ -487,8 +487,8 @@ func TestQA_YAML_CfnEvents_RawContentUncolored(t *testing.T) {
 func fixtureCfnResources() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "MyBucket",
-			Name:   "MyBucket",
+			ID:   "MyBucket",
+			Name: "MyBucket",
 			Fields: map[string]string{
 				"logical_resource_id":  "MyBucket",
 				"physical_resource_id": "my-stack-mybucket-abc123",
@@ -541,8 +541,8 @@ func TestQA_YAML_CfnResources_RawContentUncolored(t *testing.T) {
 func fixtureAsgActivities() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "act-yaml-001",
-			Name:   "2024-03-22 10:00",
+			ID:   "act-yaml-001",
+			Name: "2024-03-22 10:00",
 			Fields: map[string]string{
 				"start_time":  "2024-03-22 10:00",
 				"status_code": "Successful",
@@ -551,8 +551,8 @@ func fixtureAsgActivities() []resource.Resource {
 			},
 		},
 		{
-			ID:     "act-yaml-002",
-			Name:   "2024-03-22 10:05",
+			ID:   "act-yaml-002",
+			Name: "2024-03-22 10:05",
 			Fields: map[string]string{
 				"start_time":  "2024-03-22 10:05",
 				"status_code": "Failed",
@@ -603,8 +603,8 @@ func TestQA_YAML_AsgActivities_RawContentUncolored(t *testing.T) {
 func fixtureAlarmHistory() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "2024-03-22 10:00",
-			Name:   "2024-03-22 10:00",
+			ID:   "2024-03-22 10:00",
+			Name: "2024-03-22 10:00",
 			Fields: map[string]string{
 				"timestamp":         "2024-03-22 10:00",
 				"history_item_type": "StateUpdate",
@@ -612,8 +612,8 @@ func fixtureAlarmHistory() []resource.Resource {
 			},
 		},
 		{
-			ID:     "2024-03-22 10:05",
-			Name:   "2024-03-22 10:05",
+			ID:   "2024-03-22 10:05",
+			Name: "2024-03-22 10:05",
 			Fields: map[string]string{
 				"timestamp":         "2024-03-22 10:05",
 				"history_item_type": "ConfigurationUpdate",
@@ -663,8 +663,8 @@ func TestQA_YAML_AlarmHistory_RawContentUncolored(t *testing.T) {
 func fixtureELBListeners() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456",
-			Name:   "443",
+			ID:   "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456",
+			Name: "443",
 			Fields: map[string]string{
 				"port":                  "443",
 				"protocol":              "HTTPS",
@@ -675,8 +675,8 @@ func fixtureELBListeners() []resource.Resource {
 			},
 		},
 		{
-			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/ghi789",
-			Name:   "80",
+			ID:   "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/ghi789",
+			Name: "80",
 			Fields: map[string]string{
 				"port":                  "80",
 				"protocol":              "HTTP",
@@ -729,8 +729,8 @@ func TestQA_YAML_ELBListeners_NoANSI(t *testing.T) {
 func fixtureCBBuilds() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "my-project:build-id-001",
-			Name:   "#142",
+			ID:   "my-project:build-id-001",
+			Name: "#142",
 			Fields: map[string]string{
 				"build_number":            "142",
 				"build_status":            "SUCCEEDED",
@@ -791,8 +791,8 @@ func TestQA_YAML_CBBuilds_NoANSI(t *testing.T) {
 func fixtureCBBuildLogs() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "evt-1718445600000-0",
-			Name:   "[Container] Running command echo hello",
+			ID:   "evt-1718445600000-0",
+			Name: "[Container] Running command echo hello",
 			Fields: map[string]string{
 				"timestamp":      "2024-06-15 10:00",
 				"message":        "[Container] Running command echo hello",
@@ -843,8 +843,8 @@ func TestQA_YAML_CBBuildLogs_NoANSI(t *testing.T) {
 func fixtureECRImages() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-			Name:   "latest, v1.0.0",
+			ID:   "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+			Name: "latest, v1.0.0",
 			Fields: map[string]string{
 				"image_tags":     "latest, v1.0.0",
 				"digest_short":   "abcdef123456",
@@ -898,8 +898,8 @@ func TestQA_YAML_ECRImages_NoANSI(t *testing.T) {
 func fixturePipelineStages() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "Source/GitHub",
-			Name:   "GitHub",
+			ID:   "Source/GitHub",
+			Name: "GitHub",
 			Fields: map[string]string{
 				"stage_name":           "Source",
 				"stage_status":         "Succeeded",
@@ -956,8 +956,8 @@ func TestQA_YAML_PipelineStages_NoANSI(t *testing.T) {
 func fixtureRolePolicies() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "arn:aws:iam::aws:policy/ReadOnlyAccess",
-			Name:   "ReadOnlyAccess",
+			ID:   "arn:aws:iam::aws:policy/ReadOnlyAccess",
+			Name: "ReadOnlyAccess",
 			Fields: map[string]string{
 				"policy_name": "ReadOnlyAccess",
 				"policy_arn":  "arn:aws:iam::aws:policy/ReadOnlyAccess",
@@ -965,8 +965,8 @@ func fixtureRolePolicies() []resource.Resource {
 			},
 		},
 		{
-			ID:     "my-inline-policy",
-			Name:   "my-inline-policy",
+			ID:   "my-inline-policy",
+			Name: "my-inline-policy",
 			Fields: map[string]string{
 				"policy_name": "my-inline-policy",
 				"policy_arn":  "",
@@ -1016,8 +1016,8 @@ func TestQA_YAML_RolePolicies_NoANSI(t *testing.T) {
 func fixtureIAMGroupMembers() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "alice",
-			Name:   "alice",
+			ID:   "alice",
+			Name: "alice",
 			Fields: map[string]string{
 				"user_name":          "alice",
 				"user_id":            "AIDAEXAMPLE1111111111",
@@ -1068,8 +1068,8 @@ func TestQA_YAML_IAMGroupMembers_NoANSI(t *testing.T) {
 func fixtureELBListenerRules() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "arn:rule/1",
-			Name:   "100",
+			ID:   "arn:rule/1",
+			Name: "100",
 			Fields: map[string]string{
 				"priority":           "100",
 				"conditions_summary": "path: /api/*",
@@ -1228,8 +1228,8 @@ func TestQA_YAML_SnsSubscriptions_RawContentUncolored(t *testing.T) {
 func fixtureEbRuleTargets() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "lambda-target-1",
-			Name:   "lambda-target-1",
+			ID:   "lambda-target-1",
+			Name: "lambda-target-1",
 			Fields: map[string]string{
 				"target_id":          "lambda-target-1",
 				"target_arn":         "arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-daily",
@@ -1239,8 +1239,8 @@ func fixtureEbRuleTargets() []resource.Resource {
 			},
 		},
 		{
-			ID:     "sqs-target-2",
-			Name:   "sqs-target-2",
+			ID:   "sqs-target-2",
+			Name: "sqs-target-2",
 			Fields: map[string]string{
 				"target_id":          "sqs-target-2",
 				"target_arn":         "arn:aws:sqs:us-east-1:123456789012:processing-queue",
@@ -1292,8 +1292,8 @@ func TestQA_YAML_EbRuleTargets_RawContentUncolored(t *testing.T) {
 func fixtureGlueRuns() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID:     "jr_abc12345-6789-0abc-def0-123456789012",
-			Name:   "2024-08-10 14:30",
+			ID:   "jr_abc12345-6789-0abc-def0-123456789012",
+			Name: "2024-08-10 14:30",
 			Fields: map[string]string{
 				"run_id_short":         "jr_abc12",
 				"job_run_state":        "SUCCEEDED",

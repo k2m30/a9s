@@ -21,11 +21,11 @@ package unit_test
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/session"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // newRelatedFocusEntryController builds a Controller with a ScreenDetail on
@@ -228,9 +228,9 @@ func TestRelatedFocusEntry_Tab_MatchesMoveTopLanding(t *testing.T) {
 // lands on the first actionable row, never on a bare one.
 func TestRelatedFocusEntry_Tab_PartialReplayMix_SkipsBareRows(t *testing.T) {
 	rows := []app.DetailRelatedRow{
-		relatedRow("target-group", 0), // index 0: bare (never replayed)
-		relatedRow("subnet", 0),       // index 1: bare (never replayed)
-		relatedRow("vpc", 1),          // index 2: actionable (replayed from cache)
+		relatedRow("target-group", 0),   // index 0: bare (never replayed)
+		relatedRow("subnet", 0),         // index 1: bare (never replayed)
+		relatedRow("vpc", 1),            // index 2: actionable (replayed from cache)
 		relatedRow("security-group", 0), // index 3: bare (never replayed)
 	}
 	c := newRelatedFocusEntryController(t, rows)

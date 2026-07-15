@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/k2m30/a9s/v3/internal/costs"
+	"github.com/k2m30/a9s/v3/core/costs"
 )
 
 // costs.Store is not given exact method signatures in data-model.md (only

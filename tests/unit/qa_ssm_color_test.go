@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 func TestSsmColor(t *testing.T) {

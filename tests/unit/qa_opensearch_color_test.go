@@ -10,7 +10,7 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 func TestOpenSearchColor(t *testing.T) {
@@ -52,12 +52,12 @@ func TestOpenSearchColor(t *testing.T) {
 			name:   "encryption_off_alone",
 			status: "encryption at rest off",
 			fields: map[string]string{
-				"status":                   "encryption at rest off",
+				"status":                     "encryption at rest off",
 				"encryption_at_rest_enabled": "false",
-				"deleted":                  "false",
-				"processing":               "false",
-				"upgrade_processing":       "false",
-				"domain_processing_status": "Active",
+				"deleted":                    "false",
+				"processing":                 "false",
+				"upgrade_processing":         "false",
+				"domain_processing_status":   "Active",
 			},
 			want: resource.ColorHealthy,
 		},

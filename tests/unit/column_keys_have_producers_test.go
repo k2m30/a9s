@@ -8,7 +8,7 @@ package unit
 // fetcher field-key registry and the enricher field-key registry).
 //
 // TestEnricherFieldKeys_RegisterCallsAreInInitBlock is a stringy smoke test that
-// globs internal/aws/*_issue_enrichment.go to verify the coder actually wired up
+// globs core/aws/*_issue_enrichment.go to verify the coder actually wired up
 // RegisterEnricherFieldKeys calls rather than declaring the helper and leaving it
 // empty.
 
@@ -19,9 +19,9 @@ import (
 	"strings"
 	"testing"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/config"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/config"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // columnKeyProducerAllowlist documents column keys that INTENTIONALLY have no
@@ -37,7 +37,7 @@ var columnKeyProducerAllowlist = map[string]map[string]string{
 }
 
 // TestColumnKeysHaveProducers verifies that every List-column Key defined in
-// the built-in default views (internal/config/defaults_*.go, merged via
+// the built-in default views (core/config/defaults_*.go, merged via
 // config.DefaultConfig()) is present in GetAllFieldKeys — the union of the
 // fetcher (SetFieldKeysForTest) and enricher (RegisterEnricherFieldKeys)
 // registries for that resource type.
@@ -116,7 +116,7 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 }
 
 // TestEnricherFieldKeys_RegisterCallsAreInInitBlock is a stringy smoke test that
-// globs internal/aws/catalog_*.go and counts IssueEnricherFieldKeys: literals
+// globs core/aws/catalog_*.go and counts IssueEnricherFieldKeys: literals
 // on per-resource catalog struct literals. Post-AS-795n the Wave 2 field-key
 // registrations live in the catalog (the bridge in install.go replays them
 // into the legacy resource.SetIssueEnricherFieldKeysForTest map). Requiring at
@@ -131,12 +131,12 @@ func TestEnricherFieldKeys_RegisterCallsAreInInitBlock(t *testing.T) {
 	// tests/unit/ -> two levels up -> repo root
 	repoRoot := filepath.Join(filepath.Dir(filename), "..", "..")
 
-	matches, err := filepath.Glob(filepath.Join(repoRoot, "internal", "aws", "catalog_*.go"))
+	matches, err := filepath.Glob(filepath.Join(repoRoot, "core", "aws", "catalog_*.go"))
 	if err != nil {
 		t.Fatalf("filepath.Glob failed: %v", err)
 	}
 	if len(matches) == 0 {
-		t.Fatal("filepath.Glob returned zero matches for internal/aws/catalog_*.go — check repo layout")
+		t.Fatal("filepath.Glob returned zero matches for core/aws/catalog_*.go — check repo layout")
 	}
 
 	const needle = "IssueEnricherFieldKeys:"
@@ -155,7 +155,7 @@ func TestEnricherFieldKeys_RegisterCallsAreInInitBlock(t *testing.T) {
 	const minExpected = 10
 	if total < minExpected {
 		t.Errorf(
-			"found only %d occurrence(s) of %q across internal/aws/catalog_*.go, expected at least %d — "+
+			"found only %d occurrence(s) of %q across core/aws/catalog_*.go, expected at least %d — "+
 				"each Wave 2 issue enricher that writes Resource.Fields keys must declare them on the "+
 				"owning catalog.ResourceTypeDef literal's IssueEnricherFieldKeys field",
 			total, needle, minExpected,

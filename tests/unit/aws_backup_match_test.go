@@ -13,7 +13,7 @@ package unit
 import (
 	"testing"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
 // ---------------------------------------------------------------------------

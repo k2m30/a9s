@@ -18,9 +18,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -215,8 +215,8 @@ func TestDetailViewCTEvents_NoRawJSON_RendersFlatFields(t *testing.T) {
 	ensureNoColor(t)
 
 	res := resource.Resource{
-		ID:     "evt-fallback-000",
-		Name:   "FallbackEvent",
+		ID:   "evt-fallback-000",
+		Name: "FallbackEvent",
 		Fields: map[string]string{
 			"event_name": "FallbackEvent",
 		},

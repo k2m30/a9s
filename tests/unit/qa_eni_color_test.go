@@ -3,7 +3,7 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 func TestEniColor(t *testing.T) {
@@ -13,11 +13,11 @@ func TestEniColor(t *testing.T) {
 	}
 
 	cases := []struct {
-		name              string
-		status            string
-		typ               string
-		requesterManaged  string
-		want              resource.Color
+		name             string
+		status           string
+		typ              string
+		requesterManaged string
+		want             resource.Color
 	}{
 		{name: "in_use", status: "in-use", typ: "interface", want: resource.ColorHealthy},
 		{name: "orphan_interface", status: "available", typ: "interface", want: resource.ColorWarning},

@@ -26,8 +26,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // TestS3_Related_R53_RealisticAliasResolves pins the spec contract:
@@ -48,7 +48,7 @@ func TestS3_Related_R53_RealisticAliasResolves(t *testing.T) {
 						// Realistic: record name is the FQDN/bucket; DNSName is the
 						// regional endpoint with NO bucket segment.
 						"s3website_alias_names": bucket,
-						"alias_targets":      "s3-website-us-east-1.amazonaws.com.",
+						"alias_targets":         "s3-website-us-east-1.amazonaws.com.",
 					},
 				},
 			},
@@ -80,7 +80,7 @@ func TestS3_Related_R53_BucketNameInDNSNameDoesNotMatch(t *testing.T) {
 						// the direct s3 URL (legitimate AWS config, but not
 						// an alias to a bucket we own).
 						"s3website_alias_names": "some-cname.other.example.com.",
-						"alias_targets":      "acme-website.s3.us-east-1.amazonaws.com.",
+						"alias_targets":         "acme-website.s3.us-east-1.amazonaws.com.",
 					},
 				},
 			},

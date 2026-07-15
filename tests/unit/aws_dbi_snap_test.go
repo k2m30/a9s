@@ -21,9 +21,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
-	"github.com/k2m30/a9s/v3/internal/domain"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/domain"
 )
 
 // ---------------------------------------------------------------------------
@@ -503,13 +503,13 @@ func TestDBISnap_Fetcher_AllFixtures_NoError(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestDBISnap_StaticAudit_AllSDKCallsThrottleWrapped scans dbi_snap*.go files
-// under internal/aws and asserts that every direct RDS/Backup API call appears
+// under core/aws and asserts that every direct RDS/Backup API call appears
 // inside a RetryOnThrottle closure. Per universal rule U13, callers must never
 // call AWS APIs directly from enricher or fetcher bodies outside throttle wraps.
 // // Scan strategy: any line that calls api.Describe*/api.Get*/api.List*/api.Lookup*
 // directly (not as the argument to RetryOnThrottle) is a violation.
 func TestDBISnap_StaticAudit_AllSDKCallsThrottleWrapped(t *testing.T) {
-	root := findRepoFile(t, "internal/aws")
+	root := findRepoFile(t, "core/aws")
 
 	var violations []string
 
@@ -561,7 +561,7 @@ func TestDBISnap_StaticAudit_AllSDKCallsThrottleWrapped(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("walking internal/aws: %v", err)
+		t.Fatalf("walking core/aws: %v", err)
 	}
 
 	if len(violations) > 0 {

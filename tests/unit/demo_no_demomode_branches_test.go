@@ -8,7 +8,7 @@ import (
 )
 
 // TestDemo_NoDemoModeBranches walks every non-test .go file under
-// internal/tui/, internal/aws/, and internal/resource/ and fails if any file
+// internal/tui/, core/aws/, and core/resource/ and fails if any file
 // contains the substring "demoMode" or "DemoMode".
 //
 // This is a TDD guardrail for feature 014-demo-transport-mock: once the coder
@@ -22,8 +22,8 @@ func TestDemo_NoDemoModeBranches(t *testing.T) {
 	root := filepath.Join("..", "..")
 	searchDirs := []string{
 		filepath.Join(root, "internal", "tui"),
-		filepath.Join(root, "internal", "aws"),
-		filepath.Join(root, "internal", "resource"),
+		filepath.Join(root, "core", "aws"),
+		filepath.Join(root, "core", "resource"),
 	}
 
 	forbiddenSubstrings := []string{"demoMode", "DemoMode"}

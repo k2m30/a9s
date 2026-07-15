@@ -177,7 +177,7 @@ func rsnsScanFile(fset *token.FileSet, path, rel string) ([]rsnsViolation, error
 // original production-only scan) and ALL of tests/ (unit, integration,
 // stories, testdata; tests/e2e has no .go files to match). See this file's
 // header for the Batch 2 scope rationale.
-var rsnsScanRoots = []string{"../../internal", "../../tests"}
+var rsnsScanRoots = []string{"../../core", "../../internal", "../../tests"}
 
 // TestRelatedStateNoSentinel_NoNegativeCountLiteralInRelatedTypes is the
 // task #58 gate: no .go file under internal/ or tests/ — production or test —

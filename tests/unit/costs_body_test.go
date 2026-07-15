@@ -30,10 +30,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/costs"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/app"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/costs"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // fmtCostAmount reproduces the exact display format wireframe.md uses for

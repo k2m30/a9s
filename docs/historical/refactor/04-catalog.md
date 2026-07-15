@@ -38,7 +38,7 @@ The actual production struct lives in `internal/catalog/types.go`. The shape bel
 // internal/catalog/types.go (summary — see source for the full set)
 package catalog
 
-import "github.com/k2m30/a9s/v3/internal/domain"
+import "github.com/k2m30/a9s/v3/core/domain"
 
 type ResourceTypeDef struct {
     // ── Identity ──────────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ After PR-04m, the fallback branch in every wrapper is unreachable; PR-04n delete
   ```
 
   Every match either keeps using `resource.<API>` (which is now a wrapper) — acceptable, since the wrapper handles routing — or switches to `catalog.<API>` if the wrappers live in `internal/catalog/`. Pick one location and stick with it; do not split wrappers across two packages.
-- **Import-cycle audit**: `internal/catalog` imports `internal/domain` for the type aliases. `internal/resource` imports `internal/catalog` for wrappers. `internal/catalog` MUST NOT import `internal/resource` — verify with `go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/internal/catalog | grep internal/resource` (expected: zero hits).
+- **Import-cycle audit**: `internal/catalog` imports `internal/domain` for the type aliases. `internal/resource` imports `internal/catalog` for wrappers. `internal/catalog` MUST NOT import `internal/resource` — verify with `go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/core/catalog | grep internal/resource` (expected: zero hits).
 - `Makefile` — `make generate` runs `go generate ./...` invoking `cmd/catalogen`; CI runs `make generate` then `git diff --exit-code`.
 - `internal/catalog/doc.go` — `//go:generate go run ../../cmd/catalogen` directive (catalog drives the generator, since catalog is the input).
 
@@ -438,6 +438,6 @@ Mechanical-resource-implementation acceptance test passes (overview's program-wi
 |---|---|
 | Generator output changes during a PR but contributor forgets `make generate` | CI gate: `make generate && git diff --exit-code`. Pre-commit hook in `.git/hooks/pre-commit` invokes the same gate locally. |
 | Catalog struct gets unwieldy as fields accumulate | First ask whether the proposed field belongs in the catalog at all; cross-cutting capability contracts live outside `ResourceTypeDef`. If the remaining resource metadata still exceeds ~30 fields, split into nested sub-structs (`Display`, `Behavior`, `Pivots`). The struct literal stays readable; field grouping mirrors the documentation sections. |
-| Static `var ResourceTypes` requires `internal/catalog` to import `internal/aws/<svc>` for function references — risk of import cycle if `internal/aws/` ever imports `internal/catalog/` | Constraint: `internal/aws/` MUST NOT import `internal/catalog/`. Type definitions referenced from both sides (`PaginatedFetcher`, `IssueEnricher`, `RelatedDef`, `NavigableField`) live in the leaf `internal/domain/` package. Verify with `go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/internal/aws | grep internal/catalog` (expected: zero hits). |
+| Static `var ResourceTypes` requires `internal/catalog` to import `internal/aws/<svc>` for function references — risk of import cycle if `internal/aws/` ever imports `internal/catalog/` | Constraint: `internal/aws/` MUST NOT import `internal/catalog/`. Type definitions referenced from both sides (`PaginatedFetcher`, `IssueEnricher`, `RelatedDef`, `NavigableField`) live in the leaf `internal/domain/` package. Verify with `go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/core/aws | grep internal/catalog` (expected: zero hits). |
 | 22 NoOp enricher files contain non-trivial init logic that's not just registration | Audit before deletion: `cat internal/aws/<svc>_issue_enrichment.go` for each NoOp file. If the file has anything beyond a `registerIssueEnricher(short, NoOpIssueEnricher, prio)` call, defer that file's deletion to a separate cleanup. |
 | `cmd/catalogen` runs slowly because it imports the whole `catalog` package | This is fine — the generator runs at build time, not runtime. Slow generators are acceptable; runtime `init()` storms are not. |

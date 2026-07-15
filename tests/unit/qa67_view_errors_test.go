@@ -18,8 +18,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // I.1 — FlashMsg with clipboard error shows error flash, application does not crash.
@@ -73,8 +73,8 @@ func TestQa67_I2_RevealDeletedSecret_ShowsError(t *testing.T) {
 	})
 	secrets := []resource.Resource{
 		{
-			ID:     "arn:aws:secretsmanager:us-east-1:123:secret:deleted-secret",
-			Name:   "deleted-secret",
+			ID:   "arn:aws:secretsmanager:us-east-1:123:secret:deleted-secret",
+			Name: "deleted-secret",
 			Fields: map[string]string{
 				"name":               "deleted-secret",
 				"arn":                "arn:aws:secretsmanager:us-east-1:123:secret:deleted-secret",
@@ -116,8 +116,8 @@ func TestQa67_I3_RevealSecretNoCurrentVersion_ShowsError(t *testing.T) {
 	})
 	secrets := []resource.Resource{
 		{
-			ID:     "arn:aws:secretsmanager:us-east-1:123:secret:no-value-secret",
-			Name:   "no-value-secret",
+			ID:   "arn:aws:secretsmanager:us-east-1:123:secret:no-value-secret",
+			Name: "no-value-secret",
 			Fields: map[string]string{
 				"name":               "no-value-secret",
 				"arn":                "arn:aws:secretsmanager:us-east-1:123:secret:no-value-secret",
@@ -231,16 +231,16 @@ func TestQa67_I8_SortByStatus_ResourceTypeWithNoStatusColumn_NoCrash(t *testing.
 	})
 	resources := []resource.Resource{
 		{
-			ID:     "arn:aws:sns:us-east-1:123:topic-alpha",
-			Name:   "topic-alpha",
+			ID:   "arn:aws:sns:us-east-1:123:topic-alpha",
+			Name: "topic-alpha",
 			Fields: map[string]string{
 				"topic_name": "topic-alpha",
 				"topic_arn":  "arn:aws:sns:us-east-1:123:topic-alpha",
 			},
 		},
 		{
-			ID:     "arn:aws:sns:us-east-1:123:topic-beta",
-			Name:   "topic-beta",
+			ID:   "arn:aws:sns:us-east-1:123:topic-beta",
+			Name: "topic-beta",
 			Fields: map[string]string{
 				"topic_name": "topic-beta",
 				"topic_arn":  "arn:aws:sns:us-east-1:123:topic-beta",
@@ -311,8 +311,8 @@ func TestQa67_I4_RevealHeaderWarning_PersistsVisible(t *testing.T) {
 	})
 	secrets := []resource.Resource{
 		{
-			ID:     "arn:aws:secretsmanager:us-east-1:123:secret:prod/api/key",
-			Name:   "prod/api/key",
+			ID:   "arn:aws:secretsmanager:us-east-1:123:secret:prod/api/key",
+			Name: "prod/api/key",
 			Fields: map[string]string{
 				"name":               "prod/api/key",
 				"arn":                "arn:aws:secretsmanager:us-east-1:123:secret:prod/api/key",

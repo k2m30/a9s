@@ -18,8 +18,8 @@ package tui
 import (
 	"strings"
 
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // applyEnrichment strips every Wave-2 finding (and companion AttentionDetail)

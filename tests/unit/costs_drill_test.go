@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/k2m30/a9s/v3/internal/costs"
+	"github.com/k2m30/a9s/v3/core/costs"
 )
 
 func filterPinning(dim costs.Dimension, values ...string) costs.Filter {

@@ -94,11 +94,11 @@ cover: coverage
 # False-positive exclusions (line 56+):
 #   CreateDate/CreateTime/StartRecord/StartTime/StopTime/StopDate — timestamp field names, not API calls
 #   ExecuteCommandConfiguration — ECS cluster struct field read via NavigableField, not an API call
-#   CreateServiceClients — local helper in internal/aws/client.go that constructs SDK client structs, not an API call
+#   CreateServiceClients — local helper in core/aws/client.go that constructs SDK client structs, not an API call
 #   ExecuteTaskAt — local runtime executor helper, not an API call
 verify-readonly:
-	@echo "Checking for write API calls in internal/aws/ and internal/runtime/..."
-	@if grep -rn '\.\(Create\|Delete\|Update\|Put\|Modify\|Terminate\|Stop\|Reboot\|RunInstances\|Execute\|Send\|Publish\|Remove\)[A-Z][A-Za-z0-9]*(' internal/aws/*.go internal/runtime/*.go \
+	@echo "Checking for write API calls in core/aws/ and core/runtime/..."
+	@if grep -rn '\.\(Create\|Delete\|Update\|Put\|Modify\|Terminate\|Stop\|Reboot\|RunInstances\|Execute\|Send\|Publish\|Remove\)[A-Z][A-Za-z0-9]*(' core/aws/*.go core/runtime/*.go \
 		| grep -v '_test.go' \
 		| grep -v 'errors.go' \
 		| grep -v 'interfaces.go' \
@@ -118,16 +118,16 @@ verify-readonly:
 	fi
 
 # AS-820: lock in AS-795 invariant. init() bodies must not return to
-# internal/aws/ or internal/catalog/ after the AS-795b..p migration.
-# internal/resource/projection_init.go is excluded — AS-731 removes that
+# core/aws/ or core/catalog/ after the AS-795b..p migration.
+# core/resource/projection_init.go is excluded — AS-731 removes that
 # package wholesale.
 verify-zero-init:
-	@echo "Checking for init() bodies in internal/aws/ and internal/catalog/..."
-	@if grep -rln '^func init()' internal/aws/ internal/catalog/ 2>/dev/null; then \
-		echo "FAIL: init() bodies found in internal/aws/ or internal/catalog/ — AS-795 invariant is migrated catalog literals, not package init()"; \
+	@echo "Checking for init() bodies in core/aws/ and core/catalog/..."
+	@if grep -rln '^func init()' core/aws/ core/catalog/ 2>/dev/null; then \
+		echo "FAIL: init() bodies found in core/aws/ or core/catalog/ — AS-795 invariant is migrated catalog literals, not package init()"; \
 		exit 1; \
 	else \
-		echo "PASS: no init() bodies in internal/aws/ or internal/catalog/"; \
+		echo "PASS: no init() bodies in core/aws/ or core/catalog/"; \
 	fi
 
 demo:

@@ -14,7 +14,7 @@ import (
 
 	"github.com/aws/smithy-go"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
 func TestDegradedDetails_ClassifiesAuthVsNonAuth(t *testing.T) {

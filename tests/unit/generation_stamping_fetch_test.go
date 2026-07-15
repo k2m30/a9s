@@ -7,14 +7,16 @@
 //   - Gen domain.Gen on each of the five types
 //   - GenStamp() / GenAspect() / AcceptZeroGen() methods
 //   - messages.IsStale guards at the top of each case branch in app.go
+//
 // the tests compile AND pass.
 //
 // AC coverage:
-//   AC #1 — stale ResourcesLoaded is dropped (resources unchanged, cache not poisoned)
-//   AC #2 — stale IdentityLoaded is dropped (Session.Identity unchanged, header unchanged)
-//   AC #3 — stale ValueRevealed is dropped (reveal view not pushed, secret not rendered)
-//   AC #4 — happy path with matching gen applies all three message types
-//   AC #5 — stale APIError does not flash; stale IdentityError does not flash
+//
+//	AC #1 — stale ResourcesLoaded is dropped (resources unchanged, cache not poisoned)
+//	AC #2 — stale IdentityLoaded is dropped (Session.Identity unchanged, header unchanged)
+//	AC #3 — stale ValueRevealed is dropped (reveal view not pushed, secret not rendered)
+//	AC #4 — happy path with matching gen applies all three message types
+//	AC #5 — stale APIError does not flash; stale IdentityError does not flash
 //
 // Harness pattern follows qa_clients_ready_flash_gen_test.go: real Session,
 // Rotate() to bump counters, synthesised messages with stale stamps, assert
@@ -25,10 +27,10 @@ import (
 	"strings"
 	"testing"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // ── AC #1 — stale ResourcesLoaded is dropped ────────────────────────────────

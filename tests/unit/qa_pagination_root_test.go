@@ -38,8 +38,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
@@ -61,8 +61,8 @@ func ctEventsResources(n int) []resource.Resource {
 		id := fmt.Sprintf("evt-%04d", i)
 		actor := fmt.Sprintf("usr-%04d", i)
 		resources[i] = resource.Resource{
-			ID:     id,
-			Name:   fmt.Sprintf("CreateBucket-%d", i),
+			ID:   id,
+			Name: fmt.Sprintf("CreateBucket-%d", i),
 			Fields: map[string]string{
 				"event_name":    fmt.Sprintf("CreateBucket-%d", i),
 				"time":          "2026-03-28 14:30:15",
@@ -94,8 +94,8 @@ func ctEventsResources2(n, offset int) []resource.Resource {
 		id := fmt.Sprintf("evt-%04d", idx)
 		actor := fmt.Sprintf("usr-%04d", idx)
 		resources[i] = resource.Resource{
-			ID:     id,
-			Name:   fmt.Sprintf("DeleteObject-%d", idx),
+			ID:   id,
+			Name: fmt.Sprintf("DeleteObject-%d", idx),
 			Fields: map[string]string{
 				"event_name":    fmt.Sprintf("DeleteObject-%d", idx),
 				"time":          "2026-03-28 14:30:15",
@@ -123,8 +123,8 @@ func ec2TestResources(n int) []resource.Resource {
 	for i := range n {
 		id := fmt.Sprintf("i-%05d", i)
 		resources[i] = resource.Resource{
-			ID:     id,
-			Name:   fmt.Sprintf("web-server-%d", i),
+			ID:   id,
+			Name: fmt.Sprintf("web-server-%d", i),
 			Fields: map[string]string{
 				"instance_id":   id,
 				"instance_type": "t3.micro",

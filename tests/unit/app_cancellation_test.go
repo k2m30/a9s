@@ -22,9 +22,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 
-	awspkg "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awspkg "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 
 	tea "charm.land/bubbletea/v2"
@@ -107,14 +107,14 @@ func TestFetchersUseContextNotBackground(t *testing.T) {
 	// Files that MUST NOT contain context.Background() after the refactor.
 	// These are the sites identified in CONCERNS #2/#20.
 	files := []string{
-		"internal/runtime/fetchers.go",
+		"core/runtime/fetchers.go",
 		"internal/tui/fetch_adapter.go",
 		"internal/tui/runtime_adapter_related.go",
-		"internal/aws/iam_policies_related.go",
-		"internal/aws/iam_roles_related.go",
-		"internal/aws/iam_users_related.go",
-		"internal/aws/iam_groups_related.go",
-		"internal/aws/client.go",
+		"core/aws/iam_policies_related.go",
+		"core/aws/iam_roles_related.go",
+		"core/aws/iam_users_related.go",
+		"core/aws/iam_groups_related.go",
+		"core/aws/client.go",
 	}
 
 	// Locate the module root by walking up from the test binary's working directory.

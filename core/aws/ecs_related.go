@@ -1,0 +1,141 @@
+// ecs_related.go contains ECS cluster related-resource checker functions.
+package aws
+
+import (
+	"context"
+	"strings"
+
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+
+	"github.com/k2m30/a9s/v3/core/resource"
+)
+
+// checkECSServices checks the cache for ECS services belonging to this cluster.
+func checkECSServices(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	clusterName := res.ID
+	if clusterName == "" {
+		return resource.RelatedCheckResult{TargetType: "ecs-svc", Count: 0}
+	}
+
+	clusterArn := ""
+	raw, ok := assertStruct[ecstypes.Cluster](res.RawStruct)
+	if ok && raw.ClusterArn != nil {
+		clusterArn = *raw.ClusterArn
+	}
+
+	svcList, truncated, err := relatedResourcesFor(ctx, clients, cache, "ecs-svc")
+	if err != nil {
+		return resource.ErrorRelated("ecs-svc", err)
+	}
+	if svcList == nil {
+		return resource.UnknownRelated("ecs-svc")
+	}
+
+	var ids []string
+	for _, svcRes := range svcList {
+		rawSvc, svcOk := assertStruct[ecstypes.Service](svcRes.RawStruct)
+		if svcOk && rawSvc.ClusterArn != nil {
+			arnVal := *rawSvc.ClusterArn
+			if (clusterArn != "" && arnVal == clusterArn) || strings.HasSuffix(arnVal, "/"+clusterName) {
+				ids = append(ids, svcRes.ID)
+				continue
+			}
+		}
+		if svcRes.Fields["cluster"] == clusterName {
+			ids = append(ids, svcRes.ID)
+		}
+	}
+	return relatedResultTrunc("ecs-svc", ids, truncated)
+}
+
+// checkECSAlarms checks the cache for CloudWatch alarms with ClusterName dimension matching this cluster.
+func checkECSAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	clusterName := res.ID
+	if clusterName == "" {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+	}
+
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
+	if err != nil {
+		return resource.ErrorRelated("alarm", err)
+	}
+	if alarmList == nil {
+		return resource.UnknownRelated("alarm")
+	}
+
+	var ids []string
+	for _, alarmRes := range alarmList {
+		rawAlarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
+		if !ok {
+			continue
+		}
+		for _, d := range rawAlarm.Dimensions {
+			if d.Name != nil && *d.Name == "ClusterName" && d.Value != nil && *d.Value == clusterName {
+				ids = append(ids, alarmRes.ID)
+				break
+			}
+		}
+	}
+	return relatedResultTrunc("alarm", ids, truncated)
+}
+
+// checkECSCFN checks the ECS cluster's tags for aws:cloudformation:stack-name and finds the matching CFN stack.
+func checkECSCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	stackName := ""
+	raw, ok := assertStruct[ecstypes.Cluster](res.RawStruct)
+	if ok {
+		for _, tag := range raw.Tags {
+			if tag.Key != nil && *tag.Key == "aws:cloudformation:stack-name" && tag.Value != nil {
+				stackName = *tag.Value
+				break
+			}
+		}
+	}
+	if stackName == "" {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	}
+
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
+	if err != nil {
+		return resource.ErrorRelated("cfn", err)
+	}
+	if cfnList == nil {
+		return resource.UnknownRelated("cfn")
+	}
+
+	var ids []string
+	for _, cfnRes := range cfnList {
+		if cfnRes.ID == stackName || cfnRes.Name == stackName || cfnRes.Fields["stack_name"] == stackName {
+			ids = append(ids, cfnRes.ID)
+			continue
+		}
+		rawCFN, cfnOk := assertStruct[cfntypes.Stack](cfnRes.RawStruct)
+		if cfnOk && rawCFN.StackName != nil && *rawCFN.StackName == stackName {
+			ids = append(ids, cfnRes.ID)
+		}
+	}
+	return relatedResultTrunc("cfn", ids, truncated)
+}
+
+// checkECSKMS extracts the KMS key from the ECS Cluster's
+// Configuration.ExecuteCommandConfiguration.KmsKeyId field.
+// Returns the key ID (last segment after "/"). Pattern F — no cache needed.
+func checkECSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	cluster, ok := assertStruct[ecstypes.Cluster](res.RawStruct)
+	if !ok || cluster.Configuration == nil ||
+		cluster.Configuration.ExecuteCommandConfiguration == nil ||
+		cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId == nil ||
+		*cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId == "" {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+	}
+	keyID := kmsKeyIDFromField(*cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId, res.Type)
+	return relatedResult("kms", []string{keyID})
+}
+
+// ecsRelatedResources returns the resource list for target from cache or by
+// fetching the first page via the registered paginated fetcher.
+func ecsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+	return relatedResourcesFor(ctx, clients, cache, target)
+}

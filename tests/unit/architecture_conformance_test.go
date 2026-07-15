@@ -17,9 +17,9 @@ import (
 	"strings"
 	"testing"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/catalog"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -188,10 +188,10 @@ var forbiddenRowStoreShapeFieldPatterns = []*regexp.Regexp{
 // allowedRowStoreShapeFiles lists production files permitted to declare a
 // field of one of the forbiddenRowStoreShapeFieldPatterns shapes:
 //
-//   - internal/session/rowstore.go: RowStore itself — the sole per-type row
+//   - core/session/rowstore.go: RowStore itself — the sole per-type row
 //     store task #17 unifies onto; TypeRows/RowStore's own fields are the
 //     allowed destination, not a violation of the rule they enforce.
-//   - internal/runtime/state.go: RuntimeState.ResourceCache is a documented
+//   - core/runtime/state.go: RuntimeState.ResourceCache is a documented
 //     derived SNAPSHOT field ("mirrors RowStore's retained... entries for the
 //     active session", state.go's own doc comment) — RuntimeState has no
 //     production constructor call site at HEAD (verified: no
@@ -232,52 +232,57 @@ var allowedRowStoreShapeFiles = map[string]struct{}{
 // TestConformance_NoParallelPerTypeRowStore_OutsideRowStore scans every
 // non-test production file under internal/ for a struct field shaped like
 // the legacy per-type row maps task #17 (row-store unification) retired.
-// RowStore (internal/session/rowstore.go) is the sole per-type row store as
+// RowStore (core/session/rowstore.go) is the sole per-type row store as
 // of Stage 3+; a new field of either forbidden shape elsewhere would
 // reintroduce the dual-write-drift defect class (D13-D18) that motivated the
 // unification.
 func TestConformance_NoParallelPerTypeRowStore_OutsideRowStore(t *testing.T) {
-	root := "../../internal"
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		rel, rerr := filepath.Rel(root, path)
-		if rerr != nil {
-			return rerr
-		}
-		rel = filepath.ToSlash(rel)
-		if _, allowed := allowedRowStoreShapeFiles[rel]; allowed {
-			return nil
-		}
-		data, rerr := os.ReadFile(path)
-		if rerr != nil {
-			return rerr
-		}
-		for _, pat := range forbiddenRowStoreShapeFieldPatterns {
-			if loc := pat.FindIndex(data); loc != nil {
-				snippet := strings.TrimSpace(string(data[loc[0]:loc[1]]))
-				t.Errorf(
-					"%s: struct field %q matches a retired per-type row-store shape — "+
-						"internal/session.RowStore is the sole per-type row store (task #17); "+
-						"a new field of this shape reintroduces the dual-write-drift defect class "+
-						"(D13-D18) the unification eliminated",
-					rel, snippet,
-				)
+	for _, root := range confProductionScanRoots {
+		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
 			}
+			if info.IsDir() {
+				return nil
+			}
+			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			rel, rerr := filepath.Rel(root, path)
+			if rerr != nil {
+				return rerr
+			}
+			rel = filepath.ToSlash(rel)
+			if _, allowed := allowedRowStoreShapeFiles[rel]; allowed {
+				return nil
+			}
+			data, rerr := os.ReadFile(path)
+			if rerr != nil {
+				return rerr
+			}
+			for _, pat := range forbiddenRowStoreShapeFieldPatterns {
+				if loc := pat.FindIndex(data); loc != nil {
+					snippet := strings.TrimSpace(string(data[loc[0]:loc[1]]))
+					t.Errorf(
+						"%s: struct field %q matches a retired per-type row-store shape — "+
+							"core/session.RowStore is the sole per-type row store (task #17); "+
+							"a new field of this shape reintroduces the dual-write-drift defect class "+
+							"(D13-D18) the unification eliminated",
+						rel, snippet,
+					)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s failed: %v", root, err)
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walk internal/ failed: %v", err)
 	}
 }
+
+// confProductionScanRoots are the two production source roots after the
+// core/ extraction: the relicensable core and the GPL-only TUI adapter.
+var confProductionScanRoots = []string{"../../core", "../../internal"}
 
 var (
 	goLineCommentPattern  = regexp.MustCompile(`//[^\n]*`)
@@ -326,58 +331,59 @@ var rowStoreMutationSeamFiles = map[string]struct{}{
 // trusting an unreviewed mutation call site, forcing the same manual
 // verification this file's existing entries already received.
 func TestConformance_Wave2RowMutators_HaveNoUnvettedCallSites(t *testing.T) {
-	root := "../../internal"
 	callPattern := regexp.MustCompile(`\bApplyWave2ToRow\s*\(|\bapplyWave2ToRow\s*\(`)
 	defPattern := regexp.MustCompile(`func\s+ApplyWave2ToRow\s*\(|func\s+applyWave2ToRow\s*\(`)
 
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		rel, rerr := filepath.Rel(root, path)
-		if rerr != nil {
-			return rerr
-		}
-		rel = filepath.ToSlash(rel)
-
-		raw, rerr := os.ReadFile(path)
-		if rerr != nil {
-			return rerr
-		}
-		// Strip comments before matching: a doc comment mentioning
-		// ApplyWave2ToRow(...) is not a call site, and the scanner must not
-		// flag it (the regex's `\s*\(` otherwise matches "ApplyWave2ToRow
-		// (internal/runtime/helpers.go)" inside prose).
-		data := stripGoComments(raw)
-		if !callPattern.Match(data) {
-			return nil
-		}
-		if defPattern.Match(data) {
-			// The function's own definition file always contains its call
-			// pattern trivially (the func signature itself); that is not a
-			// call site.
-			if defOnly := callPattern.FindAllIndex(data, -1); len(defOnly) == 1 {
+	for _, root := range confProductionScanRoots {
+		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
 				return nil
 			}
+			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			rel, rerr := filepath.Rel(root, path)
+			if rerr != nil {
+				return rerr
+			}
+			rel = filepath.ToSlash(rel)
+
+			raw, rerr := os.ReadFile(path)
+			if rerr != nil {
+				return rerr
+			}
+			// Strip comments before matching: a doc comment mentioning
+			// ApplyWave2ToRow(...) is not a call site, and the scanner must not
+			// flag it (the regex's `\s*\(` otherwise matches "ApplyWave2ToRow
+			// (core/runtime/helpers.go)" inside prose).
+			data := stripGoComments(raw)
+			if !callPattern.Match(data) {
+				return nil
+			}
+			if defPattern.Match(data) {
+				// The function's own definition file always contains its call
+				// pattern trivially (the func signature itself); that is not a
+				// call site.
+				if defOnly := callPattern.FindAllIndex(data, -1); len(defOnly) == 1 {
+					return nil
+				}
+			}
+			if _, ok := rowStoreMutationSeamFiles[rel]; !ok {
+				t.Errorf(
+					"%s: calls ApplyWave2ToRow/applyWave2ToRow but is not in rowStoreMutationSeamFiles — "+
+						"a new call site must be manually verified to route any RowStore-backed mutation "+
+						"through Amend/AmendRows (never mutate a bare Snapshot/SnapshotAll result in place, "+
+						"per RowStore.Amend's DEF-7 doc comment) and then added to that allowlist",
+					rel,
+				)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s failed: %v", root, err)
 		}
-		if _, ok := rowStoreMutationSeamFiles[rel]; !ok {
-			t.Errorf(
-				"%s: calls ApplyWave2ToRow/applyWave2ToRow but is not in rowStoreMutationSeamFiles — "+
-					"a new call site must be manually verified to route any RowStore-backed mutation "+
-					"through Amend/AmendRows (never mutate a bare Snapshot/SnapshotAll result in place, "+
-					"per RowStore.Amend's DEF-7 doc comment) and then added to that allowlist",
-				rel,
-			)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walk internal/ failed: %v", err)
 	}
 }

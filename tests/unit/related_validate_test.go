@@ -31,9 +31,9 @@ import (
 	"context"
 	"testing"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws" // ensure all related registrations run
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws" // ensure all related registrations run
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,9 +66,9 @@ func TestValidateRelatedResult_Valid(t *testing.T) {
 		{
 			name: "count 0 truncated is valid",
 			r: resource.RelatedCheckResult{
-				TargetType:  "vpc",
-				Count:       0,
-				Truncated: true,
+				TargetType: "vpc",
+				Count:      0,
+				Truncated:  true,
 			},
 		},
 		{
@@ -76,7 +76,7 @@ func TestValidateRelatedResult_Valid(t *testing.T) {
 			r: resource.RelatedCheckResult{
 				TargetType:  "vpc",
 				Count:       5,
-				Truncated: true,
+				Truncated:   true,
 				ResourceIDs: []string{"vpc-1", "vpc-2", "vpc-3", "vpc-4", "vpc-5"},
 			},
 		},
@@ -123,9 +123,9 @@ func TestValidateRelatedResult_Invalid(t *testing.T) {
 		{
 			name: "truncated with unknown state",
 			r: resource.RelatedCheckResult{
-				TargetType:  "vpc",
-				State:       domain.RelatedUnknown,
-				Truncated: true,
+				TargetType: "vpc",
+				State:      domain.RelatedUnknown,
+				Truncated:  true,
 			},
 		},
 	}

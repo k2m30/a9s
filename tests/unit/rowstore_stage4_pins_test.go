@@ -23,14 +23,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/cache"
-	"github.com/k2m30/a9s/v3/internal/config"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/app"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/config"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // stage4PinType is the real catalog short name used across every pin in this
@@ -553,7 +553,7 @@ func TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane(t *testing.T) 
 func scanForResourceCacheFieldDeclaration(t *testing.T) (string, error) {
 	t.Helper()
 	const needle = "resourceCache map[string]"
-	root, err := filepath.Abs("../../internal/app")
+	root, err := filepath.Abs("../../core/app")
 	if err != nil {
 		return "", err
 	}
@@ -599,7 +599,7 @@ func scanForResourceCacheFieldDeclaration(t *testing.T) (string, error) {
 func scanForResourceCacheReaders(t *testing.T) (string, error) {
 	t.Helper()
 	const needle = "resourceCache"
-	root, err := filepath.Abs("../../internal/app")
+	root, err := filepath.Abs("../../core/app")
 	if err != nil {
 		return "", err
 	}

@@ -19,7 +19,7 @@ linters:
       - linters: [gosec]
         path: '_test\.go$'
       - linters: [gosec]
-        path: 'internal/demo/'
+        path: 'core/demo/'
       - linters: [errcheck]
         path: '_test\.go$'
       - linters: [unused]

@@ -1,0 +1,110 @@
+package aws
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/aws/aws-sdk-go-v2/service/codebuild"
+
+	"github.com/k2m30/a9s/v3/core/resource"
+)
+
+// FetchCodeBuildProjectsPage fetches one page of project names from ListProjects
+// using the continuationToken, then calls BatchGetProjects for that page's names.
+// IsTruncated reflects whether ListProjects has more pages beyond this one.
+func FetchCodeBuildProjectsPage(
+	ctx context.Context,
+	listAPI CodeBuildListProjectsAPI,
+	batchAPI CodeBuildBatchGetProjectsAPI,
+	continuationToken string,
+) (resource.FetchResult, error) {
+	input := &codebuild.ListProjectsInput{}
+	if continuationToken != "" {
+		input.NextToken = &continuationToken
+	}
+
+	listOutput, err := listAPI.ListProjects(ctx, input)
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("listing CodeBuild projects: %w", err)
+	}
+
+	if len(listOutput.Projects) == 0 {
+		nextToken := ""
+		isTruncated := false
+		if listOutput.NextToken != nil {
+			nextToken = *listOutput.NextToken
+			isTruncated = true
+		}
+		return resource.FetchResult{
+			Resources: []resource.Resource{},
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: isTruncated,
+				NextToken:   nextToken,
+				PageSize:    0,
+				TotalHint:   -1,
+			},
+		}, nil
+	}
+
+	batchOutput, err := batchAPI.BatchGetProjects(ctx, &codebuild.BatchGetProjectsInput{
+		Names: listOutput.Projects,
+	})
+	if err != nil {
+		return resource.FetchResult{}, fmt.Errorf("batch getting CodeBuild projects: %w", err)
+	}
+
+	var resources []resource.Resource
+
+	for _, project := range batchOutput.Projects {
+		name := ""
+		if project.Name != nil {
+			name = *project.Name
+		}
+
+		description := ""
+		if project.Description != nil {
+			description = *project.Description
+		}
+
+		sourceType := ""
+		if project.Source != nil {
+			sourceType = string(project.Source.Type)
+		}
+
+		lastModified := ""
+		if project.LastModified != nil {
+			lastModified = project.LastModified.Format("2006-01-02 15:04")
+		}
+
+		r := resource.Resource{
+			ID:   name,
+			Name: name,
+			Fields: map[string]string{
+				"name":          name,
+				"source_type":   sourceType,
+				"description":   description,
+				"last_modified": lastModified,
+			},
+			RawStruct: project,
+		}
+
+		resources = append(resources, r)
+	}
+
+	nextToken := ""
+	isTruncated := false
+	if listOutput.NextToken != nil {
+		nextToken = *listOutput.NextToken
+		isTruncated = true
+	}
+
+	return resource.FetchResult{
+		Resources: resources,
+		Pagination: &resource.PaginationMeta{
+			IsTruncated: isTruncated,
+			NextToken:   nextToken,
+			PageSize:    len(resources),
+			TotalHint:   -1,
+		},
+	}, nil
+}

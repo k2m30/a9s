@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/core/catalog"
 )
 
 // generateAndReadDoc runs generateResourceDoc against a temp repo root and

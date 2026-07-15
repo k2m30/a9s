@@ -20,8 +20,8 @@ package integration
 import (
 	"testing"
 
-	demofixtures "github.com/k2m30/a9s/v3/internal/demo/fixtures"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	demofixtures "github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // SES list column + §4 phrase + fixture-ID constants pinned locally from

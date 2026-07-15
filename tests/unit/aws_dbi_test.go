@@ -19,10 +19,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -155,13 +155,13 @@ func TestDBI_Fetch_TransitionalKeywords_AllBare(t *testing.T) {
 		kw := kw
 		t.Run(kw, func(t *testing.T) {
 			inst := rdstypes.DBInstance{
-				DBInstanceIdentifier: aws.String("inline-" + kw),
-				DBInstanceArn:        aws.String("arn:aws:rds:us-east-1:123456789012:db:inline-" + kw),
-				DBInstanceStatus:     aws.String(kw),
+				DBInstanceIdentifier:  aws.String("inline-" + kw),
+				DBInstanceArn:         aws.String("arn:aws:rds:us-east-1:123456789012:db:inline-" + kw),
+				DBInstanceStatus:      aws.String(kw),
 				BackupRetentionPeriod: aws.Int32(7),
-				PubliclyAccessible:   aws.Bool(false),
-				StorageEncrypted:     aws.Bool(true),
-				DeletionProtection:   aws.Bool(true),
+				PubliclyAccessible:    aws.Bool(false),
+				StorageEncrypted:      aws.Bool(true),
+				DeletionProtection:    aws.Bool(true),
 			}
 			status, fields, _ := fetchSingle(t, inst)
 			if status != "" {
@@ -198,13 +198,13 @@ func TestDBI_Fetch_BrokenStatuses(t *testing.T) {
 		tc := tc
 		t.Run(tc.status, func(t *testing.T) {
 			inst := rdstypes.DBInstance{
-				DBInstanceIdentifier: aws.String("inline-broken-" + tc.status),
-				DBInstanceArn:        aws.String("arn:aws:rds:us-east-1:123456789012:db:inline-" + tc.status),
-				DBInstanceStatus:     aws.String(tc.status),
+				DBInstanceIdentifier:  aws.String("inline-broken-" + tc.status),
+				DBInstanceArn:         aws.String("arn:aws:rds:us-east-1:123456789012:db:inline-" + tc.status),
+				DBInstanceStatus:      aws.String(tc.status),
 				BackupRetentionPeriod: aws.Int32(7),
-				PubliclyAccessible:   aws.Bool(false),
-				StorageEncrypted:     aws.Bool(true),
-				DeletionProtection:   aws.Bool(true),
+				PubliclyAccessible:    aws.Bool(false),
+				StorageEncrypted:      aws.Bool(true),
+				DeletionProtection:    aws.Bool(true),
 			}
 			status, fields, _ := fetchSingle(t, inst)
 			if status != "" {
@@ -237,13 +237,13 @@ func TestDBI_Fetch_InaccessibleEncryptionCredentials_Remap(t *testing.T) {
 // status takes precedence over any config warnings (spec §4 Broken precedence).
 func TestDBI_Fetch_BrokenPrecedenceOverConfigWarnings(t *testing.T) {
 	inst := rdstypes.DBInstance{
-		DBInstanceIdentifier: aws.String("inline-precedence-broken"),
-		DBInstanceArn:        aws.String("arn:aws:rds:us-east-1:123456789012:db:inline-precedence-broken"),
-		DBInstanceStatus:     aws.String("storage-full"),
-		BackupRetentionPeriod: aws.Int32(0),   // would trigger "no automated backups"
-		PubliclyAccessible:   aws.Bool(true),   // would trigger "publicly accessible"
-		StorageEncrypted:     aws.Bool(false),  // would trigger "unencrypted storage"
-		DeletionProtection:   aws.Bool(false),  // would trigger "deletion protection off"
+		DBInstanceIdentifier:  aws.String("inline-precedence-broken"),
+		DBInstanceArn:         aws.String("arn:aws:rds:us-east-1:123456789012:db:inline-precedence-broken"),
+		DBInstanceStatus:      aws.String("storage-full"),
+		BackupRetentionPeriod: aws.Int32(0),    // would trigger "no automated backups"
+		PubliclyAccessible:    aws.Bool(true),  // would trigger "publicly accessible"
+		StorageEncrypted:      aws.Bool(false), // would trigger "unencrypted storage"
+		DeletionProtection:    aws.Bool(false), // would trigger "deletion protection off"
 	}
 	status, fields, _ := fetchSingle(t, inst)
 

@@ -13,7 +13,7 @@ package unit
 // ValidationError; demo mode silently returned empty for forgiving fakes.
 //
 // This static test walks every Wave-2 enricher and related-checker file under
-// internal/aws/ and asserts no occurrence of the anti-pattern. If a future
+// core/aws/ and asserts no occurrence of the anti-pattern. If a future
 // enricher legitimately needs r.ID as an ARN (because its fetcher does emit
 // ID = ARN), assign through a clearly-named local first:
 //
@@ -45,7 +45,7 @@ func TestNoIDAsARN_StaticGuard(t *testing.T) {
 	patLocalFromID := regexp.MustCompile(`^\s*(\w+)\s*:=\s*(?:r|res|rsrc|resource)\.ID\s*$`)
 
 	roots := []string{
-		findRepoFile(t, "internal/aws"),
+		findRepoFile(t, "core/aws"),
 	}
 	t.Logf("scanning roots: %v", roots)
 
@@ -166,7 +166,7 @@ func itoa(n int) string {
 
 // findRepoFile resolves a path relative to the repository root by walking up
 // from cwd until a go.mod is found. Tests run from tests/unit so the relative
-// path "internal/aws" is two levels up.
+// path "core/aws" is two levels up.
 func findRepoFile(t *testing.T, rel string) string {
 	t.Helper()
 	cwd, err := os.Getwd()

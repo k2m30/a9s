@@ -12,7 +12,7 @@ import (
 
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
 // buildCTEventWithStatus is a convenience wrapper that builds a singleEventCTMock

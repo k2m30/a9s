@@ -29,7 +29,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
 // mockRDSClusterPageClient implements RDSDescribeDBClustersAPI for a fixed page.
@@ -183,9 +183,9 @@ func TestFetchRDSDBClustersPage_MixedEngines(t *testing.T) {
 	mock := &mockRDSClusterPageClient{
 		clusters: []rdstypes.DBCluster{
 			buildRDSCluster("aurora-pg-prod", "aurora-postgresql"),
-			buildRDSCluster("neptune-graph", "neptune"),   // must be filtered
+			buildRDSCluster("neptune-graph", "neptune"), // must be filtered
 			buildRDSCluster("aurora-mysql-staging", "aurora-mysql"),
-			buildRDSCluster("docdb-app", "docdb"),         // must be filtered
+			buildRDSCluster("docdb-app", "docdb"), // must be filtered
 		},
 	}
 

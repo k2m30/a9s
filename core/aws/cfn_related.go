@@ -1,0 +1,162 @@
+// cfn_related.go contains CloudFormation related-resource checker functions.
+package aws
+
+import (
+	"context"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
+	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+
+	"github.com/k2m30/a9s/v3/core/resource"
+)
+
+// checkCfnRole extracts the RoleARN from the CloudFormation Stack RawStruct.
+// It extracts the role name from the last path segment of the ARN (after the last "/")
+// and searches the role cache by name or ID.
+// Pattern F — forward field lookup.
+func checkCfnRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	if stack.RoleARN == nil || *stack.RoleARN == "" {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+	// In-body: the stack's service RoleARN normalizes to the role name (== the
+	// role's Resource.ID). Resolve by identity — no role-list fetch.
+	return relatedResult("role", []string{roleNameFromARN(*stack.RoleARN)})
+}
+
+// checkCFNCFN finds related CloudFormation stacks — parent and child (nested) stacks.
+// Pattern F+C: forward lookup for ParentId (this is a nested stack) and reverse scan
+// for stacks whose ParentId matches this stack's StackId (children of this stack).
+func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
+	if !ok {
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
+	}
+
+	cfnList, truncated, err := relatedResourcesFor(ctx, clients, cache, "cfn")
+	if err != nil {
+		return resource.ErrorRelated("cfn", err)
+	}
+	if cfnList == nil {
+		return resource.UnknownRelated("cfn")
+	}
+
+	// Collect this stack's StackId for reverse lookup.
+	thisStackID := ""
+	if stack.StackId != nil {
+		thisStackID = *stack.StackId
+	}
+
+	// Build a set so we don't emit duplicates.
+	seen := make(map[string]struct{})
+
+	// Forward: if this stack has a ParentId, it is a nested stack — add the parent.
+	if stack.ParentId != nil && *stack.ParentId != "" {
+		parentID := *stack.ParentId
+		for _, cfnRes := range cfnList {
+			rawCFN, cfnOk := assertStruct[cfntypes.Stack](cfnRes.RawStruct)
+			if !cfnOk {
+				continue
+			}
+			if rawCFN.StackId != nil && *rawCFN.StackId == parentID {
+				seen[cfnRes.ID] = struct{}{}
+			}
+		}
+	}
+
+	// Reverse: scan for stacks whose ParentId matches this stack's StackId (child stacks).
+	if thisStackID != "" {
+		for _, cfnRes := range cfnList {
+			rawCFN, cfnOk := assertStruct[cfntypes.Stack](cfnRes.RawStruct)
+			if !cfnOk {
+				continue
+			}
+			if rawCFN.ParentId != nil && *rawCFN.ParentId == thisStackID {
+				seen[cfnRes.ID] = struct{}{}
+			}
+		}
+	}
+
+	ids := make([]string, 0, len(seen))
+	for id := range seen {
+		ids = append(ids, id)
+	}
+
+	return relatedResultTrunc("cfn", ids, truncated)
+}
+
+// checkCfnSNS extracts notification ARNs from the CloudFormation Stack's
+// NotificationARNs field and returns SNS topic identifiers.
+// Pattern F — no cache needed.
+func checkCfnSNS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
+	if !ok {
+		return resource.UnknownRelated("sns")
+	}
+	var ids []string
+	for _, arn := range stack.NotificationARNs {
+		if arn != "" {
+			ids = append(ids, arn)
+		}
+	}
+	if len(ids) == 0 {
+		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
+	}
+	return relatedResult("sns", ids)
+}
+
+// cfnStackResourcesByType calls cloudformation:ListStackResources(stack) and
+// returns the PhysicalResourceIds whose ResourceType matches the given value
+// (e.g. "AWS::S3::Bucket"). Pattern C — single paginated API call; we read
+// the first page only to honor the 1-call budget.
+func cfnStackResourcesByType(ctx context.Context, clients any, stackName, resourceType string) ([]string, bool) {
+	if stackName == "" {
+		return nil, true
+	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.CloudFormation == nil {
+		return nil, false
+	}
+	out, err := c.CloudFormation.ListStackResources(ctx, &cloudformation.ListStackResourcesInput{
+		StackName: aws.String(stackName),
+	})
+	if err != nil || out == nil {
+		return nil, false
+	}
+	var ids []string
+	for _, r := range out.StackResourceSummaries {
+		if r.ResourceType == nil || *r.ResourceType != resourceType {
+			continue
+		}
+		if r.PhysicalResourceId == nil || *r.PhysicalResourceId == "" {
+			continue
+		}
+		ids = append(ids, *r.PhysicalResourceId)
+	}
+	return ids, true
+}
+
+// checkCfnS3 calls ListStackResources and returns S3 buckets created by the
+// stack (ResourceType=AWS::S3::Bucket).
+func checkCfnS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	ids, ok := cfnStackResourcesByType(ctx, clients, res.ID, "AWS::S3::Bucket")
+	if !ok {
+		return resource.UnknownRelated("s3")
+	}
+	return relatedResult("s3", ids)
+}
+
+// checkCfnEBRule calls ListStackResources and returns EventBridge rules
+// created by the stack (ResourceType=AWS::Events::Rule). The PhysicalResourceId
+// of an Events::Rule is the rule name.
+func checkCfnEBRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	ids, ok := cfnStackResourcesByType(ctx, clients, res.ID, "AWS::Events::Rule")
+	if !ok {
+		return resource.UnknownRelated("eb-rule")
+	}
+	return relatedResult("eb-rule", ids)
+}

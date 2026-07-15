@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	demofixtures "github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	demofixtures "github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
 
 // s3SortProbeBucket is a namedBuckets fixture from internal/demo/fixtures/s3.go,

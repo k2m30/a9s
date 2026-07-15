@@ -20,8 +20,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // wave3PagResources mirrors qa_pagination_stories_test.go's pgTestResources:

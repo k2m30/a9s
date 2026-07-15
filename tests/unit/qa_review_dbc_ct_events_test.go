@@ -3,8 +3,8 @@ package unit
 import (
 	"testing"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws" // trigger init chain
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws" // trigger init chain
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // TestReview_DBC_RegistersCTEvents confirms that ct-events is present in dbc's

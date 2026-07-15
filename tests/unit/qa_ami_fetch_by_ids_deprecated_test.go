@@ -21,7 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
 // TestFetchAMIsByIDs_IncludeDeprecated verifies that FetchAMIsByIDs passes
@@ -93,7 +93,7 @@ func TestFetchAMIsByIDs_DeprecatedAMIReturnedInResults(t *testing.T) {
 		t.Fatalf("FetchAMIsByIDs: unexpected error for deprecated AMI: %v", err)
 	}
 	if len(resources) != 1 {
-		t.Fatalf("FetchAMIsByIDs: deprecated AMI not in results — got %d resources; " +
+		t.Fatalf("FetchAMIsByIDs: deprecated AMI not in results — got %d resources; "+
 			"want 1 (IncludeDeprecated must be true)", len(resources))
 	}
 	if resources[0].ID != deprecatedID {

@@ -36,10 +36,10 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 
-	a9saws "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/costs"
-	"github.com/k2m30/a9s/v3/internal/demo"
-	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	a9saws "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/costs"
+	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
 
 // demoCostsQuery builds a wide-enough Range to comfortably contain whatever

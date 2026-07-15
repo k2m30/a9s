@@ -1,0 +1,156 @@
+package fixtures
+
+import (
+	"sync"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
+)
+
+// SNSFixtures holds typed fixture data for SNS.
+type SNSFixtures struct {
+	Topics        []snstypes.Topic
+	Subscriptions []snstypes.Subscription
+	// SubscriptionsByTopic maps topic ARN to its subscriptions.
+	SubscriptionsByTopic map[string][]snstypes.Subscription
+	// TopicAttributes maps topic ARN to its GetTopicAttributes response —
+	// backs the sns:kms and sns:role related-panel pivots (checkSNSKMS /
+	// checkSNSRole).
+	TopicAttributes map[string]map[string]string
+}
+
+// NewSNSFixtures constructs SNSFixtures from the canonical demo data.
+var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
+	topics := []snstypes.Topic{
+		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:alarm-notifications")},
+		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:order-events")},
+		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:deploy-notifications")},
+		// S3 healthy-bucket event notifications topic (checkS3SNS pivot).
+		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:" + S3EventsTopicName)},
+		// Redis prod ops pager topic — required for redis→sns related-panel pivot.
+		// The prod-redis-sessions member cluster NotificationConfiguration.TopicArn
+		// points here so checkRedisSNS resolves a non-zero count for the demo showroom.
+		{TopicArn: aws.String(ProdRedisSNSTopicARN)},
+		// SES bounce/complaint notifications topic (checkSESSns pivot).
+		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:" + SESBounceTopicName)},
+		// Backup vault alert topic (checkBackupSNS pivot).
+		// GetBackupVaultNotifications("acme-prod-vault").SNSTopicArn points here.
+		// checkBackupSNS resolves this ARN against sns resource cache by name (last ":" segment).
+		{TopicArn: aws.String(BackupAlertsSNSTopicARN)},
+		// Issue: zero subscribers → "~" (orphan topic). Required for
+		// EnrichSNSSubscriptions's Wave-2 issue check. Deliberately has no
+		// SubscriptionsByTopic entry so ListSubscriptionsByTopic returns empty.
+		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:staging-deploy-alerts")},
+		// Issue: every subscriber is SubscriptionArn=="PendingConfirmation" → "~"
+		// (sns.all-pending-confirmation). Required for EnrichSNSSubscriptions's
+		// Wave-2 all-pending check.
+		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:webhook-integration-pending")},
+	}
+
+	subscriptions := []snstypes.Subscription{
+		{
+			TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:alarm-notifications"),
+			Protocol:        aws.String("email"),
+			Endpoint:        aws.String("oncall@acme-corp.com"),
+			SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:alarm-notifications:a1b2c3d4-e5f6-7890-abcd-ef1234567890"),
+			Owner:           aws.String("123456789012"),
+		},
+		// Issue: SubscriptionArn=="PendingConfirmation" → Warning (never confirmed)
+		{
+			TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:order-events"),
+			Protocol:        aws.String("email"),
+			Endpoint:        aws.String("pending-recipient@partner.example.com"),
+			SubscriptionArn: aws.String("PendingConfirmation"),
+			Owner:           aws.String("123456789012"),
+		},
+		{
+			TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:alarm-notifications"),
+			Protocol:        aws.String("lambda"),
+			Endpoint:        aws.String("arn:aws:lambda:us-east-1:123456789012:function:cloudwatch-slack-notifier"),
+			SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:alarm-notifications:b2c3d4e5-f6a7-8901-bcde-f12345678901"),
+			Owner:           aws.String("123456789012"),
+		},
+		{
+			TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:order-events"),
+			Protocol:        aws.String("sqs"),
+			Endpoint:        aws.String("arn:aws:sqs:us-east-1:123456789012:order-processing-queue"),
+			SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:order-events:c3d4e5f6-a7b8-9012-cdef-123456789012"),
+			Owner:           aws.String("123456789012"),
+		},
+		{
+			TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:deploy-notifications"),
+			Protocol:        aws.String("https"),
+			Endpoint:        aws.String("https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXX"),
+			SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:deploy-notifications:d4e5f6a7-b8c9-0123-def0-234567890123"),
+			Owner:           aws.String("123456789012"),
+		},
+		// Issue: SubscriptionArn=="Deleted" → Dim (subscription torn down but
+		// still enumerable via ListSubscriptions for a retention window).
+		{
+			TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:order-events"),
+			Protocol:        aws.String("email"),
+			Endpoint:        aws.String("former-partner@decommissioned.example.com"),
+			SubscriptionArn: aws.String("Deleted"),
+			Owner:           aws.String("123456789012"),
+		},
+	}
+
+	subsByTopic := map[string][]snstypes.Subscription{
+		"arn:aws:sns:us-east-1:123456789012:alarm-notifications":  subscriptions[:2],
+		"arn:aws:sns:us-east-1:123456789012:order-events":         subscriptions[2:4],
+		"arn:aws:sns:us-east-1:123456789012:deploy-notifications": subscriptions[4:],
+		// webhook-integration-pending — 100% of subscribers PendingConfirmation.
+		"arn:aws:sns:us-east-1:123456789012:webhook-integration-pending": {
+			{
+				TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:webhook-integration-pending"),
+				Protocol:        aws.String("https"),
+				Endpoint:        aws.String("https://partner-webhooks.example.com/sns-callback"),
+				SubscriptionArn: aws.String("PendingConfirmation"),
+				Owner:           aws.String("123456789012"),
+			},
+		},
+		// Every graph-root-reachable topic must have at least one subscription
+		// so sns→sns_subscriptions drill lands on non-empty content.
+		"arn:aws:sns:us-east-1:123456789012:" + S3EventsTopicName: minimalSubscriptions("arn:aws:sns:us-east-1:123456789012:"+S3EventsTopicName, "sqs", "arn:aws:sqs:us-east-1:123456789012:s3-events-queue"),
+		ProdRedisSNSTopicARN: minimalSubscriptions(ProdRedisSNSTopicARN, "email", "redis-oncall@acme-corp.com"),
+		"arn:aws:sns:us-east-1:123456789012:" + SESBounceTopicName: minimalSubscriptions("arn:aws:sns:us-east-1:123456789012:"+SESBounceTopicName, "lambda", "arn:aws:lambda:us-east-1:123456789012:function:ses-bounce-handler"),
+		BackupAlertsSNSTopicARN: minimalSubscriptions(BackupAlertsSNSTopicARN, "email", "backup-ops@acme-corp.com"),
+	}
+
+	// TopicAttributes — required for the sns:kms and sns:role related-panel
+	// pivots (checkSNSKMS / checkSNSRole via GetTopicAttributes). The
+	// alarm-notifications topic carries an at-rest encryption key and an
+	// access policy granting the CI deploy role publish access.
+	topicAttributes := map[string]map[string]string{
+		"arn:aws:sns:us-east-1:123456789012:alarm-notifications": {
+			"KmsMasterKeyId": "a1b2c3d4-5678-90ab-cdef-111111111111",
+			"Policy":         `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/acme-ci-deploy-role"},"Action":"sns:Publish","Resource":"arn:aws:sns:us-east-1:123456789012:alarm-notifications"}]}`,
+		},
+	}
+
+	return &SNSFixtures{
+		Topics:               topics,
+		Subscriptions:        subscriptions,
+		SubscriptionsByTopic: subsByTopic,
+		TopicAttributes:      topicAttributes,
+	}
+})
+
+func NewSNSFixtures() *SNSFixtures {
+	return sharedSNSFixtures()
+}
+
+// minimalSubscriptions returns a single canonical confirmed subscription so
+// sns→sns_subscriptions drill lands on non-empty content. Used for every
+// graph-root-reachable topic ARN.
+func minimalSubscriptions(topicARN, protocol, endpoint string) []snstypes.Subscription {
+	return []snstypes.Subscription{
+		{
+			TopicArn:        aws.String(topicARN),
+			Protocol:        aws.String(protocol),
+			Endpoint:        aws.String(endpoint),
+			SubscriptionArn: aws.String(topicARN + ":11111111-2222-3333-4444-555555555555"),
+			Owner:           aws.String("123456789012"),
+		},
+	}
+}

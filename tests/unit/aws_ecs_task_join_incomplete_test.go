@@ -31,8 +31,8 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	smithy "github.com/aws/smithy-go"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -41,10 +41,10 @@ import (
 // ---------------------------------------------------------------------------
 
 type fullECSAPI struct {
-	listClustersFn         func(*ecs.ListClustersInput) (*ecs.ListClustersOutput, error)
-	listTasksFn            func(*ecs.ListTasksInput) (*ecs.ListTasksOutput, error)
-	describeTasksFn        func(*ecs.DescribeTasksInput) (*ecs.DescribeTasksOutput, error)
-	describeTaskDefFn      func(*ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error)
+	listClustersFn    func(*ecs.ListClustersInput) (*ecs.ListClustersOutput, error)
+	listTasksFn       func(*ecs.ListTasksInput) (*ecs.ListTasksOutput, error)
+	describeTasksFn   func(*ecs.DescribeTasksInput) (*ecs.DescribeTasksOutput, error)
+	describeTaskDefFn func(*ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error)
 }
 
 func (f *fullECSAPI) ListClusters(_ context.Context, in *ecs.ListClustersInput, _ ...func(*ecs.Options)) (*ecs.ListClustersOutput, error) {
@@ -175,8 +175,8 @@ func TestFetchECSTasksPage_JoinFailure_SetsTaskDefJoinErrorField(t *testing.T) {
 		t.Fatal("Pagination must not be nil")
 	}
 	if result.Pagination.IsTruncated {
-		t.Errorf("IsTruncated must be false when DescribeTaskDefinition fails — "+
-			"the fetcher must set Fields[task_def_join_error] instead of marking pagination truncated. "+
+		t.Errorf("IsTruncated must be false when DescribeTaskDefinition fails — " +
+			"the fetcher must set Fields[task_def_join_error] instead of marking pagination truncated. " +
 			"Got IsTruncated=true (OLD BUG: would surface misleading 'm: load more' in TUI).")
 	}
 	if result.Pagination.NextToken != "" {
@@ -231,8 +231,8 @@ func TestFetchECSTasksPage_JoinSucceeds_NoErrorField(t *testing.T) {
 // Setup:
 //   - Source EFS resource ID: "fs-bar" (does not match any task's efs_file_system_ids).
 //   - Cache "ecs-task" entry has two tasks:
-//       task1: efs_file_system_ids="fs-foo" (no join error, does not match source).
-//       task2: task_def_join_error="true"   (join incomplete, no efs ids).
+//     task1: efs_file_system_ids="fs-foo" (no join error, does not match source).
+//     task2: task_def_join_error="true"   (join incomplete, no efs ids).
 //   - Expected result: Count==0 (no match), Truncated==true (join incomplete).
 //
 // This proves the zero is truncated (honest lower bound), not definitive.
@@ -278,7 +278,7 @@ func TestCheckEFSECSTask_JoinIncompleteTask_MarksApproximate(t *testing.T) {
 		t.Errorf("Count: want 0 (no task matches fs-bar), got %d", result.Count)
 	}
 	if !result.Truncated {
-		t.Errorf("Truncated: want true (task2 has join error → result is a lower bound, not definitive zero); got false. "+
+		t.Errorf("Truncated: want true (task2 has join error → result is a lower bound, not definitive zero); got false. " +
 			"This means the checker is not propagating joinIncomplete into result.Truncated.")
 	}
 }

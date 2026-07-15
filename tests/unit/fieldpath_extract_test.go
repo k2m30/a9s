@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/k2m30/a9s/v3/internal/fieldpath"
+	"github.com/k2m30/a9s/v3/core/fieldpath"
 )
 
 // ---------------------------------------------------------------------------
@@ -589,10 +589,10 @@ func TestExtractFirstListScalar(t *testing.T) {
 	innerSlice := []flsInner{{ID: "inner-1"}, {ID: "inner-2"}}
 
 	tests := []struct {
-		name  string
-		obj   any
-		path  string
-		want  string
+		name string
+		obj  any
+		path string
+		want string
 	}{
 		{
 			name: "list of structs with pointer field — returns first element value",

@@ -80,15 +80,15 @@ func isAllChar(s string, ch byte) bool {
 	return true
 }
 
-// TestDemo_NoRealWebhookURLs walks every .go file under internal/demo/ and
+// TestDemo_NoRealWebhookURLs walks every .go file under core/demo/ and
 // verifies that any webhook URL found matches an approved placeholder shape.
 // It fails with the file path and line number of any non-placeholder match,
 // acting as a regression guard against real credentials being committed.
 //
 // go test sets the working directory to the package directory (tests/unit/),
-// so the path to internal/demo/ is two levels up.
+// so the path to core/demo/ is two levels up.
 func TestDemo_NoRealWebhookURLs(t *testing.T) {
-	demoDir := filepath.Join("..", "..", "internal", "demo")
+	demoDir := filepath.Join("..", "..", "core", "demo")
 
 	err := filepath.WalkDir(demoDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {

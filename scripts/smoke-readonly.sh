@@ -12,7 +12,7 @@
 # never writes).
 #
 # Not part of the push gate (needs credentials); it is the Stage 6 live
-# sub-rule companion for changes touching internal/aws/ or rendering.
+# sub-rule companion for changes touching core/aws/ or rendering.
 set -u
 
 : "${PROFILE:?smoke-readonly: set PROFILE=<a *readonly* AWS profile>}"

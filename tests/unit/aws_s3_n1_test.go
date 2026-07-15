@@ -28,11 +28,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	s3sdk "github.com/aws/aws-sdk-go-v2/service/s3"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 
 	// Side-effect import: triggers init() which calls resource.SetPaginatedForTest("s3", …)
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	_ "github.com/k2m30/a9s/v3/core/aws"
 )
 
 // countingS3RoundTripper wraps an inner transport and counts calls to the

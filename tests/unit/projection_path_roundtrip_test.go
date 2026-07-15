@@ -25,8 +25,8 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/semantics/projection"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/semantics/projection"
 )
 
 // ec2VpcResource constructs a minimal EC2-shaped domain.Resource with a VpcId
@@ -90,4 +90,3 @@ func TestProjectionPath_FieldItemToDomainItem_PreservesPath(t *testing.T) {
 		t.Error("VpcId item not found in projection.Generic output — fixture or projector broken")
 	}
 }
-

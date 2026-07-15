@@ -15,16 +15,18 @@
 // as the target ID, causing "not found" when looking up the role by name.
 //
 // Post-fix: the loop applies NavIDFromValue to ALL items where
-//   IsNavigable=true && !IsSubField && TargetType!="" && Value!=""
+//
+//	IsNavigable=true && !IsSubField && TargetType!="" && Value!=""
+//
 // yielding NavID="my-lambda-role" from the full Role ARN.
 package views
 
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/config"
-	"github.com/k2m30/a9s/v3/internal/fieldpath"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/config"
+	"github.com/k2m30/a9s/v3/core/fieldpath"
+	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 )
 

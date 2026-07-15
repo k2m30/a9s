@@ -32,58 +32,58 @@
 // by hand before this file was written; corrections to the originating
 // dispatch's claims are called out inline per gate):
 //
-//   GATE 1 (4 violations): internal/runtime/intent.go:36
-//   (ListEnrichmentPatch.Findings), internal/runtime/state.go:18
-//   (RuntimeState.EnrichmentFindings), internal/app/viewstate.go:148
-//   (ListBody.EnrichmentFindings), internal/runtime/messages/event.go:244
-//   (EnrichmentChecked.Findings). Dispatch cited intent.go:31 and
-//   state.go:16 — both are the doc-comment lines directly above the real
-//   field declarations (31 is ListEnrichmentPatch's struct-level doc start;
-//   16 is EnrichmentFindings' own leading comment); the field declarations
-//   themselves are at 36 and 18 respectively, verified by direct read
-//   (mirrors the same dispatch-cites-the-comment-not-the-code pattern noted
-//   in qa_enricher_finding_builder_discipline_test.go's own header).
+//	GATE 1 (4 violations): internal/runtime/intent.go:36
+//	(ListEnrichmentPatch.Findings), internal/runtime/state.go:18
+//	(RuntimeState.EnrichmentFindings), internal/app/viewstate.go:148
+//	(ListBody.EnrichmentFindings), internal/runtime/messages/event.go:244
+//	(EnrichmentChecked.Findings). Dispatch cited intent.go:31 and
+//	state.go:16 — both are the doc-comment lines directly above the real
+//	field declarations (31 is ListEnrichmentPatch's struct-level doc start;
+//	16 is EnrichmentFindings' own leading comment); the field declarations
+//	themselves are at 36 and 18 respectively, verified by direct read
+//	(mirrors the same dispatch-cites-the-comment-not-the-code pattern noted
+//	in qa_enricher_finding_builder_discipline_test.go's own header).
 //
-//   GATE 2 (2 violations): internal/runtime/intent.go:37
-//   (ListEnrichmentPatch.AttentionDetails), internal/runtime/state.go:22
-//   (RuntimeState.EnrichmentAttentionDetails).
+//	GATE 2 (2 violations): internal/runtime/intent.go:37
+//	(ListEnrichmentPatch.AttentionDetails), internal/runtime/state.go:22
+//	(RuntimeState.EnrichmentAttentionDetails).
 //
-//   GATE 3 (2 violations): internal/aws/snapshot_cross_ref.go:217
-//   (result.Findings[res.ID] = ...) and
-//   internal/aws/snapshot_cross_ref.go:224
-//   (result.AttentionDetails[res.ID] = ...) — both inside
-//   EnrichSnapshotCrossRef. Zero violations found in any
-//   internal/aws/*_issue_enrichment.go file — the append-only builder
-//   discipline is already clean there (matches
-//   qa_enricher_finding_builder_discipline_test.go's own green census after
-//   the MSK fix landed), verified by grep before writing this gate rather
-//   than assumed.
+//	GATE 3 (2 violations): internal/aws/snapshot_cross_ref.go:217
+//	(result.Findings[res.ID] = ...) and
+//	internal/aws/snapshot_cross_ref.go:224
+//	(result.AttentionDetails[res.ID] = ...) — both inside
+//	EnrichSnapshotCrossRef. Zero violations found in any
+//	internal/aws/*_issue_enrichment.go file — the append-only builder
+//	discipline is already clean there (matches
+//	qa_enricher_finding_builder_discipline_test.go's own green census after
+//	the MSK fix landed), verified by grep before writing this gate rather
+//	than assumed.
 //
-//   GATE 4 (3 violations, of 4 candidate patterns): internal/tui/
-//   app_enrich_fold.go:3 (go/ast merges the file's two leading
-//   package-level comment blocks — lines 3-4 and 6-8, despite the blank
-//   line 5 between them — into one CommentGroup anchored at line 3; its
-//   merged text contains "applyEnrichment is the canonical write path for
-//   Wave 2 results.", matching the "canonical ... wave 2 ... path"
-//   unordered pattern; verified against the actual t.Errorf output, not
-//   assumed from source line numbers alone), and internal/tui/
-//   app_enrich_fold.go:131 and :155 (each "break // at most one wave2
-//   finding per resource", in findingsFromRows and attentionDetailsFromRows
-//   respectively).
-//   CORRECTION to the originating dispatch: it also named
-//   internal/aws/issue_enrichment.go and "others" as carrying these
-//   phrases, and named two more literal patterns — "worse-severity wins the
-//   slot" and "attach to first finding". A case-insensitive scan of the
-//   whole internal/ tree (non-test files) at HEAD found ZERO occurrences of
-//   either phrase anywhere, and ZERO occurrences of any of the four
-//   patterns in issue_enrichment.go specifically — its setWave2Finding doc
-//   comment already describes the CURRENT append-style multi-finding
-//   contract ("every independently-evaluated condition survives as its own
-//   Finding"), not a stale single-finding one. Both patterns remain
-//   implemented in mfnlDocPatterns below — they will catch a real future
-//   regression — but neither seeds a violation today, and this file does
-//   not invent one to force a match (see
-//   .claude/agent-memory/a9s-qa/feedback_verify_dispatch_claims_against_code.md).
+//	GATE 4 (3 violations, of 4 candidate patterns): internal/tui/
+//	app_enrich_fold.go:3 (go/ast merges the file's two leading
+//	package-level comment blocks — lines 3-4 and 6-8, despite the blank
+//	line 5 between them — into one CommentGroup anchored at line 3; its
+//	merged text contains "applyEnrichment is the canonical write path for
+//	Wave 2 results.", matching the "canonical ... wave 2 ... path"
+//	unordered pattern; verified against the actual t.Errorf output, not
+//	assumed from source line numbers alone), and internal/tui/
+//	app_enrich_fold.go:131 and :155 (each "break // at most one wave2
+//	finding per resource", in findingsFromRows and attentionDetailsFromRows
+//	respectively).
+//	CORRECTION to the originating dispatch: it also named
+//	internal/aws/issue_enrichment.go and "others" as carrying these
+//	phrases, and named two more literal patterns — "worse-severity wins the
+//	slot" and "attach to first finding". A case-insensitive scan of the
+//	whole internal/ tree (non-test files) at HEAD found ZERO occurrences of
+//	either phrase anywhere, and ZERO occurrences of any of the four
+//	patterns in issue_enrichment.go specifically — its setWave2Finding doc
+//	comment already describes the CURRENT append-style multi-finding
+//	contract ("every independently-evaluated condition survives as its own
+//	Finding"), not a stale single-finding one. Both patterns remain
+//	implemented in mfnlDocPatterns below — they will catch a real future
+//	regression — but neither seeds a violation today, and this file does
+//	not invent one to force a match (see
+//	.claude/agent-memory/a9s-qa/feedback_verify_dispatch_claims_against_code.md).
 package unit_test
 
 import (
@@ -113,10 +113,10 @@ import (
 // domain.Finding or domain.AttentionDetail at all, so scanning whole-file
 // cannot produce a false positive against an unrelated field.
 var mfnlContractFiles = []string{
-	"../../internal/runtime/intent.go",
-	"../../internal/runtime/state.go",
-	"../../internal/app/viewstate.go",
-	"../../internal/runtime/messages/event.go",
+	"../../core/runtime/intent.go",
+	"../../core/runtime/state.go",
+	"../../core/app/viewstate.go",
+	"../../core/runtime/messages/event.go",
 }
 
 // mfnlIsStringIdent reports whether expr is the bare identifier "string" —
@@ -403,7 +403,7 @@ func mfnlScanFileForDirectWrite(fset *token.FileSet, path string) ([]mfnlWriteVi
 // violations exist in any *_issue_enrichment.go file today — the
 // append-only discipline is already clean there.
 func TestMultiFindingNoLegacyGate3_NoDirectResultFieldWriteOutsideBuilder(t *testing.T) {
-	root, err := filepath.Abs("../../internal/aws")
+	root, err := filepath.Abs("../../core/aws")
 	if err != nil {
 		t.Fatalf("filepath.Abs: %v", err)
 	}
@@ -535,54 +535,56 @@ func (v mfnlDocViolation) String() string {
 // active to catch a future regression, not to force today's count higher
 // than what a direct scan actually finds.
 func TestMultiFindingNoLegacyGate4_NoStaleSingleFindingDocComments(t *testing.T) {
-	root, err := filepath.Abs("../../internal")
-	if err != nil {
-		t.Fatalf("filepath.Abs: %v", err)
-	}
 	fset := token.NewFileSet()
 	var violations []mfnlDocViolation
-	walkErr := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	for _, scanRoot := range []string{"../../core", "../../internal"} {
+		root, err := filepath.Abs(scanRoot)
 		if err != nil {
-			return err
+			t.Fatalf("filepath.Abs: %v", err)
 		}
-		if info.IsDir() {
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		src, perr := parser.ParseFile(fset, path, nil, parser.ParseComments)
-		if perr != nil {
-			return perr
-		}
-		rel, rerr := filepath.Rel(root, path)
-		if rerr != nil {
-			return rerr
-		}
-		rel = filepath.ToSlash(rel)
-		for _, cg := range src.Comments {
-			text := cg.Text()
-			if strings.TrimSpace(text) == "" {
-				continue
+		walkErr := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
 			}
-			lower := strings.ToLower(text)
-			pos := fset.Position(cg.Pos())
-			for _, p := range mfnlDocPatterns {
-				if !p.matches(lower) {
+			if info.IsDir() {
+				return nil
+			}
+			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			src, perr := parser.ParseFile(fset, path, nil, parser.ParseComments)
+			if perr != nil {
+				return perr
+			}
+			rel, rerr := filepath.Rel(root, path)
+			if rerr != nil {
+				return rerr
+			}
+			rel = filepath.ToSlash(rel)
+			for _, cg := range src.Comments {
+				text := cg.Text()
+				if strings.TrimSpace(text) == "" {
 					continue
 				}
-				violations = append(violations, mfnlDocViolation{
-					file:    rel,
-					line:    pos.Line,
-					pattern: p.label,
-					snippet: strings.TrimSpace(strings.ReplaceAll(text, "\n", " ")),
-				})
+				lower := strings.ToLower(text)
+				pos := fset.Position(cg.Pos())
+				for _, p := range mfnlDocPatterns {
+					if !p.matches(lower) {
+						continue
+					}
+					violations = append(violations, mfnlDocViolation{
+						file:    rel,
+						line:    pos.Line,
+						pattern: p.label,
+						snippet: strings.TrimSpace(strings.ReplaceAll(text, "\n", " ")),
+					})
+				}
 			}
+			return nil
+		})
+		if walkErr != nil {
+			t.Fatalf("walk %s failed: %v", root, walkErr)
 		}
-		return nil
-	})
-	if walkErr != nil {
-		t.Fatalf("walk internal/ failed: %v", walkErr)
 	}
 	if len(violations) == 0 {
 		return

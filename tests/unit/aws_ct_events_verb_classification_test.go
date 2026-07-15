@@ -12,7 +12,7 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
+	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 )
 
 func TestClassifyCTVerb_V2Table(t *testing.T) {

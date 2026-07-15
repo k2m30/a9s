@@ -3,7 +3,7 @@ package views
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // TestCapTierToRowBucket pins the universal Attention-entry color-cap rule:

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/core/app"
 )
 
 // TestWebDNSRebind_RejectsNonLoopbackHost guards the dnsRebindGuard middleware

@@ -27,15 +27,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfnsvc "github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
 	elbv2svc "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
-	"github.com/aws/aws-sdk-go-v2/service/ecs"
-	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // =============================================================================
@@ -118,11 +118,11 @@ func TestEnrichECSServices_StuckServiceEmitsBangFinding(t *testing.T) {
 		descSvcOut: &ecs.DescribeServicesOutput{
 			Services: []ecstypes.Service{
 				{
-					ServiceName:   aws.String(svcName),
-					DesiredCount:  3,
-					RunningCount:  1,
-					PendingCount:  0,
-					Deployments:   []ecstypes.Deployment{},
+					ServiceName:  aws.String(svcName),
+					DesiredCount: 3,
+					RunningCount: 1,
+					PendingCount: 0,
+					Deployments:  []ecstypes.Deployment{},
 				},
 			},
 		},
@@ -344,9 +344,9 @@ func TestEnrichECSClusters_PendingTasksEmitsFinding(t *testing.T) {
 		descClustersOut: &ecs.DescribeClustersOutput{
 			Clusters: []ecstypes.Cluster{
 				{
-					ClusterName:      aws.String(clusterName),
-					PendingTasksCount: 5,
-					RunningTasksCount: 10,
+					ClusterName:                       aws.String(clusterName),
+					PendingTasksCount:                 5,
+					RunningTasksCount:                 10,
 					RegisteredContainerInstancesCount: 3,
 				},
 			},
@@ -1052,7 +1052,7 @@ func (f *ebHealthWave3Fake) DescribeEnvironmentHealth(
 	}
 	causes := f.perEnvCauses[name]
 	return &elasticbeanstalk.DescribeEnvironmentHealthOutput{
-		Causes:      causes,
+		Causes:       causes,
 		HealthStatus: aws.String("Degraded"),
 	}, nil
 }
@@ -1111,7 +1111,7 @@ func TestEnrichEBEnvironmentHealth_APIErrorMarksRowTruncatedIDNotBadge(t *testin
 	envName := "err-env"
 	envID := "e-errenv1234"
 	fake := &ebHealthWave3Fake{
-		perEnvCauses:  map[string][]string{},
+		perEnvCauses: map[string][]string{},
 		errOnEnvName: envName,
 	}
 	clients := &awsclient.ServiceClients{ElasticBeanstalk: fake}
@@ -1295,4 +1295,3 @@ func TestEnrichCFNCombined_NilClient_ReturnsEmpty(t *testing.T) {
 		t.Errorf("expected no findings for nil client; got %v", result.Findings)
 	}
 }
-

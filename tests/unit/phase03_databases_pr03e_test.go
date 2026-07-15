@@ -40,9 +40,9 @@ import (
 	s3sdk "github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // =============================================================================
@@ -1025,13 +1025,13 @@ func TestPR03e_RedshiftFetcher_HealthyEmitsNoFinding(t *testing.T) {
 		output: &redshiftsdk.DescribeClustersOutput{
 			Clusters: []redshifttypes.Cluster{
 				{
-					ClusterIdentifier:      aws.String("prod-dwh"),
-					ClusterStatus:          aws.String("available"),
-					PubliclyAccessible:     aws.Bool(false),
-					Encrypted:              aws.Bool(true),
-					NodeType:               aws.String("ra3.xlplus"),
-					NumberOfNodes:          aws.Int32(2),
-					DBName:                 aws.String("dev"),
+					ClusterIdentifier:         aws.String("prod-dwh"),
+					ClusterStatus:             aws.String("available"),
+					PubliclyAccessible:        aws.Bool(false),
+					Encrypted:                 aws.Bool(true),
+					NodeType:                  aws.String("ra3.xlplus"),
+					NumberOfNodes:             aws.Int32(2),
+					DBName:                    aws.String("dev"),
 					ClusterAvailabilityStatus: aws.String("Available"),
 				},
 			},
@@ -1265,14 +1265,14 @@ func TestPR03e_EFSFetcher_HealthyEmitsNoFinding(t *testing.T) {
 		output: &efssdk.DescribeFileSystemsOutput{
 			FileSystems: []efstypes.FileSystemDescription{
 				{
-					FileSystemId:    aws.String("fs-0abc1234"),
-					FileSystemArn:   aws.String("arn:aws:elasticfilesystem:us-east-1:000000000000:file-system/fs-0abc1234"),
-					LifeCycleState:  efstypes.LifeCycleStateAvailable,
+					FileSystemId:         aws.String("fs-0abc1234"),
+					FileSystemArn:        aws.String("arn:aws:elasticfilesystem:us-east-1:000000000000:file-system/fs-0abc1234"),
+					LifeCycleState:       efstypes.LifeCycleStateAvailable,
 					NumberOfMountTargets: 2,
-					Name:            aws.String("prod-data"),
-					PerformanceMode: efstypes.PerformanceModeGeneralPurpose,
-					ThroughputMode:  efstypes.ThroughputModeBursting,
-					Encrypted:       aws.Bool(true),
+					Name:                 aws.String("prod-data"),
+					PerformanceMode:      efstypes.PerformanceModeGeneralPurpose,
+					ThroughputMode:       efstypes.ThroughputModeBursting,
+					Encrypted:            aws.Bool(true),
 				},
 			},
 		},

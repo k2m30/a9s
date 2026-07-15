@@ -32,9 +32,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/catalog"
-	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/domain"
 )
 
 func main() {
@@ -323,4 +323,3 @@ func lifecycleFragment(rt catalog.ResourceTypeDef) string {
 	}
 	return fmt.Sprintf("Lifecycle key: `%s`.", key)
 }
-

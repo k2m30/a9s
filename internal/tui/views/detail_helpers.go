@@ -8,10 +8,10 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/fieldpath"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/fieldpath"
+	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
@@ -99,7 +99,7 @@ func (m DetailModel) buildLiveBody() app.DetailBody {
 				Count:        row.count,
 				Loading:      row.loading,
 				Err:          row.err != nil,
-				Truncated:  row.truncated,
+				Truncated:    row.truncated,
 				FetchFilter:  row.fetchFilter,
 				TargetType:   row.targetType,
 				Actionable:   isActionableRow(row),

@@ -14,15 +14,15 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/buildinfo"
-	"github.com/k2m30/a9s/v3/internal/config"
-	"github.com/k2m30/a9s/v3/internal/demo"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/buildinfo"
+	"github.com/k2m30/a9s/v3/core/config"
+	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/web"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/styles/themes"
-	"github.com/k2m30/a9s/v3/internal/web"
 )
 
 var (
@@ -46,13 +46,13 @@ var renameHints = map[string]string{
 }
 
 func main() {
-	// Install the AWS catalog into internal/catalog before any code path can
+	// Install the AWS catalog into core/catalog before any code path can
 	// hit catalog.Find / catalog.All. Must run before resource.FindResourceType
 	// below and before any tui.New construction — both transitively call
 	// catalog accessors that panic when SetTypes has not yet been invoked.
 	aws.Install()
 	// Wire resource-registry callbacks into the projection layer. Replaces
-	// the legacy internal/resource init() (internal/resource has zero
+	// the legacy core/resource init() (core/resource has zero
 	// init()). Must run after aws.Install so callbacks
 	// resolve catalog-backed defaults.
 	resource.WireProjection()

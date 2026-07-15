@@ -29,9 +29,9 @@ import (
 	"testing"
 	"time"
 
-	a9saws "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/costs"
-	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	a9saws "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/costs"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
 
 // dailyRecordKey identifies one (group-key-tuple, period) record for

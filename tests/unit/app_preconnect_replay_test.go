@@ -23,21 +23,21 @@
 //     handleActionRefresh's list branch, internal/app/actions_list.go
 //     lines 184-199) must turn that intent into a real
 //     KindFetchResources task for the active list's type, at BOTH:
-//       - BootstrapLive's return (the STARTUP connect seam), and
-//       - Controller.Handle's messages.ClientsReady path (the web
-//         profile-switch reconnect seam) — reached when DrainSync/
-//         DrainSyncPartition executes a TaskKindConnect task and feeds the
-//         resulting messages.ClientsReady through Controller.Handle
-//         (internal/app/drainsync.go, c.Handle(ev) at the end of the loop
-//         body). NOTE: as committed at HEAD, internal/runtime/orchestrator.go's
-//         Core.HandleEvent switch has NO case for messages.ClientsReady at
-//         all (it is explicitly documented as a TUI-shim-only event,
-//         handled outside HandleEvent) — so today a ClientsReady fed
-//         through Controller.Handle hits the default nil,nil branch and is
-//         silently dropped for headless/web callers. Wiring this seam is
-//         therefore part of the DEF-10 fix, not a pre-existing green path;
-//         test 1 below drives this exact path and pins the TARGET (fixed)
-//         behavior.
+//     - BootstrapLive's return (the STARTUP connect seam), and
+//     - Controller.Handle's messages.ClientsReady path (the web
+//     profile-switch reconnect seam) — reached when DrainSync/
+//     DrainSyncPartition executes a TaskKindConnect task and feeds the
+//     resulting messages.ClientsReady through Controller.Handle
+//     (internal/app/drainsync.go, c.Handle(ev) at the end of the loop
+//     body). NOTE: as committed at HEAD, internal/runtime/orchestrator.go's
+//     Core.HandleEvent switch has NO case for messages.ClientsReady at
+//     all (it is explicitly documented as a TUI-shim-only event,
+//     handled outside HandleEvent) — so today a ClientsReady fed
+//     through Controller.Handle hits the default nil,nil branch and is
+//     silently dropped for headless/web callers. Wiring this seam is
+//     therefore part of the DEF-10 fix, not a pre-existing green path;
+//     test 1 below drives this exact path and pins the TARGET (fixed)
+//     behavior.
 //
 // All tests are hermetic: A9S_CONFIG_FOLDER redirected to t.TempDir(), no
 // AWS credentials, no network. Cache seeding uses the real
@@ -50,12 +50,12 @@ package unit_test
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/cache"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/session"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // seedS3TypeFile writes a single-type disk cache (mirrors the

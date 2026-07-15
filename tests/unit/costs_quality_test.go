@@ -55,10 +55,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/costs"
-	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/costs"
+	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ func TestCostsQuality_Item3a_TUI_RenderedFrame_ContainsSharedSnapshotFrameTitle(
 // ===========================================================================
 
 func TestCostsQuality_Item3c_WebAppJS_KeyMap_HasVimMovementAliases(t *testing.T) {
-	raw, err := readQualityFile(t, "../../internal/web/static/app.js")
+	raw, err := readQualityFile(t, "../../core/web/static/app.js")
 	if err != nil {
 		t.Fatalf("reading app.js: %v", err)
 	}
@@ -319,7 +319,7 @@ func TestCostsQuality_Item4_TUIFooter_ReferencesCurrency(t *testing.T) {
 }
 
 func TestCostsQuality_Item4_WebCostsTemplate_ReferencesCurrency(t *testing.T) {
-	raw, err := readQualityFile(t, "../../internal/web/templates/costs.html")
+	raw, err := readQualityFile(t, "../../core/web/templates/costs.html")
 	if err != nil {
 		t.Fatalf("reading costs.html: %v", err)
 	}

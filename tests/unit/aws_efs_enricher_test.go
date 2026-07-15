@@ -18,8 +18,8 @@ import (
 
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 )
 
 // Shared helpers (efsMountTargetFake, efsResources, availableMT,

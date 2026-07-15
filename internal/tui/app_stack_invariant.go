@@ -11,7 +11,7 @@
 // content.
 package tui
 
-import "github.com/k2m30/a9s/v3/internal/runtime"
+import "github.com/k2m30/a9s/v3/core/runtime"
 
 // rsIsCtrlBacked reports whether the rendererState at the given stack index
 // has a corresponding controller screen. As of goal-4 wave 4a there is no

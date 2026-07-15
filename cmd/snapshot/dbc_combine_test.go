@@ -14,7 +14,7 @@ var errThrottled = errors.New("ThrottlingException: rate exceeded")
 // dbc_combine_test.go — RED regression tests pinning the fix for the finding:
 // cmd/snapshot's dbc/dbc-snap capture discards ALL DocDB rows when the RDS-side
 // DescribeDBClusters (or DescribeDBClusterSnapshots) call fails, unlike the
-// live app fetcher's partial-success behavior (internal/aws fetchers return
+// live app fetcher's partial-success behavior (core/aws fetchers return
 // whatever rows they got plus a per-source error, never discard a whole page
 // because a sibling source failed).
 //

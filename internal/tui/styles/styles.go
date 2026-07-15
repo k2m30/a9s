@@ -5,7 +5,7 @@ import (
 
 	lipgloss "charm.land/lipgloss/v2"
 
-	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/core/domain"
 )
 
 // Composed styles built from the Tokyo Night Dark palette.

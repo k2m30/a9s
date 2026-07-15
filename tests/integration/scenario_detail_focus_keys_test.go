@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	demofixtures "github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	demofixtures "github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
 
 func TestScenario_DetailFocusKeys_NavKeysWorkWithRelatedFocused(t *testing.T) {

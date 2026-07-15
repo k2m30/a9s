@@ -18,8 +18,8 @@ package unit
 import (
 	"testing"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // TestHandleClientsReady_SuccessNoPendingRefresh_FlashGenUnchanged

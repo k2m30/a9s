@@ -139,9 +139,9 @@ A PR is mergeable only when all of these are true. Verification commands run fro
 5. **No import cycle from `internal/resource` to `internal/semantics/*`.**
 
    ```bash
-   go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/internal/semantics/ctevent | tr ' ' '\n' | grep 'internal/resource'
+   go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/core/semantics/ctevent | tr ' ' '\n' | grep 'internal/resource'
    # expected: zero hits
-   go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/internal/semantics/projection | tr ' ' '\n' | grep 'internal/resource'
+   go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/core/semantics/projection | tr ' ' '\n' | grep 'internal/resource'
    # expected: zero hits
 
    ```

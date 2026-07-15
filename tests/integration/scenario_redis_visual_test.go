@@ -11,8 +11,8 @@ package integration
 import (
 	"testing"
 
-	demofixtures "github.com/k2m30/a9s/v3/internal/demo/fixtures"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	demofixtures "github.com/k2m30/a9s/v3/core/demo/fixtures"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 func TestScenario_RedisVisual(t *testing.T) {
@@ -52,8 +52,8 @@ func TestScenario_RedisVisual(t *testing.T) {
 	// -----------------------------------------------------------------
 	// Healthy rows — blank Status (§4 rule: no "OK" / "available").
 	// -----------------------------------------------------------------
-	scenario.ExpectRowStatusBlank(demofixtures.ProdRedisID)      // graph root
-	scenario.ExpectRowStatusBlank("staging-redis")               // single-AZ, no finding per §4 note
+	scenario.ExpectRowStatusBlank(demofixtures.ProdRedisID)         // graph root
+	scenario.ExpectRowStatusBlank("staging-redis")                  // single-AZ, no finding per §4 note
 	scenario.ExpectRowStatusBlank(demofixtures.MultiShardHealthyID) // cluster-mode-enabled, all shards available
 
 	// -----------------------------------------------------------------
@@ -85,9 +85,9 @@ func TestScenario_RedisVisual(t *testing.T) {
 	// All non-green rows also must NOT carry a glyph.
 	// -----------------------------------------------------------------
 	for _, id := range []string{
-		demofixtures.ProdRedisID,          // Healthy, no finding — no glyph
-		"staging-redis",                   // Healthy single-AZ, no finding — no glyph
-		demofixtures.MultiShardHealthyID,  // Healthy multi-shard, no finding — no glyph
+		demofixtures.ProdRedisID,         // Healthy, no finding — no glyph
+		"staging-redis",                  // Healthy single-AZ, no finding — no glyph
+		demofixtures.MultiShardHealthyID, // Healthy multi-shard, no finding — no glyph
 		"dev-feature-redis",
 		"prod-redis-cache",
 		"prod-redis-analytics",

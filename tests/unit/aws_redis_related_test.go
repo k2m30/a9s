@@ -24,9 +24,9 @@ import (
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -208,8 +208,8 @@ func TestRelated_Redis_Registered(t *testing.T) {
 // matches one of the RG's MemberClusters are returned.
 func TestRelated_Redis_Alarm(t *testing.T) {
 	alarmRes := resource.Resource{
-		ID:   "redis-cpu-alarm",
-		Name: "redis-cpu-alarm",
+		ID:     "redis-cpu-alarm",
+		Name:   "redis-cpu-alarm",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
 			AlarmName: aws.String("redis-cpu-alarm"),
@@ -439,8 +439,8 @@ func TestRelated_Redis_Logs_NoConfig(t *testing.T) {
 	}
 	// RG with no log delivery config.
 	src := resource.Resource{
-		ID:   "dev-redis-nologs",
-		Name: "dev-redis-nologs",
+		ID:     "dev-redis-nologs",
+		Name:   "dev-redis-nologs",
 		Fields: map[string]string{},
 		RawStruct: elasticachetypes.ReplicationGroup{
 			ReplicationGroupId:        aws.String("dev-redis-nologs"),
@@ -466,8 +466,8 @@ func TestRelated_Redis_Logs_NoConfig(t *testing.T) {
 // will fail until phase 7 implements tag/name cross-reference.
 func TestRelated_Redis_Secrets_NameMatch(t *testing.T) {
 	secretRes := resource.Resource{
-		ID:   "prod-redis-sessions/auth-token",
-		Name: "prod-redis-sessions/auth-token",
+		ID:     "prod-redis-sessions/auth-token",
+		Name:   "prod-redis-sessions/auth-token",
 		Fields: map[string]string{},
 		RawStruct: smtypes.SecretListEntry{
 			Name: aws.String("prod-redis-sessions/auth-token"),
@@ -503,8 +503,8 @@ func TestRelated_Redis_Secrets_NameMatch(t *testing.T) {
 // NOTE: same phase-7 dependency as NameMatch test above.
 func TestRelated_Redis_Secrets_TagMatch(t *testing.T) {
 	secretRes := resource.Resource{
-		ID:   "arn:aws:secretsmanager:us-east-1:123456789012:secret:redis-auth-token",
-		Name: "redis-auth-token",
+		ID:     "arn:aws:secretsmanager:us-east-1:123456789012:secret:redis-auth-token",
+		Name:   "redis-auth-token",
 		Fields: map[string]string{},
 		RawStruct: smtypes.SecretListEntry{
 			Name: aws.String("redis-auth-token"),
@@ -542,8 +542,8 @@ func TestRelated_Redis_Secrets_TagMatch(t *testing.T) {
 // either the naming convention or the tag.
 func TestRelated_Redis_Secrets_NoMatch(t *testing.T) {
 	secretRes := resource.Resource{
-		ID:   "unrelated-secret",
-		Name: "unrelated-secret",
+		ID:     "unrelated-secret",
+		Name:   "unrelated-secret",
 		Fields: map[string]string{},
 		RawStruct: smtypes.SecretListEntry{
 			Name: aws.String("unrelated-secret"),
@@ -1003,8 +1003,8 @@ func TestRelated_Redis_Registration_KMSVPCNoTargetCache(t *testing.T) {
 // truncated and at least one alarm matches a MemberCluster dimension.
 func TestRelated_Redis_Alarm_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) {
 	matchingAlarm := resource.Resource{
-		ID:   "matching-alarm",
-		Name: "matching-alarm",
+		ID:     "matching-alarm",
+		Name:   "matching-alarm",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
 			AlarmName: aws.String("matching-alarm"),
@@ -1048,8 +1048,8 @@ func TestRelated_Redis_Alarm_TruncatedCacheWithMatches_ReturnsApproximate(t *tes
 // alarm cache is truncated but no alarm matches.
 func TestRelated_Redis_Alarm_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testing.T) {
 	noMatchAlarm := resource.Resource{
-		ID:   "unrelated-alarm",
-		Name: "unrelated-alarm",
+		ID:     "unrelated-alarm",
+		Name:   "unrelated-alarm",
 		Fields: map[string]string{},
 		RawStruct: cwtypes.MetricAlarm{
 			AlarmName:  aws.String("unrelated-alarm"),

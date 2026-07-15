@@ -33,9 +33,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -60,7 +60,7 @@ func TestIsRelatedActionable_Table(t *testing.T) {
 		name           string
 		state          domain.RelatedRowState
 		count          int
-		truncated    bool
+		truncated      bool
 		wantActionable bool
 	}{
 		{"ProvenZero_NotActionable", domain.RelatedResolved, 0, false, false},
@@ -131,7 +131,7 @@ func injectApproxResult(
 			TargetType:  "tg",
 			State:       state,
 			Count:       count,
-			Truncated: truncated,
+			Truncated:   truncated,
 			FetchFilter: fetchFilter,
 			Err:         err,
 		},
@@ -343,7 +343,7 @@ func TestIsActionableRow_ApproxN_NoFilter(t *testing.T) {
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
 			Count:       5,
-			Truncated: true,
+			Truncated:   true,
 			ResourceIDs: []string{"tg-1", "tg-2", "tg-3", "tg-4", "tg-5"},
 		},
 	}
@@ -535,18 +535,18 @@ func buildMixedRelatedDetail(t *testing.T) (views.DetailModel, func()) {
 		ResourceType:   "ec2",
 		DefDisplayName: "Zero A",
 		Result: resource.RelatedCheckResult{
-			TargetType:  "tg",
-			Count:       0,
-			Truncated: false,
+			TargetType: "tg",
+			Count:      0,
+			Truncated:  false,
 		},
 	})
 	d, _ = d.Update(messages.RelatedCheckResult{
 		ResourceType:   "ec2",
 		DefDisplayName: "Zero B",
 		Result: resource.RelatedCheckResult{
-			TargetType:  "vpc",
-			Count:       0,
-			Truncated: false,
+			TargetType: "vpc",
+			Count:      0,
+			Truncated:  false,
 		},
 	})
 	d, _ = d.Update(messages.RelatedCheckResult{
@@ -630,18 +630,18 @@ func TestRightColumn_EnterOnAllZeroRows_NoNavigate(t *testing.T) {
 		ResourceType:   "ec2",
 		DefDisplayName: "Zero A",
 		Result: resource.RelatedCheckResult{
-			TargetType:  "tg",
-			Count:       0,
-			Truncated: false,
+			TargetType: "tg",
+			Count:      0,
+			Truncated:  false,
 		},
 	})
 	d, _ = d.Update(messages.RelatedCheckResult{
 		ResourceType:   "ec2",
 		DefDisplayName: "Zero B",
 		Result: resource.RelatedCheckResult{
-			TargetType:  "vpc",
-			Count:       0,
-			Truncated: false,
+			TargetType: "vpc",
+			Count:      0,
+			Truncated:  false,
 		},
 	})
 

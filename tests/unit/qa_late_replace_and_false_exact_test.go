@@ -3,19 +3,19 @@
 // Defect (observed live; coder root-causing in parallel — coordinate via
 // the mechanisms below):
 //
-//  A) A staler page-1 REPLACE landing after a deeper load-more append
-//     stomps the 55-row list back to 50+ (C2: older results must be
-//     discarded).
+//	A) A staler page-1 REPLACE landing after a deeper load-more append
+//	   stomps the 55-row list back to 50+ (C2: older results must be
+//	   discarded).
 //
-//  B) The persisted file got count:50, exact:true, rows:0 on a 55-bucket
-//     account: a page-1 session.ResourceCache entry stored WITHOUT its
-//     Pagination (HandleResourcesLoaded's PatchResourceCache at
-//     internal/runtime/handlers_resources.go builds
-//     Entry{Resources: ev.Resources} — no Pagination) makes
-//     availabilityFromResourceCache derive truncated=false for a page-1-
-//     shaped entry, producing a false-exact 50 that SaveAvailabilityCache
-//     (internal/runtime/probes.go) then accepts as a downgrade of the
-//     previously-stored true-exact 55, dropping the fuller Rows.
+//	B) The persisted file got count:50, exact:true, rows:0 on a 55-bucket
+//	   account: a page-1 session.ResourceCache entry stored WITHOUT its
+//	   Pagination (HandleResourcesLoaded's PatchResourceCache at
+//	   internal/runtime/handlers_resources.go builds
+//	   Entry{Resources: ev.Resources} — no Pagination) makes
+//	   availabilityFromResourceCache derive truncated=false for a page-1-
+//	   shaped entry, producing a false-exact 50 that SaveAvailabilityCache
+//	   (internal/runtime/probes.go) then accepts as a downgrade of the
+//	   previously-stored true-exact 55, dropping the fuller Rows.
 //
 // Pins (harnesses: qa_load_more_dedup_test.go's poisoning-sequence shape +
 // runtime_executor_depth_refetch_test.go's seedCachedRows/bucketID/
@@ -33,13 +33,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/cache"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/session"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // ────────────────────────────────────────────────────────────────────────────

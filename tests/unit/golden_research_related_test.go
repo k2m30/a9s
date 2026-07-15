@@ -20,8 +20,8 @@ import (
 	"strings"
 	"testing"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // reP0Row matches any markdown table row that ends with "| P0 |" (with optional

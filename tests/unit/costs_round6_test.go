@@ -16,7 +16,7 @@
 //
 // Item 1 is a static template-content check, not a template EXECUTION
 // test — see its doc comment for why (no exported web-render hook, zero
-// existing internal/web unit tests).
+// existing core/web unit tests).
 package unit
 
 import (
@@ -33,11 +33,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	cetypes "github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	a9saws "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/costs"
-	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/app"
+	a9saws "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/costs"
+	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -115,11 +115,11 @@ func round6FullWindowRecords(window []costs.Period, rowKey string, amount float6
 }
 
 // ===========================================================================
-// Item 1 (P2, internal/app/viewstate.go:95 + internal/web) — BodyKindCosts
+// Item 1 (P2, core/app/viewstate.go:95 + core/web) — BodyKindCosts
 // must render the grid in web mode, not the generic "Loading…" fallthrough.
 //
-// WEAKNESS FLAG: internal/web/render.go's renderPage/renderMainFragment are
-// unexported, and there are zero existing internal/web unit tests (web
+// WEAKNESS FLAG: core/web/render.go's renderPage/renderMainFragment are
+// unexported, and there are zero existing core/web unit tests (web
 // rendering is exercised only by tests/e2e's Playwright specs, outside
 // tests/unit's reach). This is therefore a static source-text check on the
 // template FILE, not a template EXECUTION test — it catches a missing
@@ -128,7 +128,7 @@ func round6FullWindowRecords(window []costs.Period, rowKey string, amount float6
 // ===========================================================================
 
 func TestCostsRound6_Item1_WebBodyTemplate_HasCostsCase(t *testing.T) {
-	path := filepath.Join("..", "..", "internal", "web", "templates", "body.html")
+	path := filepath.Join("..", "..", "core", "web", "templates", "body.html")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("reading body.html: %v", err)
@@ -153,7 +153,7 @@ func TestCostsRound6_Item2_TUI_ScrollLeftAtOldestColumn_DispatchesFetchCmd(t *te
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 
-	// internal/costs/window.go's defaultMonthColumns: the default root
+	// core/costs/window.go's defaultMonthColumns: the default root
 	// window is exactly 12 trailing months, cursor starts at the newest
 	// (rightmost) column. 11 scroll-lefts walk it to column 0; the 12th
 	// crosses the oldest loaded column — extending the range within CE's
@@ -169,7 +169,7 @@ func TestCostsRound6_Item2_TUI_ScrollLeftAtOldestColumn_DispatchesFetchCmd(t *te
 }
 
 // ===========================================================================
-// Item 3 (P2, internal/costs/grid.go:123) — the row filter must drop only
+// Item 3 (P2, core/costs/grid.go:123) — the row filter must drop only
 // rows whose cells are ALL zero/no-data: a row with +100 in one period and
 // -100 in another (net zero total) must still render; TOTAL unchanged.
 // ===========================================================================
@@ -215,7 +215,7 @@ func TestCostsRound6_Item3_BuildGrid_NetZeroRow_StillRenders_TotalUnchanged(t *t
 }
 
 // ===========================================================================
-// Item 4 (P2, internal/aws/costs.go:80) — invoiceMetricKey must not remap
+// Item 4 (P2, core/aws/costs.go:80) — invoiceMetricKey must not remap
 // invoice -> unblended for a RECORD_TYPE clause coming from a RECORD_TYPE
 // DRILL in invoice mode; only the unblended display shape's own exclusion
 // filter does.
@@ -256,7 +256,7 @@ func TestCostsRound6_Item4_InvoiceModeRecordTypeDrill_ParsesUnblendedCostIntoInv
 
 	// A record-type DRILL in invoice mode: Filter.Equals[RECORD_TYPE] is
 	// set (the user pivoted by RECORD_TYPE, digit 6, then drilled Enter
-	// into a specific row — internal/app/costs_state.go's
+	// into a specific row — core/app/costs_state.go's
 	// applyCostPivot/applyCostsSelect never touch cs.Metric, which stays
 	// "invoice"). This is NOT the unblended display shape's own
 	// NotEquals[RECORD_TYPE] exclusion filter, which legitimately maps to
@@ -289,7 +289,7 @@ func TestCostsRound6_Item4_InvoiceModeRecordTypeDrill_ParsesUnblendedCostIntoInv
 }
 
 // ===========================================================================
-// Item 5 (P2, internal/app/costs_state.go:300) — a stale ErrorMsg must
+// Item 5 (P2, core/app/costs_state.go:300) — a stale ErrorMsg must
 // clear when the requested shape is fully covered by cache (switch to a
 // warm shape renders the grid, not the old error) and when a retry starts.
 // ===========================================================================
@@ -372,7 +372,7 @@ func TestCostsRound6_Item5_StaleErrorMsg_ClearsWhenRetryStarts(t *testing.T) {
 	vs := c.Snapshot()
 	// ensureCostsShapeFetched DID set the internal cs.Loading=true (proven
 	// by retryTasks being non-empty above) — but buildCostsBody's
-	// ErrorMsg-early-return branch (internal/app/costs_body.go:28-44)
+	// ErrorMsg-early-return branch (core/app/costs_body.go:28-44)
 	// constructs the returned CostsBody WITHOUT ever copying cs.Loading
 	// into it, so Loading reads back false from the outside regardless.
 	// Same root cause as the warm-switch half of this finding: the stale
@@ -433,7 +433,7 @@ func TestCostsRound6_Item6_FooterSurvives_HeightBudget_WhenClipping(t *testing.T
 // the zero value (sum=0), never NaN; BuildGrid's per-row total is a plain
 // sum over every column, so a missing column simply contributes 0, and NaN
 // can only enter via a genuinely malformed Amount.Value (never produced on
-// this path — internal/aws/costs.go's mapCEGroup hard-errors on an
+// this path — core/aws/costs.go's mapCEGroup hard-errors on an
 // unparseable amount rather than substituting NaN). Kept per the
 // coordinator's instruction as a cheap regression pin for the user-visible
 // symptom the reviewer described ("all-zero viewports on every pivot"),
@@ -469,7 +469,7 @@ func TestCostsRound6_Item7_MissingCellRow_SortsByRealTotal_GreenRegressionPin(t 
 }
 
 // ===========================================================================
-// Item 8 (NEW) — cost cache schema version bump: internal/costs/store.go's
+// Item 8 (NEW) — cost cache schema version bump: core/costs/store.go's
 // schemaVersion goes to 2, so a version-1 file (this branch's earlier
 // builds wrote incompatible shapes/keys under the same version number)
 // gets set aside to .bak with a fresh store, exercising the existing
@@ -532,7 +532,7 @@ func TestCostsRound6_Item8_VersionOneFile_TreatedAsAlien_AfterSchemaBump(t *test
 //
 // RECONCILED (architecture.md Seam 8, CostsViewModel): this whole group's
 // mechanism — filterCostsZeroDisplayGridRows' sub-cent hide + the
-// LINKED_ACCOUNT exemption (internal/app/costs_state.go's liveCostGrid) —
+// LINKED_ACCOUNT exemption (core/app/costs_state.go's liveCostGrid) —
 // is pinned at the typed seam in costs_screen_test.go
 // (TestCostsScreen_BuildViewModel_DisplayFilter_SubCentHidden_
 // LinkedAccountExempt). These four tests stay unchanged as the full-stack

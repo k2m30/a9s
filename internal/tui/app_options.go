@@ -7,7 +7,7 @@
 // import boundary.
 package tui
 
-import "github.com/k2m30/a9s/v3/internal/runtime"
+import "github.com/k2m30/a9s/v3/core/runtime"
 
 // WithProfile overrides the profile field on the active session — used in
 // tests that need a specific profile string without going through the live

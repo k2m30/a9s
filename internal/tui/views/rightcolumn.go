@@ -8,10 +8,10 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/app"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 )
 
@@ -24,7 +24,7 @@ type rightColumnRow struct {
 	fetchFilter map[string]string      // server-side filter for filtered paginated fetcher
 	loading     bool
 	err         error
-	truncated bool                    // true when count was derived from a truncated cache; UI renders "N+"
+	truncated   bool                    // true when count was derived from a truncated cache; UI renders "N+"
 	checker     resource.RelatedChecker // originating RelatedDef.Checker — carried forward for re-apply on load-more
 }
 

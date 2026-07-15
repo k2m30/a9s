@@ -9,9 +9,9 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
+	_ "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 func ebsCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
@@ -254,7 +254,7 @@ func TestRelated_EBS_Alarm_NoMatchOtherDimension(t *testing.T) {
 	dimName := "VolumeId"
 	dimVal := "vol-other"
 	alarmRes := resource.Resource{
-		ID:     "other-alarm",
+		ID: "other-alarm",
 		RawStruct: cwtypes.MetricAlarm{
 			Dimensions: []cwtypes.Dimension{{Name: &dimName, Value: &dimVal}},
 		},
