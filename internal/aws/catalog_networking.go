@@ -158,17 +158,6 @@ func colorTGW(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-// colorTransfer prefers colorFromAnyFinding — docs/resources/transfer.md
-// §4: every signal is color-bearing, no glyph-on-green case exists for
-// transfer. Real fetched resources always carry a Finding when off-Healthy,
-// so there is no raw-field fallback to keep.
-func colorTransfer(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return domain.ColorHealthy
-}
-
 func colorENI(r domain.Resource) domain.Color {
 	if c, ok := colorFromWave1(r); ok {
 		return c
@@ -183,17 +172,6 @@ func colorENI(r domain.Resource) domain.Color {
 		return domain.ColorWarning
 	case "attaching", "detaching":
 		return domain.ColorWarning
-	}
-	return domain.ColorHealthy
-}
-
-// colorVpcPeer prefers colorFromAnyFinding — docs/resources/vpc-peer.md §4:
-// every Wave-1 state/CIDR-overlap signal is color-bearing; the two Wave-2
-// cache-scan signals (EnrichVpcPeerRoutes) mirror the lt deprecated-AMI `~`
-// treatment (colorLT precedent) rather than introducing a separate path.
-func colorVpcPeer(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
 	}
 	return domain.ColorHealthy
 }
@@ -729,7 +707,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			ContextKeys:    map[string]string{"server_id": "ID"},
 			DisplayNameKey: "server_id",
 		}},
-		Color:   colorTransfer,
+		Color:   colorAnyFindingOrHealthy,
 		Fetcher: fetcherWithClients(FetchTransferServersPage),
 		FieldKeys: []string{
 			"server_id", "status", "domain", "endpoint_type",
@@ -781,7 +759,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "accepter_owner", Title: "Accepter Owner", Width: 14, Sortable: true},
 			{Key: "expires", Title: "Expires", Width: 17, Sortable: true},
 		},
-		Color: colorVpcPeer,
+		Color: colorAnyFindingOrHealthy,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchVpcPeeringConnectionsPage(ctx, c.EC2, continuationToken)
 		}),
@@ -792,12 +770,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkVpcPeerVPC, NeedsTargetCache: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("vpc-peer")},
 		},
-		// No Navigable fields: the only structural ARN-shaped values are
-		// RequesterVpcInfo.VpcId / AccepterVpcInfo.VpcId, and the remote side
-		// is frequently a cross-account VPC absent from the local cache — a
-		// drill-through would land on an empty view. The vpc related-panel
-		// pivot (checkVpcPeerVPC) already applies the honest
-		// cache-membership gate; see docs/resources/vpc-peer-impl-plan.md §0.
+		// No Navigable fields — see docs/resources/vpc-peer-impl-plan.md §0.
 		Findings: []catalog.FindingDef{
 			{Code: vpcPeerCodeProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: vpcPeerCodeInitiating, Phrase: "initiating", Severity: domain.SevWarn, Source: "wave1"},

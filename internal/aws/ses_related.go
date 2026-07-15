@@ -377,7 +377,7 @@ func sesLambdaNamesFromRules(rules []sestypes.ReceiptRule) []string {
 			if arn == "" {
 				continue
 			}
-			name := lambdaARNToName(arn)
+			name := resource.LambdaNameFromARN(arn)
 			if name == "" {
 				continue
 			}
@@ -388,23 +388,6 @@ func sesLambdaNamesFromRules(rules []sestypes.ReceiptRule) []string {
 		}
 	}
 	return names
-}
-
-// lambdaARNToName extracts the function name from a Lambda function ARN.
-// Returns "" for unparseable input. Handles version/alias suffix by taking
-// only the segment after "function:".
-// ARN format: arn:aws:lambda:REGION:ACCOUNT:function:FUNCTION_NAME[:VERSION_OR_ALIAS]
-func lambdaARNToName(arn string) string {
-	const marker = ":function:"
-	_, tail, found := strings.Cut(arn, marker)
-	if !found {
-		return ""
-	}
-	// Strip version/alias suffix (":v1" or ":$LATEST" or ":alias")
-	if colon := strings.Index(tail, ":"); colon >= 0 {
-		tail = tail[:colon]
-	}
-	return tail
 }
 
 // sesS3BucketsFromRules walks ReceiptRule actions and collects S3Action.BucketName values.

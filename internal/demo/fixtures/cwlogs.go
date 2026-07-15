@@ -317,46 +317,6 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(90),
 			CreationTime:    aws.Int64(1750800000000),
 		},
-		// prod-airflow-etl log groups — required for mwaa→logs related-panel
-		// pivot (5 per-component groups). Names/ARNs are built from the same
-		// mwaaLogGroupName/mwaaLogGroupArn helpers (mwaa.go) that populate the
-		// environment's own LoggingConfiguration.*.CloudWatchLogGroupArn, so
-		// the two fixture files can never drift apart.
-		{
-			LogGroupName:    aws.String(mwaaLogGroupName(ProdAirflowEtlID, "DAGProcessing")),
-			Arn:             aws.String(mwaaLogGroupArn(ProdAirflowEtlID, "DAGProcessing")),
-			StoredBytes:     aws.Int64(15728640),
-			RetentionInDays: aws.Int32(30),
-			CreationTime:    aws.Int64(1756704000000),
-		},
-		{
-			LogGroupName:    aws.String(mwaaLogGroupName(ProdAirflowEtlID, "Scheduler")),
-			Arn:             aws.String(mwaaLogGroupArn(ProdAirflowEtlID, "Scheduler")),
-			StoredBytes:     aws.Int64(20971520),
-			RetentionInDays: aws.Int32(30),
-			CreationTime:    aws.Int64(1756704000000),
-		},
-		{
-			LogGroupName:    aws.String(mwaaLogGroupName(ProdAirflowEtlID, "WebServer")),
-			Arn:             aws.String(mwaaLogGroupArn(ProdAirflowEtlID, "WebServer")),
-			StoredBytes:     aws.Int64(10485760),
-			RetentionInDays: aws.Int32(30),
-			CreationTime:    aws.Int64(1756704000000),
-		},
-		{
-			LogGroupName:    aws.String(mwaaLogGroupName(ProdAirflowEtlID, "Worker")),
-			Arn:             aws.String(mwaaLogGroupArn(ProdAirflowEtlID, "Worker")),
-			StoredBytes:     aws.Int64(31457280),
-			RetentionInDays: aws.Int32(30),
-			CreationTime:    aws.Int64(1756704000000),
-		},
-		{
-			LogGroupName:    aws.String(mwaaLogGroupName(ProdAirflowEtlID, "Task")),
-			Arn:             aws.String(mwaaLogGroupArn(ProdAirflowEtlID, "Task")),
-			StoredBytes:     aws.Int64(52428800),
-			RetentionInDays: aws.Int32(30),
-			CreationTime:    aws.Int64(1756704000000),
-		},
 		// prod-as2-gateway's two structured-log destinations (transfer.go
 		// graph root) — required for the transfer→logs related-panel pivot
 		// (count ≥2).
@@ -374,6 +334,30 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(90),
 			CreationTime:    aws.Int64(1727740800000),
 		},
+	}
+
+	// prod-airflow-etl log groups — required for mwaa→logs related-panel
+	// pivot (5 per-component groups). Names/ARNs are built from the same
+	// mwaaLogGroupName/mwaaLogGroupArn helpers (mwaa.go) that populate the
+	// environment's own LoggingConfiguration.*.CloudWatchLogGroupArn, so
+	// the two fixture files can never drift apart.
+	for _, lg := range []struct {
+		component string
+		bytes     int64
+	}{
+		{"DAGProcessing", 15728640},
+		{"Scheduler", 20971520},
+		{"WebServer", 10485760},
+		{"Worker", 31457280},
+		{"Task", 52428800},
+	} {
+		logGroups = append(logGroups, cwlogstypes.LogGroup{
+			LogGroupName:    aws.String(mwaaLogGroupName(ProdAirflowEtlID, lg.component)),
+			Arn:             aws.String(mwaaLogGroupArn(ProdAirflowEtlID, lg.component)),
+			StoredBytes:     aws.Int64(lg.bytes),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1756704000000),
+		})
 	}
 
 	logStreams := map[string][]cwlogstypes.LogStream{

@@ -55,7 +55,7 @@ var navIDExtractors = map[string]func(string) string{
 	"logs":     arnLastColonSegment,
 	"s3":       s3BucketFromARN,
 	"iam-user": arnLastSlashSegment,
-	"lambda":   lambdaARNToBareName,
+	"lambda":   LambdaNameFromARN,
 }
 
 // arnLastSlashSegment returns the substring after the last "/".
@@ -80,13 +80,12 @@ func arnLastColonSegment(s string) string {
 	return s[i+1:]
 }
 
-// lambdaARNToBareName extracts the bare function name from a Lambda ARN,
-// mirroring the canonical lambdaARNToName (internal/aws/ses_related.go) —
-// the same ":function:" split with the trailing version/alias segment
+// LambdaNameFromARN extracts the bare function name from a Lambda ARN — the
+// canonical ":function:" split with the trailing version/alias segment
 // stripped. Example: "arn:aws:lambda:us-east-1:123:function:fn:v1" → "fn".
 // Returns "" when the value carries no ":function:" marker (a plain bare
 // name), so NavIDFromValue's caller falls back to the raw value unchanged.
-func lambdaARNToBareName(s string) string {
+func LambdaNameFromARN(s string) string {
 	const marker = ":function:"
 	_, tail, found := strings.Cut(s, marker)
 	if !found {

@@ -18,11 +18,11 @@ import (
 // mwaa.* FindingCodes — docs/resources/mwaa.md §3.2/§4. The eleven
 // mwaaCode* state codes below classify Environment.Status; the two
 // background codes (mwaaCodeLastUpdateFailed, mwaaCodeWebserverPublic) fire
-// on ANY status. Every code here is color-bearing — colorMWAA in
-// catalog_data.go derives row color from the worst-severity Finding present,
-// with no state-vs-background distinction (docs/resources/mwaa.md §4: no
-// glyph-on-green case exists for mwaa — every signal moves the row off
-// green).
+// on ANY status. Every code here is color-bearing — the shared
+// colorAnyFindingOrHealthy helper (catalog_color_helpers.go) derives row
+// color from the worst-severity Finding present, with no state-vs-background
+// distinction (docs/resources/mwaa.md §4: no glyph-on-green case exists for
+// mwaa — every signal moves the row off green).
 const (
 	mwaaCodeCreating         domain.FindingCode = "mwaa.warn.creating"
 	mwaaCodeCreatingSnapshot domain.FindingCode = "mwaa.warn.creating_snapshot"
@@ -92,17 +92,11 @@ func FetchMWAAEnvironmentsPage(ctx context.Context, c *ServiceClients, continuat
 		resources = append(resources, buildMWAAResource(name, getOutput.Environment))
 	}
 
-	isTruncated := listOutput.NextToken != nil
-	var nextToken string
-	if listOutput.NextToken != nil {
-		nextToken = *listOutput.NextToken
-	}
-
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: isTruncated,
-			NextToken:   nextToken,
+			IsTruncated: listOutput.NextToken != nil,
+			NextToken:   aws.ToString(listOutput.NextToken),
 			PageSize:    len(resources),
 			TotalHint:   -1,
 		},
@@ -132,11 +126,11 @@ func buildMWAAResource(name string, env *mwaatypes.Environment) resource.Resourc
 
 	var dagProcessingLogGroup, schedulerLogGroup, webserverLogGroup, workerLogGroup, taskLogGroup string
 	if env.LoggingConfiguration != nil {
-		dagProcessingLogGroup = mwaaLogGroupNameFromARN(mwaaModuleLogGroupARN(env.LoggingConfiguration.DagProcessingLogs))
-		schedulerLogGroup = mwaaLogGroupNameFromARN(mwaaModuleLogGroupARN(env.LoggingConfiguration.SchedulerLogs))
-		webserverLogGroup = mwaaLogGroupNameFromARN(mwaaModuleLogGroupARN(env.LoggingConfiguration.WebserverLogs))
-		workerLogGroup = mwaaLogGroupNameFromARN(mwaaModuleLogGroupARN(env.LoggingConfiguration.WorkerLogs))
-		taskLogGroup = mwaaLogGroupNameFromARN(mwaaModuleLogGroupARN(env.LoggingConfiguration.TaskLogs))
+		dagProcessingLogGroup = mwaaLogGroup(env.LoggingConfiguration.DagProcessingLogs)
+		schedulerLogGroup = mwaaLogGroup(env.LoggingConfiguration.SchedulerLogs)
+		webserverLogGroup = mwaaLogGroup(env.LoggingConfiguration.WebserverLogs)
+		workerLogGroup = mwaaLogGroup(env.LoggingConfiguration.WorkerLogs)
+		taskLogGroup = mwaaLogGroup(env.LoggingConfiguration.TaskLogs)
 	}
 
 	lastUpdateStatus := ""
@@ -193,11 +187,9 @@ func buildMWAAResource(name string, env *mwaatypes.Environment) resource.Resourc
 }
 
 // buildMWAADegradedResource builds the name-only degraded row for an
-// environment whose GetEnvironment call failed. ListEnvironments returns
-// names only (docs/resources/mwaa.md §3.1), so unlike transfer/lt's rich
-// degradation there are no list fields to carry forward — the shared
-// details-denied finding is appended with mwaa's own §4 sentence rather than
-// the generic degraded_resource.go text.
+// environment whose GetEnvironment call failed — ListEnvironments returns
+// names only (docs/resources/mwaa.md §3.1), so there are no list fields to
+// carry forward.
 func buildMWAADegradedResource(name string) resource.Resource {
 	return resource.Resource{
 		ID:   name,
@@ -207,13 +199,7 @@ func buildMWAADegradedResource(name string) resource.Resource {
 			"status": detailsDeniedPhrase,
 		},
 		RawStruct: &mwaatypes.Environment{Name: aws.String(name)},
-		Findings: []domain.Finding{{
-			Code:     DetailsDeniedCode("mwaa"),
-			Phrase:   detailsDeniedPhrase,
-			Detail:   mwaaDetailsDeniedDetail,
-			Severity: domain.SevWarn,
-			Source:   "wave1",
-		}},
+		Findings:  []domain.Finding{detailsDeniedFinding("mwaa", mwaaDetailsDeniedDetail)},
 	}
 }
 
@@ -271,78 +257,71 @@ func computeMWAAFindings(env *mwaatypes.Environment) ([]domain.Finding, map[doma
 	return findings, attentionDetails
 }
 
+// mwaaStateFindings maps Environment.Status to its docs/resources/mwaa.md §4
+// state-bucket Finding. AVAILABLE has no entry (Healthy — no finding).
+var mwaaStateFindings = map[mwaatypes.EnvironmentStatus]domain.Finding{ //nolint:gochecknoglobals // static lookup table, the transferLegacySecurityPolicies precedent
+	mwaatypes.EnvironmentStatusCreating: {
+		Code: mwaaCodeCreating, Phrase: "creating",
+		Detail:   "Environment is being provisioned; Airflow is not yet reachable.",
+		Severity: domain.SevWarn, Source: "wave1",
+	},
+	mwaatypes.EnvironmentStatusCreatingSnapshot: {
+		Code: mwaaCodeCreatingSnapshot, Phrase: "creating snapshot",
+		Detail:   "The environment is snapshotting its metadata database before an update or upgrade.",
+		Severity: domain.SevWarn, Source: "wave1",
+	},
+	mwaatypes.EnvironmentStatusPending: {
+		Code: mwaaCodePending, Phrase: "pending: awaiting VPC endpoints",
+		Detail:   "Creation is paused until the required VPC endpoints exist in your VPC.",
+		Severity: domain.SevWarn, Source: "wave1",
+	},
+	mwaatypes.EnvironmentStatusUpdating: {
+		Code: mwaaCodeUpdating, Phrase: "updating",
+		Detail:   "Environment update in progress; workers may be replaced.",
+		Severity: domain.SevWarn, Source: "wave1",
+	},
+	mwaatypes.EnvironmentStatusRollingBack: {
+		Code: mwaaCodeRollingBack, Phrase: "rolling back: update failed",
+		Detail:   "Update or upgrade failed; the environment is restoring the latest metadata snapshot.",
+		Severity: domain.SevWarn, Source: "wave1",
+	},
+	mwaatypes.EnvironmentStatusMaintenance: {
+		Code: mwaaCodeMaintenance, Phrase: "maintenance in progress",
+		Detail:   "Scheduled maintenance is running; the environment may be briefly unavailable.",
+		Severity: domain.SevWarn, Source: "wave1",
+	},
+	mwaatypes.EnvironmentStatusCreateFailed: {
+		Code: mwaaCodeCreateFailed, Phrase: "create failed",
+		Detail:   "Environment creation failed and the environment was not created.",
+		Severity: domain.SevBroken, Source: "wave1",
+	},
+	mwaatypes.EnvironmentStatusUpdateFailed: {
+		Code: mwaaCodeUpdateFailed, Phrase: "update failed: rolled back",
+		Detail:   "Update failed; environment was restored to its previous state and is usable.",
+		Severity: domain.SevBroken, Source: "wave1",
+	},
+	mwaatypes.EnvironmentStatusUnavailable: {
+		Code: mwaaCodeUnavailable, Phrase: "unavailable: not stable",
+		Detail:   "Environment failed and did not return to a stable state; contact AWS support.",
+		Severity: domain.SevBroken, Source: "wave1",
+	},
+	mwaatypes.EnvironmentStatusDeleting: {
+		Code: mwaaCodeDeleting, Phrase: "deleting",
+		Detail:   "Environment is being deleted.",
+		Severity: domain.SevDim, Source: "wave1",
+	},
+	mwaatypes.EnvironmentStatusDeleted: {
+		Code: mwaaCodeDeleted, Phrase: "deleted",
+		Detail:   "Environment has been deleted.",
+		Severity: domain.SevDim, Source: "wave1",
+	},
+}
+
 // mwaaStateFinding maps Environment.Status to its docs/resources/mwaa.md §4
 // state-bucket Finding. ok is false for AVAILABLE (Healthy — no finding).
 func mwaaStateFinding(status mwaatypes.EnvironmentStatus) (domain.Finding, bool) {
-	switch status {
-	case mwaatypes.EnvironmentStatusCreating:
-		return domain.Finding{
-			Code: mwaaCodeCreating, Phrase: "creating",
-			Detail:   "Environment is being provisioned; Airflow is not yet reachable.",
-			Severity: domain.SevWarn, Source: "wave1",
-		}, true
-	case mwaatypes.EnvironmentStatusCreatingSnapshot:
-		return domain.Finding{
-			Code: mwaaCodeCreatingSnapshot, Phrase: "creating snapshot",
-			Detail:   "The environment is snapshotting its metadata database before an update or upgrade.",
-			Severity: domain.SevWarn, Source: "wave1",
-		}, true
-	case mwaatypes.EnvironmentStatusPending:
-		return domain.Finding{
-			Code: mwaaCodePending, Phrase: "pending: awaiting VPC endpoints",
-			Detail:   "Creation is paused until the required VPC endpoints exist in your VPC.",
-			Severity: domain.SevWarn, Source: "wave1",
-		}, true
-	case mwaatypes.EnvironmentStatusUpdating:
-		return domain.Finding{
-			Code: mwaaCodeUpdating, Phrase: "updating",
-			Detail:   "Environment update in progress; workers may be replaced.",
-			Severity: domain.SevWarn, Source: "wave1",
-		}, true
-	case mwaatypes.EnvironmentStatusRollingBack:
-		return domain.Finding{
-			Code: mwaaCodeRollingBack, Phrase: "rolling back: update failed",
-			Detail:   "Update or upgrade failed; the environment is restoring the latest metadata snapshot.",
-			Severity: domain.SevWarn, Source: "wave1",
-		}, true
-	case mwaatypes.EnvironmentStatusMaintenance:
-		return domain.Finding{
-			Code: mwaaCodeMaintenance, Phrase: "maintenance in progress",
-			Detail:   "Scheduled maintenance is running; the environment may be briefly unavailable.",
-			Severity: domain.SevWarn, Source: "wave1",
-		}, true
-	case mwaatypes.EnvironmentStatusCreateFailed:
-		return domain.Finding{
-			Code: mwaaCodeCreateFailed, Phrase: "create failed",
-			Detail:   "Environment creation failed and the environment was not created.",
-			Severity: domain.SevBroken, Source: "wave1",
-		}, true
-	case mwaatypes.EnvironmentStatusUpdateFailed:
-		return domain.Finding{
-			Code: mwaaCodeUpdateFailed, Phrase: "update failed: rolled back",
-			Detail:   "Update failed; environment was restored to its previous state and is usable.",
-			Severity: domain.SevBroken, Source: "wave1",
-		}, true
-	case mwaatypes.EnvironmentStatusUnavailable:
-		return domain.Finding{
-			Code: mwaaCodeUnavailable, Phrase: "unavailable: not stable",
-			Detail:   "Environment failed and did not return to a stable state; contact AWS support.",
-			Severity: domain.SevBroken, Source: "wave1",
-		}, true
-	case mwaatypes.EnvironmentStatusDeleting:
-		return domain.Finding{
-			Code: mwaaCodeDeleting, Phrase: "deleting",
-			Detail:   "Environment is being deleted.",
-			Severity: domain.SevDim, Source: "wave1",
-		}, true
-	case mwaatypes.EnvironmentStatusDeleted:
-		return domain.Finding{
-			Code: mwaaCodeDeleted, Phrase: "deleted",
-			Detail:   "Environment has been deleted.",
-			Severity: domain.SevDim, Source: "wave1",
-		}, true
-	}
-	return domain.Finding{}, false
+	f, ok := mwaaStateFindings[status]
+	return f, ok
 }
 
 // mwaaUpdateErrorText formats a LastUpdate.Error as a single detail-view
@@ -364,13 +343,14 @@ func mwaaUpdateErrorText(err *mwaatypes.UpdateError) string {
 	}
 }
 
-// mwaaModuleLogGroupARN extracts CloudWatchLogGroupArn from a
-// ModuleLoggingConfiguration, returning "" for a nil pointer or field.
-func mwaaModuleLogGroupARN(m *mwaatypes.ModuleLoggingConfiguration) string {
+// mwaaLogGroup extracts the bare log group name from a
+// ModuleLoggingConfiguration's CloudWatchLogGroupArn, returning "" for a nil
+// pointer or field.
+func mwaaLogGroup(m *mwaatypes.ModuleLoggingConfiguration) string {
 	if m == nil {
 		return ""
 	}
-	return aws.ToString(m.CloudWatchLogGroupArn)
+	return mwaaLogGroupNameFromARN(aws.ToString(m.CloudWatchLogGroupArn))
 }
 
 // mwaaLogGroupNameFromARN extracts the bare log group name from a CloudWatch

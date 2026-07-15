@@ -69,6 +69,19 @@ func colorFromAnyFinding(r domain.Resource) (domain.Color, bool) {
 	return colorFromSeverity(worst), true
 }
 
+// colorAnyFindingOrHealthy classifies r from colorFromAnyFinding, defaulting
+// to healthy when no Finding is present. Shared by the mwaa/transfer/vpc-peer/
+// lt catalog entries: every signal on these types is color-bearing — no
+// glyph-on-green case exists (docs/resources/mwaa.md §4, transfer.md §4,
+// vpc-peer.md §4, lt.md §4) — and real fetched resources always carry a
+// Finding when off-Healthy, so there is no raw-field fallback to keep.
+func colorAnyFindingOrHealthy(r domain.Resource) domain.Color {
+	if c, ok := colorFromAnyFinding(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
+
 // colorWave1OrHealthy classifies r from its first wave1 Finding, defaulting to
 // healthy when none is present. Used by child-type catalog entries whose only
 // severity signal comes from fetcher-emitted wave1 Findings (cb_builds,

@@ -106,88 +106,40 @@ func vpcPeerStatus(code ec2types.VpcPeeringConnectionStateReasonCode, message st
 	return status
 }
 
+// peer builds one VpcPeeringConnection: requester is always the local prod
+// VPC (account 123456789012), accepter is always the cross-account remote
+// VPC. reqCidrs/accCidrs are omitted (nil) for every non-active state — the
+// SDK only returns CIDR info for active connections.
+func peer(id string, code ec2types.VpcPeeringConnectionStateReasonCode, msg string, reqCidrs, accCidrs []string) ec2types.VpcPeeringConnection {
+	return ec2types.VpcPeeringConnection{
+		VpcPeeringConnectionId: aws.String(id),
+		Status:                 vpcPeerStatus(code, msg),
+		RequesterVpcInfo:       vpcPeerInfo(fixtProdVPCID, "123456789012", reqCidrs...),
+		AccepterVpcInfo:        vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID, accCidrs...),
+	}
+}
+
 func buildVpcPeerConnections() []ec2types.VpcPeeringConnection {
+	root := peer(ProdPeerSharedID, ec2types.VpcPeeringConnectionStateReasonCodeActive, "",
+		[]string{"10.0.0.0/16"}, []string{"192.168.0.0/16"})
+	root.RequesterVpcInfo.PeeringOptions = &ec2types.VpcPeeringConnectionOptionsDescription{AllowDnsResolutionFromRemoteVpc: aws.Bool(true)}
+	root.AccepterVpcInfo.PeeringOptions = &ec2types.VpcPeeringConnectionOptionsDescription{AllowDnsResolutionFromRemoteVpc: aws.Bool(false)}
+
+	pending := peer(WarnPeerPendingID, ec2types.VpcPeeringConnectionStateReasonCodePendingAcceptance, "", nil, nil)
+	pending.ExpirationTime = aws.Time(time.Now().UTC().Add(72 * time.Hour))
+
 	return []ec2types.VpcPeeringConnection{
-		{
-			VpcPeeringConnectionId: aws.String(ProdPeerSharedID),
-			Status:                 vpcPeerStatus(ec2types.VpcPeeringConnectionStateReasonCodeActive, ""),
-			RequesterVpcInfo: func() *ec2types.VpcPeeringConnectionVpcInfo {
-				info := vpcPeerInfo(fixtProdVPCID, "123456789012", "10.0.0.0/16")
-				info.PeeringOptions = &ec2types.VpcPeeringConnectionOptionsDescription{AllowDnsResolutionFromRemoteVpc: aws.Bool(true)}
-				return info
-			}(),
-			AccepterVpcInfo: func() *ec2types.VpcPeeringConnectionVpcInfo {
-				info := vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID, "192.168.0.0/16")
-				info.PeeringOptions = &ec2types.VpcPeeringConnectionOptionsDescription{AllowDnsResolutionFromRemoteVpc: aws.Bool(false)}
-				return info
-			}(),
-		},
-		{
-			VpcPeeringConnectionId: aws.String(WarnPeerProvisioningID),
-			Status:                 vpcPeerStatus(ec2types.VpcPeeringConnectionStateReasonCodeProvisioning, ""),
-			RequesterVpcInfo:       vpcPeerInfo(fixtProdVPCID, "123456789012"),
-			AccepterVpcInfo:        vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID),
-		},
-		{
-			VpcPeeringConnectionId: aws.String(WarnPeerInitiatingID),
-			Status:                 vpcPeerStatus(ec2types.VpcPeeringConnectionStateReasonCodeInitiatingRequest, ""),
-			RequesterVpcInfo:       vpcPeerInfo(fixtProdVPCID, "123456789012"),
-			AccepterVpcInfo:        vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID),
-		},
-		{
-			VpcPeeringConnectionId: aws.String(WarnPeerPendingID),
-			Status:                 vpcPeerStatus(ec2types.VpcPeeringConnectionStateReasonCodePendingAcceptance, ""),
-			ExpirationTime:         aws.Time(time.Now().UTC().Add(72 * time.Hour)),
-			RequesterVpcInfo:       vpcPeerInfo(fixtProdVPCID, "123456789012"),
-			AccepterVpcInfo:        vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID),
-		},
-		{
-			VpcPeeringConnectionId: aws.String(WarnPeerExpiredID),
-			Status:                 vpcPeerStatus(ec2types.VpcPeeringConnectionStateReasonCodeExpired, ""),
-			RequesterVpcInfo:       vpcPeerInfo(fixtProdVPCID, "123456789012"),
-			AccepterVpcInfo:        vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID),
-		},
-		{
-			VpcPeeringConnectionId: aws.String(BrokenPeerRejectedID),
-			Status:                 vpcPeerStatus(ec2types.VpcPeeringConnectionStateReasonCodeRejected, "Rejected by accepter: CIDR conflict"),
-			RequesterVpcInfo:       vpcPeerInfo(fixtProdVPCID, "123456789012"),
-			AccepterVpcInfo:        vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID),
-		},
-		{
-			VpcPeeringConnectionId: aws.String(BrokenPeerFailedID),
-			Status:                 vpcPeerStatus(ec2types.VpcPeeringConnectionStateReasonCodeFailed, "Failed to activate the peering connection due to an internal error"),
-			RequesterVpcInfo:       vpcPeerInfo(fixtProdVPCID, "123456789012"),
-			AccepterVpcInfo:        vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID),
-		},
-		{
-			VpcPeeringConnectionId: aws.String(WarnPeerDeletingID),
-			Status:                 vpcPeerStatus(ec2types.VpcPeeringConnectionStateReasonCodeDeleting, ""),
-			RequesterVpcInfo:       vpcPeerInfo(fixtProdVPCID, "123456789012"),
-			AccepterVpcInfo:        vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID),
-		},
-		{
-			VpcPeeringConnectionId: aws.String(DimPeerDeletedID),
-			Status:                 vpcPeerStatus(ec2types.VpcPeeringConnectionStateReasonCodeDeleted, ""),
-			RequesterVpcInfo:       vpcPeerInfo(fixtProdVPCID, "123456789012"),
-			AccepterVpcInfo:        vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID),
-		},
-		{
-			VpcPeeringConnectionId: aws.String(WarnPeerOverlapID),
-			Status:                 vpcPeerStatus(ec2types.VpcPeeringConnectionStateReasonCodeActive, ""),
-			RequesterVpcInfo:       vpcPeerInfo(fixtProdVPCID, "123456789012", "10.0.0.0/16"),
-			AccepterVpcInfo:        vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID, "10.0.0.0/16"),
-		},
-		{
-			VpcPeeringConnectionId: aws.String(WarnPeerNoRouteID),
-			Status:                 vpcPeerStatus(ec2types.VpcPeeringConnectionStateReasonCodeActive, ""),
-			RequesterVpcInfo:       vpcPeerInfo(fixtProdVPCID, "123456789012", "10.0.0.0/16"),
-			AccepterVpcInfo:        vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID, "172.16.0.0/16"),
-		},
-		{
-			VpcPeeringConnectionId: aws.String(WarnPeerBlackholeID),
-			Status:                 vpcPeerStatus(ec2types.VpcPeeringConnectionStateReasonCodeActive, ""),
-			RequesterVpcInfo:       vpcPeerInfo(fixtProdVPCID, "123456789012", "10.0.0.0/16"),
-			AccepterVpcInfo:        vpcPeerInfo(vpcPeerRemoteVpcID, vpcPeerRemoteOwnerID, "10.30.0.0/16"),
-		},
+		root,
+		peer(WarnPeerProvisioningID, ec2types.VpcPeeringConnectionStateReasonCodeProvisioning, "", nil, nil),
+		peer(WarnPeerInitiatingID, ec2types.VpcPeeringConnectionStateReasonCodeInitiatingRequest, "", nil, nil),
+		pending,
+		peer(WarnPeerExpiredID, ec2types.VpcPeeringConnectionStateReasonCodeExpired, "", nil, nil),
+		peer(BrokenPeerRejectedID, ec2types.VpcPeeringConnectionStateReasonCodeRejected, "Rejected by accepter: CIDR conflict", nil, nil),
+		peer(BrokenPeerFailedID, ec2types.VpcPeeringConnectionStateReasonCodeFailed, "Failed to activate the peering connection due to an internal error", nil, nil),
+		peer(WarnPeerDeletingID, ec2types.VpcPeeringConnectionStateReasonCodeDeleting, "", nil, nil),
+		peer(DimPeerDeletedID, ec2types.VpcPeeringConnectionStateReasonCodeDeleted, "", nil, nil),
+		peer(WarnPeerOverlapID, ec2types.VpcPeeringConnectionStateReasonCodeActive, "", []string{"10.0.0.0/16"}, []string{"10.0.0.0/16"}),
+		peer(WarnPeerNoRouteID, ec2types.VpcPeeringConnectionStateReasonCodeActive, "", []string{"10.0.0.0/16"}, []string{"172.16.0.0/16"}),
+		peer(WarnPeerBlackholeID, ec2types.VpcPeeringConnectionStateReasonCodeActive, "", []string{"10.0.0.0/16"}, []string{"10.30.0.0/16"}),
 	}
 }

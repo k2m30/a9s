@@ -120,7 +120,7 @@ func checkNGEC2(_ context.Context, _ any, res resource.Resource, cache resource.
 	matches := matchingNGInstances(ec2List, nodegroupName, clusterName)
 	var ids []string
 	for _, m := range matches {
-		ids = append(ids, m.resource.ID)
+		ids = append(ids, m.ID)
 	}
 	return relatedResultTrunc("ec2", ids, truncated)
 }
@@ -143,36 +143,24 @@ func ngIdentity(res resource.Resource) (nodegroupName, clusterName string) {
 	return nodegroupName, clusterName
 }
 
-// ngInstanceMatch pairs a matched EC2 resource.Resource with its typed
-// ec2types.Instance so callers can read whichever fields they need
-// (checkNGEC2 needs the resource ID; checkNGEBS needs BlockDeviceMappings)
-// without re-asserting RawStruct a second time.
-type ngInstanceMatch struct {
-	resource resource.Resource
-	instance ec2types.Instance
-}
-
-// matchingNGInstances scans ec2List for instances tagged with nodegroupName
-// via "eks:nodegroup-name" and, when clusterName is non-empty, also matching
-// "eks:cluster-name". Shared by checkNGEC2 and checkNGEBS, which previously
-// each carried their own verbatim copy of this tag-matching loop.
-func matchingNGInstances(ec2List []resource.Resource, nodegroupName, clusterName string) []ngInstanceMatch {
-	var matches []ngInstanceMatch
-	for _, ec2Res := range ec2List {
-		inst, ok := assertStruct[ec2types.Instance](ec2Res.RawStruct)
-		if !ok {
-			continue
-		}
-		if tagValue(inst.Tags, "eks:nodegroup-name") != nodegroupName {
+// matchingNGInstances filters ec2List for instances tagged with
+// nodegroupName via "eks:nodegroup-name" and, when clusterName is
+// non-empty, also matching "eks:cluster-name". Shared by checkNGEC2 and
+// checkNGEBS, which previously each carried their own verbatim copy of this
+// tag-matching loop.
+func matchingNGInstances(ec2List []typedRow[ec2types.Instance], nodegroupName, clusterName string) []typedRow[ec2types.Instance] {
+	var matches []typedRow[ec2types.Instance]
+	for _, row := range ec2List {
+		if tagValue(row.Raw.Tags, "eks:nodegroup-name") != nodegroupName {
 			continue
 		}
 		if clusterName != "" {
-			instCluster := tagValue(inst.Tags, "eks:cluster-name")
+			instCluster := tagValue(row.Raw.Tags, "eks:cluster-name")
 			if instCluster != "" && instCluster != clusterName {
 				continue
 			}
 		}
-		matches = append(matches, ngInstanceMatch{resource: ec2Res, instance: inst})
+		matches = append(matches, row)
 	}
 	return matches
 }
@@ -260,7 +248,7 @@ func checkNGEBS(_ context.Context, _ any, res resource.Resource, cache resource.
 	seen := make(map[string]struct{})
 	var ids []string
 	for _, m := range matches {
-		for _, bdm := range m.instance.BlockDeviceMappings {
+		for _, bdm := range m.Raw.BlockDeviceMappings {
 			if bdm.Ebs != nil && bdm.Ebs.VolumeId != nil && *bdm.Ebs.VolumeId != "" {
 				volumeID := *bdm.Ebs.VolumeId
 				if _, dup := seen[volumeID]; dup {

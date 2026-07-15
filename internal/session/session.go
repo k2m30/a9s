@@ -124,10 +124,8 @@ type Session struct {
 	// Rotate-cleared queue/counter, Rotate() must NOT clear this map — the
 	// whole point is that a profile/region switch back to an
 	// already-fully-swept pair skips the redundant full-menu sweep instead
-	// of re-running it from scratch (live defect 2026-07-14: `:profile`
-	// switching re-ran the FULL sweep, all types plus Wave-2 enrichment, on
-	// EVERY switch instead of once per pair). Read/written under pairMu,
-	// same as Profile/Region, via PairSwept/MarkPairSwept/ClearPairSwept.
+	// of re-running it from scratch. Read/written under pairMu, same as
+	// Profile/Region, via PairSwept/MarkPairSwept/ClearPairSwept.
 	SweptPairs map[string]bool
 
 	// pairMu guards two related things that must be observed together
@@ -553,10 +551,6 @@ func (s *Session) Rotate() {
 	// prior session cannot leak into the next.
 	s.RuleSets = NewRuleSetStore()
 
-	// SweptPairs is deliberately NOT cleared here — unlike every other field
-	// above, it is session-lifetime by design: the whole point of the
-	// sweep-once-per-pair contract (see SweptPairs' doc comment) is that a
-	// profile/region switch survives in this map, so switching back to an
-	// already-fully-swept pair skips the redundant full sweep instead of
-	// re-running it on every switch.
+	// SweptPairs: deliberately NOT cleared — session-lifetime by design, see
+	// SweptPairs doc.
 }

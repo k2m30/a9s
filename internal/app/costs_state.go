@@ -536,17 +536,9 @@ func (c *Controller) applyCostZoom(cs *CostsState, in bool) *runtime.TaskRequest
 		newWindow = costs.BuildWindow(newGran, anchor)
 	}
 
-	// A RESOURCE_ID top frame's zoom-out is a boundary no-op — same shape as
-	// the idx<=0 check above — once the candidate coarser window would run
-	// past the CE GetCostAndUsageWithResources retention bound
-	// (costs.ClampResourceDrillWindow/costs.ResourceDrillAllowed enforce the
-	// same bound at push time): Week/Month/Year all tile a full calendar
-	// bucket anchored on the current period regardless of the RESOURCE_ID
-	// frame's own narrow window, so the candidate routinely reaches days
-	// with no retained resource-level cost data (and, since BuildWindow's
-	// week/day branches never clamp forward, can reach days that haven't
-	// happened yet). Nothing is mutated on this path — top.Window stays the
-	// one the push path already clamped into the retention bound.
+	// A RESOURCE_ID top frame's zoom-out is a boundary no-op, same shape as
+	// the idx<=0 check above — see resourceDrillWindowExceedsRetention's doc
+	// comment below for why. Nothing is mutated on this path.
 	if !in && top.RowDim == costs.DimensionResourceID && resourceDrillWindowExceedsRetention(newWindow) {
 		return nil
 	}

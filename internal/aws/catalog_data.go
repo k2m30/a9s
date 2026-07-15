@@ -38,19 +38,6 @@ func colorAthena(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-// colorMWAA prefers colorFromAnyFinding so every Finding (state-bucket or
-// background) is color-bearing — docs/resources/mwaa.md §4: no
-// glyph-on-green case exists for mwaa; every signal moves the row off green,
-// including last-update-failed and webserver-public. Real fetched resources
-// always carry a Finding when off-Healthy, so there is no raw-field
-// fallback to keep.
-func colorMWAA(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return domain.ColorHealthy
-}
-
 var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "Glue Jobs",
@@ -142,7 +129,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{Key: "webserver_access_mode", Title: "Access", Width: 16, Sortable: true},
 			{Key: "created_at", Title: "Created", Width: 22, Sortable: true},
 		},
-		Color:   colorMWAA,
+		Color:   colorAnyFindingOrHealthy,
 		Fetcher: fetcherWithClients(FetchMWAAEnvironmentsPage),
 		FieldKeys: []string{
 			"name", "status", "airflow_version", "environment_class",

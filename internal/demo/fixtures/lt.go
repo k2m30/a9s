@@ -104,6 +104,22 @@ func ltEncryptedRootVolume(kmsKeyID string) []ec2types.LaunchTemplateBlockDevice
 	}
 }
 
+// ltUnencryptedRootVolume mirrors ltEncryptedRootVolume with
+// Encrypted=false explicit and no KmsKeyId — the ltCodeUnencrypted witness.
+func ltUnencryptedRootVolume() []ec2types.LaunchTemplateBlockDeviceMapping {
+	return []ec2types.LaunchTemplateBlockDeviceMapping{
+		{
+			DeviceName: aws.String("/dev/xvda"),
+			Ebs: &ec2types.LaunchTemplateEbsBlockDevice{
+				DeleteOnTermination: aws.Bool(true),
+				Encrypted:           aws.Bool(false),
+				VolumeSize:          aws.Int32(30),
+				VolumeType:          ec2types.VolumeTypeGp3,
+			},
+		},
+	}
+}
+
 // buildLaunchTemplates returns the DescribeLaunchTemplates list shape: identity
 // plus DefaultVersionNumber/LatestVersionNumber/CreatedBy/CreateTime/Tags only
 // — no LaunchTemplateData (docs/resources/lt.md §6 citation on list-shape).
@@ -210,38 +226,18 @@ func buildLTDefaultVersions() map[string]ec2types.LaunchTemplateVersion {
 
 		// warn-lt-unencrypted: one BlockDeviceMappings[].Ebs.Encrypted=false explicit.
 		WarnLTUnencryptedID: version(WarnLTUnencryptedID, 1, &ec2types.ResponseLaunchTemplateData{
-			ImageId:      aws.String(fixtProdAMIID1),
-			InstanceType: ec2types.InstanceTypeT3Medium,
-			BlockDeviceMappings: []ec2types.LaunchTemplateBlockDeviceMapping{
-				{
-					DeviceName: aws.String("/dev/xvda"),
-					Ebs: &ec2types.LaunchTemplateEbsBlockDevice{
-						DeleteOnTermination: aws.Bool(true),
-						Encrypted:           aws.Bool(false),
-						VolumeSize:          aws.Int32(30),
-						VolumeType:          ec2types.VolumeTypeGp3,
-					},
-				},
-			},
-			MetadataOptions: ltHealthyMetadataOptions(),
+			ImageId:             aws.String(fixtProdAMIID1),
+			InstanceType:        ec2types.InstanceTypeT3Medium,
+			BlockDeviceMappings: ltUnencryptedRootVolume(),
+			MetadataOptions:     ltHealthyMetadataOptions(),
 		}, "2025-05-03T08:00:00Z"),
 
 		// warn-lt-multi: IMDSv1 allowed + unencrypted volume stack on one
 		// template → "IMDSv1 allowed (+1)" per §4 precedence.
 		WarnLTMultiID: version(WarnLTMultiID, 1, &ec2types.ResponseLaunchTemplateData{
-			ImageId:      aws.String(fixtProdAMIID1),
-			InstanceType: ec2types.InstanceTypeT3Medium,
-			BlockDeviceMappings: []ec2types.LaunchTemplateBlockDeviceMapping{
-				{
-					DeviceName: aws.String("/dev/xvda"),
-					Ebs: &ec2types.LaunchTemplateEbsBlockDevice{
-						DeleteOnTermination: aws.Bool(true),
-						Encrypted:           aws.Bool(false),
-						VolumeSize:          aws.Int32(30),
-						VolumeType:          ec2types.VolumeTypeGp3,
-					},
-				},
-			},
+			ImageId:             aws.String(fixtProdAMIID1),
+			InstanceType:        ec2types.InstanceTypeT3Medium,
+			BlockDeviceMappings: ltUnencryptedRootVolume(),
 			MetadataOptions: &ec2types.LaunchTemplateInstanceMetadataOptions{
 				HttpEndpoint:            ec2types.LaunchTemplateInstanceMetadataEndpointStateEnabled,
 				HttpTokens:              ec2types.LaunchTemplateHttpTokensStateOptional,

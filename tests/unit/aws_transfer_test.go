@@ -654,7 +654,7 @@ func TestTransferAgreementDetailEnrich_CertExpiry(t *testing.T) {
 	agreement := mustFindTransferResource(t, agreements, fixtures.AgreementProdPartnerID)
 
 	clients := &awsclient.ServiceClients{Transfer: fakes.NewTransfer()}
-	enriched, err := enrich(context.Background(), clients, agreement)
+	enriched, err := enrich(context.Background(), &awsclient.DetailEnrichmentCtx{Clients: clients}, agreement)
 	if err != nil {
 		t.Fatalf("DetailEnrich returned error: %v", err)
 	}
@@ -717,7 +717,7 @@ func TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail(t *testing.T
 	agreement := mustFindTransferResource(t, agreements, fixtures.AgreementProdPartnerID)
 
 	clients := &awsclient.ServiceClients{Transfer: fakes.NewTransfer()}
-	enriched, err := enrich(context.Background(), clients, agreement)
+	enriched, err := enrich(context.Background(), &awsclient.DetailEnrichmentCtx{Clients: clients}, agreement)
 	if err != nil {
 		t.Fatalf("DetailEnrich returned error: %v", err)
 	}
@@ -811,7 +811,7 @@ func TestTransferAgreementDetailEnrich_BothCertFindingsReachOpenDetailAttention(
 	}
 
 	clients := &awsclient.ServiceClients{Transfer: fakes.NewTransfer()}
-	enriched, err := enrich(context.Background(), clients, agreement)
+	enriched, err := enrich(context.Background(), &awsclient.DetailEnrichmentCtx{Clients: clients}, agreement)
 	if err != nil {
 		t.Fatalf("DetailEnrich returned error: %v", err)
 	}

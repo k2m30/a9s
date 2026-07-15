@@ -68,17 +68,11 @@ func FetchVpcPeeringConnectionsPage(ctx context.Context, api EC2DescribeVpcPeeri
 		resources = append(resources, buildVpcPeerResource(&output.VpcPeeringConnections[i]))
 	}
 
-	isTruncated := output.NextToken != nil
-	var nextToken string
-	if output.NextToken != nil {
-		nextToken = *output.NextToken
-	}
-
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: isTruncated,
-			NextToken:   nextToken,
+			IsTruncated: output.NextToken != nil,
+			NextToken:   aws.ToString(output.NextToken),
 			PageSize:    len(resources),
 			TotalHint:   -1,
 		},
@@ -91,16 +85,18 @@ func buildVpcPeerResource(pc *ec2types.VpcPeeringConnection) resource.Resource {
 	name := tagValue(pc.Tags, "Name")
 	findings := computeVpcPeerFindings(pc)
 
+	requesterVPC, requesterOwner := vpcPeerSide(pc.RequesterVpcInfo)
+	accepterVPC, accepterOwner := vpcPeerSide(pc.AccepterVpcInfo)
 	return resource.Resource{
 		ID:   id,
 		Name: name,
 		Fields: map[string]string{
 			"pcx_id":          id,
 			"status":          phraseFromFindings(findings),
-			"requester_vpc":   vpcPeerSideVpcID(pc.RequesterVpcInfo),
-			"requester_owner": vpcPeerSideOwnerID(pc.RequesterVpcInfo),
-			"accepter_vpc":    vpcPeerSideVpcID(pc.AccepterVpcInfo),
-			"accepter_owner":  vpcPeerSideOwnerID(pc.AccepterVpcInfo),
+			"requester_vpc":   requesterVPC,
+			"requester_owner": requesterOwner,
+			"accepter_vpc":    accepterVPC,
+			"accepter_owner":  accepterOwner,
 			"expires":         ltFormatTime(pc.ExpirationTime),
 		},
 		RawStruct: pc,
@@ -108,18 +104,12 @@ func buildVpcPeerResource(pc *ec2types.VpcPeeringConnection) resource.Resource {
 	}
 }
 
-func vpcPeerSideVpcID(info *ec2types.VpcPeeringConnectionVpcInfo) string {
+// vpcPeerSide extracts one side's VpcId/OwnerId, "","" for a nil pointer.
+func vpcPeerSide(info *ec2types.VpcPeeringConnectionVpcInfo) (vpcID, ownerID string) {
 	if info == nil {
-		return ""
+		return "", ""
 	}
-	return aws.ToString(info.VpcId)
-}
-
-func vpcPeerSideOwnerID(info *ec2types.VpcPeeringConnectionVpcInfo) string {
-	if info == nil {
-		return ""
-	}
-	return aws.ToString(info.OwnerId)
+	return aws.ToString(info.VpcId), aws.ToString(info.OwnerId)
 }
 
 // computeVpcPeerFindings builds the ordered Finding slice for one peering

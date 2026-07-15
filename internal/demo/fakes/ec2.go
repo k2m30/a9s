@@ -239,26 +239,10 @@ func (f *EC2Fake) DescribeTransitGatewayRouteTables(_ context.Context, _ *ec2.De
 	return &ec2.DescribeTransitGatewayRouteTablesOutput{}, nil
 }
 
-// DescribeLaunchTemplates returns the lt.go fixture list, filtered by
-// LaunchTemplateIds/LaunchTemplateNames when the caller supplies either
-// (mirrors DescribeImages's filter-or-all-on-empty convention).
-func (f *EC2Fake) DescribeLaunchTemplates(_ context.Context, input *ec2.DescribeLaunchTemplatesInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplatesOutput, error) {
-	if input == nil || (len(input.LaunchTemplateIds) == 0 && len(input.LaunchTemplateNames) == 0) {
-		return &ec2.DescribeLaunchTemplatesOutput{LaunchTemplates: f.lt.LaunchTemplates}, nil
-	}
-	idSet := toSet(input.LaunchTemplateIds)
-	nameSet := toSet(input.LaunchTemplateNames)
-	var out []ec2types.LaunchTemplate
-	for _, tpl := range f.lt.LaunchTemplates {
-		if tpl.LaunchTemplateId != nil && idSet[*tpl.LaunchTemplateId] {
-			out = append(out, tpl)
-			continue
-		}
-		if tpl.LaunchTemplateName != nil && nameSet[*tpl.LaunchTemplateName] {
-			out = append(out, tpl)
-		}
-	}
-	return &ec2.DescribeLaunchTemplatesOutput{LaunchTemplates: out}, nil
+// DescribeLaunchTemplates returns the lt.go fixture list. No caller sets
+// LaunchTemplateIds/LaunchTemplateNames, so this is unconditional.
+func (f *EC2Fake) DescribeLaunchTemplates(_ context.Context, _ *ec2.DescribeLaunchTemplatesInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplatesOutput, error) {
+	return &ec2.DescribeLaunchTemplatesOutput{LaunchTemplates: f.lt.LaunchTemplates}, nil
 }
 
 // DescribeLaunchTemplateVersions returns the "$Default" version fixture for

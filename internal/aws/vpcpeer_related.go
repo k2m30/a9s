@@ -36,14 +36,10 @@ func checkVpcPeerRTB(_ context.Context, _ any, res resource.Resource, cache reso
 		return resource.UnknownRelated("rtb")
 	}
 	var ids []string
-	for _, rtbRes := range rtbList {
-		rtb, asserted := assertStruct[ec2types.RouteTable](rtbRes.RawStruct)
-		if !asserted {
-			continue
-		}
-		for _, route := range rtb.Routes {
+	for _, row := range rtbList {
+		for _, route := range row.Raw.Routes {
 			if aws.ToString(route.VpcPeeringConnectionId) == res.ID {
-				ids = append(ids, rtbRes.ID)
+				ids = append(ids, row.ID)
 				break
 			}
 		}
@@ -72,8 +68,8 @@ func checkVpcPeerVPC(_ context.Context, _ any, res resource.Resource, cache reso
 	}
 
 	present := make(map[string]struct{}, len(vpcList))
-	for _, vpcRes := range vpcList {
-		present[vpcRes.ID] = struct{}{}
+	for _, row := range vpcList {
+		present[row.ID] = struct{}{}
 	}
 
 	var ids []string

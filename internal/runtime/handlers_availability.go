@@ -148,15 +148,10 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		})
 	}
 
-	// Build queue of all resource types to check in background — unless the
-	// current profile/region pair already ran this sweep to completion once
-	// this session (PairSwept). A revisit of an already-swept pair (e.g. a
-	// `:profile` switch back to a pair visited earlier) must not rebuild
-	// AvailQueue, fire a single probe, or latch AvailSweepPending — it only
-	// reports the progress intent as already done, so the menu shows no
-	// spinner for a sweep that would just re-derive data this session
-	// already verified. Disk-cache seeding above (menu counts + RowStore)
-	// runs unconditionally either way.
+	// Sweep-once-per-pair: a pair already swept this session (PairSwept)
+	// skips rebuilding AvailQueue/firing probes and just reports the
+	// progress intent as done. Disk-cache seeding above (menu counts +
+	// RowStore) runs unconditionally either way.
 	allNames := resource.AllShortNames()
 
 	var tasks []TaskRequest

@@ -4,9 +4,7 @@
 // calls, scanning the already-loaded "rtb" cache instead of the fetcher's own
 // client. Both derived signals ship as "~" background checks per the
 // established Wave-2 `~`-on-Healthy treatment (the dbi maintenance-scheduled
-// / lt deprecated-AMI precedent) — docs/resources/vpc-peer.md §4 note,
-// amended 2026-07-15 from an earlier color-bearing plan for blackholed to
-// match the fold's actual capability.
+// / lt deprecated-AMI precedent) — docs/resources/vpc-peer.md §4 note.
 package aws
 
 import (
@@ -46,12 +44,8 @@ func EnrichVpcPeerRoutes(_ context.Context, _ *ServiceClients, resources []resou
 
 	blackholed := make(map[string]bool)
 	routed := make(map[string]bool)
-	for _, rtbRes := range rtbList {
-		rtb, asserted := assertStruct[ec2types.RouteTable](rtbRes.RawStruct)
-		if !asserted {
-			continue
-		}
-		for _, route := range rtb.Routes {
+	for _, row := range rtbList {
+		for _, route := range row.Raw.Routes {
 			pcxID := aws.ToString(route.VpcPeeringConnectionId)
 			if pcxID == "" {
 				continue
@@ -79,7 +73,5 @@ func EnrichVpcPeerRoutes(_ context.Context, _ *ServiceClients, resources []resou
 		}
 	}
 
-	result.IssueCount = 0
-	result.Truncated = false
 	return result, nil
 }

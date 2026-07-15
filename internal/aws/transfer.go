@@ -101,17 +101,11 @@ func FetchTransferServersPage(ctx context.Context, c *ServiceClients, continuati
 		}
 	}
 
-	isTruncated := listOutput.NextToken != nil
-	var nextToken string
-	if listOutput.NextToken != nil {
-		nextToken = *listOutput.NextToken
-	}
-
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: isTruncated,
-			NextToken:   nextToken,
+			IsTruncated: listOutput.NextToken != nil,
+			NextToken:   aws.ToString(listOutput.NextToken),
 			PageSize:    len(resources),
 			TotalHint:   -1,
 		},
@@ -183,44 +177,44 @@ func computeTransferFindings(server *transfertypes.DescribedServer) []domain.Fin
 	return findings
 }
 
+// transferStateFindings maps ListedServer/DescribedServer.State to its
+// docs/resources/transfer.md §4 state-bucket Finding. ONLINE has no entry
+// (Healthy — no finding).
+var transferStateFindings = map[transfertypes.State]domain.Finding{ //nolint:gochecknoglobals // static lookup table, the transferLegacySecurityPolicies precedent
+	transfertypes.StateOffline: {
+		Code: transferCodeOffline, Phrase: "offline: not accepting transfers",
+		Detail:   "Server is offline; partners cannot connect until it is started.",
+		Severity: domain.SevWarn, Source: "wave1",
+	},
+	transfertypes.StateStarting: {
+		Code: transferCodeStarting, Phrase: "starting",
+		Detail:   "Server is starting; not yet fully able to respond.",
+		Severity: domain.SevWarn, Source: "wave1",
+	},
+	transfertypes.StateStopping: {
+		Code: transferCodeStopping, Phrase: "stopping",
+		Detail:   "Server is stopping; transfers are draining.",
+		Severity: domain.SevWarn, Source: "wave1",
+	},
+	transfertypes.StateStartFailed: {
+		Code: transferCodeStartFailed, Phrase: "start failed",
+		Detail:   "Server failed to come online; partner transfers are down.",
+		Severity: domain.SevBroken, Source: "wave1",
+	},
+	transfertypes.StateStopFailed: {
+		Code: transferCodeStopFailed, Phrase: "stop failed",
+		Detail:   "Stop failed; the server may still be serving transfers.",
+		Severity: domain.SevWarn, Source: "wave1",
+	},
+}
+
 // transferStateFinding maps ListedServer/DescribedServer.State to its
 // docs/resources/transfer.md §4 state-bucket Finding. ok is false for
 // ONLINE (Healthy — no finding). Shared by the healthy-row and degraded-row
 // builders since State is present on both ListedServer and DescribedServer.
 func transferStateFinding(state transfertypes.State) (domain.Finding, bool) {
-	switch state {
-	case transfertypes.StateOffline:
-		return domain.Finding{
-			Code: transferCodeOffline, Phrase: "offline: not accepting transfers",
-			Detail:   "Server is offline; partners cannot connect until it is started.",
-			Severity: domain.SevWarn, Source: "wave1",
-		}, true
-	case transfertypes.StateStarting:
-		return domain.Finding{
-			Code: transferCodeStarting, Phrase: "starting",
-			Detail:   "Server is starting; not yet fully able to respond.",
-			Severity: domain.SevWarn, Source: "wave1",
-		}, true
-	case transfertypes.StateStopping:
-		return domain.Finding{
-			Code: transferCodeStopping, Phrase: "stopping",
-			Detail:   "Server is stopping; transfers are draining.",
-			Severity: domain.SevWarn, Source: "wave1",
-		}, true
-	case transfertypes.StateStartFailed:
-		return domain.Finding{
-			Code: transferCodeStartFailed, Phrase: "start failed",
-			Detail:   "Server failed to come online; partner transfers are down.",
-			Severity: domain.SevBroken, Source: "wave1",
-		}, true
-	case transfertypes.StateStopFailed:
-		return domain.Finding{
-			Code: transferCodeStopFailed, Phrase: "stop failed",
-			Detail:   "Stop failed; the server may still be serving transfers.",
-			Severity: domain.SevWarn, Source: "wave1",
-		}, true
-	}
-	return domain.Finding{}, false
+	f, ok := transferStateFindings[state]
+	return f, ok
 }
 
 // buildTransferDegradedResource builds the RICH degraded row for a server
@@ -239,13 +233,7 @@ func buildTransferDegradedResource(listed transfertypes.ListedServer) resource.R
 	if f, ok := transferStateFinding(listed.State); ok {
 		findings = append(findings, f)
 	}
-	findings = append(findings, domain.Finding{
-		Code:     DetailsDeniedCode("transfer"),
-		Phrase:   detailsDeniedPhrase,
-		Detail:   transferDetailsDeniedDetail,
-		Severity: domain.SevWarn,
-		Source:   "wave1",
-	})
+	findings = append(findings, detailsDeniedFinding("transfer", transferDetailsDeniedDetail))
 	statusPhrase := phraseFromFindings(findings)
 
 	raw := listed

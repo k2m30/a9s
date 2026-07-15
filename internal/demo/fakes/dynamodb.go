@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 )
@@ -36,7 +37,10 @@ func (f *DynamoDBFake) ListTables(_ context.Context, _ *dynamodb.ListTablesInput
 func (f *DynamoDBFake) DescribeTable(_ context.Context, input *dynamodb.DescribeTableInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
 	name := aws.ToString(input.TableName)
 	if slices.Contains(f.fix.DeniedNames, name) {
-		return nil, fmt.Errorf("AccessDeniedException: not authorized to perform: dynamodb:DescribeTable on resource: %s", name)
+		return nil, &smithy.GenericAPIError{
+			Code:    "AccessDeniedException",
+			Message: fmt.Sprintf("not authorized to perform: dynamodb:DescribeTable on resource: %s", name),
+		}
 	}
 	for _, t := range f.fix.Tables {
 		if aws.ToString(t.TableName) == name {

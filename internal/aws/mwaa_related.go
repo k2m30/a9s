@@ -1,8 +1,9 @@
 // mwaa_related.go contains MWAA environment related-resource checker
 // functions. Every checker here is zero-extra-API-call: the fetcher's
 // GetEnvironment pass already carries every field these checkers read, so
-// each one is a Pattern F (RawStruct read) or a sibling-cache scan (the
-// alarm checker) — never a new AWS call. docs/resources/mwaa.md §2.
+// each one is a Pattern F (RawStruct read) checker, plus the alarm
+// sibling-cache scan which may fetch the alarm list's first page on cache
+// miss. docs/resources/mwaa.md §2.
 package aws
 
 import (
@@ -22,9 +23,6 @@ import (
 // scan), not a Pattern F read — docs/resources/mwaa.md §2 `alarm`.
 func checkMWAAAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	envName := res.ID
-	if envName == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-	}
 
 	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
 	if err != nil {
@@ -84,7 +82,7 @@ func checkMWAALogs(_ context.Context, _ any, res resource.Resource, _ resource.R
 		env.LoggingConfiguration.WorkerLogs,
 		env.LoggingConfiguration.TaskLogs,
 	} {
-		if name := mwaaLogGroupNameFromARN(mwaaModuleLogGroupARN(m)); name != "" {
+		if name := mwaaLogGroup(m); name != "" {
 			ids = append(ids, name)
 		}
 	}

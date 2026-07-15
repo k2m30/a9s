@@ -32,24 +32,17 @@ func checkTransferACM(_ context.Context, _ any, res resource.Resource, _ resourc
 
 // checkTransferLambda reads IdentityProviderDetails.Function directly
 // (Pattern F) when IdentityProviderType == AWS_LAMBDA — the custom
-// authorizer. ARN→bare-name extraction reuses lambdaARNToName (ses_related.go).
+// authorizer. ARN→bare-name extraction reuses resource.LambdaNameFromARN.
 func checkTransferLambda(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("lambda")
 	}
-	if server.IdentityProviderType != transfertypes.IdentityProviderTypeAwsLambda || server.IdentityProviderDetails == nil {
+	if server.IdentityProviderType != transfertypes.IdentityProviderTypeAwsLambda ||
+		server.IdentityProviderDetails == nil || server.IdentityProviderDetails.Function == nil {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 	}
-	fn := server.IdentityProviderDetails.Function
-	if fn == nil || *fn == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
-	}
-	name := lambdaARNToName(*fn)
-	if name == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
-	}
-	return relatedResult("lambda", []string{name})
+	return relatedResult("lambda", []string{resource.LambdaNameFromARN(*server.IdentityProviderDetails.Function)})
 }
 
 // checkTransferLogs reads StructuredLogDestinations directly (Pattern F)

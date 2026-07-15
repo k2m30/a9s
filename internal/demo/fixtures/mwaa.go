@@ -181,7 +181,6 @@ var sharedMWAAFixtures = sync.OnceValue(func() *MWAAFixtures {
 	// alarm 2 (siblings added in cloudwatch.go/cwlogs.go). AVAILABLE, healthy.
 	etl := mwaaBaseEnvironment(ProdAirflowEtlID, mwaatypes.EnvironmentStatusAvailable, "mw1.large",
 		"6f3a9c1e2b4d4e8f91a37d5c8e2f4b6a")
-	etl.MaxWorkers = aws.Int32(5)
 	etl.Schedulers = aws.Int32(2)
 	etl.WeeklyMaintenanceWindowStart = aws.String("WED:22:30")
 	envs[ProdAirflowEtlID] = etl

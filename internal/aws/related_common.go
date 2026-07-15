@@ -125,28 +125,36 @@ func relatedResultTrunc(target string, ids []string, truncated bool) resource.Re
 	return r
 }
 
+// typedRow pairs a cached Resource's ID with its RawStruct already asserted
+// to T, so callers of cachedTypedRows never re-assert.
+type typedRow[T any] struct {
+	ID  string
+	Raw T
+}
+
 // cachedTypedRows reads the shortName entry directly from cache — it never
 // fetches. Tri-state contract (the ng_related.go original): cache absent →
-// (nil, false, false) = unknown; entry present but rows don't assert to T
-// (disk-seeded, no RawStruct) → unknown; entry present and typed → rows.
-func cachedTypedRows[T any](cache resource.ResourceCache, shortName string) (rows []resource.Resource, truncated bool, ok bool) {
+// (nil, false, false) = unknown; entry present but zero rows assert to T
+// (disk-seeded, no RawStruct) → (nil, false, false) = unknown; entry present
+// and typed → the asserting rows only (non-asserting rows are dropped, as
+// every caller previously did itself).
+func cachedTypedRows[T any](cache resource.ResourceCache, shortName string) (rows []typedRow[T], truncated bool, ok bool) {
 	entry, present := cache[shortName]
 	if !present {
 		return nil, false, false
 	}
-	if len(entry.Resources) > 0 {
-		structOK := false
-		for _, r := range entry.Resources {
-			if _, asserted := assertStruct[T](r.RawStruct); asserted {
-				structOK = true
-				break
-			}
-		}
-		if !structOK {
-			return nil, false, false
+	if len(entry.Resources) == 0 {
+		return nil, entry.IsTruncated, true
+	}
+	for _, r := range entry.Resources {
+		if raw, asserted := assertStruct[T](r.RawStruct); asserted {
+			rows = append(rows, typedRow[T]{ID: r.ID, Raw: raw})
 		}
 	}
-	return entry.Resources, entry.IsTruncated, true
+	if len(rows) == 0 {
+		return nil, false, false
+	}
+	return rows, entry.IsTruncated, true
 }
 
 // lambdaEventSourceMappingLambdaCheck is shared by checkKinesisLambda and
@@ -209,21 +217,9 @@ func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, event
 			ids = append(ids, id)
 			continue
 		}
-		if name := lambdaFunctionNameFromARN(arn); name != "" {
+		if name := resource.LambdaNameFromARN(arn); name != "" {
 			ids = append(ids, name)
 		}
 	}
 	return relatedResult("lambda", ids)
-}
-
-// lambdaFunctionNameFromARN extracts the bare function name from a Lambda
-// function ARN (arn:aws:lambda:region:account:function:name[:qualifier]).
-// Returns "" if the ARN does not have the expected "function:" segment.
-func lambdaFunctionNameFromARN(functionArn string) string {
-	_, name, ok := strings.Cut(functionArn, ":function:")
-	if !ok {
-		return ""
-	}
-	name, _, _ = strings.Cut(name, ":")
-	return name
 }

@@ -3,11 +3,9 @@
 //
 // Mirrors snapshot_cross_ref.go's layer: a Wave 2 IssueEnricher that makes
 // ZERO AWS API calls, scanning the already-loaded "ami" ResourceCache entry
-// instead of the fetcher's own client. docs/resources/lt-impl-plan.md §0
-// RESOLVED (2026-07-14): the snapshot-specific SnapshotCrossRefConfig helper
-// is NOT reused (orphan/past-retention rules don't fit a deprecated-AMI
-// check), but the cache-scan layer, the IssueEnricherFunc registration
-// shape, and the idempotency contract are mirrored verbatim.
+// instead of the fetcher's own client. The cache-scan layer, the
+// IssueEnricherFunc registration shape, and the idempotency contract are
+// mirrored verbatim.
 //
 // docs/resources/lt.md §3.2 deprecated-ami signal:
 //   - fires only when the "$Default" version's ImageId is ami-prefixed AND

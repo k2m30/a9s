@@ -148,147 +148,141 @@ func FetchOpenSearchDomainsAt(
 		}
 	}
 
-	descOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*opensearch.DescribeDomainsOutput, error) {
+	descOutput, describeErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*opensearch.DescribeDomainsOutput, error) {
 		return describeAPI.DescribeDomains(ctx, &opensearch.DescribeDomainsInput{
 			DomainNames: domainNames,
 		})
 	})
-	if err != nil {
-		// The DescribeDomains batch call itself failing (e.g. an es:DescribeDomains
-		// IAM denial) must not drop every listed domain — mirrors the
-		// missing-from-response degraded pass below: a listed domain never vanishes.
-		rows := make([]resource.Resource, 0, len(domainNames))
-		var failures []string
-		for _, name := range domainNames {
-			nameCopy := name
-			failures = append(failures, fmt.Sprintf("%s: %s", name, err.Error()))
-			rows = append(rows, DegradedDetailsDenied("opensearch", name, opensearchtypes.DomainStatus{DomainName: &nameCopy}))
-		}
-		return rows, AggregateFailures("opensearch: DescribeDomains", failures, len(domainNames))
-	}
 
 	var resources []resource.Resource
-	described := make(map[string]bool, len(descOutput.DomainStatusList))
+	described := make(map[string]bool, len(domainNames))
 
-	for _, domain := range descOutput.DomainStatusList {
-		domainName := ""
-		if domain.DomainName != nil {
-			domainName = *domain.DomainName
-		}
-		described[domainName] = true
-
-		engineVersion := ""
-		if domain.EngineVersion != nil {
-			engineVersion = *domain.EngineVersion
-		}
-
-		endpoint := ""
-		if domain.Endpoint != nil {
-			endpoint = *domain.Endpoint
-		}
-
-		instanceType := ""
-		instanceCount := ""
-		if domain.ClusterConfig != nil {
-			instanceType = string(domain.ClusterConfig.InstanceType)
-			if domain.ClusterConfig.InstanceCount != nil {
-				instanceCount = fmt.Sprintf("%d", *domain.ClusterConfig.InstanceCount)
+	if descOutput != nil {
+		for _, domain := range descOutput.DomainStatusList {
+			domainName := ""
+			if domain.DomainName != nil {
+				domainName = *domain.DomainName
 			}
-		}
+			described[domainName] = true
 
-		// --- Signal flags ---
-		deleted := "false"
-		if domain.Deleted != nil && *domain.Deleted {
-			deleted = "true"
-		}
-
-		processing := "false"
-		if domain.Processing != nil && *domain.Processing {
-			processing = "true"
-		}
-
-		upgradeProcessing := "false"
-		if domain.UpgradeProcessing != nil && *domain.UpgradeProcessing {
-			upgradeProcessing = "true"
-		}
-
-		// DomainProcessingStatus: always emit at least "Active" so the Color func's
-		// Isolated branch is deterministic even when the AWS field is zero-value.
-		processingStatus := "Active"
-		if domain.DomainProcessingStatus != "" {
-			processingStatus = string(domain.DomainProcessingStatus)
-		}
-
-		// Software update forced soon: UpdateAvailable AND AutomatedUpdateDate in the past.
-		updateAvailable := "false"
-		updateDate := ""
-		currentVersion := ""
-		newVersion := ""
-		if domain.ServiceSoftwareOptions != nil {
-			sso := domain.ServiceSoftwareOptions
-			if openSearchUpdateForcedSoon(domain, now) {
-				updateAvailable = "true"
+			engineVersion := ""
+			if domain.EngineVersion != nil {
+				engineVersion = *domain.EngineVersion
 			}
-			if sso.AutomatedUpdateDate != nil {
-				updateDate = sso.AutomatedUpdateDate.Format(time.RFC3339)
+
+			endpoint := ""
+			if domain.Endpoint != nil {
+				endpoint = *domain.Endpoint
 			}
-			if sso.CurrentVersion != nil {
-				currentVersion = *sso.CurrentVersion
+
+			instanceType := ""
+			instanceCount := ""
+			if domain.ClusterConfig != nil {
+				instanceType = string(domain.ClusterConfig.InstanceType)
+				if domain.ClusterConfig.InstanceCount != nil {
+					instanceCount = fmt.Sprintf("%d", *domain.ClusterConfig.InstanceCount)
+				}
 			}
-			if sso.NewVersion != nil {
-				newVersion = *sso.NewVersion
+
+			// --- Signal flags ---
+			deleted := "false"
+			if domain.Deleted != nil && *domain.Deleted {
+				deleted = "true"
 			}
+
+			processing := "false"
+			if domain.Processing != nil && *domain.Processing {
+				processing = "true"
+			}
+
+			upgradeProcessing := "false"
+			if domain.UpgradeProcessing != nil && *domain.UpgradeProcessing {
+				upgradeProcessing = "true"
+			}
+
+			// DomainProcessingStatus: always emit at least "Active" so the Color func's
+			// Isolated branch is deterministic even when the AWS field is zero-value.
+			processingStatus := "Active"
+			if domain.DomainProcessingStatus != "" {
+				processingStatus = string(domain.DomainProcessingStatus)
+			}
+
+			// Software update forced soon: UpdateAvailable AND AutomatedUpdateDate in the past.
+			updateAvailable := "false"
+			updateDate := ""
+			currentVersion := ""
+			newVersion := ""
+			if domain.ServiceSoftwareOptions != nil {
+				sso := domain.ServiceSoftwareOptions
+				if openSearchUpdateForcedSoon(domain, now) {
+					updateAvailable = "true"
+				}
+				if sso.AutomatedUpdateDate != nil {
+					updateDate = sso.AutomatedUpdateDate.Format(time.RFC3339)
+				}
+				if sso.CurrentVersion != nil {
+					currentVersion = *sso.CurrentVersion
+				}
+				if sso.NewVersion != nil {
+					newVersion = *sso.NewVersion
+				}
+			}
+
+			// Encryption at rest: non-nil pointer with value false.
+			encEnabled := "true"
+			if domain.EncryptionAtRestOptions != nil &&
+				domain.EncryptionAtRestOptions.Enabled != nil &&
+				!*domain.EncryptionAtRestOptions.Enabled {
+				encEnabled = "false"
+			}
+
+			findings := computeOpenSearchFindings(domain, now)
+			statusPhrase := openSearchStatusPhrase(domain, now)
+
+			r := resource.Resource{
+				ID:       domainName,
+				Name:     domainName,
+				Findings: findings,
+				Fields: map[string]string{
+					"domain_name":                       domainName,
+					"engine_version":                    engineVersion,
+					"instance_type":                     instanceType,
+					"instance_count":                    instanceCount,
+					"endpoint":                          endpoint,
+					"status":                            statusPhrase,
+					"deleted":                           deleted,
+					"processing":                        processing,
+					"upgrade_processing":                upgradeProcessing,
+					"domain_processing_status":          processingStatus,
+					"service_software_update_available": updateAvailable,
+					"encryption_at_rest_enabled":        encEnabled,
+					"automated_update_date":             updateDate,
+					"current_version":                   currentVersion,
+					"new_version":                       newVersion,
+				},
+				RawStruct: domain,
+			}
+
+			resources = append(resources, r)
 		}
-
-		// Encryption at rest: non-nil pointer with value false.
-		encEnabled := "true"
-		if domain.EncryptionAtRestOptions != nil &&
-			domain.EncryptionAtRestOptions.Enabled != nil &&
-			!*domain.EncryptionAtRestOptions.Enabled {
-			encEnabled = "false"
-		}
-
-		findings := computeOpenSearchFindings(domain, now)
-		statusPhrase := openSearchStatusPhrase(domain, now)
-
-		r := resource.Resource{
-			ID:       domainName,
-			Name:     domainName,
-			Findings: findings,
-			Fields: map[string]string{
-				"domain_name":                       domainName,
-				"engine_version":                    engineVersion,
-				"instance_type":                     instanceType,
-				"instance_count":                    instanceCount,
-				"endpoint":                          endpoint,
-				"status":                            statusPhrase,
-				"deleted":                           deleted,
-				"processing":                        processing,
-				"upgrade_processing":                upgradeProcessing,
-				"domain_processing_status":          processingStatus,
-				"service_software_update_available": updateAvailable,
-				"encryption_at_rest_enabled":        encEnabled,
-				"automated_update_date":             updateDate,
-				"current_version":                   currentVersion,
-				"new_version":                       newVersion,
-			},
-			RawStruct: domain,
-		}
-
-		resources = append(resources, r)
 	}
 
-	// Domains the account listed but DescribeDomains did not return (IAM
-	// denial or per-domain fault in the batched call) are KEPT as name-only
-	// degraded rows — a listed domain must never vanish from the list.
+	// Domains the account listed but DescribeDomains did not return them for
+	// — either the batch call itself failed (e.g. an es:DescribeDomains IAM
+	// denial) or this domain was individually absent from its response —
+	// are KEPT as name-only degraded rows; a listed domain must never
+	// vanish from the list.
 	var failures []string
 	for _, name := range domainNames {
 		if described[name] {
 			continue
 		}
-		nameCopy := name
-		failures = append(failures, fmt.Sprintf("%s: absent from DescribeDomains response", name))
-		resources = append(resources, DegradedDetailsDenied("opensearch", name, opensearchtypes.DomainStatus{DomainName: &nameCopy}))
+		reason := "absent from DescribeDomains response"
+		if describeErr != nil {
+			reason = describeErr.Error()
+		}
+		failures = append(failures, fmt.Sprintf("%s: %s", name, reason))
+		resources = append(resources, DegradedDetailsDenied("opensearch", name, opensearchtypes.DomainStatus{DomainName: &name}))
 	}
 
 	return resources, AggregateFailures("opensearch: DescribeDomains", failures, len(domainNames))

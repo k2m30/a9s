@@ -44,6 +44,18 @@ func DetailsDeniedFindingDef(shortName string) catalog.FindingDef {
 	}
 }
 
+// detailsDeniedFinding builds the shared details-denied Finding for
+// shortName, with detail as the per-type §4 S5 sentence.
+func detailsDeniedFinding(shortName, detail string) domain.Finding {
+	return domain.Finding{
+		Code:     DetailsDeniedCode(shortName),
+		Phrase:   detailsDeniedPhrase,
+		Detail:   detail,
+		Severity: domain.SevWarn,
+		Source:   "wave1",
+	}
+}
+
 // DegradedDetailsDenied builds the name-only row an N+1 fetcher emits when
 // the per-item describe for id failed. raw is a minimal typed SDK value
 // carrying the identifier (so detail/YAML views render something honest);
@@ -57,12 +69,6 @@ func DegradedDetailsDenied(shortName, id string, raw any) resource.Resource {
 			"status": detailsDeniedPhrase,
 		},
 		RawStruct: raw,
-		Findings: []domain.Finding{{
-			Code:     DetailsDeniedCode(shortName),
-			Phrase:   detailsDeniedPhrase,
-			Detail:   detailsDeniedDetail,
-			Severity: domain.SevWarn,
-			Source:   "wave1",
-		}},
+		Findings:  []domain.Finding{detailsDeniedFinding(shortName, detailsDeniedDetail)},
 	}
 }

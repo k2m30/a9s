@@ -223,15 +223,6 @@ func colorAMI(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-// colorLT: every lt signal is color-bearing (docs/resources/lt.md §4 — no
-// glyph-on-green case, fleet precedent since mwaa/transfer).
-func colorLT(r domain.Resource) domain.Color {
-	if c, ok := colorFromAnyFinding(r); ok {
-		return c
-	}
-	return domain.ColorHealthy
-}
-
 // augmentEC2StatusChecks injects a Status Checks section after the State block.
 func augmentEC2StatusChecks(r domain.Resource, sections []domain.Section) []domain.Section {
 	state := r.Fields["state"]
@@ -903,7 +894,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "created_by", Title: "Created By", Width: 24, Sortable: true},
 			{Key: "created", Title: "Created", Width: 18, Sortable: true},
 		},
-		Color: colorLT,
+		Color: colorAnyFindingOrHealthy,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchLaunchTemplatesPage(ctx, c.EC2, continuationToken)
 		}),
@@ -919,11 +910,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkLTSubnet},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("lt")},
 		},
-		// ami (ssm-ref ambiguity) and kms/sg (alias forms / union-of-two-fields,
-		// not a single unconditional value→ID shape) are deliberately NOT
-		// registered — the related panel already carries the correct pivot
-		// logic for those; NetworkInterfaces[].SubnetId is the one §2 field
-		// that is unconditionally a subnet ID whenever present.
+		// See docs/resources/lt-impl-plan.md §0 for why ami/kms/sg are not
+		// registered here.
 		Navigable: []domain.NavigableField{
 			{FieldPath: "DefaultVersion.LaunchTemplateData.NetworkInterfaces.SubnetId", TargetType: "subnet"},
 		},

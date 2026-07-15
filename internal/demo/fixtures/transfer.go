@@ -76,7 +76,7 @@ const (
 	LocalProfileID   = "lp-1"
 	PartnerProfileID = "pp-1"
 
-	CertFreshID    = "cert-fresh"
+	certFreshID    = "cert-fresh"
 	CertExpiringID = "cert-expiring"
 	CertExpiredID  = "cert-expired"
 )
@@ -156,6 +156,21 @@ func transferListedFromDescribed(d transfertypes.DescribedServer) transfertypes.
 		IdentityProviderType: d.IdentityProviderType,
 		LoggingRole:          d.LoggingRole,
 		UserCount:            d.UserCount,
+	}
+}
+
+// listedAgreementFromDescribed projects the subset of fields ListAgreements
+// actually returns, the transferListedFromDescribed precedent — building the
+// listed row from the described one keeps them from ever drifting apart.
+func listedAgreementFromDescribed(d transfertypes.DescribedAgreement) transfertypes.ListedAgreement {
+	return transfertypes.ListedAgreement{
+		AgreementId:      d.AgreementId,
+		Arn:              d.Arn,
+		Description:      d.Description,
+		LocalProfileId:   d.LocalProfileId,
+		PartnerProfileId: d.PartnerProfileId,
+		ServerId:         d.ServerId,
+		Status:           d.Status,
 	}
 }
 
@@ -281,24 +296,8 @@ var sharedTransferFixtures = sync.OnceValue(func() *TransferFixtures {
 
 	listedAgreements := map[string][]transfertypes.ListedAgreement{
 		ProdAS2GatewayID: {
-			{
-				AgreementId:      aws.String(AgreementProdPartnerID),
-				Arn:              aws.String(transferAgreementArn(ProdAS2GatewayID, AgreementProdPartnerID)),
-				Description:      aws.String("ACME Corp AS2 partner exchange"),
-				LocalProfileId:   aws.String(LocalProfileID),
-				PartnerProfileId: aws.String(PartnerProfileID),
-				ServerId:         aws.String(ProdAS2GatewayID),
-				Status:           transfertypes.AgreementStatusTypeActive,
-			},
-			{
-				AgreementId:      aws.String(AgreementOldPartnerID),
-				Arn:              aws.String(transferAgreementArn(ProdAS2GatewayID, AgreementOldPartnerID)),
-				Description:      aws.String("Decommissioned partner — traffic rejected"),
-				LocalProfileId:   aws.String(LocalProfileID),
-				PartnerProfileId: aws.String(PartnerProfileID),
-				ServerId:         aws.String(ProdAS2GatewayID),
-				Status:           transfertypes.AgreementStatusTypeInactive,
-			},
+			listedAgreementFromDescribed(agreements[AgreementProdPartnerID]),
+			listedAgreementFromDescribed(agreements[AgreementOldPartnerID]),
 		},
 	}
 
@@ -310,7 +309,7 @@ var sharedTransferFixtures = sync.OnceValue(func() *TransferFixtures {
 			ProfileId:      aws.String(LocalProfileID),
 			As2Id:          aws.String("ACME-LOCAL"),
 			ProfileType:    transfertypes.ProfileTypeLocal,
-			CertificateIds: []string{CertFreshID, CertExpiringID},
+			CertificateIds: []string{certFreshID, CertExpiringID},
 		},
 		PartnerProfileID: {
 			Arn:            aws.String(transferProfileArn(PartnerProfileID)),
@@ -326,9 +325,9 @@ var sharedTransferFixtures = sync.OnceValue(func() *TransferFixtures {
 	// witnessable deterministically regardless of when the demo/tests run
 	// (mirrors dbi-snap.go/redshift.go's now-relative date pattern).
 	certificates := map[string]transfertypes.DescribedCertificate{
-		CertFreshID: {
-			Arn:           aws.String(transferCertificateArn(CertFreshID)),
-			CertificateId: aws.String(CertFreshID),
+		certFreshID: {
+			Arn:           aws.String(transferCertificateArn(certFreshID)),
+			CertificateId: aws.String(certFreshID),
 			Description:   aws.String("ACME Corp AS2 signing certificate"),
 			Status:        transfertypes.CertificateStatusTypeActive,
 			Type:          transfertypes.CertificateTypeCertificate,

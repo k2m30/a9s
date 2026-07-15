@@ -14,6 +14,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -84,17 +85,11 @@ func FetchTransferAgreements(ctx context.Context, api TransferAPI, serverID stri
 		resources = append(resources, buildTransferAgreementResource(describeOutput.Agreement))
 	}
 
-	isTruncated := listOutput.NextToken != nil
-	var nextToken string
-	if listOutput.NextToken != nil {
-		nextToken = *listOutput.NextToken
-	}
-
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: isTruncated,
-			NextToken:   nextToken,
+			IsTruncated: listOutput.NextToken != nil,
+			NextToken:   aws.ToString(listOutput.NextToken),
 			PageSize:    len(resources),
 			TotalHint:   -1,
 		},
@@ -142,16 +137,15 @@ func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement)
 // to their As2Id fact (DescribeProfile) and evaluates each profile's
 // certificates for expiry (DescribeCertificate) — both account-scoped
 // lookups with no server link, so this detail-open enrichment is the only
-// place they can be resolved (docs/resources/transfer.md §2.1). Accepts
-// either the session's *DetailEnrichmentCtx (the production shape the
-// runtime always passes) or a bare *ServiceClients (direct-call shape),
-// via the existing svcClients assertion — mirroring enrichPolicy's contract
-// while tolerating both callers.
+// place they can be resolved (docs/resources/transfer.md §2.1). clients must
+// be the session's *DetailEnrichmentCtx, the production shape the runtime
+// always passes.
 func enrichTransferAgreement(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
-	c, err := transferDetailClients(clients)
-	if err != nil {
-		return res, err
+	dctx, ok := clients.(*DetailEnrichmentCtx)
+	if !ok || dctx == nil || dctx.Clients == nil {
+		return res, fmt.Errorf("invalid detail-enrichment context")
 	}
+	c := dctx.Clients
 
 	agreement, ok := assertStruct[transfertypes.DescribedAgreement](res.RawStruct)
 	if !ok {
@@ -181,28 +175,9 @@ func enrichTransferAgreement(ctx context.Context, clients any, res resource.Reso
 		enriched.Fields["partner_profile_id"] = partnerAs2ID
 	}
 
-	var findings []domain.Finding
-	findings = append(findings, res.Findings...)
-	findings = append(findings, localCertFindings...)
-	findings = append(findings, partnerCertFindings...)
-	enriched.Findings = findings
+	enriched.Findings = slices.Concat(res.Findings, localCertFindings, partnerCertFindings)
 
 	return enriched, nil
-}
-
-// transferDetailClients extracts *ServiceClients from either shape the
-// DetailEnrich hook may receive: the production *DetailEnrichmentCtx
-// wrapper (detail_enrichment.go), or a bare *ServiceClients via the
-// existing svcClients assertion (client.go) — the shape a direct unit-test
-// call uses.
-func transferDetailClients(clients any) (*ServiceClients, error) {
-	if dctx, ok := clients.(*DetailEnrichmentCtx); ok {
-		if dctx == nil || dctx.Clients == nil {
-			return nil, fmt.Errorf("invalid detail-enrichment context")
-		}
-		return dctx.Clients, nil
-	}
-	return svcClients(clients)
 }
 
 // resolveTransferProfile resolves a profile id to its As2Id fact

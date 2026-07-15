@@ -113,13 +113,9 @@ func checkLTASG(_ context.Context, _ any, res resource.Resource, cache resource.
 		return resource.UnknownRelated("asg")
 	}
 	var ids []string
-	for _, asgRes := range asgList {
-		asg, asserted := assertStruct[asgtypes.AutoScalingGroup](asgRes.RawStruct)
-		if !asserted {
-			continue
-		}
-		if ltReferencedByASG(asg, res.ID) {
-			ids = append(ids, asgRes.ID)
+	for _, row := range asgList {
+		if ltReferencedByASG(row.Raw, res.ID) {
+			ids = append(ids, row.ID)
 		}
 	}
 	return relatedResultTrunc("asg", ids, truncated)
@@ -156,14 +152,13 @@ func checkLTNG(_ context.Context, _ any, res resource.Resource, cache resource.R
 		return resource.UnknownRelated("ng")
 	}
 	var ids []string
-	for _, ngRes := range ngList {
-		ng, asserted := assertStruct[ekstypes.Nodegroup](ngRes.RawStruct)
-		if !asserted || ng.LaunchTemplate == nil {
+	for _, row := range ngList {
+		if row.Raw.LaunchTemplate == nil {
 			continue
 		}
-		if aws.ToString(ng.LaunchTemplate.Id) == res.ID ||
-			(res.Name != "" && aws.ToString(ng.LaunchTemplate.Name) == res.Name) {
-			ids = append(ids, ngRes.ID)
+		if aws.ToString(row.Raw.LaunchTemplate.Id) == res.ID ||
+			(res.Name != "" && aws.ToString(row.Raw.LaunchTemplate.Name) == res.Name) {
+			ids = append(ids, row.ID)
 		}
 	}
 	return relatedResultTrunc("ng", ids, truncated)
@@ -179,13 +174,9 @@ func checkLTEC2(_ context.Context, _ any, res resource.Resource, cache resource.
 		return resource.UnknownRelated("ec2")
 	}
 	var ids []string
-	for _, ec2Res := range ec2List {
-		inst, asserted := assertStruct[ec2types.Instance](ec2Res.RawStruct)
-		if !asserted {
-			continue
-		}
-		if tagValue(inst.Tags, "aws:ec2launchtemplate:id") == res.ID {
-			ids = append(ids, ec2Res.ID)
+	for _, row := range ec2List {
+		if tagValue(row.Raw.Tags, "aws:ec2launchtemplate:id") == res.ID {
+			ids = append(ids, row.ID)
 		}
 	}
 	return relatedResultTrunc("ec2", ids, truncated)

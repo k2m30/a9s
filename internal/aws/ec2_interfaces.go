@@ -123,6 +123,20 @@ type EC2DescribeLaunchTemplateVersionsAPI interface {
 	DescribeLaunchTemplateVersions(ctx context.Context, params *ec2.DescribeLaunchTemplateVersionsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplateVersionsOutput, error)
 }
 
+// EC2DescribeLaunchTemplatesAPI defines the interface for the EC2
+// DescribeLaunchTemplates operation — the list call for Launch Templates.
+type EC2DescribeLaunchTemplatesAPI interface {
+	DescribeLaunchTemplates(ctx context.Context, params *ec2.DescribeLaunchTemplatesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplatesOutput, error)
+}
+
+// EC2FetchLaunchTemplatesAPI combines DescribeLaunchTemplates and
+// DescribeLaunchTemplateVersions — the two calls FetchLaunchTemplatesPage
+// (lt.go) needs.
+type EC2FetchLaunchTemplatesAPI interface {
+	EC2DescribeLaunchTemplatesAPI
+	EC2DescribeLaunchTemplateVersionsAPI
+}
+
 // EC2DescribeVpcPeeringConnectionsAPI defines the interface for the EC2
 // DescribeVpcPeeringConnections operation — the single list call that
 // carries full detail (Status, ExpirationTime, both VpcInfo sides) for VPC
@@ -156,6 +170,6 @@ type EC2API interface {
 	EC2DescribeVolumeStatusAPI           // Wave 2 enrichment
 	EC2DescribeFlowLogsAPI               // Wave 2 enrichment
 	EC2DescribeLaunchTemplateVersionsAPI // asg→ami, asg→role, asg→sg
-	EC2DescribeLaunchTemplatesAPI        // lt list call (lt_interfaces.go)
+	EC2DescribeLaunchTemplatesAPI        // lt list call
 	EC2DescribeVpcPeeringConnectionsAPI  // vpc-peer list call (vpcpeer.go)
 }

@@ -102,39 +102,37 @@ func FetchLaunchTemplatesPage(ctx context.Context, api EC2FetchLaunchTemplatesAP
 		switch {
 		case versionErr != nil:
 			failures = append(failures, fmt.Sprintf("%s: %s", id, versionErr.Error()))
-			resources = append(resources, buildLTDegradedResource(tpl))
+			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{detailsDeniedFinding("lt", ltDetailsDeniedDetail)}))
 		case len(versionOutput.LaunchTemplateVersions) == 0:
 			failures = append(failures, fmt.Sprintf("%s: no $Default version in DescribeLaunchTemplateVersions response", id))
-			resources = append(resources, buildLTDegradedResource(tpl))
+			resources = append(resources, ltResource(tpl, ec2types.LaunchTemplateVersion{}, []domain.Finding{detailsDeniedFinding("lt", ltDetailsDeniedDetail)}))
 		default:
-			resources = append(resources, buildLTResource(tpl, versionOutput.LaunchTemplateVersions[0]))
+			ver := versionOutput.LaunchTemplateVersions[0]
+			resources = append(resources, ltResource(tpl, ver, computeLTFindings(ver)))
 		}
-	}
-
-	isTruncated := listOutput.NextToken != nil
-	var nextToken string
-	if listOutput.NextToken != nil {
-		nextToken = *listOutput.NextToken
 	}
 
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: isTruncated,
-			NextToken:   nextToken,
+			IsTruncated: listOutput.NextToken != nil,
+			NextToken:   aws.ToString(listOutput.NextToken),
 			PageSize:    len(resources),
 			TotalHint:   -1,
 		},
 	}, AggregateFailures("lt: DescribeLaunchTemplateVersions", failures, total)
 }
 
-// buildLTResource constructs a healthy Resource from the list LaunchTemplate
-// plus its "$Default" LaunchTemplateVersion. RawStruct is *LTRaw (the
-// composite wrapper's pointer, mwaa/transfer's value/pointer convention).
-func buildLTResource(tpl ec2types.LaunchTemplate, ver ec2types.LaunchTemplateVersion) resource.Resource {
+// ltResource constructs a Resource from the list LaunchTemplate, its
+// "$Default" LaunchTemplateVersion, and the caller-computed findings — the
+// healthy path passes computeLTFindings(ver); the degraded path passes the
+// shared details-denied finding alongside a zero-value ver (the SAME *LTRaw
+// shape for both rows, docs/resources/lt-impl-plan.md §0). RawStruct is
+// *LTRaw (the composite wrapper's pointer, mwaa/transfer's value/pointer
+// convention).
+func ltResource(tpl ec2types.LaunchTemplate, ver ec2types.LaunchTemplateVersion, findings []domain.Finding) resource.Resource {
 	id := aws.ToString(tpl.LaunchTemplateId)
 	name := aws.ToString(tpl.LaunchTemplateName)
-	findings := computeLTFindings(ver)
 
 	raw := &LTRaw{Template: tpl, DefaultVersion: ver}
 	return resource.Resource{
@@ -198,42 +196,6 @@ func computeLTFindings(ver ec2types.LaunchTemplateVersion) []domain.Finding {
 	}
 
 	return findings
-}
-
-// buildLTDegradedResource builds the RICH degraded row for a template whose
-// DescribeLaunchTemplateVersions call failed: the row is kept using the list
-// LaunchTemplate fields, then the shared details-denied finding is appended
-// with lt's own §4 sentence. RawStruct is the SAME *LTRaw type with a zero
-// DefaultVersion — no second RawStruct shape (docs/resources/lt-impl-plan.md
-// §0) — so every related checker's assertStruct[LTRaw] succeeds but reads
-// empty DefaultVersion fields, reporting unknown rather than panicking.
-func buildLTDegradedResource(tpl ec2types.LaunchTemplate) resource.Resource {
-	id := aws.ToString(tpl.LaunchTemplateId)
-	name := aws.ToString(tpl.LaunchTemplateName)
-
-	findings := []domain.Finding{{
-		Code:     DetailsDeniedCode("lt"),
-		Phrase:   detailsDeniedPhrase,
-		Detail:   ltDetailsDeniedDetail,
-		Severity: domain.SevWarn,
-		Source:   "wave1",
-	}}
-
-	raw := &LTRaw{Template: tpl}
-	return resource.Resource{
-		ID:   id,
-		Name: name,
-		Fields: map[string]string{
-			"name":            name,
-			"status":          phraseFromFindings(findings),
-			"default_version": strconv.FormatInt(aws.ToInt64(tpl.DefaultVersionNumber), 10),
-			"latest_version":  strconv.FormatInt(aws.ToInt64(tpl.LatestVersionNumber), 10),
-			"created_by":      aws.ToString(tpl.CreatedBy),
-			"created":         ltFormatTime(tpl.CreateTime),
-		},
-		RawStruct: raw,
-		Findings:  findings,
-	}
 }
 
 // ltFormatTime formats *time.Time as the house "Created" column format

@@ -15,16 +15,6 @@ type EKSFixtures struct {
 	// Nodegroups maps cluster name → []Nodegroup.
 	// RawStructs are ekstypes.Nodegroup (values, matching production fetcher).
 	Nodegroups map[string][]ekstypes.Nodegroup
-	// Denied-witness names are deliberately ABSENT for eks and ng: a
-	// listed-but-denied cluster or node group in the DEMO leaks into every
-	// related checker that enumerates clusters / fans out DescribeNodegroup
-	// (ec2/asg/ami/eks/subnet/role pivots), flashing an error on each
-	// detail open — an adversarial fixture that corrupts the showroom.
-	// The degraded-row paths (shared DegradedDetailsDenied contract) are
-	// unit-tested with inline stubs
-	// (TestFetchEKSClusters_DescribeFailureSurfacesError,
-	// TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow) and both
-	// finding codes are allowlisted in the coverage gates.
 }
 
 // NewEKSFixtures builds and returns a fully-populated EKSFixtures struct.
