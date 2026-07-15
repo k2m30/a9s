@@ -123,7 +123,7 @@ make ready-to-push
 
 This target is the canonical gate. It MUST pass locally with zero edits before any push. It runs:
 
-1. `make test-race` — unit tests with race detector.
+1. `make test-race` — unit tests with race detector and `-shuffle=on` (CI shuffles test order; a local gate that runs in declaration order cannot catch order-dependent leaks, per the v3.54.0 macOS TempDir incident).
 2. `make lint` — golangci-lint.
 3. `make security` — govulncheck.
 4. `make gofix` — `//go:fix inline` directives applied.

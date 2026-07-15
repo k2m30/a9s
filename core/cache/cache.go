@@ -99,12 +99,20 @@ type TypeFile struct {
 	SavedAt time.Time `yaml:"saved_at"`
 }
 
-// Dir returns the cache directory path for one profile+region pair:
-// <cache root>/<profile>--<region>/. Reuses the profile/region filename
-// sanitation from the previous single-file layout (replace path separators
-// and spaces with underscores).
+// Dir returns the cache directory path for one profile+region pair under the
+// live cache.Root(): <cache root>/<profile>--<region>/. Thin wrapper over
+// DirIn for callers that want the current root rather than a pinned one.
 func Dir(profile, region string) string {
-	root := Root()
+	return DirIn(Root(), profile, region)
+}
+
+// DirIn returns the cache directory path for one profile+region pair under
+// the given root: <root>/<profile>--<region>/. Reuses the profile/region
+// filename sanitation from the previous single-file layout (replace path
+// separators and spaces with underscores). Takes root explicitly so a caller
+// that pinned its own root (e.g. session.Session.cacheRoot) never re-reads
+// Root() on every call.
+func DirIn(root, profile, region string) string {
 	if root == "" {
 		return ""
 	}
@@ -159,12 +167,23 @@ type Store struct {
 }
 
 // LoadDir loads every readable, current-version type file under
-// Dir(profile, region) into memory and returns a Store. Never fails: a
-// missing directory yields an empty (non-nil) Store; an unreadable or
-// wrong-version file is skipped (one log line) without affecting the other
-// files' load (C7).
+// Dir(profile, region) (i.e. under the live cache.Root()) into memory and
+// returns a Store. Thin wrapper over LoadDirIn for callers that want the
+// current root rather than a pinned one.
 func LoadDir(profile, region string) *Store {
-	dir := Dir(profile, region)
+	return LoadDirIn(Root(), profile, region)
+}
+
+// LoadDirIn loads every readable, current-version type file under
+// DirIn(root, profile, region) into memory and returns a Store. Never fails:
+// a missing directory yields an empty (non-nil) Store; an unreadable or
+// wrong-version file is skipped (one log line) without affecting the other
+// files' load (C7). Takes root explicitly so a caller that pinned its own
+// root at construction time (see session.Session.cacheRoot) never re-reads
+// Root() — and therefore A9S_CONFIG_FOLDER — on a later, possibly
+// differently-configured call.
+func LoadDirIn(root, profile, region string) *Store {
+	dir := DirIn(root, profile, region)
 	s := &Store{
 		profile: profile,
 		region:  region,
@@ -311,6 +330,11 @@ func (s *Store) SaveType(shortName string) error {
 	}
 
 	path := filepath.Join(dir, shortName+".yaml")
+	cleanDir := filepath.Clean(dir)
+	if cleaned := filepath.Clean(path); cleaned != cleanDir && !strings.HasPrefix(cleaned, cleanDir+string(os.PathSeparator)) {
+		return fmt.Errorf("cache: SaveType(%s): resolved path %s escapes cache directory %s", shortName, cleaned, cleanDir)
+	}
+
 	tmpFile, err := os.CreateTemp(dir, shortName+".yaml.tmp.*")
 	if err != nil {
 		return fmt.Errorf("creating cache temp file in %s: %w", dir, err)

@@ -22,7 +22,7 @@ test:
 	go test ./... -count=1 -timeout 300s
 
 test-race:
-	go test ./... -count=1 -timeout 300s -race
+	go test ./... -count=1 -timeout 300s -race -shuffle=on
 
 # AS-104: capture wall time of `make test` and write test-budget.json. The
 # CI `test-budget` job (.github/workflows/ci.yml) runs this, then invokes

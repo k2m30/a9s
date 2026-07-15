@@ -124,6 +124,11 @@ func (s *Server) requireSession(w http.ResponseWriter, r *http.Request) *session
 			Path:     "/",
 			HttpOnly: true,
 			SameSite: http.SameSiteStrictMode,
+			// WebKit does not treat http://localhost as a trustworthy origin
+			// for Secure cookies (webkit.org/b/281149), so an unconditional
+			// true would break --web in Safari; this upgrades automatically
+			// if TLS ever terminates here.
+			Secure: r.TLS != nil,
 		})
 	}
 	return s.getOrCreateSession(sessionID)

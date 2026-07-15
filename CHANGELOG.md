@@ -17,6 +17,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `core/` packages are additionally offered under a commercial license
   (COMMERCIAL-LICENSE.md); contributions to `core/` require a CLA
   (CONTRIBUTING.md). SPDX headers added across `core/` and `internal/tui/`.
+- `make test-race` now runs with `-shuffle=on`, matching CI's test-order
+  shuffling so order-dependent leaks fail locally before any push.
+
+### Fixed
+
+- A test-order-dependent flake (macOS CI, `-shuffle=on`): the session's
+  on-disk cache root was resolved lazily at first write, so a background
+  cache writer leaked by a never-closed controller could follow a
+  since-changed `A9S_CONFIG_FOLDER` into an unrelated test's temp directory
+  mid-cleanup. The cache root is now pinned once at session construction.
+- `cache.Store.SaveType` now enforces an explicit path-containment check:
+  a resolved cache file path outside the profile--region pair directory is
+  rejected with an error instead of relying on `os.CreateTemp`'s incidental
+  separator rejection.
+- The web session cookie sets `Secure` when the request arrives over TLS.
+  It stays unset on plain loopback HTTP because WebKit does not treat
+  `http://localhost` as trustworthy for Secure cookies (webkit.org/b/281149)
+  and an unconditional flag would break `--web` in Safari.
 
 ## [3.53.2] - 2026-07-15
 

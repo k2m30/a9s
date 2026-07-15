@@ -55,6 +55,16 @@ type Session struct {
 	Profile string
 	Region  string
 
+	// cacheRoot is the cache.Root() value captured once, at New() time. Every
+	// ensureCacheStoreLocked call uses this pinned value instead of a live
+	// cache.Root() re-read, so a late async writer (e.g. a leaked
+	// availability-save goroutine from a never-Closed Controller) can never
+	// follow a since-changed A9S_CONFIG_FOLDER into a directory that has
+	// nothing to do with the session it belongs to. Not recaptured by
+	// Rotate() — the root is process-stable in production, and recapturing it
+	// would reintroduce the exact test-isolation leak this field closes.
+	cacheRoot string
+
 	// Session-scoped AWS transport. Set by handleClientsReady; cleared
 	// explicitly by handlers, not by Rotate (the caller decides whether to
 	// reuse the still-valid old clients on a rotation that may fail).
@@ -278,6 +288,7 @@ type Session struct {
 // Gen at its zero value are rejected by the gen guards.
 func New() *Session {
 	return &Session{
+		cacheRoot: cache.Root(),
 		// C10: a navigation issued before the first connect must trigger the
 		// active-list re-fetch once connected, exactly like a post-switch
 		// reconnect. On a menu-only startup, maybeRefreshIntents consumes this
@@ -409,7 +420,7 @@ func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
 	if s.CacheStore != nil && s.cacheStoreProfile == profile && s.cacheStoreRegion == region {
 		return s.CacheStore
 	}
-	s.CacheStore = cache.LoadDir(profile, region)
+	s.CacheStore = cache.LoadDirIn(s.cacheRoot, profile, region)
 	s.cacheStoreProfile = profile
 	s.cacheStoreRegion = region
 	return s.CacheStore
