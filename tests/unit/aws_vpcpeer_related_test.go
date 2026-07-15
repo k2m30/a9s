@@ -101,6 +101,9 @@ func TestRelated_VpcPeer_Registered(t *testing.T) {
 	}
 
 	expectedTargets := []string{"rtb", "vpc", "ct-events"}
+	if len(defs) != len(expectedTargets) {
+		t.Errorf("vpc-peer: len(GetRelated) = %d, want exactly %d (sg must not sneak in as an extra registration — spec §2 explicitly excludes it)", len(defs), len(expectedTargets))
+	}
 	seen := map[string]bool{}
 	for _, def := range defs {
 		for _, want := range expectedTargets {

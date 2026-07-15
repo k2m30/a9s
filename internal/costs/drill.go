@@ -45,9 +45,12 @@ type FallbackGate struct {
 	SelectedPeriod    Period
 }
 
-// resourceDrillWindowDays is the CE hard limit for GetCostAndUsageWithResources:
-// the queried range cannot start more than this many days before now.
-const resourceDrillWindowDays = 14
+// ResourceDrillWindowRetentionDays is the CE hard limit for
+// GetCostAndUsageWithResources: the queried range cannot start more than
+// this many days before now. Exported so callers outside this package (e.g.
+// internal/app/costs_state.go) reference the same single literal instead of
+// carrying their own mirrored copy.
+const ResourceDrillWindowRetentionDays = 14
 
 // resourceDrillAllowedService is the only SERVICE value CE's
 // GetCostAndUsageWithResources supports — a hard CE API requirement, not an
@@ -68,7 +71,7 @@ const resourceDrillAllowedService = "Amazon Elastic Compute Cloud - Compute"
 // period itself, so validating the selected period alone can pass while the
 // window actually queried does not.
 func ClampResourceDrillWindow(window []Period, now time.Time) []Period {
-	cutoff := utcDate(now).AddDate(0, 0, -resourceDrillWindowDays)
+	cutoff := utcDate(now).AddDate(0, 0, -ResourceDrillWindowRetentionDays)
 	out := make([]Period, 0, len(window))
 	for _, p := range window {
 		start, err := ParseDate(p.Start)
@@ -92,7 +95,7 @@ func ResourceDrillAllowed(l DrillLevel, now time.Time) (bool, string) {
 	if len(l.Window) == 0 {
 		return false, fmt.Sprintf(
 			"resource-level cost data is only retained for the last %d days — nothing in range to drill into",
-			resourceDrillWindowDays,
+			ResourceDrillWindowRetentionDays,
 		)
 	}
 	services := l.Filter.Equals[DimensionService]

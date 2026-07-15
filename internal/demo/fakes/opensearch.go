@@ -21,7 +21,7 @@ func NewOpenSearch() *OpenSearchFake {
 }
 
 func (f *OpenSearchFake) ListDomainNames(_ context.Context, _ *opensearch.ListDomainNamesInput, _ ...func(*opensearch.Options)) (*opensearch.ListDomainNamesOutput, error) {
-	domainNames := make([]ostypes.DomainInfo, 0, len(f.fix.Domains)+len(f.fix.DeniedNames))
+	domainNames := make([]ostypes.DomainInfo, 0, len(f.fix.Domains)+len(f.fix.UnavailableNames))
 	for i := range f.fix.Domains {
 		d := &f.fix.Domains[i]
 		domainNames = append(domainNames, ostypes.DomainInfo{
@@ -29,11 +29,11 @@ func (f *OpenSearchFake) ListDomainNames(_ context.Context, _ *opensearch.ListDo
 			EngineType: ostypes.EngineTypeOpenSearch,
 		})
 	}
-	// Denied witnesses are listed but omitted from DescribeDomains — the
-	// batched API's IAM-denial shape.
-	for i := range f.fix.DeniedNames {
+	// Unavailable witnesses are listed but omitted from DescribeDomains — the
+	// batched API's absent-from-response shape.
+	for i := range f.fix.UnavailableNames {
 		domainNames = append(domainNames, ostypes.DomainInfo{
-			DomainName: &f.fix.DeniedNames[i],
+			DomainName: &f.fix.UnavailableNames[i],
 			EngineType: ostypes.EngineTypeOpenSearch,
 		})
 	}

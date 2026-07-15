@@ -202,7 +202,7 @@ var sharedTransferFixtures = sync.OnceValue(func() *TransferFixtures {
 	// subnet 3, vpce 1, logs 2, acm 1, eip 3 = 7, with ≥2 on subnet+logs+eip
 	// (3/7 — VpcId/VpcEndpointId/Certificate/LoggingRole are 1:1 by API shape;
 	// documented structural ceiling, transfer-impl-plan.md §2). AllocationIds
-	// match ec2.go's buildAddresses eipalloc-0transfer111111{a,b,c} entries.
+	// match ec2.go's buildAddresses eipalloc-0a1b2c3d4e5f60a1{a,b,c} entries.
 	gateway := transferBaseServer(ProdAS2GatewayID, transfertypes.StateOnline, "SHA256:6b1f9c9e2a4d4e8f91a37d5c8e2f4b6a70c1d2e3f4a5")
 	gateway.EndpointType = transfertypes.EndpointTypeVpc
 	gateway.Protocols = []transfertypes.Protocol{transfertypes.ProtocolAs2, transfertypes.ProtocolFtps}
@@ -210,7 +210,7 @@ var sharedTransferFixtures = sync.OnceValue(func() *TransferFixtures {
 		VpcId:                aws.String(fixtProdVPCID),
 		VpcEndpointId:        aws.String(ProdAS2GatewayVpcEndpointID),
 		SubnetIds:            []string{fixtProdPublicSubnetA, fixtProdPublicSubnetB, fixtProdPrivateSubnetA},
-		AddressAllocationIds: []string{"eipalloc-0transfer111111a", "eipalloc-0transfer111111b", "eipalloc-0transfer111111c"},
+		AddressAllocationIds: []string{"eipalloc-0a1b2c3d4e5f60a1a", "eipalloc-0a1b2c3d4e5f60a1b", "eipalloc-0a1b2c3d4e5f60a1c"},
 	}
 	gateway.Certificate = aws.String(ProdACMCertARN1)
 	gateway.StructuredLogDestinations = []string{

@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   classified as a denial. Applies to MWAA, Transfer, Launch Templates,
   DynamoDB, OpenSearch, EKS clusters, and node groups. Row color, menu
   counts, and severity are unchanged.
+- EKS node-group related panels no longer risk associating EC2 instances or
+  EBS volumes from another cluster: an instance matches only when its
+  `eks:cluster-name` tag exactly equals the node group's cluster (an absent
+  tag previously slipped through, so two clusters with a same-named node
+  group could cross-contaminate).
 
 ## [3.53.1] - 2026-07-15
 

@@ -13,6 +13,8 @@ func ExpectedTopLevelCounts() map[string]int {
 	ec2 := NewEC2Fixtures()
 	mwaaFix := NewMWAAFixtures()
 	transferFix := NewTransferFixtures()
+	ddb := NewDDBFixtures()
+	openSearch := NewOpenSearchFixtures()
 	ecs := NewECSFixtures()
 	eks := NewEKSFixtures()
 	rds := NewRDSFixtures()
@@ -53,8 +55,8 @@ func ExpectedTopLevelCounts() map[string]int {
 		"s3":           len(s3.Buckets),
 		"redis":        countRedisEngineReplicationGroups(NewRedisFixtures()),
 		"dbc":          len(docdb.DBClusters) + len(rds.DBClusters),
-		"ddb":          len(NewDDBFixtures().Tables) + len(NewDDBFixtures().DeniedNames),
-		"opensearch":   len(NewOpenSearchFixtures().Domains) + len(NewOpenSearchFixtures().DeniedNames),
+		"ddb":          len(ddb.Tables) + len(ddb.DeniedNames),
+		"opensearch":   len(openSearch.Domains) + len(openSearch.UnavailableNames),
 		"redshift":     len(NewRedshiftFixtures().Clusters),
 		"efs":          len(NewEFSFixtures().FileSystems),
 		"dbi-snap":     len(rds.DBSnapshots),

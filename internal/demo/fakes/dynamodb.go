@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sort"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -31,6 +32,7 @@ func (f *DynamoDBFake) ListTables(_ context.Context, _ *dynamodb.ListTablesInput
 		names = append(names, aws.ToString(t.TableName))
 	}
 	names = append(names, f.fix.DeniedNames...)
+	sort.Strings(names)
 	return &dynamodb.ListTablesOutput{TableNames: names}, nil
 }
 

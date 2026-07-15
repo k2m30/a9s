@@ -44,8 +44,8 @@ import (
 func fetchLTDemoPage(t *testing.T) resource.FetchResult {
 	t.Helper()
 	result, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fakes.NewEC2(), "")
-	if err != nil && !strings.Contains(err.Error(), fixtures.WarnLTDeniedID) {
-		t.Fatalf("expected only the details-denied composite error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), fixtures.WarnLTDeniedID) {
+		t.Fatalf("expected the details-denied composite error naming %q, got %v", fixtures.WarnLTDeniedID, err)
 	}
 	return result
 }
@@ -101,10 +101,38 @@ func (f *ltEC2Fake) DescribeLaunchTemplateVersions(
 	if err, ok := f.versionErr[id]; ok {
 		return nil, err
 	}
-	if out, ok := f.versions[id]; ok {
-		return out, nil
+	out, ok := f.versions[id]
+	if !ok {
+		return nil, fmt.Errorf("launch template %q not found", id)
 	}
-	return nil, fmt.Errorf("launch template %q not found", id)
+
+	// Honor params.Versions the way the real EC2 API does — "$Default"
+	// matches only the version flagged DefaultVersion=true; anything else is
+	// matched by exact VersionNumber. Single-version fixtures (every
+	// existing caller) are unaffected: filtering a one-element slice by
+	// "$Default" always keeps that element. This filter is what lets a
+	// multi-version fixture catch a fetcher regression that stops
+	// requesting Versions=["$Default"] and would otherwise silently pick up
+	// whatever version happens to sit at index 0.
+	wantDefault := false
+	wantNumbers := map[int64]bool{}
+	for _, v := range params.Versions {
+		if v == "$Default" {
+			wantDefault = true
+			continue
+		}
+		var n int64
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil {
+			wantNumbers[n] = true
+		}
+	}
+	filtered := &ec2.DescribeLaunchTemplateVersionsOutput{}
+	for _, v := range out.LaunchTemplateVersions {
+		if (wantDefault && aws.ToBool(v.DefaultVersion)) || wantNumbers[aws.ToInt64(v.VersionNumber)] {
+			filtered.LaunchTemplateVersions = append(filtered.LaunchTemplateVersions, v)
+		}
+	}
+	return filtered, nil
 }
 
 var _ awsclient.EC2API = (*ltEC2Fake)(nil)
@@ -487,8 +515,17 @@ func TestFetchLaunchTemplatesPage_PartialDescribe(t *testing.T) {
 	if err == nil {
 		t.Fatal("FetchLaunchTemplatesPage must return a composite error when DescribeLaunchTemplateVersions fails for some templates")
 	}
-	if len(result.Resources) != 5 {
-		t.Fatalf("got %d resources, want 5 — a denied/missing describe must never make a listed template vanish", len(result.Resources))
+	seen := make(map[string]int, len(ids))
+	for _, r := range result.Resources {
+		seen[r.ID]++
+	}
+	for _, id := range ids {
+		if seen[id] != 1 {
+			t.Errorf("listed template %q: retained %d times, want exactly 1 — a denied/missing describe must never make a listed template vanish or duplicate", id, seen[id])
+		}
+	}
+	if len(result.Resources) != len(ids) {
+		t.Errorf("got %d resources, want %d (no extra rows beyond the listed set)", len(result.Resources), len(ids))
 	}
 
 	// lt-partial-denied → UnauthorizedOperation (EC2's authorization-denied
@@ -514,6 +551,69 @@ func TestFetchLaunchTemplatesPage_PartialDescribe(t *testing.T) {
 		if !strings.Contains(errStr, want) {
 			t.Errorf("composite error must contain %q, got: %q", want, errStr)
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// default_version_selection — DescribeLaunchTemplateVersions can legitimately
+// return more than one version; the fetcher must use the one flagged
+// DefaultVersion=true, never "whichever version happens to be first". The
+// non-default entry here is listed FIRST and is IMDSv1-vulnerable — a
+// fetcher that stopped requesting Versions=["$Default"] (or a naive
+// index-0 read) would surface that finding on the wrong version.
+// ---------------------------------------------------------------------------
+
+func TestFetchLaunchTemplatesPage_UsesDefaultVersionNotFirstListed(t *testing.T) {
+	const id = "lt-0defaultversion001a"
+	fake := &ltEC2Fake{
+		listOut: &ec2.DescribeLaunchTemplatesOutput{
+			LaunchTemplates: []ec2types.LaunchTemplate{
+				{
+					LaunchTemplateId:     aws.String(id),
+					LaunchTemplateName:   aws.String("default-version-witness"),
+					DefaultVersionNumber: aws.Int64(2),
+					LatestVersionNumber:  aws.Int64(3),
+				},
+			},
+		},
+		versions: map[string]*ec2.DescribeLaunchTemplateVersionsOutput{
+			id: {
+				LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{
+					{
+						LaunchTemplateId: aws.String(id),
+						VersionNumber:    aws.Int64(3),
+						DefaultVersion:   aws.Bool(false),
+						LaunchTemplateData: &ec2types.ResponseLaunchTemplateData{
+							MetadataOptions: &ec2types.LaunchTemplateInstanceMetadataOptions{
+								HttpTokens: ec2types.LaunchTemplateHttpTokensStateOptional,
+							},
+						},
+					},
+					{
+						LaunchTemplateId: aws.String(id),
+						VersionNumber:    aws.Int64(2),
+						DefaultVersion:   aws.Bool(true),
+						LaunchTemplateData: &ec2types.ResponseLaunchTemplateData{
+							MetadataOptions: &ec2types.LaunchTemplateInstanceMetadataOptions{
+								HttpTokens: ec2types.LaunchTemplateHttpTokensStateRequired,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	result, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fake, "")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	r := mustFindLTResource(t, result.Resources, id)
+	raw := ltAsRaw(t, r.RawStruct)
+	if got := aws.ToInt64(raw.DefaultVersion.VersionNumber); got != 2 {
+		t.Fatalf("RawStruct.DefaultVersion.VersionNumber = %d, want 2 (the $Default version, not the first-listed version 3)", got)
+	}
+	if len(r.Findings) != 0 {
+		t.Errorf("the $Default version (2) has HttpTokens=required and raises no finding; got %+v — the fetcher picked the wrong version", r.Findings)
 	}
 }
 
@@ -669,6 +769,30 @@ func TestEnrichLTDeprecatedAMI_SSMReferenceNoFinding(t *testing.T) {
 	if len(result.Findings[fixtures.SSMAmiLTID]) != 0 {
 		t.Errorf("Findings[%s]: expected 0 (resolve:ssm: reference is never a pivot), got %+v",
 			fixtures.SSMAmiLTID, result.Findings[fixtures.SSMAmiLTID])
+	}
+}
+
+// TestEnrichLTDeprecatedAMI_DetailsDeniedRowNoPanic feeds the enricher the
+// REAL details-denied degraded row (zero-valued DefaultVersion, nil
+// LaunchTemplateData — see TestFetchLaunchTemplatesPage_DetailsDeniedRich)
+// against a fully loaded, non-empty AMI cache: the nil-LaunchTemplateData
+// guard must skip it silently, never panic on the nil ImageId dereference.
+func TestEnrichLTDeprecatedAMI_DetailsDeniedRowNoPanic(t *testing.T) {
+	demo := fetchLTDemoPage(t)
+	lt := mustFindLTResource(t, demo.Resources, fixtures.WarnLTDeniedID)
+	raw := ltAsRaw(t, lt.RawStruct)
+	if raw.DefaultVersion.LaunchTemplateData != nil {
+		t.Fatalf("precondition: expected a nil LaunchTemplateData on the details-denied row, got %+v", raw.DefaultVersion.LaunchTemplateData)
+	}
+
+	clients := &awsclient.ServiceClients{EC2: fakes.NewEC2()}
+	result, err := awsclient.EnrichLTDeprecatedAMI(context.Background(), clients, []resource.Resource{lt}, ltAMICache(t))
+	if err != nil {
+		t.Fatalf("EnrichLTDeprecatedAMI returned error: %v", err)
+	}
+	if len(result.Findings[fixtures.WarnLTDeniedID]) != 0 {
+		t.Errorf("Findings[%s]: expected 0 (nil LaunchTemplateData must never produce a finding), got %+v",
+			fixtures.WarnLTDeniedID, result.Findings[fixtures.WarnLTDeniedID])
 	}
 }
 

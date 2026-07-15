@@ -56,10 +56,22 @@ func TestScenario_DetailFocusKeys_NavKeysWorkWithRelatedFocused(t *testing.T) {
 	// widget owns outside filter-input mode) — guard against over-fixing.
 	scenario.OpenDetailResource("transfer", root)
 	scenario.Press("l")
+
+	// Precondition: "IAM Roles" (the "role" pivot's DisplayName) is present
+	// unfiltered — otherwise its absence after filtering would prove
+	// nothing.
+	unfiltered := scenario.currentView()
+	if !strings.Contains(unfiltered, "IAM Roles") {
+		t.Fatalf("precondition: unfiltered related panel must show \"IAM Roles\":\n%s", unfiltered)
+	}
+
 	scenario.Type("/")
 	scenario.Type("vpc")
 	view := scenario.currentView()
 	if !strings.Contains(view, "vpc") {
 		t.Fatalf("related filter via / stopped working with focus held:\n%s", view)
+	}
+	if strings.Contains(view, "IAM Roles") {
+		t.Fatalf("related filter via / did not narrow the row set — \"IAM Roles\" (a nonmatching pivot) is still visible:\n%s", view)
 	}
 }

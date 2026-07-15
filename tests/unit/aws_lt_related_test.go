@@ -104,6 +104,9 @@ func TestRelated_LT_Registered(t *testing.T) {
 	}
 
 	expectedTargets := []string{"ami", "asg", "ec2", "kms", "ng", "sg", "subnet", "ct-events"}
+	if len(defs) != len(expectedTargets) {
+		t.Errorf("lt: len(GetRelated) = %d, want exactly %d (spec §2's 8-target pivot SET must not gain an unlisted extra registration)", len(defs), len(expectedTargets))
+	}
 	seen := map[string]bool{}
 	for _, def := range defs {
 		for _, want := range expectedTargets {

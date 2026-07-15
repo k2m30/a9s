@@ -562,15 +562,6 @@ func (c *Controller) applyCostZoom(cs *CostsState, in bool) *runtime.TaskRequest
 	return c.ensureCostsShapeFetched(cs)
 }
 
-// resourceDrillWindowRetentionDays mirrors internal/costs/drill.go's
-// unexported resourceDrillWindowDays — the CE GetCostAndUsageWithResources
-// hard 14-day retention limit costs.ClampResourceDrillWindow enforces at
-// push time. The value can't be imported across packages (it's
-// deliberately unexported there, same as tests/unit/costs_state_test.go's
-// own local copy), so this file mirrors it rather than inventing a
-// different number.
-const resourceDrillWindowRetentionDays = 14
-
 // resourceDrillWindowExceedsRetention reports whether window's overall span
 // (its first period's Start to its last period's End) is wider than the CE
 // resource-level retention bound. costs.ClampResourceDrillWindow only drops
@@ -587,7 +578,7 @@ func resourceDrillWindowExceedsRetention(window []costs.Period) bool {
 	if errS != nil || errE != nil {
 		return false
 	}
-	return end.Sub(start).Hours()/24 > resourceDrillWindowRetentionDays
+	return end.Sub(start).Hours()/24 > costs.ResourceDrillWindowRetentionDays
 }
 
 func granChainIndex(g costs.Granularity) int {

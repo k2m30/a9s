@@ -373,6 +373,28 @@ func serviceRouter(req *http.Request) (int, string) {
 </DescribeAutoScalingGroupsResponse>`
 	}
 
+	// MWAA (REST-JSON)
+	if strings.Contains(host, "airflow.") {
+		path := req.URL.Path
+		if strings.HasPrefix(path, "/environments/") {
+			return 200, `{"Environment":{"Name":"mock-mwaa-1","Status":"AVAILABLE"}}`
+		}
+		if strings.HasSuffix(path, "/environments") {
+			return 200, `{"Environments":["mock-mwaa-1"]}`
+		}
+	}
+
+	// Transfer Family (AWS JSON 1.1)
+	if strings.Contains(host, "transfer.") {
+		target := req.Header.Get("X-Amz-Target")
+		if strings.Contains(target, "DescribeServer") {
+			return 200, `{"Server":{"ServerId":"s-mocktransfer1","State":"ONLINE"}}`
+		}
+		if strings.Contains(target, "ListServers") {
+			return 200, `{"Servers":[{"ServerId":"s-mocktransfer1","State":"ONLINE"}]}`
+		}
+	}
+
 	// Fallback: empty 200
 	return 200, `{}`
 }
@@ -707,6 +729,80 @@ func TestQA_FetchResources_Secrets(t *testing.T) {
 	}
 	if rl.ResourceType != "secrets" {
 		t.Errorf("expected ResourceType 'secrets', got %q", rl.ResourceType)
+	}
+}
+
+func TestQA_FetchResources_MWAA(t *testing.T) {
+	m := buildModelWithMockClients(t)
+
+	_, cmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetResourceList,
+		ResourceType: "mwaa",
+	})
+	if cmd == nil {
+		t.Fatal("navigating to mwaa resource list should return a command")
+	}
+
+	msgs := executeBatchCmd(cmd)
+	rl := findResourcesLoadedMsg(msgs)
+	ae := findAPIErrorMsg(msgs)
+
+	if ae != nil {
+		t.Fatalf("mwaa fetch returned APIErrorMsg: %v", ae.Err)
+	}
+	if rl == nil {
+		t.Fatal("mwaa fetch should return ResourcesLoadedMsg")
+	}
+	if rl.ResourceType != "mwaa" {
+		t.Errorf("expected ResourceType 'mwaa', got %q", rl.ResourceType)
+	}
+	if len(rl.Resources) != 1 {
+		t.Fatalf("expected exactly 1 MWAA environment from the mock ListEnvironments+GetEnvironment round trip, got %d", len(rl.Resources))
+	}
+	if got := rl.Resources[0].ID; got != "mock-mwaa-1" {
+		t.Errorf("expected the mock environment's name as ID, got %q", got)
+	}
+	if got := rl.Resources[0].Fields["status"]; got != "" {
+		t.Errorf("AVAILABLE environment with no findings should render a blank status, got %q", got)
+	}
+}
+
+func TestQA_FetchResources_Transfer(t *testing.T) {
+	m := buildModelWithMockClients(t)
+
+	_, cmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetResourceList,
+		ResourceType: "transfer",
+	})
+	if cmd == nil {
+		t.Fatal("navigating to transfer resource list should return a command")
+	}
+
+	msgs := executeBatchCmd(cmd)
+	rl := findResourcesLoadedMsg(msgs)
+	ae := findAPIErrorMsg(msgs)
+
+	if ae != nil {
+		t.Fatalf("transfer fetch returned APIErrorMsg: %v", ae.Err)
+	}
+	if rl == nil {
+		t.Fatal("transfer fetch should return ResourcesLoadedMsg")
+	}
+	if rl.ResourceType != "transfer" {
+		t.Errorf("expected ResourceType 'transfer', got %q", rl.ResourceType)
+	}
+	if len(rl.Resources) != 1 {
+		t.Fatalf("expected exactly 1 Transfer server from the mock ListServers+DescribeServer round trip, got %d", len(rl.Resources))
+	}
+	if got := rl.Resources[0].ID; got != "s-mocktransfer1" {
+		t.Errorf("expected the mock server's ServerId as ID, got %q", got)
+	}
+	// ONLINE (no state finding), but the mock server has no LoggingRole/
+	// StructuredLogDestinations set — computeTransferFindings' no-logging
+	// finding fires regardless of state, so this is the real fetcher's
+	// genuine status phrase for a minimal server, not a stubbed value.
+	if got := rl.Resources[0].Fields["status"]; got != "no activity logging" {
+		t.Errorf("expected status %q, got %q", "no activity logging", got)
 	}
 }
 

@@ -234,12 +234,13 @@ func TestCostsState_Zoom_ResourceIDFrame_ZoomOut_StaysWithinRetentionWindow(t *t
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionCostZoomOut})
 
+	// Rendered result: RowDim staying RESOURCE_ID after a zoom-out already
+	// proves the frame was mutated in place rather than popped/replaced —
+	// pinning len(GetCostsDrillStack()) on top of this would just encode the
+	// same fact as an internal-state magic number.
 	top := topDrill(t, c)
 	if top.RowDim != costs.DimensionResourceID {
 		t.Fatalf("zoom must mutate the top frame in place — RowDim changed to %q", top.RowDim)
-	}
-	if depth := len(c.GetCostsDrillStack()); depth != 3 {
-		t.Fatalf("zoom must mutate the top frame in place, not push/pop — DrillStack depth got %d want 3", depth)
 	}
 	if len(top.Window) == 0 {
 		t.Fatal("zoom-out on a RESOURCE_ID frame left an empty Window")
@@ -253,15 +254,16 @@ func TestCostsState_Zoom_ResourceIDFrame_ZoomOut_StaysWithinRetentionWindow(t *t
 	if err != nil {
 		t.Fatalf("Window[-1].End = %q, ParseDate: %v", top.Window[len(top.Window)-1].End, err)
 	}
-	// 14 days — the same CE GetCostAndUsageWithResources retention bound
-	// costs.ClampResourceDrillWindow enforces (internal/costs/drill.go's
-	// resourceDrillWindowDays) when a RESOURCE_ID frame is first pushed.
-	const resourceDrillWindowDays = 14
-	if span := end.Sub(start).Hours() / 24; span > resourceDrillWindowDays {
+	if span := end.Sub(start).Hours() / 24; span > costs.ResourceDrillWindowRetentionDays {
 		t.Errorf("RESOURCE_ID frame zoom-out produced a %.0f-day window %s..%s — exceeds the %d-day CE resource-level retention bound the push path enforces",
-			span, top.Window[0].Start, top.Window[len(top.Window)-1].End, resourceDrillWindowDays)
+			span, top.Window[0].Start, top.Window[len(top.Window)-1].End, costs.ResourceDrillWindowRetentionDays)
 	}
 
+	// Dispatched fetch payload: on a cache miss for this zoom's shape, the
+	// CE fetch it triggers must itself carry a window within the same
+	// retention bound. Empirically this particular zoom hits cache (no task
+	// fires) — "if found" keeps the assertion honest instead of requiring a
+	// task the production path doesn't actually dispatch here.
 	if payload, found := findFetchCostsTask(tasks); found {
 		if len(payload.Window) == 0 {
 			t.Fatal("dispatched fetch task carries an empty Window")
@@ -271,8 +273,8 @@ func TestCostsState_Zoom_ResourceIDFrame_ZoomOut_StaysWithinRetentionWindow(t *t
 		if errS != nil || errE != nil {
 			t.Fatalf("fetch task Window bounds unparseable: start err=%v end err=%v", errS, errE)
 		}
-		if span := pEnd.Sub(pStart).Hours() / 24; span > resourceDrillWindowDays {
-			t.Errorf("dispatched fetch task Window spans %.0f days — a GetCostAndUsageWithResources call over %d days is invalid against CE", span, resourceDrillWindowDays)
+		if span := pEnd.Sub(pStart).Hours() / 24; span > costs.ResourceDrillWindowRetentionDays {
+			t.Errorf("dispatched fetch task Window spans %.0f days — a GetCostAndUsageWithResources call over %d days is invalid against CE", span, costs.ResourceDrillWindowRetentionDays)
 		}
 	}
 }

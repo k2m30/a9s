@@ -89,8 +89,8 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 		}
 	}
 	logView := stripANSI(rootViewContent(logModel))
-	if !strings.Contains(logView, "partial") {
-		t.Errorf("handleAvailabilityChecked partial-err: `!` error log must contain the composite error text; got view:\n%s", logView)
+	if !strings.Contains(logView, partialErr.Error()) {
+		t.Errorf("handleAvailabilityChecked partial-err: `!` error log must contain the full composite error text %q; got view:\n%s", partialErr.Error(), logView)
 	}
 
 	// CONTRACT 2: probeResources must be seeded so Wave 2 enrichment can run.

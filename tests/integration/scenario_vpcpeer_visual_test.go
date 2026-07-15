@@ -83,6 +83,25 @@ func TestScenario_VpcPeerVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(demofixtures.WarnPeerNoRouteID, vpcPeerPhraseNoRoute)
 	scenario.ExpectRowStatusEquals(demofixtures.WarnPeerBlackholeID, vpcPeerPhraseBlackhole)
 
+	// Glyph rules: every finding is color-bearing — no row wears a glyph
+	// (the color is the signal); the healthy baseline is also glyph-free.
+	for _, id := range []string{
+		demofixtures.ProdPeerSharedID,
+		demofixtures.WarnPeerProvisioningID,
+		demofixtures.WarnPeerInitiatingID,
+		demofixtures.WarnPeerPendingID,
+		demofixtures.WarnPeerExpiredID,
+		demofixtures.BrokenPeerRejectedID,
+		demofixtures.BrokenPeerFailedID,
+		demofixtures.WarnPeerDeletingID,
+		demofixtures.DimPeerDeletedID,
+		demofixtures.WarnPeerOverlapID,
+		demofixtures.WarnPeerNoRouteID,
+		demofixtures.WarnPeerBlackholeID,
+	} {
+		scenario.ExpectRowNoGlyphPrefix(id)
+	}
+
 	// Related panel — graph root: rtb 2 (two tables route to it), vpc 1
 	// (the LOCAL side only — the cross-account accepter renders as plain
 	// OwnerId/VpcId facts, never a pivot entry).

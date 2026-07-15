@@ -16,6 +16,7 @@ package unit_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -35,10 +36,11 @@ func mwaaGraphRootResource(t *testing.T) resource.Resource {
 	t.Helper()
 	clients := &awsclient.ServiceClients{MWAA: fakes.NewMWAA()}
 	result, err := awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, "")
-	if err != nil && len(result.Resources) == 0 {
+	if err == nil || !strings.Contains(err.Error(), fixtures.WarnAirflowDetailsDeniedID) {
 		// The demo set includes the details-denied witness, so the fetch
-		// legitimately returns rows + a composite error (E5 partial success).
-		t.Fatalf("FetchMWAAEnvironmentsPage returned error: %v", err)
+		// must legitimately return rows + a composite error naming that
+		// witness (E5 partial success) — any other outcome is unexpected.
+		t.Fatalf("expected the details-denied composite error naming %q, got %v", fixtures.WarnAirflowDetailsDeniedID, err)
 	}
 	for _, r := range result.Resources {
 		if r.ID == fixtures.ProdAirflowEtlID {
@@ -68,6 +70,9 @@ func TestRelated_MWAA_Registered(t *testing.T) {
 		"subnet":    "Subnets",
 		"alarm":     "CW Alarms",
 		"ct-events": "CloudTrail Events",
+	}
+	if len(defs) != len(expected) {
+		t.Errorf("mwaa: len(GetRelated) = %d, want exactly %d (spec §2's excluded targets — vpc/sqs/vpce — must not sneak in as extra registrations)", len(defs), len(expected))
 	}
 	seen := map[string]bool{}
 	for _, def := range defs {

@@ -122,6 +122,9 @@ func TestScenario_MWAAVisual(t *testing.T) {
 		demofixtures.BrokenAirflowUpdateFailedID,
 		demofixtures.BrokenAirflowUnavailableID,
 		demofixtures.DimAirflowDeletingID,
+		// The details-denied degraded row is color-bearing (Warning), not a
+		// glyphed green row — it belongs in the no-glyph contract too.
+		demofixtures.WarnAirflowDetailsDeniedID,
 	} {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}

@@ -2079,7 +2079,7 @@ func buildAddresses() []ec2types.Address {
 		// (RFC 5737 TEST-NET-3, 203.0.113.0/24) since these are not actually
 		// bound to any ENI/instance in the demo graph.
 		{
-			AllocationId: aws.String("eipalloc-0transfer111111a"), PublicIp: aws.String("203.0.113.10"),
+			AllocationId: aws.String("eipalloc-0a1b2c3d4e5f60a1a"), PublicIp: aws.String("203.0.113.10"),
 			Domain: ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("prod-as2-gateway-eip-a")},
@@ -2087,7 +2087,7 @@ func buildAddresses() []ec2types.Address {
 			},
 		},
 		{
-			AllocationId: aws.String("eipalloc-0transfer111111b"), PublicIp: aws.String("203.0.113.11"),
+			AllocationId: aws.String("eipalloc-0a1b2c3d4e5f60a1b"), PublicIp: aws.String("203.0.113.11"),
 			Domain: ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("prod-as2-gateway-eip-b")},
@@ -2095,7 +2095,7 @@ func buildAddresses() []ec2types.Address {
 			},
 		},
 		{
-			AllocationId: aws.String("eipalloc-0transfer111111c"), PublicIp: aws.String("203.0.113.12"),
+			AllocationId: aws.String("eipalloc-0a1b2c3d4e5f60a1c"), PublicIp: aws.String("203.0.113.12"),
 			Domain: ec2types.DomainTypeVpc, NetworkBorderGroup: aws.String("us-east-1"),
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("prod-as2-gateway-eip-c")},
@@ -2533,7 +2533,7 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 			State:               ec2types.StateAvailable,
 			VpcId:               aws.String(fixtProdVPCID),
 			SubnetIds:           []string{fixtProdPublicSubnetA, fixtProdPublicSubnetB, fixtProdPrivateSubnetA},
-			NetworkInterfaceIds: []string{"eni-0transfer1111111a", "eni-0transfer1111111b", "eni-0transfer1111111c"},
+			NetworkInterfaceIds: []string{"eni-0a1b2c3d4e5f60a2a", "eni-0a1b2c3d4e5f60a2b", "eni-0a1b2c3d4e5f60a2c"},
 			PrivateDnsEnabled:   aws.Bool(false),
 			OwnerId:             aws.String("123456789012"),
 			CreationTimestamp:   aws.Time(time.Date(2025, 10, 1, 9, 0, 0, 0, time.UTC)),

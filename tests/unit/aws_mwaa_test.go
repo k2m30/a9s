@@ -35,8 +35,8 @@ func fetchMWAADemoPage(t *testing.T) resource.FetchResult {
 	t.Helper()
 	clients := &awsclient.ServiceClients{MWAA: fakes.NewMWAA()}
 	result, err := awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, "")
-	if err != nil && !strings.Contains(err.Error(), fixtures.WarnAirflowDetailsDeniedID) {
-		t.Fatalf("expected only the details-denied composite error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), fixtures.WarnAirflowDetailsDeniedID) {
+		t.Fatalf("expected the details-denied composite error naming %q, got %v", fixtures.WarnAirflowDetailsDeniedID, err)
 	}
 	return result
 }

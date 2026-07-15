@@ -154,11 +154,8 @@ func matchingNGInstances(ec2List []typedRow[ec2types.Instance], nodegroupName, c
 		if tagValue(row.Raw.Tags, "eks:nodegroup-name") != nodegroupName {
 			continue
 		}
-		if clusterName != "" {
-			instCluster := tagValue(row.Raw.Tags, "eks:cluster-name")
-			if instCluster != "" && instCluster != clusterName {
-				continue
-			}
+		if clusterName != "" && tagValue(row.Raw.Tags, "eks:cluster-name") != clusterName {
+			continue
 		}
 		matches = append(matches, row)
 	}

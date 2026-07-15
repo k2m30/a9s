@@ -17,6 +17,7 @@ package unit_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
@@ -32,10 +33,11 @@ func transferResourceByID(t *testing.T, id string) resource.Resource {
 	t.Helper()
 	clients := &awsclient.ServiceClients{Transfer: fakes.NewTransfer()}
 	result, err := awsclient.FetchTransferServersPage(context.Background(), clients, "")
-	if err != nil && len(result.Resources) == 0 {
+	if err == nil || !strings.Contains(err.Error(), fixtures.WarnTransferDetailsDeniedID) {
 		// The demo set includes the details-denied witness, so the fetch
-		// legitimately returns rows + a composite error (E5 partial success).
-		t.Fatalf("FetchTransferServersPage returned error: %v", err)
+		// must legitimately return rows + a composite error naming that
+		// witness (E5 partial success) — any other outcome is unexpected.
+		t.Fatalf("expected the details-denied composite error naming %q, got %v", fixtures.WarnTransferDetailsDeniedID, err)
 	}
 	for _, r := range result.Resources {
 		if r.ID == id {
@@ -66,6 +68,9 @@ func TestRelated_Transfer_Registered(t *testing.T) {
 		"vpc":       "VPC",
 		"vpce":      "VPC Endpoints",
 		"ct-events": "CloudTrail Events",
+	}
+	if len(defs) != len(expected) {
+		t.Errorf("transfer: len(GetRelated) = %d, want exactly %d (spec §2's excluded targets — sg/apigw/s3/efs — must not sneak in as extra registrations)", len(defs), len(expected))
 	}
 	seen := map[string]bool{}
 	for _, def := range defs {

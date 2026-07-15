@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -662,15 +663,19 @@ func TestTransferAgreementDetailEnrich_CertExpiry(t *testing.T) {
 		t.Fatalf("DetailEnrich returned error: %v", err)
 	}
 
-	expiringRe := regexp.MustCompile(`expires in \d+d`)
+	expiringRe := regexp.MustCompile(`^expires in (\d+)d$`)
 	var expiredFinding, expiringFinding *domain.Finding
+	var expiringDays string
 	for i := range enriched.Findings {
 		f := &enriched.Findings[i]
 		switch {
 		case f.Phrase == "expired":
 			expiredFinding = f
-		case expiringRe.MatchString(f.Phrase):
-			expiringFinding = f
+		default:
+			if m := expiringRe.FindStringSubmatch(f.Phrase); m != nil {
+				expiringFinding = f
+				expiringDays = m[1]
+			}
 		}
 	}
 
@@ -686,6 +691,13 @@ func TestTransferAgreementDetailEnrich_CertExpiry(t *testing.T) {
 	}
 	if expiringFinding.Severity != domain.SevWarn {
 		t.Errorf("expiring-cert Severity = %v, want SevWarn", expiringFinding.Severity)
+	}
+	d, err := strconv.Atoi(expiringDays)
+	if err != nil {
+		t.Fatalf("expiring-cert Phrase %q: day count %q did not parse: %v", expiringFinding.Phrase, expiringDays, err)
+	}
+	if d <= 0 || d >= 30 {
+		t.Errorf("expiring-cert Phrase %q: day count %d out of the <30d warning window's own bound (0 < d < 30)", expiringFinding.Phrase, d)
 	}
 }
 

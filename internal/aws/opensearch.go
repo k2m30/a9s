@@ -3,8 +3,10 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
 	opensearchtypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 
@@ -159,21 +161,11 @@ func FetchOpenSearchDomainsAt(
 
 	if descOutput != nil {
 		for _, domain := range descOutput.DomainStatusList {
-			domainName := ""
-			if domain.DomainName != nil {
-				domainName = *domain.DomainName
-			}
+			domainName := aws.ToString(domain.DomainName)
 			described[domainName] = true
 
-			engineVersion := ""
-			if domain.EngineVersion != nil {
-				engineVersion = *domain.EngineVersion
-			}
-
-			endpoint := ""
-			if domain.Endpoint != nil {
-				endpoint = *domain.Endpoint
-			}
+			engineVersion := aws.ToString(domain.EngineVersion)
+			endpoint := aws.ToString(domain.Endpoint)
 
 			instanceType := ""
 			instanceCount := ""
@@ -185,20 +177,9 @@ func FetchOpenSearchDomainsAt(
 			}
 
 			// --- Signal flags ---
-			deleted := "false"
-			if domain.Deleted != nil && *domain.Deleted {
-				deleted = "true"
-			}
-
-			processing := "false"
-			if domain.Processing != nil && *domain.Processing {
-				processing = "true"
-			}
-
-			upgradeProcessing := "false"
-			if domain.UpgradeProcessing != nil && *domain.UpgradeProcessing {
-				upgradeProcessing = "true"
-			}
+			deleted := strconv.FormatBool(aws.ToBool(domain.Deleted))
+			processing := strconv.FormatBool(aws.ToBool(domain.Processing))
+			upgradeProcessing := strconv.FormatBool(aws.ToBool(domain.UpgradeProcessing))
 
 			// DomainProcessingStatus: always emit at least "Active" so the Color func's
 			// Isolated branch is deterministic even when the AWS field is zero-value.
@@ -220,12 +201,8 @@ func FetchOpenSearchDomainsAt(
 				if sso.AutomatedUpdateDate != nil {
 					updateDate = sso.AutomatedUpdateDate.Format(time.RFC3339)
 				}
-				if sso.CurrentVersion != nil {
-					currentVersion = *sso.CurrentVersion
-				}
-				if sso.NewVersion != nil {
-					newVersion = *sso.NewVersion
-				}
+				currentVersion = aws.ToString(sso.CurrentVersion)
+				newVersion = aws.ToString(sso.NewVersion)
 			}
 
 			// Encryption at rest: non-nil pointer with value false.

@@ -534,7 +534,10 @@ func TestEnrichVpcPeerRoutes_NoLocalRoute(t *testing.T) {
 	demo := fetchVpcPeerDemoPage(t)
 	pcx := mustFindVpcPeerResource(t, demo.Resources, fixtures.WarnPeerNoRouteID)
 
-	clients := &awsclient.ServiceClients{EC2: fakes.NewEC2()}
+	// EC2 deliberately nil: EnrichVpcPeerRoutes is a pure cache-scan checker
+	// (zero AWS calls) — a nil EC2 client turns any accidental live call into
+	// an immediate panic instead of a silently-satisfied fake.
+	clients := &awsclient.ServiceClients{}
 	result, err := awsclient.EnrichVpcPeerRoutes(context.Background(), clients, []resource.Resource{pcx}, vpcPeerRTBCache(t))
 	if err != nil {
 		t.Fatalf("EnrichVpcPeerRoutes returned error: %v", err)
@@ -564,7 +567,10 @@ func TestEnrichVpcPeerRoutes_RouteBlackholed(t *testing.T) {
 	demo := fetchVpcPeerDemoPage(t)
 	pcx := mustFindVpcPeerResource(t, demo.Resources, fixtures.WarnPeerBlackholeID)
 
-	clients := &awsclient.ServiceClients{EC2: fakes.NewEC2()}
+	// EC2 deliberately nil: EnrichVpcPeerRoutes is a pure cache-scan checker
+	// (zero AWS calls) — a nil EC2 client turns any accidental live call into
+	// an immediate panic instead of a silently-satisfied fake.
+	clients := &awsclient.ServiceClients{}
 	result, err := awsclient.EnrichVpcPeerRoutes(context.Background(), clients, []resource.Resource{pcx}, vpcPeerRTBCache(t))
 	if err != nil {
 		t.Fatalf("EnrichVpcPeerRoutes returned error: %v", err)
@@ -594,7 +600,10 @@ func TestEnrichVpcPeerRoutes_ActiveRoutedNoFinding(t *testing.T) {
 	demo := fetchVpcPeerDemoPage(t)
 	pcx := mustFindVpcPeerResource(t, demo.Resources, fixtures.ProdPeerSharedID)
 
-	clients := &awsclient.ServiceClients{EC2: fakes.NewEC2()}
+	// EC2 deliberately nil: EnrichVpcPeerRoutes is a pure cache-scan checker
+	// (zero AWS calls) — a nil EC2 client turns any accidental live call into
+	// an immediate panic instead of a silently-satisfied fake.
+	clients := &awsclient.ServiceClients{}
 	result, err := awsclient.EnrichVpcPeerRoutes(context.Background(), clients, []resource.Resource{pcx}, vpcPeerRTBCache(t))
 	if err != nil {
 		t.Fatalf("EnrichVpcPeerRoutes returned error: %v", err)
@@ -609,7 +618,10 @@ func TestEnrichVpcPeerRoutes_NonActiveGuardedNoFinding(t *testing.T) {
 	demo := fetchVpcPeerDemoPage(t)
 	pcx := mustFindVpcPeerResource(t, demo.Resources, fixtures.WarnPeerPendingID)
 
-	clients := &awsclient.ServiceClients{EC2: fakes.NewEC2()}
+	// EC2 deliberately nil: EnrichVpcPeerRoutes is a pure cache-scan checker
+	// (zero AWS calls) — a nil EC2 client turns any accidental live call into
+	// an immediate panic instead of a silently-satisfied fake.
+	clients := &awsclient.ServiceClients{}
 	result, err := awsclient.EnrichVpcPeerRoutes(context.Background(), clients, []resource.Resource{pcx}, vpcPeerRTBCache(t))
 	if err != nil {
 		t.Fatalf("EnrichVpcPeerRoutes returned error: %v", err)
@@ -625,7 +637,10 @@ func TestEnrichVpcPeerRoutes_RTBCacheAbsentSkipsSilently(t *testing.T) {
 	noRoute := mustFindVpcPeerResource(t, demo.Resources, fixtures.WarnPeerNoRouteID)
 	blackhole := mustFindVpcPeerResource(t, demo.Resources, fixtures.WarnPeerBlackholeID)
 
-	clients := &awsclient.ServiceClients{EC2: fakes.NewEC2()}
+	// EC2 deliberately nil: EnrichVpcPeerRoutes is a pure cache-scan checker
+	// (zero AWS calls) — a nil EC2 client turns any accidental live call into
+	// an immediate panic instead of a silently-satisfied fake.
+	clients := &awsclient.ServiceClients{}
 	result, err := awsclient.EnrichVpcPeerRoutes(context.Background(), clients, []resource.Resource{noRoute, blackhole}, resource.ResourceCache{})
 	if err != nil {
 		t.Fatalf("EnrichVpcPeerRoutes returned error: %v", err)
@@ -648,7 +663,10 @@ func TestEnrichVpcPeerRoutes_RTBCacheTruncatedSkipsSilently(t *testing.T) {
 	entry.IsTruncated = true
 	cache["rtb"] = entry
 
-	clients := &awsclient.ServiceClients{EC2: fakes.NewEC2()}
+	// EC2 deliberately nil: EnrichVpcPeerRoutes is a pure cache-scan checker
+	// (zero AWS calls) — a nil EC2 client turns any accidental live call into
+	// an immediate panic instead of a silently-satisfied fake.
+	clients := &awsclient.ServiceClients{}
 	result, err := awsclient.EnrichVpcPeerRoutes(context.Background(), clients, []resource.Resource{noRoute, blackhole}, cache)
 	if err != nil {
 		t.Fatalf("EnrichVpcPeerRoutes returned error: %v", err)
