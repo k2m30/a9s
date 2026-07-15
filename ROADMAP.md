@@ -4,7 +4,7 @@ This document outlines the planned direction for a9s. Priorities may shift based
 
 ## Already Implemented
 
-- **67 AWS resource types** across 12 categories
+- **70 AWS resource types** across 12 categories
 - **Search and filter** -- `/` to filter resource lists; `/` to search within YAML, detail, and JSON views with `n`/`N` for next/prev match
 - **Column sorting** -- `1`-`0` keys to sort by any column position
 - **Customizable columns** -- `~/.a9s/views/` overrides which fields are displayed per resource type
@@ -31,7 +31,6 @@ This document outlines the planned direction for a9s. Priorities may shift based
 
 ## Short-Term
 
-- **New resource types from real production accounts** -- shipped one per minor release: Managed Airflow (`mwaa`, done in v3.50.0), Transfer Family with an agreements child view (`transfer`, in progress), EC2 Launch Templates (`lt`), VPC Peering (`vpc-peer`)
 - **Cost overlay in resource lists** -- show each resource's monthly cost as a column, powered by the Cost Explorer data already cached ([#73](https://github.com/k2m30/a9s/issues/73))
 - **Richer detail views** -- extend the enrichment pattern to more resource types ([#261](https://github.com/k2m30/a9s/issues/261))
 
