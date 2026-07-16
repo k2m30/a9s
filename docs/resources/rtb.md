@@ -177,13 +177,13 @@ rtb — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| subnet | Subnets | yes |
-| nat | NAT Gateways | yes |
-| igw | Internet Gateways | yes |
+| subnet | Subnets | no |
+| nat | NAT Gateways | no |
+| igw | Internet Gateways | no |
 | cfn | CloudFormation | yes |
 | vpc | VPC | no |
-| eni | Network Interfaces | yes |
-| tgw | Transit Gateways | yes |
+| eni | Network Interfaces | no |
+| tgw | Transit Gateways | no |
 | vpce | VPC Endpoints | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

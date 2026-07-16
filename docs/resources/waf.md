@@ -154,7 +154,7 @@ waf — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle f
 | elb | Load Balancers | no |
 | apigw | API Gateways | no |
 | cf | CloudFront | no |
-| alarm | CloudWatch Alarms | no |
+| alarm | CloudWatch Alarms | yes |
 | logs | Log Groups | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

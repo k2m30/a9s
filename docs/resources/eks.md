@@ -237,6 +237,8 @@ eks — CONTAINERS. Lifecycle key: `status`.
 | eks.state.updating | updating | warn | wave1 |
 | eks.state.failed | failed | broken | wave1 |
 | eks.health-issue | issue: <Issue.Code> | warn | wave1 |
+| eks.warn.details\_denied | details denied | warn | wave1 |
+| eks.warn.details\_unavailable | details unavailable | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
@@ -254,5 +256,5 @@ eks — CONTAINERS. Lifecycle key: `status`.
 | ami | AMI | no |
 | asg | Auto Scaling Groups | yes |
 | ec2 | EC2 Instances | no |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

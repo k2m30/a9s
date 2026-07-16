@@ -113,7 +113,7 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 
 	// Resolve parent DBInstanceArn via the dbi cache. If the cache isn't loaded,
 	// the parent ARN is unavailable and the answer is genuinely unknown.
-	dbiList, _, err := relatedResourcesFor(ctx, clients, cache, "dbi")
+	dbiList, dbiTruncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
 	if err != nil {
 		return resource.ErrorRelated("backup", err)
 	}
@@ -131,10 +131,13 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 		break
 	}
 	if parentARN == "" {
-		// Parent DB not in cache (orphan) — Backup tracks the parent so this
-		// pivot has no answer for orphan snapshots. Definitive Count=0 rather
-		// than UnknownRelated: we DID load the dbi cache and the parent is
-		// gone; further coverage by AWS Backup is impossible.
+		// Parent not found in visible window.
+		if dbiTruncated {
+			// Cache is truncated — parent may be in a later page; answer is unknown.
+			return resource.UnknownRelated("backup")
+		}
+		// Cache is complete — parent is genuinely absent (orphan) — Backup
+		// tracks the parent so this pivot has no answer for orphan snapshots.
 		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
 	}
 

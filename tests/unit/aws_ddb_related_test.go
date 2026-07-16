@@ -831,12 +831,12 @@ func sortStrings(s []string) {
 // Post-fix: truncated+matches → Truncated=true; truncated+no-matches → TruncatedResult.
 // ---------------------------------------------------------------------------
 
-// TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsApproximate pins the
+// TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsTruncated pins the
 // truncated+matches path of checkDdbBackup. The cache has IsTruncated=true and
 // exactly one backup plan whose "resources" CSV contains the table ARN.
 // Pre-fix: result.Truncated==false (uses relatedResult, not truncatedResultDDB).
 // Post-fix: result.Truncated==true AND Count==1 AND ResourceIDs contains the plan.
-func TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) {
+func TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T) {
 	// Build a minimal DDB resource with an ARN that the plan covers.
 	res := resource.Resource{
 		ID:   "orders",

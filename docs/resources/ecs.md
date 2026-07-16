@@ -208,7 +208,7 @@ ecs — COMPUTE. Lifecycle key: `status`.
 | kms | KMS Key | no |
 | asg | Auto Scaling Groups | yes |
 | ec2 | EC2 Instances | yes |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 | ecs-task | ECS Tasks | yes |
 | logs | Log Groups | yes |
 <!-- END GENERATED: related -->

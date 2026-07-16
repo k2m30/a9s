@@ -166,7 +166,7 @@ func TestChecker_RetryOnThrottle_WrapsCall(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T112 — TestChecker_Approximate_PropagatedFromCache
+// T112 — TestChecker_Truncated_PropagatedFromCache
 //
 // For 2 reverse-scan checkers, call the checker twice:
 //   1. cache has matching resource, IsTruncated=false → Truncated must be false
@@ -179,7 +179,7 @@ func TestChecker_RetryOnThrottle_WrapsCall(t *testing.T) {
 //   efs → ecs-task (checkEFSECSTask — reverse-scan via cache["ecs-task"])
 // ---------------------------------------------------------------------------
 
-func TestChecker_Approximate_PropagatedFromCache(t *testing.T) {
+func TestChecker_Truncated_PropagatedFromCache(t *testing.T) {
 	t.Run("ecr_ecs", func(t *testing.T) {
 		const repoName = "boundary-repo"
 		const account = "111111111111"

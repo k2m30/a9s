@@ -247,7 +247,7 @@ ecs-task — COMPUTE. Lifecycle key: `status`.
 | logs | Log Groups | yes |
 | role | IAM Role | yes |
 | alarm | CloudWatch Alarms | yes |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 | ec2 | EC2 Instances | no |
 | ecr | ECR Repositories | no |
 | eni | Network Interfaces | no |

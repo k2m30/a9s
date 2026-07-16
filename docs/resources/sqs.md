@@ -208,7 +208,7 @@ sqs — MESSAGING. Lifecycle key: none (the list API returns no lifecycle field)
 | sqs | Dead Letter Queues | yes |
 | sns-sub | SNS Subscriptions | yes |
 | sns | SNS Topics | yes |
-| eb-rule | EventBridge Rules | yes |
+| eb-rule | EventBridge Rules | no |
 | kms | KMS Key | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

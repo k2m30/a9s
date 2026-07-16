@@ -186,7 +186,7 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 	if len(recordNames) == 0 {
 		return resource.RelatedCheckResult{TargetType: "r53", Count: 0}
 	}
-	zoneList, _, _ := FetchRelatedTarget(ctx, clients, cache, "r53")
+	zoneList, truncated, _ := FetchRelatedTarget(ctx, clients, cache, "r53")
 	if zoneList == nil {
 		// Without zone cache we can only report a "we saw validation records" signal.
 		return resource.UnknownRelated("r53")
@@ -212,5 +212,5 @@ func checkACMR53(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, bestZoneID)
 		}
 	}
-	return relatedResult("r53", ids)
+	return relatedResultTrunc("r53", ids, truncated)
 }

@@ -208,7 +208,7 @@ cb — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | logs | Log Groups | yes |
-| role | IAM Roles | yes |
+| role | IAM Roles | no |
 | pipeline | CodePipelines | yes |
 | sg | Security Groups | no |
 | subnet | Subnets | no |

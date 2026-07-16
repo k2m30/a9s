@@ -208,7 +208,7 @@ asg — COMPUTE. Lifecycle key: `status`.
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | ec2 | EC2 Instances | no |
-| tg | Target Groups | no |
+| tg | Target Groups | yes |
 | subnet | Subnets | no |
 | alarm | CloudWatch Alarms | yes |
 | ng | EKS Node Groups | yes |

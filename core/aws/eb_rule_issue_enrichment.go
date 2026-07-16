@@ -87,7 +87,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 
 		targetCountStr := resource.FormatExact(len(targets))
 		if targetsTruncated {
-			targetCountStr = resource.FormatApproximate(len(targets))
+			targetCountStr = resource.FormatTruncated(len(targets))
 		}
 		var rows []domain.DetailRow
 

@@ -152,7 +152,7 @@ func TestRelatedDim_TruncatedResult_BrightAndActionable(t *testing.T) {
 		t.Run(tc.shortName, func(t *testing.T) {
 			m := newRelatedDimParityDetail(tc.shortName, tc.res)
 
-			approxBlock := app.RelatedBlock{
+			truncatedBlock := app.RelatedBlock{
 				Name:         "Trail Events",
 				State:        domain.RelatedResolved,
 				Count:        0,
@@ -170,31 +170,31 @@ func TestRelatedDim_TruncatedResult_BrightAndActionable(t *testing.T) {
 				Actionable:   resource.IsRelatedActionable(domain.RelatedResolved, 0, false),
 				CountDisplay: resource.FormatRelatedCount(domain.RelatedResolved, 0, false),
 			}
-			if !approxBlock.Actionable {
-				t.Fatal("test setup: approxBlock.Actionable must be true (0+ lower bound is drillable)")
+			if !truncatedBlock.Actionable {
+				t.Fatal("test setup: truncatedBlock.Actionable must be true (0+ lower bound is drillable)")
 			}
 			if exactBlock.Actionable {
 				t.Fatal("test setup: exactBlock.Actionable must be false (proven zero is a dead end)")
 			}
 
-			body := relatedDimParityBody([]app.RelatedBlock{approxBlock, exactBlock})
+			body := relatedDimParityBody([]app.RelatedBlock{truncatedBlock, exactBlock})
 			rendered := m.RenderDetail(body)
 
-			approxLine := extractRelatedLine(t, rendered, "Trail Events")
+			truncatedLine := extractRelatedLine(t, rendered, "Trail Events")
 			exactLine := extractRelatedLine(t, rendered, "Backup Plans")
 
 			// Truncated row: BRIGHT with a "(0+)" badge.
-			wantApproxStyled := styles.RowNormal.Render("  Trail Events (0+)")
+			wantTruncatedStyled := styles.RowNormal.Render("  Trail Events (0+)")
 			// Exact zero: DIM with a plain "(0)" badge.
 			wantExactStyled := styles.DimText.Render("  Backup Plans (0)")
 
-			if approxLine != wantApproxStyled {
-				t.Errorf("[%s] truncated-zero row not rendered BRIGHT with \"(0+)\" badge.\n  got:  %q\n  want: %q", tc.shortName, approxLine, wantApproxStyled)
+			if truncatedLine != wantTruncatedStyled {
+				t.Errorf("[%s] truncated-zero row not rendered BRIGHT with \"(0+)\" badge.\n  got:  %q\n  want: %q", tc.shortName, truncatedLine, wantTruncatedStyled)
 			}
 			if exactLine != wantExactStyled {
 				t.Errorf("[%s] exact-zero row not rendered DIM with \"(0)\" badge.\n  got:  %q\n  want: %q", tc.shortName, exactLine, wantExactStyled)
 			}
-			if approxLine == exactLine {
+			if truncatedLine == exactLine {
 				t.Errorf("[%s] truncated-zero and exact-zero rows render identically — a drillable lower bound must be visually distinct from a proven dead-end zero", tc.shortName)
 			}
 		})
@@ -270,9 +270,9 @@ func relatedDimParitySweepCases() []relatedDimParityCase {
 		mk("UnknownNoFilter", -1, false, false, false, false),
 		mk("UnknownWithFilter", -1, false, true, false, false),
 		mk("ExactZero", 0, false, false, false, false),
-		mk("ApproxZero", 0, true, false, false, false),
+		mk("TruncatedZero", 0, true, false, false, false),
 		mk("PositiveCount", 7, false, false, false, false),
-		mk("PositiveApprox", 7, true, false, false, false),
+		mk("PositiveTruncated", 7, true, false, false, false),
 	}
 }
 
@@ -301,8 +301,8 @@ func expectedRelatedRowText(c relatedDimParityCase) string {
 // containing every block-state combination and asserts, per row, that the
 // rendered style is styles.RowNormal (bright) exactly when
 // resource.IsRelatedActionable(...) is true for that block, and
-// styles.DimText otherwise. This is RED at HEAD for the ApproxZero and
-// PositiveApprox cases only if the renderer's inline switch diverges from
+// styles.DimText otherwise. This is RED at HEAD for the TruncatedZero and
+// PositiveTruncated cases only if the renderer's inline switch diverges from
 // blk.Actionable; it is the general contract the coder's fix must satisfy
 // for every state, not just the truncated-zero one named in the report.
 func TestRelatedDim_PropertySweep_BrightIffActionable(t *testing.T) {
@@ -353,9 +353,9 @@ func TestRelatedDim_PropertySweep_TableDrivenSanity(t *testing.T) {
 		"UnknownNoFilter":   true,
 		"UnknownWithFilter": true,
 		"ExactZero":         false,
-		"ApproxZero":        true,
+		"TruncatedZero":     true,
 		"PositiveCount":     true,
-		"PositiveApprox":    true,
+		"PositiveTruncated": true,
 	}
 	for _, c := range relatedDimParitySweepCases() {
 		w, ok := want[c.name]
@@ -381,10 +381,10 @@ func TestRelatedDim_PropertySweep_TableDrivenSanity(t *testing.T) {
 // so this is a regression guard tying the three surfaces — render style,
 // cursor skip, Enter/click gating — to the single shared predicate).
 
-// relatedRowApprox builds a DetailRelatedRow with an explicit Truncated
+// relatedRowTruncated builds a DetailRelatedRow with an explicit Truncated
 // flag, extending relatedRow (which always passes truncated=false) for the
 // one case this suite adds.
-func relatedRowApprox(targetType string, count int, truncated bool) app.DetailRelatedRow {
+func relatedRowTruncated(targetType string, count int, truncated bool) app.DetailRelatedRow {
 	return app.DetailRelatedRow{
 		TargetType:  targetType,
 		DisplayName: targetType,
@@ -402,9 +402,9 @@ func relatedRowApprox(targetType string, count int, truncated bool) app.DetailRe
 // row exactly like any other actionable row.
 func TestRelatedCursor_MoveDown_LandsOnTruncatedResultRow(t *testing.T) {
 	rows := []app.DetailRelatedRow{
-		relatedRow("sg", 3),                    // index 0: actionable, cursor starts here
-		relatedRowApprox("ct-events", 0, true), // index 1: truncated-zero, actionable (0+ drillable)
-		relatedRow("eni", 2),                   // index 2: actionable
+		relatedRow("sg", 3),                       // index 0: actionable, cursor starts here
+		relatedRowTruncated("ct-events", 0, true), // index 1: truncated-zero, actionable (0+ drillable)
+		relatedRow("eni", 2),                      // index 2: actionable
 	}
 	c := newRelatedSkipController(t, rows)
 

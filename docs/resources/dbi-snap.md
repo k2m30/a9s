@@ -208,6 +208,6 @@ dbi-snap — DATABASES & STORAGE. Lifecycle key: `status`.
 | --- | --- | --- |
 | dbi | DB Instances | yes |
 | kms | KMS Keys | yes |
-| backup | Backup Plans | no |
-| ct-events | CloudTrail Events | yes |
+| backup | Backup Plans | yes |
+| ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

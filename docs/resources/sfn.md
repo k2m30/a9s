@@ -175,10 +175,10 @@ sfn — MESSAGING. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| alarm | CloudWatch Alarms | no |
+| alarm | CloudWatch Alarms | yes |
 | logs | Log Groups | yes |
 | role | IAM Role | no |
-| eb-rule | EventBridge Rules | yes |
+| eb-rule | EventBridge Rules | no |
 | kms | KMS Key | no |
 | lambda | Lambda Functions | no |
 | ct-events | CloudTrail Events | no |

@@ -46,7 +46,7 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkBackupRole},
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkBackupKMS},
-			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkBackupSNS},
+			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkBackupSNS, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("backup")},
 		},
 		IssueEnricherFieldKeys: []string{"status"},

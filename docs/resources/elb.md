@@ -217,7 +217,7 @@ elb — NETWORKING. Lifecycle key: `state`.
 | vpc | VPC | no |
 | cfn | CloudFormation | no |
 | acm | ACM Certificates | no |
-| cf | CloudFront | no |
+| cf | CloudFront | yes |
 | eni | Network Interfaces | yes |
 | s3 | S3 Buckets | no |
 | subnet | Subnets | no |

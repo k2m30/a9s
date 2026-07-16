@@ -173,9 +173,9 @@ test.describe("a9s web UI — live read-only AWS data structural checks", () => 
     // -----------------------------------------------------------------------
     // Bug 2: every resolved row is EITHER actionable-and-clickable OR a marked
     // dead-end — never both, never neither. (A zero/-1 row is NOT automatically a
-    // dead-end: a FetchFilter or Approximate row resolves the real count on
+    // dead-end: a FetchFilter or Truncated row resolves the real count on
     // drill-in and stays clickable, per resource.IsRelatedActionable. A true
-    // dead-end — zero with no FetchFilter, not approximate — must be dimmed and
+    // dead-end — zero with no FetchFilter, not truncated — must be dimmed and
     // non-navigable.)
     // -----------------------------------------------------------------------
     const allRows = page.locator(".related-row");

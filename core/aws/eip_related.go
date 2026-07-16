@@ -115,7 +115,7 @@ func checkEIPAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	if len(wanted) == 0 {
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
-	alarmList, _, err := FetchRelatedTarget(ctx, clients, cache, "alarm")
+	alarmList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "alarm")
 	if err != nil {
 		if _, sok := clients.(*ServiceClients); !sok {
 			return resource.UnknownRelated("alarm")
@@ -145,7 +145,7 @@ func checkEIPAlarm(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	return relatedResult("alarm", ids)
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // checkEIPASG reports Auto Scaling Groups whose instances hold this EIP.
@@ -162,7 +162,7 @@ func checkEIPASG(ctx context.Context, clients any, res resource.Resource, cache 
 	}
 	instanceID := *raw.InstanceId
 
-	ec2List, _, err := FetchRelatedTarget(ctx, clients, cache, "ec2")
+	ec2List, truncated, err := FetchRelatedTarget(ctx, clients, cache, "ec2")
 	if err != nil {
 		if _, sok := clients.(*ServiceClients); !sok {
 			return resource.UnknownRelated("asg")
@@ -185,6 +185,9 @@ func checkEIPASG(ctx context.Context, clients any, res resource.Resource, cache 
 		break
 	}
 	if asgName == "" {
+		if truncated {
+			return resource.UnknownRelated("asg")
+		}
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
 	}
 	return relatedResult("asg", []string{asgName})

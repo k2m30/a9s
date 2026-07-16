@@ -205,6 +205,6 @@ acm — DNS & CDN. Lifecycle key: `status`.
 | cf | CloudFront Distros | yes |
 | elb | Load Balancers | no |
 | apigw | API Gateways | no |
-| r53 | Route 53 Zones | no |
+| r53 | Route 53 Zones | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

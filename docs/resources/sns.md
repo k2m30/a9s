@@ -161,7 +161,7 @@ sns — MESSAGING. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| alarm | CloudWatch Alarms | no |
+| alarm | CloudWatch Alarms | yes |
 | sns-sub | Subscriptions | yes |
 | kms | KMS Key | no |
 | role | IAM Role | no |

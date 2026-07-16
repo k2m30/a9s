@@ -205,18 +205,20 @@ ng — CONTAINERS. Lifecycle key: `status`.
 | ng.state.create-failed | create failed | broken | wave1 |
 | ng.state.delete-failed | delete failed | broken | wave1 |
 | ng.state.degraded | degraded | broken | wave1 |
+| ng.warn.details\_denied | details denied | warn | wave1 |
+| ng.warn.details\_unavailable | details unavailable | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | eks | EKS Clusters | yes |
-| role | IAM Roles | yes |
+| role | IAM Roles | no |
 | asg | Auto Scaling Groups | yes |
-| ec2 | EC2 Instances | no |
+| ec2 | EC2 Instances | yes |
 | sg | Security Groups | no |
 | ami | AMI | no |
-| ebs | EBS Volumes | no |
+| ebs | EBS Volumes | yes |
 | subnet | Subnets | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

@@ -183,11 +183,11 @@ nat — NETWORKING. Lifecycle key: `state`.
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| vpc | VPCs | yes |
-| subnet | Subnets | yes |
+| vpc | VPCs | no |
+| subnet | Subnets | no |
 | rtb | Route Tables | yes |
 | alarm | CloudWatch Alarms | yes |
-| eip | Elastic IPs | yes |
-| eni | Network Interfaces | yes |
+| eip | Elastic IPs | no |
+| eni | Network Interfaces | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

@@ -238,16 +238,25 @@ resource-list frame title. The frame-title rules:
 | ami | ami.state.failed | failed | broken | wave1 |
 | ami | ami.state.dim | deregistered | dim | wave1 |
 | ami | ami.deprecated | deprecated | warn | wave1 |
+| lt | lt.warn.imdsv1 | IMDSv1 allowed | warn | wave1 |
+| lt | lt.warn.unencrypted | EBS encryption disabled | warn | wave1 |
+| lt | lt.warn.deprecated\_ami | deprecated AMI | warn | wave2 |
+| lt | lt.warn.details\_denied | details denied | warn | wave1 |
+| lt | lt.warn.details\_unavailable | details unavailable | warn | wave1 |
 | eks | eks.state.creating | creating | warn | wave1 |
 | eks | eks.state.updating | updating | warn | wave1 |
 | eks | eks.state.failed | failed | broken | wave1 |
 | eks | eks.health-issue | issue: <Issue.Code> | warn | wave1 |
+| eks | eks.warn.details\_denied | details denied | warn | wave1 |
+| eks | eks.warn.details\_unavailable | details unavailable | warn | wave1 |
 | ng | ng.state.creating | creating | warn | wave1 |
 | ng | ng.state.updating | updating | warn | wave1 |
 | ng | ng.state.deleting | deleting | warn | wave1 |
 | ng | ng.state.create-failed | create failed | broken | wave1 |
 | ng | ng.state.delete-failed | delete failed | broken | wave1 |
 | ng | ng.state.degraded | degraded | broken | wave1 |
+| ng | ng.warn.details\_denied | details denied | warn | wave1 |
+| ng | ng.warn.details\_unavailable | details unavailable | warn | wave1 |
 | elb | elb.state.provisioning | provisioning | warn | wave1 |
 | elb | elb.state.active\_impaired | active impaired | warn | wave1 |
 | elb | elb.state.failed | failed | broken | wave1 |
@@ -289,6 +298,26 @@ resource-list frame title. The frame-title rules:
 | eni | eni.state.attaching | attaching | warn | wave1 |
 | eni | eni.state.detaching | detaching | warn | wave1 |
 | eni | eni.state.available | available | warn | wave1 |
+| transfer | transfer.warn.offline | offline: not accepting transfers | warn | wave1 |
+| transfer | transfer.warn.starting | starting | warn | wave1 |
+| transfer | transfer.warn.stopping | stopping | warn | wave1 |
+| transfer | transfer.broken.start\_failed | start failed | broken | wave1 |
+| transfer | transfer.warn.stop\_failed | stop failed | warn | wave1 |
+| transfer | transfer.warn.legacy\_policy | legacy security policy | warn | wave1 |
+| transfer | transfer.warn.no\_logging | no activity logging | warn | wave1 |
+| transfer | transfer.warn.details\_denied | details denied | warn | wave1 |
+| transfer | transfer.warn.details\_unavailable | details unavailable | warn | wave1 |
+| vpc-peer | vpc-peer.warn.provisioning | provisioning | warn | wave1 |
+| vpc-peer | vpc-peer.warn.initiating | initiating | warn | wave1 |
+| vpc-peer | vpc-peer.warn.pending\_acceptance | pending acceptance: expires in <N>d | warn | wave1 |
+| vpc-peer | vpc-peer.warn.expired | expired: never accepted | warn | wave1 |
+| vpc-peer | vpc-peer.broken.rejected | rejected | broken | wave1 |
+| vpc-peer | vpc-peer.broken.failed | failed | broken | wave1 |
+| vpc-peer | vpc-peer.warn.deleting | deleting | warn | wave1 |
+| vpc-peer | vpc-peer.dim.deleted | deleted | dim | wave1 |
+| vpc-peer | vpc-peer.warn.cidr\_overlap | CIDR overlap with peer | warn | wave1 |
+| vpc-peer | vpc-peer.warn.no\_local\_route | no local route to peer | warn | wave2 |
+| vpc-peer | vpc-peer.warn.route\_blackholed | route to peer blackholed | warn | wave2 |
 | dbi | dbi.broken.failed | failed | broken | wave1 |
 | dbi | dbi.broken.storage\_full | storage-full | broken | wave1 |
 | dbi | dbi.broken.incompatible\_network | incompatible-network | broken | wave1 |
@@ -328,11 +357,15 @@ resource-list frame title. The frame-title rules:
 | ddb | ddb.warn.deleting | deleting | warn | wave1 |
 | ddb | ddb.warn.archiving | archiving | warn | wave1 |
 | ddb | ddb.pitr-off | point-in-time recovery disabled | warn | wave2 |
+| ddb | ddb.warn.details\_denied | details denied | warn | wave1 |
+| ddb | ddb.warn.details\_unavailable | details unavailable | warn | wave1 |
 | opensearch | opensearch.dim.deleting | deleting: removal in progress | dim | wave1 |
 | opensearch | opensearch.broken.isolated | isolated: quarantined by AWS | broken | wave1 |
 | opensearch | opensearch.warn.processing | processing: config change in flight | warn | wave1 |
 | opensearch | opensearch.update-forced | software update forced soon | broken | wave2 |
 | opensearch | opensearch.encryption-off | encryption at rest off | warn | wave2 |
+| opensearch | opensearch.warn.details\_denied | details denied | warn | wave1 |
+| opensearch | opensearch.warn.details\_unavailable | details unavailable | warn | wave1 |
 | redshift | redshift.broken.incompatible\_hsm | incompatible-hsm | broken | wave1 |
 | redshift | redshift.broken.incompatible\_network | incompatible-network | broken | wave1 |
 | redshift | redshift.broken.incompatible\_parameters | incompatible-parameters | broken | wave1 |
@@ -461,6 +494,21 @@ resource-list frame title. The frame-title rules:
 | glue | glue.latest-run-failed | latest run <STATUS> | broken | wave2 |
 | athena | athena.workgroup-disabled | disabled | warn | wave1 |
 | athena | athena.governance-misconfigured | EnforceWorkGroupConfiguration (<N> findings) | warn | wave2 |
+| mwaa | mwaa.warn.creating | creating | warn | wave1 |
+| mwaa | mwaa.warn.creating\_snapshot | creating snapshot | warn | wave1 |
+| mwaa | mwaa.warn.pending | pending: awaiting VPC endpoints | warn | wave1 |
+| mwaa | mwaa.warn.updating | updating | warn | wave1 |
+| mwaa | mwaa.warn.rolling\_back | rolling back: update failed | warn | wave1 |
+| mwaa | mwaa.warn.maintenance | maintenance in progress | warn | wave1 |
+| mwaa | mwaa.broken.create\_failed | create failed | broken | wave1 |
+| mwaa | mwaa.broken.update\_failed | update failed: rolled back | broken | wave1 |
+| mwaa | mwaa.broken.unavailable | unavailable: not stable | broken | wave1 |
+| mwaa | mwaa.dim.deleting | deleting | dim | wave1 |
+| mwaa | mwaa.dim.deleted | deleted | dim | wave1 |
+| mwaa | mwaa.warn.last\_update\_failed | last update failed | warn | wave1 |
+| mwaa | mwaa.warn.webserver\_public | webserver public | warn | wave1 |
+| mwaa | mwaa.warn.details\_denied | details denied | warn | wave1 |
+| mwaa | mwaa.warn.details\_unavailable | details unavailable | warn | wave1 |
 | backup | backup.job-failed | <N> jobs failed in last 24h | broken | wave2 |
 | backup | backup.job-partial | partial: <N> of <M> resources skipped | warn | wave2 |
 <!-- END GENERATED: findings-table -->

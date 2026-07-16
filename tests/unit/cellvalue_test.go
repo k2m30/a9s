@@ -25,9 +25,9 @@ func TestFormatExact_ProducesPlainDecimal(t *testing.T) {
 	}
 }
 
-// TestFormatApproximate_AppendsPlusSuffix verifies that FormatApproximate
+// TestFormatTruncated_AppendsPlusSuffix verifies that FormatTruncated
 // returns the decimal with a trailing "+" to signal a lower-bound count.
-func TestFormatApproximate_AppendsPlusSuffix(t *testing.T) {
+func TestFormatTruncated_AppendsPlusSuffix(t *testing.T) {
 	cases := []struct {
 		input int
 		want  string
@@ -36,9 +36,9 @@ func TestFormatApproximate_AppendsPlusSuffix(t *testing.T) {
 		{1000, "1000+"},
 	}
 	for _, tc := range cases {
-		got := resource.FormatApproximate(tc.input)
+		got := resource.FormatTruncated(tc.input)
 		if got != tc.want {
-			t.Errorf("FormatApproximate(%d) = %q; want %q", tc.input, got, tc.want)
+			t.Errorf("FormatTruncated(%d) = %q; want %q", tc.input, got, tc.want)
 		}
 	}
 }
@@ -65,7 +65,7 @@ func TestCellUnknownText_IsEmDash(t *testing.T) {
 func TestCellKind_Enum_DistinctValues(t *testing.T) {
 	values := []resource.CellKind{
 		resource.CellKindExact,
-		resource.CellKindApproximate,
+		resource.CellKindTruncated,
 		resource.CellKindUnknown,
 	}
 	seen := make(map[resource.CellKind]bool)
@@ -77,16 +77,16 @@ func TestCellKind_Enum_DistinctValues(t *testing.T) {
 	}
 }
 
-// TestFormatApproximate_NotSameAsExact verifies that for any non-zero n,
-// FormatApproximate(n) differs from FormatExact(n). This guards against
+// TestFormatTruncated_NotSameAsExact verifies that for any non-zero n,
+// FormatTruncated(n) differs from FormatExact(n). This guards against
 // accidentally stripping the "+" suffix.
-func TestFormatApproximate_NotSameAsExact(t *testing.T) {
+func TestFormatTruncated_NotSameAsExact(t *testing.T) {
 	nonZeroCases := []int{1, 5, 42, 1000, -1}
 	for _, n := range nonZeroCases {
-		approx := resource.FormatApproximate(n)
+		truncated := resource.FormatTruncated(n)
 		exact := resource.FormatExact(n)
-		if approx == exact {
-			t.Errorf("FormatApproximate(%d) == FormatExact(%d) == %q; truncated must differ from exact for non-zero n", n, n, exact)
+		if truncated == exact {
+			t.Errorf("FormatTruncated(%d) == FormatExact(%d) == %q; truncated must differ from exact for non-zero n", n, n, exact)
 		}
 	}
 }

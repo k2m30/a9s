@@ -497,7 +497,7 @@ func TestRelated_DBC_Secrets_NoMasterUserSecret(t *testing.T) {
 // not a DBCluster shape. dbcClusterMasterSecretARN returns "" for any
 // unrecognised parent, so there is no MasterUserSecret link to find.
 // Returning -1 would drop the honest lower bound — see
-// TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsApproximate.
+// TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated.
 func TestRelated_DBC_Secrets_WrongRawStruct(t *testing.T) {
 	src := resource.Resource{
 		ID:        "acme-docdb-prod",

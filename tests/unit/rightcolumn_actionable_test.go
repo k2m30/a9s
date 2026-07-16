@@ -5,7 +5,7 @@ package unit_test
 //
 // Background (contract — only a PROVEN zero is a dead end):
 //   resource.IsRelatedActionable treats a RESOLVED count==0 as ACTIONABLE when
-//   it is APPROXIMATE (a "0+" lower bound from a truncated target scan — more
+//   it is TRUNCATED (a "0+" lower bound from a truncated target scan — more
 //   may exist on later pages, so the user can drill in). Only a proven exact
 //   zero (truncated==false) is a non-actionable dead end. RelatedDeferred
 //   pivots (server-side FetchFilter navigation) remain actionable regardless.
@@ -64,11 +64,11 @@ func TestIsRelatedActionable_Table(t *testing.T) {
 		wantActionable bool
 	}{
 		{"ProvenZero_NotActionable", domain.RelatedResolved, 0, false, false},
-		{"ApproxZero_IsActionable", domain.RelatedResolved, 0, true, true},
+		{"TruncZero_IsActionable", domain.RelatedResolved, 0, true, true},
 		{"UnknownCount_WithFetchFilter_Actionable", domain.RelatedDeferred, 0, false, true},
 		{"UnknownCount_NoFilter_Actionable", domain.RelatedUnknown, 0, false, true},
 		{"PositiveCount_NoFilter_Actionable", domain.RelatedResolved, 3, false, true},
-		{"PositiveCount_Approximate_Actionable", domain.RelatedResolved, 3, true, true},
+		{"PositiveCount_Truncated_Actionable", domain.RelatedResolved, 3, true, true},
 		{"Loading_BlocksRegardlessOfCount", domain.RelatedLoading, 5, false, false},
 		{"Error_BlocksRegardlessOfCount", domain.RelatedError, 5, false, false},
 	}
@@ -88,36 +88,36 @@ func TestIsRelatedActionable_Table(t *testing.T) {
 // helpers local to this file
 // ---------------------------------------------------------------------------
 
-const approxTestWidth = 140
+const truncTestWidth = 140
 
-// buildApproxDetail creates a DetailModel with a single RelatedDef "tg"
-// ("Target Groups") registered for resource type "approx-test-ec2".
+// buildTruncDetail creates a DetailModel with a single RelatedDef "tg"
+// ("Target Groups") registered for resource type "trunc-test-ec2".
 // At width=140 the right column is auto-shown with the row in loading state.
 // The caller must defer the returned cleanup func.
-func buildApproxDetail(t *testing.T) (views.DetailModel, func()) {
+func buildTruncDetail(t *testing.T) (views.DetailModel, func()) {
 	t.Helper()
-	resource.SetRelatedForTest("approx-test-ec2", []resource.RelatedDef{
+	resource.SetRelatedForTest("trunc-test-ec2", []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	cleanup := func() { resource.CleanupRelatedForTest("approx-test-ec2") }
+	cleanup := func() { resource.CleanupRelatedForTest("trunc-test-ec2") }
 
 	res := resource.Resource{
-		ID:   "i-approxtest001",
-		Name: "approx-test-instance",
+		ID:   "i-trunctest001",
+		Name: "trunc-test-instance",
 		Fields: map[string]string{
-			"instance_id": "i-approxtest001",
+			"instance_id": "i-trunctest001",
 			"state":       "running",
 		},
 	}
 	k := keys.Default()
-	d := views.NewDetail(res, "approx-test-ec2", nil, k)
-	d.SetSize(approxTestWidth, 30)
+	d := views.NewDetail(res, "trunc-test-ec2", nil, k)
+	d.SetSize(truncTestWidth, 30)
 	return d, cleanup
 }
 
-// injectApproxResult injects a RelatedCheckResultMsg for targetType "tg" with
+// injectTruncResult injects a RelatedCheckResultMsg for targetType "tg" with
 // the given state, count, truncated flag, fetchFilter, and error.
-func injectApproxResult(
+func injectTruncResult(
 	d views.DetailModel,
 	state domain.RelatedRowState,
 	count int,
@@ -126,7 +126,7 @@ func injectApproxResult(
 	err error,
 ) views.DetailModel {
 	msg := messages.RelatedCheckResult{
-		ResourceType: "approx-test-ec2",
+		ResourceType: "trunc-test-ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
 			State:       state,
@@ -162,9 +162,9 @@ func pressEnterCmd(d views.DetailModel) tea.Msg {
 	return cmd()
 }
 
-// isApproxNavMsg reports whether a tea.Msg is a RelatedNavigateMsg.
+// isTruncNavMsg reports whether a tea.Msg is a RelatedNavigateMsg.
 // Named to avoid clash with any existing isNavMsg in other test files.
-func isApproxNavMsg(msg tea.Msg) bool {
+func isTruncNavMsg(msg tea.Msg) bool {
 	if msg == nil {
 		return false
 	}
@@ -195,41 +195,41 @@ func pressScrollRightDetail(d views.DetailModel) (views.DetailModel, bool) {
 // calls isActionableRow(*row) at the moment it is pressed, so the test reflects
 // the actual gating logic regardless of whether focus was acquired via loading.
 
-// TestIsActionableRow_ApproxZero_NoFilter — count=0, truncated=true, no fetchFilter
+// TestIsActionableRow_TruncZero_NoFilter — count=0, truncated=true, no fetchFilter
 // Expected: ACTIONABLE. A "0+" lower bound (truncated scan, more may exist on
 // later pages) is drillable — Enter opens the target list so the user can see
 // the rest.
-func TestIsActionableRow_ApproxZero_NoFilter(t *testing.T) {
+func TestIsActionableRow_TruncZero_NoFilter(t *testing.T) {
 	ensureNoColor(t)
-	d, cleanup := buildApproxDetail(t)
+	d, cleanup := buildTruncDetail(t)
 	defer cleanup()
 
 	// Get focus while row is loading (always succeeds).
 	d = focusRightColWhileLoading(t, d)
 
 	// Inject the truncated-zero (0+) result.
-	d = injectApproxResult(d, domain.RelatedResolved, 0, true, nil, nil)
+	d = injectTruncResult(d, domain.RelatedResolved, 0, true, nil, nil)
 
 	// Enter MUST produce RelatedNavigateMsg — a 0+ lower bound is drillable.
 	msg := pressEnterCmd(d)
-	if !isApproxNavMsg(msg) {
+	if !isTruncNavMsg(msg) {
 		t.Errorf("Enter on truncated-zero row (0+, count=0, truncated=true) must produce RelatedNavigateMsg (drillable lower bound); got %T", msg)
 	}
 }
 
-// TestIsActionableRow_ApproxZero_WithFilter — count=0, truncated=true, fetchFilter={"x":"y"}
+// TestIsActionableRow_TruncZero_WithFilter — count=0, truncated=true, fetchFilter={"x":"y"}
 // Expected: ACTIONABLE. An truncated "0+" lower bound is drillable regardless
 // of a fetchFilter being present.
-func TestIsActionableRow_ApproxZero_WithFilter(t *testing.T) {
+func TestIsActionableRow_TruncZero_WithFilter(t *testing.T) {
 	ensureNoColor(t)
-	d, cleanup := buildApproxDetail(t)
+	d, cleanup := buildTruncDetail(t)
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
-	d = injectApproxResult(d, domain.RelatedResolved, 0, true, map[string]string{"x": "y"}, nil)
+	d = injectTruncResult(d, domain.RelatedResolved, 0, true, map[string]string{"x": "y"}, nil)
 
 	msg := pressEnterCmd(d)
-	if !isApproxNavMsg(msg) {
+	if !isTruncNavMsg(msg) {
 		t.Errorf("Enter on truncated-zero row (0+, count=0, truncated=true, fetchFilter set) must produce RelatedNavigateMsg; got %T", msg)
 	}
 }
@@ -241,14 +241,14 @@ func TestIsActionableRow_ApproxZero_WithFilter(t *testing.T) {
 // RelatedUnknown) is.
 func TestIsActionableRow_DefiniteZero_WithFilter(t *testing.T) {
 	ensureNoColor(t)
-	d, cleanup := buildApproxDetail(t)
+	d, cleanup := buildTruncDetail(t)
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
-	d = injectApproxResult(d, domain.RelatedResolved, 0, false, map[string]string{"x": "y"}, nil)
+	d = injectTruncResult(d, domain.RelatedResolved, 0, false, map[string]string{"x": "y"}, nil)
 
 	msg := pressEnterCmd(d)
-	if isApproxNavMsg(msg) {
+	if isTruncNavMsg(msg) {
 		t.Errorf("Enter on definite-zero row (count=0, truncated=false, fetchFilter set) must NOT produce RelatedNavigateMsg; got RelatedNavigateMsg")
 	}
 }
@@ -257,14 +257,14 @@ func TestIsActionableRow_DefiniteZero_WithFilter(t *testing.T) {
 // Expected: NOT actionable (existing behavior, must keep passing)
 func TestIsActionableRow_DefiniteZero_NoFilter(t *testing.T) {
 	ensureNoColor(t)
-	d, cleanup := buildApproxDetail(t)
+	d, cleanup := buildTruncDetail(t)
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
-	d = injectApproxResult(d, domain.RelatedResolved, 0, false, nil, nil)
+	d = injectTruncResult(d, domain.RelatedResolved, 0, false, nil, nil)
 
 	msg := pressEnterCmd(d)
-	if isApproxNavMsg(msg) {
+	if isTruncNavMsg(msg) {
 		t.Errorf("REGRESSION: definite-zero row (count=0, truncated=false) must NOT produce RelatedNavigateMsg; got RelatedNavigateMsg")
 	}
 }
@@ -277,14 +277,14 @@ func TestIsActionableRow_DefiniteZero_NoFilter(t *testing.T) {
 // app/controller-level end-to-end pin of this contract.)
 func TestIsActionableRow_UnknownState_NoFilter(t *testing.T) {
 	ensureNoColor(t)
-	d, cleanup := buildApproxDetail(t)
+	d, cleanup := buildTruncDetail(t)
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
-	d = injectApproxResult(d, domain.RelatedUnknown, 0, false, nil, nil)
+	d = injectTruncResult(d, domain.RelatedUnknown, 0, false, nil, nil)
 
 	msg := pressEnterCmd(d)
-	if !isApproxNavMsg(msg) {
+	if !isTruncNavMsg(msg) {
 		t.Errorf("REGRESSION: a RelatedUnknown row without fetchFilter must produce RelatedNavigateMsg (owner decision #38: transient unknown rows are now actionable); got %T", msg)
 	}
 }
@@ -293,14 +293,14 @@ func TestIsActionableRow_UnknownState_NoFilter(t *testing.T) {
 // Expected: actionable (existing behavior — must keep passing)
 func TestIsActionableRow_DeferredState_WithFilter(t *testing.T) {
 	ensureNoColor(t)
-	d, cleanup := buildApproxDetail(t)
+	d, cleanup := buildTruncDetail(t)
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
-	d = injectApproxResult(d, domain.RelatedDeferred, 0, false, map[string]string{"x": "y"}, nil)
+	d = injectTruncResult(d, domain.RelatedDeferred, 0, false, map[string]string{"x": "y"}, nil)
 
 	msg := pressEnterCmd(d)
-	if !isApproxNavMsg(msg) {
+	if !isTruncNavMsg(msg) {
 		t.Errorf("REGRESSION: Enter on a RelatedDeferred row with fetchFilter must produce RelatedNavigateMsg; got %T", msg)
 	}
 }
@@ -309,13 +309,13 @@ func TestIsActionableRow_DeferredState_WithFilter(t *testing.T) {
 // Expected: actionable (existing behavior — must keep passing)
 func TestIsActionableRow_PositiveCount_NoFilter(t *testing.T) {
 	ensureNoColor(t)
-	d, cleanup := buildApproxDetail(t)
+	d, cleanup := buildTruncDetail(t)
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
 	// Inject count=5 with ResourceIDs (required when Count>0).
 	injectMsg := messages.RelatedCheckResult{
-		ResourceType: "approx-test-ec2",
+		ResourceType: "trunc-test-ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
 			Count:       5,
@@ -325,21 +325,21 @@ func TestIsActionableRow_PositiveCount_NoFilter(t *testing.T) {
 	d, _ = d.Update(injectMsg)
 
 	msg := pressEnterCmd(d)
-	if !isApproxNavMsg(msg) {
+	if !isTruncNavMsg(msg) {
 		t.Errorf("REGRESSION: Enter on count=5 row must produce RelatedNavigateMsg; got %T", msg)
 	}
 }
 
-// TestIsActionableRow_ApproxN_NoFilter — count=5, truncated=true, no fetchFilter
+// TestIsActionableRow_TruncatedN_NoFilter — count=5, truncated=true, no fetchFilter
 // Expected: actionable (count>0 path already returns true; kept as regression pin)
-func TestIsActionableRow_ApproxN_NoFilter(t *testing.T) {
+func TestIsActionableRow_TruncatedN_NoFilter(t *testing.T) {
 	ensureNoColor(t)
-	d, cleanup := buildApproxDetail(t)
+	d, cleanup := buildTruncDetail(t)
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
 	injectMsg := messages.RelatedCheckResult{
-		ResourceType: "approx-test-ec2",
+		ResourceType: "trunc-test-ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
 			Count:       5,
@@ -350,7 +350,7 @@ func TestIsActionableRow_ApproxN_NoFilter(t *testing.T) {
 	d, _ = d.Update(injectMsg)
 
 	msg := pressEnterCmd(d)
-	if !isApproxNavMsg(msg) {
+	if !isTruncNavMsg(msg) {
 		t.Errorf("REGRESSION: Enter on count=5, truncated=true row must produce RelatedNavigateMsg; got %T", msg)
 	}
 }
@@ -359,7 +359,7 @@ func TestIsActionableRow_ApproxN_NoFilter(t *testing.T) {
 // Expected: Enter does NOT produce RelatedNavigateMsg (loading blocks navigation)
 func TestIsActionableRow_Loading_Blocks(t *testing.T) {
 	ensureNoColor(t)
-	d, cleanup := buildApproxDetail(t)
+	d, cleanup := buildTruncDetail(t)
 	defer cleanup()
 
 	// Focus while loading (Tab succeeds because loading rows are focusable).
@@ -368,7 +368,7 @@ func TestIsActionableRow_Loading_Blocks(t *testing.T) {
 	// Do NOT inject any result — row stays loading.
 	// isActionableRow: loading==true → return false.
 	msg := pressEnterCmd(d)
-	if isApproxNavMsg(msg) {
+	if isTruncNavMsg(msg) {
 		t.Errorf("loading row must NOT produce RelatedNavigateMsg; got RelatedNavigateMsg")
 	}
 }
@@ -377,14 +377,14 @@ func TestIsActionableRow_Loading_Blocks(t *testing.T) {
 // Expected: NOT actionable when err != nil
 func TestIsActionableRow_Error_Blocks(t *testing.T) {
 	ensureNoColor(t)
-	d, cleanup := buildApproxDetail(t)
+	d, cleanup := buildTruncDetail(t)
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
-	d = injectApproxResult(d, domain.RelatedError, 0, true, nil, errors.New("boom"))
+	d = injectTruncResult(d, domain.RelatedError, 0, true, nil, errors.New("boom"))
 
 	msg := pressEnterCmd(d)
-	if isApproxNavMsg(msg) {
+	if isTruncNavMsg(msg) {
 		t.Errorf("error row must NOT produce RelatedNavigateMsg; got RelatedNavigateMsg (err blocks actionability)")
 	}
 }
@@ -397,12 +397,12 @@ func TestIsActionableRow_Error_Blocks(t *testing.T) {
 // Probing "l" AFTER injecting a result (from an unfocused state) directly tests
 // whether HasActionableRows() considers the injected row actionable.
 
-// TestIsActionableRow_HasActionableRows_ApproxZero_AllowsFocus
+// TestIsActionableRow_HasActionableRows_TruncZero_AllowsFocus
 // An truncated "0+" row IS actionable, so with only that single row
 // registered, "l" transfers focus to the right column.
-func TestIsActionableRow_HasActionableRows_ApproxZero_AllowsFocus(t *testing.T) {
+func TestIsActionableRow_HasActionableRows_TruncZero_AllowsFocus(t *testing.T) {
 	ensureNoColor(t)
-	d, cleanup := buildApproxDetail(t)
+	d, cleanup := buildTruncDetail(t)
 	defer cleanup()
 
 	if !strings.Contains(d.View(), "RELATED") {
@@ -410,7 +410,7 @@ func TestIsActionableRow_HasActionableRows_ApproxZero_AllowsFocus(t *testing.T) 
 	}
 
 	// Inject truncated-zero (0+) BEFORE any focus attempt.
-	d = injectApproxResult(d, domain.RelatedResolved, 0, true, nil, nil)
+	d = injectTruncResult(d, domain.RelatedResolved, 0, true, nil, nil)
 
 	// "l" focuses right column only when HasActionableRows()==true. A 0+ lower
 	// bound is actionable, so focus MUST transfer.
@@ -424,14 +424,14 @@ func TestIsActionableRow_HasActionableRows_ApproxZero_AllowsFocus(t *testing.T) 
 // Expected: after injecting definite-zero, "l" must NOT transfer focus (existing behavior)
 func TestIsActionableRow_HasActionableRows_DefiniteZero_BlocksFocus(t *testing.T) {
 	ensureNoColor(t)
-	d, cleanup := buildApproxDetail(t)
+	d, cleanup := buildTruncDetail(t)
 	defer cleanup()
 
 	if !strings.Contains(d.View(), "RELATED") {
 		t.Skip("right column not visible — cannot test l-key focus behavior")
 	}
 
-	d = injectApproxResult(d, domain.RelatedResolved, 0, false, nil, nil)
+	d = injectTruncResult(d, domain.RelatedResolved, 0, false, nil, nil)
 
 	_, focused := pressScrollRightDetail(d)
 	if focused {
@@ -443,20 +443,20 @@ func TestIsActionableRow_HasActionableRows_DefiniteZero_BlocksFocus(t *testing.T
 // Render-level smoke tests
 // ---------------------------------------------------------------------------
 
-// TestIsActionableRow_ApproxZero_ViewShape verifies the "(0+)" suffix
+// TestIsActionableRow_TruncZero_ViewShape verifies the "(0+)" suffix
 // rendering for truncated-zero rows: a truncated scan that found nothing yet
 // is a lower bound, so it renders with the "+" marker (and is drillable).
 //   - Part 1: truncated-zero row renders as "Target Groups (0+)".
 //   - Part 2: after focus transition via loading state, the "(0+)" suffix is
 //     still present.
-func TestIsActionableRow_ApproxZero_ViewShape(t *testing.T) {
+func TestIsActionableRow_TruncZero_ViewShape(t *testing.T) {
 	ensureNoColor(t)
 
 	// --- Part 1: "(0+)" present in unfocused view ---
-	d, cleanup := buildApproxDetail(t)
+	d, cleanup := buildTruncDetail(t)
 	defer cleanup()
 
-	d = injectApproxResult(d, domain.RelatedResolved, 0, true, nil, nil)
+	d = injectTruncResult(d, domain.RelatedResolved, 0, true, nil, nil)
 	plain := stripAnsi(d.View())
 	if !strings.Contains(plain, "(0+)") {
 		t.Errorf("truncated-zero row must render as 'Target Groups (0+)' in View(); got:\n%s", plain)
@@ -466,11 +466,11 @@ func TestIsActionableRow_ApproxZero_ViewShape(t *testing.T) {
 	}
 
 	// --- Part 2: "(0+)" present after focus transition via loading state ---
-	d2, cleanup2 := buildApproxDetail(t)
+	d2, cleanup2 := buildTruncDetail(t)
 	defer cleanup2()
 
 	d2 = focusRightColWhileLoading(t, d2)
-	d2 = injectApproxResult(d2, domain.RelatedResolved, 0, true, nil, nil)
+	d2 = injectTruncResult(d2, domain.RelatedResolved, 0, true, nil, nil)
 
 	plain2 := stripAnsi(d2.View())
 	if !strings.Contains(plain2, "(0+)") {
@@ -483,10 +483,10 @@ func TestIsActionableRow_ApproxZero_ViewShape(t *testing.T) {
 // Guards against rendering regression where truncated flag is ignored.
 func TestIsActionableRow_DefiniteZero_ViewShape_NoPlusSign(t *testing.T) {
 	ensureNoColor(t)
-	d, cleanup := buildApproxDetail(t)
+	d, cleanup := buildTruncDetail(t)
 	defer cleanup()
 
-	d = injectApproxResult(d, domain.RelatedResolved, 0, false, nil, nil)
+	d = injectTruncResult(d, domain.RelatedResolved, 0, false, nil, nil)
 	plain := stripAnsi(d.View())
 
 	if strings.Contains(plain, "(0+)") {
@@ -649,7 +649,7 @@ func TestRightColumn_EnterOnAllZeroRows_NoNavigate(t *testing.T) {
 	// never emit RelatedNavigate regardless of cursor position.
 	for i := 0; i < 3; i++ {
 		msg := pressEnterCmd(d)
-		if isApproxNavMsg(msg) {
+		if isTruncNavMsg(msg) {
 			t.Errorf("iteration %d: Enter on all-zero rows (no actionable row present) must NOT produce RelatedNavigateMsg; got RelatedNavigateMsg", i)
 		}
 		d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "j"})

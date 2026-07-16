@@ -1,6 +1,6 @@
 package unit_test
 
-// related_approximate_zero_test.go — tests for relatedResultTrunc and
+// related_truncated_zero_test.go — tests for relatedResultTrunc and
 // the truncated-empty-cache honest-lower-bound contract.
 //
 // Anti-pattern (pre-task-#58; historically 225 occurrences across 69
@@ -292,10 +292,10 @@ func TestCheckAMI_NG_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsApproximate
+// TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated
 // ─────────────────────────────────────────────────────────────────────────────
 
-// TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsApproximate iterates over
+// TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated iterates over
 // every registered (sourceType, RelatedDef) where NeedsTargetCache is true,
 // constructs a ResourceCache where ALL target entries are {IsTruncated: true,
 // Resources: []}, calls the checker with a minimal parent resource, and asserts
@@ -304,7 +304,7 @@ func TestCheckAMI_NG_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 // This is the regression pin: after the coder sweeps all 225 anti-pattern sites,
 // every reverse-scan checker must pass this test. The test stays RED (many
 // Count=-1 failures) until the sweep is complete.
-func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsApproximate(t *testing.T) {
+func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T) {
 	// Minimal parent resources keyed by source type. These are shaped to avoid
 	// the early-exit "no ID / no key field → Count=0 definitively" guard, so
 	// that each checker actually reaches the truncated-cache code path.

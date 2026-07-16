@@ -30,11 +30,11 @@ import (
 
 func TestFormatRelatedCount_Table(t *testing.T) {
 	cases := []struct {
-		name   string
-		state  domain.RelatedRowState
-		count  int
-		approx bool
-		want   string
+		name      string
+		state     domain.RelatedRowState
+		count     int
+		truncated bool
+		want      string
 	}{
 		{"ResolvedUnknown_NoFilter", domain.RelatedUnknown, 0, false, ""},
 		{"ResolvedUnknown_WithFilter_NoBadge", domain.RelatedDeferred, 0, false, ""},
@@ -42,16 +42,16 @@ func TestFormatRelatedCount_Table(t *testing.T) {
 		{"Positive", domain.RelatedResolved, 7, false, "(7)"},
 		{"LargeCount", domain.RelatedResolved, 1000, false, "(1000)"},
 		// Truncated lower bounds from a truncated target scan render "N+".
-		{"ApproxZero", domain.RelatedResolved, 0, true, "(0+)"},
-		{"ApproxPositive", domain.RelatedResolved, 3, true, "(3+)"},
+		{"TruncatedZero", domain.RelatedResolved, 0, true, "(0+)"},
+		{"TruncatedPositive", domain.RelatedResolved, 3, true, "(3+)"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := resource.FormatRelatedCount(tc.state, tc.count, tc.approx)
+			got := resource.FormatRelatedCount(tc.state, tc.count, tc.truncated)
 			if got != tc.want {
-				t.Errorf("FormatRelatedCount(state=%v, %d, approx=%v) = %q, want %q",
-					tc.state, tc.count, tc.approx, got, tc.want)
+				t.Errorf("FormatRelatedCount(state=%v, %d, truncated=%v) = %q, want %q",
+					tc.state, tc.count, tc.truncated, got, tc.want)
 			}
 		})
 	}

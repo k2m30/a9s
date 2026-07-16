@@ -182,8 +182,8 @@ kinesis — MESSAGING. Lifecycle key: `status`.
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
 | alarm | CW Alarms | yes |
-| lambda | Lambda Functions | yes |
-| cfn | CloudFormation | no |
+| lambda | Lambda Functions | no |
+| cfn | CloudFormation | yes |
 | ddb | DynamoDB Streams | yes |
 | kms | KMS Key | no |
 | ct-events | CloudTrail Events | no |

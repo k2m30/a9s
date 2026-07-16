@@ -209,7 +209,7 @@ func TestS3Related_CrossRegion_PreservesUnknownContract(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (real failure must NOT be swallowed)", got.Count)
 	}
 	if got.Truncated {
-		t.Error("Truncated = true; AccessDenied must remain a hard unknown, not an approximation")
+		t.Error("Truncated = true; AccessDenied must remain a hard unknown, not a truncated count")
 	}
 	if got.Err == nil {
 		t.Error("Err = nil; AccessDenied must surface the underlying error for diagnosis")

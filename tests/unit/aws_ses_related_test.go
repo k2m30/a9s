@@ -881,12 +881,12 @@ func TestSESActiveReceiptRuleSet_RetriesAfterTransientError(t *testing.T) {
 // Post-fix: truncated+matches → Truncated=true.
 // ---------------------------------------------------------------------------
 
-// TestCheckSESR53_TruncatedCacheWithMatches_ReturnsApproximate pins the
+// TestCheckSESR53_TruncatedCacheWithMatches_ReturnsTruncated pins the
 // truncated+matches path of checkSESR53. The r53 cache has IsTruncated=true
 // and a zone whose name matches the identity domain.
 // Pre-fix: result.Truncated==false.
 // Post-fix: result.Truncated==true AND Count==1.
-func TestCheckSESR53_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) {
+func TestCheckSESR53_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T) {
 	// DOMAIN identity: domain is used as-is.
 	src := resource.Resource{
 		ID:   "acme-corp.com",
@@ -960,12 +960,12 @@ func TestCheckSESR53_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testing.T
 	}
 }
 
-// TestCheckSESEbRule_TruncatedCacheWithMatches_ReturnsApproximate pins the
+// TestCheckSESEbRule_TruncatedCacheWithMatches_ReturnsTruncated pins the
 // truncated+matches path of checkSESEbRule. The eb-rule cache has IsTruncated=true
 // and a rule on the expected bus name.
 // Pre-fix: result.Truncated==false.
 // Post-fix: result.Truncated==true AND Count==1.
-func TestCheckSESEbRule_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) {
+func TestCheckSESEbRule_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T) {
 	clients := sesFixtureClients()
 	src := sesFixtureSrcIdentity(fixtures.SESGraphRootIdentity)
 

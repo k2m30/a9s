@@ -224,7 +224,7 @@ func TestFetchECSTasksPage_JoinSucceeds_NoErrorField(t *testing.T) {
 	}
 }
 
-// TestCheckEFSECSTask_JoinIncompleteTask_MarksApproximate verifies that the
+// TestCheckEFSECSTask_JoinIncompleteTask_MarksTruncated verifies that the
 // checkEFSECSTask checker (accessed via resource.GetRelated("efs")) returns
 // Truncated=true when any task in the cache carries Fields["task_def_join_error"]="true".
 //
@@ -236,7 +236,7 @@ func TestFetchECSTasksPage_JoinSucceeds_NoErrorField(t *testing.T) {
 //   - Expected result: Count==0 (no match), Truncated==true (join incomplete).
 //
 // This proves the zero is truncated (honest lower bound), not definitive.
-func TestCheckEFSECSTask_JoinIncompleteTask_MarksApproximate(t *testing.T) {
+func TestCheckEFSECSTask_JoinIncompleteTask_MarksTruncated(t *testing.T) {
 	// Locate the efs→ecs-task checker via the registered related defs.
 	var checker resource.RelatedChecker
 	for _, def := range resource.GetRelated("efs") {

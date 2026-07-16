@@ -201,7 +201,7 @@ func TestEC2RelatedColdCache_FirstPageOnly_CFN(t *testing.T) {
 // (the TruncatedResult honest-lower-bound contract from core/resource/related.go).
 // This ensures partial pages are not treated as conclusive negatives but ALSO preserve
 // the honest lower bound instead of dropping it as Count=-1 (unknown).
-func TestEC2RelatedColdCache_TruncatedZeroMatch_IsApproximate(t *testing.T) {
+func TestEC2RelatedColdCache_TruncatedZeroMatch_Truncated(t *testing.T) {
 	mockFetcher := resource.PaginatedFetcher(func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{
 			Resources:  []resource.Resource{},

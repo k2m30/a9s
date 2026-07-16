@@ -204,9 +204,9 @@ func TestRelated_Secrets_EB_MatchByResolveReference(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_EB_MatchApproximate verifies that checkSecretsEB propagates
+// TestRelated_Secrets_EB_MatchTruncated verifies that checkSecretsEB propagates
 // Truncated=true when cache is truncated.
-func TestRelated_Secrets_EB_MatchApproximate(t *testing.T) {
+func TestRelated_Secrets_EB_MatchTruncated(t *testing.T) {
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password"
 
 	source := secretsSourceWithARN(secretARN, "prod/db/password")

@@ -168,6 +168,6 @@ backup — BACKUP. Lifecycle key: none (the list API returns no lifecycle field)
 | --- | --- | --- |
 | role | IAM Roles | no |
 | kms | KMS Keys | no |
-| sns | SNS Topics | no |
+| sns | SNS Topics | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

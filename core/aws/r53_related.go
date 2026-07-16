@@ -87,7 +87,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 	if len(wanted) == 0 {
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
-	elbList, _, fetchErr := FetchRelatedTarget(ctx, clients, cache, "elb")
+	elbList, elbTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "elb")
 	if elbList == nil {
 		// Fallback: return the alias DNS names as Ids when cache is unavailable.
 		ids := make([]string, 0, len(wanted))
@@ -113,7 +113,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 			ids = append(ids, elbRes.ID)
 		}
 	}
-	return relatedResult("elb", ids)
+	return relatedResultTrunc("elb", ids, elbTruncated)
 }
 
 // checkR53CF reports CloudFront distributions referenced by AliasTarget.DNSName
@@ -144,7 +144,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 	if len(wanted) == 0 {
 		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
 	}
-	cfList, _, fetchErr := FetchRelatedTarget(ctx, clients, cache, "cf")
+	cfList, cfTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "cf")
 	if cfList == nil {
 		ids := make([]string, 0, len(wanted))
 		for d := range wanted {
@@ -164,7 +164,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, cfRes.ID)
 		}
 	}
-	return relatedResult("cf", ids)
+	return relatedResultTrunc("cf", ids, cfTruncated)
 }
 
 // checkR53APIGW reports API Gateways fronted by AliasTarget.DNSName in this
@@ -196,7 +196,7 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 	if len(wantedIDs) == 0 {
 		return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
 	}
-	apigwList, _, fetchErr := FetchRelatedTarget(ctx, clients, cache, "apigw")
+	apigwList, apigwTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "apigw")
 	if apigwList == nil {
 		ids := make([]string, 0, len(wantedIDs))
 		for id := range wantedIDs {
@@ -212,7 +212,7 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 			ids = append(ids, apigwRes.ID)
 		}
 	}
-	return relatedResult("apigw", ids)
+	return relatedResultTrunc("apigw", ids, apigwTruncated)
 }
 
 // checkR53S3 reports S3 buckets referenced by AliasTarget.DNSName (S3 website
@@ -244,7 +244,7 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 	if len(wantedBuckets) == 0 {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
 	}
-	s3List, _, fetchErr := FetchRelatedTarget(ctx, clients, cache, "s3")
+	s3List, s3Truncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "s3")
 	if s3List == nil {
 		ids := make([]string, 0, len(wantedBuckets))
 		for b := range wantedBuckets {
@@ -260,7 +260,7 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, s3Res.ID)
 		}
 	}
-	return relatedResult("s3", ids)
+	return relatedResultTrunc("s3", ids, s3Truncated)
 }
 
 // checkR53ACM reports ACM certificates whose DNS validation CNAME records
@@ -335,7 +335,7 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
 
-	logList, _, fetchErr := FetchRelatedTarget(ctx, clients, cache, "logs")
+	logList, logsTruncated, fetchErr := FetchRelatedTarget(ctx, clients, cache, "logs")
 	if logList == nil {
 		// Fallback: return the log-group ARNs as IDs when the cache is unavailable.
 		var ids []string
@@ -373,7 +373,7 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 			ids = append(ids, logRes.ID)
 		}
 	}
-	return relatedResult("logs", ids)
+	return relatedResultTrunc("logs", ids, logsTruncated)
 }
 
 // checkR53VPC reports VPCs associated with a private hosted zone.

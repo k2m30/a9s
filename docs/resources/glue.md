@@ -183,13 +183,13 @@ glue — DATA & ANALYTICS. Lifecycle key: none (the list API returns no lifecycl
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| role | IAM Roles | yes |
+| role | IAM Roles | no |
 | alarm | CW Alarms | yes |
 | logs | Log Groups | yes |
-| cfn | CloudFormation Stacks | no |
+| cfn | CloudFormation Stacks | yes |
 | s3 | S3 (script bucket) | no |
 | kms | KMS Key | no |
-| athena | Athena WorkGroups | no |
+| athena | Athena WorkGroups | yes |
 | secrets | Secrets Manager | no |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

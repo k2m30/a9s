@@ -200,6 +200,8 @@ ddb — DATABASES & STORAGE. Lifecycle key: `status`.
 | ddb.warn.deleting | deleting | warn | wave1 |
 | ddb.warn.archiving | archiving | warn | wave1 |
 | ddb.pitr-off | point-in-time recovery disabled | warn | wave2 |
+| ddb.warn.details\_denied | details denied | warn | wave1 |
+| ddb.warn.details\_unavailable | details unavailable | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
@@ -209,7 +211,7 @@ ddb — DATABASES & STORAGE. Lifecycle key: `status`.
 | alarm | CloudWatch Alarms | yes |
 | lambda | Lambda Functions | no |
 | kinesis | Kinesis Streams | no |
-| backup | Backup Plans | no |
+| backup | Backup Plans | yes |
 | logs | Log Groups | yes |
 | vpce | VPC Endpoints | yes |
 | ct-events | CloudTrail Events | no |

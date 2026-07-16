@@ -177,15 +177,15 @@ func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 	// Related section content.
 	var relatedContent strings.Builder
 	if len(rt.Related) > 0 {
-		relatedContent.WriteString("| Target Type | Display Name | Approximate? |\n")
+		relatedContent.WriteString("| Target Type | Display Name | Truncated? |\n")
 		relatedContent.WriteString("| --- | --- | --- |\n")
 		for _, rel := range rt.Related {
-			approx := "no"
-			if rel.NeedsTargetCache {
-				approx = "yes"
+			truncated := "no"
+			if rel.Truncated {
+				truncated = "yes"
 			}
 			fmt.Fprintf(&relatedContent, "| %s | %s | %s |\n",
-				escapeMarkdownCell(rel.TargetType), escapeMarkdownCell(rel.DisplayName), approx)
+				escapeMarkdownCell(rel.TargetType), escapeMarkdownCell(rel.DisplayName), truncated)
 		}
 	}
 

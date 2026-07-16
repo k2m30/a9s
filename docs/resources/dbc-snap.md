@@ -212,9 +212,9 @@ dbc-snap — DATABASES & STORAGE. Lifecycle key: `status`.
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| dbc | DocumentDB Cluster | yes |
+| dbc | DocumentDB Cluster | no |
 | kms | KMS Key | no |
 | vpc | VPC | no |
-| backup | Backup Plans | no |
+| backup | Backup Plans | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

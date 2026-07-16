@@ -70,7 +70,7 @@ func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache 
 	for arn := range topicSet {
 		ids = append(ids, arn)
 	}
-	return relatedResult("sns", ids)
+	return relatedResultTrunc("sns", ids, truncated)
 }
 
 // checkSQSSNSSub searches the sns-sub cache for subscriptions where protocol=sqs

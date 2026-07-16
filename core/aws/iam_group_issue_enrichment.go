@@ -173,7 +173,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		memberCount := len(allUsers)
 		memberCountStr := resource.FormatExact(memberCount)
 		if memberTruncated {
-			memberCountStr = resource.FormatApproximate(memberCount)
+			memberCountStr = resource.FormatTruncated(memberCount)
 		}
 		result.FieldUpdates[r.ID] = map[string]string{
 			"member_count": memberCountStr,

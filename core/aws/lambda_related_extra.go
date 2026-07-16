@@ -388,10 +388,7 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 			}
 		}
 	}
-	result := relatedResult("tg", ids)
-	if len(ids) == 0 && truncated {
-		result = relatedResultTrunc("tg", nil, true)
-	}
+	result := relatedResultTrunc("tg", ids, truncated)
 	result.Err = AggregateFailures("lambda-related: DescribeTargetHealth", failures, len(lambdaTGs))
 	return result
 }

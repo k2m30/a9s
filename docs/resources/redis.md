@@ -237,7 +237,7 @@ redis — DATABASES & STORAGE. Lifecycle key: `status`.
 | --- | --- | --- |
 | alarm | CW Alarms | yes |
 | cfn | CloudFormation | yes |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 | kms | KMS Key | no |
 | logs | Log Groups | yes |
 | secrets | Secrets Manager | yes |

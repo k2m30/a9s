@@ -274,8 +274,8 @@ dbi — DATABASES & STORAGE. Lifecycle key: `status`.
 | logs | Log Groups | yes |
 | vpc | VPC | no |
 | secrets | Secrets Manager | yes |
-| dbc | RDS Clusters | yes |
+| dbc | RDS Clusters | no |
 | role | IAM Roles | no |
 | eni | Network Interfaces | no |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

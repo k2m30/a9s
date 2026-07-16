@@ -29,7 +29,7 @@ func checkNGEKS(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "eks", Count: 0}
 	}
 
-	eksList, _, err := relatedResourcesFor(ctx, clients, cache, "eks")
+	eksList, truncated, err := relatedResourcesFor(ctx, clients, cache, "eks")
 	if err != nil {
 		return resource.ErrorRelated("eks", err)
 	}
@@ -43,7 +43,7 @@ func checkNGEKS(ctx context.Context, clients any, res resource.Resource, cache r
 			ids = append(ids, eksRes.ID)
 		}
 	}
-	return relatedResult("eks", ids)
+	return relatedResultTrunc("eks", ids, truncated)
 }
 
 // checkNGRole extracts the NodeRole ARN from the Node Group RawStruct, derives

@@ -346,15 +346,15 @@ lambda — COMPUTE. Lifecycle key: `state`.
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| role | IAM Roles | yes |
+| role | IAM Roles | no |
 | alarm | CW Alarms | yes |
 | logs | Log Groups | yes |
 | sg | Security Groups | no |
 | vpc | VPC | no |
 | kms | KMS Key | no |
 | sqs | SQS Queues | no |
-| cfn | CloudFormation | no |
-| eb-rule | EventBridge Rules | no |
+| cfn | CloudFormation | yes |
+| eb-rule | EventBridge Rules | yes |
 | subnet | Subnets | no |
 | efs | EFS File Systems | no |
 | apigw | API Gateways | yes |
@@ -362,7 +362,7 @@ lambda — COMPUTE. Lifecycle key: `state`.
 | ddb | DynamoDB Tables | no |
 | kinesis | Kinesis Streams | no |
 | msk | MSK Clusters | no |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 | tg | Target Groups | yes |
 | sns | SNS Topics | yes |
 | sns-sub | SNS Subscriptions | yes |

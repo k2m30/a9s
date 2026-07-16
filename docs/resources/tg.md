@@ -233,7 +233,7 @@ tg — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field)
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| elb | Load Balancers | no |
+| elb | Load Balancers | yes |
 | ecs-svc | ECS Services | yes |
 | asg | Auto Scaling Groups | yes |
 | alarm | CW Alarms | yes |

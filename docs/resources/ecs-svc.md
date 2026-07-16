@@ -291,7 +291,7 @@ ecs-svc — COMPUTE. Lifecycle key: `status`.
 | sg | Security Groups | no |
 | role | IAM Role | no |
 | cfn | CloudFormation Stacks | yes |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 | eb-rule | EventBridge Rules | yes |
 | ecr | ECR Repositories | no |
 | ecs-task | ECS Tasks | yes |

@@ -310,7 +310,7 @@ ec2 — COMPUTE. Lifecycle key: `state`.
 | ct-events | CloudTrail Events | no |
 | sg | Security Groups | no |
 | vpc | VPC | no |
-| role | IAM Role | no |
+| role | IAM Role | yes |
 | ami | AMI | no |
 | eni | Network Interfaces | no |
 | subnet | Subnet | no |

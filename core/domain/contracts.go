@@ -45,6 +45,12 @@ type RelatedDef struct {
 	DisplayName      string // right-column row label (e.g., "Target Groups")
 	Checker          RelatedChecker
 	NeedsTargetCache bool
+	// Truncated is true when this pivot's checker can return a truncated
+	// lower-bound ("N+") count — i.e. it scans a cache page that may itself
+	// be truncated and returns relatedResultTrunc(...). It is orthogonal to
+	// NeedsTargetCache (a prefetch flag), and is the single source of truth
+	// for the per-resource docs' "Truncated?" column.
+	Truncated bool
 }
 
 // NavigableField associates a detail view field path with a target resource type.

@@ -192,13 +192,13 @@ func TestCheckCfR53_NoMatchDifferentDomain(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TestCheckCfR53_TruncatedEmptyCacheReturnsApproximate
+// TestCheckCfR53_TruncatedEmptyCacheReturnsTruncated
 // ---------------------------------------------------------------------------
 
-// TestCheckCfR53_TruncatedEmptyCacheReturnsApproximate: when r53 cache is
+// TestCheckCfR53_TruncatedEmptyCacheReturnsTruncated: when r53 cache is
 // truncated and contains no matching zones, the result must be Truncated=true
 // (not a hard zero — more zones may exist beyond the cache window).
-func TestCheckCfR53_TruncatedEmptyCacheReturnsApproximate(t *testing.T) {
+func TestCheckCfR53_TruncatedEmptyCacheReturnsTruncated(t *testing.T) {
 	checker := cfR53Checker(t)
 
 	res := makeCFResource("E5MNO", []string{"example.com"})

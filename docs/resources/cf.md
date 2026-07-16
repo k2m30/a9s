@@ -210,7 +210,7 @@ cf — DNS & CDN. Lifecycle key: `status`.
 | elb | Load Balancers (origin) | yes |
 | waf | WAF Web ACLs | yes |
 | acm | ACM Certificates | yes |
-| r53 | Route 53 Zones | no |
+| r53 | Route 53 Zones | yes |
 | alarm | CloudWatch Alarms | yes |
 | lambda | Lambda@Edge | no |
 | logs | Log Groups | no |

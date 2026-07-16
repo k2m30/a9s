@@ -281,7 +281,7 @@ vpce — NETWORKING. Lifecycle key: `state`.
 | rtb | Route Tables | no |
 | eni | Network Interfaces | no |
 | vpc | VPC | no |
-| alarm | CloudWatch Alarms | no |
+| alarm | CloudWatch Alarms | yes |
 | logs | Log Groups | no |
 | r53 | Route 53 Zones | no |
 | ct-events | CloudTrail Events | no |

@@ -244,7 +244,7 @@ subnet — NETWORKING. Lifecycle key: `state`.
 | cfn | CloudFormation | no |
 | vpc | VPC | no |
 | asg | Auto Scaling Groups | yes |
-| efs | EFS File Systems | no |
+| efs | EFS File Systems | yes |
 | eks | EKS Clusters | yes |
 | vpce | VPC Endpoints | yes |
 | ct-events | CloudTrail Events | no |

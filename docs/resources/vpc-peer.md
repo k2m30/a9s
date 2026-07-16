@@ -133,3 +133,31 @@ Every problem row names its cause in the Status column (`pending acceptance: exp
 - Cache-scan enricher layer — snapshot_cross_ref.go / EnrichLTDeprecatedAMI precedent (fleet mechanism since v3.50.x).
 - `~` vs Warning split for missing-route vs blackholed — spec decision 2026-07-15 mirroring the lt deprecated-AMI treatment (background concern vs active breakage).
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
+
+<!-- BEGIN GENERATED: header -->
+vpc-peer — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field).
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| vpc-peer.warn.provisioning | provisioning | warn | wave1 |
+| vpc-peer.warn.initiating | initiating | warn | wave1 |
+| vpc-peer.warn.pending\_acceptance | pending acceptance: expires in <N>d | warn | wave1 |
+| vpc-peer.warn.expired | expired: never accepted | warn | wave1 |
+| vpc-peer.broken.rejected | rejected | broken | wave1 |
+| vpc-peer.broken.failed | failed | broken | wave1 |
+| vpc-peer.warn.deleting | deleting | warn | wave1 |
+| vpc-peer.dim.deleted | deleted | dim | wave1 |
+| vpc-peer.warn.cidr\_overlap | CIDR overlap with peer | warn | wave1 |
+| vpc-peer.warn.no\_local\_route | no local route to peer | warn | wave2 |
+| vpc-peer.warn.route\_blackholed | route to peer blackholed | warn | wave2 |
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Truncated? |
+| --- | --- | --- |
+| rtb | Route Tables | yes |
+| vpc | VPC | yes |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

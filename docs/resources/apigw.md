@@ -224,8 +224,8 @@ apigw — DNS & CDN. Lifecycle key: none (the list API returns no lifecycle fiel
 | lambda | Lambda Functions | no |
 | acm | ACM Certificates | no |
 | alarm | CloudWatch Alarms | yes |
-| cf | CloudFront | no |
-| elb | Load Balancers | no |
+| cf | CloudFront | yes |
+| elb | Load Balancers | yes |
 | kms | KMS Keys | no |
 | role | IAM Role | no |
 | ct-events | CloudTrail Events | no |

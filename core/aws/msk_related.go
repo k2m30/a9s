@@ -143,7 +143,7 @@ func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 	}
 
-	subnetList, _, err := relatedResourcesFor(ctx, clients, cache, "subnet")
+	subnetList, truncated, err := relatedResourcesFor(ctx, clients, cache, "subnet")
 	if err != nil {
 		return resource.ErrorRelated("vpc", err)
 	}
@@ -162,7 +162,12 @@ func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache 
 		}
 		return relatedResult("vpc", []string{*sn.VpcId})
 	}
-	return resource.UnknownRelated("vpc")
+	if truncated {
+		// Subnet cache is truncated — the cluster's client subnet may be on a
+		// dropped page; answer is unknown rather than a definitive non-match.
+		return resource.UnknownRelated("vpc")
+	}
+	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 }
 
 // checkMSKLogs would resolve the CloudWatch log group configured for broker

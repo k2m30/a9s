@@ -194,11 +194,11 @@ eip — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field
 | ec2 | EC2 Instances | no |
 | eni | Network Interfaces | no |
 | nat | NAT Gateways | yes |
-| alarm | CloudWatch Alarms | no |
+| alarm | CloudWatch Alarms | yes |
 | asg | Auto Scaling Groups | no |
 | cfn | CloudFormation | no |
-| ecs | ECS Clusters | no |
-| ecs-svc | ECS Services | no |
-| ecs-task | ECS Tasks | no |
+| ecs | ECS Clusters | yes |
+| ecs-svc | ECS Services | yes |
+| ecs-task | ECS Tasks | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

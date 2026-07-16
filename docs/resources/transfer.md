@@ -182,3 +182,35 @@ Every problem row names its cause in the Status column (`offline: not accepting 
 - Certificate expiry rules — `AWS SDK Go v2 — transfer/types.ListedCertificate § InactiveDate, § Status`.
 - Degraded-row contract — shared `DegradedDetailsDenied` (fleet contract since v3.50.0).
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
+
+<!-- BEGIN GENERATED: header -->
+transfer — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field).
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| transfer.warn.offline | offline: not accepting transfers | warn | wave1 |
+| transfer.warn.starting | starting | warn | wave1 |
+| transfer.warn.stopping | stopping | warn | wave1 |
+| transfer.broken.start\_failed | start failed | broken | wave1 |
+| transfer.warn.stop\_failed | stop failed | warn | wave1 |
+| transfer.warn.legacy\_policy | legacy security policy | warn | wave1 |
+| transfer.warn.no\_logging | no activity logging | warn | wave1 |
+| transfer.warn.details\_denied | details denied | warn | wave1 |
+| transfer.warn.details\_unavailable | details unavailable | warn | wave1 |
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Truncated? |
+| --- | --- | --- |
+| acm | ACM Certificates | no |
+| eip | Elastic IPs | no |
+| lambda | Lambda Functions | no |
+| logs | Log Groups | no |
+| role | IAM Roles | no |
+| subnet | Subnets | no |
+| vpc | VPC | no |
+| vpce | VPC Endpoints | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

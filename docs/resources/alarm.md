@@ -262,5 +262,5 @@ alarm — MONITORING. Lifecycle key: `state`.
 | s3 | S3 Buckets | no |
 | sfn | Step Functions | no |
 | waf | WAF Web ACLs | no |
-| ct-events | CloudTrail Events | yes |
+| ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

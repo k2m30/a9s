@@ -151,7 +151,7 @@ igw — NETWORKING. Lifecycle key: `state`.
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| vpc | VPCs | yes |
+| vpc | VPCs | no |
 | rtb | Route Tables | yes |
 | ct-events | CloudTrail Events | no |
 <!-- END GENERATED: related -->

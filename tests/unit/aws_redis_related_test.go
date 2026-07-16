@@ -998,10 +998,10 @@ func TestRelated_Redis_Registration_KMSVPCNoTargetCache(t *testing.T) {
 // instead of `truncatedResultRedis`, yielding Truncated=false and losing
 // the signal that the count may be understated.
 
-// TestRelated_Redis_Alarm_TruncatedCacheWithMatches_ReturnsApproximate
+// TestRelated_Redis_Alarm_TruncatedCacheWithMatches_ReturnsTruncated
 // verifies that checkRedisAlarm sets Truncated=true when the alarm cache is
 // truncated and at least one alarm matches a MemberCluster dimension.
-func TestRelated_Redis_Alarm_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) {
+func TestRelated_Redis_Alarm_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T) {
 	matchingAlarm := resource.Resource{
 		ID:     "matching-alarm",
 		Name:   "matching-alarm",
@@ -1074,10 +1074,10 @@ func TestRelated_Redis_Alarm_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *t
 	}
 }
 
-// TestRelated_Redis_Logs_TruncatedCacheWithMatches_ReturnsApproximate
+// TestRelated_Redis_Logs_TruncatedCacheWithMatches_ReturnsTruncated
 // verifies that checkRedisLogs sets Truncated=true when the logs cache is
 // truncated and the log group matches the RG's LogDeliveryConfigurations.
-func TestRelated_Redis_Logs_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) {
+func TestRelated_Redis_Logs_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T) {
 	const logGroupName = "/aws/elasticache/redis/prod-redis-sessions/slow-log"
 	logRes := resource.Resource{
 		ID:     logGroupName,

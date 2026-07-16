@@ -142,7 +142,7 @@ func TestCheckAMING_NoMatchWhenImageIDDiffers(t *testing.T) {
 // T-AMI-NG03: Truncated=true when cache is truncated and no match found
 // ---------------------------------------------------------------------------
 
-func TestCheckAMING_ApproximateWhenCacheTruncatedAndNoMatch(t *testing.T) {
+func TestCheckAMING_TruncatedWhenCacheTruncatedAndNoMatch(t *testing.T) {
 	checker := findCheckAMING(t)
 
 	amiResource := resource.Resource{

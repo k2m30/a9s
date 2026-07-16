@@ -9,7 +9,7 @@ import "strconv"
 // CellKind classifies how a string-formatted numeric cell value should be read.
 //
 //   - CellKindExact:        the number is the true count (e.g., "150").
-//   - CellKindApproximate:  the number is a lower bound; more may exist beyond
+//   - CellKindTruncated:  the number is a lower bound; more may exist beyond
 //     the window the enricher could inspect (e.g., "150+").
 //   - CellKindUnknown:      the true count could not be determined; the cell is
 //     rendered as an em dash "—".
@@ -21,7 +21,7 @@ type CellKind int
 
 const (
 	CellKindExact CellKind = iota
-	CellKindApproximate
+	CellKindTruncated
 	CellKindUnknown
 )
 
@@ -36,7 +36,7 @@ func FormatExact(n int) string {
 	return strconv.Itoa(n)
 }
 
-// FormatApproximate returns n with a trailing "+" (e.g., "150+") signaling
+// FormatTruncated returns n with a trailing "+" (e.g., "150+") signaling
 // that n is a lower bound: the true count is >= n. Use when pagination was
 // capped, an API error cut the walk short, or the enricher only inspected a
 // prefix of the set.
@@ -44,7 +44,7 @@ func FormatExact(n int) string {
 // Never concatenate "+" manually onto a numeric string — use this helper so
 // the guard test in tests/unit/ can verify nothing else mints truncated
 // cells.
-func FormatApproximate(n int) string {
+func FormatTruncated(n int) string {
 	return strconv.Itoa(n) + "+"
 }
 

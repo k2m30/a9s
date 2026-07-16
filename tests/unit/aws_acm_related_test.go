@@ -264,7 +264,7 @@ func TestRelated_ACM_R53_EmptyCertARNInRawStruct(t *testing.T) {
 // --- checkACMCF: truncated cache → TruncatedResult ---
 
 // TestRelated_ACM_CF_TruncatedCacheNoMatch: when the cache is truncated and no
-// distribution matches, returns TruncatedResult (Count: 0 with IsApproximate true).
+// distribution matches, returns TruncatedResult (Count: 0 with Truncated true).
 func TestRelated_ACM_CF_TruncatedCacheNoMatch(t *testing.T) {
 	certARN := "arn:aws:acm:us-east-1:111122223333:certificate/abc-123"
 	source := resource.Resource{
@@ -293,7 +293,7 @@ func TestRelated_ACM_CF_TruncatedCacheNoMatch(t *testing.T) {
 	checker := acmCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, source, cache)
 	if !result.Truncated {
-		t.Errorf("IsApproximate = false, want true (truncated cache, no match)")
+		t.Errorf("Truncated = false, want true (truncated cache, no match)")
 	}
 }
 

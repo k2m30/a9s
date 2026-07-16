@@ -584,7 +584,7 @@ func TestRelated_CF_R53_TruncatedCacheNoMatch(t *testing.T) {
 	checker := cfCheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, res, cache)
 	if !result.Truncated {
-		t.Errorf("IsApproximate = false, want true (truncated cache, no match)")
+		t.Errorf("Truncated = false, want true (truncated cache, no match)")
 	}
 }
 
@@ -721,7 +721,7 @@ func TestRelated_CF_Alarm_TruncatedCacheNoMatch(t *testing.T) {
 	checker := cfAlarmCheckerByTarget(t)
 	result := checker(context.Background(), nil, res, cache)
 	if !result.Truncated {
-		t.Errorf("IsApproximate = false, want true (truncated cache, no match)")
+		t.Errorf("Truncated = false, want true (truncated cache, no match)")
 	}
 }
 

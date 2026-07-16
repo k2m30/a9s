@@ -233,9 +233,9 @@ efs — DATABASES & STORAGE. Lifecycle key: `status`.
 | --- | --- | --- |
 | kms | KMS Keys | no |
 | cfn | CloudFormation Stacks | yes |
-| sg | Security Groups | no |
-| subnet | Subnets | no |
-| lambda | Lambda Functions | no |
+| sg | Security Groups | yes |
+| subnet | Subnets | yes |
+| lambda | Lambda Functions | yes |
 | alarm | CloudWatch Alarms | yes |
 | backup | Backup Plans | yes |
 | ecs-task | ECS Tasks | yes |

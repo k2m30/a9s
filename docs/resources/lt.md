@@ -162,3 +162,30 @@ Every problem row names its cause in the Status column (`IMDSv1 allowed`, `EBS e
 - role exclusion — `a9s-devops (2026-07-14): IamInstanceProfile is a profile, not a role; second call or dishonest heuristic required.`
 - Degraded-row contract — shared rich degradation (fleet contract since v3.50.0, rich form since transfer).
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
+
+<!-- BEGIN GENERATED: header -->
+lt — COMPUTE. Lifecycle key: none (the list API returns no lifecycle field).
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| lt.warn.imdsv1 | IMDSv1 allowed | warn | wave1 |
+| lt.warn.unencrypted | EBS encryption disabled | warn | wave1 |
+| lt.warn.deprecated\_ami | deprecated AMI | warn | wave2 |
+| lt.warn.details\_denied | details denied | warn | wave1 |
+| lt.warn.details\_unavailable | details unavailable | warn | wave1 |
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Truncated? |
+| --- | --- | --- |
+| ami | AMI | no |
+| asg | Auto Scaling Groups | yes |
+| ec2 | EC2 Instances | yes |
+| kms | KMS Key | no |
+| ng | EKS Node Groups | yes |
+| sg | Security Groups | no |
+| subnet | Subnets | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

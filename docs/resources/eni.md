@@ -191,9 +191,9 @@ eni — NETWORKING. Lifecycle key: `status`.
 <!-- BEGIN GENERATED: related -->
 | Target Type | Display Name | Truncated? |
 | --- | --- | --- |
-| ec2 | EC2 Instances | yes |
-| sg | Security Groups | yes |
-| eip | Elastic IPs | yes |
+| ec2 | EC2 Instances | no |
+| sg | Security Groups | no |
+| eip | Elastic IPs | no |
 | vpc | VPC | no |
 | subnet | Subnet | no |
 | elb | Load Balancers | no |

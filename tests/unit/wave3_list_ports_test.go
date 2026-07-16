@@ -9,7 +9,7 @@
 //     TestListFilter_* only exercises Name-based matches.
 //  2. reapplyCheckerAgainst (core/app/list_filter.go), driven through the
 //     real c.Handle(messages.ResourcesLoaded{...}) event path — merge-across-
-//     LoadMore, non-approx extension, zero-initial filtering, and sort
+//     LoadMore, non-truncated extension, zero-initial filtering, and sort
 //     preservation. Existing coverage (reapply_checker_leak_test.go,
 //     headless_regression_test.go) only pins leak-prevention and payload
 //     shape, never the merge/grow/sort behavior itself.
@@ -178,7 +178,7 @@ func TestWave3ListFilter_MatchesFindingsPhrase_CaseInsensitive(t *testing.T) {
 }
 
 // ===========================================================================
-// 2. reapplyCheckerAgainst — merge-across-LoadMore, non-approx extension,
+// 2. reapplyCheckerAgainst — merge-across-LoadMore, non-truncated extension,
 //    zero-initial filtering, sort preservation, no-checker inert.
 //    Driven through the REAL c.Handle(messages.ResourcesLoaded{...}) event
 //    path (handle.go calls reapplyCheckerAgainst only from there — the
@@ -256,11 +256,11 @@ func TestWave3RelatedCheckerCarry_ZeroInitialGrowsOnLoadMore(t *testing.T) {
 	}
 }
 
-// TestWave3RelatedCheckerCarry_NonApproxStillExtends verifies that even a
+// TestWave3RelatedCheckerCarry_NonTruncatedStillExtends verifies that even a
 // non-truncated pivot (initial RelatedIDSet seeded from an exact match count,
 // not a (0+)/(N+) scan) keeps extending on LoadMore — the carry mechanism is
 // identical regardless of how the initial set was seeded.
-func TestWave3RelatedCheckerCarry_NonApproxStillExtends(t *testing.T) {
+func TestWave3RelatedCheckerCarry_NonTruncatedStillExtends(t *testing.T) {
 	c := wave3ListController(t, "sg")
 	c.PatchListRelatedIDSet([]string{"sg-a", "sg-b"})
 	c.PatchListReapplyChecker(wave3VPCSGChecker, resource.Resource{ID: "vpc-target"})

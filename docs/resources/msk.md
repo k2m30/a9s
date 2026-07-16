@@ -243,10 +243,10 @@ msk — MESSAGING. Lifecycle key: `state`.
 | alarm | CW Alarms | yes |
 | sg | Security Groups | no |
 | kms | KMS Key | no |
-| lambda | Lambda Functions | yes |
+| lambda | Lambda Functions | no |
 | cfn | CloudFormation | yes |
 | subnet | Subnets | no |
-| vpc | VPC | yes |
+| vpc | VPC | no |
 | logs | Log Groups | no |
 | s3 | S3 (broker logs) | no |
 | secrets | Secrets Manager | no |

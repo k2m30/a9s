@@ -77,7 +77,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 
 		stagesCountStr := resource.FormatExact(len(stages))
 		if stagesTruncated {
-			stagesCountStr = resource.FormatApproximate(len(stages))
+			stagesCountStr = resource.FormatTruncated(len(stages))
 		}
 		var summaries []string
 		var rows []domain.DetailRow

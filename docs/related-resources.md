@@ -1319,7 +1319,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ecs-task | sg | Security Groups | yes |
 | ecs-task | ssm | SSM Parameters | yes |
 | ecs-task | subnet | Subnets | no |
-| lambda | role | IAM Roles | yes |
+| lambda | role | IAM Roles | no |
 | lambda | alarm | CW Alarms | yes |
 | lambda | logs | Log Groups | yes |
 | lambda | sg | Security Groups | no |
@@ -1376,6 +1376,14 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ami | kms | KMS Keys | no |
 | ami | ng | EKS Node Groups | yes |
 | ami | ct-events | CloudTrail Events | no |
+| lt | ami | AMI | no |
+| lt | asg | Auto Scaling Groups | yes |
+| lt | ec2 | EC2 Instances | yes |
+| lt | kms | KMS Key | no |
+| lt | ng | EKS Node Groups | yes |
+| lt | sg | Security Groups | no |
+| lt | subnet | Subnets | no |
+| lt | ct-events | CloudTrail Events | no |
 | eks | ng | Node Groups | yes |
 | eks | alarm | CloudWatch Alarms | yes |
 | eks | cfn | CloudFormation Stacks | yes |
@@ -1390,7 +1398,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | eks | ec2 | EC2 Instances | no |
 | eks | ct-events | CloudTrail Events | yes |
 | ng | eks | EKS Clusters | yes |
-| ng | role | IAM Roles | yes |
+| ng | role | IAM Roles | no |
 | ng | asg | Auto Scaling Groups | yes |
 | ng | ec2 | EC2 Instances | no |
 | ng | sg | Security Groups | no |
@@ -1451,23 +1459,23 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | subnet | eks | EKS Clusters | yes |
 | subnet | vpce | VPC Endpoints | yes |
 | subnet | ct-events | CloudTrail Events | no |
-| rtb | subnet | Subnets | yes |
-| rtb | nat | NAT Gateways | yes |
-| rtb | igw | Internet Gateways | yes |
+| rtb | subnet | Subnets | no |
+| rtb | nat | NAT Gateways | no |
+| rtb | igw | Internet Gateways | no |
 | rtb | cfn | CloudFormation | yes |
 | rtb | vpc | VPC | no |
-| rtb | eni | Network Interfaces | yes |
-| rtb | tgw | Transit Gateways | yes |
+| rtb | eni | Network Interfaces | no |
+| rtb | tgw | Transit Gateways | no |
 | rtb | vpce | VPC Endpoints | yes |
 | rtb | ct-events | CloudTrail Events | no |
-| nat | vpc | VPCs | yes |
-| nat | subnet | Subnets | yes |
+| nat | vpc | VPCs | no |
+| nat | subnet | Subnets | no |
 | nat | rtb | Route Tables | yes |
 | nat | alarm | CloudWatch Alarms | yes |
-| nat | eip | Elastic IPs | yes |
-| nat | eni | Network Interfaces | yes |
+| nat | eip | Elastic IPs | no |
+| nat | eni | Network Interfaces | no |
 | nat | ct-events | CloudTrail Events | no |
-| igw | vpc | VPCs | yes |
+| igw | vpc | VPCs | no |
 | igw | rtb | Route Tables | yes |
 | igw | ct-events | CloudTrail Events | no |
 | eip | ec2 | EC2 Instances | no |
@@ -1494,9 +1502,9 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | tgw | role | IAM Role | no |
 | tgw | subnet | Subnets | no |
 | tgw | ct-events | CloudTrail Events | no |
-| eni | ec2 | EC2 Instances | yes |
-| eni | sg | Security Groups | yes |
-| eni | eip | Elastic IPs | yes |
+| eni | ec2 | EC2 Instances | no |
+| eni | sg | Security Groups | no |
+| eni | eip | Elastic IPs | no |
 | eni | vpc | VPC | no |
 | eni | subnet | Subnet | no |
 | eni | elb | Load Balancers | no |
@@ -1504,6 +1512,18 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | eni | nat | NAT Gateways | yes |
 | eni | vpce | VPC Endpoints | yes |
 | eni | ct-events | CloudTrail Events | no |
+| transfer | acm | ACM Certificates | no |
+| transfer | eip | Elastic IPs | no |
+| transfer | lambda | Lambda Functions | no |
+| transfer | logs | Log Groups | no |
+| transfer | role | IAM Roles | no |
+| transfer | subnet | Subnets | no |
+| transfer | vpc | VPC | no |
+| transfer | vpce | VPC Endpoints | no |
+| transfer | ct-events | CloudTrail Events | no |
+| vpc-peer | rtb | Route Tables | yes |
+| vpc-peer | vpc | VPC | yes |
+| vpc-peer | ct-events | CloudTrail Events | no |
 | dbi | sg | Security Groups | no |
 | dbi | kms | KMS Key | no |
 | dbi | subnet | Subnets | no |
@@ -1512,7 +1532,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | dbi | logs | Log Groups | yes |
 | dbi | vpc | VPC | no |
 | dbi | secrets | Secrets Manager | yes |
-| dbi | dbc | RDS Clusters | yes |
+| dbi | dbc | RDS Clusters | no |
 | dbi | role | IAM Roles | no |
 | dbi | eni | Network Interfaces | no |
 | dbi | ct-events | CloudTrail Events | yes |
@@ -1628,19 +1648,19 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | trail | kms | KMS Key | yes |
 | trail | role | IAM Role | no |
 | trail | ct-events | CloudTrail Events | no |
-| ct-events | role | IAM Roles | yes |
-| ct-events | iam-user | IAM Users | yes |
-| ct-events | ec2 | EC2 Instances | yes |
-| ct-events | s3 | S3 Buckets | yes |
-| ct-events | lambda | Lambda Functions | yes |
-| ct-events | dbi | RDS Instances | yes |
-| ct-events | kms | KMS Keys | yes |
-| ct-events | secrets | Secrets | yes |
-| ct-events | vpce | VPC Endpoints | yes |
-| ct-events | sg | Security Groups | yes |
-| ct-events | ddb | DynamoDB Tables | yes |
-| ct-events | cfn | CloudFormation Stacks | yes |
-| ct-events | trail | CloudTrail Trails | yes |
+| ct-events | role | IAM Roles | no |
+| ct-events | iam-user | IAM Users | no |
+| ct-events | ec2 | EC2 Instances | no |
+| ct-events | s3 | S3 Buckets | no |
+| ct-events | lambda | Lambda Functions | no |
+| ct-events | dbi | RDS Instances | no |
+| ct-events | kms | KMS Keys | no |
+| ct-events | secrets | Secrets | no |
+| ct-events | vpce | VPC Endpoints | no |
+| ct-events | sg | Security Groups | no |
+| ct-events | ddb | DynamoDB Tables | no |
+| ct-events | cfn | CloudFormation Stacks | no |
+| ct-events | trail | CloudTrail Trails | no |
 | ct-events | ct-events | CT events by AccessKeyId | no |
 | ct-events | ct-events | CT events by Username | no |
 | ct-events | ct-events | CT events by EventName | no |
@@ -1786,7 +1806,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | waf | alarm | CloudWatch Alarms | no |
 | waf | logs | Log Groups | no |
 | waf | ct-events | CloudTrail Events | no |
-| cfn | role | IAM Roles | yes |
+| cfn | role | IAM Roles | no |
 | cfn | cfn | Related Stacks | yes |
 | cfn | sns | SNS Topics | no |
 | cfn | s3 | S3 (stack resources) | no |
@@ -1805,7 +1825,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | pipeline | sns | SNS Topics | no |
 | pipeline | ct-events | CloudTrail Events | no |
 | cb | logs | Log Groups | yes |
-| cb | role | IAM Roles | yes |
+| cb | role | IAM Roles | no |
 | cb | pipeline | CodePipelines | yes |
 | cb | sg | Security Groups | no |
 | cb | subnet | Subnets | no |
@@ -1828,7 +1848,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ecr | role | IAM Roles | no |
 | codeartifact | kms | KMS Key | no |
 | codeartifact | ct-events | CloudTrail Events | no |
-| glue | role | IAM Roles | yes |
+| glue | role | IAM Roles | no |
 | glue | alarm | CW Alarms | yes |
 | glue | logs | Log Groups | yes |
 | glue | cfn | CloudFormation Stacks | no |
@@ -1842,6 +1862,14 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | athena | logs | Log Groups | no |
 | athena | role | IAM Roles | no |
 | athena | ct-events | CloudTrail Events | no |
+| mwaa | alarm | CW Alarms | yes |
+| mwaa | kms | KMS Key | no |
+| mwaa | logs | Log Groups | no |
+| mwaa | role | IAM Roles | no |
+| mwaa | s3 | S3 Buckets | no |
+| mwaa | sg | Security Groups | no |
+| mwaa | subnet | Subnets | no |
+| mwaa | ct-events | CloudTrail Events | no |
 | backup | role | IAM Roles | no |
 | backup | kms | KMS Keys | no |
 | backup | sns | SNS Topics | no |

@@ -198,6 +198,8 @@ opensearch — DATABASES & STORAGE. Lifecycle key: none (the list API returns no
 | opensearch.warn.processing | processing: config change in flight | warn | wave1 |
 | opensearch.update-forced | software update forced soon | broken | wave2 |
 | opensearch.encryption-off | encryption at rest off | warn | wave2 |
+| opensearch.warn.details\_denied | details denied | warn | wave1 |
+| opensearch.warn.details\_unavailable | details unavailable | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->
@@ -208,7 +210,7 @@ opensearch — DATABASES & STORAGE. Lifecycle key: none (the list API returns no
 | sg | Security Groups | no |
 | vpc | VPC | no |
 | kms | KMS Key | no |
-| cfn | CloudFormation | no |
+| cfn | CloudFormation | yes |
 | subnet | Subnets | no |
 | acm | ACM Certificates | yes |
 | ct-events | CloudTrail Events | no |
