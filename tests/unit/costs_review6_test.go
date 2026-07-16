@@ -138,7 +138,7 @@ func TestCostsReview6_Q2_FallbackOnResourceFrame_ReclampsAgainstRetentionCutoff(
 	if len(usageTop.Window) == 0 {
 		t.Fatal("precondition: USAGE_TYPE frame has an empty Window")
 	}
-	weekPeriod := usageTop.Window[0] // cursor defaults to column 0 on a fresh drill
+	weekPeriod := usageTop.Window[0] // the stale, boundary week this test targets
 	if weekPeriod.Start != "2026-07-01" {
 		t.Fatalf("test assumption wrong: July's first (clipped) week Start = %q, want \"2026-07-01\" — date arithmetic drifted", weekPeriod.Start)
 	}
@@ -146,8 +146,16 @@ func TestCostsReview6_Q2_FallbackOnResourceFrame_ReclampsAgainstRetentionCutoff(
 		t.Fatalf("test assumption wrong: the week period %+v survives ClampResourceDrillWindow at now=%v (cutoff %s) — pick a staler week", weekPeriod, now, cutoff)
 	}
 
+	// The pushed child frame now opens with the cursor on its own newest
+	// column (FR-002, applyCostsSelect's PushDrill case) — scroll it back
+	// to col 0 so the stale week[0] cell stays selected below. ActionScrollLeft
+	// clamps at col 0, so over-scrolling is safe.
+	for range usageTop.Window {
+		c.Apply(app.Action{Kind: app.ActionScrollLeft})
+	}
+
 	// The USAGE_TYPE frame's own delivery: a non-zero cell at weekPeriod
-	// (column 0, the cursor's default), making the RESOURCE_ID drill's own
+	// (column 0, restored above), making the RESOURCE_ID drill's own
 	// Fallback.Eligible true.
 	c.Handle(messages.CostsLoaded{
 		Query:    usagePayload.Query,

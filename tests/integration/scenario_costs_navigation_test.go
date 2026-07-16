@@ -88,9 +88,11 @@ func TestCostsScenario_GridPivotDrillAndBackToMenu(t *testing.T) {
 	scenario.ExpectFrameContains("USAGE_TYPE")
 	scenario.ExpectFrameContains(growthLabel)
 
-	// A fresh drill frame's cursor starts on the OLDEST column of its own
-	// (weekly) window; over-scroll right to the newest week — ScrollRight
-	// clamps at the window's own end, so this is safe regardless of how many
+	// A fresh drill frame's cursor now opens already on the newest column of
+	// its own (weekly) window (PushDrill pins Cursor.Col to the newest
+	// column, same as the root frame's own FR-002 default) — the
+	// over-scroll right below is therefore redundant but harmless:
+	// ScrollRight clamps at the window's own end regardless of how many
 	// weeks the current month actually has.
 	const overScrollWeeks = 8
 	for range overScrollWeeks {

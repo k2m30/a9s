@@ -672,6 +672,18 @@ func TestCostsReview_ResourceRowEnter_TUI_NavigatesToEC2Detail_NotStuckOnCostsSc
 	// SOME period lands inside whatever window the drill actually built.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 
+	// The pushed USAGE_TYPE frame now opens with the cursor already on its
+	// own newest column (FR-002, applyCostsSelect's PushDrill case) — the
+	// last, often not-yet-elapsed week of the current month. Scroll it back
+	// to the oldest (first) week, guaranteed fully in the past, so the
+	// 60-day-ending-today record spans built below (usageTypeRecords,
+	// resourceIDRecords) actually cover whatever day-level window the next
+	// drill selects. ScrollLeft clamps at column 0, so over-scrolling is safe.
+	const overScrollWeeks = 8
+	for range overScrollWeeks {
+		m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyLeft))
+	}
+
 	usageTypeQuery := costs.Query{
 		Granularity: costs.GranularityDay.APIGranularity(),
 		GroupBy:     []costs.Dimension{costs.DimensionUsageType},

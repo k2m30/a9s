@@ -134,14 +134,13 @@ func TestCostsCodex_X1_GrowthStory_ResourceChain_EndToEnd_OverDemoTransport(t *t
 	}
 	deliverCodexDemoFetch(t, core, c, payload)
 
-	// Enter 2: USAGE_TYPE level. A fresh push's Cursor is always (0,0) —
-	// the OLDEST column of the child window (applyCostsSelect constructs a
-	// bare costs.DrillLevel{}, never costsOpenAtNewestDrillLevel) — so
-	// column 0 of "weeks of the current month" can be more than 14 days
-	// before now whenever today isn't in the first week. Move to the
-	// newest column first (matching a real user drilling into "today"),
-	// same as the root frame's own FR-002 default, before locating the
-	// growth-usage-type row.
+	// Enter 2: USAGE_TYPE level. A freshly-pushed child frame now opens with
+	// the cursor already on the newest column of its own window
+	// (applyCostsSelect's PushDrill case pins Cursor.Col = len(Window)-1 and
+	// reconciles scroll, same as the root frame's own FR-002 default) —
+	// codexMoveCursorToNewestColumn below is therefore a no-op here, kept
+	// only so this precondition stays explicit about which column the
+	// growth-usage-type row lookup depends on.
 	codexMoveCursorToNewestColumn(c)
 	if !codexMoveCursorToRow(c, fixtures.CostsGrowthUsageType) {
 		t.Fatalf("precondition: no USAGE_TYPE row labeled %q in the demo grid after the fetch landed", fixtures.CostsGrowthUsageType)

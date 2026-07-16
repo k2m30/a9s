@@ -556,10 +556,20 @@ func TestCostsReview2_R9_ResourceDrillGate_NearBoundary_ClampsExpandedWindow_Not
 		t.Fatalf("precondition: week[0].Start got %q want %q — the boundary scenario depends on this exact clip", weekTop.Window[0].Start, "2026-07-01")
 	}
 
+	// The pushed child frame now opens with the cursor on its own newest
+	// column (FR-002, applyCostsSelect's PushDrill case) — scroll it back
+	// to col 0 so the record delivered below, and the next Select, target
+	// week[0], the exact boundary-adjacent cell this test is about.
+	// ActionScrollLeft clamps at col 0 (WEEK granularity never triggers the
+	// month-only scroll-to-load extension), so over-scrolling is safe.
+	for range weekTop.Window {
+		c.Apply(app.Action{Kind: app.ActionScrollLeft})
+	}
+
 	// Loading gates Select unconditionally now (screen.Select's
 	// WaitForRows) — the USAGE_TYPE frame's own fetch must land before the
-	// next Enter. Seeded at week[0] (cursor's own cell) so the grid still
-	// has a real row at (0,0) after landing.
+	// next Enter. Seeded at week[0] (the cursor's cell after scrolling back
+	// to col 0) so the grid still has a real row there after landing.
 	drill1Payload, found := reviewFindFetchCostsTask(drill1Tasks)
 	if !found {
 		t.Fatal("precondition: SERVICE -> USAGE_TYPE drill did not emit a fetch task")
@@ -571,8 +581,8 @@ func TestCostsReview2_R9_ResourceDrillGate_NearBoundary_ClampsExpandedWindow_Not
 		Requests: 1,
 	})
 
-	// Drill again: USAGE_TYPE -> RESOURCE_ID. Cursor is already at (0,0),
-	// pointing at week[0].
+	// Drill again: USAGE_TYPE -> RESOURCE_ID. Cursor is scrolled back to
+	// col 0, pointing at week[0].
 	c.Apply(app.Action{Kind: app.ActionSelect})
 
 	stack := c.GetCostsDrillStack()

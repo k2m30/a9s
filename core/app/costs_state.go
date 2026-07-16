@@ -130,6 +130,26 @@ func costsOpenAtNewestDrillLevel(rowDim costs.Dimension, filter costs.Filter, gr
 	return dl
 }
 
+// costsCurrentCol returns the index of the newest drill-window column whose
+// period has already started at or before now — the "current" column. Week
+// and day child windows (unlike months, which monthsWithinPeriod
+// future-clamps) tile the whole parent period, so a mid-month drill's raw
+// last column can be an empty future week/day; the default child cursor must
+// land on today's column, not that. Falls back to col 0 only for a window
+// entirely in the future, which a normal drill never produces.
+func costsCurrentCol(window []costs.Period, now time.Time) int {
+	nowUTC := now.UTC()
+	col := 0
+	for i, p := range window {
+		start, err := costs.ParseDate(p.Start)
+		if err != nil || start.After(nowUTC) {
+			continue
+		}
+		col = i
+	}
+	return col
+}
+
 // EnsureCostsState seeds the top-of-stack costs screen with its root drill
 // frame (service pivot, monthly, invoice, trailing 12 months ending at
 // now's own month) and loads the on-disk per-profile cost cache. Set-once —
@@ -824,6 +844,17 @@ func (c *Controller) applyCostsSelect(cs *CostsState) *runtime.TaskRequest {
 				SelectedPeriod:    out.SelectedPeriod,
 			},
 		})
+		// Open the child on the current column — the newest whose period has
+		// already begun (FR-002 "open at today"), like the root/pivot frames.
+		// The col-0 (oldest) default parks on a cell outside the RESOURCE_ID
+		// 14-day retention window late in the month; the raw last column is
+		// wrong too, because week/day child windows — unlike months, which
+		// monthsWithinPeriod future-clamps — tile the whole parent period, so
+		// mid-month their last column is an empty FUTURE week/day. reconcile
+		// pins the chosen column to the visible edge.
+		top := &cs.DrillStack[len(cs.DrillStack)-1]
+		top.Cursor.Col = costsCurrentCol(top.Window, cs.Now)
+		reconcileCostsScrollToCursor(top, cs.ViewportCols)
 		// X7: AwaitedIdentity is left exactly as ensureCostsShapeFetched set
 		// it for the new child frame (set when genuinely a shape-miss, ""
 		// when the child's shape happens to already be cached) — no longer

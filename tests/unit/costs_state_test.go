@@ -172,6 +172,48 @@ func TestCostsState_EnsureCostsState_SeedsRootDrillFrame(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// A freshly-pushed child drill frame also opens on the newest column
+// ---------------------------------------------------------------------------
+
+func TestCostsState_PushDrill_ChildFrame_OpensOnCurrentColumn(t *testing.T) {
+	c := newCostsController(t, fixedCostsNow)
+	seedServiceGrid(t, c, fixedCostsNow)
+
+	c.Apply(app.Action{Kind: app.ActionSelect}) // SERVICE -> USAGE_TYPE
+	if depth := len(c.GetCostsDrillStack()); depth != 2 {
+		t.Fatalf("precondition: ActionSelect must push a child drill frame — DrillStack depth got %d want 2", depth)
+	}
+
+	child := topDrill(t, c)
+	if child.RowDim != costs.DimensionUsageType {
+		t.Fatalf("pushed child frame's RowDim: got %q want %q", child.RowDim, costs.DimensionUsageType)
+	}
+	if len(child.Window) == 0 {
+		t.Fatal("precondition: pushed child frame's Window is empty")
+	}
+
+	// FR-002 "open at today": the child opens on the CURRENT column — the
+	// newest whose period has already begun at now — NOT the raw last column
+	// (week/day child windows tile the whole parent period, so their last
+	// column can be an empty future bucket) and NOT column 0 (the oldest
+	// often falls outside the RESOURCE_ID 14-day retention window).
+	cur := child.Window[child.Cursor.Col]
+	curStart, err := time.Parse("2006-01-02", cur.Start)
+	if err != nil {
+		t.Fatalf("parsing cursor period start %q: %v", cur.Start, err)
+	}
+	if curStart.After(fixedCostsNow.UTC()) {
+		t.Errorf("child opened on a FUTURE column (col %d, %s) — the cursor must land on a period that has already begun by now", child.Cursor.Col, cur.Start)
+	}
+	if child.Cursor.Col < len(child.Window)-1 {
+		next := child.Window[child.Cursor.Col+1]
+		if nextStart, nerr := time.Parse("2006-01-02", next.Start); nerr == nil && !nextStart.After(fixedCostsNow.UTC()) {
+			t.Errorf("child did not open on the NEWEST non-future column — col %d (%s) is non-future but so is the next col (%s)", child.Cursor.Col, cur.Start, next.Start)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Zoom walks year -> month -> week -> day with boundary no-ops
 // ---------------------------------------------------------------------------
 
