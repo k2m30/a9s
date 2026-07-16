@@ -69,8 +69,15 @@ func costsReview5DrillToStrandedByIDPlaceholder(t *testing.T, profile string) (t
 	})
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter)) // -> RESOURCE_ID child
 
+	// The NEWEST day in the window, not window[0] — costs.ClampResourceDrillWindow
+	// (core/costs/drill.go) already trimmed the RESOURCE_ID frame's actual
+	// Window down to the last ResourceDrillWindowRetentionDays, so window[0]'s
+	// UNCLAMPED period can fall outside every column the frame actually
+	// renders; window[len-1]'s End is always the clamp's own upper bound and
+	// is therefore always a real column (see costs_lane_parity_test.go's
+	// TestCostsLaneParity_A for the full trace).
 	resourceWindow := costs.WindowWithin(usagePeriod, costs.GranularityDay, now)
-	resourcePeriod := resourceWindow[0]
+	resourcePeriod := resourceWindow[len(resourceWindow)-1]
 	resourceQuery := costs.Query{
 		Granularity: costs.GranularityDay.APIGranularity(),
 		GroupBy:     []costs.Dimension{costs.DimensionResourceID},
@@ -86,6 +93,7 @@ func costsReview5DrillToStrandedByIDPlaceholder(t *testing.T, profile string) (t
 		Requests: 1,
 	})
 	assertStackInSync(t, m, "before the by-ID drill")
+	m = m2MoveTUICursorToNewestColumn(m) // align the cursor with the newest-day cell the record above was planted at
 
 	m, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	if cmd == nil {

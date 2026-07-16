@@ -82,6 +82,34 @@ func m2FullMetricRecord(p costs.Period, rowKey string, amount float64) costs.Rec
 	}
 }
 
+// m2MoveHeadlessCursorToNewestColumn scrolls c's costs cursor to the last
+// (newest) column of the current drill frame's window — mirrors
+// costs_codex_test.go's own codexMoveCursorToNewestColumn (package
+// unit_test, unreachable from this package unit file): ActionScrollRight
+// clamps at the window's own end, so over-scrolling is safe.
+func m2MoveHeadlessCursorToNewestColumn(c *app.Controller) {
+	vs := c.Snapshot()
+	if vs.Body.Costs == nil {
+		return
+	}
+	for range vs.Body.Costs.Columns {
+		c.Apply(app.Action{Kind: app.ActionScrollRight})
+	}
+}
+
+// m2MoveTUICursorToNewestColumn presses the scroll-right key enough times to
+// reach the last column of whatever drill frame m is currently on. The TUI
+// lane exposes no Snapshot() to size the loop exactly (unlike
+// m2MoveHeadlessCursorToNewestColumn) — internal/tui/app_costs.go's
+// ScrollRight case forwards to the same ActionScrollRight, which clamps at
+// the window's own end, so a generous fixed over-press is safe.
+func m2MoveTUICursorToNewestColumn(m tui.Model) tui.Model {
+	for i := 0; i < 10; i++ {
+		m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyRight))
+	}
+	return m
+}
+
 // ===========================================================================
 // Scenario A — full drill chain (SERVICE -> USAGE_TYPE -> RESOURCE_ID) to a
 // SUCCESSFUL by-ID resource jump. Both lanes must land on the resource's
@@ -90,7 +118,13 @@ func m2FullMetricRecord(p costs.Period, rowKey string, amount float64) costs.Rec
 
 func TestCostsLaneParity_A_DrillToResourceJump_Success(t *testing.T) {
 	const ec2Service = "Amazon Elastic Compute Cloud - Compute"
-	now := time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC)
+	// A real clock, not a pinned literal: the TUI lane's own costs clock
+	// (internal/tui/runtime_adapter_navigate.go's EnsureCostsState(time.Now()))
+	// is always the real wall clock, so the headless half must share the
+	// SAME now the test itself uses to plant periods, or the two lanes'
+	// 14-day resource-drill retention clamps (costs.ClampResourceDrillWindow)
+	// diverge.
+	now := time.Now()
 	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	period := costs.Period{Start: start.Format("2006-01-02"), End: start.AddDate(0, 1, 0).Format("2006-01-02")}
 	q := costs.Query{Granularity: costs.GranularityMonth.APIGranularity(), GroupBy: []costs.Dimension{costs.DimensionService}}
@@ -119,7 +153,15 @@ func TestCostsLaneParity_A_DrillToResourceJump_Success(t *testing.T) {
 	if !found {
 		t.Fatal("headless precondition: USAGE_TYPE -> RESOURCE_ID drill did not emit a fetch task")
 	}
-	resourcePeriod := costs.WindowWithin(usagePeriod, costs.GranularityDay, now)[0]
+	// The NEWEST day in the RESOURCE_ID frame's window, not the oldest
+	// (window[0]) — costs.ClampResourceDrillWindow (core/costs/drill.go)
+	// already trimmed resourcePayload's own Window down to the last
+	// ResourceDrillWindowRetentionDays before this delivery ever landed, so
+	// window[0]'s UNCLAMPED period can fall outside every column the
+	// RESOURCE_ID frame actually renders — window[len-1]'s End is always the
+	// clamp's own upper bound and is therefore always a real column.
+	resourceWindow := costs.WindowWithin(usagePeriod, costs.GranularityDay, now)
+	resourcePeriod := resourceWindow[len(resourceWindow)-1]
 	// A REAL demo fixture ID (core/demo/fixtures/ec2.go's "web-prod-01")
 	// — the by-ID fetch runs against the actual demo transport in both
 	// lanes, so it must resolve as found, not a not-found Flash.
@@ -129,6 +171,7 @@ func TestCostsLaneParity_A_DrillToResourceJump_Success(t *testing.T) {
 		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{m2FullMetricRecord(resourcePeriod, realID, 450.0)}},
 		Requests: 1,
 	})
+	m2MoveHeadlessCursorToNewestColumn(c)                         // align the cursor with the newest-day cell the record above was planted at
 	_, selectTasks := c.Apply(app.Action{Kind: app.ActionSelect}) // Enter on the RESOURCE_ID leaf
 	var byIDPayload runtime.FetchByIDDetailPayload
 	byIDFound := false
@@ -180,6 +223,7 @@ func TestCostsLaneParity_A_DrillToResourceJump_Success(t *testing.T) {
 		Requests: 1,
 	})
 	assertStackInSync(t, m, "before the by-ID drill")
+	m = m2MoveTUICursorToNewestColumn(m) // align the cursor with the newest-day cell the record above was planted at
 
 	m, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	if cmd == nil {
@@ -348,12 +392,16 @@ func m2DrillHeadlessToStrandedByIDPlaceholder(t *testing.T, profile string, now 
 	if !found {
 		t.Fatal("headless precondition: USAGE_TYPE -> RESOURCE_ID drill did not emit a fetch task")
 	}
-	resourcePeriod := costs.WindowWithin(usagePeriod, costs.GranularityDay, now)[0]
+	// The NEWEST day, not window[0] — see TestCostsLaneParity_A's own
+	// comment on the identical clamp/window mismatch.
+	resourceWindow := costs.WindowWithin(usagePeriod, costs.GranularityDay, now)
+	resourcePeriod := resourceWindow[len(resourceWindow)-1]
 	c.Handle(messages.CostsLoaded{
 		Query:    resourcePayload.Query,
 		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{m2FullMetricRecord(resourcePeriod, bogusID, 450.0)}},
 		Requests: 1,
 	})
+	m2MoveHeadlessCursorToNewestColumn(c)                         // align the cursor with the newest-day cell the record above was planted at
 	_, selectTasks := c.Apply(app.Action{Kind: app.ActionSelect}) // Enter on the RESOURCE_ID leaf
 	var byIDPayload runtime.FetchByIDDetailPayload
 	byIDFound := false
@@ -369,7 +417,9 @@ func m2DrillHeadlessToStrandedByIDPlaceholder(t *testing.T, profile string, now 
 }
 
 func TestCostsLaneParity_D_DrillToResourceJump_NotFound(t *testing.T) {
-	now := time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC)
+	// A real clock, not a pinned literal — see TestCostsLaneParity_A's own
+	// comment: the TUI lane's costs clock is always real wall-clock time.
+	now := time.Now()
 	const bogusID = "i-doesnotexistlaneparity1"
 
 	// --- headless lane ---
