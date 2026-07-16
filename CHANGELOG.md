@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.55.0] - 2026-07-16
+
+### Changed
+
+- **BREAKING (`core/resource`)**: `FormatApproximate` and
+  `CellKindApproximate` are renamed to `FormatTruncated` and
+  `CellKindTruncated`. External importers of the now-public `core/resource`
+  package must update references. AWS wire field names
+  (`ApproximateNumberOfMessages`, ...) and the SQS `approx_messages` /
+  `approx_not_visible` domain keys are unchanged — they are AWS's own
+  semantics, not the a9s related-count truncation concept.
+
+### Fixed
+
+- The per-resource docs' related-panel **"Truncated?"** column was derived
+  from `NeedsTargetCache` — a prefetch flag that does not imply whether a
+  count can be a truncated lower bound — so it carried stale yes/no values
+  across every `docs/resources/*.md`. It is now sourced from a new
+  `domain.RelatedDef.Truncated` flag set from each checker's actual
+  behavior, and the affected docs are corrected.
+- 13 reverse-scan / count related checkers dropped the truncation flag
+  (returned an exact `relatedResult` where the honest answer is a truncated
+  lower bound), so a partially-scanned cache rendered a misleading exact
+  count instead of `N+`. They now carry the flag via `relatedResultTrunc`;
+  identity-resolvers that miss on a truncated parent return `?` (unknown)
+  rather than a false `0`. The 8 corresponding catalog `Truncated` flags are
+  flipped to match.
+- Six Cost Explorer resource-drill tests began failing once the calendar
+  passed the 14th of the month: they drilled into a first-of-month cell that
+  the (correct) 14-day resource-retention guard refuses. The tests now drill
+  into the current day and share one clock across their headless and TUI
+  lanes; application behavior is unchanged.
+- A CodeQL path-injection finding on the cache path is closed by an
+  `IsLocal` containment guard, and a controller close-discipline test gate
+  fixes 8 leaked controllers surfaced under `-shuffle=on` test ordering.
+
 ## [3.54.0] - 2026-07-15
 
 ### Changed
