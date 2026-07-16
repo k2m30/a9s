@@ -164,7 +164,7 @@ Every problem row names its cause in the Status column (`IMDSv1 allowed`, `EBS e
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-lt — COMPUTE. Lifecycle key: none (the list API returns no lifecycle field).
+lt — COMPUTE. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

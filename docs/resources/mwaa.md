@@ -203,7 +203,7 @@ At 3am every problem row names its cause in the Status column — `pending: awai
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-mwaa — DATA & ANALYTICS. Lifecycle key: none (the list API returns no lifecycle field).
+mwaa — DATA & ANALYTICS. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

@@ -135,7 +135,7 @@ Every problem row names its cause in the Status column (`pending acceptance: exp
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-vpc-peer — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field).
+vpc-peer — NETWORKING. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

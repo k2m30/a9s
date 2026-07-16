@@ -888,6 +888,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Aliases:       []string{"lt", "launch-template", "launchtemplate", "launch-templates", "lts"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 32, Sortable: true},
 			{Key: "status", Title: "Status", Width: 32, Sortable: true},

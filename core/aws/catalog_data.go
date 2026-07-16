@@ -121,6 +121,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Aliases:       []string{"mwaa", "airflow"},
 		Category:      "DATA & ANALYTICS",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 32, Sortable: true},
 			{Key: "status", Title: "Status", Width: 32, Sortable: true},

@@ -695,6 +695,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"transfer", "sftp", "as2", "ftps"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "server_id", Title: "Server Id", Width: 32, Sortable: true},
 			{Key: "status", Title: "Status", Width: 32, Sortable: true},
@@ -753,6 +754,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"vpc-peer", "pcx", "peering"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "pcx_id", Title: "Pcx Id", Width: 24, Sortable: true},
 			{Key: "status", Title: "Status", Width: 34, Sortable: true},

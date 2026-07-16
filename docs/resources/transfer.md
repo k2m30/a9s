@@ -184,7 +184,7 @@ Every problem row names its cause in the Status column (`offline: not accepting 
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-transfer — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field).
+transfer — NETWORKING. Lifecycle key: `status`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

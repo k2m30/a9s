@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A CodeQL path-injection finding on the cache path is closed by an
   `IsLocal` containment guard, and a controller close-discipline test gate
   fixes 8 leaked controllers surfaced under `-shuffle=on` test ordering.
+- The four newest resource types (`mwaa`, `transfer`, `vpc-peer`, `lt`)
+  omitted `LifecycleKey: "status"` in their catalog definitions, so their
+  Status column skipped the lifecycle-aware decoration sibling types get and
+  the generated docs mislabeled the lifecycle key as "none". All four now
+  declare it.
 
 ## [3.54.0] - 2026-07-15
 
