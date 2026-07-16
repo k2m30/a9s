@@ -55,8 +55,12 @@ func costsReview5DrillToStrandedByIDPlaceholder(t *testing.T, profile string) (t
 	})
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter)) // -> USAGE_TYPE child
 
+	// Newest week, not usageWindow[0]: a freshly-pushed drill child opens on
+	// the OLDEST column, which late in the month is outside the 14-day
+	// resource-drill clamp and would refuse the drill — so plant the record
+	// on the newest week and scroll the cursor there before drilling.
 	usageWindow := costs.WindowWithin(period, costs.GranularityWeek, now)
-	usagePeriod := usageWindow[0]
+	usagePeriod := usageWindow[len(usageWindow)-1]
 	usageQuery := costs.Query{
 		Granularity: costs.GranularityWeek.APIGranularity(),
 		GroupBy:     []costs.Dimension{costs.DimensionUsageType},
@@ -67,6 +71,7 @@ func costsReview5DrillToStrandedByIDPlaceholder(t *testing.T, profile string) (t
 		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{reviewFullMetricRecord(usagePeriod, "USE1-BoxUsage:m5.large", 450.0)}},
 		Requests: 1,
 	})
+	m = m2MoveTUICursorToNewestColumn(m)                 // scroll to the newest week the record was planted at
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter)) // -> RESOURCE_ID child
 
 	// The NEWEST day in the window, not window[0] — costs.ClampResourceDrillWindow

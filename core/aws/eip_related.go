@@ -173,6 +173,7 @@ func checkEIPASG(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("asg")
 	}
 	asgName := ""
+	instanceReadable := false
 	for _, ec2Res := range ec2List {
 		if ec2Res.ID != instanceID {
 			continue
@@ -181,16 +182,25 @@ func checkEIPASG(ctx context.Context, clients any, res resource.Resource, cache 
 		if !iok {
 			break
 		}
+		instanceReadable = true
 		asgName = tagValue(inst.Tags, "aws:autoscaling:groupName")
 		break
 	}
-	if asgName == "" {
-		if truncated {
-			return resource.UnknownRelated("asg")
-		}
+	if asgName != "" {
+		return relatedResult("asg", []string{asgName})
+	}
+	// The instance was located and read: its ASG membership is definitively
+	// empty, regardless of whether other EC2 pages were truncated.
+	if instanceReadable {
 		return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
 	}
-	return relatedResult("asg", []string{asgName})
+	// The instance is not on this page (or its struct was unreadable). A
+	// truncated cache may hold it later, so report unknown rather than a
+	// false zero; an exhaustive cache means it genuinely has no ASG.
+	if truncated {
+		return resource.UnknownRelated("asg")
+	}
+	return resource.RelatedCheckResult{TargetType: "asg", Count: 0}
 }
 
 // eipENIID resolves the network interface ID this Elastic IP is attached to,

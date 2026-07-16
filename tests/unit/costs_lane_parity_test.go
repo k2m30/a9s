@@ -141,13 +141,15 @@ func TestCostsLaneParity_A_DrillToResourceJump_Success(t *testing.T) {
 	if !found {
 		t.Fatal("headless precondition: SERVICE -> USAGE_TYPE drill did not emit a fetch task")
 	}
-	usagePeriod := costs.WindowWithin(period, costs.GranularityWeek, now)[0]
+	usageWeeks := costs.WindowWithin(period, costs.GranularityWeek, now)
+	usagePeriod := usageWeeks[len(usageWeeks)-1] // newest week — the col-0 default (oldest week) falls outside the 14-day resource-drill clamp late in the month, refusing the drill below
 	c.Handle(messages.CostsLoaded{
 		Query:    usagePayload.Query,
 		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{m2FullMetricRecord(usagePeriod, "USE1-BoxUsage:m5.large", 450.0)}},
 		Window:   usagePayload.Window,
 		Requests: 1,
 	})
+	m2MoveHeadlessCursorToNewestColumn(c)                  // drill RESOURCE_ID off the newest week the record was planted at, not the col-0 oldest
 	_, tasks = c.Apply(app.Action{Kind: app.ActionSelect}) // -> RESOURCE_ID
 	resourcePayload, found := m2FindFetchCostsTask(tasks)
 	if !found {
@@ -208,6 +210,7 @@ func TestCostsLaneParity_A_DrillToResourceJump_Success(t *testing.T) {
 		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{m2FullMetricRecord(usagePeriod, "USE1-BoxUsage:m5.large", 450.0)}},
 		Requests: 1,
 	})
+	m = m2MoveTUICursorToNewestColumn(m)                 // drill RESOURCE_ID off the newest week (matching usagePeriod), not the col-0 oldest
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter)) // -> RESOURCE_ID
 	resourceQuery := costs.Query{
 		Granularity: costs.GranularityDay.APIGranularity(),
@@ -380,13 +383,15 @@ func m2DrillHeadlessToStrandedByIDPlaceholder(t *testing.T, profile string, now 
 	if !found {
 		t.Fatal("headless precondition: SERVICE -> USAGE_TYPE drill did not emit a fetch task")
 	}
-	usagePeriod := costs.WindowWithin(period, costs.GranularityWeek, now)[0]
+	usageWeeks := costs.WindowWithin(period, costs.GranularityWeek, now)
+	usagePeriod := usageWeeks[len(usageWeeks)-1] // newest week — the col-0 default (oldest week) falls outside the 14-day resource-drill clamp late in the month, refusing the drill below
 	c.Handle(messages.CostsLoaded{
 		Query:    usagePayload.Query,
 		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{m2FullMetricRecord(usagePeriod, "USE1-BoxUsage:m5.large", 450.0)}},
 		Window:   usagePayload.Window,
 		Requests: 1,
 	})
+	m2MoveHeadlessCursorToNewestColumn(c)                  // drill RESOURCE_ID off the newest week the record was planted at, not the col-0 oldest
 	_, tasks = c.Apply(app.Action{Kind: app.ActionSelect}) // -> RESOURCE_ID
 	resourcePayload, found := m2FindFetchCostsTask(tasks)
 	if !found {

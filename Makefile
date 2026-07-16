@@ -86,7 +86,7 @@ mdlint:
 	markdownlint-cli2 "docs/**/*.md" "!docs/historical/refactor/**" "CLAUDE.md" "CONTRIBUTING.md" "CHANGELOG.md"
 
 coverage:
-	go test ./internal/... ./tests/... -coverpkg=./internal/... -coverprofile=coverage.out -covermode=atomic
+	go test ./core/... ./internal/... ./tests/... -coverpkg=./core/...,./internal/... -coverprofile=coverage.out -covermode=atomic
 	go tool cover -func=coverage.out
 
 cover: coverage

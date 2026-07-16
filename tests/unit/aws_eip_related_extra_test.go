@@ -242,6 +242,41 @@ func TestRelated_EIP_ASG_InstanceNotInASGReturnsZero(t *testing.T) {
 	}
 }
 
+func TestRelated_EIP_ASG_InstanceFoundInTruncatedCacheReturnsZero(t *testing.T) {
+	// The attached instance IS present in a TRUNCATED ec2 cache but carries no
+	// aws:autoscaling:groupName tag. Its ASG membership is therefore
+	// definitively empty — truncation on OTHER ec2 pages must not downgrade a
+	// located-and-read instance to "?" (RelatedUnknown, which renders as an
+	// actionable/blank row rather than a dead-end 0).
+	source := resource.Resource{
+		ID: "eipalloc-009",
+		RawStruct: ec2types.Address{
+			AllocationId: aws.String("eipalloc-009"),
+			InstanceId:   aws.String("i-standalone-trunc"),
+		},
+	}
+	ec2Res := resource.Resource{
+		ID: "i-standalone-trunc",
+		RawStruct: ec2types.Instance{
+			InstanceId: aws.String("i-standalone-trunc"),
+			Tags:       []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("standalone")}},
+		},
+	}
+	cache := resource.ResourceCache{
+		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{ec2Res}, IsTruncated: true},
+	}
+
+	checker := eipCheckerByTarget(t, "asg")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.State == domain.RelatedUnknown {
+		t.Errorf("State = RelatedUnknown; a located instance with no ASG tag is a definitive 0, not '?', even when the ec2 cache is truncated")
+	}
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (located instance has no asg tag)", result.Count)
+	}
+}
+
 func TestRelated_EIP_ASG_NilCacheNoClients(t *testing.T) {
 	source := resource.Resource{
 		ID: "eipalloc-008",

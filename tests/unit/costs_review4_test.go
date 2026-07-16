@@ -120,12 +120,13 @@ func TestCostsReview4_P4_TUI_ByIDFetchNotFound_PopsStrandedPlaceholder(t *testin
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter)) // -> USAGE_TYPE child
 
 	// A freshly-pushed drill child's Cursor is left at its zero value
-	// (Row:0, Col:0) — applyCostsSelect's PushDrill case never sets it —
-	// unlike the root/TrailingAnchored frames' own FR-002 "open at today"
-	// placement. The selected CELL is therefore window[0], not the period
-	// containing "now".
+	// (Row:0, Col:0) — applyCostsSelect's PushDrill case never sets it — so
+	// the selected cell is the OLDEST week. Late in the month that week is
+	// outside the 14-day resource-drill clamp, so the RESOURCE_ID drill would
+	// be refused: plant the record on the newest week and scroll the cursor
+	// there before drilling.
 	usageWindow := costs.WindowWithin(period, costs.GranularityWeek, now)
-	usagePeriod := usageWindow[0]
+	usagePeriod := usageWindow[len(usageWindow)-1]
 	usageQuery := costs.Query{
 		Granularity: costs.GranularityWeek.APIGranularity(),
 		GroupBy:     []costs.Dimension{costs.DimensionUsageType},
@@ -136,6 +137,7 @@ func TestCostsReview4_P4_TUI_ByIDFetchNotFound_PopsStrandedPlaceholder(t *testin
 		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{reviewFullMetricRecord(usagePeriod, "USE1-BoxUsage:m5.large", 450.0)}},
 		Requests: 1,
 	})
+	m = m2MoveTUICursorToNewestColumn(m)                 // scroll to the newest week the record was planted at
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter)) // -> RESOURCE_ID child
 
 	// The NEWEST day in the window, not window[0] — costs.ClampResourceDrillWindow
