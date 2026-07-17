@@ -52,6 +52,22 @@ type ProbeStatusRecord struct {
 	Duration time.Duration
 	Err      string
 	At       time.Time
+
+	// AvailOutcome/AvailDuration/AvailErr are the Wave-1 availability probe's
+	// OWN outcome/duration/error classification for this type, distinct from
+	// Outcome/Duration/Err above (which fold in a Wave-2 enrichment rerun,
+	// see runtime.handleEnrichmentChecked). Set equal to the aggregate
+	// fields by handleAvailabilityChecked (a fresh availability probe IS the
+	// new baseline); left untouched by handleEnrichmentChecked, which reads
+	// them to recompute Outcome/Duration/Err from the baseline instead of
+	// from whatever aggregate a PRIOR enrichment rerun already folded in —
+	// without this, re-running enrichment (list-open / Ctrl+R ProbeEnrich
+	// without a fresh availability probe) would re-accumulate Duration and
+	// keep a stale partial/Err from an earlier failed enrichment (#462/#463
+	// external review, defect 1).
+	AvailOutcome  string
+	AvailDuration time.Duration
+	AvailErr      string
 }
 
 // Session owns the in-memory orchestration state for the active
@@ -558,9 +574,12 @@ func (s *Session) AllProbeStatus() map[string]ProbeStatusRecord {
 }
 
 // SetNewFindingPairs replaces shortName's new-finding-pair counts wholesale
-// with counts (#463) — the per-save chokepoint (saveResourceListCache) always
-// overwrites, never accumulates, so a type's entry always reflects only its
-// most recent save.
+// with counts (#463) — used by a non-authoritative save (each one is a fresh
+// one-step scan baseline, so REPLACE is correct there). A wave2Authoritative
+// save must use MergeNewFindingPairs instead (#463 defect 2): it diffs
+// against the just-written Wave-1 generation, so a wholesale replace here
+// would wipe the Wave-1 new-pair counts that same sweep's earlier save just
+// recorded.
 func (s *Session) SetNewFindingPairs(shortName string, counts map[domain.FindingCode]int) {
 	s.newFindingPairsMu.Lock()
 	defer s.newFindingPairsMu.Unlock()
@@ -568,6 +587,34 @@ func (s *Session) SetNewFindingPairs(shortName string, counts map[domain.Finding
 		s.NewFindingPairs = make(map[string]map[domain.FindingCode]int)
 	}
 	s.NewFindingPairs[shortName] = counts
+}
+
+// MergeNewFindingPairs adds counts onto shortName's existing new-finding-pair
+// entry, summing per code, rather than replacing it (#463 defect 2) — the
+// Wave-2-completion save's counterpart to SetNewFindingPairs, used so its
+// own (Wave-2-sourced) new pairs accumulate onto whatever the sweep's
+// earlier Wave-1 save already recorded this cycle instead of wiping it.
+// No-op when counts is empty, so a clean rerun with nothing new never
+// touches the map. Cannot double-count a pair across the two saves in one
+// cycle: stampFindingFirstSeen only reports a pair as new relative to the
+// on-disk generation it diffed against, and the second save's diff already
+// sees the first save's just-written generation.
+func (s *Session) MergeNewFindingPairs(shortName string, counts map[domain.FindingCode]int) {
+	if len(counts) == 0 {
+		return
+	}
+	s.newFindingPairsMu.Lock()
+	defer s.newFindingPairsMu.Unlock()
+	if s.NewFindingPairs == nil {
+		s.NewFindingPairs = make(map[string]map[domain.FindingCode]int)
+	}
+	existing := s.NewFindingPairs[shortName]
+	merged := make(map[domain.FindingCode]int, len(existing)+len(counts))
+	maps.Copy(merged, existing)
+	for code, n := range counts {
+		merged[code] += n
+	}
+	s.NewFindingPairs[shortName] = merged
 }
 
 // GetNewFindingPairs returns shortName's most recently recorded new-finding-
