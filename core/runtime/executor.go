@@ -28,6 +28,8 @@ import (
 	"slices"
 	"sync"
 
+	"time"
+
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
 	"github.com/k2m30/a9s/v3/core/costs"
@@ -95,6 +97,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 	case TaskKindProbeAvailability:
 		shortName := req.Key.Scope
 		gen := snap.AvailabilityGen
+		start := time.Now()
 		r := c.ProbeResourceAvailability(ctx, snap.Clients, shortName)
 		return messages.AvailabilityChecked{
 			ResourceType: shortName,
@@ -105,6 +108,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Resources:    r.Resources,
 			Err:          r.Err,
 			Gen:          gen,
+			Duration:     time.Since(start),
 		}, nil
 
 	// --- enrichment probe (Wave 2) ---
@@ -118,6 +122,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		gen := snap.EnrichmentGen
 		typeGen := snap.EnrichmentTypeGen[shortName]
+		start := time.Now()
 		r := c.ProbeEnrichment(ctx, snap.Clients, shortName)
 		return messages.EnrichmentChecked{
 			ResourceType:     shortName,
@@ -130,6 +135,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Gen:              gen,
 			TypeGen:          typeGen,
 			Err:              r.Err,
+			Duration:         time.Since(start),
 		}, nil
 
 	// --- save availability cache ---

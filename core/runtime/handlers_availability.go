@@ -288,6 +288,11 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UIIntent, []TaskRequest) {
 	c.session.AvailChecked++
 
+	// #462: record this probe's scan status regardless of outcome — a
+	// hard-failed probe still needs to be visible via Core.ScanStatus.
+	outcome, errClass := availabilityOutcome(c, msg.ResourceType, len(msg.Resources) > 0, msg.Truncated, msg.Err)
+	c.setProbeStatus(msg.ResourceType, outcome, msg.Duration, errClass, time.Now())
+
 	var intents []UIIntent
 	var tasks []TaskRequest
 
@@ -469,6 +474,24 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	if msg.TypeGen != 0 && msg.TypeGen != c.session.EnrichmentTypeGen[msg.ResourceType] {
 		return nil, nil
 	}
+
+	// #462: fold this Wave-2 result onto the type's existing scan-status
+	// record. Duration accumulates (availability + enrichment probe wall
+	// time, summed — see ProbeStatus.Duration's doc comment); Err is
+	// re-classified only when this probe itself errored, otherwise the
+	// prior (availability) classification is kept.
+	prevStatus, _ := c.session.GetProbeStatus(msg.ResourceType)
+	enrichErrClass := classifyProbeErr(msg.Err)
+	if enrichErrClass == "" {
+		enrichErrClass = prevStatus.Err
+	}
+	c.setProbeStatus(
+		msg.ResourceType,
+		degradeForEnrichment(ProbeOutcome(prevStatus.Outcome), msg.Err, msg.Truncated),
+		prevStatus.Duration+msg.Duration,
+		enrichErrClass,
+		time.Now(),
+	)
 
 	c.session.EnrichChecked++
 

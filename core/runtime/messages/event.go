@@ -3,6 +3,8 @@
 package messages
 
 import (
+	"time"
+
 	"github.com/k2m30/a9s/v3/core/costs"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -242,6 +244,9 @@ type AvailabilityChecked struct {
 	Gen          domain.Gen          // generation counter -- ignore if != current availabilityGen
 	Issues       int                 // count of IsIssueRowColor() resources (red/yellow only)
 	Resources    []resource.Resource // Populated on success AND on partial-success (Err non-nil but partial results present)
+	// Duration is the wall time ExecuteTaskAt spent inside
+	// ProbeResourceAvailability for this probe (runtime.ProbeStatus.Duration, #462).
+	Duration time.Duration
 }
 
 func (AvailabilityChecked) isEvent()               {}
@@ -288,6 +293,10 @@ type EnrichmentChecked struct {
 	Gen          domain.Gen // session-wide generation counter (stale probe protection; profile/region switch)
 	TypeGen      domain.Gen // per-type generation counter; bumped on every rerun for that type. Stale
 	// results whose TypeGen doesn't match the current per-type gen are discarded.
+	// Duration is the wall time ExecuteTaskAt spent inside ProbeEnrichment for
+	// this probe (runtime.ProbeStatus.Duration, #462) — summed onto the
+	// type's availability-probe duration, not tracked separately.
+	Duration time.Duration
 }
 
 func (EnrichmentChecked) isEvent()               {}

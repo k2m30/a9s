@@ -32,13 +32,27 @@
 package session
 
 import (
+	"maps"
 	"sync"
+	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
+
+// ProbeStatusRecord is the session-scoped record of one resource type's
+// most recent scan outcome (#462 — per-probe status + duration). Plain
+// fields only: session must not import core/runtime (runtime already
+// imports session, the reverse would cycle), so runtime.Core.ScanStatus
+// converts these into the runtime-owned ProbeStatus/ProbeOutcome types.
+type ProbeStatusRecord struct {
+	Outcome  string
+	Duration time.Duration
+	Err      string
+	At       time.Time
+}
 
 // Session owns the in-memory orchestration state for the active
 // profile/region session.
@@ -280,6 +294,17 @@ type Session struct {
 	// *ServiceClients.RuleSets on every ClientsReadyMsg so checkSESLambda /
 	// checkSESS3 see a session-scoped cache rather than a process-global map.
 	RuleSets *ruleSetStore
+
+	// ProbeStatus is the per-type most-recent-scan-outcome record (#462),
+	// keyed by resource short name. Guarded by probeStatusMu — unlike
+	// AvailChecked/EnrichChecked and the rest of the Wave-1/Wave-2
+	// bookkeeping above, which is single-goroutine (written only from the
+	// handler loop), a host (desktop/web) may call Core.ScanStatus() to
+	// read this map from a different goroutine. Access only through
+	// SetProbeStatus/GetProbeStatus/AllProbeStatus — never read/write this
+	// field directly outside probeStatusMu.
+	ProbeStatus   map[string]ProbeStatusRecord
+	probeStatusMu sync.Mutex
 }
 
 // New constructs a fresh Session with all maps initialized and generation
@@ -493,6 +518,34 @@ func (s *Session) CurrentGenFor(a messages.Aspect) domain.Gen {
 	return 0
 }
 
+// SetProbeStatus records shortName's most recent scan-status outcome.
+func (s *Session) SetProbeStatus(shortName string, rec ProbeStatusRecord) {
+	s.probeStatusMu.Lock()
+	defer s.probeStatusMu.Unlock()
+	if s.ProbeStatus == nil {
+		s.ProbeStatus = make(map[string]ProbeStatusRecord)
+	}
+	s.ProbeStatus[shortName] = rec
+}
+
+// GetProbeStatus returns shortName's most recent scan-status record, if any.
+func (s *Session) GetProbeStatus(shortName string) (ProbeStatusRecord, bool) {
+	s.probeStatusMu.Lock()
+	defer s.probeStatusMu.Unlock()
+	rec, ok := s.ProbeStatus[shortName]
+	return rec, ok
+}
+
+// AllProbeStatus returns a defensive copy of every recorded scan-status
+// entry, safe for the caller to range over without holding probeStatusMu.
+func (s *Session) AllProbeStatus() map[string]ProbeStatusRecord {
+	s.probeStatusMu.Lock()
+	defer s.probeStatusMu.Unlock()
+	out := make(map[string]ProbeStatusRecord, len(s.ProbeStatus))
+	maps.Copy(out, s.ProbeStatus)
+	return out
+}
+
 // Rotate rotates the session when the user switches profile or region. Every
 // generation counter is bumped so that in-flight async messages tagged with
 // the pre-switch gens are rejected by the handlers' gen guards; all cached
@@ -547,6 +600,13 @@ func (s *Session) Rotate() {
 	s.EnrichmentRan = make(map[string]bool)
 	s.EnrichmentTypeGen = make(map[string]domain.Gen)
 	s.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
+
+	// ProbeStatus: a prior profile/region's scan-status records must not
+	// leak into the next pair's scan (#462) — same rationale as the
+	// EnrichmentRan/EnrichmentTypeGen resets just above.
+	s.probeStatusMu.Lock()
+	s.ProbeStatus = nil
+	s.probeStatusMu.Unlock()
 
 	// Feature caches: swap the PolicyDocumentCache for a fresh instance so
 	// documents fetched in the previous account cannot leak into the next.
