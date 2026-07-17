@@ -86,15 +86,23 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// no TUI shim, so Handle must do the same renderer-shape computation here
 	// — mirroring BootstrapLive — or a connect result fed through DrainSync
 	// (drainsync.go) never reaches HandleClientsReady at all, and C10's
-	// pre-connect-navigation replay never fires on this lane.
-	if msg, ok := ev.(messages.ClientsReady); ok && msg.Err == nil {
+	// pre-connect-navigation replay never fires on this lane. Routed
+	// unconditionally (success AND failure) — Core.HandleClientsReady's own
+	// Gen guard drops stale results, and Err != nil routes internally to
+	// handleClientsReadyFailure (rollback + error flash + FlashTick task), so
+	// a failed connect on this lane surfaces the same way it does in the TUI
+	// (internal/tui/app_session.go's handleClientsReady also passes Err
+	// unconditionally) instead of being silently dropped.
+	if msg, ok := ev.(messages.ClientsReady); ok {
 		crIntents, crTasks := c.core.HandleClientsReady(runtime.ClientsReadyEvent{
 			Clients:        msg.Clients,
+			Err:            msg.Err,
 			Region:         msg.Region,
 			Gen:            msg.Gen,
 			StackDepth:     len(c.stack),
 			HasActiveRL:    c.topListState() != nil,
 			HasActiveCosts: c.costsStateBeneathOverlay() != nil,
+			NewGen:         c.core.ConnectGen(),
 		})
 		c.applyIntents(crIntents)
 		tasks = append(tasks, crTasks...)

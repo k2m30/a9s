@@ -9,9 +9,13 @@
 //	messages.RelatedCheckResult — Handle returns Snapshot() unchanged, nil tasks.
 //	messages.EnrichDetailResult — Handle returns Snapshot() unchanged, nil tasks.
 //	messages.ValueRevealed      — Handle returns Snapshot() unchanged, nil tasks.
-//	messages.ClientsReady       — Handle returns Snapshot() unchanged, nil tasks.
 //	messages.ClearFlash         — Handle returns Snapshot() unchanged, nil tasks.
 //	messages.APIError           — Handle returns Snapshot() unchanged, nil tasks.
+//
+// messages.ClientsReady is the one exception (issue #464): both success and
+// failure route through Core.HandleClientsReady (renderer-shape fields
+// computed the same way BootstrapLive computes them). See
+// app_headless_parity_test.go for the failure-path routing contract.
 //
 // COMMAND LANE (Apply) — 6 actions wired for real in PR-B:
 //
@@ -325,13 +329,14 @@ func TestController_Handle_PRB_ClientsReady_Success_DispatchesToCore(t *testing.
 	}
 }
 
-// TestController_Handle_PRB_ClientsReady_Error_IsNoOpPassThrough verifies that
-// Handle fed a messages.ClientsReady with Err set returns Snapshot() unchanged
-// with no tasks and does not panic.
-//
-// Deferred to post-PR-C: ClientsReady dispatch is blocked on relocating
-// TUI-shim pre-processing (see plan PR-B note).
-func TestController_Handle_PRB_ClientsReady_Error_IsNoOpPassThrough(t *testing.T) {
+// TestController_Handle_ClientsReady_Error_RoutesFailurePath verifies that
+// Handle fed a messages.ClientsReady with Err set routes through
+// Core.HandleClientsReady's failure path (issue #464): an error flash is
+// applied to the snapshot and the returned tasks include the FlashTick that
+// clears it. Gen:0 matches newTestController's fresh session (ConnectGen
+// defaults to the zero value, never rotated), so the event is not dropped
+// as stale.
+func TestController_Handle_ClientsReady_Error_RoutesFailurePath(t *testing.T) {
 	c := newTestController(t)
 
 	ev := messages.ClientsReady{
@@ -340,8 +345,6 @@ func TestController_Handle_PRB_ClientsReady_Error_IsNoOpPassThrough(t *testing.T
 		Region:  "",
 		Gen:     0,
 	}
-
-	snapBefore := c.Snapshot()
 
 	var vs app.ViewState
 	var tasks []runtime.TaskRequest
@@ -356,11 +359,18 @@ func TestController_Handle_PRB_ClientsReady_Error_IsNoOpPassThrough(t *testing.T
 
 	snap := c.Snapshot()
 	assertViewStateEqualsSnapshot(t, "Handle(ClientsReady error)", vs, snap)
-	if vs.Body.Kind != snapBefore.Body.Kind {
-		t.Errorf("Handle(ClientsReady error) changed Body.Kind: before=%q after=%q — expected no-op", snapBefore.Body.Kind, vs.Body.Kind)
+	if !snap.Header.Flash.IsError {
+		t.Errorf("Handle(ClientsReady error): Snapshot().Header.Flash.IsError = false, want true — failed connect must surface an error flash")
 	}
-	if len(tasks) != 0 {
-		t.Errorf("Handle(ClientsReady error) returned %d tasks, want 0 (no-op until PR-C)", len(tasks))
+	hasFlashTick := false
+	for _, task := range tasks {
+		if task.Key.Kind == runtime.TaskKindFlashTick {
+			hasFlashTick = true
+			break
+		}
+	}
+	if !hasFlashTick {
+		t.Errorf("Handle(ClientsReady error) tasks = %v, missing TaskKindFlashTick to clear the error flash", taskKindStrings(tasks))
 	}
 }
 
