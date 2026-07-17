@@ -1087,10 +1087,10 @@ func TestTypeFile_FirstFieldIsFormatVersion(t *testing.T) {
 
 // TestCacheSchemaVersion_Exported pins that cache.SchemaVersion (the
 // current format marker value new saves must stamp) is exported and equals
-// 1 for this initial round-2 rollout, per the architect's handoff.
+// 2 (issue #463: per-finding FirstSeen bumped the on-disk schema).
 func TestCacheSchemaVersion_Exported(t *testing.T) {
-	if cache.SchemaVersion != 1 {
-		t.Errorf("cache.SchemaVersion = %d, want 1", cache.SchemaVersion)
+	if cache.SchemaVersion != 2 {
+		t.Errorf("cache.SchemaVersion = %d, want 2", cache.SchemaVersion)
 	}
 }
 

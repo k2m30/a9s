@@ -563,6 +563,13 @@ func (c *Core) saveResourceListCache(shortName string, rows []cache.Row, count i
 			ShortName:          canon,
 			Wave2Authoritative: wave2Authoritative,
 		})
+		// #463: FirstSeen diff runs unconditionally, after reconcileTypeFile
+		// (including any Wave-2 carry it performed), against the pre-save
+		// on-disk generation (existing.Rows) — the single chokepoint both
+		// SaveResourceListCache and saveResourceListCacheWave2Complete share.
+		var newPairs map[domain.FindingCode]int
+		tf.Rows, newPairs = stampFindingFirstSeen(existing.Rows, tf.Rows, time.Now())
+		c.session.SetNewFindingPairs(canon, newPairs)
 		if issuesKnown {
 			tf.Issues = issues
 			tf.IssuesKnown = true

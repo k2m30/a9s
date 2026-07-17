@@ -305,6 +305,17 @@ type Session struct {
 	// field directly outside probeStatusMu.
 	ProbeStatus   map[string]ProbeStatusRecord
 	probeStatusMu sync.Mutex
+
+	// NewFindingPairs is the per-type count of (row, finding-code) pairs
+	// newly observed on the most recent on-disk cache save for that type
+	// (#463 — new-since-previous-scan deltas for FindingsOverview), keyed by
+	// resource short name then domain.FindingCode. Replaced wholesale per
+	// type on each save (core/runtime.saveResourceListCache), never
+	// accumulated across saves — same access discipline as ProbeStatus:
+	// guarded by newFindingPairsMu, access only through
+	// SetNewFindingPairs/GetNewFindingPairs/AllNewFindingPairs.
+	NewFindingPairs   map[string]map[domain.FindingCode]int
+	newFindingPairsMu sync.Mutex
 }
 
 // New constructs a fresh Session with all maps initialized and generation
@@ -546,6 +557,41 @@ func (s *Session) AllProbeStatus() map[string]ProbeStatusRecord {
 	return out
 }
 
+// SetNewFindingPairs replaces shortName's new-finding-pair counts wholesale
+// with counts (#463) — the per-save chokepoint (saveResourceListCache) always
+// overwrites, never accumulates, so a type's entry always reflects only its
+// most recent save.
+func (s *Session) SetNewFindingPairs(shortName string, counts map[domain.FindingCode]int) {
+	s.newFindingPairsMu.Lock()
+	defer s.newFindingPairsMu.Unlock()
+	if s.NewFindingPairs == nil {
+		s.NewFindingPairs = make(map[string]map[domain.FindingCode]int)
+	}
+	s.NewFindingPairs[shortName] = counts
+}
+
+// GetNewFindingPairs returns shortName's most recently recorded new-finding-
+// pair counts, if any.
+func (s *Session) GetNewFindingPairs(shortName string) (map[domain.FindingCode]int, bool) {
+	s.newFindingPairsMu.Lock()
+	defer s.newFindingPairsMu.Unlock()
+	rec, ok := s.NewFindingPairs[shortName]
+	return rec, ok
+}
+
+// AllNewFindingPairs returns a defensive deep copy of every recorded
+// new-finding-pair entry, safe for the caller to range over (and mutate)
+// without holding newFindingPairsMu or aliasing the stored per-type maps.
+func (s *Session) AllNewFindingPairs() map[string]map[domain.FindingCode]int {
+	s.newFindingPairsMu.Lock()
+	defer s.newFindingPairsMu.Unlock()
+	out := make(map[string]map[domain.FindingCode]int, len(s.NewFindingPairs))
+	for shortName, counts := range s.NewFindingPairs {
+		out[shortName] = maps.Clone(counts)
+	}
+	return out
+}
+
 // Rotate rotates the session when the user switches profile or region. Every
 // generation counter is bumped so that in-flight async messages tagged with
 // the pre-switch gens are rejected by the handlers' gen guards; all cached
@@ -607,6 +653,12 @@ func (s *Session) Rotate() {
 	s.probeStatusMu.Lock()
 	s.ProbeStatus = nil
 	s.probeStatusMu.Unlock()
+
+	// NewFindingPairs: same rationale — a prior profile/region's new-finding
+	// deltas must not leak into the next pair's scan (#463).
+	s.newFindingPairsMu.Lock()
+	s.NewFindingPairs = nil
+	s.newFindingPairsMu.Unlock()
 
 	// Feature caches: swap the PolicyDocumentCache for a fresh instance so
 	// documents fetched in the previous account cannot leak into the next.

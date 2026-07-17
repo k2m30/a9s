@@ -31,7 +31,11 @@ import (
 // Version field is stamped with this value on save (C7a: encode/decode is a
 // single chokepoint inside this package; a version bump only changes this
 // constant plus the encode/decode logic, never callers).
-const SchemaVersion = 1
+//
+// v2 (#463) adds Row.FindingFirstSeen. LoadDirIn also accepts a v1 file,
+// backfilling FindingFirstSeen from the file's own SavedAt so a pre-#463
+// cache never regresses to "no cache" on the next load.
+const SchemaVersion = 2
 
 // Row is a render-sufficient snapshot of one list row, persisted alongside
 // the type's TypeFile so a cold start can seed the list screen with real
@@ -47,13 +51,23 @@ type Row struct {
 	Name     string            `yaml:"name,omitempty"`
 	Fields   map[string]string `yaml:"fields,omitempty"`
 	Findings []domain.Finding  `yaml:"findings,omitempty"`
+
+	// FindingFirstSeen is the first observation time of each finding code
+	// currently on this row, keyed by domain.FindingCode. Carried forward
+	// across saves (core/runtime.stampFindingFirstSeen) while the finding
+	// persists; a code absent here that reappears later is treated as newly
+	// observed, not re-dated to its original first sighting (#463).
+	FindingFirstSeen map[domain.FindingCode]time.Time `yaml:"finding_first_seen,omitempty"`
 }
 
-// deepCopyRows returns a copy of rows in which every element's Fields map
-// and Findings slice are freshly allocated, never sharing backing storage
-// with rows itself. domain.Finding has no reference-typed fields (see its
-// doc comment), so a fresh slice with copied elements is sufficient for
-// Findings; Fields (a map) needs an explicit per-row maps.Clone.
+// deepCopyRows returns a copy of rows in which every element's Fields and
+// FindingFirstSeen maps and Findings slice are freshly allocated, never
+// sharing backing storage with rows itself. domain.Finding has no
+// reference-typed fields (see its doc comment), so a fresh slice with copied
+// elements is sufficient for Findings; Fields and FindingFirstSeen (maps)
+// each need an explicit per-row maps.Clone — any reference-typed field added
+// to Row in the future needs the same treatment here, or SaveType's
+// marshal-vs-mutation race (below) reopens for that field.
 //
 // Required because Row.Fields commonly ALIASES a live resource.Resource's
 // own Fields map (runtime.SaveTypeRows only copies when
@@ -73,6 +87,9 @@ func deepCopyRows(rows []Row) []Row {
 		}
 		if r.Findings != nil {
 			r.Findings = append([]domain.Finding(nil), r.Findings...)
+		}
+		if r.FindingFirstSeen != nil {
+			r.FindingFirstSeen = maps.Clone(r.FindingFirstSeen)
 		}
 		out[i] = r
 	}
@@ -239,8 +256,27 @@ func LoadDirIn(root, profile, region string) *Store {
 			log.Printf("cache: skipping %s: %v", path, err)
 			continue
 		}
-		if tf.Version != SchemaVersion {
-			log.Printf("cache: skipping %s: unsupported schema version %d (want %d)", path, tf.Version, SchemaVersion)
+		switch tf.Version {
+		case SchemaVersion:
+			// current format, nothing to backfill.
+		case SchemaVersion - 1:
+			// v1 file: FindingFirstSeen never existed, so every finding
+			// currently on the row is stamped with the file's own SavedAt —
+			// the closest available approximation of when it was first
+			// observed — rather than losing the row (#463: a pre-existing
+			// cache must not regress to "no cache" on the next load).
+			for i, r := range tf.Rows {
+				if len(r.Findings) == 0 {
+					continue
+				}
+				stamped := make(map[domain.FindingCode]time.Time, len(r.Findings))
+				for _, f := range r.Findings {
+					stamped[f.Code] = tf.SavedAt
+				}
+				tf.Rows[i].FindingFirstSeen = stamped
+			}
+		default:
+			log.Printf("cache: skipping %s: unsupported schema version %d (want %d or %d)", path, tf.Version, SchemaVersion, SchemaVersion-1)
 			continue
 		}
 		s.types[shortName] = tf

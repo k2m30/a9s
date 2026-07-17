@@ -381,9 +381,9 @@ func TestCache_LoadDir_AllResourceTypes(t *testing.T) {
 // SchemaVersion constant
 // ---------------------------------------------------------------------------
 
-func TestCache_SchemaVersion_IsOne(t *testing.T) {
-	if cache.SchemaVersion != 1 {
-		t.Errorf("SchemaVersion = %d, want 1", cache.SchemaVersion)
+func TestCache_SchemaVersion_IsTwo(t *testing.T) {
+	if cache.SchemaVersion != 2 {
+		t.Errorf("SchemaVersion = %d, want 2 (issue #463: per-finding FirstSeen bumped the on-disk schema)", cache.SchemaVersion)
 	}
 }
 

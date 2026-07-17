@@ -4,6 +4,7 @@ package app
 
 import (
 	"sort"
+	"time"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -20,6 +21,20 @@ type FindingsGroup struct {
 	Types     []string
 	SampleIDs []string
 	Truncated bool
+
+	// OldestFirstSeen is the earliest FirstSeen recorded (#463) across every
+	// (type, row, code) pair contributing to this group, read from the
+	// on-disk availability cache (Core.FindingFirstSeenForType). Zero when
+	// unknown — no contributing pair has a cache entry yet (cold start,
+	// NoCache/demo, or a pair whose cache predates #463 and hasn't been
+	// re-saved since).
+	OldestFirstSeen time.Time
+	// NewSincePrev is the sum, across this group's contributing types, of
+	// that type's most recent on-disk-save new-finding-pair count for this
+	// Code (Core.NewFindingPairsSincePrev) — the (row, code) pairs that
+	// appeared for the first time on the type's last cache save. Zero when
+	// no contributing type has saved this session, or caching is disabled.
+	NewSincePrev int
 }
 
 // FindingsTotals summarizes FindingsOverview's session-wide counters
@@ -43,13 +58,14 @@ type FindingsTotals struct {
 // Wave-1 row's folded Finding (Source "wave2:<short>"), once via the raw
 // enrichmentStore entry that produced it — contributes to Count exactly once.
 type findingsGroupAccum struct {
-	types         map[string]bool
-	seen          map[string]bool
-	sampleLabels  []string
-	count         int
-	worstSeverity domain.Severity
-	worstPhrase   string
-	truncated     bool
+	types           map[string]bool
+	seen            map[string]bool
+	sampleLabels    []string
+	count           int
+	worstSeverity   domain.Severity
+	worstPhrase     string
+	truncated       bool
+	oldestFirstSeen time.Time
 }
 
 // FindingsOverview aggregates every qualifying Finding (Severity >=
@@ -84,6 +100,26 @@ func (c *Controller) findingsOverview() ([]FindingsGroup, FindingsTotals) {
 
 	var totals FindingsTotals
 
+	// firstSeenByType lazily loads Core.FindingFirstSeenForType(rt) at most
+	// once per canonical type this pass touches (#463) — contribute() is
+	// called once per (type, resource, finding), so caching here is what
+	// keeps this the single aggregation pass rather than adding a second
+	// per-row walk.
+	firstSeenByType := make(map[string]map[string]map[domain.FindingCode]time.Time)
+	firstSeenFor := func(rt, id string, code domain.FindingCode) (time.Time, bool) {
+		byRow, ok := firstSeenByType[rt]
+		if !ok {
+			byRow = c.core.FindingFirstSeenForType(rt)
+			firstSeenByType[rt] = byRow
+		}
+		codes, ok := byRow[id]
+		if !ok {
+			return time.Time{}, false
+		}
+		t, ok := codes[code]
+		return t, ok
+	}
+
 	contribute := func(rt, id, label string, f domain.Finding, typeTruncated bool) {
 		if f.Severity < domain.SevWarn {
 			return
@@ -112,6 +148,11 @@ func (c *Controller) findingsOverview() ([]FindingsGroup, FindingsTotals) {
 		acc.types[rt] = true
 		if typeTruncated {
 			acc.truncated = true
+		}
+		if t, ok := firstSeenFor(rt, id, f.Code); ok {
+			if acc.oldestFirstSeen.IsZero() || t.Before(acc.oldestFirstSeen) {
+				acc.oldestFirstSeen = t
+			}
 		}
 		if f.Severity > acc.worstSeverity {
 			acc.worstSeverity = f.Severity
@@ -205,6 +246,12 @@ func (c *Controller) findingsOverview() ([]FindingsGroup, FindingsTotals) {
 		}
 	}
 
+	// newPairsByType is fetched once (not per group) — NewSincePrev only ever
+	// sums pre-recorded per-type-per-code counts, never re-walks rows, so a
+	// single fetch here keeps this the aggregation pass's single lookup
+	// rather than one per group.
+	newPairsByType := c.core.NewFindingPairsSincePrev()
+
 	result := make([]FindingsGroup, 0, len(groups))
 	for code, acc := range groups {
 		types := make([]string, 0, len(acc.types))
@@ -212,6 +259,11 @@ func (c *Controller) findingsOverview() ([]FindingsGroup, FindingsTotals) {
 			types = append(types, t)
 		}
 		sort.Strings(types)
+
+		newSincePrev := 0
+		for _, t := range types {
+			newSincePrev += newPairsByType[t][code]
+		}
 
 		phrase := acc.worstPhrase
 		for _, t := range types {
@@ -243,13 +295,15 @@ func (c *Controller) findingsOverview() ([]FindingsGroup, FindingsTotals) {
 		}
 
 		result = append(result, FindingsGroup{
-			Code:      code,
-			Phrase:    phrase,
-			Severity:  acc.worstSeverity,
-			Count:     acc.count,
-			Types:     types,
-			SampleIDs: samples,
-			Truncated: acc.truncated,
+			Code:            code,
+			Phrase:          phrase,
+			Severity:        acc.worstSeverity,
+			Count:           acc.count,
+			Types:           types,
+			SampleIDs:       samples,
+			Truncated:       acc.truncated,
+			OldestFirstSeen: acc.oldestFirstSeen,
+			NewSincePrev:    newSincePrev,
 		})
 	}
 	totals.OpenGroups = len(result)

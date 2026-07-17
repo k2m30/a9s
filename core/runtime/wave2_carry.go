@@ -13,6 +13,7 @@ package runtime
 import (
 	"maps"
 	"slices"
+	"time"
 
 	"github.com/k2m30/a9s/v3/core/cache"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -183,6 +184,55 @@ func wave2FindingsOf(findings []domain.Finding) []domain.Finding {
 		}
 	}
 	return out
+}
+
+// stampFindingFirstSeen returns newRows with FindingFirstSeen populated for
+// every finding code each row currently carries, plus a count of the
+// (row, code) pairs newly appearing since oldRows — per FindingCode, summed
+// across every row (#463). A code already present on the matching oldRows
+// entry (by row ID) carries its FirstSeen forward unchanged; a code with no
+// match in oldRows — because the row is new, or the code is new on an
+// existing row, or the code previously resolved and has now reappeared — is
+// stamped now and counted as new. A code no longer present in newRows simply
+// has no entry (resolved findings drop out). A row with no findings gets a
+// nil FindingFirstSeen map, not an empty one.
+//
+// Runs at the disk reconcile chokepoint (saveResourceListCache), on
+// reconcileTypeFile's result — i.e. AFTER any Wave-2 carry it performed —
+// so a Wave-2-carried finding keeps the FirstSeen stamp its earlier
+// observation already earned, rather than being treated as newly observed
+// just because this particular save's raw fetch didn't itself re-report it.
+func stampFindingFirstSeen(oldRows, newRows []cache.Row, now time.Time) ([]cache.Row, map[domain.FindingCode]int) {
+	oldByID := make(map[string]cache.Row, len(oldRows))
+	for _, r := range oldRows {
+		oldByID[r.ID] = r
+	}
+
+	newPairs := make(map[domain.FindingCode]int)
+	out := make([]cache.Row, len(newRows))
+	for i, row := range newRows {
+		if len(row.Findings) == 0 {
+			row.FindingFirstSeen = nil
+			out[i] = row
+			continue
+		}
+		old := oldByID[row.ID]
+		stamped := make(map[domain.FindingCode]time.Time, len(row.Findings))
+		for _, f := range row.Findings {
+			if _, already := stamped[f.Code]; already {
+				continue
+			}
+			if t, ok := old.FindingFirstSeen[f.Code]; ok {
+				stamped[f.Code] = t
+				continue
+			}
+			stamped[f.Code] = now
+			newPairs[f.Code]++
+		}
+		row.FindingFirstSeen = stamped
+		out[i] = row
+	}
+	return out, newPairs
 }
 
 // baselineWave2FieldKey is always eligible to carry alongside a carried
