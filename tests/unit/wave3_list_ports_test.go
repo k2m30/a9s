@@ -28,6 +28,7 @@ package unit_test
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -338,10 +339,12 @@ func TestWave3RelatedCheckerCarry_NoChecker_Inert(t *testing.T) {
 }
 
 // ===========================================================================
-// 3. resolveListMarkerCol — S13 parity-bridge precondition. Self-contained
-//    byte-parity check (legacy ResourceListModel.View() vs the live
-//    RenderList(ListBody) seam) across every real catalog type, so this
-//    survives the future deletion of resourcelist_render_parity_test.go.
+// 3. resolveListMarkerCol — S13 marker-glyph placement check. Verifies
+//    RenderList(ListBody) places the enrichment glyph (row.Decorator) at the
+//    exact cell body.MarkerCol/body.ScrollX identify, across every real
+//    catalog type. The legacy ResourceListModel.View() byte-parity oracle
+//    this once ran against is gone (View() is dead code); this now asserts
+//    directly against the already-resolved body fields instead.
 // ===========================================================================
 
 func wave3MarkerColResources(td resource.ResourceTypeDef, n int) []resource.Resource {
@@ -388,37 +391,142 @@ func wave3MarkerColFindings(resources []resource.Resource) map[string][]domain.F
 	return out
 }
 
-func wave3AssertMarkerColParity(t *testing.T, typeName string, m *views.ResourceListModel, body app.ListBody) {
+// wave3ColSep matches the gap between two adjacent rendered column slots:
+// renderListDataRow (resourcelist.go) pads every cell to its fixed column
+// width via text.PadOrTrunc and joins columns with a literal "  " (2-space)
+// separator, so the run of whitespace between two slots is always >= 2 chars.
+var wave3ColSep = regexp.MustCompile(`\s{2,}`)
+
+// wave3ColStarts returns the character offset, within a rendered list line,
+// at which each column's slot begins. It derives these offsets from the
+// HEADER line rather than a data line: text.PadOrTrunc left-aligns (content
+// first, spaces padded on the right) and every column's Title is non-empty,
+// so the header's per-column content always starts exactly at its slot's
+// start with no ambiguity. A DATA row's own cell can be empty (a keyless
+// Path column with no RawStruct renders "" — see resource.ExtractScalar),
+// which collapses that slot's padding into the surrounding 2-space
+// separators when naively split on whitespace runs, shifting the inferred
+// index of every later column. Header and data rows share the exact same
+// resolved column list (post sort-prefix-widen, post status-widen, post
+// fitColumns) and join scheme, so a slot's start offset measured on the
+// header line applies unchanged to every data line rendered alongside it.
+func wave3ColStarts(headerLine string) []int {
+	trimmed := strings.TrimRight(headerLine, " ")
+	pos := 0
+	for pos < len(trimmed) && trimmed[pos] == ' ' {
+		pos++
+	}
+	starts := []int{pos}
+	for _, gap := range wave3ColSep.FindAllStringIndex(trimmed, -1) {
+		starts = append(starts, gap[1])
+	}
+	return starts
+}
+
+// wave3AssertMarkerGlyphPlacement checks that RenderList's output places each
+// row's already-resolved glyph (row.Decorator) at the cell body.MarkerCol
+// names, when that column is on-screen (body.MarkerCol - body.ScrollX >= 0),
+// and that the glyph does NOT leak into the output when the marker column
+// has scrolled off-screen. It reads body.MarkerCol/ScrollX/Decorator
+// verbatim (already computed by resolveListMarkerCol/resolveListDecoratorFull)
+// rather than re-deriving them, so it only pins RenderList's OWN placement
+// logic, not the column/decorator resolution cascade (covered elsewhere).
+// wave3AssertT is the subset of *testing.T that wave3AssertMarkerGlyphPlacement
+// needs, so a meta-test can verify it actually fails on broken input (via
+// wave3FailSpy) without the failure bubbling up through t.Run and marking an
+// otherwise-passing parent test as failed.
+type wave3AssertT interface {
+	Helper()
+	Errorf(format string, args ...any)
+	Fatalf(format string, args ...any)
+}
+
+// wave3FailSpy records whether Errorf/Fatalf was ever called, without
+// touching *testing.T's internals or aborting the calling goroutine.
+type wave3FailSpy struct{ failed bool }
+
+func (s *wave3FailSpy) Helper() {}
+func (s *wave3FailSpy) Errorf(format string, args ...any) { s.failed = true }
+func (s *wave3FailSpy) Fatalf(format string, args ...any) { s.failed = true }
+
+func wave3AssertMarkerGlyphPlacement(t wave3AssertT, typeName string, out string, body app.ListBody) {
 	t.Helper()
-	legacy := m.View()
-	got := m.RenderList(body)
-	if got == legacy {
-		return
+	// Cursor-row reverse-video (and any other non-color SGR attribute) wraps
+	// a cell's rendered text even under tuitest.NoColor (NO_COLOR only
+	// suppresses color, not attributes like reverse-video/bold/underline —
+	// confirmed empirically: the selected row's cells carry \x1b[7m...\x1b[m
+	// regardless). Substring-matching the raw output risks a false negative
+	// (or worse, a false positive on a coincidental byte sequence) if any
+	// styling ever wraps the glyph and its cell text separately instead of
+	// as one contiguous span; stripping ANSI first makes the check depend
+	// only on the actual rendered characters.
+	out = stripAnsi(out)
+	onScreen := body.MarkerCol-body.ScrollX >= 0
+
+	// Per-row, per-COLUMN check instead of a whole-output occurrence count:
+	// a plain strings.Count(out, decorator+" "+cellText) still passes if the
+	// decorator renders beside the right text in the WRONG column (e.g. a
+	// wrong markerColIdx translation that happens to land on a column
+	// holding an identical value). Column slot offsets are measured once
+	// from the header line (wave3ColStarts) — not re-derived per data row —
+	// so an empty cell in an earlier column of THIS row can never shift the
+	// slot boundary used to check the marker column.
+	lines := strings.Split(out, "\n")
+	var colStarts []int
+	if onScreen && len(lines) > 0 {
+		colStarts = wave3ColStarts(lines[0])
 	}
-	legacyLines := strings.Split(legacy, "\n")
-	gotLines := strings.Split(got, "\n")
-	maxLines := len(legacyLines)
-	if len(gotLines) > maxLines {
-		maxLines = len(gotLines)
+	for i, row := range body.Rows {
+		if row.Decorator == "" {
+			continue
+		}
+		lineIdx := i + 1 // header occupies line 0
+		if lineIdx >= len(lines) {
+			t.Fatalf("[%s]: row %d (id=%s) has a decorator but no corresponding rendered line (MarkerCol=%d, ScrollX=%d):\n%s",
+				typeName, i, row.ResourceID, body.MarkerCol, body.ScrollX, out)
+		}
+		cellText := ""
+		if body.MarkerCol >= 0 && body.MarkerCol < len(row.Cells) {
+			cellText = row.Cells[body.MarkerCol]
+		}
+		want := string(row.Decorator)
+		if cellText != "" {
+			want += " " + cellText
+		}
+
+		if !onScreen {
+			// Check for the decorator glyph ANYWHERE in the rendered line, not
+			// just as part of the full "decorator+cellText" combo in a given
+			// column — a decorator that leaks into a DIFFERENT column (one
+			// that doesn't happen to hold the marker column's own cell text)
+			// would otherwise pass undetected.
+			if strings.Contains(lines[lineIdx], string(row.Decorator)) {
+				t.Errorf("[%s]: row %d (id=%s) decorator glyph %q leaked into its rendered line even though the marker column scrolled off-screen (MarkerCol=%d, ScrollX=%d):\n%s",
+					typeName, i, row.ResourceID, row.Decorator, body.MarkerCol, body.ScrollX, lines[lineIdx])
+			}
+			continue
+		}
+
+		wantIdx := body.MarkerCol - body.ScrollX
+		line := lines[lineIdx]
+		if wantIdx < 0 || wantIdx >= len(colStarts) {
+			t.Errorf("[%s]: row %d (id=%s) marker column index %d out of range (have %d rendered columns; MarkerCol=%d, ScrollX=%d):\n%s",
+				typeName, i, row.ResourceID, wantIdx, len(colStarts), body.MarkerCol, body.ScrollX, line)
+			continue
+		}
+		start := colStarts[wantIdx]
+		got := ""
+		switch {
+		case start+len(want) <= len(line):
+			got = line[start : start+len(want)]
+		case start < len(line):
+			got = line[start:]
+		}
+		if got != want {
+			t.Errorf("[%s]: row %d (id=%s) expected glyph-prefixed cell %q at column index %d (char offset %d; MarkerCol=%d, ScrollX=%d), got %q:\n%s",
+				typeName, i, row.ResourceID, want, wantIdx, start, body.MarkerCol, body.ScrollX, got, line)
+		}
 	}
-	var diff strings.Builder
-	diff.WriteString(fmt.Sprintf(
-		"[%s] S13 MarkerCol parity: RenderList differs from View() (MarkerCol=%d) — View() %d lines, RenderList %d lines\n",
-		typeName, body.MarkerCol, len(legacyLines), len(gotLines),
-	))
-	for i := range maxLines {
-		leg, g := "", ""
-		if i < len(legacyLines) {
-			leg = legacyLines[i]
-		}
-		if i < len(gotLines) {
-			g = gotLines[i]
-		}
-		if leg != g {
-			diff.WriteString(fmt.Sprintf("  line %d:\n    View():     %q\n    RenderList: %q\n", i+1, leg, g))
-		}
-	}
-	t.Errorf("%s", diff.String())
 }
 
 // TestWave3MarkerColParity_EnrichmentFindings_AllResourceTypes ports the
@@ -446,15 +554,13 @@ func TestWave3MarkerColParity_EnrichmentFindings_AllResourceTypes(t *testing.T) 
 
 			m := views.NewResourceList(td, nil, k)
 			m.SetSize(stdW, stdH)
-			m, _ = m.Update(messages.ResourcesLoaded{Resources: resources, ResourceType: td.ShortName})
-			m.SetEnrichmentState(len(findings), false, findings, nil)
 
 			c := wave3ListController(t, td.ShortName)
 			c.ApplyResourcesLoaded(td.ShortName, resources, nil, false)
 			c.ApplyEnrichmentState(td.ShortName, len(findings), false, findings, nil)
 			body := *c.Snapshot().Body.List
 
-			wave3AssertMarkerColParity(t, td.ShortName, &m, body)
+			wave3AssertMarkerGlyphPlacement(t, td.ShortName, m.RenderList(body), body)
 		})
 	}
 }
@@ -488,15 +594,8 @@ func TestWave3MarkerColParity_EnrichmentFindingsWithHScroll_AllResourceTypes(t *
 			resources := wave3MarkerColResources(td, 6)
 			findings := wave3MarkerColFindings(resources)
 
-			m := views.NewResourceListFromCache(
-				td, nil, k,
-				resources, nil,
-				"",
-				views.SortColNone, true,
-				0, 1, false, // hScrollOffset=1
-			)
+			m := views.NewResourceList(td, nil, k)
 			m.SetSize(stdW, stdH)
-			m.SetEnrichmentState(len(findings), false, findings, nil)
 
 			c := wave3ListController(t, td.ShortName)
 			c.ApplyResourcesLoaded(td.ShortName, resources, nil, false)
@@ -504,9 +603,79 @@ func TestWave3MarkerColParity_EnrichmentFindingsWithHScroll_AllResourceTypes(t *
 			c.Apply(app.Action{Kind: app.ActionScrollRight})
 			body := *c.Snapshot().Body.List
 
-			wave3AssertMarkerColParity(t, td.ShortName, &m, body)
+			wave3AssertMarkerGlyphPlacement(t, td.ShortName, m.RenderList(body), body)
 		})
 	}
+}
+
+// TestWave3MarkerColParity_EmptyPrecedingCell_KeylessPathColumn pins
+// wave3AssertMarkerGlyphPlacement's own robustness against a column BEFORE
+// the marker column rendering empty — the "keyless Path column with no
+// RawStruct" case CodeRabbit flagged: naively splitting a data row on
+// whitespace runs collapses an empty cell's padding into its neighboring
+// separators, shifting the inferred index of every later column (including
+// the marker column) and false-failing correct output. Uses a synthetic
+// ResourceTypeDef (not a real catalog entry — RegisterFallbackTypeDef /
+// PushChildListScreen mirrors the unifiedIssueCount helper's ad hoc
+// registration pattern in qa_issue_count_invariant_test.go) with the marker
+// column (Key: "name") at index 1, so an empty index-0 column sits strictly
+// before it.
+func TestWave3MarkerColParity_EmptyPrecedingCell_KeylessPathColumn(t *testing.T) {
+	td := resource.ResourceTypeDef{
+		ShortName: "wave3synthetic",
+		Name:      "Wave3 Synthetic",
+		Columns: []resource.Column{
+			{Key: "empty_col", Title: "Empty", Width: 10},
+			{Key: "name", Title: "Name", Width: 20},
+			{Key: "val", Title: "Val", Width: 10},
+		},
+	}
+	resources := make([]resource.Resource, 4)
+	for i := range resources {
+		resources[i] = resource.Resource{
+			ID:   fmt.Sprintf("synthetic-%03d", i+1),
+			Name: fmt.Sprintf("demo-synthetic-%d", i+1),
+			// Deliberately no "empty_col" entry: mirrors a keyless Path
+			// column with no RawStruct backing it, which renders "".
+			Fields: map[string]string{
+				"name": fmt.Sprintf("demo-synthetic-%d", i+1),
+				"val":  fmt.Sprintf("v-val-%d", i+1),
+			},
+		}
+	}
+	findings := wave3MarkerColFindings(resources)
+
+	buildBody := func(t *testing.T) (app.ListBody, string) {
+		t.Helper()
+		c := newTestController(t)
+		c.RegisterFallbackTypeDef(td)
+		c.PushChildListScreen(td.ShortName)
+		c.ApplyResourcesLoaded(td.ShortName, resources, nil, false)
+		c.ApplyEnrichmentState(td.ShortName, len(findings), false, findings, nil)
+		body := *c.Snapshot().Body.List
+		if body.MarkerCol != 1 {
+			t.Fatalf("precondition: MarkerCol = %d, want 1 (the \"name\" column) — synthetic td.Columns changed?", body.MarkerCol)
+		}
+		m := views.NewResourceList(td, nil, keys.Default())
+		m.SetSize(160, 30)
+		return body, m.RenderList(body)
+	}
+
+	t.Run("correct render with an empty preceding cell must NOT false-fail", func(t *testing.T) {
+		body, out := buildBody(t)
+		wave3AssertMarkerGlyphPlacement(t, td.ShortName, out, body)
+	})
+
+	t.Run("a marker column genuinely shifted by one must still fail", func(t *testing.T) {
+		body, out := buildBody(t)
+		shifted := body
+		shifted.MarkerCol = body.MarkerCol + 1
+		spy := &wave3FailSpy{}
+		wave3AssertMarkerGlyphPlacement(spy, td.ShortName, out, shifted)
+		if !spy.failed {
+			t.Fatal("expected wave3AssertMarkerGlyphPlacement to fail against a shifted MarkerCol, but it passed")
+		}
+	})
 }
 
 // ===========================================================================
@@ -547,6 +716,46 @@ func TestWave3AttentionFilter_IncludesResourcesWithWave2OnlyFindings(t *testing.
 	}
 	if lb.Rows[0].ResourceID != "res-0" {
 		t.Errorf("attention filter must show res-0 (Wave-2 finding only, Wave-1 Color Healthy), got %q", lb.Rows[0].ResourceID)
+	}
+}
+
+// TestWave3AttentionFilter_ReappliesOnLateEnrichmentArrival ports
+// qa_attention_filter_enrichment_test.go's TestAttentionFilter_
+// SetEnrichmentState_ReappliesFilter: unlike the sibling test above (which
+// applies enrichment BEFORE toggling attention), this activates the
+// attention filter FIRST — mimicking a user pressing ctrl+z while Wave 2 is
+// still in flight — then applies enrichment. Every render derives Body.List
+// fresh from current filter+enrichment state (no cached filtered-rows
+// snapshot to go stale), so this ordering is structurally safe by
+// architecture; kept as a regression pin against exactly the historical bug
+// (ResourceListModel.SetEnrichmentState not re-running applySortAndFilter).
+func TestWave3AttentionFilter_ReappliesOnLateEnrichmentArrival(t *testing.T) {
+	c := wave3ListController(t, "s3")
+
+	resources := []resource.Resource{
+		{ID: "b-0", Name: "bucket-alpha", Fields: map[string]string{"name": "bucket-alpha"}},
+		{ID: "b-1", Name: "bucket-beta", Fields: map[string]string{"name": "bucket-beta"}},
+		{ID: "b-2", Name: "bucket-gamma", Fields: map[string]string{"name": "bucket-gamma"}},
+	}
+	c.ApplyResourcesLoaded("s3", resources, nil, false)
+
+	// Enable the attention filter BEFORE Wave 2 lands.
+	c.Apply(app.Action{Kind: app.ActionToggleAttention})
+	if got := len(c.Snapshot().Body.List.Rows); got != 0 {
+		t.Fatalf("precondition: attention filter with no findings yet should hide all healthy rows, got %d visible", got)
+	}
+
+	findings := map[string][]domain.Finding{
+		"b-0": {{Code: "s3.public.access.enabled", Phrase: "public access enabled", Severity: domain.SevBroken, Source: "wave2:s3"}},
+	}
+	c.ApplyEnrichmentState("s3", 1, false, findings, nil)
+
+	lb := *c.Snapshot().Body.List
+	if len(lb.Rows) != 1 {
+		t.Fatalf("an already-active attention filter must immediately reflect a Wave-2 finding that lands afterward: got %d rows, want 1", len(lb.Rows))
+	}
+	if lb.Rows[0].ResourceID != "b-0" {
+		t.Errorf("attention filter must show b-0 (newly Wave-2-flagged), got %q", lb.Rows[0].ResourceID)
 	}
 }
 
@@ -632,4 +841,262 @@ func TestWave3ResourcesLoaded_AppliesMatchingType(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ===========================================================================
+// 6. RenderList narrow-screen column fit — port of tui_resourcelist_test.go's
+// TestResourceList_NarrowScreen_ShowsAllColumns (a fixed bug: a narrow
+// terminal used to DROP a wide column entirely instead of shrinking it).
+// m.fitColumns (resourcelist.go), called from the live RenderList seam, is
+// otherwise untested — the legacy pin only exercised it via the dead View().
+// log_events's real catalog columns (Timestamp:22, Message:120) already
+// exceed an 80-col terminal, so no synthetic type is needed.
+// ===========================================================================
+
+func TestWave3RenderList_NarrowScreen_ShrinksWideColumnInsteadOfDropping(t *testing.T) {
+	td := resource.GetChildType("log_events")
+	if td == nil {
+		t.Fatal("log_events child type not registered")
+	}
+
+	c := wave3ChildListController(t, "log_events")
+	c.ApplyResourcesLoaded("log_events", []resource.Resource{
+		{
+			ID: "evt-1", Name: "test event",
+			Fields: map[string]string{
+				"timestamp": "2025-07-25 16:05",
+				"message":   "Downloading snowflake_connector_python-3.2.1",
+			},
+		},
+	}, nil, false)
+	body := *c.Snapshot().Body.List
+
+	m := views.NewResourceList(*td, nil, keys.Default())
+	m.SetSize(80, 20) // narrow — 80 cols can't fit 22+120
+
+	// This test does not call tuitest.NoColor(t), so it runs with the
+	// package's TestMain "colors on" baseline — headers and cells are real
+	// candidates for SGR-wrapped styling. Strip ANSI before substring
+	// checks so a styling change can't split "Timestamp"/"Message"/
+	// "Downloading"/"snowflake" mid-string and produce a false negative.
+	out := stripAnsi(m.RenderList(body))
+	if !strings.Contains(out, "Timestamp") {
+		t.Errorf("Timestamp header should be visible on narrow screen:\n%s", out)
+	}
+	if !strings.Contains(out, "Message") {
+		t.Errorf("Message header should be visible on narrow screen (shrunk to fit):\n%s", out)
+	}
+	if !strings.Contains(out, "Downloading") || !strings.Contains(out, "snowflake") {
+		t.Errorf("Message content should be visible (truncated) on narrow screen:\n%s", out)
+	}
+}
+
+// ===========================================================================
+// 7. Controller.PatchListDisplayName / PatchListParentContext — port of
+// child_view_resourcelist_test.go's NewChildResourceList constructor pins
+// (ResourceType/FrameTitle/ParentContext on the dead ResourceListModel).
+// NewResourceList's child-view constructor (resourcelist.go:120) calls these
+// two Controller setters directly; GetListDisplayName/GetListParentContext
+// had ZERO test callers anywhere before this port — the display-name (child
+// breadcrumb, e.g. an S3 bucket name) and parent-context (feeds the
+// related-panel ContextKeys lookup, docs/related-resources.md) wiring was
+// otherwise completely unpinned at the live seam.
+// ===========================================================================
+
+// TestWave3ChildList_DisplayNameAndParentContext_SetByConstructorPath drives
+// the actual production constructor, views.NewChildResourceList (which itself
+// calls PatchListDisplayName/PatchListParentContext internally,
+// resourcelist.go:120) — a direct c.PatchListDisplayName/PatchListParentContext
+// call from the test bypasses that wiring entirely and would stay green even
+// if the constructor stopped calling either setter.
+func TestWave3ChildList_DisplayNameAndParentContext_SetByConstructorPath(t *testing.T) {
+	c := wave3ChildListController(t, "s3_objects")
+	td := resource.GetChildType("s3_objects")
+	if td == nil {
+		t.Fatal("s3_objects child resource type not registered")
+	}
+
+	views.NewChildResourceList(*td, map[string]string{"bucket": "test-bucket"}, "test-bucket", nil, keys.Default(), c)
+
+	if got := c.GetListDisplayName(); got != "test-bucket" {
+		t.Errorf("GetListDisplayName(): got %q, want %q", got, "test-bucket")
+	}
+	if got := c.GetListParentContext()["bucket"]; got != "test-bucket" {
+		t.Errorf("GetListParentContext()[bucket]: got %q, want %q", got, "test-bucket")
+	}
+	if title := c.ListFrameTitle(); title != "test-bucket" {
+		t.Errorf("ListFrameTitle() with a DisplayName set and no rows loaded: got %q, want %q", title, "test-bucket")
+	}
+}
+
+// TestWave3ChildList_DisplayName_CombinesWithRowCount verifies the
+// DisplayName+count FrameTitle format ("b1(2)") once rows are loaded — the
+// display-name substitutes only the leading name, the count suffix behaves
+// identically to a top-level list.
+func TestWave3ChildList_DisplayName_CombinesWithRowCount(t *testing.T) {
+	c := wave3ChildListController(t, "s3_objects")
+	c.PatchListDisplayName("b1")
+	c.ApplyResourcesLoaded("s3_objects", []resource.Resource{
+		{ID: "file1.txt", Name: "file1.txt", Fields: map[string]string{"status": "file", "key": "file1.txt"}},
+		{ID: "file2.txt", Name: "file2.txt", Fields: map[string]string{"status": "file", "key": "file2.txt"}},
+	}, nil, false)
+
+	if title := c.ListFrameTitle(); title != "b1(2)" {
+		t.Errorf("ListFrameTitle() with DisplayName + 2 rows: got %q, want %q", title, "b1(2)")
+	}
+}
+
+func TestWave3ChildList_ParentContext_EmptyForTopLevelList(t *testing.T) {
+	c := wave3ListController(t, "ec2")
+	if got := c.GetListParentContext(); len(got) != 0 {
+		t.Errorf("GetListParentContext() on a top-level (non-child) list: got %v, want empty", got)
+	}
+}
+
+// ===========================================================================
+// 8. ct-events default sort (event_time RFC3339, not the display "time"
+// string) across a real month boundary — port of aws_ct_events_review_fixes_
+// test.go's TestCTSort_RFC3339_AcrossMonthBoundary. ct-events's TIME column
+// config sets SortKey:"event_time" (core/config/defaults_monitoring.go), and
+// ensureListState seeds SortCol="event_time"/SortDir="desc" automatically
+// (core/app/list_defaults_test.go's TestEnsureListState_SeedsCTEventsDefaultSort
+// pins the SEEDED column/direction only, not that a real cross-month
+// comparison actually resolves correctly) — this closes that gap on the live
+// ApplyResourcesLoaded seam.
+// ===========================================================================
+
+func TestWave3CTEventsSort_RFC3339_AcrossMonthBoundary(t *testing.T) {
+	c := wave3ListController(t, "ct-events")
+	resources := []resource.Resource{
+		{
+			ID: "event-a", Name: "GetObject",
+			Fields: map[string]string{"time": "Apr 02 10:00:00", "event_time": "2026-04-02T10:00:00Z", "status": "ct-info"},
+		},
+		{
+			ID: "event-b", Name: "DescribeInstances",
+			Fields: map[string]string{"time": "Mar 28 10:00:00", "event_time": "2026-03-28T10:00:00Z", "status": "ct-info"},
+		},
+		{
+			ID: "event-c", Name: "PutObject",
+			Fields: map[string]string{"time": "Apr 07 17:00:59", "event_time": "2026-04-07T17:00:59Z", "status": "ct-info"},
+		},
+	}
+	c.ApplyResourcesLoaded("ct-events", resources, nil, false)
+
+	lb := *c.Snapshot().Body.List
+	if len(lb.Rows) != 3 {
+		t.Fatalf("want 3 rows, got %d", len(lb.Rows))
+	}
+	// Lexicographic display-string order would be B (Mar 28), C (Apr 07), A
+	// (Apr 02) — 'M' > 'A' in ASCII, so "Mar 28" wrongly sorts newest. The
+	// correct RFC3339 event_time DESC order is C, A, B (newest first).
+	got := []string{lb.Rows[0].ResourceID, lb.Rows[1].ResourceID, lb.Rows[2].ResourceID}
+	want := []string{"event-c", "event-a", "event-b"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("ct-events default sort must use event_time (RFC3339), not the display time string, across a month boundary; got order %v, want %v", got, want)
+		}
+	}
+}
+
+// ===========================================================================
+// 9. buildListBody's enrichment-map-only status-cell override — port of
+// wave2_risk_text_s4_s5_test.go's TestWave2_ListStatusColumn_
+// ShowsConcretePhrase_ForIssueFinding. list_body.go's S4 fallback branch
+// ("This override is only a fallback for the case where Wave-2 enrichment
+// has landed in the enrichment-store map but has NOT yet been mutated onto
+// r.Findings") is a DISTINCT code path from phase03_view_reads_test.go's
+// TestViews_ListStatusColumn_Wave2OverridesLifecycle, which drives the
+// resource's own r.Findings directly — this test drives the finding only
+// through ApplyEnrichmentState's separate map, and had zero other coverage
+// (hasWave2Finding/statusCol fallback never appeared in any test file).
+// Reuses loadListController from phase03_view_reads_test.go (same package).
+// ===========================================================================
+
+func TestWave3ListStatusColumn_EnrichmentMapOnlyFinding_OverridesRawState(t *testing.T) {
+	td := resource.ResourceTypeDef{
+		ShortName: "wave3-s4-status-test",
+		Name:      "S4 Status Test",
+		Columns: []resource.Column{
+			{Key: "name", Title: "Name", Width: 28},
+			{Key: "state", Title: "State", Width: 30},
+		},
+	}
+	c := loadListController(t, td, []resource.Resource{
+		{ID: "i-flagged-1", Name: "billing-db-01", Fields: map[string]string{"name": "billing-db-01", "state": "available"}},
+	})
+
+	findings := map[string][]domain.Finding{
+		"i-flagged-1": {{Code: "dbi.no-backups", Phrase: "no automated backups", Severity: domain.SevWarn, Source: "wave2:dbi"}},
+	}
+	c.ApplyEnrichmentState(td.ShortName, 0, false, findings, nil)
+
+	body := *c.Snapshot().Body.List
+	if len(body.Rows) != 1 {
+		t.Fatalf("want 1 row, got %d", len(body.Rows))
+	}
+	joined := strings.Join(body.Rows[0].Cells, "|")
+	if !strings.Contains(joined, "no automated backups") {
+		t.Errorf("row must show the enrichment-map finding's Phrase in the status cell (r.Findings not yet mutated); got: %q", joined)
+	}
+	if strings.Contains(joined, "available") {
+		t.Errorf("row must NOT still show the raw AWS state once an enrichment-map finding exists for it; got: %q", joined)
+	}
+}
+
+// ===========================================================================
+// 10. buildListFooterHints's "t" (CloudTrail) hint gate — port of
+// ct_events_t_key_test.go's TestResourceList_TKey_NoHintOnCtEventsList /
+// TestResourceList_TKey_SuppressedOnChildList (dead
+// ResourceListModel.BottomHints()). Those fixtures used ct-events/s3_objects,
+// neither of which sets CloudTrailKey, so they never actually exercised the
+// "ls.ParentContext == nil" half of the guard (core/app/footer.go:72) — the
+// hint was absent for the trivial reason (empty CloudTrailKey) in both
+// cases. This port uses a synthetic type WITH CloudTrailKey set and checks
+// both halves: the hint appears at top level and is suppressed once the
+// screen carries a ParentContext, proving the ParentContext check (not just
+// CloudTrailKey) drives the suppression.
+// ===========================================================================
+
+func hasTKeyHint(hints []app.KeyHint) bool {
+	for _, h := range hints {
+		if h.Key == "t" {
+			return true
+		}
+	}
+	return false
+}
+
+func TestWave3ListFooterHints_CloudTrailTKey_GatedByParentContext(t *testing.T) {
+	td := resource.ResourceTypeDef{
+		ShortName:     "wave3-ct-hint-test",
+		Name:          "CT Hint Test",
+		CloudTrailKey: "ResourceName:ID",
+		Columns: []resource.Column{
+			{Key: "name", Title: "Name", Width: 28},
+		},
+	}
+
+	t.Run("top-level list: CloudTrailKey set, no parent context → hint present", func(t *testing.T) {
+		c := newTestController(t)
+		c.RegisterFallbackTypeDef(td)
+		c.PushChildListScreen(td.ShortName)
+
+		footer := c.Snapshot().Footer
+		if !hasTKeyHint(footer) {
+			t.Errorf("footer = %+v, want a %q hint (CloudTrailKey set, ParentContext nil)", footer, "t")
+		}
+	})
+
+	t.Run("child list: CloudTrailKey set but ParentContext non-nil → hint suppressed", func(t *testing.T) {
+		c := newTestController(t)
+		c.RegisterFallbackTypeDef(td)
+		c.PushChildListScreen(td.ShortName)
+		c.PatchListParentContext(map[string]string{"bucket": "my-bucket"})
+
+		footer := c.Snapshot().Footer
+		if hasTKeyHint(footer) {
+			t.Errorf("footer = %+v, must NOT contain a %q hint once ParentContext is set (child list)", footer, "t")
+		}
+	})
 }

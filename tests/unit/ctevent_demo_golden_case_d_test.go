@@ -20,9 +20,12 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/viewport"
+
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo/fakes"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // TestCTDetailDemoGolden_CaseD renders the ct-events detail view for fixture
@@ -56,13 +59,19 @@ func TestCTDetailDemoGolden_CaseD(t *testing.T) {
 	}
 	res := resources[caseDIdx]
 
-	// Build the detail model at the specified size.
-	cfg := configForType("ct-events")
-	m := newDetailModel(res, "ct-events", cfg)
-	m.SetSize(180, 40)
+	// Render via the live controller + NewTransientDetail seam (views.NewDetail/
+	// DetailModel.View are dead — see specs/022-codebase-cleanup/wave3-map-detail.md).
+	c := newDetailController(t, res, "ct-events")
+	c.SetViewConfig(configForType("ct-events"))
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil for ct-events Case D fixture")
+	}
+	vp := viewport.New(viewport.WithWidth(180), viewport.WithHeight(40))
+	m := views.NewTransientDetail(180, 40, vp)
 
 	// Render and strip ANSI codes for deterministic comparison.
-	actual := stripAnsi(m.View())
+	actual := stripAnsi(m.RenderDetail(*body))
 	actual = strings.ReplaceAll(actual, "\r\n", "\n")
 
 	goldenPath := filepath.Join("..", "testdata", "golden", "ctdetail_demo", "case_d.txt")

@@ -4,29 +4,43 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // TestIssue119_StackedWidth_ToggleRelated verifies that at 80-99 columns
-// (stacked mode), pressing r still toggles the related panel off and on.
+// (stacked mode), pressing r still toggles the related panel off and on —
+// the live replacement for the retired views.NewDetail(...).Update(KeyPress
+// "r").View() chain (DetailModel.Update/View are dead; see
+// specs/022-codebase-cleanup/wave3-map-detail.md). Drives the real tui.Model
+// root path (real "r" keypresses) rather than raw Controller.Apply: the TUI
+// adapter syncs the renderer's auto-show state into the controller before
+// dispatching the toggle, a step a bare Controller.Apply call skips.
 func TestIssue119_StackedWidth_ToggleRelated(t *testing.T) {
-	d, cleanup := ec2StoryDetail(t, 85, 30, true)
-	defer cleanup()
+	withIssue140EC2RelatedDefs(t)
+	m := newPreviewDemoModel(t, 85, 30)
+	ec2Res := previewEC2Resource()
+	m, _ = previewApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: "ec2",
+		Resource:     &ec2Res,
+	})
 
-	before := stripAnsi(d.View())
+	before := previewView(m)
 	if !strings.Contains(before, "RELATED") {
 		t.Fatalf("precondition failed: expected RELATED panel to be visible at width=85; got:\n%s", before)
 	}
 
-	d, _ = pressDetailKey(d, "r")
-	afterHide := stripAnsi(d.View())
+	m, _ = previewApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "r"})
+	afterHide := previewView(m)
 	if strings.Contains(afterHide, "RELATED") {
 		t.Errorf("at width=85, first r press should hide related panel; got:\n%s", afterHide)
 	}
 
-	d, _ = pressDetailKey(d, "r")
-	afterShow := stripAnsi(d.View())
+	m, _ = previewApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "r"})
+	afterShow := previewView(m)
 	if !strings.Contains(afterShow, "RELATED") {
 		t.Errorf("at width=85, second r press should show related panel again; got:\n%s", afterShow)
 	}

@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
 	lipgloss "charm.land/lipgloss/v2"
 
+	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
@@ -16,8 +16,8 @@ import (
 func TestDetail_SelectedRow_LabelVisible_NoNestedKeyTint(t *testing.T) {
 	tuitest.ForceColor(t)
 
-	d := makePreviewEC2Detail(t, 120, 35)
-	line := findLineContaining(d.View(), "InstanceId:")
+	c := makePreviewEC2Detail(t, 120, 35)
+	line := findLineContaining(previewDetailView(t, c, 120, 35), "InstanceId:")
 	if line == "" {
 		t.Fatalf("selected row line not found")
 	}
@@ -33,16 +33,16 @@ func TestDetail_SelectedNavigableRow_DropsUnderline(t *testing.T) {
 	tuitest.ForceColor(t)
 	withIssue140EC2RelatedDefs(t)
 
-	d := makePreviewEC2Detail(t, 120, 35)
+	c := makePreviewEC2Detail(t, 120, 35)
 	// Move to VpcId.
 	for range 80 {
-		if strings.Contains(findSelectedLine(d.View()), "VpcId:") {
+		if strings.Contains(findSelectedLine(previewDetailView(t, c, 120, 35)), "VpcId:") {
 			break
 		}
-		d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "j"})
+		c.Apply(app.Action{Kind: app.ActionMoveDown})
 	}
 
-	line := findSelectedLine(d.View())
+	line := findSelectedLine(previewDetailView(t, c, 120, 35))
 	if line == "" {
 		t.Fatalf("VpcId row not found")
 	}
@@ -62,8 +62,8 @@ func TestDetail_SelectedRow_FillsViewportWidth(t *testing.T) {
 	resource.SetRelatedForTest("ec2", nil)
 	t.Cleanup(func() { resource.SetRelatedForTest("ec2", oldDefs) })
 
-	d := makePreviewEC2Detail(t, 90, 30)
-	line := findSelectedLine(d.View())
+	c := makePreviewEC2Detail(t, 90, 30)
+	line := findSelectedLine(previewDetailView(t, c, 90, 30))
 	if line == "" {
 		t.Fatal("selected line not found")
 	}

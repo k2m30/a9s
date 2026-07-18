@@ -5,6 +5,9 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
+	"charm.land/bubbles/v2/viewport"
+
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	"github.com/k2m30/a9s/v3/core/config"
@@ -47,87 +50,6 @@ func rdsLoadedModel(t *testing.T) views.ResourceListModel {
 	return m
 }
 
-// rdsLoadedModelWide returns a model with a wide terminal to show all columns.
-func rdsLoadedModelWide(t *testing.T) views.ResourceListModel {
-	t.Helper()
-	tuitest.ForceColor(t)
-
-	td := rdsTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(200, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "dbi",
-		Resources:    fixtureRDSInstances(),
-	})
-	return m
-}
-
-// fixtureRDSInstancesExtended adds extra instances for edge-case testing:
-// a stopped instance, a creating instance (no endpoint), and a postgres instance.
-func fixtureRDSInstancesExtended() []resource.Resource {
-	base := fixtureRDSInstances()
-	return append(base,
-		resource.Resource{
-			ID:   "stopped-db",
-			Name: "stopped-db",
-			Fields: map[string]string{
-				"db_identifier":  "stopped-db",
-				"engine":         "mysql",
-				"engine_version": "8.0.35",
-				"status":         "stopped",
-				"class":          "db.r5.large",
-				"endpoint":       "stopped-db.abc123.us-east-1.rds.amazonaws.com",
-				"multi_az":       "Yes",
-			},
-		},
-		resource.Resource{
-			ID:   "creating-db",
-			Name: "creating-db",
-			Fields: map[string]string{
-				"db_identifier":  "creating-db",
-				"engine":         "postgres",
-				"engine_version": "16.2",
-				"status":         "creating",
-				"class":          "db.t3.medium",
-				"endpoint":       "",
-				"multi_az":       "No",
-			},
-		},
-		resource.Resource{
-			ID:   "prod-postgres-primary",
-			Name: "prod-postgres-primary",
-			Fields: map[string]string{
-				"db_identifier":  "prod-postgres-primary",
-				"engine":         "postgres",
-				"engine_version": "14.9",
-				"status":         "available",
-				"class":          "db.r5.xlarge",
-				"endpoint":       "prod-postgres-primary.abc123.us-east-1.rds.amazonaws.com",
-				"multi_az":       "Yes",
-			},
-		},
-	)
-}
-
-// rdsExtendedModel loads a model with the extended fixture set.
-func rdsExtendedModel(t *testing.T) views.ResourceListModel {
-	t.Helper()
-	tuitest.ForceColor(t)
-
-	td := rdsTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(200, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "dbi",
-		Resources:    fixtureRDSInstancesExtended(),
-	})
-	return m
-}
-
 // rdsKeyPress creates a tea.KeyPressMsg for a printable character.
 func rdsKeyPress(char string) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: -1, Text: char}
@@ -136,51 +58,6 @@ func rdsKeyPress(char string) tea.KeyPressMsg {
 // ===========================================================================
 // A.2 Column Layout
 // ===========================================================================
-
-func TestQA_RDS_ListColumns_AllSevenPresent(t *testing.T) {
-	m := rdsLoadedModelWide(t)
-	out := m.View()
-
-	expectedHeaders := []string{
-		"DB Identifier",
-		"Engine",
-		"Version",
-		"Status",
-		"Class",
-		"Endpoint",
-		"Multi-AZ",
-	}
-	for _, hdr := range expectedHeaders {
-		if !strings.Contains(out, hdr) {
-			t.Errorf("RDS list view missing column header %q", hdr)
-		}
-	}
-}
-
-func TestQA_RDS_ListColumns_CorrectOrder(t *testing.T) {
-	m := rdsLoadedModelWide(t)
-	out := m.View()
-	plain := stripANSI(out)
-	lines := strings.Split(plain, "\n")
-
-	// The header line is the first line (line 0).
-	headerLine := lines[0]
-
-	// Verify the expected order by checking column positions.
-	headers := []string{"DB Identifier", "Engine", "Version", "Status", "Class", "Endpoint", "Multi-AZ"}
-	prevPos := -1
-	for _, h := range headers {
-		pos := strings.Index(headerLine, h)
-		if pos < 0 {
-			t.Errorf("column header %q not found in header line: %q", h, headerLine)
-			continue
-		}
-		if pos <= prevPos {
-			t.Errorf("column %q at position %d should be after previous column at position %d", h, pos, prevPos)
-		}
-		prevPos = pos
-	}
-}
 
 func TestQA_RDS_ListColumns_ColumnWidths(t *testing.T) {
 	// Verify that the resource type definition has the correct column widths per spec.
@@ -202,154 +79,6 @@ func TestQA_RDS_ListColumns_ColumnWidths(t *testing.T) {
 		if col.Width != expected {
 			t.Errorf("column %q width: expected %d, got %d", col.Key, expected, col.Width)
 		}
-	}
-}
-
-func TestQA_RDS_ListColumns_NoSeparatorBelowHeaders(t *testing.T) {
-	m := rdsLoadedModelWide(t)
-	out := m.View()
-	plain := stripANSI(out)
-	lines := strings.SplitSeq(plain, "\n")
-
-	for line := range lines {
-		stripped := strings.TrimSpace(line)
-		if stripped == "" {
-			continue
-		}
-		allDash := true
-		for _, ch := range stripped {
-			if ch != '-' && ch != '_' && ch != '=' && ch != ' ' {
-				allDash = false
-				break
-			}
-		}
-		if allDash && len(stripped) > 5 {
-			t.Errorf("found separator-like row in RDS list: %q", stripped)
-		}
-	}
-}
-
-func TestQA_RDS_ListColumns_SpaceAlignedNotPipeSeparated(t *testing.T) {
-	m := rdsLoadedModelWide(t)
-	out := m.View()
-	plain := stripANSI(out)
-	lines := strings.SplitSeq(plain, "\n")
-
-	for line := range lines {
-		if strings.Contains(line, "|") {
-			t.Errorf("found pipe character in RDS list output: %q", line)
-		}
-	}
-}
-
-// ===========================================================================
-// A.3 Data Mapping
-// ===========================================================================
-
-func TestQA_RDS_ListData_DBIdentifier(t *testing.T) {
-	m := rdsLoadedModelWide(t)
-	out := m.View()
-
-	for _, r := range fixtureRDSInstances() {
-		id := r.Fields["db_identifier"]
-		if !strings.Contains(out, id) {
-			t.Errorf("RDS list missing DB Identifier %q", id)
-		}
-	}
-}
-
-func TestQA_RDS_ListData_Engine(t *testing.T) {
-	m := rdsLoadedModelWide(t)
-	out := m.View()
-
-	for _, r := range fixtureRDSInstances() {
-		engine := r.Fields["engine"]
-		// Engine column is 12 chars wide; long values like "aurora-postgresql" (18 chars)
-		// get truncated by PadOrTrunc. Check for the first 10 chars which will be present
-		// whether the value is truncated or not.
-		prefix := engine
-		if len(prefix) > 10 {
-			prefix = engine[:10]
-		}
-		if !strings.Contains(out, prefix) {
-			t.Errorf("RDS list missing Engine value prefix %q (full: %q)", prefix, engine)
-		}
-	}
-}
-
-func TestQA_RDS_ListData_Version(t *testing.T) {
-	m := rdsLoadedModelWide(t)
-	out := m.View()
-
-	for _, r := range fixtureRDSInstances() {
-		ver := r.Fields["engine_version"]
-		if !strings.Contains(out, ver) {
-			t.Errorf("RDS list missing Version %q", ver)
-		}
-	}
-}
-
-func TestQA_RDS_ListData_Status(t *testing.T) {
-	m := rdsLoadedModelWide(t)
-	out := m.View()
-
-	for _, r := range fixtureRDSInstances() {
-		status := r.Fields["status"]
-		if !strings.Contains(out, status) {
-			t.Errorf("RDS list missing Status %q", status)
-		}
-	}
-}
-
-func TestQA_RDS_ListData_Class(t *testing.T) {
-	m := rdsLoadedModelWide(t)
-	out := m.View()
-
-	for _, r := range fixtureRDSInstances() {
-		class := r.Fields["class"]
-		if !strings.Contains(out, class) {
-			t.Errorf("RDS list missing Class %q", class)
-		}
-	}
-}
-
-func TestQA_RDS_ListData_Endpoint(t *testing.T) {
-	m := rdsLoadedModelWide(t)
-	out := m.View()
-
-	for _, r := range fixtureRDSInstances() {
-		ep := r.Fields["endpoint"]
-		if ep == "" {
-			continue
-		}
-		// Endpoint may be truncated; check for the first segment.
-		prefix := ep
-		if len(prefix) > 30 {
-			prefix = ep[:30]
-		}
-		if !strings.Contains(out, prefix) {
-			t.Errorf("RDS list missing Endpoint prefix %q", prefix)
-		}
-	}
-}
-
-func TestQA_RDS_ListData_MultiAZ(t *testing.T) {
-	m := rdsLoadedModelWide(t)
-	out := m.View()
-	plain := stripANSI(out)
-
-	// All fixture instances have Multi-AZ "No".
-	if !strings.Contains(plain, "No") {
-		t.Errorf("RDS list missing Multi-AZ value 'No'")
-	}
-}
-
-func TestQA_RDS_ListData_RowCount(t *testing.T) {
-	m := rdsLoadedModel(t)
-	title := m.FrameTitle()
-	expected := "dbi(2)"
-	if title != expected {
-		t.Errorf("FrameTitle: expected %q, got %q", expected, title)
 	}
 }
 
@@ -486,339 +215,8 @@ func TestQA_RDS_StatusColor_AvailableAndCreatingDifferent(t *testing.T) {
 }
 
 // ===========================================================================
-// A.5 Edge Cases
-// ===========================================================================
-
-func TestQA_RDS_EdgeCase_CreatingInstanceNoEndpoint(t *testing.T) {
-	m := rdsExtendedModel(t)
-	out := m.View()
-	plain := stripANSI(out)
-
-	// The creating instance should appear in the list.
-	if !strings.Contains(plain, "creating-db") {
-		t.Error("creating instance should appear in the list")
-	}
-
-	// It should NOT show "null" or "<nil>".
-	lines := strings.SplitSeq(plain, "\n")
-	for line := range lines {
-		if strings.Contains(line, "creating-db") {
-			if strings.Contains(line, "<nil>") || strings.Contains(line, "null") {
-				t.Errorf("creating instance row should not show <nil> or null: %q", line)
-			}
-		}
-	}
-}
-
-func TestQA_RDS_EdgeCase_MultiEngineMix(t *testing.T) {
-	m := rdsExtendedModel(t)
-	out := m.View()
-	plain := stripANSI(out)
-
-	// Both postgres and mysql should be present.
-	if !strings.Contains(plain, "postgres") {
-		t.Error("expected 'postgres' engine in multi-engine list")
-	}
-	if !strings.Contains(plain, "mysql") {
-		t.Error("expected 'mysql' engine in multi-engine list")
-	}
-}
-
-func TestQA_RDS_EdgeCase_AuroraInstancePresent(t *testing.T) {
-	m := rdsLoadedModelWide(t)
-	out := m.View()
-	plain := stripANSI(out)
-
-	// "aurora-postgresql" is 18 chars but the Engine column is 12 wide,
-	// so it gets truncated with PadOrTrunc to 11 chars + ellipsis = "aurora-post..."
-	// Check that the aurora engine prefix is present (truncated).
-	if !strings.Contains(plain, "aurora-post") {
-		t.Error("expected truncated aurora-postgresql engine prefix 'aurora-post' in the list")
-	}
-}
-
-func TestQA_RDS_EdgeCase_EmptyList(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := rdsTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(160, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "dbi",
-		Resources:    []resource.Resource{},
-	})
-
-	out := m.View()
-	if !strings.Contains(out, "No resources found") {
-		t.Errorf("empty RDS list should show 'No resources found', got: %q", out)
-	}
-
-	title := m.FrameTitle()
-	if title != "dbi(0)" {
-		t.Errorf("empty RDS list FrameTitle: expected %q, got %q", "dbi(0)", title)
-	}
-}
-
-func TestQA_RDS_EdgeCase_MultiAZBooleanDisplay(t *testing.T) {
-	m := rdsExtendedModel(t)
-	out := m.View()
-	plain := stripANSI(out)
-
-	// Fixture data has "No" and "Yes" as multi_az values.
-	if !strings.Contains(plain, "No") && !strings.Contains(plain, "false") {
-		t.Error("expected Multi-AZ column to display 'No' or 'false'")
-	}
-}
-
-// ===========================================================================
-// A.6 Frame Title
-// ===========================================================================
-
-func TestQA_RDS_FrameTitle_ShowsCount(t *testing.T) {
-	m := rdsLoadedModel(t)
-	title := m.FrameTitle()
-	if title != "dbi(2)" {
-		t.Errorf("FrameTitle: expected %q, got %q", "dbi(2)", title)
-	}
-}
-
-func TestQA_RDS_FrameTitle_FilteredCount(t *testing.T) {
-	m := rdsLoadedModel(t)
-	m.SetFilter("dbc")
-
-	title := m.FrameTitle()
-	if title != "dbi(1/2)" {
-		t.Errorf("FrameTitle with filter: expected %q, got %q", "dbi(1/2)", title)
-	}
-}
-
-func TestQA_RDS_FrameTitle_ClearedFilter(t *testing.T) {
-	m := rdsLoadedModel(t)
-	m.SetFilter("dbc")
-	m.SetFilter("")
-
-	title := m.FrameTitle()
-	if title != "dbi(2)" {
-		t.Errorf("FrameTitle after clearing filter: expected %q, got %q", "dbi(2)", title)
-	}
-}
-
-// ===========================================================================
-// A.7 Sorting
-// ===========================================================================
-
-func TestQA_RDS_Sort_ByNameAscending(t *testing.T) {
-	m := rdsExtendedModel(t)
-
-	// Press '1' to sort by column 0 (DB Identifier) ascending.
-	m, _ = m.Update(rdsKeyPress("1"))
-	out := m.View()
-	plain := stripANSI(out)
-
-	// Name sort works on r.Name but the sort indicator only shows on columns
-	// whose key/title contains "name". For RDS, "DB Identifier" does not contain
-	// "name", so no indicator is shown. Instead, verify the data is actually sorted.
-	posCreating := strings.Index(plain, "creating-db")
-	posDocdb := strings.Index(plain, "test-docdb-1")
-	if posCreating >= 0 && posDocdb >= 0 && posCreating > posDocdb {
-		t.Error("expected creating-db before test-docdb-1 in ascending name sort")
-	}
-}
-
-func TestQA_RDS_Sort_ByNameDescending(t *testing.T) {
-	m := rdsExtendedModel(t)
-
-	// Press '1' twice for descending (column 0 = DB Identifier).
-	m, _ = m.Update(rdsKeyPress("1"))
-	m, _ = m.Update(rdsKeyPress("1"))
-	out := m.View()
-	plain := stripANSI(out)
-
-	// Verify descending order: stopped-db should come before creating-db.
-	posStopped := strings.Index(plain, "stopped-db")
-	posCreating := strings.Index(plain, "creating-db")
-	if posStopped >= 0 && posCreating >= 0 && posStopped > posCreating {
-		t.Error("expected stopped-db before creating-db in descending name sort")
-	}
-}
-
-func TestQA_RDS_Sort_ByID(t *testing.T) {
-	m := rdsExtendedModel(t)
-
-	// Press '1' to sort by column 0 (DB Identifier) ascending.
-	m, _ = m.Update(rdsKeyPress("1"))
-	out := m.View()
-
-	// Sort indicator should appear on the DB Identifier column.
-	if !strings.Contains(out, "\u2191") && !strings.Contains(out, "\u2193") {
-		t.Error("expected sort indicator after pressing '1'")
-	}
-}
-
-func TestQA_RDS_Sort_IndicatorOnlyOneColumn(t *testing.T) {
-	m := rdsExtendedModel(t)
-
-	// Sort by column 0 (DB Identifier).
-	m, _ = m.Update(rdsKeyPress("1"))
-	out := m.View()
-	plain := stripANSI(out)
-	lines := strings.Split(plain, "\n")
-
-	headerLine := lines[0]
-	arrowCount := strings.Count(headerLine, "\u2191") + strings.Count(headerLine, "\u2193")
-	if arrowCount != 1 {
-		t.Errorf("expected exactly 1 sort arrow in header, got %d in: %q", arrowCount, headerLine)
-	}
-}
-
-// ===========================================================================
-// A.8 Filtering
-// ===========================================================================
-
-func TestQA_RDS_Filter_ByPartialName(t *testing.T) {
-	m := rdsExtendedModel(t)
-	m.SetFilter("prod")
-
-	out := m.View()
-	plain := stripANSI(out)
-
-	if !strings.Contains(plain, "prod-postgres-primary") {
-		t.Error("filter 'prod' should show prod-postgres-primary")
-	}
-	if strings.Contains(plain, "stopped-db") {
-		t.Error("filter 'prod' should NOT show stopped-db")
-	}
-}
-
-func TestQA_RDS_Filter_ByEngine(t *testing.T) {
-	m := rdsExtendedModel(t)
-	m.SetFilter("postgres")
-
-	out := m.View()
-	plain := stripANSI(out)
-
-	if !strings.Contains(plain, "prod-postgres-primary") {
-		t.Error("filter 'postgres' should match prod-postgres-primary")
-	}
-}
-
-func TestQA_RDS_Filter_NoMatches(t *testing.T) {
-	m := rdsLoadedModel(t)
-	m.SetFilter("zzz_nonexistent_zzz")
-
-	out := m.View()
-	if !strings.Contains(out, "No resources found") {
-		t.Error("filter with no matches should show 'No resources found'")
-	}
-
-	title := m.FrameTitle()
-	if !strings.Contains(title, "0/2") {
-		t.Errorf("filter with no matches: FrameTitle should contain '0/2', got %q", title)
-	}
-}
-
-func TestQA_RDS_Filter_CaseInsensitive(t *testing.T) {
-	m := rdsExtendedModel(t)
-	m.SetFilter("POSTGRES")
-
-	out := m.View()
-	plain := stripANSI(out)
-
-	if !strings.Contains(plain, "postgres") {
-		t.Error("case-insensitive filter 'POSTGRES' should match postgres instances")
-	}
-}
-
-func TestQA_RDS_Filter_AcrossAllColumns(t *testing.T) {
-	m := rdsExtendedModel(t)
-	m.SetFilter("db.t3")
-
-	out := m.View()
-	plain := stripANSI(out)
-
-	// db.t3.medium class instances should match.
-	if !strings.Contains(plain, "db.t3") {
-		t.Error("filter 'db.t3' should match instances with db.t3.medium class")
-	}
-}
-
-func TestQA_RDS_Filter_ByStatus(t *testing.T) {
-	m := rdsExtendedModel(t)
-	m.SetFilter("stopped")
-
-	out := m.View()
-	plain := stripANSI(out)
-
-	if !strings.Contains(plain, "stopped-db") {
-		t.Error("filter 'stopped' should show stopped-db")
-	}
-}
-
-// ===========================================================================
 // A.9 Keyboard Navigation
 // ===========================================================================
-
-func TestQA_RDS_Navigation_CursorDown(t *testing.T) {
-	m := rdsLoadedModel(t)
-
-	// Initially cursor is at 0. Press j to move down.
-	m, _ = m.Update(rdsKeyPress("j"))
-
-	selected := m.SelectedResource()
-	if selected == nil {
-		t.Fatal("expected a selected resource after cursor down")
-	}
-	// Second fixture is "test-rds-1".
-	if selected.ID != "test-rds-1" {
-		t.Errorf("after j, expected selected ID %q, got %q", "test-rds-1", selected.ID)
-	}
-}
-
-func TestQA_RDS_Navigation_CursorUp(t *testing.T) {
-	m := rdsLoadedModel(t)
-
-	// Move down first, then up.
-	m, _ = m.Update(rdsKeyPress("j"))
-	m, _ = m.Update(rdsKeyPress("k"))
-
-	selected := m.SelectedResource()
-	if selected == nil {
-		t.Fatal("expected a selected resource after cursor up")
-	}
-	if selected.ID != "test-docdb-1" {
-		t.Errorf("after j then k, expected selected ID %q, got %q", "test-docdb-1", selected.ID)
-	}
-}
-
-func TestQA_RDS_Navigation_JumpToBottom(t *testing.T) {
-	m := rdsLoadedModel(t)
-	m, _ = m.Update(rdsKeyPress("G"))
-
-	selected := m.SelectedResource()
-	if selected == nil {
-		t.Fatal("expected a selected resource after jump to bottom")
-	}
-	// Last fixture is "test-rds-1".
-	if selected.ID != "test-rds-1" {
-		t.Errorf("after G, expected last resource, got %q", selected.ID)
-	}
-}
-
-func TestQA_RDS_Navigation_JumpToTop(t *testing.T) {
-	m := rdsLoadedModel(t)
-	m, _ = m.Update(rdsKeyPress("G"))
-	m, _ = m.Update(rdsKeyPress("g"))
-
-	selected := m.SelectedResource()
-	if selected == nil {
-		t.Fatal("expected a selected resource after jump to top")
-	}
-	if selected.ID != "test-docdb-1" {
-		t.Errorf("after G then g, expected first resource, got %q", selected.ID)
-	}
-}
 
 func TestQA_RDS_Navigation_EnterOpensChildView(t *testing.T) {
 	m := rdsLoadedModel(t)
@@ -886,35 +284,34 @@ func TestQA_RDS_Navigation_YOpensYAML(t *testing.T) {
 }
 
 // ===========================================================================
-// A.10 Loading State
-// ===========================================================================
-
-func TestQA_RDS_LoadingSpinner(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := rdsTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(120, 20)
-	m, _ = m.Init()
-
-	out := m.View()
-	if !strings.Contains(out, "Loading") {
-		t.Errorf("RDS list should show 'Loading' before data arrives, got: %q", out)
-	}
-}
-
-// ===========================================================================
 // B. RDS Detail View
 // ===========================================================================
 
-func TestQA_RDS_Detail_ContainsAllFields(t *testing.T) {
-	k := keys.Default()
-	res := fixtureRDSInstances()[0]
-	m := views.NewDetail(res, "dbi", nil, k)
-	m.SetSize(120, 30)
+// renderRDSDetail builds a Controller (via the package-unit blessed
+// newDetailControllerUnit helper) for res/"dbi" with the given *ViewsConfig
+// (nil uses the controller's zero-value/default), and renders it via the
+// live NewTransientDetail+RenderDetail seam — the replacement for the retired
+// views.NewDetail(...).SetSize(...).View() chain (DetailModel.View is dead;
+// see specs/022-codebase-cleanup/wave3-map-detail.md). ANSI-stripped: every
+// caller does textual (Contains) assertions, not raw-style comparisons.
+func renderRDSDetail(t *testing.T, res resource.Resource, viewCfg *config.ViewsConfig) string {
+	t.Helper()
+	c := newDetailControllerUnit(t, res, "dbi")
+	if viewCfg != nil {
+		c.SetViewConfig(viewCfg)
+	}
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil")
+	}
+	vp := viewport.New(viewport.WithWidth(120), viewport.WithHeight(30))
+	m := views.NewTransientDetail(120, 30, vp)
+	return stripANSI(m.RenderDetail(*body))
+}
 
-	out := m.View()
+func TestQA_RDS_Detail_ContainsAllFields(t *testing.T) {
+	res := fixtureRDSInstances()[0]
+	out := renderRDSDetail(t, res, nil)
 	if out == "Initializing..." || out == "" {
 		t.Fatal("Detail view should not be empty or initializing after SetSize")
 	}
@@ -937,24 +334,22 @@ func TestQA_RDS_Detail_ContainsAllFields(t *testing.T) {
 	}
 }
 
+// TestQA_RDS_Detail_FrameTitle is the live-seam replacement for the retired
+// views.NewDetail(...).FrameTitle() call — drives Snapshot().FrameTitle
+// instead (detailFrameTitleLocked mirrors the legacy Name-else-ID semantics).
 func TestQA_RDS_Detail_FrameTitle(t *testing.T) {
-	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewDetail(res, "dbi", nil, k)
+	c := newDetailControllerUnit(t, res, "dbi")
 
-	title := m.FrameTitle()
+	title := c.Snapshot().FrameTitle
 	if title != "test-docdb-1" {
 		t.Errorf("Detail FrameTitle: expected %q, got %q", "test-docdb-1", title)
 	}
 }
 
 func TestQA_RDS_Detail_EndpointField(t *testing.T) {
-	k := keys.Default()
 	res := fixtureRDSInstances()[0]
-	m := views.NewDetail(res, "dbi", nil, k)
-	m.SetSize(120, 30)
-
-	out := m.View()
+	out := renderRDSDetail(t, res, nil)
 	endpointAddr := res.Fields["endpoint"]
 	if !strings.Contains(out, endpointAddr[:20]) {
 		t.Errorf("Detail should show endpoint address %q", endpointAddr)
@@ -962,8 +357,6 @@ func TestQA_RDS_Detail_EndpointField(t *testing.T) {
 }
 
 func TestQA_RDS_Detail_WithRawStruct_AllDetailPaths(t *testing.T) {
-	k := keys.Default()
-
 	// Use an RDS-only config to avoid non-deterministic map iteration
 	// over all resource ViewDefs in renderFromConfig.
 	rdsViewDef := config.DefaultViewDef("dbi")
@@ -1004,11 +397,7 @@ func TestQA_RDS_Detail_WithRawStruct_AllDetailPaths(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := views.NewDetail(res, "dbi", viewCfg, k)
-	m.SetSize(120, 30)
-
-	out := m.View()
-	plain := stripANSI(out)
+	plain := renderRDSDetail(t, res, viewCfg)
 
 	// Verify all detail fields from config are present.
 	expectedValues := []string{
@@ -1036,7 +425,6 @@ func TestQA_RDS_Detail_WithRawStruct_AllDetailPaths(t *testing.T) {
 }
 
 func TestQA_RDS_Detail_CreatingInstanceNoEndpoint(t *testing.T) {
-	k := keys.Default()
 	viewCfg := config.DefaultConfig()
 
 	dbIdentifier := "creating-db"
@@ -1055,12 +443,8 @@ func TestQA_RDS_Detail_CreatingInstanceNoEndpoint(t *testing.T) {
 		Fields:    map[string]string{},
 	}
 
-	m := views.NewDetail(res, "dbi", viewCfg, k)
-	m.SetSize(120, 30)
-
 	// Should not panic.
-	out := m.View()
-	plain := stripANSI(out)
+	plain := renderRDSDetail(t, res, viewCfg)
 
 	if strings.Contains(plain, "<nil>") {
 		t.Error("Detail for creating instance should not show '<nil>'")
@@ -1070,26 +454,11 @@ func TestQA_RDS_Detail_CreatingInstanceNoEndpoint(t *testing.T) {
 	}
 }
 
-func TestQA_RDS_Detail_SwitchToYAML(t *testing.T) {
-	k := keys.Default()
-	res := fixtureRDSInstances()[0]
-	m := views.NewDetail(res, "dbi", nil, k)
-	m.SetSize(120, 30)
-
-	_, cmd := m.Update(rdsKeyPress("y"))
-	if cmd == nil {
-		t.Fatal("'y' in detail view should return a command to navigate to YAML")
-	}
-
-	msg := cmd()
-	nav, ok := msg.(messages.Navigate)
-	if !ok {
-		t.Fatalf("'y' should produce NavigateMsg, got %T", msg)
-	}
-	if nav.Target != messages.TargetYAML {
-		t.Errorf("'y' in detail should navigate to YAML, got target %d", nav.Target)
-	}
-}
+// TestQA_RDS_Detail_SwitchToYAML deleted (round 5, specs/022-codebase-cleanup,
+// DetailModel core cleanup): drove the retired views.NewDetail(...).Update("y")
+// call (DetailModel.Update is dead). The "y navigates to YAML" behavior is
+// type-agnostic and already pinned on the live seam by
+// coverage_live_gaps_test.go's TestLiveGap_HandleDetailKeyMsg_YAMLKey_NavigatesToYAMLTarget.
 
 // ===========================================================================
 // C. RDS YAML View
@@ -1391,62 +760,5 @@ func TestQA_RDS_CrossView_EscFromListReturnsToMainMenu(t *testing.T) {
 
 	if !strings.Contains(plain, "resource-types") {
 		t.Errorf("Esc from RDS list should return to main menu, got: %s", plain[:min(200, len(plain))])
-	}
-}
-
-// ===========================================================================
-// Horizontal scroll
-// ===========================================================================
-
-func TestQA_RDS_HorizontalScroll(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := rdsTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(60, 20) // Narrow to force some columns off-screen.
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "dbi",
-		Resources:    fixtureRDSInstances(),
-	})
-
-	outBefore := m.View()
-
-	// Scroll right.
-	m, _ = m.Update(rdsKeyPress("l"))
-	outAfter := m.View()
-
-	if outBefore == outAfter {
-		t.Error("horizontal scroll should change the visible output")
-	}
-}
-
-// ===========================================================================
-// Config-driven columns
-// ===========================================================================
-
-func TestQA_RDS_ConfigDrivenColumns(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := rdsTypeDef()
-	k := keys.Default()
-
-	cfg := config.DefaultConfig()
-	m := views.NewResourceList(td, cfg, k)
-	m.SetSize(200, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "dbi",
-		Resources:    fixtureRDSInstances(),
-	})
-
-	out := m.View()
-
-	// With default config, the same 7 headers should be present.
-	for _, hdr := range []string{"DB Identifier", "Engine", "Version", "Status", "Class", "Endpoint", "Multi-AZ"} {
-		if !strings.Contains(out, hdr) {
-			t.Errorf("config-driven RDS list missing column header %q", hdr)
-		}
 	}
 }

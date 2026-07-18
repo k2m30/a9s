@@ -379,7 +379,36 @@ func TestIssue140StoryMapCoversAllStories(t *testing.T) {
 	}
 
 	addStoryEvidence([]string{"scenario:ec2_001_initial_detail", "file:tests/unit/left_column_preview_regressions_test.go", "file:tests/unit/issue140_story_render_contract_test.go"}, "Wide terminals show EC2 detail and related resources side by side", "EC2 detail shows the configured curated field set instead of raw YAML", "Section headers and nested fields are visibly structured", "Long detail values wrap instead of forcing horizontal detail scrolling", "Updated detail flow no longer depends on a word-wrap toggle", "Pressing `w` does not introduce a separate wrap mode in the updated detail screen")
-	addStoryEvidence([]string{"scenario:ec2_021_right_focus_after_tab", "file:tests/unit/detail_focus_test.go"}, "Focus indicator changes with the active detail column", "Tab switches focus between detail and related columns", "Shift-Tab also flips focus between the two visible columns", "H and L switch focus instead of horizontally scrolling the detail view")
+	// detail_focus_test.go was legacy-DetailModel-only (deleted, wave3
+	// detail-family cleanup, specs/022-codebase-cleanup, DetailModel cluster —
+	// its own test functions had already been removed in an earlier round,
+	// leaving only orphaned dead-API helpers with zero real story coverage).
+	// "scenario:ec2_021_right_focus_after_tab" is a golden snapshot, not
+	// enforced coverage: TestIssue140ScenarioGoldens only diffs
+	// ec2_001_initial_detail/ec2_020_counts_arrived against disk (see its own
+	// "Perf: render and compare only 2 representative scenarios" comment
+	// above) — ec2_021's golden is written by TestGenerateIssue140Scenarios
+	// but never compared automatically, so it is dropped from this mapping.
+	// "Tab switches focus" and "Enter dispatches for the focused row" are
+	// covered by TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter.
+	// TestPreview_RightColumnFocus_HLAndTabToggleFocus proves "H and L switch
+	// focus instead of horizontally scrolling" via the real 'l'/'h' key
+	// routing and "Focus indicator changes with the active detail column"
+	// via the footer-hint text swap.
+	//
+	// "Tab flips focus between the two visible columns in both directions"
+	// names the underlying UX goal: the detail screen has exactly two
+	// columns, so a single `Tab` toggles focus in both directions (press it
+	// twice to return to the start) — no separate Shift+Tab binding is
+	// provided (it would be redundant). keys.Default() (internal/tui/keys/
+	// keys.go) binds only "tab", and every production call site
+	// (app_input.go, app_stack.go) matches via key.Matches(msg, m.keys.Tab).
+	// TestPreview_RightColumnFocus_HLAndTabToggleFocus's two-Tab-press
+	// assertion proves that bidirectional round trip through the real root
+	// model, so this story is genuinely covered by the same file as the
+	// other Tab/focus stories above, not left as an unimplemented-behavior
+	// gap.
+	addStoryEvidence([]string{"file:tests/unit/preview_design_regression_test.go"}, "Focus indicator changes with the active detail column", "Tab switches focus between detail and related columns", "H and L switch focus instead of horizontally scrolling the detail view", "Tab flips focus between the two visible columns in both directions")
 	// ec2_stories_cursor_enter_test.go was legacy-DetailModel-only (deleted,
 	// wave3 detail-family cleanup, specs/022-codebase-cleanup). Cursor
 	// movement/jump/paging on the live controller path is pinned by

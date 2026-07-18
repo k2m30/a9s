@@ -10,6 +10,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
@@ -64,33 +65,224 @@ func previewEC2Resource() resource.Resource {
 // DetailModel.Update() directly (not .View()/.CopyContent) — out of this
 // item's literal scope; kept as-is and flagged as a residual gap.
 
+// TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter is the live-seam
+// replacement for the retired views.NewDetail(...).Update(RelatedCheckResult)
+// .Update(KeyTab).Update(KeyEnter) chain (DetailModel.Update is dead; see
+// specs/022-codebase-cleanup/wave3-map-detail.md). Drives the real
+// tui.Model root path: Tab focuses the right column (auto-skipping to the
+// first drillable row), Enter dispatches navigation for that row.
 func TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter(t *testing.T) {
-	d, cleanup := ec2StoryDetail(t, 120, 30, true)
-	defer cleanup()
+	oldDefs := append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
+	t.Cleanup(func() { resource.SetRelatedForTest("ec2", oldDefs) })
+	resource.SetRelatedForTest("ec2", []resource.RelatedDef{
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: resource.NoopChecker},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopChecker},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: resource.NoopChecker},
+	})
 
-	// tg=0 (dim), asg=2 (available), others dim.
-	for _, msg := range []messages.RelatedCheckResult{
-		{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "tg", Count: 0}},
-		{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "asg", Count: 2, ResourceIDs: []string{"asg-1", "asg-2"}}},
-		{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "alarm", Count: 0}},
-		{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "cfn", Count: 0}},
+	m := newPreviewDemoModel(t, 120, 30)
+	ec2Res := previewEC2Resource()
+	m, _ = previewApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: "ec2",
+		Resource:     &ec2Res,
+	})
+
+	// tg=0 (dim), asg=2 (available), others dim. SourceResourceID and
+	// Generation must be set — a compliant adapter (session-backed
+	// Controller) drops any RelatedCheckResult missing the source ID or
+	// carrying a stale generation, leaving every row unresolved regardless
+	// of the test's intent. Generation: 1 is the fresh session's initial
+	// RelatedGen (session.New() seeds it at 1, never 0; bumped only on
+	// refresh/profile/region switch — neither happens here).
+	for _, tc := range []struct {
+		target string
+		count  int
+		ids    []string
+	}{
+		{"tg", 0, nil},
+		// These synthetic asg IDs only seed the RIGHT COLUMN's pre-Enter
+		// count/actionable state (making the "asg" row Resolved, non-dim, so
+		// Tab lands on it). Post-Enter, the real ec2->asg RelatedDef.Checker
+		// (NoopChecker, set above) re-runs against the freshly fetched asg
+		// list and always returns zero matches — the navigated screen's own
+		// resolved count is asserted separately below via the source-scoped
+		// title breadcrumb, not this seed count.
+		{"asg", 2, []string{"asg-1", "asg-2"}},
+		{"alarm", 0, nil},
+		{"cfn", 0, nil},
 	} {
-		d, _ = d.Update(msg)
+		m, _ = previewApplyMsg(m, messages.RelatedCheckResult{
+			ResourceType:     "ec2",
+			SourceResourceID: ec2Res.ID,
+			Generation:       1,
+			Result:           resource.RelatedCheckResult{TargetType: tc.target, Count: tc.count, ResourceIDs: tc.ids},
+		})
 	}
 
 	// Focus right column and press Enter. Expected: first actionable row (asg) is selected.
-	d, _ = d.Update(tea.KeyPressMsg{Code: tea.KeyTab})
-	_, cmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, _ = previewApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyTab})
+	m, cmd := previewApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
-		t.Fatal("enter on focused right column should emit RelatedNavigateMsg for first non-dim row")
+		t.Fatal("enter on focused right column should dispatch a navigation command for the first non-dim row")
+	}
+	// The Enter cmd resolves to messages.RelatedNavigate, which itself
+	// dispatches the demo fetch as a further tea.Cmd (a tea.BatchMsg wrapping
+	// the fetch + a ClearFlash). tui.Model.Update's own tea.BatchMsg case
+	// (internal/tui/app.go) recursively resolves every sub-command, so one
+	// more previewApplyMsg round-trip is enough to land on the fully loaded
+	// asg list screen.
+	m, cmd = previewApplyMsg(m, cmd())
+	if cmd != nil {
+		m, _ = previewApplyMsg(m, cmd())
+	}
+
+	view := previewView(m)
+	asgRT := resource.FindResourceType("asg")
+	if asgRT == nil {
+		t.Fatal("asg resource type not registered")
+	}
+	// A bare Contains(view, "Auto Scaling Groups") (asgRT's DisplayName) would
+	// pass even if Enter never navigated anywhere — the EC2 detail's own
+	// RELATED panel already renders that exact string as a row label before
+	// Enter is ever pressed. Instead require BOTH:
+	//   1. the source-scoped title breadcrumb runtime.RelatedTitleSuffix
+	//      produces (" -- <ec2 ID> (<ec2 Name>)") — the single source both
+	//      the TUI and the headless Controller append to a related child
+	//      list's frame title (core/runtime/related.go), naming the exact
+	//      resource this navigation drilled from. This cannot appear by
+	//      accident from the pre-Enter RELATED panel.
+	//   2. the EC2 detail's own "RELATED" panel header is gone — proving the
+	//      screen actually changed, not just that a similar string overlaps.
+	wantSuffix := runtime.RelatedTitleSuffix(ec2Res)
+	if !strings.Contains(view, wantSuffix) {
+		t.Errorf("focused right column should skip dim rows, land on asg, and show the source-scoped title suffix %q; got:\n%s", wantSuffix, view)
+	}
+	if strings.Contains(view, "RELATED") {
+		t.Errorf("navigating to asg should leave the EC2 detail's RELATED panel behind; got:\n%s", view)
+	}
+	// The suffix + RELATED-gone checks above prove SOME navigation happened,
+	// not that it landed on asg specifically. asg has no catalog ListTitle
+	// override (core/aws/catalog_compute.go), so buildListFrameTitle
+	// (core/app/list_body.go) falls back to the bare type key ShortName
+	// ("asg") for the frame name — this navigates against the real demo
+	// fetcher with a NoopChecker (see the loop comment above), so the
+	// destination list is empty and its column headers never render;
+	// the frame-title type marker is the only asg-specific signal available
+	// on an empty destination screen.
+	wantMarker := asgRT.ShortName
+	if asgRT.ListTitle != "" {
+		wantMarker = asgRT.ListTitle
+	}
+	wantMarker += "("
+	if !strings.Contains(view, wantMarker) {
+		t.Errorf("navigating to asg should show its own frame-title marker %q, proving the destination is the asg list; got:\n%s", wantMarker, view)
+	}
+}
+
+// TestPreview_RightColumnFocus_HLAndTabToggleFocus is live-path coverage for
+// two issue140 stories previously (mis)mapped only to
+// TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter, which exercises Tab +
+// Enter alone: "Focus indicator changes with the active detail column" and "H
+// and L switch focus instead of horizontally scrolling the detail view".
+//
+// The design docs also describe a third story, "Tab flips focus between the
+// two visible columns in both directions" (docs/design/qa-user-stories-
+// related-views-ec2.md). keys.Default() (internal/tui/keys/keys.go) binds only
+// "tab", and every production call site (app_input.go:224, app_stack.go:
+// 351,475) matches via key.Matches(msg, m.keys.Tab), which only matches a
+// literal "tab" key string — there is no "shift+tab" binding anywhere in
+// production, and there does not need to be: focus here is a binary toggle
+// between exactly two columns, so Tab alone already flips it in both
+// directions (a second Tab press returns focus to where it started — the
+// same round trip a dedicated Shift-Tab would provide for a two-element
+// cycle). The two-Tab-press assertion below is therefore real, live-path
+// coverage of that story, not a stand-in for a key binding that would be
+// redundant if it existed.
+//
+// The focus indicator (footer hints) is genuinely textual, not just a style
+// difference: app_stack.go's key-help footer swaps "r Related" for
+// "enter Auto Scaling Groups──tab Fields" once the right column is focused —
+// so plain stripAnsi(view) Contains checks on those hint strings are a real,
+// non-cosmetic proof that focus moved, without depending on ANSI byte
+// comparison.
+func TestPreview_RightColumnFocus_HLAndTabToggleFocus(t *testing.T) {
+	oldDefs := append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
+	t.Cleanup(func() { resource.SetRelatedForTest("ec2", oldDefs) })
+	resource.SetRelatedForTest("ec2", []resource.RelatedDef{
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: resource.NoopChecker},
+	})
+
+	m := newPreviewDemoModel(t, 120, 30)
+	ec2Res := previewEC2Resource()
+	m, _ = previewApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: "ec2",
+		Resource:     &ec2Res,
+	})
+	for _, tc := range []struct {
+		target string
+		count  int
+		ids    []string
+	}{
+		{"tg", 0, nil},
+		{"asg", 2, []string{"asg-1", "asg-2"}},
+	} {
+		m, _ = previewApplyMsg(m, messages.RelatedCheckResult{
+			ResourceType:     "ec2",
+			SourceResourceID: ec2Res.ID,
+			Generation:       1,
+			Result:           resource.RelatedCheckResult{TargetType: tc.target, Count: tc.count, ResourceIDs: tc.ids},
+		})
+	}
+
+	unfocused := previewView(m)
+	if !strings.Contains(unfocused, "r Related") {
+		t.Fatalf("precondition: unfocused left-column footer should hint \"r Related\"; got:\n%s", unfocused)
+	}
+	if strings.Contains(unfocused, "tab Fields") {
+		t.Fatalf("precondition: unfocused footer should not yet show the right-column-focused \"tab Fields\" hint; got:\n%s", unfocused)
+	}
+
+	// 'l' (m.keys.ScrollRight) focuses the right column from the unfocused
+	// left column — app_stack.go's ScrollRight case, distinct from Tab.
+	mAfterL, _ := previewApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "l"})
+	focusedRight := previewView(mAfterL)
+	if !strings.Contains(focusedRight, "tab Fields") || !strings.Contains(focusedRight, "enter Auto Scaling Groups") {
+		t.Errorf("'l' should focus the right column (footer should hint \"enter Auto Scaling Groups\" / \"tab Fields\"); got:\n%s", focusedRight)
+	}
+	// Functional proof the right column really is focused: Enter now
+	// dispatches the actionable "asg" row's navigation.
+	_, cmd := previewApplyMsg(mAfterL, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("Enter after 'l' should dispatch a navigation command for the focused right column's actionable row")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigate)
-	if !ok {
-		t.Fatalf("expected RelatedNavigateMsg, got %T", msg)
+	if nav, ok := msg.(messages.RelatedNavigate); !ok || nav.TargetType != "asg" {
+		t.Errorf("Enter after 'l' = %#v, want messages.RelatedNavigate{TargetType: \"asg\"}", msg)
 	}
-	if nav.TargetType != "asg" {
-		t.Errorf("focused right column should skip dim rows and land on asg; got target %q", nav.TargetType)
+
+	// 'h' (m.keys.ScrollLeft) focuses back to the left column — the render
+	// must return exactly to the original unfocused footer.
+	mAfterH, _ := previewApplyMsg(mAfterL, tea.KeyPressMsg{Code: -1, Text: "h"})
+	if got := previewView(mAfterH); got != unfocused {
+		t.Errorf("'h' should return the render to the original unfocused state; got:\n%s\nwant:\n%s", got, unfocused)
+	}
+
+	// Tab round trip: Tab focuses right (same visual change as 'l' above);
+	// pressing Tab again flips back to left, exactly like 'h'. This is real
+	// coverage of the Tab binding's own toggle behavior only — see the
+	// doc comment above for why it is NOT a stand-in for Shift-Tab (no such
+	// binding or handler exists in production).
+	mAfterTab1, _ := previewApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyTab})
+	if got := previewView(mAfterTab1); got != focusedRight {
+		t.Errorf("Tab should focus the right column identically to 'l'; got:\n%s\nwant:\n%s", got, focusedRight)
+	}
+	mAfterTab2, _ := previewApplyMsg(mAfterTab1, tea.KeyPressMsg{Code: tea.KeyTab})
+	if got := previewView(mAfterTab2); got != unfocused {
+		t.Errorf("a second Tab press should flip focus back to the left column; got:\n%s\nwant:\n%s", got, unfocused)
 	}
 }
 

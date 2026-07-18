@@ -993,3 +993,66 @@ func TestWave3ListRawStruct_ChildViews(t *testing.T) {
 		})
 	}
 }
+
+// ===========================================================================
+// 2. TestWave3ListRawStruct_S3ObjectSort_UsesNumericByteOrder — port of
+// qa_s3_test.go's TestQA_S3_B10_3_ObjectList_SortBySize_UsesNumericByteOrder.
+// s3_objects's default view config sets {Key:"size", SortPath:"Size"} on the
+// Size column (core/config/defaults_databases.go), routing sort through
+// listCompareRaw's RawStruct-numeric comparison — not the display string
+// ("1 KB" vs "900 B"), which would sort lexicographically wrong ('1' < '9').
+// Neither core/app/list_test.go's TestListSort_* (Name-only) nor this file's
+// AllTypes/OverridesFields cases (cell VALUE, not sort ORDER) cover a
+// SortPath-driven numeric sort — this was otherwise unpinned at the
+// controller level.
+// ===========================================================================
+
+func TestWave3ListRawStruct_S3ObjectSort_UsesNumericByteOrder(t *testing.T) {
+	objects := []resource.Resource{
+		{
+			ID: "medium.bin", Name: "medium.bin",
+			Fields:    map[string]string{"key": "medium.bin", "size": "1 KB", "last_modified": "2025-01-02"},
+			RawStruct: s3types.Object{Key: wave3StrPtr("medium.bin"), Size: wave3Int64Ptr(1024)},
+		},
+		{
+			ID: "small.bin", Name: "small.bin",
+			Fields:    map[string]string{"key": "small.bin", "size": "900 B", "last_modified": "2025-01-01"},
+			RawStruct: s3types.Object{Key: wave3StrPtr("small.bin"), Size: wave3Int64Ptr(900)},
+		},
+		{
+			ID: "large.bin", Name: "large.bin",
+			Fields:    map[string]string{"key": "large.bin", "size": "2 KB", "last_modified": "2025-01-03"},
+			RawStruct: s3types.Object{Key: wave3StrPtr("large.bin"), Size: wave3Int64Ptr(2048)},
+		},
+	}
+
+	c := wave3ChildListController(t, "s3_objects")
+	c.ApplyResourcesLoaded("s3_objects", objects, nil, false)
+
+	c.Apply(app.Action{Kind: app.ActionSort, Arg: "size"})
+	lb := *c.Snapshot().Body.List
+	if len(lb.Rows) != 3 {
+		t.Fatalf("want 3 rows, got %d", len(lb.Rows))
+	}
+	gotAsc := []string{lb.Rows[0].ResourceID, lb.Rows[1].ResourceID, lb.Rows[2].ResourceID}
+	wantAsc := []string{"small.bin", "medium.bin", "large.bin"}
+	for i := range wantAsc {
+		if gotAsc[i] != wantAsc[i] {
+			t.Fatalf("size ascending sort must use numeric byte order (RawStruct.Size), got order %v, want %v", gotAsc, wantAsc)
+		}
+	}
+
+	// Toggle to descending.
+	c.Apply(app.Action{Kind: app.ActionSort, Arg: "size"})
+	lb = *c.Snapshot().Body.List
+	gotDesc := []string{lb.Rows[0].ResourceID, lb.Rows[1].ResourceID, lb.Rows[2].ResourceID}
+	wantDesc := []string{"large.bin", "medium.bin", "small.bin"}
+	for i := range wantDesc {
+		if gotDesc[i] != wantDesc[i] {
+			t.Fatalf("size descending sort must use numeric byte order (RawStruct.Size), got order %v, want %v", gotDesc, wantDesc)
+		}
+	}
+}
+
+func wave3StrPtr(s string) *string { return &s }
+func wave3Int64Ptr(n int64) *int64 { return &n }
