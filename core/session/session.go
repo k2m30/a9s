@@ -179,17 +179,21 @@ type Session struct {
 	// HandleRegionSelected/handleClientsReadyFailure/
 	// handleClientsReadySuccess in core/runtime/handlers.go) — all via
 	// SetProfileRegion, never by direct field assignment. They are read
-	// cross-goroutine by EnsureCacheStore/WithCacheStore/ReadCacheStore's own
-	// callers, which historically read c.session.Profile/Region at the Core
-	// accessor call site BEFORE entering this lock — that pre-lock read was
-	// the actual data race (a profile switch's field write interleaving with
-	// the detached availability-cache-save writer goroutine's read, caught by
-	// -race on CI run 28839454135: Core.HandleProfileSelected's write at
-	// handlers.go:418 against Core.WithCacheStore's read at accessors.go:97,
-	// reached via the single-writer goroutine runAvailabilitySaveLoop spawns
-	// in core/app/menu.go). EnsureCacheStore/WithCacheStore/ReadCacheStore
-	// now read the pair via CurrentPair while already holding pairMu, closing
-	// that gap for every caller in one place rather than one at a time.
+	// cross-goroutine by EnsureCacheStore/WithCacheStore/WithCacheStoreSave/
+	// ReadCacheStore's own callers, which historically read
+	// c.session.Profile/Region at the Core accessor call site BEFORE
+	// entering this lock — that pre-lock read was the actual data race (a
+	// profile switch's field write interleaving with the detached
+	// availability-cache-save writer goroutine's read, caught by -race on CI
+	// run 28839454135: Core.HandleProfileSelected's write at
+	// handlers.go:418 against Core.WithCacheStore's read at accessors.go:97
+	// — that call site now goes through Core.WithCacheStoreSave instead, see
+	// its own doc comment — reached via the single-writer goroutine
+	// runAvailabilitySaveLoop spawns in core/app/menu.go).
+	// EnsureCacheStore/WithCacheStore/WithCacheStoreSave/ReadCacheStore now
+	// read the pair
+	// via CurrentPair while already holding pairMu, closing that gap for
+	// every caller in one place rather than one at a time.
 	//
 	// TUI tea.Cmd goroutines and concurrent web drains both reach
 	// EnsureCacheStore/CacheStore, and Rotate clears CacheStore from the
@@ -404,8 +408,8 @@ func New() *Session {
 // caller on any goroutine observes a consistent snapshot rather than reading
 // the two fields separately (which could race a concurrent SetProfileRegion
 // writing one and not yet the other). Callers needing the pair together with
-// a CacheStore decision (EnsureCacheStore/WithCacheStore/ReadCacheStore) read
-// it from inside their own pairMu-held critical section instead of calling
+// a CacheStore decision (EnsureCacheStore/WithCacheStore/WithCacheStoreSave/
+// ReadCacheStore) read it from inside their own pairMu-held critical section instead of calling
 // this method, to avoid a lock-release-then-reacquire window between the
 // pair read and the store decision.
 func (s *Session) CurrentPair() (profile, region string) {
@@ -417,8 +421,8 @@ func (s *Session) CurrentPair() (profile, region string) {
 // SetProfileRegion sets the live Profile/Region pair while holding pairMu.
 // Every write to Session.Profile/Session.Region MUST go through this method
 // (never a direct field assignment) so a concurrent EnsureCacheStore/
-// WithCacheStore/ReadCacheStore call on another goroutine can never observe a
-// torn or half-written pair, and never races the write itself (see pairMu's
+// WithCacheStore/WithCacheStoreSave/ReadCacheStore call on another goroutine
+// can never observe a torn or half-written pair, and never races the write itself (see pairMu's
 // doc comment for the CI-caught race this closes).
 func (s *Session) SetProfileRegion(profile, region string) {
 	s.pairMu.Lock()
@@ -498,9 +502,10 @@ func (s *Session) EnsureCacheStoreForRegion(region string) *cache.Store {
 }
 
 // ensureCacheStoreLocked is EnsureCacheStore/EnsureCacheStoreForRegion's
-// shared body, factored out so WithCacheStore/ReadCacheStore can also reuse
-// it inside their own already-held pairMu critical section without a
-// reentrant Lock call (sync.Mutex is not reentrant).
+// shared body, factored out so WithCacheStore/WithCacheStoreSave/
+// ReadCacheStore can also reuse it inside their own already-held pairMu
+// critical section without a reentrant Lock call (sync.Mutex is not
+// reentrant).
 func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
 	if profile == "" || region == "" {
 		return nil
@@ -515,47 +520,103 @@ func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
 }
 
 // WithCacheStore runs fn against the current Profile/Region pair's
-// *cache.Store while holding pairMu for the entire call (both the pair read
-// and the store decision, then fn itself), then returns fn's error.
+// *cache.Store while holding pairMu for the ENTIRE call (the pair read, the
+// store decision, and fn itself, including any disk I/O fn performs) — the
+// coarse, general-purpose primitive. SaveResourceListCache and
+// SaveAvailabilityCache, the two hot per-type save call sites, use the
+// narrower WithCacheStoreSave below instead (so their disk write does not
+// hold pairMu); this method remains for any caller that genuinely needs a
+// single fn to run fully atomically against the store, and for tests seeding
+// a pair's on-disk state via store.Put+store.SaveType in one call.
 //
-// Store-lock serialization (D13): SaveResourceListCache and SaveAvailabilityCache each perform their
-// own store.Type (read) / mutate / store.Put+SaveType (write) sequence for
-// the same on-disk type file. Obtaining the *cache.Store via EnsureCacheStore
-// and then mutating it afterward (the previous shape of both callers) only
-// serializes the pointer lookup — the lock is released before the
-// read-modify-write runs, so two of these sequences dispatched from
-// concurrent tea.Cmd goroutines (e.g. a list's own fetch-completion save
-// racing a background availability-sweep save for the same resource type)
-// can interleave: each reads the other's stale pre-write TypeFile, and
-// whichever's Put+SaveType lands last wins with a Count/Rows pairing that
-// never itself violated the persisted-pair invariant (runtime/probes.go) but does not reflect
-// either write in full (e.g. one call's Count together with the other
-// call's Rows). cache.Store also has no internal locking of its own — two
-// goroutines writing s.types[shortName] concurrently is a data race on the
-// map, independent of the logical inconsistency above.
-//
-// fn must not call back into WithCacheStore/EnsureCacheStore/CurrentPair/
-// SetProfileRegion (Session's mutex is not reentrant) and should do no
-// blocking I/O beyond store.SaveType. Always calls fn (never skips it) —
-// when profile/region has not resolved yet, fn receives a nil store, matching
-// EnsureCacheStore's nil-store contract; callers already check for a nil
-// store inside fn (see SaveAvailabilityCache). The NoCache short-circuit
-// lives one layer up, in Core.WithCacheStore/Core.ReadCacheStore, which never
-// call down into this method at all when NoCache is set.
+// fn must not call back into WithCacheStore/WithCacheStoreSave/
+// EnsureCacheStore/CurrentPair/SetProfileRegion (Session's mutex is not
+// reentrant). Always calls fn (never skips it) — when profile/region has not
+// resolved yet, fn receives a nil store, matching EnsureCacheStore's
+// nil-store contract. The NoCache short-circuit lives one layer up, in
+// Core.WithCacheStore/Core.ReadCacheStore, which never call down into this
+// method at all when NoCache is set.
 func (s *Session) WithCacheStore(fn func(store *cache.Store) error) error {
 	s.pairMu.Lock()
 	defer s.pairMu.Unlock()
 	return fn(s.ensureCacheStoreLocked(s.Profile, s.Region))
 }
 
+// WithCacheStoreSave runs fn against the current Profile/Region pair's
+// *cache.Store while holding pairMu for the pair read, the store decision,
+// and fn itself (mirroring WithCacheStore's discipline) — but fn does NOT
+// write to disk. fn stages its writes as cache.WritePlan values (via
+// store.Put + store.PrepareSave, both cheap in-memory work) and returns them;
+// WithCacheStoreSave commits each one via store.CommitSave AFTER pairMu is
+// released, so a save's disk I/O (MkdirAll/temp-write/rename) never blocks a
+// concurrent pairMu-guarded reader (CurrentPair, ReadCacheStore, ...) behind
+// file I/O. This is WithCacheStore narrowed for the save lanes specifically:
+// hold pairMu across only the read/mutate/marshal part of the former
+// store.Type(read)/mutate/store.Put+SaveType(write) sequence, not the write.
+//
+// Store-lock serialization (D13) still holds for the part that matters to
+// every OTHER pairMu-guarded caller: SaveResourceListCache and
+// SaveAvailabilityCache's own store.Type read and store.Put write for a type
+// file are still fully serialized against each other and against any
+// concurrent profile/region switch, because both still run inside fn under
+// pairMu. What moved outside the lock is only the disk write, which
+// store.CommitSave's own saveMu (scoped to this *cache.Store, i.e. this pair)
+// still serializes against a sibling commit for the SAME pair — see
+// cache.Store's saveMu doc comment for what CommitSave's serialization does
+// and does not guarantee: two commits for the same pair can never tear each
+// other's rename, but the ORDER two racing commits land in is not guaranteed
+// to match the order their corresponding fn/Put calls ran in under pairMu
+// (an accepted trade-off — see CommitSave's doc comment). WithCacheStore
+// above holds pairMu across the disk write specifically to close that
+// ordering gap (a list's own fetch-completion save racing a background
+// availability-sweep save for the same resource type could otherwise
+// interleave: each reads the other's stale pre-write TypeFile, and whichever
+// write lands last wins with a Count/Rows pairing that never itself violated
+// the persisted-pair invariant (runtime/probes.go) but does not reflect
+// either write in full). WithCacheStoreSave accepts that a losing commit's
+// stale bytes could transiently be what's on disk for that type until its
+// next save — which, given no cache entry has a TTL (C1) and every save lane
+// here runs on a recurring sweep/list-refresh cadence rather than a
+// one-shot, self-corrects on the next save rather than persisting
+// indefinitely — in exchange for pairMu never blocking on file I/O, which is
+// this method's whole reason to exist.
+//
+// fn must not call back into WithCacheStore/WithCacheStoreSave/
+// EnsureCacheStore/CurrentPair/SetProfileRegion (Session's mutex is not
+// reentrant) and must do no blocking I/O at all — that is the point of
+// returning WritePlans instead of writing inline. Always calls fn (never
+// skips it) — when profile/region has not resolved yet, fn receives a nil
+// store, matching EnsureCacheStore's nil-store contract; callers already
+// check for a nil store inside fn (see SaveAvailabilityCache). The NoCache
+// short-circuit lives one layer up, in Core.WithCacheStoreSave/
+// Core.ReadCacheStore, which never call down into this method at all when
+// NoCache is set.
+func (s *Session) WithCacheStoreSave(fn func(store *cache.Store) ([]cache.WritePlan, error)) error {
+	s.pairMu.Lock()
+	store := s.ensureCacheStoreLocked(s.Profile, s.Region)
+	plans, err := fn(store)
+	s.pairMu.Unlock()
+	if store == nil || len(plans) == 0 {
+		return err
+	}
+	for _, wp := range plans {
+		if cerr := store.CommitSave(wp); cerr != nil && err == nil {
+			err = cerr
+		}
+	}
+	return err
+}
+
 // ReadCacheStore runs fn against the current Profile/Region pair's
 // *cache.Store while holding pairMu, for callers that only read
-// (store.Type/store.Types) and never Put/SaveType. Pairs with WithCacheStore
-// (the store-lock serialization, D13): a reader that bypassed the lock (the
-// shape every read call site once had) could observe cache.Store's internal map mid-write from
-// a concurrent WithCacheStore call — a data race on the map itself,
-// independent of the logical Count/Rows consistency WithCacheStore's callers
-// already guard. Same nil-store-to-fn contract as WithCacheStore.
+// (store.Type/store.Types) and never Put/PrepareSave/SaveType. Pairs with
+// WithCacheStore/WithCacheStoreSave (the store-lock serialization, D13): a
+// reader that bypassed the lock (the shape every read call site once had)
+// could observe cache.Store's internal map mid-write from a concurrent
+// WithCacheStore/WithCacheStoreSave call's fn (the in-memory store.Put half,
+// which always runs under pairMu even for WithCacheStoreSave) — a data race
+// on the map itself, independent of the logical Count/Rows consistency
+// those callers already guard. Same nil-store-to-fn contract as both.
 func (s *Session) ReadCacheStore(fn func(store *cache.Store) error) error {
 	s.pairMu.Lock()
 	defer s.pairMu.Unlock()

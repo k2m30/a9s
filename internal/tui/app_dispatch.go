@@ -247,8 +247,15 @@ func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 // The session snapshot is captured SYNCHRONOUSLY here — before the goroutine
 // runs — so a concurrent session.Rotate (profile/region switch) cannot cause
 // the obsolete task to read the new gen/clients and wrongly pass messages.IsStale.
+//
+// ctx is m.pairCtx, not m.appCtx: pairCtx is scoped to the currently active
+// profile/region pair and is cancelled-then-re-armed by
+// handleProfileSelected/handleRegionSelected on every rotation (see the
+// Model.pairCtx field doc in app.go), so an already-dispatched background
+// task is aborted the instant the user switches pair instead of surviving
+// on appCtx (which is cancelled only by quit).
 func (m Model) executeTaskCmd(req runtime.TaskRequest) tea.Cmd {
-	ctx := m.appCtx
+	ctx := m.pairCtx
 	// Capture the session snapshot at dispatch time (synchronous, on the Update
 	// goroutine) so a profile/region switch before this cmd executes cannot
 	// restamp the obsolete task with the new generation or clients.

@@ -11,6 +11,8 @@ package tui
 // Apply/Pop/Flash + Save task).
 
 import (
+	"context"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -61,22 +63,45 @@ func hasFlashWork(intents []runtime.UIIntent, tasks []runtime.TaskRequest) bool 
 
 // handleProfileSelected defers to runtime.Core.HandleProfileSelected for
 // the Session.Rotate + rollback-latch + reconnect-request sequence.
+//
+// Cancels the outgoing pair's pairCtx BEFORE the Core call, so any
+// background task already dispatched for the old pair (availability/enrich
+// probe, save-cache, ...) is aborted rather than surviving the switch, then
+// re-arms a fresh pairCtx AFTER the Core call — before dispatchHandlerResult
+// translates the returned tasks (e.g. the reconnect) into tea.Cmds via
+// executeTaskCmd — so every task dispatched for the NEW pair starts with a
+// live context instead of the one just cancelled.
 func (m Model) handleProfileSelected(msg messages.ProfileSelected) (tea.Model, tea.Cmd) {
 	m.flash.gen++
+	if m.pairCancel != nil {
+		m.pairCancel()
+	}
 	intents, tasks := m.core.HandleProfileSelected(runtime.ProfileSelectedEvent{
 		Profile: msg.Profile, NewGen: m.flash.gen,
 	})
+	//nolint:gosec // G118 false positive — m.pairCancel is stored on the Model
+	// and IS called, either by the next rotation's cancel-before-rearm above
+	// or transitively via appCancel on quit (pairCtx is a child of appCtx).
+	m.pairCtx, m.pairCancel = context.WithCancel(m.appCtx)
 	cmd := m.dispatchHandlerResult(intents, tasks)
 	return m, cmd
 }
 
 // handleRegionSelected defers to runtime.Core.HandleRegionSelected for
 // the Session.Rotate + rollback-latch + reconnect-request sequence.
+//
+// See handleProfileSelected's doc comment for why pairCtx is
+// cancelled-then-re-armed around the Core call.
 func (m Model) handleRegionSelected(msg messages.RegionSelected) (tea.Model, tea.Cmd) {
 	m.flash.gen++
+	if m.pairCancel != nil {
+		m.pairCancel()
+	}
 	intents, tasks := m.core.HandleRegionSelected(runtime.RegionSelectedEvent{
 		Region: msg.Region, NewGen: m.flash.gen,
 	})
+	//nolint:gosec // G118 false positive — see handleProfileSelected above.
+	m.pairCtx, m.pairCancel = context.WithCancel(m.appCtx)
 	cmd := m.dispatchHandlerResult(intents, tasks)
 	return m, cmd
 }

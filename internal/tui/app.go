@@ -59,6 +59,22 @@ type Model struct {
 	appCtx    context.Context
 	appCancel context.CancelFunc
 
+	// pairCtx/pairCancel scope every background task dispatch (executeTaskCmd
+	// in app_dispatch.go — the availability/enrich probe, save-cache, and
+	// connect lanes) to the currently active profile/region pair. pairCtx is
+	// a child of appCtx (so quit still cancels everything, including
+	// mid-rotation — see TestModel_QuitCancelsAppContext/
+	// TestModel_Cancel_CancelsAppContext), and is cancelled-then-re-armed by
+	// handleProfileSelected/handleRegionSelected (app_session.go) on every
+	// rotation, so an already-dispatched background task for the old pair is
+	// aborted instead of surviving on appCtx (quit-only) and burning its AWS
+	// budget after the switch. The interactive fetch lanes in
+	// fetch_adapter.go deliberately keep using appCtx directly — they are
+	// already bounded by their own 30s fetchTimeout, and are not the lanes
+	// this field's rotation fixes.
+	pairCtx    context.Context
+	pairCancel context.CancelFunc
+
 	stack []*rendererState
 
 	inputMode inputMode
@@ -114,6 +130,10 @@ func New(profile, region string, opts ...Option) Model {
 	// Create the app-wide context first so it can be passed to AWS client
 	// construction and threaded through all fetchers.
 	ctx, cancel := context.WithCancel(context.Background())
+	// The initial pair context is a child of the app-wide context — see the
+	// Model.pairCtx field doc for why this is derived rather than reusing ctx
+	// directly.
+	pairCtx, pairCancel := context.WithCancel(ctx)
 
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 
@@ -134,6 +154,8 @@ func New(profile, region string, opts ...Option) Model {
 		activeTheme: "tokyo-night.yaml",
 		appCtx:      ctx,
 		appCancel:   cancel,
+		pairCtx:     pairCtx,
+		pairCancel:  pairCancel,
 	}
 	m.screens = defaultBuilders()
 	for _, opt := range opts {

@@ -97,8 +97,8 @@ type DemoPrefetchResult struct {
 // This method is itself dispatched as a tea.Cmd (background goroutine), so
 // its own Profile/Region read goes through the pairMu-guarded
 // EnsureCacheStoreForRegion rather than reading c.session.Region/Profile
-// directly — the same cross-goroutine hazard EnsureCacheStore/WithCacheStore/
-// ReadCacheStore close (see Session.pairMu's doc comment).
+// directly — the same cross-goroutine hazard EnsureCacheStore/
+// WithCacheStoreSave/ReadCacheStore close (see Session.pairMu's doc comment).
 func (c *Core) LoadAvailabilityCache() *cache.Store {
 	if c.session.NoCache {
 		return nil
@@ -272,15 +272,18 @@ func rowIDsAreSubset(candidate, superset []cache.Row) bool {
 // SaveAvailabilityCache persists the supplied availability state to disk, one
 // type file per resource type (C7: per-type files, no merge logic). Returns
 // nil immediately when entries is nil or caching is disabled (NoCache). The
-// entire per-type read-modify-write-to-disk sequence runs inside
-// WithCacheStore (the store-lock serialization, D13) so it can never interleave with a concurrent
-// SaveResourceListCache/SaveAvailabilityCache call for the same type file
-// dispatched from another tea.Cmd goroutine (e.g. a background availability
-// sweep's save racing a list screen's own fetch-completion save) — that race
-// previously let one call's Count and another's Rows land in the same
-// on-disk TypeFile as a mismatched pair, even though each call's own write
-// was individually consistent. WithCacheStore also covers the initial load
-// (C7 hard invariant: a save can never precede that pair's own load).
+// per-type read-modify-marshal sequence runs inside WithCacheStoreSave (the
+// store-lock serialization, D13) so the in-memory half can never interleave
+// with a concurrent SaveResourceListCache/SaveAvailabilityCache call for the
+// same type file dispatched from another tea.Cmd goroutine (e.g. a
+// background availability sweep's save racing a list screen's own
+// fetch-completion save) — that race previously let one call's Count and
+// another's Rows land in the same on-disk TypeFile as a mismatched pair,
+// even though each call's own write was individually consistent. The actual
+// disk write happens after WithCacheStoreSave releases pairMu — see its doc
+// comment for what changed and the trade-off that split accepts.
+// WithCacheStoreSave also covers the initial load (C7 hard invariant: a save
+// can never precede that pair's own load).
 //
 // Row/Findings persistence (C6, all loaded pages) is intentionally NOT done
 // here — this method only carries the counts-only availability-probe shape
@@ -299,11 +302,12 @@ func (c *Core) SaveAvailabilityCache(
 	if entries == nil {
 		return nil
 	}
-	return c.WithCacheStore(func(store *cache.Store) error {
+	return c.WithCacheStoreSave(func(store *cache.Store) ([]cache.WritePlan, error) {
 		if store == nil {
-			return nil
+			return nil, nil
 		}
 		var firstErr error
+		var plans []cache.WritePlan
 		for rawName, count := range entries {
 			name := canonShortName(rawName)
 			trunc := false
@@ -357,11 +361,16 @@ func (c *Core) SaveAvailabilityCache(
 				continue
 			}
 			store.Put(name, tf)
-			if err := store.SaveType(name); err != nil && firstErr == nil {
-				firstErr = err
+			wp, err := store.PrepareSave(name)
+			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				continue
 			}
+			plans = append(plans, wp)
 		}
-		return firstErr
+		return plans, firstErr
 	})
 }
 
@@ -474,14 +483,16 @@ func materializeResourceFields(r resource.Resource, columns []config.ListColumn,
 // for the C6 scope gate (only calling this for a top-level unfiltered list,
 // never a child/related/filtered view).
 //
-// The entire read-modify-write-to-disk sequence runs inside WithCacheStore
-// (the store-lock serialization, D13) — see SaveAvailabilityCache's doc comment for why obtaining the
-// store via EnsureCacheStore and mutating it afterward is not sufficient:
-// that shape only serializes the pointer lookup, not the store.Type/Put/
-// SaveType sequence, letting two concurrent saves for the same type file
-// interleave. rows is always passed as a real (possibly zero-length, never
-// nil) slice so reconcileTypeFile's rows-carrying lane (rules 1/3/4) is the
-// one that applies here.
+// The read-modify-marshal sequence runs inside WithCacheStoreSave (the
+// store-lock serialization, D13) — see SaveAvailabilityCache's doc comment
+// for why obtaining the store via EnsureCacheStore and mutating it
+// afterward is not sufficient: that shape only serializes the pointer
+// lookup, not the store.Type/Put/PrepareSave sequence, letting two
+// concurrent saves for the same type file interleave. The disk write itself
+// runs after WithCacheStoreSave releases pairMu — see its doc comment. rows
+// is always passed as a real (possibly zero-length, never nil) slice so
+// reconcileTypeFile's rows-carrying lane (rules 1/3/4) is the one that
+// applies here.
 //
 // This is the list-open save lane (app.Controller.maybeSaveResourceListCache
 // and the executor's per-type sweep loop) — never the Wave-2-completion save,
@@ -547,9 +558,9 @@ func (c *Core) saveResourceListCache(shortName string, rows []cache.Row, count i
 	if rows == nil {
 		rows = []cache.Row{}
 	}
-	return c.WithCacheStore(func(store *cache.Store) error {
+	return c.WithCacheStoreSave(func(store *cache.Store) ([]cache.WritePlan, error) {
 		if store == nil {
-			return nil
+			return nil, nil
 		}
 		existing, _ := store.Type(canon)
 		incoming := cache.TypeFile{
@@ -606,7 +617,11 @@ func (c *Core) saveResourceListCache(shortName string, rows []cache.Row, count i
 			tf.IssuesTruncated = existing.IssuesTruncated
 		}
 		store.Put(canon, tf)
-		return store.SaveType(canon)
+		wp, err := store.PrepareSave(canon)
+		if err != nil {
+			return nil, err
+		}
+		return []cache.WritePlan{wp}, nil
 	})
 }
 

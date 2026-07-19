@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -186,12 +187,27 @@ func SanitizePathElem(s string) string {
 // already-removed) directory. A profile/region switch always constructs a
 // brand-new Store via a fresh LoadDir call (see Session.Rotate +
 // ensureCacheStoreLocked), so this capture is naturally per-pair and never
-// goes stale across a rotation.
+// goes stale across a rotation. Always used by pointer (LoadDir/LoadDirIn are
+// its only constructors, both returning *Store) — never copy a Store by
+// value, since saveMu below must not be duplicated.
 type Store struct {
 	profile string
 	region  string
 	dir     string
 	types   map[string]TypeFile
+
+	// saveMu serializes CommitSave's disk write (MkdirAll+temp-write+rename)
+	// against any other concurrent CommitSave for this SAME Store — i.e. this
+	// profile/region pair — so two renames can never interleave. Deliberately
+	// separate from a caller's own in-memory lock (session.Session.pairMu):
+	// PrepareSave/Put (the cheap, in-memory half of a save) run under pairMu,
+	// but CommitSave's I/O runs after pairMu is released, so a slow disk write
+	// never blocks an unrelated pairMu-guarded reader. See
+	// Session.WithCacheStoreSave's doc comment for the full trade-off this
+	// accepts: saveMu stops two commits from tearing each other's write, but
+	// does NOT guarantee commit order matches the order the corresponding
+	// PrepareSave/Put calls happened in.
+	saveMu sync.Mutex
 }
 
 // LoadDir loads every readable, current-version type file under
@@ -316,86 +332,44 @@ func (s *Store) Put(shortName string, tf TypeFile) {
 	s.types[shortName] = tf
 }
 
-// SaveType atomically writes shortName's current staged state (as set by
-// Put) to its own file — <dir>/<shortName>.yaml — via a temp file in the same
-// directory followed by rename. No other type's file is opened or touched
-// (C7: per-type files, no merge logic). The directory is created (0700) if
-// missing; the written file is 0600.
-//
-// tf.Rows is deep-copied before Marshal (deepCopyRows): callers stage a
-// TypeFile via Put with Rows built from live resource.Resource data (e.g.
-// runtime.SaveTypeRows aliases cache.Row.Fields directly onto
-// resource.Resource.Fields whenever materializeResourceFields finds nothing
-// left to add — no copy is made in that case). When SaveType then runs on a
-// different goroutine than the one still holding that live resource (e.g.
-// Controller's async availability-cache writer racing a controller-lane
-// applyFieldUpdatesToSlice call that mutates the same Fields map in place),
-// yaml.Marshal's reflect-based map/slice walk and that mutation can race on
-// the identical map — this was a real, reproduced data race (go test -race),
-// not a theoretical one. Deep-copying here — the single chokepoint every
-// save lane's Marshal goes through — makes the marshaled snapshot fully
-// independent of whatever live structure Rows/Fields/Findings originally
-// aliased, without requiring any caller to take a lock it doesn't already
-// hold or without SaveType itself taking one (Store has none, and adding one
-// would only re-serialize callers, not fix the aliasing).
-//
-// Writes to s.dir — the root captured once at LoadDir construction time, NOT
-// a fresh Dir(s.profile, s.region) recompute (see Store's doc comment) — so a
-// SaveType call that runs on a goroutine outliving its owning Controller
-// always targets the directory that existed when the Store was built, even if
-// A9S_CONFIG_FOLDER has since changed or that directory has since been
-// removed. A leaked writer's SaveType against a removed s.dir returns an
-// error here (MkdirAll/rename against a deleted parent); every caller in this
-// codebase (queueAvailabilitySave's save loop) already logs and discards a
-// SaveType error rather than panicking, so this failure mode is tolerated by
-// design, not merely by accident.
-func (s *Store) SaveType(shortName string) error {
-	// filepath.IsLocal is the guard shape static taint analysis recognizes as
-	// a path-injection barrier; ContainsAny alone is not. IsLocal alone would
-	// still allow a nested element like "sub/evil", so ContainsAny keeps the
-	// stricter single-path-element rule this package requires.
-	if strings.ContainsAny(shortName, `/\`) || !filepath.IsLocal(shortName) {
-		return fmt.Errorf("cache: SaveType(%s): shortName must be a single local path element", shortName)
-	}
-	tf, ok := s.types[shortName]
-	if !ok {
-		return fmt.Errorf("cache: SaveType(%s): no staged state (call Put first)", shortName)
-	}
-	tf.Rows = deepCopyRows(tf.Rows)
+// WritePlan is an immutable, already-marshaled write staged by PrepareSave:
+// the target directory/path plus the exact bytes to write. Produced while a
+// caller's own lock is still held (e.g. session.Session.pairMu) and safe to
+// Commit — or, via CommitSave, hand to the Store that produced it — after
+// that lock is released, since a WritePlan holds no reference back into the
+// Store's types map. See PrepareSave/CommitSave.
+type WritePlan struct {
+	dir  string
+	path string
+	data []byte
+}
 
-	dir := s.dir
-	if dir == "" {
-		return fmt.Errorf("cache: cannot determine cache directory")
-	}
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return fmt.Errorf("creating cache directory %s: %w", dir, err)
+// commit performs the disk write staged by PrepareSave — the directory
+// create, temp-file write, and atomic rename SaveType previously did inline.
+// Unexported: callers reach it only through Store.CommitSave, which adds the
+// saveMu serialization a WritePlan needs against a sibling commit for the
+// same Store (a WritePlan by itself is not safe to Commit concurrently
+// against another WritePlan for the same path — two renames into the same
+// path have no ordering guarantee against each other without it).
+func (wp WritePlan) commit() error {
+	if err := os.MkdirAll(wp.dir, 0700); err != nil {
+		return fmt.Errorf("creating cache directory %s: %w", wp.dir, err)
 	}
 	// Enforce 0700 even on a pre-existing directory (C7b). gosec's G302 rule
 	// flags any Chmod call expecting file-oriented (<=0600) permissions; 0700
 	// is the correct, more-restrictive owner-only mode for a DIRECTORY (needs
 	// the execute bit to remain traversable by its owner), not a file.
-	if err := os.Chmod(dir, 0700); err != nil { //nolint:gosec // 0700 is correct for a directory, not a file
-		return fmt.Errorf("setting permissions on cache directory %s: %w", dir, err)
+	if err := os.Chmod(wp.dir, 0700); err != nil { //nolint:gosec // 0700 is correct for a directory, not a file
+		return fmt.Errorf("setting permissions on cache directory %s: %w", wp.dir, err)
 	}
 
-	data, err := yaml.Marshal(tf)
+	fname := filepath.Base(wp.path)
+	tmpFile, err := os.CreateTemp(wp.dir, fname+".tmp.*")
 	if err != nil {
-		return fmt.Errorf("marshaling cache type %s: %w", shortName, err)
-	}
-
-	fname := shortName + ".yaml"
-	path := filepath.Join(dir, fname)
-	cleanDir := filepath.Clean(dir)
-	if cleaned := filepath.Clean(path); cleaned != cleanDir && !strings.HasPrefix(cleaned, cleanDir+string(os.PathSeparator)) {
-		return fmt.Errorf("cache: SaveType(%s): resolved path %s escapes cache directory %s", shortName, cleaned, cleanDir)
-	}
-
-	tmpFile, err := os.CreateTemp(dir, fname+".tmp.*")
-	if err != nil {
-		return fmt.Errorf("creating cache temp file in %s: %w", dir, err)
+		return fmt.Errorf("creating cache temp file in %s: %w", wp.dir, err)
 	}
 	tmpPath := tmpFile.Name()
-	if _, err := tmpFile.Write(data); err != nil {
+	if _, err := tmpFile.Write(wp.data); err != nil {
 		_ = tmpFile.Close()
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("writing cache %s: %w", tmpPath, err)
@@ -408,9 +382,106 @@ func (s *Store) SaveType(shortName string) error {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("setting permissions on cache %s: %w", tmpPath, err)
 	}
-	if err := os.Rename(tmpPath, path); err != nil {
+	if err := os.Rename(tmpPath, wp.path); err != nil {
 		_ = os.Remove(tmpPath)
-		return fmt.Errorf("renaming cache %s: %w", path, err)
+		return fmt.Errorf("renaming cache %s: %w", wp.path, err)
 	}
 	return nil
+}
+
+// PrepareSave is SaveType's non-I/O half: validates shortName, deep-copies
+// (deepCopyRows) and yaml.Marshals shortName's current staged state (as set
+// by Put) into an immutable WritePlan, and resolves + escape-checks its
+// target path. Touches no disk — safe to call while holding a caller's own
+// lock (e.g. session.Session.pairMu) for only as long as this in-memory work
+// takes, deferring the actual write (CommitSave) until after that lock is
+// released. See Session.WithCacheStoreSave, the caller this split exists for.
+//
+// tf.Rows is deep-copied before Marshal (deepCopyRows): callers stage a
+// TypeFile via Put with Rows built from live resource.Resource data (e.g.
+// runtime.SaveTypeRows aliases cache.Row.Fields directly onto
+// resource.Resource.Fields whenever materializeResourceFields finds nothing
+// left to add — no copy is made in that case). Marshal here can run on a
+// different goroutine than the one still holding that live resource (e.g.
+// Controller's async availability-cache writer racing a controller-lane
+// applyFieldUpdatesToSlice call that mutates the same Fields map in place);
+// yaml.Marshal's reflect-based map/slice walk and that mutation can race on
+// the identical map — this was a real, reproduced data race (go test -race),
+// not a theoretical one. Deep-copying here — the single chokepoint every
+// save lane's Marshal goes through — makes the marshaled snapshot fully
+// independent of whatever live structure Rows/Fields/Findings originally
+// aliased, without requiring any caller to take a lock it doesn't already
+// hold.
+func (s *Store) PrepareSave(shortName string) (WritePlan, error) {
+	// filepath.IsLocal is the guard shape static taint analysis recognizes as
+	// a path-injection barrier; ContainsAny alone is not. IsLocal alone would
+	// still allow a nested element like "sub/evil", so ContainsAny keeps the
+	// stricter single-path-element rule this package requires.
+	if strings.ContainsAny(shortName, `/\`) || !filepath.IsLocal(shortName) {
+		return WritePlan{}, fmt.Errorf("cache: SaveType(%s): shortName must be a single local path element", shortName)
+	}
+	tf, ok := s.types[shortName]
+	if !ok {
+		return WritePlan{}, fmt.Errorf("cache: SaveType(%s): no staged state (call Put first)", shortName)
+	}
+	tf.Rows = deepCopyRows(tf.Rows)
+
+	// dir is s.dir — the root captured once at LoadDir construction time, NOT
+	// a fresh Dir(s.profile, s.region) recompute (see Store's doc comment) —
+	// so a commit that runs on a goroutine outliving its owning Controller
+	// always targets the directory that existed when the Store was built,
+	// even if A9S_CONFIG_FOLDER has since changed or that directory has
+	// since been removed. A leaked writer's commit against a removed dir
+	// returns an error from CommitSave (MkdirAll/rename against a deleted
+	// parent); every caller in this codebase (queueAvailabilitySave's save
+	// loop) already logs and discards a SaveType/CommitSave error rather
+	// than panicking, so this failure mode is tolerated by design, not
+	// merely by accident.
+	dir := s.dir
+	if dir == "" {
+		return WritePlan{}, fmt.Errorf("cache: cannot determine cache directory")
+	}
+
+	data, err := yaml.Marshal(tf)
+	if err != nil {
+		return WritePlan{}, fmt.Errorf("marshaling cache type %s: %w", shortName, err)
+	}
+
+	fname := shortName + ".yaml"
+	path := filepath.Join(dir, fname)
+	cleanDir := filepath.Clean(dir)
+	if cleaned := filepath.Clean(path); cleaned != cleanDir && !strings.HasPrefix(cleaned, cleanDir+string(os.PathSeparator)) {
+		return WritePlan{}, fmt.Errorf("cache: SaveType(%s): resolved path %s escapes cache directory %s", shortName, cleaned, cleanDir)
+	}
+
+	return WritePlan{dir: dir, path: path, data: data}, nil
+}
+
+// CommitSave writes wp to disk (MkdirAll + temp-write + rename), serialized
+// against every other CommitSave call for this Store via saveMu so two
+// commits can never interleave their renames. The only entry point that
+// actually touches disk for a Store — SaveType and Session.WithCacheStoreSave
+// both fall through to this.
+func (s *Store) CommitSave(wp WritePlan) error {
+	s.saveMu.Lock()
+	defer s.saveMu.Unlock()
+	return wp.commit()
+}
+
+// SaveType atomically writes shortName's current staged state (as set by
+// Put) to its own file — <dir>/<shortName>.yaml — via a temp file in the same
+// directory followed by rename. No other type's file is opened or touched
+// (C7: per-type files, no merge logic). The directory is created (0700) if
+// missing; the written file is 0600.
+//
+// A thin PrepareSave+CommitSave composition, for callers that don't need to
+// split the in-memory marshal step from the disk write (i.e. every caller
+// except Session.WithCacheStoreSave's save lanes, which call PrepareSave and
+// CommitSave directly so a caller-held lock can cover only the former).
+func (s *Store) SaveType(shortName string) error {
+	wp, err := s.PrepareSave(shortName)
+	if err != nil {
+		return err
+	}
+	return s.CommitSave(wp)
 }

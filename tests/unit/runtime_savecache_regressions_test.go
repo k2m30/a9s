@@ -34,6 +34,7 @@ package unit_test
 import (
 	"context"
 	"os"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -631,5 +632,124 @@ func TestSaveAvailabilityCache_OneTypeChanged_OnlyThatTypeFileIsRewritten(t *tes
 	}
 	if s3InoAfter != s3InoBefore {
 		t.Errorf("s3.yaml inode changed (%d -> %d) even though s3's availability data was resubmitted unchanged — only the type whose data actually changed should be rewritten", s3InoBefore, s3InoAfter)
+	}
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Test 7 — concurrency safety net for the pairMu critical-section-narrowing
+// fix (WithCacheStore currently holds Session.pairMu for SaveAvailabilityCache's
+// entire per-type deepCopyRows+yaml.Marshal+MkdirAll+temp-write+rename
+// sequence; the fix will snapshot/copy/marshal under the lock and do the
+// file write+rename outside it — see Session.WithCacheStore's doc comment).
+// ────────────────────────────────────────────────────────────────────────────
+
+// TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock is a
+// SAFETY NET, not a red test: it is written to pass identically BEFORE and
+// AFTER the critical-section-narrowing fix, because a single non-reentrant
+// sync.Mutex cannot deadlock on its own and a coarse lock trivially satisfies
+// "no -race report" too (nothing runs outside it to race against). What it
+// DOES catch is a regression the narrowing refactor could plausibly
+// introduce: if the fix's snapshot/copy step going into the marshal-outside-
+// the-lock stage is insufficiently deep (e.g. still aliases a store row
+// slice/map instead of copying it), a concurrent pairMu-guarded reader
+// observing that same store data races against the now-unlocked marshal
+// goroutine under `go test -race`. Run in isolation to make the -race
+// requirement explicit:
+//
+//	go test -race -run TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock ./tests/unit/
+func TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+
+	const numTypes = 30
+	const rowsPerType = 50
+	shortNames := make([]string, numTypes)
+	for i := range shortNames {
+		shortNames[i] = saveRegID("concty", i)
+	}
+
+	// Seed every type with a realistically large row set on disk first, so
+	// the save below performs a genuine per-type read-modify-write (not a
+	// bootstrap from an empty store) — matching the "large account" shape
+	// the review finding describes.
+	seedStore := cache.LoadDir(saveRegProfile, saveRegRegion)
+	for _, name := range shortNames {
+		rows := make([]cache.Row, rowsPerType)
+		for i := range rows {
+			rows[i] = cache.Row{ID: saveRegID(name+"-row", i), Name: saveRegID(name+"-row", i)}
+		}
+		seedStore.Put(name, cache.TypeFile{HasResources: true, Count: rowsPerType, Exact: true, Rows: rows})
+		if err := seedStore.SaveType(name); err != nil {
+			t.Fatalf("seed SaveType(%s): %v", name, err)
+		}
+	}
+
+	c := newSaveCacheRegressionCore(t, false)
+
+	// entries carries a genuinely CHANGED count for every type, so the save
+	// below cannot take the skip-unchanged fast path (pinned separately by
+	// TestSaveAvailabilityCache_UnchangedEntries_DoesNotRewriteTypeFiles) —
+	// every type file actually gets marshaled and rewritten.
+	entries := make(map[string]int, numTypes)
+	trunc := make(map[string]bool, numTypes)
+	for i, name := range shortNames {
+		entries[name] = rowsPerType + 1 + i
+		trunc[name] = false
+	}
+
+	var saveErr error
+	saveDone := make(chan struct{})
+	go func() {
+		saveErr = c.SaveAvailabilityCache(entries, trunc, nil, nil, nil)
+		close(saveDone)
+	}()
+
+	// Concurrent readers hammer the same pairMu-guarded read surface the
+	// save's WithCacheStore contends with (Core.FindingFirstSeenForType ->
+	// Session.ReadCacheStore -> pairMu), for as long as the save is in
+	// flight, then a little past it.
+	const readerGoroutines = 8
+	var wg sync.WaitGroup
+	wg.Add(readerGoroutines)
+	stopReaders := make(chan struct{})
+	for g := 0; g < readerGoroutines; g++ {
+		g := g
+		go func() {
+			defer wg.Done()
+			i := 0
+			for {
+				select {
+				case <-stopReaders:
+					return
+				default:
+				}
+				_ = c.FindingFirstSeenForType(shortNames[(g+i)%numTypes])
+				i++
+			}
+		}()
+	}
+
+	select {
+	case <-saveDone:
+	case <-time.After(10 * time.Second):
+		t.Fatal("SaveAvailabilityCache did not return within the timeout while readers were hammering pairMu — possible deadlock")
+	}
+	close(stopReaders)
+	wg.Wait()
+
+	if saveErr != nil {
+		t.Fatalf("SaveAvailabilityCache (concurrent with pairMu readers): %v", saveErr)
+	}
+
+	reloaded := cache.LoadDir(saveRegProfile, saveRegRegion)
+	for i, name := range shortNames {
+		tf, ok := reloaded.Type(name)
+		if !ok {
+			t.Errorf("TypeFile %q missing on disk after the concurrent save", name)
+			continue
+		}
+		want := rowsPerType + 1 + i
+		if tf.Count != want {
+			t.Errorf("TypeFile(%q).Count = %d, want %d — a save run concurrently with pairMu readers must still persist every type's new count correctly", name, tf.Count, want)
+		}
 	}
 }

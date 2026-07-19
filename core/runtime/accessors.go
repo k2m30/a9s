@@ -98,18 +98,33 @@ func (c *Core) EnsureCacheStore() *cache.Store {
 }
 
 // WithCacheStore runs fn against the current pair's *cache.Store with
-// session.pairMu held for fn's entire duration, so a caller's own
-// store.Type/Put/SaveType read-modify-write sequence for one type file can
-// never interleave with another such sequence running concurrently (the
-// store-lock serialization, D13),
-// and so the Profile/Region pair itself cannot be read torn or racing a
-// concurrent profile/region switch. No-op (fn not called) when NoCache is
-// set, mirroring EnsureCacheStore.
+// session.pairMu held for fn's ENTIRE duration, including any disk I/O fn
+// performs — the coarse, general-purpose primitive. See
+// Session.WithCacheStore's doc comment for why SaveResourceListCache/
+// SaveAvailabilityCache use the narrower WithCacheStoreSave below instead.
+// No-op (fn not called) when NoCache is set, mirroring EnsureCacheStore.
 func (c *Core) WithCacheStore(fn func(store *cache.Store) error) error {
 	if c.session.NoCache {
 		return nil
 	}
 	return c.session.WithCacheStore(fn)
+}
+
+// WithCacheStoreSave runs fn against the current pair's *cache.Store with
+// session.pairMu held for the pair read, the store decision, and fn itself —
+// fn's own store.Type read and store.Put write for one type file can never
+// interleave with another such sequence running concurrently (the store-lock
+// serialization, D13), and the Profile/Region pair itself cannot be read torn
+// or racing a concurrent profile/region switch. fn stages its writes as
+// cache.WritePlan values instead of touching disk itself; the actual write
+// happens after pairMu is released — see Session.WithCacheStoreSave's doc
+// comment for the full design and its trade-offs. No-op (fn not called) when
+// NoCache is set, mirroring EnsureCacheStore.
+func (c *Core) WithCacheStoreSave(fn func(store *cache.Store) ([]cache.WritePlan, error)) error {
+	if c.session.NoCache {
+		return nil
+	}
+	return c.session.WithCacheStoreSave(fn)
 }
 
 // ReadCacheStore runs fn against the current pair's *cache.Store with

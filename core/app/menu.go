@@ -411,9 +411,9 @@ func (c *Controller) queueAvailabilitySave(p availabilitySavePayload) {
 
 // runAvailabilitySaveLoop is the single writer goroutine started by
 // queueAvailabilitySave. It owns every call to Core.SaveAvailabilityCache for
-// the menu-badge persistence path, so the synchronous disk write
-// (SaveAvailabilityCache -> WithCacheStore -> store.SaveType's temp
-// file+chmod+rename) never runs on a goroutine holding Controller.mu. Exits
+// the menu-badge persistence path, so the disk write (SaveAvailabilityCache
+// -> WithCacheStoreSave -> store.CommitSave's temp file+chmod+rename) never
+// runs on a goroutine holding Controller.mu. Exits
 // once Close closes availSaveStop, after persisting any snapshot still
 // pending in availSaveCh (Close.Wait()s on availSaveWG for exactly this).
 func (c *Controller) runAvailabilitySaveLoop() {
