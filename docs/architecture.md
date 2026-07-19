@@ -50,7 +50,7 @@ Important interaction rules:
 - `Update()` must not block; AWS/network work goes in `tea.Cmd`.
 - Old async results are dropped if the user refreshed or switched profile/region.
 - Cache lifetime follows the session; switching account or region must rotate session state.
-- On `main` today, behavior is driven by the declarative catalog (`core/catalog` + `core/aws/catalog_*.go`), not by `init()`/`Register*` wiring. `runtime.Core` owns the active session (`session.Session`) and the app-core dispatch; the Phase-05 extraction has **landed**. The renderer-agnostic boundary holds: `core/domain`, `core/runtime`, `core/session`, `core/aws`, `core/catalog`, and `core/semantics/*` compile with zero Bubble Tea / Lipgloss dependencies (verified transitively, not just by direct import). Theme YAML is validated in the TUI adapter and handed to the runtime as a domain-safe `ParseErr`.
+- On `main` today, behavior is driven by the declarative catalog (`core/catalog` + `core/aws/catalog_*.go`), not by `init()`/`Register*` wiring. `runtime.Core` owns the active session (`session.Session`) and the app-core dispatch; the Phase-05 extraction has **landed**. The renderer-agnostic boundary holds: all of `core/` compiles with zero Bubble Tea / Lipgloss / `internal/` dependencies, gated by `make verify-renderer-free` (a transitive `go list -deps ./core/...` check, part of `make ready-to-push`). Theme YAML is validated in the TUI adapter and handed to the runtime as a domain-safe `ParseErr`.
 - The target patterns are in place: an explicit catalog, shared selectors (`core/semantics/selector`), the canonical `Finding` model, and runtime-owned screen/task contracts. Of the cross-cutting capability modules, **cost is implemented**: the Cost Explorer lives as a pure domain state machine (`core/costs` for records/store/grid/windows, `core/costs/screen` for fetch planning, drill transitions, and the computed view) consumed by a thin `core/app` adapter — typed outcomes, fetch results that carry their own authority, and one computed view shared by cursor movement, rendering, and Enter. Its invariants are specified in [`specs/021-cost-explorer/architecture.md`](../specs/021-cost-explorer/architecture.md) and enforced by a delivery-matrix table test, a TUI/web lane-parity harness, and two AST discipline gates. Logs and CloudTrail scan keep their declarative contracts (`domain.CapabilityID`, `QuerySpec`, `ScreenRegistry`) as a follow-on workstream.
 
 ## What is a9s?
@@ -69,11 +69,11 @@ The codebase has a clean separation of concerns. The 020-architecture-refactor h
 
 - **`cmd/a9s`** — bootstrap only: parse flags, validate startup inputs, load config/theme, wire clients and options, start Bubble Tea.
 - **`internal/tui`** — UI shell and adapter: view stack, global key handling, message routing, sizing, and transient UI state. Holds a `*runtime.Core` and reaches session-scoped state through typed `m.core.*` accessors. As the renderer adapter it legitimately imports `core/session` and `core/aws` (to supply clients and translate runtime `TaskRequest`s into `tea.Cmd`s); the shared core never imports back into `internal/tui`.
-- **`core/runtime`** — platform-agnostic app core: `runtime.Core` owns the active `*session.Session` and the catalog snapshot, dispatches inbound `messages.Event`s to handlers, and returns `UIIntent` / `TaskRequest` lists for adapters to apply. It compiles with zero Bubble Tea / Lipgloss dependencies (verified transitively via `go list -deps`). The cmd/event message taxonomy and screen-builder registry have landed; `HandleEvent` takes the typed `messages.Event` interface.
+- **`core/runtime`** — platform-agnostic app core: `runtime.Core` owns the active `*session.Session` and the catalog snapshot, dispatches inbound `messages.Event`s to handlers, and returns `UIIntent` / `TaskRequest` lists for adapters to apply. It compiles with zero Bubble Tea / Lipgloss dependencies (gated by `make verify-renderer-free`, a transitive `go list -deps` check). Interactive fetch lanes are deadline-bounded: every Core fetch (`FetchResources`, load-more, filtered, child, by-IDs) runs under the 30s `fetchTimeout` in `core/runtime/fetchers.go`. The cmd/event message taxonomy and screen-builder registry have landed; `HandleEvent` takes the typed `messages.Event` interface.
 - **`core/session`** — session-scoped state container (Phase 02 deliverable, **done**): `session.Session` owns per-profile/region orchestration state — the `RowStore` (the single session-scoped per-type row store; see Caching Layers), `RelatedCache`, the enrichment queues and per-type maps, every generation counter (all typed `domain.Gen` after Phase 05a-gens), and the capability stores (`PolicyStore`, `IdentityStore`, `RuleSetStore`) that replaced the deleted `core/aws/` package globals (`allPoliciesMu`, `identityCacheMu`, `sesRuleSetCacheMu`). `Session.Rotate()` is the single point that invalidates all of it on profile/region switch.
-- **`core/resource`** — backward-compat alias layer (type aliases + thin wrapper funcs) over `core/catalog`. The canonical declarative registry is `core/catalog` (`ResourceTypeDef` and friends), populated by the per-category `core/aws/catalog_*.go` literals: resource types, child-view metadata, related defs, navigable fields, and fetcher/enricher registration.
+- **`core/resource`** — the stable façade API over `core/domain` + `core/catalog`, and the package most of the codebase imports (~1000 files, vs ~48 importing `core/catalog` directly). It carries type aliases (`resource.Resource = domain.Resource`, `resource.ResourceTypeDef = catalog.ResourceTypeDef`) plus substantial original logic of its own: navigation ID normalization (`NavIDFromValue`), related-panel entry and validation (`RelatedEnter`, `ValidateRelatedResult`, `FormatRelatedCount`), child-context resolution (`ResolveChildContext`), and the test-only related override registry (`relatedTestOverrides` — `SetRelatedForTest`/`AppendRelated` panic outside a test binary via a `testing.Testing()` guard; production `RelatedDef`s live on catalog literals). Canonical TYPES live in `core/domain`; the canonical declarative registry is `core/catalog`, populated by the per-category `core/aws/catalog_*.go` literals: resource types, child-view metadata, related defs, navigable fields, and fetcher/enricher declarations.
 - **`core/aws`** — primarily the adapter layer: call AWS SDK APIs, transform responses into `resource.Resource`, and host a few non-UI helper subsystems that have not yet been split out. This layer should not know about Bubble Tea views.
-- **`core/cache`** — persistence only: on-disk availability cache and TTL rules.
+- **`core/cache`** — persistence only: the on-disk availability/row cache — one directory per profile+region pair, one YAML file per resource type, no TTL by contract ([`design/cache-requirements.md`](design/cache-requirements.md) C1).
 - **`core/demo`** — injected fake transport for development and tests, not a parallel feature architecture.
 
 ### Architectural Invariants
@@ -88,11 +88,11 @@ These are **current-state invariants**. The 020-architecture-refactor that produ
 1. **One root application model owns session state and orchestration.**
    `tui.Model` owns the UI shell; the session state container
    (`session.Session`) lives in `runtime.Core` and is reached through
-   typed `m.core.*` accessors. The renderer-agnostic boundary holds: the
-   shared core (`core/domain`, `core/runtime`, `core/session`,
-   `core/aws`, `core/catalog`, `core/semantics/*`) compiles
-   with zero Bubble Tea / Lipgloss dependencies, verified transitively via
-   `go list -deps`. As the renderer adapter, `internal/tui` legitimately
+   typed `m.core.*` accessors. The renderer-agnostic boundary holds: all of
+   `core/` compiles with zero Bubble Tea / Lipgloss / `internal/`
+   dependencies, gated by `make verify-renderer-free` (a transitive
+   `go list -deps ./core/...` check enforced by `make ready-to-push`).
+   As the renderer adapter, `internal/tui` legitimately
    imports `core/session` and `core/aws`; nothing imports back into
    `internal/tui` from the core.
 2. **Views render state and emit typed messages.** Views never call AWS
@@ -182,12 +182,12 @@ Key messages (the canonical taxonomy lives in `core/runtime/messages/{cmd,event}
 | `EnrichDetailMsg` | Start async detail enrichment (e.g., policy doc fetch) |
 | `EnrichDetailResultMsg` | Deliver enriched resource back to detail/YAML/JSON view |
 | `RelatedCheckStartedMsg` | Start async related-resource checks |
-| `RelatedCheckResultMsg` | Deliver one related-check result to detail view — carries `Result.Err` (checker failure), `LazyAddError` (FetchByIDs failure), `LazyAddedResources` (out-of-scope targets resolved via `FetchByIDs`), `CachedPages` (cold-miss prefetch); app handler routes errors to `FlashMsg{IsError:true}` so the `!` error log captures them |
+| `RelatedCheckResultMsg` | Deliver one related-check result to detail view — carries `Result.Err` (checker failure), `LazyAddError` (FetchByIDs failure; a panicking checker is recovered by the dispatch `tea.Cmd` in `internal/tui/runtime_adapter_related.go` and surfaced here too, with an `UnknownRelated` result), `LazyAddedResources` (out-of-scope targets resolved via `FetchByIDs`), `CachedPages` (cold-miss prefetch); app handler routes errors to `FlashMsg{IsError:true}` so the `!` error log captures them |
 | **Availability & Issue Counts** | |
 | `AvailabilityCacheLoadedMsg` | Deliver disk-cached availability + issue count data (includes `IssueCounts`, `IssueKnown` maps) |
 | `AvailabilityPrefetchedMsg` | No-cache-mode availability + issue counts + retained resources for Wave 2; `PrefetchErr` carries per-type fetch failures aggregated across all registered paginated fetchers, surfaced via FlashMsg |
 | `AvailabilityCheckedMsg` | One resource type's background probe result (includes `Issues` count + retained `Resources`) |
-| `EnrichmentCheckedMsg` | One resource type's Wave 2 enrichment result (issue count + truncated flag + per-resource `Findings` map; dual-generation guard via `Gen` + `TypeGen`) |
+| `EnrichmentCheckedMsg` | One resource type's Wave 2 enrichment result (truncated flag + per-resource `Findings` / `AttentionDetails` / `FieldUpdates` / `TruncatedIDs` maps; dual-generation guard via `Gen` + `TypeGen`). It carries no issue count — the menu badge is recomputed by `unifiedIssueCount` (`core/runtime/handlers_availability.go`) over the freshly folded rows |
 | **UI feedback** | |
 | `FlashMsg` | Show a temporary status/error message |
 | `ClearFlashMsg` | Auto-clear flash after timer |
@@ -218,41 +218,46 @@ Views are created in `handleNavigate()` and pushed immediately. Async data arriv
 
 ```text
 cmd/
-  a9s/              # main binary — CLI flags, tea.NewProgram
-  readmegen/        # generates README.md from docs/README.tmpl.md
-  viewsgen/         # generates ~/.a9s/views/*.yaml from built-in defaults
+  a9s/              # main binary — CLI flags, tea.NewProgram (--demo, --web)
+  readmegen/        # generates README.md from docs/README.tmpl.md + docs/shared/
+  viewsgen/         # generates .a9s/views/*.yaml from built-in defaults
   refgen/           # generates views_reference.yaml from AWS SDK struct reflection
   preview/          # renders static TUI design mockups (no AWS)
+  catalogen/        # catalog codegen
+  snapshot/         # web-e2e snapshot collector
+  checklist/        # web-e2e checklist oracle
 
-internal/
+core/            # platform-agnostic core — renderer-free, gated by `make verify-renderer-free`
   app/           # headless controller (Controller) — shared list/detail/menu/cost state+render, consumed by both tui/ and web/
-  aws/           # AWS service clients, resource fetchers, related checkers, enrichers
+  aws/           # AWS service clients, resource fetchers, related checkers, enrichers, catalog_<category>.go type defs
   buildinfo/     # version resolution (ldflags at build time)
-  cache/         # on-disk availability cache with TTL (see Caching Layers)
-  catalog/       # canonical resource catalog: static `var ResourceTypes`, type defs in `core/aws/catalog_*.go`, installed via `aws.Install()` + `catalog.SetTypes(...)`. The sole source of truth; the legacy `Register*` registry is gone.
-  config/        # YAML config loading, built-in defaults per service
+  cache/         # on-disk availability/row cache — one dir per profile+region pair, one YAML file per type, no TTL (see Caching Layers)
+  catalog/       # canonical resource catalog: ResourceTypeDef + FindingDef, aggregated from `core/aws/catalog_*.go` literals, installed via `aws.Install()` + `catalog.SetTypes(...)`. The sole source of truth; the legacy `Register*` registry is gone.
+  config/        # YAML config loading, built-in defaults per service category (defaults_<category>.go)
   costs/         # Cost Explorer domain state machine (records/store/grid/windows); costs/screen for fetch planning + drill
   demo/          # synthetic fixture data for --demo mode
     fixtures/    #   per-service Go structs (ec2.go, iam.go, etc.)
     fakes/       #   per-service fake API implementations
   domain/        # leaf type-declaration package: Resource, Type, Severity, FindingCode, Finding, AttentionDetail, Color, Gen, plus query-contract types. Introduced in Phase 01 (`docs/historical/refactor/landed/01-projection-hook.md`); `Gen` added in Phase 05a-gens.
   fieldpath/     # struct field extraction via reflection (frozen — don't modify)
-  resource/      # backward-compat alias layer — `resource.Resource`, `resource.ResourceTypeDef`, `resource.Color` re-export `core/domain` / `core/catalog`; registry-style getters now read the catalog
-  runtime/       # platform-agnostic app core: Core (orchestrator.go), handlers.go, screens.go, tasks.go, state.go, intent.go (zero Bubble Tea/Lipgloss deps)
-    messages/    #   typed Cmd/Event message taxonomy (cmd.go, event.go, messages.go marker interfaces)
-  session/       # session.Session — all session-scoped mutable state + capability stores; Rotate() invalidates in-flight gens
-  semantics/     # shared semantic helpers: projection (DetailProjector), ctevent (CloudTrail event summarization), selector (shared ARN/tag matching)
   jsonyaml/      # renderer-free JSON→YAML helpers (used by projection without pulling in lipgloss)
-  tui/           # Bubble Tea adapter shell; as the renderer adapter it imports session/ and aws/ to supply clients and translate runtime TaskRequests into tea.Cmds
+  resource/      # stable façade over domain/ + catalog/ — type aliases plus original helpers (NavIDFromValue, RelatedEnter, ResolveChildContext) and the test-only related override registry
+  runtime/       # platform-agnostic app core: Core (orchestrator.go), handlers, screens, tasks, state, intents; 30s fetchTimeout on interactive fetch lanes (fetchers.go)
+    messages/    #   typed Cmd/Event message taxonomy (cmd.go, event.go, messages.go marker interfaces)
+  semantics/     # shared semantic helpers: projection (DetailProjector), ctevent (CloudTrail event summarization), selector (shared ARN/tag matching)
+  session/       # session.Session — all session-scoped mutable state + capability stores; Rotate() invalidates in-flight gens
+  web/           # web mode: HTTP server rendering the same controller state (server.go, templates/, static/)
+
+internal/
+  tui/           # Bubble Tea adapter shell — GPL-3.0-or-later only; as the renderer adapter it imports core/session and core/aws to supply clients and translate runtime TaskRequests into tea.Cmds
     keys/        #   key bindings (single Map struct, one file)
     layout/      #   frame rendering (borders, title, status line)
     styles/      #   Tokyo Night Dark palette, theming system
     text/        #   text utilities (PadOrTrunc for column rendering)
     views/       #   all view models (see View Types below)
-  web/           # web mode: HTTP server rendering the same controller state (server.go, templates/, static/)
 
 tests/
-  unit/          # all unit tests (run via `make test`; `make test-race` adds -race)
+  unit/          # black-box behavior tests, package `unit` (run via `make test`; `make test-race` adds -race). White-box tests live in-package next to the code — see Test Architecture.
   integration/   # gated by //go:build integration
   testdata/      # hand-crafted JSON fixtures — AWS SDK response bodies for fetcher unit tests (no live AWS)
 ```
@@ -293,23 +298,49 @@ Resource types are registered declaratively through the catalog: each type is on
 ```go
 // core/catalog/types.go    (canonical home; `core/resource/types.go`
 //                               re-exports as `type ResourceTypeDef = catalog.ResourceTypeDef`
-//                               for backward compat until PR-04n.)
+//                               for zero-churn backward compat.)
 type ResourceTypeDef struct {
+    // Identity & display
     Name        string           // "EC2 Instances" — display name
     ShortName   string           // "ec2" — colon-command alias and registry key
-    ListTitle   string           // overrides ShortName in list frame titles; empty = use ShortName
     Aliases     []string         // alternative command names
     Category    string           // main-menu group (e.g., "COMPUTE")
-    Columns     []Column         // table columns for list view
-    Children    []ChildViewDef   // child views triggerable from the list (key bindings)
-    CopyField   string           // overrides which Fields key `c` copies; empty = copy ID
-    StubCreator func(id string) Resource // builds a minimal stub for auto-navigate when cache is empty
-    RelatedContextFromIDs func(relatedIDs []string) map[string]string // extracts parent context for related-panel navigation
-    CloudTrailKey string         // "LookupAttr:ValueSource" for CloudTrail pivot; empty = no `t` key
+    ListTitle   string           // overrides ShortName in list frame titles; empty = use ShortName
+    TitleOmitsID bool            // detail title renders "detail -- <Name>" for opaque synthetic IDs
+    CostExplorerServiceName string // Cost Explorer SERVICE dimension for the cost drill-down; empty = unsupported
+    Columns     []domain.Column  // table columns for list view
+    LifecycleKey string          // Fields key holding lifecycle state; defaults to "state"
     IdentityKey string           // column key for enrichment row-marker placement; empty = use 5-step cascade
-    Color func(domain.Resource) domain.Color   // REQUIRED: classifies row health; findings-first, raw fields only as fallback
+    CellDecorators map[string]func(domain.Resource, string) string // transforms cell values per column before render
+    CopyField   string           // overrides which Fields key `c` copies; empty = copy ID
+
+    // Behavior — fetchers and enrichers are struct fields, not registrations
+    Fetcher             domain.PaginatedFetcher  // Wave 1 paginated fetcher
+    AvailabilityFetcher domain.PaginatedFetcher  // optional cheaper probe-only fetcher; nil = use Fetcher
+    Wave2               any                      // aws.IssueEnricher{Fn, Priority}; nil = no Wave 2 signal
+    Project             domain.DetailProjector   // custom projector; nil = projection.GenericWithConfig fallback
+    Related             []domain.RelatedDef      // right-column related-panel defs (contract: docs/related-resources.md)
+    Navigable           []domain.NavigableField  // detail-view field → target-type navigation
+    Children            []domain.ChildViewDef    // child views triggerable from the list (key bindings)
+    Reveal              domain.RevealFetcher     // secret reveal (`x` key); nil = no reveal
+    DetailEnrich        domain.DetailEnricher    // on-demand detail enricher; nil = none
+    FieldKeys           []string                 // valid Resource.Fields keys the Wave 1 fetcher produces
+    FieldAliases        map[string]string        // source field key → alias key copied by ApplyFieldAliases
+    FetchByIDs          domain.FetchByIDsFunc    // by-ID fetch, bypassing pagination (lazy related adds)
+    FilteredFetcher     domain.FilteredPaginatedFetcher // server-side filtered page fetch
+    IssueEnricherFieldKeys []string              // Fields keys the Wave 2 enricher writes via FieldUpdates
+    ChildFetcher        domain.PaginatedChildFetcher    // set on child-type entries via catalog.SetChildTypes
+
+    // Cross-cutting
+    CloudTrailKey string         // "LookupAttr:ValueSource" for CloudTrail pivot; empty = no `t` key
     ExcludeFromIssueBadge bool   // rows still colored + ctrl+z visible, but excluded from menu badge (used by ct-events)
-    CellDecorators map[string]func(r Resource, value string) string // transforms cell values per column before render
+    StubCreator func(string) domain.Resource // builds a minimal stub for auto-navigate when cache is empty
+    RelatedContextFromIDs func([]string) map[string]string // extracts parent context for related-panel navigation
+
+    // Color, augmentation, findings
+    Color    func(domain.Resource) domain.Color // REQUIRED: classifies row health; findings-first, raw fields only as fallback
+    Augment  domain.Augmenter                   // optional post-projector section hook (e.g. EC2 status checks)
+    Findings []FindingDef                       // declarative finding-code table: {Code, Phrase, Severity, Source}
 }
 ```
 
@@ -345,7 +376,7 @@ All registered via `catalog.ResourceTypeDef` literals in `core/aws/catalog_*.go`
 | **FilteredPaginatedFetcher** | `func(ctx, clients, filter, token) (FetchResult, error)` | Server-side filtered queries (CloudTrail events) |
 | **RevealFetcher** | `func(ctx, clients, resourceID) (string, error)` | On-demand secret reveal (`x` key — Secrets Manager, SSM) |
 | **DetailEnricher** | `func(ctx, clients, Resource) (Resource, error)` | On-demand detail enrichment (policy documents) |
-| **IssueEnricherFunc** | `func(ctx, *ServiceClients, []Resource) (IssueEnricherResult, error)` | Wave 2 issue enrichment; `IssueEnricherResult` carries issue count, truncated flag, and per-resource `Findings` map |
+| **IssueEnricherFunc** | `func(ctx, *ServiceClients, []Resource) (IssueEnricherResult, error)` | Wave 2 issue enrichment; `IssueEnricherResult` carries `Truncated`, `TruncatedIDs`, and per-resource `Findings` / `AttentionDetails` / `FieldUpdates` maps — no issue count field; the badge count is derived by `unifiedIssueCount` (`core/runtime/handlers_availability.go`) |
 
 Each fetcher takes `clients any` and type-asserts to `*aws.ServiceClients` internally. This allows tests to inject mocks.
 
@@ -363,18 +394,22 @@ This section documents the current Wave 2 implementation on `main`. The refactor
 - `core/aws/catalog_*.go` — per-category catalog literals. Each entry's `Wave2` field carries an `IssueEnricher{Fn:..., Priority:...}`, and `IssueEnricherFieldKeys` lists the `Fields` keys the enricher writes via `IssueEnricherResult.FieldUpdates`. Types with `NoOpIssueEnricher` are explicit placeholders for in-fetcher Wave 2 work.
 - `core/runtime/probes.go` — `(*Core).BuildEnrichQueue()` (queue construction lives on `runtime.Core`).
 - `internal/tui/probe_adapter.go` — `(*Model).probeEnrichment()` — the TUI-side `tea.Cmd` wrapper that dispatches enrichers and emits `EnrichmentChecked` messages.
-- `core/runtime/handlers_availability.go` — `(*Core).startEnrichment()` (builds the queue, returns probe tasks) and `(*Core).handleEnrichmentChecked()` (applies one Wave-2 result with the only-increase guard).
+- `core/runtime/handlers_availability.go` — `(*Core).startEnrichment()` (builds the queue, dispatches the initial window) and `(*Core).handleEnrichmentChecked()` (folds one Wave-2 result onto the type's cached rows, rebases the probe status on the Wave-1 availability baseline, recomputes the menu badge via `unifiedIssueCount`, and refills the next queued type).
 
 **Flow:**
 
 ```text
 Wave 1 probes complete
   → startEnrichment() builds queue from awsclient.AllWave2() ∩ observed RowStore types
-  → probeEnrichment() dispatches issue enrichers (4-at-a-time, same as Wave 1)
+  → dispatches the first enrichDispatchWindow (4) types; the rest stay queued in
+    session.EnrichQueue and each EnrichmentChecked completion refills exactly one
+    (the refill branch in handleEnrichmentChecked) — dispatch is windowed, never unbounded
   → EnrichmentCheckedMsg arrives
-    → only-increase guard: menu badge updated only if new count > current
+    → findings/FieldUpdates fold onto the type's cached rows (applyEnrichment + AmendRows)
+    → menu badge recomputed via unifiedIssueCount over the folded rows (a healed issue clears)
     → progress indicator updated
-  → all done: save cache with enriched counts (when caching enabled); the RowStore retains the enriched rows for the session
+  → all done: save cache with enriched rows/findings (when caching enabled, wave2Complete=true);
+    the RowStore retains the enriched rows for the session
 ```
 
 **Registry**: Wave 2 capability is declared on each `catalog.ResourceTypeDef` literal's `Wave2` field (`IssueEnricher{Fn, Priority}`); a type with no Wave 2 signal simply omits the field — `Wave2EnricherFor` returns `ok=false` for it. Some types without a `Wave2` enricher still perform in-fetcher Wave 2 work — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`; since v3.50.x this list-then-describe-each shape is the standard for new types whose pivots live on the describe response: mwaa `GetEnvironment` per environment, transfer `DescribeServer` per server, lt one `DescribeLaunchTemplateVersions("$Default")` per template).
@@ -407,7 +442,7 @@ After Wave 2 issue enrichment runs, findings are surfaced in list and detail vie
 - `DetailModel.SetEnrichmentFinding(f *domain.Finding, ad *domain.AttentionDetail)` (`internal/tui/views/detail_helpers.go`) — injects (or, with `nil`, clears) the finding in the unified detail-view Attention section (`injectAttentionSection`, `internal/tui/views/detail_fields.go`).
 
 **Stacked-view live-update pattern:**
-- `handleEnrichmentChecked` iterates the full view stack, not just the active view. This allows enrichment messages to update non-active `ResourceListModel` and `DetailModel` instances for the affected type. A user can navigate away to a detail view while Wave 2 runs and both the list (behind) and the detail receive the findings without requiring a re-open.
+- The runtime's `handleEnrichmentChecked` emits `PatchResourceList` and `PatchDetail` intents scoped to the affected type (`PatchDetail` with an empty `ResourceID` means "all open detail views of this type"). The adapter applies them to every matching view in the stack, not just the active one, so a user can navigate away to a detail view while Wave 2 runs and both the list (behind) and the detail receive the findings without requiring a re-open.
 
 **Current-state ownership (Phase-05, AS-237)**: Session-scoped state lives exclusively in `session.Session`, owned by `runtime.Core` and accessed from `tui.Model` via `m.core.Session()`. The `tui.Model` struct holds only pure UI-shell state (view stack, input mode, flash, tab completion). Profile/region switches call `m.core.Session().Rotate()` which bumps every generation counter and rebuilds the maps — in-flight async messages tagged with the pre-switch gens are then rejected by the handlers' gen guards.
 
@@ -487,8 +522,8 @@ The main menu shows `issues:N` badges per resource type, counting resources in w
 **Issue counting flow**:
 1. Wave 1 probes (or `demoPrefetchCounts()`) count `td.ResolveColor(r).IsIssue()` rows from first page
 2. Counts flow to `MainMenuModel` via `SetIssues()`, rendered as `issues:N` badges
-3. Wave 2 enrichment discovers hidden issues, updates badges (only-increase guard)
-4. `popView()` sync-back: when user returns from a list, the list's `issueCount` syncs back to the menu — but only if higher than the current menu count (prevents overwriting enriched counts)
+3. Wave 2 enrichment folds findings onto the cached rows, then `unifiedIssueCount` (`core/runtime/handlers_availability.go`) recomputes the badge from the folded rows and emits `PatchMenu` — a recount, not an only-increase merge, so a healed issue clears
+4. The old `popView()` sync-back is gone: the list-count → menu-badge sync runs at the controller level (`core/app/handle.go`, `handleResourcesLoadedEvent`/`syncExactTotalToMenu`) on every `ResourcesLoaded` for a top-level list, so both the TUI and web renderers get it as soon as a fetch or load-more result lands
 
 **`ExcludeFromIssueBadge`**: When set on a `ResourceTypeDef`, rows are still colored and ctrl+z is honored, but the type is excluded from the main-menu badge count. Used by ct-events where severity is event-level, not resource-health.
 
@@ -681,19 +716,19 @@ One session field is deliberately EXEMPT from `Rotate()`'s clean-slate rule: `Se
 
 | Cache | Location | Scope | Invalidation |
 |-------|----------|-------|-------------|
-| **Disk availability cache** | `core/cache/` | Persisted at `~/.a9s/cache/<profile>--<region>.yaml` | TTL of 1 hour; file replaced atomically |
+| **Disk availability cache** | `core/cache/` | Persisted at `~/.a9s/cache/<profile>--<region>/` — one directory per pair, one YAML file per resource type (`<shortName>.yaml`) | No TTL by contract (C1: cached content renders stale-marked and is re-verified on sight); each type's file replaced atomically via temp+rename |
 | **Row store** | `session.Session.RowStore` (owned by `runtime.Core`) | In-memory `map[string]session.TypeRows` — one entry per canonical resource type | Cleared on profile/region switch via `session.Rotate()` |
 | **Related cache** | `session.Session.RelatedCache` | In-memory LRU with fixed capacity | Cleared on `Rotate()`; entry deleted on Ctrl+R |
 | **Detail-enricher caches** | Feature-specific cache on `session.Session`, delivered to enrichers via `*awsclient.DetailEnrichmentCtx` (current example: `PolicyDocumentCache`) | In-memory, session-scoped | Rotated by `session.Rotate()` on profile/region switch |
 | **Enrichment visibility state** | `EnrichmentRan`, `EnrichmentTypeGen`, `EnrichmentTruncatedIDs`, `EnrichmentGen` on `session.Session` (Wave 2 progress/control); per-resource findings are folded into `resource.Resource.Findings` on cached rows — see "Wave 2 findings (where they live)" above | In-memory, session-scoped | Cleared per-type on Ctrl+R rerun start; cleared entirely on `Rotate()` |
 
-**Disk availability cache** (`core/cache/cache.go`): Tracks which resource types have resources, their counts, and issue counts. Loaded on startup to instantly grey-out empty types and show issue badges in the main menu. Structure: `File{Profile, Region, CheckedAt, Resources map[string]Entry}` where `Entry{HasResources, Count, Truncated, Issues, IssuesTruncated, IssuesKnown}`. The `IssuesKnown` bool distinguishes "probed and found zero issues" from "not yet probed" (both unmarshal as int 0 without this flag). When caching is enabled (not `--no-cache`), the cache is saved after Wave 1 probes complete and again after Wave 2 enrichment completes, so enriched issue counts persist across restarts. When `--no-cache` is active, `saveAvailabilityCache()` is a no-op.
+**Disk availability cache** (`core/cache/cache.go`): Tracks which resource types have resources, their counts, issue counts, and render-sufficient row snapshots. Loaded on startup to instantly grey-out empty types, show issue badges in the main menu, and seed list screens with real rows before any live fetch. Layout: one directory per profile+region pair (`<cache root>/<profile>--<region>/`) containing one self-contained YAML file per resource type (`<shortName>.yaml`) — C7: per-type files, no merge logic. Each file is a `TypeFile{Version, HasResources, Count, Exact, Issues, IssuesKnown, IssuesTruncated, Rows, SavedAt}`; `Rows` carry `{ID, Name, Fields, Findings, FindingFirstSeen}`. The schema is v2 (`cache.SchemaVersion`): v2 added `Row.FindingFirstSeen` (#463), and `LoadDirIn` still accepts a v1 file, backfilling `FindingFirstSeen` from the file's own `SavedAt` so a pre-#463 cache never regresses to "no cache". The `IssuesKnown` bool distinguishes "probed and found zero issues" from "not yet probed" (both unmarshal as int 0 without this flag). There is deliberately NO TTL ([`design/cache-requirements.md`](design/cache-requirements.md) C1): arbitrarily old rows may render, stale-marked, while re-verification runs in the background. When caching is enabled (not `--no-cache`), per-type files are saved after Wave 1 probes complete and again after Wave 2 enrichment completes (atomic temp+rename per file), so enriched findings persist across restarts; `Core.SaveAvailabilityCache` (`core/runtime/probes.go`) skips a type's write entirely when the counts-only scalars are unchanged against the existing on-disk entry. When `--no-cache` is active, the save lanes are no-ops.
 
 **Row store** (`core/session/rowstore.go`): The single source of truth for every cached resource-list row the session has observed. One `TypeRows` entry per canonical short name carries: `Rows` (immutable once stored — every change produces a new slice, so snapshots can never be invalidated by a later write), `Pagination` (nil is never exact — conservatively treated as truncated, C5), `TotalCount` (may exceed `len(Rows)`), `Origin` (`disk|probe|fetch` — which lane last accepted a rows-carrying write), `Partial` (sparse `FetchByIDs` lazy adds; a full observe clears it — full-beats-partial — and a sparse add never downgrades a full entry), `Gen` (increments on every accepted write; `Gen != 0` makes "observed empty" first-class, distinct from "never observed"), and `ViewState` (filter/sort/cursor/h-scroll, so a warm re-entry restores the exact view the user left). Writes go through `Observe` (full rows), `ObservePartial` (sparse adds), `ObserveCount` (counts-only — never touches rows), and `Amend` (copy-on-write content mutation — the enrichment fold and finding patches apply exactly once, here); reads are defensive-copy `Snapshot`/`SnapshotAll`. Reconciliation rules: appends dedup by ID; a stale truncated ID-subset replace is rejected once an entry is exact; a disk seed never overwrites live probe/fetch rows. The store is pair-scoped — `Rotate()` clears it on profile/region switch (C9).
 
 The legacy accessor names survive on `runtime.Core` as store-backed views: `Core.ResourceCache(rt)` reports a hit only for a FULL, `OriginFetch` entry — this gates navigation's cache-hit promotion (a probe- or disk-origin entry seeds the list but still verifies with a live fetch, per C1: cached content renders before any AWS activity, then is verified); `Core.LazyResourceCache(rt)` reads `Partial` entries; `Core.AnyOriginResourceCache(rt)` serves related-navigate's any-origin (full-lane) cache hits; `Core.AnyLaneResources(rt)` returns a type's rows from EITHER lane (full or `Partial`) and is the render-time row source for a related-**filtered** list — the `RelatedIDSet` scopes it, so surfacing the lazy/by-ID `Partial` lane is safe and a cache-hit filtered list renders without a fetch on both the TUI and the web (`Controller.seedRelatedExactRows`, the single seed both renderers share).
 
-**Per-screen views**: the headless controller's `ListState.Rows` is a per-screen VIEW adopted from the store's accepted rows for the canonical top-level list — the store reconciles, the screen adopts, and `ListState.RowsGen` pins the store generation the rows were adopted at. Child, related, and filtered screens stay screen-local (the C6 scope boundary) — their rows never route through the store. There is no controller-side row mirror; field updates and finding patches reach every screen through the store's `Amend`.
+**Per-screen views**: the headless controller's `ListState.Rows` is a per-screen VIEW adopted from the store's accepted rows for the canonical top-level list — the store reconciles, the screen adopts, and `ListState.RowsGen` pins the store generation the rows were adopted at. Child, related, and filtered screens stay screen-local (the C6 scope boundary) — their rows never route through the store. There is no controller-side row mirror; field updates and finding patches reach every screen through the store's `Amend`. List body rendering is memoized, not rebuilt per frame: `buildListBody` (`core/app/list_body.go`) keeps a per-`ListState` memo invalidated only when `rowsVersion` (bumped on every content-changing row mutation), filter, attention-only toggle, sort column/direction, or the enrichment generation changes.
 
 **One save lane**: every per-type disk save goes through `Core.SaveTypeRows` (`core/runtime/probes.go`), which resolves save columns via a view-config-aware resolver injected with `SetSaveColumns` and hands the rows to `reconcileTypeFile` — the on-disk reconciliation rules are unchanged, now reachable from exactly one chokepoint (the former sweep/list two-materializer split persisted different field sets for the same row under user-reordered columns).
 
@@ -809,35 +844,39 @@ main.go → parseFlags → tui.New(profile, region, opts...)
 
 ## Extension Guide
 
-The steps below describe how to extend the current `main` architecture. They are intentionally not the target contributor workflow after the refactor lands. For the target shape, see [`docs/historical/refactor/00-overview.md`](historical/refactor/00-overview.md) and [`docs/historical/refactor/04-catalog.md`](historical/refactor/04-catalog.md).
+Everything a resource type does is declared on ONE `catalog.ResourceTypeDef` struct literal. There is no `Register*` call and no feature-wiring `init()` anywhere — `make verify-zero-init` fails the build if one appears.
 
 ### Adding a New Resource Type
 
-1. Add or update the `ResourceTypeDef` and built-in default view config.
-2. Implement the fetcher in `core/aws/` so it returns stable `resource.Resource` values with meaningful `ID`, `Name`, `Status`, `Issues`, `Fields`, and `RawStruct` for the current resource model on `main`. If the fetcher makes per-item describe calls, adopt the honest-degradation contract (`DetailsDeniedFindingDef` — a listed resource whose describe is denied stays as a `details denied` row; see §Wave 2 Issue Enrichment Pipeline).
-3. Register the resource behavior in `core/resource/`:
-   - paginated fetcher
-   - child fetchers, if any
-   - related defs, if any
-   - navigable fields, if any
-   - reveal fetcher or enricher, if needed
-4. Add demo fixtures and fakes so the feature can be exercised without AWS access.
-5. Add both fetcher-level tests and TUI-level behavior tests.
+1. **Write the catalog literal** — one `catalog.ResourceTypeDef` entry in the matching `core/aws/catalog_<category>.go` file (see the category table above; e.g. the `"ec2"` literal in `catalog_compute.go` is the reference example). Everything is a struct field on the literal:
+   - identity/display: `Name`, `ShortName`, `Aliases`, `Category`, `Columns`
+   - `Color` — REQUIRED; findings-first classification (see Issue Counting & Attention Filter)
+   - `Fetcher` — the Wave 1 paginated fetcher (wrapped via `fetcherWithClients`); add `FetchByIDs` when other types' related pivots target this type (lazy adds)
+   - `Wave2` — `IssueEnricher{Fn: ..., Priority: ...}` when the type has hidden issues behind extra API calls; omit for none, `NoOpIssueEnricher` for explicit in-fetcher Wave 2 work; declare `IssueEnricherFieldKeys` for any `Fields` keys the enricher writes via `FieldUpdates`
+   - `Related` — the right-column pivots. ⚠️ Governed by [`related-resources.md`](./related-resources.md); every entry needs an AWS API field citation or documented DevOps workflow reason
+   - `Findings` — the declarative `FindingDef` table: `{Code, Phrase, Severity, Source}` for every Wave 1 and Wave 2 finding the type can emit
+   - `Navigable`, `Children`, `Reveal`, `DetailEnrich`, `CloudTrailKey`, `Augment` — as needed
+2. **Implement the fetcher** in `core/aws/<shortname>.go`, returning `resource.Resource` values with meaningful `ID`, `Name`, `Type`, `Fields`, `RawStruct`, and Wave-1 `Findings` (the legacy `Status`/`Issues` string fields no longer exist on the model — see §Resource Model). If the fetcher makes per-item describe calls, adopt the honest-degradation contract (`DetailsDeniedFindingDef` — a listed resource whose describe is denied stays as a `details denied` row; see §Wave 2 Issue Enrichment Pipeline).
+3. **Add built-in view defaults** in `core/config/defaults_<category>.go`, then regenerate the on-disk views (`go run ./cmd/viewsgen/`).
+4. **Add demo fixtures and fakes** — `core/demo/fixtures/<shortName>.go` (graph-connected, shared by demo mode and tests) plus the typed fake in `core/demo/fakes/`.
+5. **Add tests** in `tests/unit/`: fetcher-level tests (narrow interface mocks) and TUI-level behavior tests (demo fakes). The catalog conformance gates (`tests/unit/architecture_conformance_test.go`, `qa_color_findings_conformance_test.go`) pick the new literal up automatically.
 
 ### Adding a Child View
 
-1. Define a `ChildViewDef` on the parent resource type.
-2. Implement and register the `PaginatedChildFetcher`.
-3. Ensure the parent resource exposes the `ContextKeys` required by the child fetcher.
+1. Define a `ChildViewDef` in the parent literal's `Children` field, and the child-type entry (with its `ChildFetcher`) installed via `catalog.SetChildTypes`.
+2. Implement the `PaginatedChildFetcher` in `core/aws/`.
+3. Ensure the parent resource exposes the `ContextKeys` required by the child fetcher (`ResolveChildContext` resolves `"ID"`, `"Name"`, `"@parent.x"`, and `Fields` keys).
 4. Add demo data and a navigation test that drives the real root model.
 
 ### Adding an Enricher
 
+Both enricher kinds are catalog struct fields — `Wave2` for background issue enrichment, `DetailEnrich` for on-demand detail enrichment. Tests may override them per-test via `awsclient.SetWave2EnricherForTest` / `resource.SetDetailEnricherForTest` (with the matching cleanup); production code never registers anything.
+
 1. Keep the base list/detail fetch path fast; defer expensive or optional data to the enricher.
 2. Make the enricher idempotent and safe to re-run.
-3. Ensure stale results are rejectable by generation plus resource context.
-4. Treat this `Register*`/Wave-2 path as current-state implementation guidance, not the long-term target API. New refactor work should follow the phased design under `docs/historical/refactor/`.
-5. If the enricher caches, document its scope and invalidation rules.
+3. Ensure stale results are rejectable by generation plus resource context (Wave 2 results carry the `Gen` + `TypeGen` dual guard; detail enrichment carries `enrichGen`).
+4. A Wave 2 enricher returns `IssueEnricherResult{Truncated, TruncatedIDs, Findings, AttentionDetails, FieldUpdates}` — findings only, no counts; the badge is recomputed centrally by `unifiedIssueCount`. Every emitted `Finding.Code` must have a matching `FindingDef` row in the literal's `Findings` table.
+5. If the enricher caches, use a session-scoped cache on `session.Session` reached via `*awsclient.DetailEnrichmentCtx`, and document its scope and invalidation rules.
 6. Add tests for success, error, stale-result rejection, and cache invalidation paths.
 
 ---
@@ -850,8 +889,13 @@ Tests verify **behavior**, not implementation. A test should assert on what the 
 
 ### Directory Layout
 
-- `tests/unit/` — all unit tests. Run via `make test`; `make test-race` adds `-race`.
+Unit tests live in two layers:
+
+- `tests/unit/` — **black-box behavior tests** (package `unit`). The bulk of the suite: they exercise the app through its public surfaces — fetcher functions, the root `tui.Model`, the headless controller — and assert on rendered output or returned values. Run via `make test`; `make test-race` adds `-race`.
+- **In-package white-box tests** — ~39 `_test.go` files colocated with the code they test, under `core/app`, `core/runtime`, `core/aws`, `core/session`, `internal/tui`, and `internal/tui/views` (e.g. `core/runtime/handlers_availability_test.go`, `internal/tui/views/coverage_topup_whitebox_test.go`). They cover unexported behavior that has no public seam — internal reconcilers, whitebox regression pins, coverage top-ups. `make test`/`make test-race` run both layers (`go test ./...`).
 - `tests/integration/` — gated by `//go:build integration`. Run manually with specific flags.
+
+**Where a new test belongs**: default to a black-box test in `tests/unit/` — if the behavior is observable through a public surface, test it there. Add an in-package white-box test only when the logic is unexported and cannot be exercised meaningfully through the public surface.
 
 ### Test Categories
 
@@ -974,4 +1018,4 @@ Detail views render from pre-fetched `Fields`/`RawStruct`. Some data (like polic
 
 ### Why four separate caches?
 
-Each cache serves a fundamentally different access pattern: disk cache survives restarts for instant startup; the session row store is the one in-memory copy of every type's rows (probe retention, disk seed, list cache, and lazy related adds are lanes into it, not separate copies) and enables instant back-navigation; related cache avoids redundant API fanouts; enricher caches prevent repeated expensive single-resource fetches. Collapsing them would conflate TTL/invalidation/eviction policies.
+Each cache serves a fundamentally different access pattern: disk cache survives restarts for instant startup; the session row store is the one in-memory copy of every type's rows (probe retention, disk seed, list cache, and lazy related adds are lanes into it, not separate copies) and enables instant back-navigation; related cache avoids redundant API fanouts; enricher caches prevent repeated expensive single-resource fetches. Collapsing them would conflate invalidation and eviction policies.

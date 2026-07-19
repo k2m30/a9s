@@ -147,11 +147,16 @@ row (`detailSkipToDrillable`: a row Enter would navigate from, i.e. carrying
 deferred `(?)` rows stay reachable via Up/Down and the all-dimmed cursor-0
 fallback is unchanged.
 
-`RightColumnModel` remains as the related-panel **widget** (cursor movement,
-filter typing); its row slice is interaction state, not the navigation source of
-truth. Folding that residual cursor/filter state into the controller is a
-code-structure cleanup with no known correctness impact — the navigation
-contract above already reads a single owned row.
+`RightColumnModel` remains as the related-panel **widget**, but its private
+row store is gone entirely: the struct now holds only interaction state —
+focus, cursor, scroll offset, and filter query
+(`internal/tui/views/rightcolumn.go`; `newRightColumn` accepts defs/resource
+args purely for call-site compatibility and discards them, "the widget itself
+holds no row facts"). The render path consumes the controller's
+`app.DetailBody.Related` verbatim (`RenderDetail(body.Related)`) — which was
+already the render truth above; the duplicate store that could have diverged
+from it has been deleted. The folding cleanup this paragraph used to propose
+is done: no widget-owned copy of row facts remains.
 
 ---
 

@@ -543,22 +543,22 @@ else
 fi
 
 # ============================================================================
-section "DEAD EXPORTS (deadcode vs baseline ratchet)"
+section "DEAD EXPORTS (deadcode vs committed baseline)"
 # ============================================================================
 
 # golang.org/x/tools/cmd/deadcode reports functions unreachable from the
 # shipped binary. Test seams (*ForTest and friends) are unreachable BY DESIGN,
-# so the check is a ratchet against a committed baseline rather than a bare
-# fail: new dead exports FAIL; baseline entries that came back alive or got
-# deleted WARN so the baseline gets pruned. Line numbers are stripped —
-# they churn on every edit.
+# so the check compares against a committed baseline instead of failing on
+# every entry: a dead export NOT in the baseline FAILS; a baseline entry that
+# came back alive or got deleted WARNS so the baseline gets pruned. Line
+# numbers are stripped — they churn on every edit.
 DEADCODE_BASELINE=".claude/scripts/deadcode-baseline.txt"
 deadcode_out=$(go run golang.org/x/tools/cmd/deadcode@latest ./cmd/a9s 2>/dev/null \
   | sed -E 's/:[0-9]+:[0-9]+: unreachable func: /: /' \
   | sort -u || true)
 
 if [ -z "$deadcode_out" ] && ! go run golang.org/x/tools/cmd/deadcode@latest ./cmd/a9s >/dev/null 2>&1; then
-  warn "deadcode tool unavailable (offline?) — dead-export ratchet skipped"
+  warn "deadcode tool unavailable (offline?) — dead-export baseline check skipped"
 elif [ ! -f "$DEADCODE_BASELINE" ]; then
   warn "No deadcode baseline at $DEADCODE_BASELINE — create it: the sorted current output of this check"
 else

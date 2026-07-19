@@ -1,4 +1,4 @@
-.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security coverage verify-readonly verify-zero-init verify-renderer-free verify-hooks demo readme check-readme mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live smoke-costs check-no-real-data install-hooks ready-to-push ready-to-release generate
+.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security coverage verify-readonly verify-zero-init verify-renderer-free verify-hooks demo readme check-readme check-catalogen mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live smoke-costs check-no-real-data install-hooks ready-to-push ready-to-release generate
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -144,6 +144,25 @@ check-readme:
 	rm -f "$$tmpfile"
 	@echo "PASS: README.md is in sync with docs/shared/"
 
+# catalogen regenerates the generated blocks in docs/attention-signals.md,
+# docs/related-resources.md, and docs/resources/*.md from catalog
+# declarations, writing in place. The check runs it and fails when the
+# regeneration changes anything — i.e. a catalog edit landed without its doc
+# regeneration. It refuses to run over already-dirty generated docs so a
+# failure diff is unambiguously catalogen's.
+CATALOGEN_DOCS = docs/attention-signals.md docs/related-resources.md docs/resources
+check-catalogen:
+	@if ! git diff --quiet -- $(CATALOGEN_DOCS); then \
+		echo "FAIL: uncommitted changes under $(CATALOGEN_DOCS) — commit or revert before check-catalogen"; exit 1; \
+	fi
+	@go run ./cmd/catalogen > /dev/null
+	@if git diff --quiet -- $(CATALOGEN_DOCS); then \
+		echo "PASS: generated catalog docs are in sync with catalog declarations"; \
+	else \
+		git diff --stat -- $(CATALOGEN_DOCS); \
+		echo "FAIL: catalog declarations changed without regenerating docs — commit the diff above (go run ./cmd/catalogen)"; exit 1; \
+	fi
+
 # Snapshot tests run the existing golden-file tests (issue119, issue140,
 # ec2_related_view, ctdetail_demo, scenario_*_visual_test.go) and verify the
 # rendered output matches the committed golden files byte-for-byte.
@@ -213,7 +232,7 @@ install-hooks:
 
 # Stage 6 — Pre-push gate. The single command every PR must pass before push.
 # See docs/development-process.md.
-ready-to-push: verify-hooks check-no-real-data test-race lint security gofix verify-readonly verify-zero-init verify-renderer-free check-readme snapshot mdlint smoke smoke-related smoke-costs
+ready-to-push: verify-hooks check-no-real-data test-race lint security gofix verify-readonly verify-zero-init verify-renderer-free check-readme check-catalogen snapshot mdlint smoke smoke-related smoke-costs
 	@echo "PASS: ready-to-push gate green"
 
 # Stage 7 — Pre-release gate. ADDITIVE on top of Stage 6: it does NOT re-run

@@ -121,18 +121,26 @@ Review the diff before it merges. Use the available lenses as tools:
 make ready-to-push
 ```
 
-This target is the canonical gate. It MUST pass locally with zero edits before any push. It runs:
+This target is the canonical gate. It MUST pass locally with zero edits before any push. It runs, in Makefile order:
 
-1. `make test-race` — unit tests with race detector and `-shuffle=on` (CI shuffles test order; a local gate that runs in declaration order cannot catch order-dependent leaks, per the v3.54.0 macOS TempDir incident).
-2. `make lint` — golangci-lint.
-3. `make security` — govulncheck.
-4. `make gofix` — `//go:fix inline` directives applied.
-5. `make verify-readonly` — read-only invariant.
-6. `make check-readme` — README in sync with `docs/shared/`.
-7. `make snapshot` — golden-file render checks.
-8. `make mdlint` — markdown lint across `docs/`, `CLAUDE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`.
-9. `make smoke` — tmux-driven demo smoke over the compiled binary (`scripts/smoke-demo.sh`): rendered menu counts, humanized statuses, per-row issue causes, the reference bucket's related panel. Requires tmux. When demo fixtures legitimately change, update the script's assertions in the same PR.
-10. `make smoke-related` — tmux-driven demo smoke dedicated to the RELATED panel (`scripts/smoke-related-demo.sh`): exact fixture witness badges, the zero-count-row cursor skip, a count-1 drill landing on the target detail, a circular drill re-showing cached counts, and the ec2 IAM Role pivot. Requires tmux.
+1. `make verify-hooks` — aborts unless `git config core.hooksPath` is `.githooks`. The sensitive-term half of `check-no-real-data` lives in the git hooks; an unhooked clone would silently lose it.
+2. `make check-no-real-data` — blocks real AWS/environment identifiers (account IDs in ARNs, previously-leaked terms) from tracked files; tree mode also term-scans NEW content against the merge-base with `origin/main`.
+3. `make test-race` — unit tests with race detector and `-shuffle=on` (CI shuffles test order; a local gate that runs in declaration order cannot catch order-dependent leaks, per the v3.54.0 macOS TempDir incident).
+4. `make lint` — golangci-lint.
+5. `make security` — govulncheck.
+6. `make gofix` — `//go:fix inline` directives applied.
+7. `make verify-readonly` — read-only invariant via `scripts/verify-readonly.sh`: a token-based scan that strips comments before matching, with exemptions as exact method names — a trailing `//` or a read verb elsewhere on the line cannot hide a write call.
+8. `make verify-zero-init` — zero `init()` bodies in `core/aws/` and `core/catalog/` (the AS-795 invariant: migrated catalog literals, not package `init()`).
+9. `make verify-renderer-free` — runs `go list -deps` over `core/` and fails on any `charm.land` or `internal/` dependency (the renderer-agnostic boundary, architecture invariant 1).
+10. `make check-readme` — README in sync with `docs/shared/`.
+11. `make check-catalogen` — the generated blocks in `docs/attention-signals.md`, `docs/related-resources.md`, and `docs/resources/*.md` are in sync with the catalog declarations (runs `cmd/catalogen` and fails if regeneration changes anything).
+12. `make snapshot` — golden-file render checks.
+13. `make mdlint` — markdown lint across `docs/`, `CLAUDE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`.
+14. `make smoke` — tmux-driven demo smoke over the compiled binary (`scripts/smoke-demo.sh`): rendered menu counts, humanized statuses, per-row issue causes, the reference bucket's related panel. Requires tmux. When demo fixtures legitimately change, update the script's assertions in the same PR.
+15. `make smoke-related` — tmux-driven demo smoke dedicated to the RELATED panel (`scripts/smoke-related-demo.sh`): exact fixture witness badges, the zero-count-row cursor skip, a count-1 drill landing on the target detail, a circular drill re-showing cached counts, and the ec2 IAM Role pivot. Requires tmux.
+16. `make smoke-costs` — tmux-driven demo smoke of the Cost Explorer (`scripts/smoke-costs-demo.sh`): month→week→day zoom, metric cycle, account pivot, the planted growth-story drill to usage types, the 14-day resource boundary message. Fixtures anchor to the current month, so assertions stay evergreen. Requires tmux.
+
+This enumeration is pinned against the Makefile's `ready-to-push` dependency list by a unit test (`tests/unit/docs_gate_sync_test.go`) — when the target changes, that test fails until this list is updated to match.
 
 For changes that touch `core/aws/` real-account behavior, additionally run the live integration test against a real AWS profile (this is also the entry to Stage 6.5):
 

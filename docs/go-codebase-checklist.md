@@ -19,6 +19,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 - [ ] Shared logic extracted only when identical code appears in 3+ places (not 2)
 - [ ] Extracted helpers live as close to their callers as possible (same package > utility package)
 - [ ] Test helpers live in `tests/unit/helpers_*.go` — not duplicated across test files
+- [ ] SDK fakes follow the one-configurable-fake-per-SDK-interface convention in service-named files (`tests/unit/fakes_athena_test.go`, `fakes_s3_test.go` are the pattern) — never wave/batch-named fake files
 - [ ] AWS fetchers follow a consistent pattern but are NOT generated or abstracted into a framework — each is a straightforward function
 - [ ] Style constants defined once in `styles/palette.go` — never inline hex strings
 
@@ -47,7 +48,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 - [ ] `messages/` is data definitions only — no behavior
 
 **Open/Closed:**
-- [ ] New resource types added by creating a fetcher file + registering — no existing code modified
+- [ ] New resource types added by creating a fetcher file + a catalog literal in `core/aws/catalog_*.go` — no existing code modified
 - [ ] New views added by implementing the `View` interface + adding a message case in `app.go`
 - [ ] Styles extensible via `views.yaml` without touching Go code
 
@@ -71,7 +72,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 
 - [ ] Package name describes what it provides, not what it does (`resource` not `resourceutils`)
 - [ ] No circular imports between packages
-- [ ] `internal/` used to enforce API boundaries — all domain packages live under `internal/`
+- [ ] `core/` is the importable, renderer-agnostic domain surface (dual-licensed by design); `internal/` holds only the `tui/` Bubble Tea adapter — the compiler's import boundary applies to `internal/tui` only
 - [ ] Package paths are flat over deep (`internal/tui/views` not `internal/tui/components/views/models`)
 - [ ] Dependency direction is strictly enforced:
   - `views` -> `keys`, `messages`, `styles`, `text`, `fieldpath`, `config`, `resource`
@@ -163,8 +164,8 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 
 ## AWS Resource Types
 
-- [ ] Each resource type has a `ResourceTypeDef` in `core/resource/types.go`
-- [ ] Each fetcher registered via `resource.RegisterPaginated()` in an `init()` function
+- [ ] Each resource type has a `ResourceTypeDef` (defined in `core/catalog/types.go`; `core/resource/types.go` re-exports it as an alias)
+- [ ] Production wiring is declarative: a catalog literal in `core/aws/catalog_*.go`, installed via `aws.Install` — no `init()` registration; tests swap fetchers via the `Set*ForTest`/`Cleanup*ForTest` seams in `core/resource/accessors.go`
 - [ ] Fetcher signature is `func(ctx context.Context, clients interface{}, continuationToken string) (FetchResult, error)`
 - [ ] Fetcher type-asserts `clients` to `*awsclient.ServiceClients` internally
 - [ ] Column keys in `ResourceTypeDef` match the field keys populated by the fetcher
@@ -226,7 +227,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 
 - [ ] `/cmd` contains only binary entrypoints with thin `main()`
 - [ ] `/cmd/refgen` is a dev-time code generation tool (no AWS credentials needed)
-- [ ] `/internal` holds all domain packages
+- [ ] `/core` holds the platform-agnostic domain packages; `/internal` holds only the `tui/` adapter
 - [ ] `/tests/unit/` contains all unit tests (external test package)
 - [ ] `/tests/integration/` is behind build tags
 - [ ] `/docs/design/` holds the visual design spec (architectural truth)
@@ -235,10 +236,10 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 
 ## init() Functions
 
-- [ ] `init()` in `core/aws/*.go` is acceptable — registers fetchers in the resource registry
-- [ ] `init()` in `core/demo/*.go` is acceptable — registers fixture generators in the demo data map
+- [ ] Zero `init()` bodies in `core/aws/` and `core/catalog/` — enforced by `make verify-zero-init`; wiring is migrated catalog literals, not package `init()`
+- [ ] `init()` in `core/demo/*.go` is acceptable — demo transport wiring
 - [ ] `init()` in `internal/tui/styles/` is acceptable — initializes computed style values
-- [ ] No other `init()` functions exist outside these three locations
+- [ ] No other `init()` functions exist outside these two locations
 - [ ] Each `init()` contains only simple registrations — no complex logic
 
 ---
@@ -268,11 +269,11 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 - [ ] Subtests use `t.Run(tc.name, ...)` for parallel-safe isolation
 - [ ] AWS mocks implement single-method interfaces from `<service>_interfaces.go`
 - [ ] Mocks return canned data — no real AWS calls in unit tests
-- [ ] `resource.RegisterPaginated()` / `resource.UnregisterPaginated()` used for test isolation
+- [ ] `resource.Set*ForTest()` / `resource.Cleanup*ForTest()` seams (`core/resource/accessors.go`) used for test isolation
 - [ ] View tests construct models directly and call `Update()` / `View()` — no `tea.Program`
 - [ ] Integration tests behind `//go:build integration` tag
 - [ ] `go test -race ./...` should pass (no data races in unit tests)
-- [ ] Version bumped in `cmd/a9s/main.go` after every code change
+- [ ] Version is resolved at build time via `core/buildinfo` + ldflags (`make build`) — never hand-bumped in source
 
 ---
 
@@ -280,7 +281,8 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 
 ### File
 
-- [ ] No file exceeds 500 lines (views and test files may push this — flag for review)
+- [ ] No file exceeds 500 lines — enforced as a WARN by `.claude/scripts/arch-review.sh`, not a hard gate; views and test files may push this — flag for review
+- [ ] Excluded from the 500-line budget (declarative data files, inherently large): demo fixtures (`core/demo/fixtures/*.go`) and catalog literals (`core/aws/catalog_*.go`)
 - [ ] Each file has one primary type; file is named after it
 - [ ] Test files may be larger than source (table-driven tests with fixtures are verbose)
 

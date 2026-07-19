@@ -91,11 +91,11 @@ number.
 
 ## Key Bindings
 
-See the **[Key Bindings](https://github.com/k2m30/a9s/wiki/Key-Bindings)** wiki page for the full keyboard reference.
+See the **[Key Bindings](https://k2m30.github.io/a9s/docs/#key-bindings)** docs page for the full keyboard reference.
 
 ## Child Views (Drill-Downs)
 
-See the **[Child Views](https://github.com/k2m30/a9s/wiki/Child-Views)** wiki page for the full drill-down reference.
+See the **[Child Views](https://k2m30.github.io/a9s/docs/#child-views-drill-downs)** docs page for the full drill-down reference.
 
 ## Commands
 

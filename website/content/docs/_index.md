@@ -14,7 +14,7 @@ title: "Documentation"
 
 ## Child Views (Drill-Downs)
 
-See the **[Child Views](https://github.com/k2m30/a9s/wiki/Child-Views)** wiki page for the full drill-down reference.
+See the **[child-view design reference](https://github.com/k2m30/a9s/tree/main/docs/design/child-views)** for the full drill-down reference (versioned with the code).
 
 ## Commands
 

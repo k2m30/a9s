@@ -18,7 +18,7 @@ Quick reference:
 ## Active Technologies
 
 - Go 1.26+, Bubble Tea v2.0.6, Lipgloss v2.0.3, Bubbles v2.1.0 (all under `charm.land/*/v2`), AWS SDK Go v2 (one service module per supported AWS service), yaml.v3, clipboard
-- YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`); YAML cache on disk (`~/.a9s/cache/<profile>--<region>.yaml`)
+- YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`); YAML cache on disk, per-type layout: `~/.a9s/cache/<profile>--<region>/<shortName>.yaml` (TypeFile schema v2, no TTL)
 - Session-scoped in-memory state owned by `core/session.Session` (RowStore, capability stores, generation counters; cleared on profile/region `Rotate()`)
 - In-process demo fixture store (per resource type, typed fakes in `core/demo/fixtures/` + `fakes/`, loaded at startup)
 
@@ -38,7 +38,7 @@ core/            # platform-agnostic core — importable by external modules; du
   app/           # headless controller — shared list/detail/menu/cost state+render for tui/ and web/
   aws/           # AWS service clients, fetchers, related checkers, enrichers, catalog_<category>.go type defs
   buildinfo/     # version resolution from ldflags / go install
-  cache/         # on-disk availability cache with TTL
+  cache/         # per-type on-disk availability cache (TypeFile schema v2, no TTL)
   catalog/       # canonical resource catalog (ResourceTypeDef, installed via aws.Install)
   config/        # YAML config loading, per-category view defaults (defaults_<category>.go)
   costs/         # Cost Explorer domain state machine
@@ -188,6 +188,12 @@ When code changes affect any of the following, update the shared source and rege
 - Install methods changed → `docs/shared/install.md`
 - Resource types added/removed/renamed → `docs/README.tmpl.md` services table + `website/content/resources.md`
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
+- Keybindings, child views, IAM policy changed → **GitHub wiki** (see below)
+
+GitHub wiki — out-of-repo surface, updated MANUALLY on release:
+- The wiki pages (Key Bindings, Child Views, View Customization, Color Themes, Minimal IAM Profile) have no repo-tracked source; **no gate catches their drift**
+- Any keybinding, child-view, or IAM-policy change requires a manual wiki edit as part of the release
+- README's keybindings/child-views links point at the website; the wiki remains authoritative only for the pages without a repo-tracked source
 
 ## Recent Changes
 
