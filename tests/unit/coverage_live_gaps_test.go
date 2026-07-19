@@ -2,7 +2,9 @@
 // exported/semi-exported surface that carried low coverage: handleCostsKeyMsg
 // and handleDetailKeyMsg (driven through the real key-routing chain via
 // tui.Model.Update), WithActiveTheme, ActiveDetailResource, RawYAML,
-// RawYAMLFromResource, SetReapplyChecker, and SelectedTypeName.
+// RawYAMLFromResource, SetReapplyChecker, the RELATED panel's Enter-navigate
+// route, and Controller.ApplyDetailRelatedResultForResource's
+// DefDisplayName-omitted fallback and filtered-set cursor movement.
 //
 // Reuses the chain* helpers from ec2_stories_nav_chains_test.go (same package)
 // for navigation into a live EC2 detail screen.
@@ -19,6 +21,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -523,25 +526,172 @@ func TestLiveGap_SetReapplyChecker_NilCheckerLeavesRelatedIDSetUntouched(t *test
 }
 
 // ---------------------------------------------------------------------------
-// SelectedTypeName (rightcolumn.go)
+// handleDetailKeyMsg's right-column Enter path (app_stack.go:376-421):
+// SelectedRelatedRow feeding messages.RelatedNavigate. RightColumnModel's
+// SelectedTypeName/rows/View were removed (rightcolumn.go's row-fact store
+// is dead — see internal/tui/views/coverage_topup_whitebox_test.go); row
+// facts now live in core/app's DetailState and the Enter key reads them via
+// Controller.SelectedRelatedRow (already unit-tested directly in
+// core/app/controller_selected_related_test.go), but no test previously
+// drove the actual key-press route from a focused, actionable related row to
+// the resulting messages.RelatedNavigate cmd through the real
+// tui.Model.Update chain.
 // ---------------------------------------------------------------------------
 
-func TestLiveGap_SelectedTypeName_ReturnsDisplayNameOfSelectedRow(t *testing.T) {
-	defs := []resource.RelatedDef{
-		{TargetType: "sg", DisplayName: "Security Groups"},
-		{TargetType: "subnet", DisplayName: "Subnets"},
-	}
-	m := views.NewRightColumn(defs, resource.Resource{ID: "i-1"}, "ec2")
+func TestLiveGap_HandleDetailKeyMsg_RelatedPanelEnter_OnActionableRow_NavigatesUsingControllerRow(t *testing.T) {
+	m := newChainDemoModel(t)
+	m = chainNavigateToEC2Detail(t, m)
 
-	if got := m.SelectedTypeName(); got != "Security Groups" {
-		t.Errorf("SelectedTypeName() = %q, want %q (first row, default cursor)", got, "Security Groups")
+	// Resolve exactly one EC2 related row ("Security Groups") to an
+	// actionable, drillable state; every other row (InitDetailRelatedRows
+	// seeds all of them Loading on navigate) stays non-drillable, so
+	// focusing the right column below auto-lands the cursor here
+	// (ActionToggleFocus's detailSkipToDrillable).
+	m, _ = chainApplyMsg(m, messages.RelatedCheckResult{
+		ResourceType:   "ec2",
+		DefDisplayName: "Security Groups",
+		Result: resource.RelatedCheckResult{
+			TargetType:  "sg",
+			Count:       1,
+			ResourceIDs: []string{"sg-0aaa111111111111a"},
+		},
+	})
+
+	// 'l' (ScrollRight) focuses the right column via ActionToggleFocus.
+	m, _ = chainApplyMsg(m, livegapKey("l"))
+
+	_, cmd := chainApplyMsg(m, livegapSpecialKey(tea.KeyEnter))
+	if cmd == nil {
+		t.Fatal("Enter on the focused, actionable related row returned a nil cmd, want messages.RelatedNavigate")
+	}
+	nav, ok := cmd().(messages.RelatedNavigate)
+	if !ok {
+		t.Fatalf("cmd() = %T, want messages.RelatedNavigate", nav)
+	}
+	if nav.TargetType != "sg" {
+		t.Errorf("RelatedNavigate.TargetType = %q, want %q", nav.TargetType, "sg")
+	}
+	if len(nav.RelatedIDs) != 1 || nav.RelatedIDs[0] != "sg-0aaa111111111111a" {
+		t.Errorf("RelatedNavigate.RelatedIDs = %v, want [sg-0aaa111111111111a]", nav.RelatedIDs)
+	}
+	if nav.TargetID != "sg-0aaa111111111111a" {
+		t.Errorf("RelatedNavigate.TargetID = %q, want %q (single-ID fast path)", nav.TargetID, "sg-0aaa111111111111a")
+	}
+	if nav.SourceResource.ID != ec2TestResource().ID {
+		t.Errorf("RelatedNavigate.SourceResource.ID = %q, want %q", nav.SourceResource.ID, ec2TestResource().ID)
+	}
+	if nav.SourceType != "ec2" {
+		t.Errorf("RelatedNavigate.SourceType = %q, want %q", nav.SourceType, "ec2")
 	}
 }
 
-func TestLiveGap_SelectedTypeName_EmptyWhenNoRows(t *testing.T) {
-	m := views.NewRightColumn(nil, resource.Resource{ID: "i-1"}, "ec2")
+// ---------------------------------------------------------------------------
+// Controller.ApplyDetailRelatedResultForResource's DefDisplayName-omitted
+// fallback (core/app/handle.go's mergeDetailRelatedRow): production always
+// sets DefDisplayName, so this branch only fires for callers (or messages)
+// that omit it — it must refuse to bind when the TargetType is ambiguous
+// across rows, and bind when exactly one row carries that TargetType.
+// ---------------------------------------------------------------------------
 
-	if got := m.SelectedTypeName(); got != "" {
-		t.Errorf("SelectedTypeName() with no related defs = %q, want empty string", got)
+func TestLiveGap_ApplyDetailRelatedResultForResource_AmbiguousTargetTypeWithoutDisplayName_NoBind(t *testing.T) {
+	res := resource.Resource{ID: "evt-livegap-ambiguous-0001", Name: "evt-livegap-ambiguous-0001"}
+	c := newDetailController(t, res, "ct-events")
+
+	rows := []app.DetailRelatedRow{
+		{TargetType: "ct-events", DisplayName: "CT events by AccessKeyId", State: domain.RelatedLoading, Loading: true},
+		{TargetType: "ct-events", DisplayName: "CT events by Username", State: domain.RelatedLoading, Loading: true},
+	}
+	c.ApplyDetailRelated(rows)
+
+	c.ApplyDetailRelatedResultForResource("ct-events", res.ID, "", "ct-events", domain.RelatedResolved, 5, false, "", false, nil, nil)
+
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil")
+	}
+	if len(body.Related) != 2 {
+		t.Fatalf("expected exactly 2 related rows, got %d", len(body.Related))
+	}
+	for _, rb := range body.Related {
+		if !rb.Loading {
+			t.Errorf("row %q resolved to non-loading after an ambiguous DefDisplayName-less result; the ambiguous match must be refused", rb.Name)
+		}
+		if rb.Count != 0 {
+			t.Errorf("row %q Count = %d, want 0 (unbound, untouched)", rb.Name, rb.Count)
+		}
+	}
+}
+
+func TestLiveGap_ApplyDetailRelatedResultForResource_UnambiguousTargetTypeFallback_Binds(t *testing.T) {
+	res := resource.Resource{ID: "i-livegap-unambiguous-0001", Name: "i-livegap-unambiguous-0001"}
+	c := newDetailController(t, res, "ec2")
+
+	rows := []app.DetailRelatedRow{
+		{TargetType: "tg", DisplayName: "Target Groups", State: domain.RelatedLoading, Loading: true},
+	}
+	c.ApplyDetailRelated(rows)
+
+	// DefDisplayName omitted, but exactly one row carries TargetType "tg" —
+	// the tight fallback must bind it.
+	c.ApplyDetailRelatedResultForResource("ec2", res.ID, "", "tg", domain.RelatedResolved, 7, false, "", false, []string{"tg-1"}, nil)
+
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil")
+	}
+	if len(body.Related) != 1 {
+		t.Fatalf("expected exactly 1 related row, got %d", len(body.Related))
+	}
+	rb := body.Related[0]
+	if rb.Loading {
+		t.Error("row still Loading after the unique-TargetType fallback should have resolved it")
+	}
+	if rb.Count != 7 {
+		t.Errorf("row.Count = %d, want 7", rb.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Related-panel cursor movement within a filtered (narrowed) row set
+// (core/app/detail_cursor.go's ActionMoveDown/Up + visibleRelatedRowCount /
+// visibleRelatedRowAt honoring ds.RelatedFilter).
+// ---------------------------------------------------------------------------
+
+func TestLiveGap_RelatedCursor_FilterMode_UpDown_MoveWithinFilteredSet(t *testing.T) {
+	res := resource.Resource{ID: "i-livegap-filtercursor-0001", Name: "i-livegap-filtercursor-0001"}
+	c := newDetailController(t, res, "ec2")
+
+	rows := []app.DetailRelatedRow{
+		{TargetType: "tg", DisplayName: "Target Groups A", State: domain.RelatedResolved, Count: 1},
+		{TargetType: "tg2", DisplayName: "Target Groups B", State: domain.RelatedResolved, Count: 1},
+		{TargetType: "sg", DisplayName: "Security Groups", State: domain.RelatedResolved, Count: 1},
+	}
+	c.SetDetailRelatedVisible(true, false)
+	c.ApplyDetailRelated(rows)
+	c.Apply(app.Action{Kind: app.ActionToggleFocus})
+	vs, _ := c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "Target"})
+
+	if len(vs.Body.Detail.Related) != 2 {
+		t.Fatalf("precondition: filtering on %q should leave 2 rows visible, got %d", "Target", len(vs.Body.Detail.Related))
+	}
+	if got := vs.Body.Detail.Related[vs.Body.Detail.RelatedCursor].Name; got != "Target Groups A" {
+		t.Fatalf("precondition: RelatedCursor after ActionSetFilter = %q, want %q", got, "Target Groups A")
+	}
+
+	vs, _ = c.Apply(app.Action{Kind: app.ActionMoveDown})
+	if got := vs.Body.Detail.Related[vs.Body.Detail.RelatedCursor].Name; got != "Target Groups B" {
+		t.Errorf("MoveDown inside filter mode = %q, want %q", got, "Target Groups B")
+	}
+
+	// A further Down must stay clamped to the filtered set (2 rows), never
+	// leaking into the filtered-out "Security Groups" row.
+	vs, _ = c.Apply(app.Action{Kind: app.ActionMoveDown})
+	if got := vs.Body.Detail.Related[vs.Body.Detail.RelatedCursor].Name; got != "Target Groups B" {
+		t.Errorf("MoveDown past the last filtered row = %q, want to stay clamped at %q (Security Groups is filtered out)", got, "Target Groups B")
+	}
+
+	vs, _ = c.Apply(app.Action{Kind: app.ActionMoveUp})
+	if got := vs.Body.Detail.Related[vs.Body.Detail.RelatedCursor].Name; got != "Target Groups A" {
+		t.Errorf("MoveUp inside filter mode = %q, want %q", got, "Target Groups A")
 	}
 }

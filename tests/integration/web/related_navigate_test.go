@@ -54,42 +54,44 @@ func TestWebRelatedNavigate_SingleTarget_SeedsDetailFromCache(t *testing.T) {
 		t.Fatal("step 2 — Body.Detail is nil after open-detail")
 	}
 	if !vs.Body.Detail.RelatedVisible {
-		t.Skip("step 2 — ec2 detail: RelatedVisible=false — related panel not available; cannot guard regression")
+		t.Fatal("step 2 — ec2 detail: RelatedVisible=false — related panel must be available in demo mode")
 	}
 
-	// The headless runRelatedCheckers must have populated the related rows via
-	// DrainSync so the panel is navigable. Skip rather than fail if the panel
-	// is still loading (would indicate a separate runRelatedCheckers regression).
-	var targetGroupsRow *app.RelatedBlock
-	for i := range vs.Body.Detail.Related {
-		row := &vs.Body.Detail.Related[i]
-		if row.Loading || row.Err {
-			continue
+	// handleAction partitions the related-check fan-out as background tasks
+	// drained in their own goroutine (Server.drainBackgroundTasks), so the
+	// related rows resolve asynchronously after the /action response — poll
+	// until the tg row lands instead of reading /state once.
+	vs = coldPollState(t, c, "step 2 (Target Groups related row resolved)", func(vs app.ViewState) bool {
+		if vs.Body.Kind != app.BodyKindDetail || vs.Body.Detail == nil {
+			return false
 		}
-		if row.TargetType == "tg" {
-			targetGroupsRow = row
+		for _, row := range vs.Body.Detail.Related {
+			if row.TargetType == "tg" {
+				return !row.Loading && !row.Err
+			}
+		}
+		return false
+	})
+
+	var targetGroupsRow *app.RelatedBlock
+	tgIdx := -1
+	for i := range vs.Body.Detail.Related {
+		if vs.Body.Detail.Related[i].TargetType == "tg" {
+			targetGroupsRow = &vs.Body.Detail.Related[i]
+			tgIdx = i
 			break
 		}
 	}
 	if targetGroupsRow == nil {
-		t.Skip("step 2 — Target Groups related row not found or still loading — " +
-			"runRelatedCheckers regression would be a separate bug; skipping this guard")
+		t.Fatal("step 2 — Target Groups related row missing after poll convergence")
 	}
+	// web-prod-01 (i-0a1b2c3d4e5f60001) is registered only in acme-web-tg;
+	// acme-grpc-tg's targets are IP addresses (core/demo/fixtures/elb.go
+	// buildTargetHealth), so the instance pivot stays single-target.
 	if targetGroupsRow.Count != 1 {
-		t.Skipf("step 2 — Target Groups count=%d, want 1 — "+
-			"demo fixture for web-prod-01 must have exactly one target group (acme-web-tg); "+
-			"skipping single-target guard", targetGroupsRow.Count)
-	}
-
-	// Move the related cursor to the Target Groups row (index 0 is the first
-	// related def; it should already be the cursor default, but move up to be safe).
-	// RelatedCursor starts at 0. Find the index of the tg row in the Related slice.
-	tgIdx := -1
-	for i, row := range vs.Body.Detail.Related {
-		if row.TargetType == "tg" {
-			tgIdx = i
-			break
-		}
+		t.Fatalf("step 2 — Target Groups count=%d, want 1 — "+
+			"demo fixture for web-prod-01 must have exactly one target group (acme-web-tg)",
+			targetGroupsRow.Count)
 	}
 	// Move cursor down to the tg row (from default position 0).
 	for i := 0; i < tgIdx; i++ {

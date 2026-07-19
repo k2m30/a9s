@@ -134,8 +134,11 @@ func (m DetailModel) NeedsRelatedCheck() bool {
 //
 // The related panel is rendered from body.Related + body.RelatedCursor +
 // body.RelatedScroll + body.RelatedFocused via renderDetailRelatedFromBody,
-// a thin adapter over the shared renderRelatedPanel — the same function
-// RightColumnModel.View() calls, so the two lanes cannot drift.
+// a thin adapter over renderRelatedPanel — the panel's one render
+// implementation, reading row facts from the controller-assembled
+// app.RelatedBlock slice verbatim. RightColumnModel (rightcolumn.go) holds
+// only the widget's key-routing/focus/filter interaction state; it carries
+// no row facts and has nothing to drift against.
 // The panel visibility gate uses body.RelatedVisible (set by buildDetailBody
 // when the type has registered defs or ds.RelatedVisible is true), matching
 // the TUI's rightColShowing() auto-show behaviour.
@@ -232,13 +235,10 @@ func renderDetailRelatedFromBody(body app.DetailBody, w, h int) string {
 	return renderRelatedPanel(body.Related, body.RelatedFilterActive, body.RelatedCursor, body.RelatedScroll, body.RelatedFocused, w, h)
 }
 
-// renderRelatedPanel is the single pure renderer for the RELATED right panel,
-// shared by the live TUI (RightColumnModel.View(), via an []app.RelatedBlock
-// adapter) and the controller-backed renderer (RenderDetail, via
-// renderDetailRelatedFromBody). Both lanes must produce byte-identical output
-// for the same logical state — this function is the one place that logic
-// lives, so it can no longer drift between the two call sites the way it did
-// before this consolidation (the dim/count-badge bug had to be fixed twice).
+// renderRelatedPanel is the single pure renderer for the RELATED right
+// panel, called by RenderDetail via renderDetailRelatedFromBody with the
+// controller-assembled app.RelatedBlock slice. It is the one place this
+// rendering logic lives, so there is no second lane it can drift against.
 //
 // rows is the visible, filtered, ordered list of related-panel entries.
 // cursor is an index into rows (-1 when no row is selected/highlighted).

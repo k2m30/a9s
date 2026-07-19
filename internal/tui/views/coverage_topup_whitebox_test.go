@@ -20,7 +20,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/core/config"
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -28,7 +27,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// RightColumnModel.Init (rightcolumn.go:73)
+// RightColumnModel.Init (rightcolumn.go:53)
 // ---------------------------------------------------------------------------
 
 func TestTopUp_RightColumn_Init_ReturnsSameModelNilCmd(t *testing.T) {
@@ -37,78 +36,66 @@ func TestTopUp_RightColumn_Init_ReturnsSameModelNilCmd(t *testing.T) {
 	if cmd != nil {
 		t.Errorf("Init() cmd = %v, want nil", cmd)
 	}
-	// Compare identity-relevant fields directly (not reflect.DeepEqual: rows
-	// carry an `error` field, which golangci-lint's deepequalerrors check
-	// forbids comparing that way).
-	if got.cursor != m.cursor || got.focused != m.focused || len(got.rows) != len(m.rows) {
+	if got.cursor != m.cursor || got.focused != m.focused {
 		t.Errorf("Init() model = %+v, want unchanged %+v", got, m)
 	}
 }
 
 // ---------------------------------------------------------------------------
-// RightColumnModel.View (rightcolumn.go:214)
+// renderRelatedPanel (detail_helpers.go:248) — RightColumnModel's row-fact
+// store (rows, View, SelectedTypeName, HasActionableRows) was removed; row
+// facts and the RELATED panel's single render implementation now live in
+// core/app (buildDetailRelatedBlocks) and renderRelatedPanel respectively.
+// The "no defs registered" / "loading rows show display names + header"
+// cases already have direct coverage via the live Controller+RenderDetail
+// seam (tests/unit/rightcolumn_test.go's TestRightColumn_EmptyDefsShowsHint,
+// TestRightColumn_ShowsLoadingState, TestRightColumn_ToggleShowsRelatedHeader);
+// only the width<=0 guard and the filter-matches-nothing branch lacked
+// coverage anywhere, so those two are pinned here directly.
 // ---------------------------------------------------------------------------
 
-func TestTopUp_RightColumn_View_WidthZero_ReturnsEmpty(t *testing.T) {
-	m := newRightColumn([]resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
-	}, resource.Resource{}, "ec2")
-	// SetSize never called: width defaults to zero.
-	if got := m.View(); got != "" {
-		t.Errorf("View() with width<=0 = %q, want empty string", got)
+func TestTopUp_RenderRelatedPanel_WidthZero_ReturnsEmpty(t *testing.T) {
+	if got := renderRelatedPanel(nil, false, -1, 0, false, 0, 10); got != "" {
+		t.Errorf("renderRelatedPanel(w<=0) = %q, want empty string", got)
 	}
 }
 
-func TestTopUp_RightColumn_View_NoRowsRegistered_ShowsHint(t *testing.T) {
-	m := newRightColumn(nil, resource.Resource{}, "ec2")
-	m.SetSize(30, 10)
-	view := m.View()
-	if !strings.Contains(view, "No related types registered") {
-		t.Errorf("View() with no RelatedDefs = %q, want it to contain %q", view, "No related types registered")
-	}
-}
-
-func TestTopUp_RightColumn_View_LoadingRows_ShowsDisplayNamesAndHeader(t *testing.T) {
-	defs := []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
-	}
-	m := newRightColumn(defs, resource.Resource{}, "ec2")
-	m.SetSize(40, 10)
-	view := m.View()
-	if !strings.Contains(view, "RELATED") {
-		t.Errorf("View() = %q, want it to contain the \"RELATED\" header", view)
-	}
-	if !strings.Contains(view, "Target Groups") {
-		t.Errorf("View() with a loading row = %q, want it to contain the row's display name %q", view, "Target Groups")
-	}
-}
-
-func TestTopUp_RightColumn_View_FilterMatchesNothing_ShowsNoMatches(t *testing.T) {
-	defs := []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
-	}
-	m := newRightColumn(defs, resource.Resource{}, "ec2")
-	m.SetSize(40, 10)
-	m.filterQuery = "zzz-no-such-related-type-zzz"
-
-	view := m.View()
-	if !strings.Contains(view, "No matches") {
-		t.Errorf("View() with a filter query matching nothing = %q, want it to contain %q", view, "No matches")
-	}
-	if strings.Contains(view, "Target Groups") {
-		t.Errorf("View() with a non-matching filter = %q, should not still show the filtered-out row", view)
+func TestTopUp_RenderRelatedPanel_FilterActiveNoRows_ShowsNoMatches(t *testing.T) {
+	got := renderRelatedPanel(nil, true, -1, 0, false, 40, 10)
+	if !strings.Contains(got, "No matches") {
+		t.Errorf("renderRelatedPanel(filterActive=true, rows=nil) = %q, want it to contain %q", got, "No matches")
 	}
 }
 
 // ---------------------------------------------------------------------------
-// RightColumnModel.Update / updateKeyMsg (rightcolumn.go:78, :133)
+// RightColumnModel.Update / updateKeyMsg (rightcolumn.go:61, :69) — the
+// widget now holds only interaction state (focus/cursor/filter/scroll); row
+// facts and cursor skip-to-actionable semantics moved to
+// core/app/detail_cursor.go and are covered there:
+//   - resolve-by-DisplayName + DefDisplayName ambiguity fallback:
+//     tests/unit/detail_livepath_migration_test.go's
+//     TestDetailController_ApplyDetailRelatedResultForResource_CtEventsSelfPivots_ResolveByDefDisplayName,
+//     plus coverage_live_gaps_test.go's
+//     TestLiveGap_ApplyDetailRelatedResultForResource_AmbiguousTargetTypeWithoutDisplayName_NoBind
+//     and _UnambiguousTargetTypeFallback_Binds for the DefDisplayName-omitted
+//     branches.
+//   - Down/Up skip-to-next-actionable: tests/unit/app_related_cursor_skip_test.go
+//     (TestRelatedCursor_MoveDown_SkipsDimmedRow and siblings).
+//   - focus-entry landing on the first actionable/drillable row (the old
+//     live incremental "reassign cursor as new results stream in" behavior
+//     no longer exists — cursor placement only happens once, at
+//     ActionToggleFocus time): tests/unit/app_related_focus_entry_test.go.
+//   - filtered-set Up/Down movement: coverage_live_gaps_test.go's
+//     TestLiveGap_RelatedCursor_FilterMode_UpDown_MoveWithinFilteredSet.
+//   - Enter navigation sourcing SelectedRelatedRow from controller state:
+//     coverage_live_gaps_test.go's
+//     TestLiveGap_HandleDetailKeyMsg_RelatedPanelEnter_OnActionableRow_NavigatesUsingControllerRow.
 // ---------------------------------------------------------------------------
 
-// topUpDefs3 returns three RelatedDefs and delivers RelatedCheckResult
-// messages via m.Update so the resulting rows carry realistic, resolved
-// states: "Target Groups" is actionable (Count=2), "ASGs" is a proven dead
-// end (Count=0, not truncated), "Security Groups" is actionable via the
-// blank-navigable RelatedDeferred state.
+// topUpDefs3ResolvedModel returns a focused, sized RightColumnModel. defs are
+// accepted only for newRightColumn call-site parity — per rightcolumn.go's
+// package doc, the widget stores no row facts, so there is nothing left to
+// "resolve" here.
 func topUpDefs3ResolvedModel(t *testing.T) RightColumnModel {
 	t.Helper()
 	defs := []resource.RelatedDef{
@@ -119,97 +106,19 @@ func topUpDefs3ResolvedModel(t *testing.T) RightColumnModel {
 	m := newRightColumn(defs, resource.Resource{ID: "i-topup"}, "ec2")
 	m.SetSize(40, 10)
 	m.SetFocused(true)
-
-	deliver := func(displayName, targetType string, result domain.RelatedCheckResult) {
-		var cmd tea.Cmd
-		m, cmd = m.Update(messages.RelatedCheckResult{DefDisplayName: displayName, Result: result})
-		if cmd != nil {
-			t.Fatalf("Update(RelatedCheckResult{%s}) returned a non-nil cmd, want nil", displayName)
-		}
-	}
-	deliver("Target Groups", "tg", domain.RelatedCheckResult{TargetType: "tg", Count: 2, ResourceIDs: []string{"tg-1", "tg-2"}})
-	deliver("ASGs", "asg", domain.RelatedCheckResult{TargetType: "asg", Count: 0})
-	deliver("Security Groups", "sg", domain.RelatedCheckResult{TargetType: "sg", State: domain.RelatedDeferred})
 	return m
-}
-
-func TestTopUp_RightColumn_Update_RelatedCheckResult_ResolvesRowsByDisplayName(t *testing.T) {
-	m := topUpDefs3ResolvedModel(t)
-	view := m.View()
-	if !strings.Contains(view, "(2)") {
-		t.Errorf("View() after delivering Count=2 for tg = %q, want it to contain \"(2)\"", view)
-	}
-}
-
-func TestTopUp_RightColumn_Update_Down_SkipsNonActionableRowToNextActionable(t *testing.T) {
-	m := topUpDefs3ResolvedModel(t)
-	// ensureCursorValid already parked the cursor on the first actionable row (tg).
-	if got := m.SelectedTypeName(); got != "Target Groups" {
-		t.Fatalf("precondition: SelectedTypeName() = %q, want %q", got, "Target Groups")
-	}
-
-	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
-	if cmd != nil {
-		t.Errorf("Update(Down) plain cursor move returned a non-nil cmd, want nil")
-	}
-	if got := m.SelectedTypeName(); got != "Security Groups" {
-		t.Errorf("Update(Down) from %q = %q, want %q (skips the proven-zero ASGs row)", "Target Groups", got, "Security Groups")
-	}
-}
-
-func TestTopUp_RightColumn_Update_Up_SkipsNonActionableRowToPrevActionable(t *testing.T) {
-	m := topUpDefs3ResolvedModel(t)
-	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown}) // tg -> sg
-	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyUp}) // sg -> tg (skips asg)
-	if cmd != nil {
-		t.Errorf("Update(Up) plain cursor move returned a non-nil cmd, want nil")
-	}
-	if got := m.SelectedTypeName(); got != "Target Groups" {
-		t.Errorf("Update(Up) from %q = %q, want %q (skips the proven-zero ASGs row)", "Security Groups", got, "Target Groups")
-	}
-}
-
-func TestTopUp_RightColumn_Update_Enter_OnActionableRow_ReturnsRelatedNavigateCmd(t *testing.T) {
-	m := topUpDefs3ResolvedModel(t)
-	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	if cmd == nil {
-		t.Fatal("Update(Enter) on an actionable row returned a nil cmd, want a messages.RelatedNavigate cmd")
-	}
-	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigate)
-	if !ok {
-		t.Fatalf("Update(Enter)()() = %T (%#v), want messages.RelatedNavigate", msg, msg)
-	}
-	if nav.TargetType != "tg" {
-		t.Errorf("RelatedNavigate.TargetType = %q, want %q", nav.TargetType, "tg")
-	}
-	if len(nav.RelatedIDs) != 2 || nav.RelatedIDs[0] != "tg-1" {
-		t.Errorf("RelatedNavigate.RelatedIDs = %v, want [tg-1 tg-2]", nav.RelatedIDs)
-	}
-	if nav.SourceResource.ID != "i-topup" {
-		t.Errorf("RelatedNavigate.SourceResource.ID = %q, want %q", nav.SourceResource.ID, "i-topup")
-	}
-}
-
-func TestTopUp_RightColumn_Update_Enter_OnNonActionableRow_ReturnsNilCmd(t *testing.T) {
-	m := topUpDefs3ResolvedModel(t)
-	m.cursor = 1 // ASGs: resolved, Count=0, not truncated -> not actionable
-	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	if cmd != nil {
-		t.Error("Update(Enter) on a proven-zero (non-actionable) row returned a non-nil cmd, want nil")
-	}
 }
 
 func TestTopUp_RightColumn_Update_NotFocused_KeyMsgIsNoop(t *testing.T) {
 	m := topUpDefs3ResolvedModel(t)
 	m.SetFocused(false)
-	before := m.SelectedTypeName()
+	before := m.cursor
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if cmd != nil {
 		t.Error("Update(Down) while unfocused returned a non-nil cmd, want nil")
 	}
-	if got := m.SelectedTypeName(); got != before {
-		t.Errorf("Update(Down) while unfocused changed selection: %q -> %q, want unchanged", before, got)
+	if m.cursor != before {
+		t.Errorf("Update(Down) while unfocused changed cursor: %d -> %d, want unchanged", before, m.cursor)
 	}
 }
 
@@ -230,14 +139,7 @@ func TestTopUp_RightColumn_Update_FilterMode_TypingNarrowsVisibleRows(t *testing
 	m, _ = m.Update(tea.KeyPressMsg{Text: "Target"})
 
 	if got := m.FilterQuery(); got != "Target" {
-		t.Fatalf("FilterQuery() = %q, want %q", got, "Target")
-	}
-	view := m.View()
-	if !strings.Contains(view, "Target Groups") {
-		t.Errorf("View() filtered on %q = %q, want it to still contain %q", "Target", view, "Target Groups")
-	}
-	if strings.Contains(view, "Security Groups") {
-		t.Errorf("View() filtered on %q = %q, should not contain the filtered-out row %q", "Target", view, "Security Groups")
+		t.Errorf("FilterQuery() after typing %q = %q, want %q", "Target", got, "Target")
 	}
 }
 
@@ -305,147 +207,6 @@ func TestTopUp_RightColumn_Update_FilterMode_Enter_ExitsFilterModeKeepsQuery(t *
 	}
 	if got := m.FilterQuery(); got != "Target" {
 		t.Errorf("FilterQuery() after Enter = %q, want the query preserved (%q)", got, "Target")
-	}
-}
-
-func TestTopUp_RightColumn_Update_FilterMode_UpDown_MoveCursorWithinFilteredSet(t *testing.T) {
-	defs := []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups A", Checker: resource.NoopChecker},
-		{TargetType: "tg2", DisplayName: "Target Groups B", Checker: resource.NoopChecker},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: resource.NoopChecker},
-	}
-	m := newRightColumn(defs, resource.Resource{}, "ec2")
-	m.SetSize(40, 10)
-	m.SetFocused(true)
-	m, _ = m.Update(messages.RelatedCheckResult{DefDisplayName: "Target Groups A", Result: domain.RelatedCheckResult{TargetType: "tg", Count: 1}})
-	m, _ = m.Update(messages.RelatedCheckResult{DefDisplayName: "Target Groups B", Result: domain.RelatedCheckResult{TargetType: "tg2", Count: 1}})
-	m, _ = m.Update(messages.RelatedCheckResult{DefDisplayName: "Security Groups", Result: domain.RelatedCheckResult{TargetType: "sg", Count: 1}})
-
-	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
-	m, _ = m.Update(tea.KeyPressMsg{Text: "Target"})
-
-	if got := m.SelectedTypeName(); got != "Target Groups A" {
-		t.Fatalf("precondition: SelectedTypeName() after filtering = %q, want %q", got, "Target Groups A")
-	}
-
-	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
-	if got := m.SelectedTypeName(); got != "Target Groups B" {
-		t.Errorf("Down inside filter mode = %q, want %q", got, "Target Groups B")
-	}
-
-	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
-	if got := m.SelectedTypeName(); got != "Target Groups A" {
-		t.Errorf("Up inside filter mode = %q, want %q", got, "Target Groups A")
-	}
-}
-
-func TestTopUp_RightColumn_Update_RelatedCheckResult_AmbiguousTargetTypeWithoutDisplayName_NoBind(t *testing.T) {
-	// Two rows sharing TargetType "ct-events" (the self-pivot case), delivered
-	// with an empty DefDisplayName: production always sets DefDisplayName, so
-	// this is the deliberately-refused ambiguous fallback.
-	defs := []resource.RelatedDef{
-		{TargetType: "ct-events", DisplayName: "CT events by AccessKeyId", Checker: resource.NoopChecker},
-		{TargetType: "ct-events", DisplayName: "CT events by Username", Checker: resource.NoopChecker},
-	}
-	m := newRightColumn(defs, resource.Resource{}, "ct-events")
-	m, _ = m.Update(messages.RelatedCheckResult{Result: domain.RelatedCheckResult{TargetType: "ct-events", Count: 5}})
-
-	for i, row := range m.rows {
-		if !row.loading {
-			t.Errorf("row[%d] (%s) loading = false, want still-loading (ambiguous match must be refused)", i, row.displayName)
-		}
-	}
-}
-
-func TestTopUp_RightColumn_Update_RelatedCheckResult_UnambiguousTargetTypeFallback_Binds(t *testing.T) {
-	defs := []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
-	}
-	m := newRightColumn(defs, resource.Resource{}, "ec2")
-	// No DefDisplayName, but exactly one row carries TargetType "tg" -> the
-	// tight fallback should bind it.
-	m, _ = m.Update(messages.RelatedCheckResult{Result: domain.RelatedCheckResult{TargetType: "tg", Count: 7}})
-
-	if m.rows[0].loading {
-		t.Error("row loading = true, want the unique-TargetType fallback to have resolved it")
-	}
-	if m.rows[0].count != 7 {
-		t.Errorf("row.count = %d, want 7", m.rows[0].count)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// RightColumnModel.HasActionableRows (rightcolumn.go:428)
-// ---------------------------------------------------------------------------
-
-// TestTopUp_RightColumn_Update_RelatedCheckResult_ReassignsCursorOffNonActionableSelection
-// exercises the ensureCursorValid branch that jumps the cursor onto the first
-// actionable row when the CURRENTLY SELECTED row is not actionable but some
-// other visible row is: resolve the non-selected rows first (a proven-zero,
-// then an actionable deferred row) while the cursor sits on the still-loading
-// row at index 0 (not actionable), which must trigger the reassignment.
-func TestTopUp_RightColumn_Update_RelatedCheckResult_ReassignsCursorOffNonActionableSelection(t *testing.T) {
-	defs := []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
-		{TargetType: "asg", DisplayName: "ASGs", Checker: resource.NoopChecker},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: resource.NoopChecker},
-	}
-	m := newRightColumn(defs, resource.Resource{}, "ec2")
-	m.SetSize(40, 10)
-	m.SetFocused(true)
-	if got := m.SelectedTypeName(); got != "Target Groups" {
-		t.Fatalf("precondition: cursor should default to index 0 (%q), got %q", "Target Groups", got)
-	}
-
-	// ASGs resolves to a proven zero: still no actionable row exists yet, so
-	// the cursor (on the still-loading Target Groups) is left alone.
-	m, _ = m.Update(messages.RelatedCheckResult{DefDisplayName: "ASGs", Result: domain.RelatedCheckResult{TargetType: "asg", Count: 0}})
-	if got := m.SelectedTypeName(); got != "Target Groups" {
-		t.Fatalf("after resolving a non-selected proven-zero row (no actionable rows yet): SelectedTypeName() = %q, want unchanged %q", got, "Target Groups")
-	}
-
-	// Security Groups resolves as actionable (RelatedDeferred): the selected
-	// row (Target Groups, still loading -> not actionable) must now be
-	// reassigned to the first actionable visible row.
-	m, _ = m.Update(messages.RelatedCheckResult{DefDisplayName: "Security Groups", Result: domain.RelatedCheckResult{TargetType: "sg", State: domain.RelatedDeferred}})
-	if got := m.SelectedTypeName(); got != "Security Groups" {
-		t.Errorf("after a non-selected row resolves as the only actionable row: SelectedTypeName() = %q, want %q", got, "Security Groups")
-	}
-}
-
-func TestTopUp_RightColumn_HasActionableRows_EmptyRows_False(t *testing.T) {
-	m := newRightColumn(nil, resource.Resource{}, "ec2")
-	if m.HasActionableRows() {
-		t.Error("HasActionableRows() with no rows = true, want false")
-	}
-}
-
-func TestTopUp_RightColumn_HasActionableRows_AllLoading_True(t *testing.T) {
-	m := newRightColumn([]resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
-	}, resource.Resource{}, "ec2")
-	if !m.HasActionableRows() {
-		t.Error("HasActionableRows() with a still-loading row = false, want true (loading rows are focusable)")
-	}
-}
-
-func TestTopUp_RightColumn_HasActionableRows_AllResolvedZero_False(t *testing.T) {
-	m := newRightColumn([]resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
-	}, resource.Resource{}, "ec2")
-	m, _ = m.Update(messages.RelatedCheckResult{DefDisplayName: "Target Groups", Result: domain.RelatedCheckResult{TargetType: "tg", Count: 0}})
-	if m.HasActionableRows() {
-		t.Error("HasActionableRows() with only a proven-zero row = true, want false")
-	}
-}
-
-func TestTopUp_RightColumn_HasActionableRows_OneActionable_True(t *testing.T) {
-	m := newRightColumn([]resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
-	}, resource.Resource{}, "ec2")
-	m, _ = m.Update(messages.RelatedCheckResult{DefDisplayName: "Target Groups", Result: domain.RelatedCheckResult{TargetType: "tg", Count: 3}})
-	if !m.HasActionableRows() {
-		t.Error("HasActionableRows() with a Count=3 resolved row = false, want true")
 	}
 }
 
