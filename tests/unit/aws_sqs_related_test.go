@@ -322,8 +322,8 @@ func TestRelated_SQS_EbRule_Match(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{
-		EventBridge: &fakeEventBridgeUS1{
-			ruleNames: []string{"rule-order", "rule-payment", "rule-dlq"},
+		EventBridge: &fakeEventBridgeAPI{
+			RuleNames: []string{"rule-order", "rule-payment", "rule-dlq"},
 		},
 	}
 	checker := sqsCheckerByTarget(t, "eb-rule")

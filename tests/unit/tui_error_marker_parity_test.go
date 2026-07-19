@@ -1,7 +1,7 @@
-// tui_error_marker_parity_test.go — regression pin for DEF-5 renderer parity
-// on the TUI side (branch feat/cache).
+// tui_error_marker_parity_test.go — regression pin for the C4 fetch-failure
+// error marker's renderer parity on the TUI side (branch feat/cache).
 //
-// The headless controller's DEF-5 contract (a fetch failure over cached
+// The headless controller's C4 contract (a fetch failure over cached
 // content clears Refreshing and sets an error marker, cached rows stay on
 // screen) is already pinned end-to-end at the Controller.Handle seam in
 // app_pilot_defects_test.go's TestAPIError_OverCachedList_ClearsRefreshing_
@@ -12,7 +12,7 @@
 // but that write only reaches the SCREEN if the TUI's real Bubble Tea
 // Update/View path actually surfaces ListBody.LastFetchError. This test
 // drives the real renderer seam (tuitest.Step/Render, exactly as
-// tui_savecache_routing_test.go does for its own DEF-11 pin) end to end: a
+// tui_savecache_routing_test.go does for its own save-cache routing pin) end to end: a
 // list with cached rows on screen, then a real messages.APIError delivered
 // through m.Update, asserting the rendered View() carries the
 // "── error: ..." marker text (internal/tui/views/resourcelist.go) and the
@@ -55,8 +55,8 @@ type errTUIFetchFailed struct{}
 
 func (errTUIFetchFailed) Error() string { return "tui pilot: simulated fetch failure" }
 
-// TestTUI_APIError_OverListWithRows_RendersErrorMarker_KeepsRows pins DEF-5
-// renderer parity at the real Bubble Tea Update/View seam: a list screen
+// TestTUI_APIError_OverListWithRows_RendersErrorMarker_KeepsRows pins the C4
+// error marker's renderer parity at the real Bubble Tea Update/View seam: a list screen
 // with rows already landed (via a real messages.ResourcesLoaded through
 // m.Update, exactly as the live runtime would deliver a completed fetch),
 // then a real messages.APIError landing for the SAME type, must render the

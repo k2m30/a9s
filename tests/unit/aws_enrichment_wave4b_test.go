@@ -817,8 +817,8 @@ func TestEnrichMSKCluster_VersionBoundaries(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			arn := mskARNForVersionTests
 			// Use TLS so no encryption finding masks the version result.
-			fake := &mskDescribeClusterV2Fake{
-				results: map[string]*kafkatypes.Cluster{
+			fake := &fakeMSKDescribeClusterV2{
+				Results: map[string]*kafkatypes.Cluster{
 					arn: provisionedCluster(arn, tc.version, kafkatypes.ClientBrokerTls),
 				},
 			}

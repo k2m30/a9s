@@ -303,7 +303,7 @@ func TestSaveAvailabilityCache_ExactShrink_CountAdvancesRowsUntouched(t *testing
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestSnapshotProbeResourcesForSave_FieldsIsolatedFromLaterMutation pins
-// Fields isolation on the DEF-7 dispatch-time snapshot: seeding
+// Fields isolation on the dispatch-time payload freeze: seeding
 // session.ProbeResources with rows carrying Fields, taking the
 // TaskKindSaveCache snapshot via the sweep-completion seam
 // (handleAvailabilityChecked's queue-drained branch), THEN mutating the

@@ -55,37 +55,9 @@ func (f *fakeWAFv2CR) GetLoggingConfiguration(_ context.Context, _ *wafv2.GetLog
 
 var _ awsclient.WAFv2API = (*fakeWAFv2CR)(nil)
 
-// ---------------------------------------------------------------------------
-// fakeCloudFrontWAF — implements CloudFrontAPI + CloudFrontListDistributionsByWebACLIdAPI
-// for WAF→CF related checker tests. checkWAFCF does a type assertion on c.CloudFront
-// so the fake must satisfy CloudFrontAPI (the field type) AND the narrow API.
-// ---------------------------------------------------------------------------
-
-type fakeCloudFrontWAF struct {
-	output *cloudfront.ListDistributionsByWebACLIdOutput
-	err    error
-}
-
-func (f *fakeCloudFrontWAF) ListDistributions(_ context.Context, _ *cloudfront.ListDistributionsInput, _ ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsOutput, error) {
-	return &cloudfront.ListDistributionsOutput{}, nil
-}
-
-func (f *fakeCloudFrontWAF) GetDistributionConfig(_ context.Context, _ *cloudfront.GetDistributionConfigInput, _ ...func(*cloudfront.Options)) (*cloudfront.GetDistributionConfigOutput, error) {
-	return &cloudfront.GetDistributionConfigOutput{}, nil
-}
-
-func (f *fakeCloudFrontWAF) ListDistributionsByWebACLId(_ context.Context, _ *cloudfront.ListDistributionsByWebACLIdInput, _ ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	if f.output != nil {
-		return f.output, nil
-	}
-	return &cloudfront.ListDistributionsByWebACLIdOutput{}, nil
-}
-
-var _ awsclient.CloudFrontAPI = (*fakeCloudFrontWAF)(nil)
-var _ awsclient.CloudFrontListDistributionsByWebACLIdAPI = (*fakeCloudFrontWAF)(nil)
+// The fake CloudFront client for WAF→CF related checker tests now lives in
+// fakes_cloudfront_test.go (fakeCloudFrontAPI) — see that file's header for
+// the one-fake-per-interface convention.
 
 // wafCheckerByTarget retrieves the RelatedChecker for the given targetType
 // and fails the test if the checker is nil or not found.
@@ -566,8 +538,8 @@ func TestRelated_WAF_CF_CloudfrontScopeReturnsDistributionIDs(t *testing.T) {
 		},
 	}
 
-	fakeCF := &fakeCloudFrontWAF{
-		output: &cloudfront.ListDistributionsByWebACLIdOutput{
+	fakeCF := &fakeCloudFrontAPI{
+		WebACLOutput: &cloudfront.ListDistributionsByWebACLIdOutput{
 			DistributionList: &cftypes.DistributionList{
 				Items: []cftypes.DistributionSummary{
 					{Id: aws.String("E1ABC123DEF456")},
@@ -605,8 +577,8 @@ func TestRelated_WAF_CF_CloudfrontScopeEmptyDistributionList(t *testing.T) {
 		},
 	}
 
-	fakeCF := &fakeCloudFrontWAF{
-		output: &cloudfront.ListDistributionsByWebACLIdOutput{
+	fakeCF := &fakeCloudFrontAPI{
+		WebACLOutput: &cloudfront.ListDistributionsByWebACLIdOutput{
 			DistributionList: &cftypes.DistributionList{
 				Items: []cftypes.DistributionSummary{},
 			},

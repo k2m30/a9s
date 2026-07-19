@@ -18,14 +18,14 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestFetchCodeBuildProjects_ParsesMultipleProjects(t *testing.T) {
-	listMock := &mockCodeBuildListProjectsClient{
-		output: &codebuild.ListProjectsOutput{
+	listMock := &fakeCodeBuildListProjects{
+		Output: &codebuild.ListProjectsOutput{
 			Projects: []string{"project-alpha", "project-beta"},
 		},
 	}
 
-	batchMock := &mockCodeBuildBatchGetProjectsClient{
-		output: &codebuild.BatchGetProjectsOutput{
+	batchMock := &fakeCodeBuildBatchGetProjects{
+		Output: &codebuild.BatchGetProjectsOutput{
 			Projects: []cbtypes.Project{
 				{
 					Name:        aws.String("project-alpha"),
@@ -105,10 +105,10 @@ func TestFetchCodeBuildProjects_ParsesMultipleProjects(t *testing.T) {
 }
 
 func TestFetchCodeBuildProjects_ListError(t *testing.T) {
-	listMock := &mockCodeBuildListProjectsClient{
-		err: fmt.Errorf("AWS API error: access denied"),
+	listMock := &fakeCodeBuildListProjects{
+		Err: fmt.Errorf("AWS API error: access denied"),
 	}
-	batchMock := &mockCodeBuildBatchGetProjectsClient{}
+	batchMock := &fakeCodeBuildBatchGetProjects{}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchCodeBuildProjectsPage(context.Background(), listMock, batchMock, token)
@@ -122,12 +122,12 @@ func TestFetchCodeBuildProjects_ListError(t *testing.T) {
 }
 
 func TestFetchCodeBuildProjects_EmptyResponse(t *testing.T) {
-	listMock := &mockCodeBuildListProjectsClient{
-		output: &codebuild.ListProjectsOutput{
+	listMock := &fakeCodeBuildListProjects{
+		Output: &codebuild.ListProjectsOutput{
 			Projects: []string{},
 		},
 	}
-	batchMock := &mockCodeBuildBatchGetProjectsClient{}
+	batchMock := &fakeCodeBuildBatchGetProjects{}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchCodeBuildProjectsPage(context.Background(), listMock, batchMock, token)
@@ -141,13 +141,13 @@ func TestFetchCodeBuildProjects_EmptyResponse(t *testing.T) {
 }
 
 func TestFetchCodeBuildProjects_BatchGetError(t *testing.T) {
-	listMock := &mockCodeBuildListProjectsClient{
-		output: &codebuild.ListProjectsOutput{
+	listMock := &fakeCodeBuildListProjects{
+		Output: &codebuild.ListProjectsOutput{
 			Projects: []string{"proj-1"},
 		},
 	}
-	batchMock := &mockCodeBuildBatchGetProjectsClient{
-		err: fmt.Errorf("batch get failed"),
+	batchMock := &fakeCodeBuildBatchGetProjects{
+		Err: fmt.Errorf("batch get failed"),
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {

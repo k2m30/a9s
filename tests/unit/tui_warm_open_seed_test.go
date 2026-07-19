@@ -1,4 +1,4 @@
-// tui_warm_open_seed_test.go — RED pin for DEF-12 (C1 + Goal 4 of
+// tui_warm_open_seed_test.go — RED pin for the warm-open seed, D9 (C1 + Goal 4 of
 // docs/design/cache-requirements.md).
 //
 // Root cause: on a cache-MISS (no session.ResourceCache entry for the type
@@ -62,7 +62,7 @@ import (
 // a cache miss, without dropping the verify-on-sight fetch task.
 // ────────────────────────────────────────────────────────────────────────────
 
-// TestHandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask pins DEF-12
+// TestHandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask pins the warm-open seed
 // at the runtime.Core.HandleNavigate seam: session.ResourceCache has NO entry
 // for "s3" (a genuine cache miss), but session.RowStore holds retained
 // first-page rows for "s3" from a prior Wave-1 probe, with
@@ -184,7 +184,7 @@ func newWarmOpenApp(t *testing.T) tui.Model {
 	return m
 }
 
-// TestTUI_WarmOpen_RendersSeededRows_NotLoading pins DEF-12 at the real
+// TestTUI_WarmOpen_RendersSeededRows_NotLoading pins the warm-open seed at the real
 // Bubble Tea Update/View seam. A prior Wave-1 availability probe for "s3" is
 // driven through the exact same seam tui_savecache_routing_test.go's
 // driveSweepCompletion uses (a real messages.AvailabilityChecked with

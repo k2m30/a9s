@@ -1,11 +1,11 @@
-// qa_load_more_dedup_test.go — RED pins for DEF-17.
+// qa_load_more_dedup_test.go — RED pins for the load-more duplication defect (D13).
 //
 // Defect (observed live, TUI cold pilot): cold `:s3` open (fresh pair) lands
 // on page 1 (50 rows, truncated, NextToken="p2"). Pressing 'm' (load more)
 // appends a FULL DUPLICATE of page 1 instead of fetching page 2 — title
 // grows 50+ -> 100+, row IDs repeat consecutively, the More hint persists.
 // The persisted per-type cache file then carries Count:100 with only 50
-// distinct rows — a mismatched pair the DEF-4b matched-pair rule in
+// distinct rows — a mismatched pair the persisted-pair invariant in
 // Core.SaveResourceListCache (core/runtime/probes.go) forbids.
 //
 // A coder is root-causing the mechanism in parallel. These pins target the
@@ -21,7 +21,7 @@
 //     must not duplicate rows whose IDs already exist on the screen.
 //  4. PersistedPair_NeverMismatched — after driving the poisoning sequence
 //     through the real save wiring, the persisted TypeFile must never leave
-//     Count > len(Rows) via a double-append (DEF-4b).
+//     Count > len(Rows) via a double-append (the persisted-pair invariant).
 //
 // Harness precedents:
 //   - tests/unit/runtime_executor_depth_refetch_test.go: page1(50,
@@ -155,7 +155,7 @@ func TestLoadMore_TUI_ColdOpen_NoDuplicates(t *testing.T) {
 	// frame title text, both of which must be visible in the rendered
 	// output for the checks to be meaningful (a truncated viewport would
 	// otherwise produce a false RED from scrolled-off rows, not the
-	// DEF-17 defect itself).
+	// load-more duplication defect itself).
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 70})
 
 	// Drive Init() so the pre-supplied demo clients actually land on
@@ -328,7 +328,7 @@ func TestLoadMore_TokenPresent_AfterColdOpen(t *testing.T) {
 // Controller.ApplyResourcesLoaded(append=true) with rows whose IDs already
 // exist on the screen must not duplicate them. Drives the exact poisoning
 // shape observed live — page 1 landing, then an append call that (as if by
-// the DEF-17 bug) resends page 1's own rows instead of page 2's.
+// the load-more duplication bug) resends page 1's own rows instead of page 2's.
 //
 // RED today: core/app/list_body.go's applyResourcesLoaded appends
 // unconditionally (`ls.Rows = append(ls.Rows, resources...)`) with no ID
@@ -356,7 +356,7 @@ func TestLoadMore_AppendDedup_Backstop(t *testing.T) {
 	}, false)
 
 	// Poisoning sequence: an append landing page 1's own rows again (the
-	// exact DEF-17 symptom shape), instead of page 2's distinct rows.
+	// exact load-more duplication symptom shape), instead of page 2's distinct rows.
 	ctrl.ApplyResourcesLoaded("s3", page1, &resource.PaginationMeta{
 		IsTruncated: true,
 		NextToken:   "p2",
@@ -395,7 +395,7 @@ func TestLoadMore_AppendDedup_Backstop(t *testing.T) {
 // maybeSaveResourceListCache -> Core.SaveResourceListCache) and asserts the
 // on-disk TypeFile for s3 stays internally consistent.
 //
-// Note on the DEF-4b matched-pair rule cited in the dispatch: Count and Rows
+// Note on the persisted-pair invariant cited in the dispatch: Count and Rows
 // are ALWAYS written as len(ls.Rows)/ls.Rows together (maybeSaveResourceListCache,
 // core/app/handle.go), so Count==len(Rows) holds by construction even
 // when ls.Rows itself has been poisoned with duplicate IDs — a bare
@@ -425,7 +425,7 @@ func TestLoadMore_PersistedPair_NeverMismatched(t *testing.T) {
 		PageSize:    50,
 	}, false)
 
-	// Poisoning sequence: the DEF-17 symptom shape — an append that lands
+	// Poisoning sequence: the load-more duplication symptom shape — an append that lands
 	// page 1's rows again instead of page 2's distinct rows, with a
 	// pagination result claiming exhaustion (title 50+ -> 100).
 	ctrl.ApplyResourcesLoaded("s3", page1, &resource.PaginationMeta{

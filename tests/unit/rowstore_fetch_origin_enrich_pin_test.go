@@ -136,7 +136,7 @@ func TestProbeEnrichment_FetchOriginRows_ReachesRealEnricher(t *testing.T) {
 // enricher (driven via ProbeEnrichment above) has produced findings for a
 // fetch-origin type, the sweep-completion save dispatched by
 // Core.Handle(messages.EnrichmentChecked) must carry those findings on the
-// type's rows — mirroring the DEF-7 pin's payload-inspection pattern
+// type's rows — mirroring the dispatch-time payload-freeze pin's payload-inspection pattern
 // (TestStage2Pin_DEF7_SavePayloadFrozenAtDispatch_SurvivesLaterAmend) but for
 // a fetch-origin-seeded type rather than a probe-seeded one.
 //

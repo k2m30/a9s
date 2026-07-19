@@ -39,7 +39,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
-	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
@@ -83,32 +82,9 @@ func (m *mockCFNDescribeStackEventsClient) DescribeStackEvents(ctx context.Conte
 	return m.output, nil
 }
 
-// mockCFNListStackResourcesClient implements awsclient.CFNListStackResourcesAPI.
-// It supports pagination via the outputs slice with callIdx counter.
-// For backward compatibility, if outputs is nil it falls back to the single output field.
-type mockCFNListStackResourcesClient struct {
-	output    *cloudformation.ListStackResourcesOutput
-	outputs   []*cloudformation.ListStackResourcesOutput
-	err       error
-	callIdx   int
-	lastInput *cloudformation.ListStackResourcesInput
-}
-
-func (m *mockCFNListStackResourcesClient) ListStackResources(ctx context.Context, params *cloudformation.ListStackResourcesInput, optFns ...func(*cloudformation.Options)) (*cloudformation.ListStackResourcesOutput, error) {
-	m.lastInput = params
-	if m.err != nil {
-		return nil, m.err
-	}
-	if m.outputs != nil {
-		if m.callIdx >= len(m.outputs) {
-			return &cloudformation.ListStackResourcesOutput{}, nil
-		}
-		out := m.outputs[m.callIdx]
-		m.callIdx++
-		return out, nil
-	}
-	return m.output, nil
-}
+// CFN ListStackResources mocks: the fake client for this operation now
+// lives in fakes_cloudformation_test.go (fakeCFNListStackResources) — see
+// that file's header for the one-fake-per-interface convention.
 
 // ---------------------------------------------------------------------------
 // IAM mocks
@@ -355,18 +331,9 @@ func (m *mockEC2DescribeNetworkInterfacesClient) DescribeNetworkInterfaces(ctx c
 	return m.output, m.err
 }
 
-// ---------------------------------------------------------------------------
-// SNS Subscriptions mocks
-// ---------------------------------------------------------------------------
-
-type mockSNSListSubscriptionsClient struct {
-	output *sns.ListSubscriptionsOutput
-	err    error
-}
-
-func (m *mockSNSListSubscriptionsClient) ListSubscriptions(ctx context.Context, params *sns.ListSubscriptionsInput, optFns ...func(*sns.Options)) (*sns.ListSubscriptionsOutput, error) {
-	return m.output, m.err
-}
+// SNS Subscriptions mocks: the fake client for ListSubscriptions now lives
+// in fakes_sns_test.go (fakeSNSListSubscriptions) — see that file's header
+// for the one-fake-per-interface convention.
 
 // ---------------------------------------------------------------------------
 // IAM Users mocks
@@ -525,18 +492,9 @@ func (m *mockEventBridgeListTargetsClient) ListTargetsByRule(
 	return m.output, nil
 }
 
-// ---------------------------------------------------------------------------
-// Step Functions (SFN) mocks
-// ---------------------------------------------------------------------------
-
-type mockSFNClient struct {
-	output *sfn.ListStateMachinesOutput
-	err    error
-}
-
-func (m *mockSFNClient) ListStateMachines(ctx context.Context, params *sfn.ListStateMachinesInput, optFns ...func(*sfn.Options)) (*sfn.ListStateMachinesOutput, error) {
-	return m.output, m.err
-}
+// Step Functions (SFN) mocks: the fake client for ListStateMachines now
+// lives in fakes_sfn_test.go (fakeSFNListStateMachines) — see that file's
+// header for the one-fake-per-interface convention.
 
 // ---------------------------------------------------------------------------
 // CodePipeline mocks
@@ -722,27 +680,10 @@ func (m *mockCodeArtifactClient) ListRepositories(ctx context.Context, params *c
 	return m.output, m.err
 }
 
-// ---------------------------------------------------------------------------
-// CodeBuild mocks
-// ---------------------------------------------------------------------------
-
-type mockCodeBuildListProjectsClient struct {
-	output *codebuild.ListProjectsOutput
-	err    error
-}
-
-func (m *mockCodeBuildListProjectsClient) ListProjects(ctx context.Context, params *codebuild.ListProjectsInput, optFns ...func(*codebuild.Options)) (*codebuild.ListProjectsOutput, error) {
-	return m.output, m.err
-}
-
-type mockCodeBuildBatchGetProjectsClient struct {
-	output *codebuild.BatchGetProjectsOutput
-	err    error
-}
-
-func (m *mockCodeBuildBatchGetProjectsClient) BatchGetProjects(ctx context.Context, params *codebuild.BatchGetProjectsInput, optFns ...func(*codebuild.Options)) (*codebuild.BatchGetProjectsOutput, error) {
-	return m.output, m.err
-}
+// CodeBuild mocks: the fake clients for ListProjects and BatchGetProjects
+// now live in fakes_codebuild_test.go (fakeCodeBuildListProjects,
+// fakeCodeBuildBatchGetProjects) — see that file's header for the
+// one-fake-per-interface convention.
 
 // ---------------------------------------------------------------------------
 // OpenSearch mocks

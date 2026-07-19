@@ -7,10 +7,10 @@ package unit
 // enrichmentFindings cleared, probeResources seeded) are inferred via:
 //   - Whether a subsequent EnrichmentCheckedMsg/ResourcesLoadedMsg is
 //     accepted or dropped, checked via hasReenrichOrRefetch (see below) —
-//     NOT via raw tea.Cmd nilness (see DEF-11 note below).
+//     NOT via raw tea.Cmd nilness (see the save-cache routing note below).
 //   - Whether the active ResourceListModel's View() reflects new resources
 //
-// DEF-11 note: internal/tui/app_dispatch.go's TaskKindSaveCache case now
+// Save-cache routing note: internal/tui/app_dispatch.go's TaskKindSaveCache case now
 // routes through the shared executor (m.executeTaskCmd) instead of the
 // deleted TUI-local saveAvailabilityCache(). A queue-drained
 // EnrichmentChecked delivery (session.EnrichChecked >= session.EnrichTotal,
@@ -55,7 +55,7 @@ import (
 // hasReenrichOrRefetch executes cmd (recursing through any tea.BatchMsg) and
 // reports whether any resulting message is messages.EnrichmentChecked or
 // messages.ResourcesLoaded — the two message shapes that indicate a real
-// re-enrichment or refetch actually fired. A DEF-11-era TaskKindSaveCache
+// re-enrichment or refetch actually fired. A rerouted TaskKindSaveCache
 // background-save cmd resolves to nil or messages.Flash, neither of which
 // trips this check, so it safely distinguishes "the stale/guarded message
 // caused new enrichment/fetch work" from "an unrelated cache save happened

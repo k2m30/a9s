@@ -108,8 +108,8 @@ func TestCBBuilds_ColorSignal(t *testing.T) {
 
 func fetchOneCfnResource(t *testing.T, status cfntypes.ResourceStatus) resource.Resource {
 	t.Helper()
-	mock := &mockCFNListStackResourcesClient{
-		outputs: []*cloudformation.ListStackResourcesOutput{{
+	mock := &fakeCFNListStackResources{
+		Pages: []*cloudformation.ListStackResourcesOutput{{
 			StackResourceSummaries: []cfntypes.StackResourceSummary{{
 				LogicalResourceId: aws.String("MyResource"),
 				ResourceType:      aws.String("AWS::S3::Bucket"),

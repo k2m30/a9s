@@ -1,11 +1,12 @@
 // rowstore_stage2_pins_test.go — behavior pins for Stage 2 of the row-store
 // unification plan (rowstore-unification-plan.md, Stage 2: "ProbeResources/
 // ProbeTruncated die. Reads/writes re-point... Save = SnapshotAll. Delete...
-// SyncProbeResourcesForType"). See docs/design/cache-requirements.md D12,
-// DEF-7 (renamed here from the plan's shorthand — the requirements doc calls
-// this defect class out under the snapshotProbeResourcesForSave doc comment,
-// not a numbered D-entry of its own), D16, DEF-15 (D15 in the requirements
-// doc), and DEF-21 (the plan's item-A/SyncProbeResourcesForType rationale,
+// SyncProbeResourcesForType"). Pinned mechanisms: docs/design/
+// cache-requirements.md D12 and D16, the dispatch-time payload freeze (the
+// requirements doc calls this defect class out under the
+// snapshotProbeResourcesForSave doc comment, not a numbered D-entry of its
+// own), the observed-empty guard on the disk-store fallback, and the
+// sweep-vs-list-lane save depth (the SyncProbeResourcesForType rationale,
 // also undocumented as a numbered D-entry in cache-requirements.md — pinned
 // here directly against the mechanism instead).
 //
@@ -57,7 +58,7 @@ func newStage2PinTestController(t *testing.T) (*session.Session, *runtime.Core, 
 // stage2PinReadTypeFile re-reads the on-disk TypeFile for shortName under
 // (profile, region), failing the test if it is missing. A local variant of
 // qa_cache_lifecycle_test.go's readTypeFile (package unit, not unit_test —
-// this file's package cannot see it directly) so the DEF-21/D16 pin can use
+// this file's package cannot see it directly) so the D16 lockstep pin can use
 // the identical byte-compare pattern the dispatch calls out
 // (qa_cache_lifecycle_test.go:219).
 func stage2PinReadTypeFile(t *testing.T, profile, region, shortName string) cache.TypeFile {
@@ -178,7 +179,7 @@ func TestStage2Pin_D12_PostSweepListOpen_SeedsTitleRowsAndEnrichedField(t *testi
 }
 
 // -----------------------------------------------------------------------
-// Pin 2 — DEF-7 restated structurally: the enrichment-completion save
+// Pin 2 — the dispatch-time payload freeze restated structurally: the enrichment-completion save
 // payload equals the store snapshot AT DISPATCH TIME even when a later
 // Amend lands before the executor runs.
 // -----------------------------------------------------------------------
@@ -189,7 +190,7 @@ func TestStage2Pin_D12_PostSweepListOpen_SeedsTitleRowsAndEnrichedField(t *testi
 // second, distinct enrichment landing for the same type with different
 // field values, simulating a rerun's FieldUpdates fold arriving after the
 // save was already dispatched) and asserts the ALREADY-DISPATCHED payload's
-// rows still carry the ORIGINAL field value, not the later Amend's — DEF-7's
+// rows still carry the ORIGINAL field value, not the later Amend's — the
 // "snapshot BEFORE any subsequent same-call OR later-call mutation" contract,
 // restated at the RowStore level instead of the legacy map-copy level.
 //
@@ -276,7 +277,7 @@ func TestStage2Pin_DEF7_SavePayloadFrozenAtDispatch_SurvivesLaterAmend(t *testin
 }
 
 // -----------------------------------------------------------------------
-// Pin 3 — DEF-21/D16 lockstep: open list → load-more to depth 2 →
+// Pin 3 — D16 lockstep: open list → load-more to depth 2 →
 // sweep-completion save persists the SAME accumulated depth the list lane
 // would save. No SyncProbeResourcesForType caller left in production.
 // -----------------------------------------------------------------------
@@ -461,14 +462,14 @@ func caseInsensitiveGrepSyncProbeResourcesForTypeCallers(t *testing.T) (string, 
 }
 
 // -----------------------------------------------------------------------
-// Pin 4 — Observed-empty (DEF-15): a live probe returning zero rows must
+// Pin 4 — Observed-empty: a live probe returning zero rows must
 // seed an EMPTY list on navigation. Origin=Probe empty beats Origin=Disk
 // rows; no stale disk rows resurrect.
 // -----------------------------------------------------------------------
 
 // TestStage2Pin_DEF15_ObservedEmptyProbe_BeatsStaleDiskRows pins the
 // "observed-empty is fresher than any disk row" rule the handlers_navigate.go
-// doc comment states explicitly (DEF-15/P2): a live Wave-1 probe confirming
+// doc comment states explicitly: a live Wave-1 probe confirming
 // a type is genuinely empty this session (map key present, zero-length
 // slice) must seed a BARE list on navigation — even when a populated,
 // stale on-disk per-type cache file exists for the same pair. The disk

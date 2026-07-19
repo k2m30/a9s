@@ -1,5 +1,5 @@
-// tui_post_sweep_seed_test.go — RED regression tests for DEF-15 (C1
-// systemic follow-on to DEF-12).
+// tui_post_sweep_seed_test.go — RED regression tests for the post-sweep
+// disk-store fallback, D12 (C1 systemic follow-on to the warm-open seed, D9).
 //
 // Root cause: handleEnrichmentChecked (core/runtime/handlers_availability.go,
 // "All enrichment done" branch, ~L494-507) nils c.session.ProbeResources /
@@ -25,10 +25,10 @@
 // HandleNavigate seed.
 //
 // Harness precedents:
-//   - tui_warm_open_seed_test.go (DEF-12): HandleNavigate-level and
+//   - tui_warm_open_seed_test.go (warm-open seed, D9): HandleNavigate-level and
 //     TUI-Update-level warm-open seed pins; newWarmOpenApp/rootApplyMsg/
 //     rootViewContent/stripANSI patterns reused verbatim here.
-//   - tui_savecache_routing_test.go (DEF-11): driveSweepCompletion pattern
+//   - tui_savecache_routing_test.go (save-cache routing): driveSweepCompletion pattern
 //     for driving a real AvailabilityChecked-queue-drained completion
 //     through the actual TUI renderer seam; runCmdTree for draining the
 //     resulting tea.Cmd tree.
@@ -89,7 +89,7 @@ func seedDiskStoreWithS3Rows(t *testing.T, profile, region string) *cache.Store 
 // #17 wave 1 stage 2), which in this fixture match the disk store's rows.
 // ────────────────────────────────────────────────────────────────────────────
 
-// TestPostSweepWarmOpen_SeedsFromStore pins DEF-15 at the Core.HandleNavigate
+// TestPostSweepWarmOpen_SeedsFromStore pins the disk-store fallback at the Core.HandleNavigate
 // seam. The disk store for "s3" carries 2 real rows (written exactly as a
 // completed sweep's TaskKindSaveCache would). The session is driven through
 // the full post-sweep state machine: AvailabilityCacheLoaded (seeds
@@ -253,7 +253,7 @@ func driveToPostSweepState(m tui.Model, region string) tui.Model {
 	return m
 }
 
-// TestPostSweepWarmOpen_TUI_RendersRows pins DEF-15 at the real Bubble Tea
+// TestPostSweepWarmOpen_TUI_RendersRows pins the disk-store fallback at the real Bubble Tea
 // Update/View seam. Same post-sweep state as Test 1, driven through
 // tui.Model.Update; navigating via a messages.Navigate (exactly what pressing
 // Enter on the main menu emits) must render the RowStore-seeded row names
@@ -307,7 +307,7 @@ func TestPostSweepWarmOpen_TUI_RendersRows(t *testing.T) {
 // is still populated (mid-sweep — AvailabilityCacheLoaded has seeded it, but
 // enrichment has NOT yet reached completion, so the free has not fired).
 // This isolates whether the Loading regression observed live in tmux
-// (":s3" at 39/47, mid-sweep) shares DEF-15's root cause or is a distinct
+// (":s3" at 39/47, mid-sweep) shares the disk-store fallback's root cause or is a distinct
 // lane-divergence bug: if this test passes at HEAD, the live symptom's cause
 // is NOT "seed never read" (Test 1/2 already cover that at completion) but
 // something specific to the colon-command key-mode input path diverging from
@@ -452,7 +452,7 @@ func TestMenuEnter_PostSweep_RendersRows(t *testing.T) {
 // cache.LoadDir(profile, region) whenever the memoized store's pair differs
 // from session.Profile/Region), so a correct fallback implementation reads
 // B's (empty) store, not A's. This is a non-regression guard, not a RED pin:
-// it must be green both before and after the DEF-15 fix lands, proving the
+// it must be green both before and after the disk-store fallback fix lands, proving the
 // fix does not introduce a stale cross-pair leak.
 func TestPairSwitch_PostSweep_NoStaleSeed(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -488,7 +488,8 @@ func TestPairSwitch_PostSweep_NoStaleSeed(t *testing.T) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Test 6/7 — Codex P2 on DEF-15's own seed: an observed-empty probe result
+// Test 6/7 — the observed-empty guard on the disk-store fallback's own seed:
+// an observed-empty probe result
 // this session must NOT fall back to stale disk-store rows.
 //
 // Storage-shape finding (dispatch item 3): handleAvailabilityChecked
@@ -640,12 +641,12 @@ func TestObservedEmpty_TUI_DoesNotRenderStaleRows(t *testing.T) {
 	}
 }
 
-// TestUnobserved_StillSeedsFromStore is the regression guard for DEF-15
-// itself: when ProbeResources lacks the "s3" key entirely (never observed
+// TestUnobserved_StillSeedsFromStore is the regression guard for the
+// disk-store fallback itself: when ProbeResources lacks the "s3" key entirely (never observed
 // this session — the map is nil, e.g. before any probe or after the
 // post-sweep free), HandleNavigate must still fall back to the on-disk
 // per-type store and seed CachedEntry from its rows. Must stay green both
-// before and after the P2 fix — it pins the DEF-15 base behavior the P2 fix
+// before and after the observed-empty-guard fix — it pins the base fallback behavior that fix
 // must not regress.
 func TestUnobserved_StillSeedsFromStore(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())

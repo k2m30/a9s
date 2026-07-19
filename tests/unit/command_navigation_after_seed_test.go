@@ -1,5 +1,5 @@
-// command_navigation_after_seed_test.go — RED regression tests for
-// DEF-14/D11 Cause B: `-p <profile> -c <type>` races the one-shot -c
+// command_navigation_after_seed_test.go — RED regression tests for the
+// navigation-race half of D11: `-p <profile> -c <type>` races the one-shot -c
 // navigation against the disk-cache ProbeResources seed. Today the
 // EmitNavigate task fires directly from handleClientsReadySuccess, before
 // handleAvailabilityCacheLoaded has had a chance to seed
@@ -149,7 +149,7 @@ func TestCommandNavigation_AfterSeed_Deterministic(t *testing.T) {
 	// ProbeResources/ProbeTruncated are a distinct, lower-confidence knowledge
 	// source from session.ResourceCache, so the seed rides
 	// NavigateKindPushResourceList's CachedEntry fallback instead. What
-	// DEF-14/D11 actually requires is that THAT fallback is already
+	// D11 actually requires is that THAT fallback is already
 	// populated with real rows — not empty — by the time this call runs.
 	if navResult.Kind != runtime.NavigateKindPushResourceList {
 		t.Errorf("HandleNavigate(s3) Kind = %v, want NavigateKindPushResourceList (cache-miss branch with a ProbeResources-seeded CachedEntry fallback)", navResult.Kind)

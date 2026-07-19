@@ -486,18 +486,9 @@ func (m *mockCloudWatchDescribeAlarmsClient) DescribeAlarms(ctx context.Context,
 	return m.output, m.err
 }
 
-// ---------------------------------------------------------------------------
-// SNS mocks
-// ---------------------------------------------------------------------------
-
-type mockSNSListTopicsClient struct {
-	output *sns.ListTopicsOutput
-	err    error
-}
-
-func (m *mockSNSListTopicsClient) ListTopics(ctx context.Context, params *sns.ListTopicsInput, optFns ...func(*sns.Options)) (*sns.ListTopicsOutput, error) {
-	return m.output, m.err
-}
+// SNS mocks: the fake client for ListTopics now lives in fakes_sns_test.go
+// (fakeSNSListTopics) — see that file's header for the one-fake-per-
+// interface convention.
 
 // mockSNSListSubscriptionsByTopicClient supports paginated responses.
 type mockSNSListSubscriptionsByTopicClient struct {

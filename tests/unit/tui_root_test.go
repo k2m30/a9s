@@ -40,7 +40,7 @@ var lastAutoIsolatedModel *tui.Model
 // helper: create a model with a size set so View() actually renders.
 //
 // #17 wave 2 isolation fix: every one of this helper's ~575 call sites shares
-// the hardcoded "testprofile"/"us-east-1" pair. Since Item A (#17 wave 1)
+// the hardcoded "testprofile"/"us-east-1" pair. Since #17 wave 1
 // made a top-level TUI list open genuinely persist to
 // <A9S_CONFIG_FOLDER>/cache/testprofile--us-east-1/<type>.yaml (previously a
 // dead gate — see runtime_adapter_navigate.go), every caller now reads and

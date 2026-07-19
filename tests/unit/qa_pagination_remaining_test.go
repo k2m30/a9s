@@ -470,25 +470,12 @@ func TestQA_Pagination_FetchMSKClustersPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Mock: SFN ListStateMachines (paginated, NextToken)
 // ---------------------------------------------------------------------------
-
-type mockSFNListStateMachinesAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*sfn.ListStateMachinesOutput, error)
-	lastInput *sfn.ListStateMachinesInput
-}
-
-func (m *mockSFNListStateMachinesAPIPaginated) ListStateMachines(_ context.Context, in *sfn.ListStateMachinesInput, _ ...func(*sfn.Options)) (*sfn.ListStateMachinesOutput, error) {
-	m.Calls++
-	m.lastInput = in
-	return m.PageFunc(m.Calls)
-}
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchStepFunctionsPage
-// ---------------------------------------------------------------------------
+// The fake client for this operation now lives in fakes_sfn_test.go
+// (fakeSFNListStateMachines) — see that file's header for the one-fake-per-
+// interface convention.
 
 func TestQA_Pagination_FetchStepFunctionsPage_FirstPage(t *testing.T) {
-	mock := &mockSFNListStateMachinesAPIPaginated{
+	mock := &fakeSFNListStateMachines{
 		PageFunc: func(_ int) (*sfn.ListStateMachinesOutput, error) {
 			return &sfn.ListStateMachinesOutput{
 				StateMachines: []sfntypes.StateMachineListItem{
@@ -528,7 +515,7 @@ func TestQA_Pagination_FetchStepFunctionsPage_FirstPage(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchStepFunctionsPage_Continuation(t *testing.T) {
-	mock := &mockSFNListStateMachinesAPIPaginated{
+	mock := &fakeSFNListStateMachines{
 		PageFunc: func(_ int) (*sfn.ListStateMachinesOutput, error) {
 			return &sfn.ListStateMachinesOutput{
 				StateMachines: []sfntypes.StateMachineListItem{
@@ -561,16 +548,16 @@ func TestQA_Pagination_FetchStepFunctionsPage_Continuation(t *testing.T) {
 	if result.Resources[0].ID != "last-state-machine" {
 		t.Errorf("resource ID: expected %q, got %q", "last-state-machine", result.Resources[0].ID)
 	}
-	if mock.lastInput == nil {
+	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-sfn-page-2" {
-		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-sfn-page-2")
+	if mock.LastInput.NextToken == nil || *mock.LastInput.NextToken != "token-sfn-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.LastInput.NextToken, "token-sfn-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchStepFunctionsPage_Empty(t *testing.T) {
-	mock := &mockSFNListStateMachinesAPIPaginated{
+	mock := &fakeSFNListStateMachines{
 		PageFunc: func(_ int) (*sfn.ListStateMachinesOutput, error) {
 			return &sfn.ListStateMachinesOutput{
 				StateMachines: []sfntypes.StateMachineListItem{},
@@ -598,7 +585,7 @@ func TestQA_Pagination_FetchStepFunctionsPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchStepFunctionsPage_Error(t *testing.T) {
-	mock := &mockSFNListStateMachinesAPIPaginated{
+	mock := &fakeSFNListStateMachines{
 		PageFunc: func(_ int) (*sfn.ListStateMachinesOutput, error) {
 			return nil, errors.New("sfn: state machine not found")
 		},
@@ -613,25 +600,12 @@ func TestQA_Pagination_FetchStepFunctionsPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Mock: SNS ListSubscriptions (paginated, NextToken)
 // ---------------------------------------------------------------------------
-
-type mockSNSListSubscriptionsAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*sns.ListSubscriptionsOutput, error)
-	lastInput *sns.ListSubscriptionsInput
-}
-
-func (m *mockSNSListSubscriptionsAPIPaginated) ListSubscriptions(_ context.Context, in *sns.ListSubscriptionsInput, _ ...func(*sns.Options)) (*sns.ListSubscriptionsOutput, error) {
-	m.Calls++
-	m.lastInput = in
-	return m.PageFunc(m.Calls)
-}
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchSNSSubscriptionsPage
-// ---------------------------------------------------------------------------
+// The fake client for this operation now lives in fakes_sns_test.go
+// (fakeSNSListSubscriptions) — see that file's header for the one-fake-per-
+// interface convention.
 
 func TestQA_Pagination_FetchSNSSubscriptionsPage_FirstPage(t *testing.T) {
-	mock := &mockSNSListSubscriptionsAPIPaginated{
+	mock := &fakeSNSListSubscriptions{
 		PageFunc: func(_ int) (*sns.ListSubscriptionsOutput, error) {
 			return &sns.ListSubscriptionsOutput{
 				Subscriptions: []snstypes.Subscription{
@@ -672,7 +646,7 @@ func TestQA_Pagination_FetchSNSSubscriptionsPage_FirstPage(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchSNSSubscriptionsPage_Continuation(t *testing.T) {
-	mock := &mockSNSListSubscriptionsAPIPaginated{
+	mock := &fakeSNSListSubscriptions{
 		PageFunc: func(_ int) (*sns.ListSubscriptionsOutput, error) {
 			return &sns.ListSubscriptionsOutput{
 				Subscriptions: []snstypes.Subscription{
@@ -706,16 +680,16 @@ func TestQA_Pagination_FetchSNSSubscriptionsPage_Continuation(t *testing.T) {
 	if result.Resources[0].ID != "arn:aws:sns:us-east-1:123456789012:last-topic:def-456" {
 		t.Errorf("resource ID: expected %q, got %q", "arn:aws:sns:us-east-1:123456789012:last-topic:def-456", result.Resources[0].ID)
 	}
-	if mock.lastInput == nil {
+	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-sns-page-2" {
-		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-sns-page-2")
+	if mock.LastInput.NextToken == nil || *mock.LastInput.NextToken != "token-sns-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.LastInput.NextToken, "token-sns-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchSNSSubscriptionsPage_Empty(t *testing.T) {
-	mock := &mockSNSListSubscriptionsAPIPaginated{
+	mock := &fakeSNSListSubscriptions{
 		PageFunc: func(_ int) (*sns.ListSubscriptionsOutput, error) {
 			return &sns.ListSubscriptionsOutput{
 				Subscriptions: []snstypes.Subscription{},
@@ -743,7 +717,7 @@ func TestQA_Pagination_FetchSNSSubscriptionsPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchSNSSubscriptionsPage_Error(t *testing.T) {
-	mock := &mockSNSListSubscriptionsAPIPaginated{
+	mock := &fakeSNSListSubscriptions{
 		PageFunc: func(_ int) (*sns.ListSubscriptionsOutput, error) {
 			return nil, errors.New("sns: subscription not found")
 		},

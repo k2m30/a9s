@@ -15,7 +15,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
 	catypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
@@ -24,31 +23,9 @@ import (
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 )
 
-// ---------------------------------------------------------------------------
-// EventBridge fake — implements EventBridgeAPI
-// (EventBridgeListRulesAPI + EventBridgeListTargetsByRuleAPI +
-//  EventBridgeListRuleNamesByTargetAPI)
-// ---------------------------------------------------------------------------
-
-type fakeEventBridgeUS1 struct {
-	ruleNames []string
-	err       error
-}
-
-func (f *fakeEventBridgeUS1) ListRules(_ context.Context, _ *eventbridge.ListRulesInput, _ ...func(*eventbridge.Options)) (*eventbridge.ListRulesOutput, error) {
-	return &eventbridge.ListRulesOutput{}, nil
-}
-
-func (f *fakeEventBridgeUS1) ListTargetsByRule(_ context.Context, _ *eventbridge.ListTargetsByRuleInput, _ ...func(*eventbridge.Options)) (*eventbridge.ListTargetsByRuleOutput, error) {
-	return &eventbridge.ListTargetsByRuleOutput{}, nil
-}
-
-func (f *fakeEventBridgeUS1) ListRuleNamesByTarget(_ context.Context, _ *eventbridge.ListRuleNamesByTargetInput, _ ...func(*eventbridge.Options)) (*eventbridge.ListRuleNamesByTargetOutput, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	return &eventbridge.ListRuleNamesByTargetOutput{RuleNames: f.ruleNames}, nil
-}
+// The fake client for EventBridgeAPI now lives in fakes_eventbridge_test.go
+// (fakeEventBridgeAPI) — see that file's header for the one-fake-per-
+// interface convention.
 
 // ---------------------------------------------------------------------------
 // Backup fake — implements BackupAPI

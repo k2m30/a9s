@@ -30,7 +30,7 @@ func newEC2ListModel(t *testing.T) tui.Model {
 	// newRootSizedModel/tuitest.Sized), so it needs its own
 	// A9S_CONFIG_FOLDER redirect — otherwise every call in this file shares
 	// the same on-disk testprofile--us-east-1/ec2.yaml once a top-level list
-	// open genuinely persists to disk (Item A, #17 wave 1), and an earlier
+	// open genuinely persists to disk (#17 wave 1), and an earlier
 	// test's loaded EC2 rows leak into a later test's "fresh list" precondition.
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"

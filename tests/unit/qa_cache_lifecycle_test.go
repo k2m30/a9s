@@ -60,7 +60,8 @@
 // TestCacheLifecycle_Scenario3_CachePresent_WorldChanged's "issue resolved"
 // case is RED at HEAD. applyResourcesLoaded's silent-swap finding-carry-
 // forward (core/app/list_body.go, the `case len(resources[i].Findings)
-// == 0: resources[i].Findings = f` branch, DEF-8's contract) treats ANY
+// == 0: resources[i].Findings = f` branch — the silent-swap findings
+// carry) treats ANY
 // incoming resource with zero Findings as "not yet re-checked" and
 // unconditionally re-attaches its FULL prior finding set — including
 // Wave-1 findings whose absence on a fresh fetch is exactly how a fetcher

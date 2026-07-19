@@ -325,20 +325,13 @@ func TestQA_ChildPagination_FetchCfnEvents_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Mock: CloudFormation ListStackResources
 // ---------------------------------------------------------------------------
-
-type mockCFNListStackResourcesAPIChildPaginated struct {
-	PageFunc func(call int) (*cloudformation.ListStackResourcesOutput, error)
-	calls    int
-}
-
-func (m *mockCFNListStackResourcesAPIChildPaginated) ListStackResources(_ context.Context, _ *cloudformation.ListStackResourcesInput, _ ...func(*cloudformation.Options)) (*cloudformation.ListStackResourcesOutput, error) {
-	m.calls++
-	return m.PageFunc(m.calls)
-}
+// The fake client for this operation now lives in fakes_cloudformation_test.go
+// (fakeCFNListStackResources) — see that file's header for the one-fake-per-
+// interface convention.
 
 func TestQA_ChildPagination_FetchCfnResources_FirstPage(t *testing.T) {
 	ts := time.Date(2025, 2, 15, 9, 0, 0, 0, time.UTC)
-	mock := &mockCFNListStackResourcesAPIChildPaginated{
+	mock := &fakeCFNListStackResources{
 		PageFunc: func(_ int) (*cloudformation.ListStackResourcesOutput, error) {
 			return &cloudformation.ListStackResourcesOutput{
 				StackResourceSummaries: []cfntypes.StackResourceSummary{
@@ -359,7 +352,7 @@ func TestQA_ChildPagination_FetchCfnResources_FirstPage(t *testing.T) {
 
 func TestQA_ChildPagination_FetchCfnResources_Continuation(t *testing.T) {
 	ts := time.Date(2025, 2, 16, 9, 0, 0, 0, time.UTC)
-	mock := &mockCFNListStackResourcesAPIChildPaginated{
+	mock := &fakeCFNListStackResources{
 		PageFunc: func(_ int) (*cloudformation.ListStackResourcesOutput, error) {
 			return &cloudformation.ListStackResourcesOutput{
 				StackResourceSummaries: []cfntypes.StackResourceSummary{
@@ -379,7 +372,7 @@ func TestQA_ChildPagination_FetchCfnResources_Continuation(t *testing.T) {
 }
 
 func TestQA_ChildPagination_FetchCfnResources_Empty(t *testing.T) {
-	mock := &mockCFNListStackResourcesAPIChildPaginated{
+	mock := &fakeCFNListStackResources{
 		PageFunc: func(_ int) (*cloudformation.ListStackResourcesOutput, error) {
 			return &cloudformation.ListStackResourcesOutput{StackResourceSummaries: []cfntypes.StackResourceSummary{}}, nil
 		},
@@ -390,7 +383,7 @@ func TestQA_ChildPagination_FetchCfnResources_Empty(t *testing.T) {
 
 func TestQA_ChildPagination_FetchCfnResources_Error(t *testing.T) {
 	wantErr := errors.New("list stack resources failed")
-	mock := &mockCFNListStackResourcesAPIChildPaginated{
+	mock := &fakeCFNListStackResources{
 		PageFunc: func(_ int) (*cloudformation.ListStackResourcesOutput, error) {
 			return nil, wantErr
 		},

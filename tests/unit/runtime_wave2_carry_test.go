@@ -235,7 +235,7 @@ func TestReconcileTypeFile_Wave2SourcedObservation_ClearsCarriedData(t *testing.
 
 	// Enrichment queue already drained (EnrichChecked reaches EnrichTotal once
 	// this single result lands) so handleEnrichmentChecked's "all done" branch
-	// fires immediately — mirrors the DEF-7 precedent's single-type shape.
+	// fires immediately — mirrors the dispatch-time payload-freeze precedent's single-type shape.
 	core.Session().EnrichTotal = 1
 	core.Session().EnrichChecked = 0
 	core.Session().EnrichQueue = nil

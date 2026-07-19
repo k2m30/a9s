@@ -18,7 +18,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/kafka"
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -26,41 +25,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// mskDescribeClusterV2Fake implements MSKAPI for enrichment testing.
-// It embeds the interface and overrides only DescribeClusterV2.
-// The results map is keyed by ClusterArn (from the input) so the fake can
-// serve different responses per resource.
-type mskDescribeClusterV2Fake struct {
-	awsclient.MSKAPI
-	// results maps ClusterArn → cluster. If absent the fake returns errByArn.
-	results map[string]*kafkatypes.Cluster
-	// errByArn maps ClusterArn → error; overrides results when set.
-	errByArn map[string]error
-}
-
-func (f *mskDescribeClusterV2Fake) DescribeClusterV2(
-	_ context.Context,
-	in *kafka.DescribeClusterV2Input,
-	_ ...func(*kafka.Options),
-) (*kafka.DescribeClusterV2Output, error) {
-	arn := ""
-	if in != nil && in.ClusterArn != nil {
-		arn = *in.ClusterArn
-	}
-	if f.errByArn != nil {
-		if err, ok := f.errByArn[arn]; ok {
-			return nil, err
-		}
-	}
-	clusterInfo, ok := f.results[arn]
-	if !ok {
-		return &kafka.DescribeClusterV2Output{}, nil
-	}
-	return &kafka.DescribeClusterV2Output{ClusterInfo: clusterInfo}, nil
-}
-
-// Compile-time check: mskDescribeClusterV2Fake satisfies MSKAPI.
-var _ awsclient.MSKAPI = (*mskDescribeClusterV2Fake)(nil)
+// The fake client for DescribeClusterV2 now lives in fakes_msk_test.go
+// (fakeMSKDescribeClusterV2) — see that file's header for the one-fake-per-
+// interface convention.
 
 // mskClusterResources returns a slice of MSK Resource stubs with the given ARNs.
 // Mirrors the fetcher contract: ID = bare cluster name, Fields["cluster_arn"] = full ARN.
@@ -124,8 +91,8 @@ const (
 // TestEnrichMSKCluster_ModernTLSProducesNoFindings verifies that when both clusters
 // use KafkaVersion >= 3.0 and EncryptionInTransit=TLS, no findings are produced.
 func TestEnrichMSKCluster_ModernTLSProducesNoFindings(t *testing.T) {
-	fake := &mskDescribeClusterV2Fake{
-		results: map[string]*kafkatypes.Cluster{
+	fake := &fakeMSKDescribeClusterV2{
+		Results: map[string]*kafkatypes.Cluster{
 			mskARN1: provisionedCluster(mskARN1, "3.5.1", kafkatypes.ClientBrokerTls),
 			mskARN2: provisionedCluster(mskARN2, "3.5.1", kafkatypes.ClientBrokerTls),
 		},
@@ -149,8 +116,8 @@ func TestEnrichMSKCluster_ModernTLSProducesNoFindings(t *testing.T) {
 // cluster-1 uses KafkaVersion=2.6.0 (below 3.0), a finding with severity "~" is
 // produced for cluster-1, and cluster-2 (modern version) produces no finding.
 func TestEnrichMSKCluster_OutdatedVersionProducesFindingSevTilde(t *testing.T) {
-	fake := &mskDescribeClusterV2Fake{
-		results: map[string]*kafkatypes.Cluster{
+	fake := &fakeMSKDescribeClusterV2{
+		Results: map[string]*kafkatypes.Cluster{
 			mskARN1: provisionedCluster(mskARN1, "2.6.0", kafkatypes.ClientBrokerTls),
 			mskARN2: provisionedCluster(mskARN2, "3.5.1", kafkatypes.ClientBrokerTls),
 		},
@@ -179,8 +146,8 @@ func TestEnrichMSKCluster_OutdatedVersionProducesFindingSevTilde(t *testing.T) {
 // cluster-1 uses EncryptionInTransit=PLAINTEXT, a finding with severity "~" is
 // produced for cluster-1, and cluster-2 (TLS) produces no finding.
 func TestEnrichMSKCluster_PlaintextEncryptionProducesFindingSevTilde(t *testing.T) {
-	fake := &mskDescribeClusterV2Fake{
-		results: map[string]*kafkatypes.Cluster{
+	fake := &fakeMSKDescribeClusterV2{
+		Results: map[string]*kafkatypes.Cluster{
 			mskARN1: provisionedCluster(mskARN1, "3.5.1", kafkatypes.ClientBrokerPlaintext),
 			mskARN2: provisionedCluster(mskARN2, "3.5.1", kafkatypes.ClientBrokerTls),
 		},
@@ -208,8 +175,8 @@ func TestEnrichMSKCluster_PlaintextEncryptionProducesFindingSevTilde(t *testing.
 // TestEnrichMSKCluster_ServerlessClusterSkipped verifies that when cluster-1 is
 // serverless (Provisioned==nil, Serverless!=nil), it is skipped and produces no finding.
 func TestEnrichMSKCluster_ServerlessClusterSkipped(t *testing.T) {
-	fake := &mskDescribeClusterV2Fake{
-		results: map[string]*kafkatypes.Cluster{
+	fake := &fakeMSKDescribeClusterV2{
+		Results: map[string]*kafkatypes.Cluster{
 			mskARN1: serverlessCluster(mskARN1),
 			mskARN2: provisionedCluster(mskARN2, "3.5.1", kafkatypes.ClientBrokerTls),
 		},
@@ -258,8 +225,8 @@ func TestEnrichMSKCluster_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 // condition is silently dropped — the cluster shows only "broker software outdated",
 // never "encryption in transit not enforced", even though both are true.
 func TestEnrichMSKCluster_OutdatedVersionAndPlaintextEncryption_ProducesBothFindings(t *testing.T) {
-	fake := &mskDescribeClusterV2Fake{
-		results: map[string]*kafkatypes.Cluster{
+	fake := &fakeMSKDescribeClusterV2{
+		Results: map[string]*kafkatypes.Cluster{
 			mskARN1: provisionedCluster(mskARN1, "2.6.0", kafkatypes.ClientBrokerPlaintext),
 		},
 	}
@@ -301,11 +268,11 @@ func TestEnrichMSKCluster_OutdatedVersionAndPlaintextEncryption_ProducesBothFind
 // lower-bounds the issue badge.
 func TestEnrichMSKCluster_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("kafka: DescribeClusterV2 throttled")
-	fake := &mskDescribeClusterV2Fake{
-		errByArn: map[string]error{
+	fake := &fakeMSKDescribeClusterV2{
+		ErrByArn: map[string]error{
 			mskARN1: apiErr,
 		},
-		results: map[string]*kafkatypes.Cluster{
+		Results: map[string]*kafkatypes.Cluster{
 			mskARN2: provisionedCluster(mskARN2, "3.5.1", kafkatypes.ClientBrokerTls),
 		},
 	}

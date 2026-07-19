@@ -51,8 +51,8 @@ func TestRelated_Pipeline_EbRule_Match(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{
-		EventBridge: &fakeEventBridgeUS1{
-			ruleNames: []string{"rule-deploy", "rule-notify", "rule-rollback"},
+		EventBridge: &fakeEventBridgeAPI{
+			RuleNames: []string{"rule-deploy", "rule-notify", "rule-rollback"},
 		},
 	}
 	checker := pipelineCheckerByTarget(t, "eb-rule")

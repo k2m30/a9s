@@ -2,7 +2,8 @@
 // runtime/probes.go), the single chokepoint every type-file write goes
 // through as of task #17 wave 1 (C6a, docs/design/cache-requirements.md):
 //
-//  1. TestSaveAvailabilityCache_CountsOnly_NeverDropsRows — the DEF-20 shape:
+//  1. TestSaveAvailabilityCache_CountsOnly_NeverDropsRows — the counts-only
+//     rows-drop shape (D16):
 //     a counts-only exact write must never nuke existing Rows to zero, even
 //     when its Count differs from len(Rows).
 //  2. TestSaveResourceListCache_SubsetRowsWrite_KeepsFullerRows — a
@@ -27,7 +28,7 @@ import (
 
 // newSeededTestController and its underlying "demo"/"us-east-1" profile/
 // region pair are defined in app_cache_first_seeding_test.go (same package,
-// precedented helper) — reused here for the DEF-20 end-to-end pin so the
+// precedented helper) — reused here for the counts-only rows-drop end-to-end pin so the
 // Controller-level ApplyResourcesLoaded save seam (which resolves its own
 // cache dir from core.Session().Profile/Region) is exercised exactly as the
 // real task-result lane would.
@@ -58,7 +59,7 @@ func reconcileRows(prefix string, n int) []cache.Row {
 	return rows
 }
 
-// TestSaveAvailabilityCache_CountsOnly_NeverDropsRows pins the DEF-20 shape
+// TestSaveAvailabilityCache_CountsOnly_NeverDropsRows pins the counts-only rows-drop shape (D16)
 // directly against SaveAvailabilityCache (the counts-only write lane): an
 // existing TypeFile with 50 rows, followed by a counts-only exact
 // observation of count 55 (rowsProvided=false in reconcileTypeFile terms),
@@ -247,7 +248,7 @@ func TestSaveResourceListCache_NonSubsetSameDepth_RefreshWins(t *testing.T) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// DEF-20 end-to-end pin — the live evidence chain across three real save
+// Counts-only rows-drop (D16) end-to-end pin — the live evidence chain across three real save
 // call sites sharing one on-disk TypeFile, in order:
 //
 //  1. A list screen opens and pages to 55 exact rows (ApplyResourcesLoaded
@@ -266,7 +267,7 @@ func TestSaveResourceListCache_NonSubsetSameDepth_RefreshWins(t *testing.T) {
 // the observed counts agree. It is pinned anyway as an end-to-end regression
 // guard for the reconciler chokepoint (reconcileTypeFile) across all three
 // real call sites in sequence, not as a standalone RED-at-HEAD repro; the
-// standalone counts-only MISMATCH shape that reproduces the DEF-20 bug at
+// standalone counts-only MISMATCH shape that reproduces the rows-drop bug at
 // HEAD (Count disagreeing with len(existing.Rows)) is pinned separately by
 // TestSaveAvailabilityCache_CountsOnly_NeverDropsRows and
 // TestSaveAvailabilityCache_ExactShrink_CountAdvancesRowsUntouched, both RED

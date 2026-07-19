@@ -15,8 +15,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
-	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
-	cloudfronttypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -26,7 +24,6 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
-	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -561,17 +558,9 @@ func TestLogs_Related_ECSTask_MatchesFamilyFromTaskDefinitionField(t *testing.T)
 // client context.
 // ---------------------------------------------------------------------------
 
-type fakeEventBridgeListRuleNamesByTarget struct {
-	awsclient.EventBridgeAPI
-	byTargetArn map[string][]string
-}
-
-func (f *fakeEventBridgeListRuleNamesByTarget) ListRuleNamesByTarget(_ context.Context, params *eventbridge.ListRuleNamesByTargetInput, _ ...func(*eventbridge.Options)) (*eventbridge.ListRuleNamesByTargetOutput, error) {
-	if params.TargetArn == nil {
-		return &eventbridge.ListRuleNamesByTargetOutput{}, nil
-	}
-	return &eventbridge.ListRuleNamesByTargetOutput{RuleNames: f.byTargetArn[*params.TargetArn]}, nil
-}
+// The fake client for ListRuleNamesByTarget now lives in
+// fakes_eventbridge_test.go (fakeEventBridgeAPI) — see that file's header
+// for the one-fake-per-interface convention.
 
 type fakeCodePipelineListPipelinesOnly struct {
 	awsclient.CodePipelineAPI
@@ -605,8 +594,8 @@ func TestPipeline_Related_EbRule_ResolvesViaRealFetcherOutput(t *testing.T) {
 		t.Fatalf("Fields[arn] = %q, want %q — the pipeline fetcher must construct the ARN with no \"pipeline/\" segment (region+account are already known from the client context; AWS CodePipeline resource ARN format)", got, pipelineARN)
 	}
 
-	fake := &fakeEventBridgeListRuleNamesByTarget{
-		byTargetArn: map[string][]string{pipelineARN: {"checkout-deploy-trigger"}},
+	fake := &fakeEventBridgeAPI{
+		RuleNamesByTargetArn: map[string][]string{pipelineARN: {"checkout-deploy-trigger"}},
 	}
 	clients := &awsclient.ServiceClients{EventBridge: fake}
 
@@ -989,25 +978,9 @@ func TestGlue_Related_CFN_ResolvesRegionWithoutEnvVar(t *testing.T) {
 // REGIONAL case is unaffected (still 0).
 // ---------------------------------------------------------------------------
 
-type fakeCloudFrontListDistributionsByWebACLId struct {
-	awsclient.CloudFrontAPI
-	byWebACLID map[string][]string
-}
-
-func (f *fakeCloudFrontListDistributionsByWebACLId) ListDistributionsByWebACLId(_ context.Context, params *cloudfront.ListDistributionsByWebACLIdInput, _ ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
-	if params.WebACLId == nil {
-		return &cloudfront.ListDistributionsByWebACLIdOutput{}, nil
-	}
-	ids := f.byWebACLID[*params.WebACLId]
-	if len(ids) == 0 {
-		return &cloudfront.ListDistributionsByWebACLIdOutput{DistributionList: &cloudfronttypes.DistributionList{}}, nil
-	}
-	var items []cloudfronttypes.DistributionSummary
-	for _, id := range ids {
-		items = append(items, cloudfronttypes.DistributionSummary{Id: aws.String(id)})
-	}
-	return &cloudfront.ListDistributionsByWebACLIdOutput{DistributionList: &cloudfronttypes.DistributionList{Items: items}}, nil
-}
+// The fake CloudFront client for these tests now lives in
+// fakes_cloudfront_test.go (fakeCloudFrontAPI) — see that file's header for
+// the one-fake-per-interface convention.
 
 func TestWAF_Related_CF_CloudfrontScopeResolvesDistribution(t *testing.T) {
 	webACLID := "acl-1234abcd"
@@ -1017,8 +990,8 @@ func TestWAF_Related_CF_CloudfrontScopeResolvesDistribution(t *testing.T) {
 		Fields: map[string]string{"scope": string(wafv2types.ScopeCloudfront), "id": webACLID},
 	}
 
-	fake := &fakeCloudFrontListDistributionsByWebACLId{
-		byWebACLID: map[string][]string{webACLID: {"E1234567890ABC"}},
+	fake := &fakeCloudFrontAPI{
+		DistByWebACLID: map[string][]string{webACLID: {"E1234567890ABC"}},
 	}
 	clients := &awsclient.ServiceClients{CloudFront: fake}
 
@@ -1040,8 +1013,8 @@ func TestWAF_Related_CF_RegionalScopeStaysZero(t *testing.T) {
 		Fields: map[string]string{"scope": string(wafv2types.ScopeRegional), "id": "acl-regional"},
 	}
 
-	fake := &fakeCloudFrontListDistributionsByWebACLId{
-		byWebACLID: map[string][]string{"acl-regional": {"SHOULD-NOT-BE-RETURNED"}},
+	fake := &fakeCloudFrontAPI{
+		DistByWebACLID: map[string][]string{"acl-regional": {"SHOULD-NOT-BE-RETURNED"}},
 	}
 	clients := &awsclient.ServiceClients{CloudFront: fake}
 
@@ -1051,28 +1024,6 @@ func TestWAF_Related_CF_RegionalScopeStaysZero(t *testing.T) {
 	if result.Count != 0 {
 		t.Fatalf("Count = %d, want 0 for a REGIONAL-scope Web ACL (CloudFront can only bind CLOUDFRONT-scope ACLs)", result.Count)
 	}
-}
-
-// fakeCloudFrontRejectsBareID implements CloudFrontListDistributionsByWebACLIdAPI
-// but only matches the exact WebACL ARN. Any other input (e.g. the bare WebACL
-// ID) returns an empty distribution list, so a checker that mistakenly passes
-// the bare ID instead of the full ARN observably fails this test (Count stays
-// 0) rather than silently succeeding against a lenient fake.
-type fakeCloudFrontRejectsBareID struct {
-	awsclient.CloudFrontAPI
-	wantWebACLArn string
-	distIDs       []string
-}
-
-func (f *fakeCloudFrontRejectsBareID) ListDistributionsByWebACLId(_ context.Context, params *cloudfront.ListDistributionsByWebACLIdInput, _ ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsByWebACLIdOutput, error) {
-	if params.WebACLId == nil || *params.WebACLId != f.wantWebACLArn {
-		return &cloudfront.ListDistributionsByWebACLIdOutput{DistributionList: &cloudfronttypes.DistributionList{}}, nil
-	}
-	var items []cloudfronttypes.DistributionSummary
-	for _, id := range f.distIDs {
-		items = append(items, cloudfronttypes.DistributionSummary{Id: aws.String(id)})
-	}
-	return &cloudfront.ListDistributionsByWebACLIdOutput{DistributionList: &cloudfronttypes.DistributionList{Items: items}}, nil
 }
 
 // TestWAF_Related_CF_PassesFullARNNotBareID pins the docs/resources/waf.md
@@ -1095,9 +1046,9 @@ func TestWAF_Related_CF_PassesFullARNNotBareID(t *testing.T) {
 		},
 	}
 
-	fake := &fakeCloudFrontRejectsBareID{
-		wantWebACLArn: webACLArn,
-		distIDs:       []string{"EARNMATCH0001"},
+	fake := &fakeCloudFrontAPI{
+		WantWebACLArn:  webACLArn,
+		DistByWebACLID: map[string][]string{webACLArn: {"EARNMATCH0001"}},
 	}
 	clients := &awsclient.ServiceClients{CloudFront: fake}
 

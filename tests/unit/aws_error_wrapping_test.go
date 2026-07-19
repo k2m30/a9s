@@ -208,7 +208,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching SNS topics",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchSNSTopicsPage(ctx, &mockSNSListTopicsClient{err: sentinel}, token)
+					return awsclient.FetchSNSTopicsPage(ctx, &fakeSNSListTopics{Err: sentinel}, token)
 				})
 				return err
 			},
@@ -415,7 +415,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching SNS subscriptions",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchSNSSubscriptionsPage(ctx, &mockSNSListSubscriptionsClient{err: sentinel}, token)
+					return awsclient.FetchSNSSubscriptionsPage(ctx, &fakeSNSListSubscriptions{Err: sentinel}, token)
 				})
 				return err
 			},
@@ -521,7 +521,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching Step Functions",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchStepFunctionsPage(ctx, &mockSFNClient{err: sentinel}, token)
+					return awsclient.FetchStepFunctionsPage(ctx, &fakeSFNListStateMachines{Err: sentinel}, token)
 				})
 				return err
 			},
@@ -630,8 +630,8 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 					return awsclient.FetchCodeBuildProjectsPage(ctx,
-						&mockCodeBuildListProjectsClient{err: sentinel},
-						&mockCodeBuildBatchGetProjectsClient{}, token)
+						&fakeCodeBuildListProjects{Err: sentinel},
+						&fakeCodeBuildBatchGetProjects{}, token)
 				})
 				return err
 			},

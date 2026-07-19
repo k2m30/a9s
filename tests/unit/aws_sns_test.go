@@ -17,8 +17,8 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestFetchSNSTopics_ParsesMultipleTopics(t *testing.T) {
-	mock := &mockSNSListTopicsClient{
-		output: &sns.ListTopicsOutput{
+	mock := &fakeSNSListTopics{
+		Output: &sns.ListTopicsOutput{
 			Topics: []snstypes.Topic{
 				{
 					TopicArn: new("arn:aws:sns:us-east-1:123456789012:my-alerts-topic"),
@@ -81,9 +81,8 @@ func TestFetchSNSTopics_ParsesMultipleTopics(t *testing.T) {
 }
 
 func TestFetchSNSTopics_ErrorResponse(t *testing.T) {
-	mock := &mockSNSListTopicsClient{
-		output: nil,
-		err:    fmt.Errorf("AWS API error: access denied"),
+	mock := &fakeSNSListTopics{
+		Err: fmt.Errorf("AWS API error: access denied"),
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -98,8 +97,8 @@ func TestFetchSNSTopics_ErrorResponse(t *testing.T) {
 }
 
 func TestFetchSNSTopics_EmptyResponse(t *testing.T) {
-	mock := &mockSNSListTopicsClient{
-		output: &sns.ListTopicsOutput{
+	mock := &fakeSNSListTopics{
+		Output: &sns.ListTopicsOutput{
 			Topics: []snstypes.Topic{},
 		},
 	}

@@ -1,6 +1,7 @@
 package unit_test
 
-// runtime_executor_depth_refetch_test.go — RED regression tests for DEF-9.
+// runtime_executor_depth_refetch_test.go — RED regression tests for the
+// verify-depth walk (D7).
 //
 // Contract: docs/design/cache-requirements.md C1/C2/C5, Goal 3. A warm list
 // open that previously persisted an exact total (e.g. 55 rows across 2
@@ -177,8 +178,8 @@ func registerDepthFetcherErrorOnPage2(t *testing.T, shortName string) {
 // Test 1 — RefetchesToCachedDepth
 // ────────────────────────────────────────────────────────────────────────────
 
-// TestExecuteTask_FetchResources_RefetchesToCachedDepth pins DEF-9 / C1 / C2 /
-// C5: when 55 rows were previously persisted for this type, a background
+// TestExecuteTask_FetchResources_RefetchesToCachedDepth pins the verify-depth
+// walk (C1 / C2 / C5): when 55 rows were previously persisted for this type, a background
 // verify-refetch (KindFetchResources) must keep paginating past the
 // truncated 50-row first page until it reaches the previously-shown depth
 // (55), and the final Pagination must reflect the LAST page fetched

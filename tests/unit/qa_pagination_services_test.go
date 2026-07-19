@@ -1523,35 +1523,12 @@ func TestQA_Pagination_FetchCloudFormationStacksPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Mock: CodeBuild ListProjects + BatchGetProjects (paginated)
 // ---------------------------------------------------------------------------
-
-type mockCodeBuildListProjectsAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*codebuild.ListProjectsOutput, error)
-	lastInput *codebuild.ListProjectsInput
-}
-
-func (m *mockCodeBuildListProjectsAPIPaginated) ListProjects(_ context.Context, in *codebuild.ListProjectsInput, _ ...func(*codebuild.Options)) (*codebuild.ListProjectsOutput, error) {
-	m.Calls++
-	m.lastInput = in
-	return m.PageFunc(m.Calls)
-}
-
-type mockCodeBuildBatchGetProjectsAPIPaginated struct {
-	Calls        int
-	BatchGetFunc func(call int) (*codebuild.BatchGetProjectsOutput, error)
-}
-
-func (m *mockCodeBuildBatchGetProjectsAPIPaginated) BatchGetProjects(_ context.Context, _ *codebuild.BatchGetProjectsInput, _ ...func(*codebuild.Options)) (*codebuild.BatchGetProjectsOutput, error) {
-	m.Calls++
-	return m.BatchGetFunc(m.Calls)
-}
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchCodeBuildProjectsPage
-// ---------------------------------------------------------------------------
+// The fake clients for these operations now live in fakes_codebuild_test.go
+// (fakeCodeBuildListProjects, fakeCodeBuildBatchGetProjects) — see that
+// file's header for the one-fake-per-interface convention.
 
 func TestQA_Pagination_FetchCodeBuildProjectsPage_FirstPage(t *testing.T) {
-	listMock := &mockCodeBuildListProjectsAPIPaginated{
+	listMock := &fakeCodeBuildListProjects{
 		PageFunc: func(_ int) (*codebuild.ListProjectsOutput, error) {
 			return &codebuild.ListProjectsOutput{
 				Projects:  []string{"my-build-project"},
@@ -1559,8 +1536,8 @@ func TestQA_Pagination_FetchCodeBuildProjectsPage_FirstPage(t *testing.T) {
 			}, nil
 		},
 	}
-	batchMock := &mockCodeBuildBatchGetProjectsAPIPaginated{
-		BatchGetFunc: func(_ int) (*codebuild.BatchGetProjectsOutput, error) {
+	batchMock := &fakeCodeBuildBatchGetProjects{
+		PageFunc: func(_ int) (*codebuild.BatchGetProjectsOutput, error) {
 			return &codebuild.BatchGetProjectsOutput{
 				Projects: []cbtypes.Project{
 					{
@@ -1597,7 +1574,7 @@ func TestQA_Pagination_FetchCodeBuildProjectsPage_FirstPage(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchCodeBuildProjectsPage_Continuation(t *testing.T) {
-	listMock := &mockCodeBuildListProjectsAPIPaginated{
+	listMock := &fakeCodeBuildListProjects{
 		PageFunc: func(_ int) (*codebuild.ListProjectsOutput, error) {
 			return &codebuild.ListProjectsOutput{
 				Projects:  []string{"another-project"},
@@ -1605,8 +1582,8 @@ func TestQA_Pagination_FetchCodeBuildProjectsPage_Continuation(t *testing.T) {
 			}, nil
 		},
 	}
-	batchMock := &mockCodeBuildBatchGetProjectsAPIPaginated{
-		BatchGetFunc: func(_ int) (*codebuild.BatchGetProjectsOutput, error) {
+	batchMock := &fakeCodeBuildBatchGetProjects{
+		PageFunc: func(_ int) (*codebuild.BatchGetProjectsOutput, error) {
 			return &codebuild.BatchGetProjectsOutput{
 				Projects: []cbtypes.Project{
 					{
@@ -1630,16 +1607,16 @@ func TestQA_Pagination_FetchCodeBuildProjectsPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
-	if listMock.lastInput == nil {
+	if listMock.LastInput == nil {
 		t.Fatal("list mock was not called")
 	}
-	if listMock.lastInput.NextToken == nil || *listMock.lastInput.NextToken != "token-page-2" {
-		t.Errorf("NextToken not forwarded: got %v, want %q", listMock.lastInput.NextToken, "token-page-2")
+	if listMock.LastInput.NextToken == nil || *listMock.LastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", listMock.LastInput.NextToken, "token-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchCodeBuildProjectsPage_Empty(t *testing.T) {
-	listMock := &mockCodeBuildListProjectsAPIPaginated{
+	listMock := &fakeCodeBuildListProjects{
 		PageFunc: func(_ int) (*codebuild.ListProjectsOutput, error) {
 			return &codebuild.ListProjectsOutput{
 				Projects:  []string{},
@@ -1647,8 +1624,8 @@ func TestQA_Pagination_FetchCodeBuildProjectsPage_Empty(t *testing.T) {
 			}, nil
 		},
 	}
-	batchMock := &mockCodeBuildBatchGetProjectsAPIPaginated{
-		BatchGetFunc: func(_ int) (*codebuild.BatchGetProjectsOutput, error) {
+	batchMock := &fakeCodeBuildBatchGetProjects{
+		PageFunc: func(_ int) (*codebuild.BatchGetProjectsOutput, error) {
 			return &codebuild.BatchGetProjectsOutput{Projects: []cbtypes.Project{}}, nil
 		},
 	}
@@ -1669,13 +1646,13 @@ func TestQA_Pagination_FetchCodeBuildProjectsPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchCodeBuildProjectsPage_Error(t *testing.T) {
-	listMock := &mockCodeBuildListProjectsAPIPaginated{
+	listMock := &fakeCodeBuildListProjects{
 		PageFunc: func(_ int) (*codebuild.ListProjectsOutput, error) {
 			return nil, errors.New("list projects failed")
 		},
 	}
-	batchMock := &mockCodeBuildBatchGetProjectsAPIPaginated{
-		BatchGetFunc: func(_ int) (*codebuild.BatchGetProjectsOutput, error) {
+	batchMock := &fakeCodeBuildBatchGetProjects{
+		PageFunc: func(_ int) (*codebuild.BatchGetProjectsOutput, error) {
 			return &codebuild.BatchGetProjectsOutput{}, nil
 		},
 	}

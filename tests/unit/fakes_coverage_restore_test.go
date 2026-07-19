@@ -11,8 +11,6 @@ import (
 	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
-	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
-	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -106,32 +104,10 @@ func newFakeAthenaWithExecutionRole(roleARN string) *fakeAthenaCR {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// fakeEventBridgeCR — implements EventBridgeAPI with controllable ListTargetsByRule.
-// Used by: eventbridge_rule coverage-restore tests.
-// ---------------------------------------------------------------------------
-
-type fakeEventBridgeCR struct {
-	targets []eventbridgetypes.Target
-	err     error
-}
-
-func (f *fakeEventBridgeCR) ListRules(_ context.Context, _ *eventbridge.ListRulesInput, _ ...func(*eventbridge.Options)) (*eventbridge.ListRulesOutput, error) {
-	return &eventbridge.ListRulesOutput{}, nil
-}
-
-func (f *fakeEventBridgeCR) ListTargetsByRule(_ context.Context, _ *eventbridge.ListTargetsByRuleInput, _ ...func(*eventbridge.Options)) (*eventbridge.ListTargetsByRuleOutput, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	return &eventbridge.ListTargetsByRuleOutput{Targets: f.targets}, nil
-}
-
-func (f *fakeEventBridgeCR) ListRuleNamesByTarget(_ context.Context, _ *eventbridge.ListRuleNamesByTargetInput, _ ...func(*eventbridge.Options)) (*eventbridge.ListRuleNamesByTargetOutput, error) {
-	return &eventbridge.ListRuleNamesByTargetOutput{}, nil
-}
-
-var _ awsclient.EventBridgeAPI = (*fakeEventBridgeCR)(nil)
+// The fake client for EventBridgeAPI (ListRules, ListTargetsByRule,
+// ListRuleNamesByTarget) now lives in fakes_eventbridge_test.go
+// (fakeEventBridgeAPI) — see that file's header for the one-fake-per-
+// interface convention.
 
 // ---------------------------------------------------------------------------
 // fakeRedshiftCR — implements RedshiftAPI (DescribeClusters, DescribeLoggingStatus,

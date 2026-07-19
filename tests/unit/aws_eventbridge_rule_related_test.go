@@ -148,8 +148,8 @@ func TestRelated_EbRule_Role_WrongRawStruct(t *testing.T) {
 func TestRelated_EbRule_Kinesis_Match(t *testing.T) {
 	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
 	clients := &awsclient.ServiceClients{
-		EventBridge: &fakeEventBridgeCR{
-			targets: []eventbridgetypes.Target{
+		EventBridge: &fakeEventBridgeAPI{
+			Targets: []eventbridgetypes.Target{
 				{Arn: aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/my-stream")},
 			},
 		},
@@ -168,8 +168,8 @@ func TestRelated_EbRule_Kinesis_Match(t *testing.T) {
 func TestRelated_EbRule_Kinesis_NoMatch(t *testing.T) {
 	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
 	clients := &awsclient.ServiceClients{
-		EventBridge: &fakeEventBridgeCR{
-			targets: []eventbridgetypes.Target{
+		EventBridge: &fakeEventBridgeAPI{
+			Targets: []eventbridgetypes.Target{
 				{Arn: aws.String("arn:aws:lambda:us-east-1:123456789012:function:my-func")},
 			},
 		},
@@ -209,8 +209,8 @@ func TestRelated_EbRule_Kinesis_EmptyID(t *testing.T) {
 func TestRelated_EbRule_Lambda_Match(t *testing.T) {
 	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
 	clients := &awsclient.ServiceClients{
-		EventBridge: &fakeEventBridgeCR{
-			targets: []eventbridgetypes.Target{
+		EventBridge: &fakeEventBridgeAPI{
+			Targets: []eventbridgetypes.Target{
 				{Arn: aws.String("arn:aws:lambda:us-east-1:123456789012:function:process-events:3")},
 			},
 		},
@@ -230,8 +230,8 @@ func TestRelated_EbRule_Lambda_Match(t *testing.T) {
 func TestRelated_EbRule_Lambda_NoVersion(t *testing.T) {
 	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
 	clients := &awsclient.ServiceClients{
-		EventBridge: &fakeEventBridgeCR{
-			targets: []eventbridgetypes.Target{
+		EventBridge: &fakeEventBridgeAPI{
+			Targets: []eventbridgetypes.Target{
 				{Arn: aws.String("arn:aws:lambda:us-east-1:123456789012:function:my-func")},
 			},
 		},
@@ -254,8 +254,8 @@ func TestRelated_EbRule_Lambda_NoVersion(t *testing.T) {
 func TestRelated_EbRule_Logs_Match(t *testing.T) {
 	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
 	clients := &awsclient.ServiceClients{
-		EventBridge: &fakeEventBridgeCR{
-			targets: []eventbridgetypes.Target{
+		EventBridge: &fakeEventBridgeAPI{
+			Targets: []eventbridgetypes.Target{
 				{Arn: aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/my-app:*")},
 			},
 		},
@@ -279,8 +279,8 @@ func TestRelated_EbRule_Logs_Match(t *testing.T) {
 func TestRelated_EbRule_SFN_Match(t *testing.T) {
 	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
 	clients := &awsclient.ServiceClients{
-		EventBridge: &fakeEventBridgeCR{
-			targets: []eventbridgetypes.Target{
+		EventBridge: &fakeEventBridgeAPI{
+			Targets: []eventbridgetypes.Target{
 				{Arn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine")},
 			},
 		},
@@ -303,8 +303,8 @@ func TestRelated_EbRule_SFN_Match(t *testing.T) {
 func TestRelated_EbRule_SNS_Match(t *testing.T) {
 	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
 	clients := &awsclient.ServiceClients{
-		EventBridge: &fakeEventBridgeCR{
-			targets: []eventbridgetypes.Target{
+		EventBridge: &fakeEventBridgeAPI{
+			Targets: []eventbridgetypes.Target{
 				{Arn: aws.String("arn:aws:sns:us-east-1:123456789012:my-alerts-topic")},
 			},
 		},
@@ -327,8 +327,8 @@ func TestRelated_EbRule_SNS_Match(t *testing.T) {
 func TestRelated_EbRule_SQS_Match(t *testing.T) {
 	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
 	clients := &awsclient.ServiceClients{
-		EventBridge: &fakeEventBridgeCR{
-			targets: []eventbridgetypes.Target{
+		EventBridge: &fakeEventBridgeAPI{
+			Targets: []eventbridgetypes.Target{
 				{Arn: aws.String("arn:aws:sqs:us-east-1:123456789012:my-queue")},
 			},
 		},

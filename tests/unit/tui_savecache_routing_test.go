@@ -1,4 +1,5 @@
-// tui_savecache_routing_test.go — RED pin for DEF-11 (C6 + Goal 4 of
+// tui_savecache_routing_test.go — RED pin for the TUI save-cache
+// row-persistence routing defect (C6 + Goal 4 of
 // docs/design/cache-requirements.md).
 //
 // Root cause: internal/tui/app_dispatch.go's tasksToCmd intercepts
@@ -47,10 +48,11 @@ import (
 
 // newSaveCacheApp builds a tui.Model wired to demo clients (no real AWS
 // calls) with on-disk caching ENABLED (unlike newEnrichApp in
-// app_enrich_test.go, which sets WithNoCache(true) — DEF-11 is specifically
+// app_enrich_test.go, which sets WithNoCache(true) — this pin is specifically
 // about what lands on disk, so caching must stay on here). A9S_CONFIG_FOLDER
 // is redirected to t.TempDir() so cache.LoadDir/Store.SaveType write under an
-// isolated directory, matching the app_pilot_defects_test.go DEF-7 precedent.
+// isolated directory, matching the dispatch-time payload-freeze precedent in
+// app_pilot_defects_test.go.
 func newSaveCacheApp(t *testing.T, profile, region string) tui.Model {
 	t.Helper()
 	tmp := t.TempDir()
@@ -113,7 +115,7 @@ func runCmdTree(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 	}
 }
 
-// TestTUISaveCache_PersistsRowsToTypeFile pins DEF-11: a TUI-driven
+// TestTUISaveCache_PersistsRowsToTypeFile pins the save-cache routing: a TUI-driven
 // availability-sweep-completion save must persist the swept type's rows to
 // disk, not just its availability count. RED originally — tasksToCmd's
 // TaskKindSaveCache case called m.saveAvailabilityCache() (counts-only from
@@ -134,7 +136,7 @@ func runCmdTree(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 // enrichment run for real even in demo mode, a "wave2:*" Source on a
 // synthetic finding that was never actually produced by the s3 enricher would
 // misrepresent what this pin asserts. The finding here stays synthetic
-// (Source: "wave1:s3") because DEF-11's point is that the save-cache dispatch
+// (Source: "wave1:s3") because this pin's point is that the save-cache dispatch
 // persists whatever Findings the row already carries at snapshot time — not
 // that any particular enricher produced them.
 func TestTUISaveCache_PersistsRowsToTypeFile(t *testing.T) {
@@ -180,7 +182,7 @@ func TestTUISaveCache_PersistsRowsToTypeFile(t *testing.T) {
 
 // TestTUISaveCache_AvailabilityCountsStillPersist guards the half of the
 // save-cache dispatch that already works today: availability Count/HasResources
-// must keep persisting once the routing fix lands, so the DEF-11 reroute cannot
+// must keep persisting once the routing fix lands, so the save-cache reroute cannot
 // regress the one thing the intercepted TUI path got right. Green both before
 // and after the fix.
 func TestTUISaveCache_AvailabilityCountsStillPersist(t *testing.T) {
@@ -215,7 +217,7 @@ func TestTUISaveCache_AvailabilityCountsStillPersist(t *testing.T) {
 	// diagnostic run confirmed the identical (Issues=0) outcome through the
 	// headless executor path in this same "sweep-only, no list ever opened"
 	// scenario. That classification fidelity is a different subsystem than
-	// DEF-11 (which is about Rows, not Issues); Count/HasResources above are
+	// this file's routing pin (which is about Rows, not Issues); Count/HasResources above are
 	// the load-bearing counts-still-work assertions for this guard.
 }
 
@@ -228,5 +230,5 @@ func TestTUISaveCache_AvailabilityCountsStillPersist(t *testing.T) {
 // under test would duplicate nearly all of newSaveCacheApp/driveSweepCompletion
 // with no additional reachable-seam risk — TestTUISaveCache_PersistsRowsToTypeFile
 // already pins the exact rows/findings the executor path is known (via the
-// DEF-7 test) to persist, so a lane-parity diff would only restate the same
+// dispatch-time payload-freeze test) to persist, so a lane-parity diff would only restate the same
 // assertion through a heavier harness.

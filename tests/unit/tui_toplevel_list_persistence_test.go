@@ -1,4 +1,4 @@
-// tui_toplevel_list_persistence_test.go — pin tests for #17 wave 2 (DEF-21),
+// tui_toplevel_list_persistence_test.go — pin tests for #17 wave 2,
 // verifying the coder's fix in internal/tui/runtime_adapter_navigate.go: a
 // top-level, menu-driven list open now pushes runtime.ScreenResourceList
 // (via app.Controller.ApplyIntents + EnsureListState), not
@@ -10,11 +10,12 @@
 // per-type cache file to disk, RED at commit effdd465 (confirmed by reading
 // PushChildListScreen's runtime.ScreenChildList push at that commit).
 //
-// Item A/B/C — see core/app/handle.go, core/app/list_body.go,
+// See core/app/handle.go, core/app/list_body.go,
 // core/app/navigate.go, core/runtime/handlers_navigate.go for the
-// production-side contracts these tests pin against.
+// production-side contracts (top-level list save gate, seed-time provisional
+// total, silent-swap findings carry) these tests pin against.
 //
-// SCOPE NOTE on item B (screen-ID guard): internal/tui.Model.ctrl is
+// SCOPE NOTE on the screen-ID guard: internal/tui.Model.ctrl is
 // unexported and Model exposes no accessor onto app.Controller (only
 // Model.Core() for *runtime.Core, which does not carry ScreenIDs()) — so a
 // tests/unit black-box test cannot directly assert
@@ -190,8 +191,8 @@ func TestScreenIDGuard_TopLevelCommandVsPushChildListScreen(t *testing.T) {
 // total, and a genuine fetch clears the override.
 // -----------------------------------------------------------------------
 
-// TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch pins Item
-// B/DEF-21 end-to-end through the TUI: a disk pair reconstructed with
+// TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch pins the
+// seed-time provisional total end-to-end through the TUI: a disk pair reconstructed with
 // Count=55 but only 50 Rows (the C6a "counts-only write never touches Rows"
 // shape) must seed the s3 list with title "s3(55)", not "s3(50)" — and once
 // a genuine fetch result lands, the title must follow the real row count

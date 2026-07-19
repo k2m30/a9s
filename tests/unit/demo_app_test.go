@@ -384,7 +384,7 @@ func TestDemoMode_RefreshReturnsSameData(t *testing.T) {
 
 // TestNonDemoMode_Unchanged pins that non-demo mode still initiates a live
 // AWS connect (messages.InitConnect), not a demo handshake
-// (messages.ClientsReady). Updated for DEF-13: Init() on the live
+// (messages.ClientsReady). Updated for the startup disk seed (D10): Init() on the live
 // (no-pre-supplied-clients) path now returns tea.Batch(connectCmd, seedCmd)
 // instead of a bare connectCmd, so the InitConnect message must be located by
 // walking the returned cmd tree (extractMsg, already defined in this file)

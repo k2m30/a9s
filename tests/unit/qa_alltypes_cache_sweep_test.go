@@ -33,7 +33,8 @@
 //  2. SilentSwap: feeding a real messages.ResourcesLoaded through
 //     Controller.Handle (Gen:0, always accepted per AcceptZeroGen) routes to
 //     handleResourcesLoadedEvent -> applyResourcesLoaded, which replaces
-//     ls.Rows wholesale, clears ls.Refreshing (Contract A) and ls.Loading
+//     ls.Rows wholesale, clears ls.Refreshing (the cache-first seeding
+//     contract) and ls.Loading
 //     (already false from step 1, so it never flips true in between).
 //
 //  3. SaveIsolation: cache.Store.SaveType writes ONLY the touched type's
@@ -43,7 +44,7 @@
 //
 // Structural-class sampling (§5's list) is layered on top of the same drive:
 // paginated (Exact:false Row-count mismatch => IsTruncated), zero-resource
-// (HasResources:false, Count:0, Rows:nil => DEF-16 "empty not stale":
+// (HasResources:false, Count:0, Rows:nil => "empty not stale":
 // CachedEntry stays nil, Loading:true, Refreshing:false, no phantom rows),
 // issue-badge-excluded (td.ExcludeFromIssueBadge — persists issuesKnown via
 // TypeFile.IssuesKnown round-trip), child-list (len(td.Children) > 0), and
@@ -398,7 +399,7 @@ func TestAllTypes_StructuralClass_Paginated(t *testing.T) {
 	}
 }
 
-// TestAllTypes_StructuralClass_ZeroResource pins the DEF-16 contract: a
+// TestAllTypes_StructuralClass_ZeroResource pins the empty-not-stale contract: a
 // zero-resource TypeFile (HasResources:false, Count:0, Rows:nil) must render
 // an EMPTY list, not stale phantom rows — HandleNavigate's disk-store
 // fallback only populates CachedEntry when len(tf.Rows) > 0, so a genuinely

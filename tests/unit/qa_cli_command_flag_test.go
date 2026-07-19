@@ -182,7 +182,7 @@ func TestQA_CLICommand_DemoMode_EmitsNavigateMsg(t *testing.T) {
 }
 
 // TestQA_CLICommand_LivePath_ClientsReady_ArmsButDoesNotEmitNavigateYet
-// verifies DEF-14/D11's Cause B fix reaches the real TUI Update loop: on the
+// verifies the navigation-race half of D11's fix reaches the real TUI Update loop: on the
 // LIVE (non-demo, NoCache=false) path, a ClientsReadyMsg must NOT produce a
 // NavigateMsg directly — the one-shot -c navigation is armed
 // (session.CommandArmed/PendingCommand) and deferred to the follow-up

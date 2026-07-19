@@ -20,8 +20,8 @@ import (
 
 func TestFetchStepFunctions_ParsesMultiple(t *testing.T) {
 	now := time.Now()
-	mock := &mockSFNClient{
-		output: &sfn.ListStateMachinesOutput{
+	mock := &fakeSFNListStateMachines{
+		Output: &sfn.ListStateMachinesOutput{
 			StateMachines: []sfntypes.StateMachineListItem{
 				{
 					Name:            aws.String("order-processing"),
@@ -85,8 +85,8 @@ func TestFetchStepFunctions_ParsesMultiple(t *testing.T) {
 
 func TestFetchStepFunctions_RawStructPopulated(t *testing.T) {
 	now := time.Now()
-	mock := &mockSFNClient{
-		output: &sfn.ListStateMachinesOutput{
+	mock := &fakeSFNListStateMachines{
+		Output: &sfn.ListStateMachinesOutput{
 			StateMachines: []sfntypes.StateMachineListItem{
 				{
 					Name:            aws.String("raw-sm"),
@@ -119,8 +119,8 @@ func TestFetchStepFunctions_RawStructPopulated(t *testing.T) {
 }
 
 func TestFetchStepFunctions_ErrorResponse(t *testing.T) {
-	mock := &mockSFNClient{
-		err: fmt.Errorf("AWS API error: access denied"),
+	mock := &fakeSFNListStateMachines{
+		Err: fmt.Errorf("AWS API error: access denied"),
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -135,8 +135,8 @@ func TestFetchStepFunctions_ErrorResponse(t *testing.T) {
 }
 
 func TestFetchStepFunctions_EmptyResponse(t *testing.T) {
-	mock := &mockSFNClient{
-		output: &sfn.ListStateMachinesOutput{
+	mock := &fakeSFNListStateMachines{
+		Output: &sfn.ListStateMachinesOutput{
 			StateMachines: []sfntypes.StateMachineListItem{},
 		},
 	}

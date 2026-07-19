@@ -960,34 +960,13 @@ func TestFetchSQSQueues_Pagination(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Paginated mock: SNS ListTopics
 // ---------------------------------------------------------------------------
-
-type mockSNSPaginatedClient struct {
-	outputs []*sns.ListTopicsOutput
-	inputs  []*sns.ListTopicsInput
-	err     error
-	callIdx int
-}
-
-func (m *mockSNSPaginatedClient) ListTopics(
-	ctx context.Context,
-	params *sns.ListTopicsInput,
-	optFns ...func(*sns.Options),
-) (*sns.ListTopicsOutput, error) {
-	m.inputs = append(m.inputs, params)
-	if m.err != nil {
-		return nil, m.err
-	}
-	if m.callIdx >= len(m.outputs) {
-		return &sns.ListTopicsOutput{}, nil
-	}
-	out := m.outputs[m.callIdx]
-	m.callIdx++
-	return out, nil
-}
+// The fake client for this operation now lives in fakes_sns_test.go
+// (fakeSNSListTopics) — see that file's header for the one-fake-per-
+// interface convention.
 
 func TestFetchSNSTopics_Pagination(t *testing.T) {
-	mock := &mockSNSPaginatedClient{
-		outputs: []*sns.ListTopicsOutput{
+	mock := &fakeSNSListTopics{
+		Pages: []*sns.ListTopicsOutput{
 			{
 				NextToken: aws.String("page2-token"),
 				Topics: []snstypes.Topic{
@@ -1032,17 +1011,17 @@ func TestFetchSNSTopics_Pagination(t *testing.T) {
 	})
 
 	t.Run("api_called_twice", func(t *testing.T) {
-		if mock.callIdx != 2 {
-			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
+		if mock.Calls != 2 {
+			t.Errorf("expected 2 API calls, got %d", mock.Calls)
 		}
 	})
 
 	t.Run("page2_received_token", func(t *testing.T) {
-		if len(mock.inputs) < 2 {
-			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		if len(mock.Inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.Inputs))
 		}
-		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
-			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		if mock.Inputs[1].NextToken == nil || *mock.Inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.Inputs[1].NextToken, "page2-token")
 		}
 	})
 }

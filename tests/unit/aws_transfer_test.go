@@ -354,28 +354,14 @@ func TestFetchTransferServersPage_DetailsDeniedRich(t *testing.T) {
 // empty successful result.
 // ---------------------------------------------------------------------------
 
-type transferListErrorFake struct {
-	transferUnimplementedAPI
-	err error
-}
-
-func (f *transferListErrorFake) ListServers(
-	_ context.Context, _ *transfer.ListServersInput, _ ...func(*transfer.Options),
-) (*transfer.ListServersOutput, error) {
-	return nil, f.err
-}
-
-func (f *transferListErrorFake) DescribeServer(
-	_ context.Context, _ *transfer.DescribeServerInput, _ ...func(*transfer.Options),
-) (*transfer.DescribeServerOutput, error) {
-	return nil, fmt.Errorf("DescribeServer should not be called when ListServers fails")
-}
-
-var _ awsclient.TransferAPI = (*transferListErrorFake)(nil)
+// The fake client for ListServers/DescribeServer now lives in
+// fakes_transfer_test.go (fakeTransferServers) — see that file's header for
+// the one-fake-per-interface convention.
 
 func TestFetchTransferServersPage_ListDeniedIsError(t *testing.T) {
-	fake := &transferListErrorFake{
-		err: &transfertypes.AccessDeniedException{Message: aws.String("User is not authorized to perform transfer:ListServers")},
+	fake := &fakeTransferServers{
+		ListErr:     &transfertypes.AccessDeniedException{Message: aws.String("User is not authorized to perform transfer:ListServers")},
+		DescribeErr: fmt.Errorf("DescribeServer should not be called when ListServers fails"),
 	}
 	clients := &awsclient.ServiceClients{Transfer: fake}
 
@@ -395,35 +381,6 @@ func TestFetchTransferServersPage_ListDeniedIsError(t *testing.T) {
 // partial_describe — U12/E5: 5 listed, 2 describes fail → 5 rows (2
 // rich-degraded) + composite error naming both, in "N of M" form.
 // ---------------------------------------------------------------------------
-
-type transferPartialDescribeFake struct {
-	transferUnimplementedAPI
-	listed    []transfertypes.ListedServer
-	servers   map[string]transfertypes.DescribedServer
-	errByName map[string]error
-}
-
-func (f *transferPartialDescribeFake) ListServers(
-	_ context.Context, _ *transfer.ListServersInput, _ ...func(*transfer.Options),
-) (*transfer.ListServersOutput, error) {
-	return &transfer.ListServersOutput{Servers: f.listed}, nil
-}
-
-func (f *transferPartialDescribeFake) DescribeServer(
-	_ context.Context, input *transfer.DescribeServerInput, _ ...func(*transfer.Options),
-) (*transfer.DescribeServerOutput, error) {
-	id := aws.ToString(input.ServerId)
-	if err, ok := f.errByName[id]; ok {
-		return nil, err
-	}
-	s, ok := f.servers[id]
-	if !ok {
-		return nil, fmt.Errorf("server %q not found", id)
-	}
-	return &transfer.DescribeServerOutput{Server: &s}, nil
-}
-
-var _ awsclient.TransferAPI = (*transferPartialDescribeFake)(nil)
 
 func transferPartialListedServer(id string) transfertypes.ListedServer {
 	return transfertypes.ListedServer{
@@ -457,14 +414,14 @@ func TestFetchTransferServersPage_PartialDescribe(t *testing.T) {
 	for i, id := range ids {
 		listed[i] = transferPartialListedServer(id)
 	}
-	fake := &transferPartialDescribeFake{
-		listed: listed,
-		servers: map[string]transfertypes.DescribedServer{
+	fake := &fakeTransferServers{
+		Listed: listed,
+		Servers: map[string]transfertypes.DescribedServer{
 			"server-a": transferPartialDescribedServer("server-a"),
 			"server-b": transferPartialDescribedServer("server-b"),
 			"server-c": transferPartialDescribedServer("server-c"),
 		},
-		errByName: map[string]error{
+		ErrByName: map[string]error{
 			"server-denied":  &transfertypes.AccessDeniedException{Message: aws.String("not authorized")},
 			"server-missing": &transfertypes.ResourceNotFoundException{Message: aws.String("Server server-missing not found")},
 		},
@@ -508,27 +465,6 @@ func TestFetchTransferServersPage_PartialDescribe(t *testing.T) {
 // lone nil LoggingRole (structured logs still present) never become findings.
 // ---------------------------------------------------------------------------
 
-type transferSingleServerFake struct {
-	transferUnimplementedAPI
-	listed    transfertypes.ListedServer
-	described transfertypes.DescribedServer
-}
-
-func (f *transferSingleServerFake) ListServers(
-	_ context.Context, _ *transfer.ListServersInput, _ ...func(*transfer.Options),
-) (*transfer.ListServersOutput, error) {
-	return &transfer.ListServersOutput{Servers: []transfertypes.ListedServer{f.listed}}, nil
-}
-
-func (f *transferSingleServerFake) DescribeServer(
-	_ context.Context, _ *transfer.DescribeServerInput, _ ...func(*transfer.Options),
-) (*transfer.DescribeServerOutput, error) {
-	d := f.described
-	return &transfer.DescribeServerOutput{Server: &d}, nil
-}
-
-var _ awsclient.TransferAPI = (*transferSingleServerFake)(nil)
-
 func TestFetchTransferServersPage_WaveThreeAntiTests(t *testing.T) {
 	result := fetchTransferDemoPage(t)
 
@@ -559,7 +495,7 @@ func TestFetchTransferServersPage_WaveThreeAntiTests(t *testing.T) {
 	described.LoggingRole = nil
 	described.StructuredLogDestinations = []string{"arn:aws:logs:us-east-1:123456789012:log-group:/aws/transfer/wave3-anti:*"}
 
-	fake := &transferSingleServerFake{listed: listed, described: described}
+	fake := &fakeTransferServers{Listed: []transfertypes.ListedServer{listed}, Described: &described}
 	clients := &awsclient.ServiceClients{Transfer: fake}
 	single, err := awsclient.FetchTransferServersPage(context.Background(), clients, "")
 	if err != nil {

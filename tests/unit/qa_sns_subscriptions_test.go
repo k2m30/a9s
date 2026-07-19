@@ -14,8 +14,8 @@ import (
 )
 
 func TestQA_SNSSubscriptions_FetchSuccess(t *testing.T) {
-	mock := &mockSNSListSubscriptionsClient{
-		output: &sns.ListSubscriptionsOutput{
+	mock := &fakeSNSListSubscriptions{
+		Output: &sns.ListSubscriptionsOutput{
 			Subscriptions: []snstypes.Subscription{
 				{
 					SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:my-topic:sub-001"),
@@ -72,8 +72,8 @@ func TestQA_SNSSubscriptions_FetchSuccess(t *testing.T) {
 }
 
 func TestQA_SNSSubscriptions_FetchEmpty(t *testing.T) {
-	mock := &mockSNSListSubscriptionsClient{
-		output: &sns.ListSubscriptionsOutput{
+	mock := &fakeSNSListSubscriptions{
+		Output: &sns.ListSubscriptionsOutput{
 			Subscriptions: []snstypes.Subscription{},
 		},
 	}
@@ -90,8 +90,8 @@ func TestQA_SNSSubscriptions_FetchEmpty(t *testing.T) {
 }
 
 func TestQA_SNSSubscriptions_FetchError(t *testing.T) {
-	mock := &mockSNSListSubscriptionsClient{
-		err: fmt.Errorf("access denied"),
+	mock := &fakeSNSListSubscriptions{
+		Err: fmt.Errorf("access denied"),
 	}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {

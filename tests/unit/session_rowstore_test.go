@@ -112,7 +112,7 @@ func TestRowStore_Observe_AppendDedupsByID_NewRowsStillAdded(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
-// Pin 2 — stale truncated ID-subset replace rejected once exact (DEF-18/D14).
+// Pin 2 — stale truncated ID-subset replace rejected once exact (D14).
 // -----------------------------------------------------------------------
 
 // TestRowStore_Observe_StaleTruncatedSubsetRejectedOnceExact mirrors
@@ -386,10 +386,11 @@ func TestRowStore_ObserveCount_OnAbsentType(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
-// Pin 5 — Amend is copy-on-write (structural DEF-7 pin); Gen bumped.
+// Pin 5 — Amend is copy-on-write (structural dispatch-time-freeze pin); Gen bumped.
 // -----------------------------------------------------------------------
 
-// TestRowStore_Amend_CopyOnWrite_EarlierSnapshotUnchanged pins DEF-7: taking
+// TestRowStore_Amend_CopyOnWrite_EarlierSnapshotUnchanged pins Amend's
+// copy-on-write contract: taking
 // a Snapshot, then Amend-ing (adding a finding/field), must NOT mutate the
 // rows already captured by the earlier Snapshot — the enrichment-fold rows
 // mutated in place today (runtime/helpers.go, tui/app_enrich_fold.go) are

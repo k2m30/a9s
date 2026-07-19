@@ -642,25 +642,12 @@ func TestQA_Pagination_FetchSQSQueuesPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Mock: SNS ListTopics (paginated)
 // ---------------------------------------------------------------------------
-
-type mockSNSListTopicsAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*sns.ListTopicsOutput, error)
-	lastInput *sns.ListTopicsInput
-}
-
-func (m *mockSNSListTopicsAPIPaginated) ListTopics(_ context.Context, in *sns.ListTopicsInput, _ ...func(*sns.Options)) (*sns.ListTopicsOutput, error) {
-	m.Calls++
-	m.lastInput = in
-	return m.PageFunc(m.Calls)
-}
-
-// ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchSNSTopicsPage
-// ---------------------------------------------------------------------------
+// The fake client for this operation now lives in fakes_sns_test.go
+// (fakeSNSListTopics) — see that file's header for the one-fake-per-
+// interface convention.
 
 func TestQA_Pagination_FetchSNSTopicsPage_FirstPage(t *testing.T) {
-	mock := &mockSNSListTopicsAPIPaginated{
+	mock := &fakeSNSListTopics{
 		PageFunc: func(_ int) (*sns.ListTopicsOutput, error) {
 			return &sns.ListTopicsOutput{
 				Topics: []snstypes.Topic{
@@ -701,7 +688,7 @@ func TestQA_Pagination_FetchSNSTopicsPage_FirstPage(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchSNSTopicsPage_Continuation(t *testing.T) {
-	mock := &mockSNSListTopicsAPIPaginated{
+	mock := &fakeSNSListTopics{
 		PageFunc: func(_ int) (*sns.ListTopicsOutput, error) {
 			return &sns.ListTopicsOutput{
 				Topics: []snstypes.Topic{
@@ -725,16 +712,16 @@ func TestQA_Pagination_FetchSNSTopicsPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
-	if mock.lastInput == nil {
+	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
-		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	if mock.LastInput.NextToken == nil || *mock.LastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.LastInput.NextToken, "token-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchSNSTopicsPage_Empty(t *testing.T) {
-	mock := &mockSNSListTopicsAPIPaginated{
+	mock := &fakeSNSListTopics{
 		PageFunc: func(_ int) (*sns.ListTopicsOutput, error) {
 			return &sns.ListTopicsOutput{
 				Topics:    []snstypes.Topic{},
@@ -756,7 +743,7 @@ func TestQA_Pagination_FetchSNSTopicsPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchSNSTopicsPage_Error(t *testing.T) {
-	mock := &mockSNSListTopicsAPIPaginated{
+	mock := &fakeSNSListTopics{
 		PageFunc: func(_ int) (*sns.ListTopicsOutput, error) {
 			return nil, errors.New("list topics failed")
 		},

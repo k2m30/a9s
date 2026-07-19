@@ -28,8 +28,8 @@ func TestFetchCfnResources_Basic(t *testing.T) {
 	lastUpdated2 := time.Date(2024, 3, 22, 10, 5, 0, 0, time.UTC)
 	lastUpdated3 := time.Date(2024, 3, 22, 10, 10, 0, 0, time.UTC)
 
-	mock := &mockCFNListStackResourcesClient{
-		output: &cloudformation.ListStackResourcesOutput{
+	mock := &fakeCFNListStackResources{
+		Output: &cloudformation.ListStackResourcesOutput{
 			StackResourceSummaries: []cfntypes.StackResourceSummary{
 				{
 					LogicalResourceId:    aws.String("MyBucket"),
@@ -194,8 +194,8 @@ func TestFetchCfnResources_Basic(t *testing.T) {
 // TestFetchCfnResources_Empty verifies that a stack with no resources
 // returns an empty slice with no error.
 func TestFetchCfnResources_Empty(t *testing.T) {
-	mock := &mockCFNListStackResourcesClient{
-		output: &cloudformation.ListStackResourcesOutput{
+	mock := &fakeCFNListStackResources{
+		Output: &cloudformation.ListStackResourcesOutput{
 			StackResourceSummaries: []cfntypes.StackResourceSummary{},
 		},
 	}
@@ -216,8 +216,8 @@ func TestFetchCfnResources_Empty(t *testing.T) {
 
 // TestFetchCfnResources_APIError verifies that API errors are propagated.
 func TestFetchCfnResources_APIError(t *testing.T) {
-	mock := &mockCFNListStackResourcesClient{
-		err: fmt.Errorf("AWS API error: stack not found"),
+	mock := &fakeCFNListStackResources{
+		Err: fmt.Errorf("AWS API error: stack not found"),
 	}
 
 	result, err := awsclient.FetchCfnResources(
@@ -239,8 +239,8 @@ func TestFetchCfnResources_APIError(t *testing.T) {
 func TestFetchCfnResources_NilDriftInformation(t *testing.T) {
 	lastUpdated := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	mock := &mockCFNListStackResourcesClient{
-		output: &cloudformation.ListStackResourcesOutput{
+	mock := &fakeCFNListStackResources{
+		Output: &cloudformation.ListStackResourcesOutput{
 			StackResourceSummaries: []cfntypes.StackResourceSummary{
 				{
 					LogicalResourceId:    aws.String("NoDrift"),
@@ -280,8 +280,8 @@ func TestFetchCfnResources_NilDriftInformation(t *testing.T) {
 func TestFetchCfnResources_NilOptionalFields(t *testing.T) {
 	lastUpdated := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	mock := &mockCFNListStackResourcesClient{
-		output: &cloudformation.ListStackResourcesOutput{
+	mock := &fakeCFNListStackResources{
+		Output: &cloudformation.ListStackResourcesOutput{
 			StackResourceSummaries: []cfntypes.StackResourceSummary{
 				{
 					LogicalResourceId:    aws.String("NilPhysical"),
@@ -323,8 +323,8 @@ func TestFetchCfnResources_NilOptionalFields(t *testing.T) {
 func TestFetchCfnResources_TimestampFormatting(t *testing.T) {
 	ts := time.Date(2024, 12, 25, 14, 30, 45, 0, time.UTC)
 
-	mock := &mockCFNListStackResourcesClient{
-		output: &cloudformation.ListStackResourcesOutput{
+	mock := &fakeCFNListStackResources{
+		Output: &cloudformation.ListStackResourcesOutput{
 			StackResourceSummaries: []cfntypes.StackResourceSummary{
 				{
 					LogicalResourceId:    aws.String("TsResource"),
@@ -363,8 +363,8 @@ func TestFetchCfnResources_TimestampFormatting(t *testing.T) {
 func TestFetchCfnResources_RawStruct(t *testing.T) {
 	ts := time.Date(2024, 3, 22, 12, 30, 0, 0, time.UTC)
 
-	mock := &mockCFNListStackResourcesClient{
-		output: &cloudformation.ListStackResourcesOutput{
+	mock := &fakeCFNListStackResources{
+		Output: &cloudformation.ListStackResourcesOutput{
 			StackResourceSummaries: []cfntypes.StackResourceSummary{
 				{
 					LogicalResourceId:    aws.String("RawBucket"),
@@ -533,8 +533,8 @@ func TestCfnResources_ParentHasChildDef(t *testing.T) {
 func TestFetchCfnResources_Pagination(t *testing.T) {
 	lastUpdated := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	mock := &mockCFNListStackResourcesClient{
-		outputs: []*cloudformation.ListStackResourcesOutput{
+	mock := &fakeCFNListStackResources{
+		Pages: []*cloudformation.ListStackResourcesOutput{
 			{
 				NextToken: aws.String("page2-token"),
 				StackResourceSummaries: []cfntypes.StackResourceSummary{
@@ -660,17 +660,17 @@ func TestFetchCfnResources_Pagination(t *testing.T) {
 	})
 
 	t.Run("api_called_twice", func(t *testing.T) {
-		if mock.callIdx != 2 {
-			t.Errorf("expected 2 API calls for pagination, got %d", mock.callIdx)
+		if mock.Calls != 2 {
+			t.Errorf("expected 2 API calls for pagination, got %d", mock.Calls)
 		}
 	})
 
 	t.Run("page2_token_forwarded", func(t *testing.T) {
-		if mock.lastInput == nil {
+		if mock.LastInput == nil {
 			t.Fatal("mock was not called")
 		}
-		if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "page2-token" {
-			t.Errorf("NextToken not forwarded to ListStackResources: got %v, want %q", mock.lastInput.NextToken, "page2-token")
+		if mock.LastInput.NextToken == nil || *mock.LastInput.NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to ListStackResources: got %v, want %q", mock.LastInput.NextToken, "page2-token")
 		}
 	})
 

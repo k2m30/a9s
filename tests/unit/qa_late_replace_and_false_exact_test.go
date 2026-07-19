@@ -1,4 +1,5 @@
-// qa_late_replace_and_false_exact_test.go — RED pins for DEF-18.
+// qa_late_replace_and_false_exact_test.go — RED pins for the late-replace and
+// false-exact defect pair (D14).
 //
 // Defect (observed live; coder root-causing in parallel — coordinate via
 // the mechanisms below):
@@ -196,7 +197,7 @@ func TestNilPaginationEntry_IsNotExact(t *testing.T) {
 
 // ────────────────────────────────────────────────────────────────────────────
 // Test 3 — a late page-1 replace must not stomp a deeper, already-loaded
-// list (DEF-18 mechanism A).
+// list (the stale verify-refetch discard).
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestLateReplace_DoesNotStompDeeperList drives the headless controller via
@@ -206,7 +207,7 @@ func TestNilPaginationEntry_IsNotExact(t *testing.T) {
 // fires and the menu-availability/title-derived count is also exercised:
 // page 1 (50, truncated, token) lands with Append=false, then page 2 (5,
 // exact) with Append=true — landing the list at 55 exact, matching the
-// pre-existing DEF-17 dedup contract.
+// pre-existing append-dedup contract (D13).
 //
 // Then a LATE page-1 replace arrives (Append=false) carrying the SAME 50
 // page-1 IDs, still truncated — the exact shape a straggling background

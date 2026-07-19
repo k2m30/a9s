@@ -289,8 +289,8 @@ func TestRelated_SFN_EbRule_Match(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{
-		EventBridge: &fakeEventBridgeUS1{
-			ruleNames: []string{"rule-start", "rule-monitor", "rule-retry"},
+		EventBridge: &fakeEventBridgeAPI{
+			RuleNames: []string{"rule-start", "rule-monitor", "rule-retry"},
 		},
 	}
 	checker := sfnCheckerByTarget(t, "eb-rule")

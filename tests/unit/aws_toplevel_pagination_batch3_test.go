@@ -386,61 +386,13 @@ func TestFetchBackupPlans_Pagination(t *testing.T) {
 // ---------------------------------------------------------------------------
 // 5. CodeBuild ListProjects — NextToken pagination (two-step: List + BatchGet)
 // ---------------------------------------------------------------------------
-
-type mockCodeBuildListProjectsPaginatedClient struct {
-	outputs []*codebuild.ListProjectsOutput
-	inputs  []*codebuild.ListProjectsInput
-	err     error
-	callIdx int
-}
-
-func (m *mockCodeBuildListProjectsPaginatedClient) ListProjects(
-	ctx context.Context,
-	params *codebuild.ListProjectsInput,
-	optFns ...func(*codebuild.Options),
-) (*codebuild.ListProjectsOutput, error) {
-	m.inputs = append(m.inputs, params)
-	if m.err != nil {
-		return nil, m.err
-	}
-	if m.callIdx >= len(m.outputs) {
-		return &codebuild.ListProjectsOutput{}, nil
-	}
-	out := m.outputs[m.callIdx]
-	m.callIdx++
-	return out, nil
-}
-
-type mockCodeBuildBatchGetProjectsPaginatedClient struct {
-	output *codebuild.BatchGetProjectsOutput
-	err    error
-}
-
-func (m *mockCodeBuildBatchGetProjectsPaginatedClient) BatchGetProjects(
-	ctx context.Context,
-	params *codebuild.BatchGetProjectsInput,
-	optFns ...func(*codebuild.Options),
-) (*codebuild.BatchGetProjectsOutput, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	// Filter projects based on requested names
-	var filtered []codebuildtypes.Project
-	nameSet := make(map[string]bool)
-	for _, n := range params.Names {
-		nameSet[n] = true
-	}
-	for _, p := range m.output.Projects {
-		if p.Name != nil && nameSet[*p.Name] {
-			filtered = append(filtered, p)
-		}
-	}
-	return &codebuild.BatchGetProjectsOutput{Projects: filtered}, nil
-}
+// The fake clients for these operations now live in fakes_codebuild_test.go
+// (fakeCodeBuildListProjects, fakeCodeBuildBatchGetProjects) — see that
+// file's header for the one-fake-per-interface convention.
 
 func TestFetchCodeBuildProjects_Pagination(t *testing.T) {
-	listMock := &mockCodeBuildListProjectsPaginatedClient{
-		outputs: []*codebuild.ListProjectsOutput{
+	listMock := &fakeCodeBuildListProjects{
+		Pages: []*codebuild.ListProjectsOutput{
 			{
 				NextToken: aws.String("page2-token"),
 				Projects:  []string{"page1-project-1"},
@@ -451,8 +403,9 @@ func TestFetchCodeBuildProjects_Pagination(t *testing.T) {
 		},
 	}
 
-	batchMock := &mockCodeBuildBatchGetProjectsPaginatedClient{
-		output: &codebuild.BatchGetProjectsOutput{
+	batchMock := &fakeCodeBuildBatchGetProjects{
+		FilterByName: true,
+		Output: &codebuild.BatchGetProjectsOutput{
 			Projects: []codebuildtypes.Project{
 				{Name: aws.String("page1-project-1"), Description: aws.String("Project 1")},
 				{Name: aws.String("page2-project-1"), Description: aws.String("Project 2")},
@@ -490,17 +443,17 @@ func TestFetchCodeBuildProjects_Pagination(t *testing.T) {
 	})
 
 	t.Run("list_api_called_twice", func(t *testing.T) {
-		if listMock.callIdx != 2 {
-			t.Errorf("expected 2 ListProjects API calls, got %d", listMock.callIdx)
+		if listMock.Calls != 2 {
+			t.Errorf("expected 2 ListProjects API calls, got %d", listMock.Calls)
 		}
 	})
 
 	t.Run("page2_received_token", func(t *testing.T) {
-		if len(listMock.inputs) < 2 {
-			t.Fatalf("expected at least 2 ListProjects inputs captured, got %d", len(listMock.inputs))
+		if len(listMock.Inputs) < 2 {
+			t.Fatalf("expected at least 2 ListProjects inputs captured, got %d", len(listMock.Inputs))
 		}
-		if listMock.inputs[1].NextToken == nil || *listMock.inputs[1].NextToken != "page2-token" {
-			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", listMock.inputs[1].NextToken, "page2-token")
+		if listMock.Inputs[1].NextToken == nil || *listMock.Inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", listMock.Inputs[1].NextToken, "page2-token")
 		}
 	})
 }
@@ -1529,34 +1482,13 @@ func TestFetchNodeGroups_Pagination(t *testing.T) {
 // ---------------------------------------------------------------------------
 // 16. SNS ListSubscriptions — NextToken pagination
 // ---------------------------------------------------------------------------
-
-type mockSNSSubscriptionsPaginatedClient struct {
-	outputs []*sns.ListSubscriptionsOutput
-	inputs  []*sns.ListSubscriptionsInput
-	err     error
-	callIdx int
-}
-
-func (m *mockSNSSubscriptionsPaginatedClient) ListSubscriptions(
-	ctx context.Context,
-	params *sns.ListSubscriptionsInput,
-	optFns ...func(*sns.Options),
-) (*sns.ListSubscriptionsOutput, error) {
-	m.inputs = append(m.inputs, params)
-	if m.err != nil {
-		return nil, m.err
-	}
-	if m.callIdx >= len(m.outputs) {
-		return &sns.ListSubscriptionsOutput{}, nil
-	}
-	out := m.outputs[m.callIdx]
-	m.callIdx++
-	return out, nil
-}
+// The fake client for this operation now lives in fakes_sns_test.go
+// (fakeSNSListSubscriptions) — see that file's header for the one-fake-per-
+// interface convention.
 
 func TestFetchSNSSubscriptions_Pagination(t *testing.T) {
-	mock := &mockSNSSubscriptionsPaginatedClient{
-		outputs: []*sns.ListSubscriptionsOutput{
+	mock := &fakeSNSListSubscriptions{
+		Pages: []*sns.ListSubscriptionsOutput{
 			{
 				NextToken: aws.String("page2-token"),
 				Subscriptions: []snstypes.Subscription{
@@ -1620,17 +1552,17 @@ func TestFetchSNSSubscriptions_Pagination(t *testing.T) {
 	})
 
 	t.Run("api_called_twice", func(t *testing.T) {
-		if mock.callIdx != 2 {
-			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
+		if mock.Calls != 2 {
+			t.Errorf("expected 2 API calls, got %d", mock.Calls)
 		}
 	})
 
 	t.Run("page2_received_token", func(t *testing.T) {
-		if len(mock.inputs) < 2 {
-			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		if len(mock.Inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.Inputs))
 		}
-		if mock.inputs[1].NextToken == nil || *mock.inputs[1].NextToken != "page2-token" {
-			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.inputs[1].NextToken, "page2-token")
+		if mock.Inputs[1].NextToken == nil || *mock.Inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", mock.Inputs[1].NextToken, "page2-token")
 		}
 	})
 }

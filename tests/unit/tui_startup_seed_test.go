@@ -1,4 +1,4 @@
-// tui_startup_seed_test.go — RED pin for DEF-13/D10 (C1 + goal 4 of
+// tui_startup_seed_test.go — RED pin for the startup disk seed, D10 (C1 + goal 4 of
 // docs/design/cache-requirements.md; observed live: the TUI main menu renders
 // empty at startup until the AWS connect completes).
 //
@@ -79,7 +79,7 @@ func seedTypeFile(t *testing.T, profile, region, shortName string, count int) {
 // disk on the very first Init()-driven frame, without any ClientsReady.
 // ────────────────────────────────────────────────────────────────────────────
 
-// TestTUIInit_SeedsMenuFromDisk_BeforeClientsReady pins DEF-13: a
+// TestTUIInit_SeedsMenuFromDisk_BeforeClientsReady pins the startup disk seed: a
 // disk-cache-warm TUI start must render cached availability counts on the
 // menu before the live AWS connect completes. The model is constructed with
 // an explicit profile/region (so region resolution is not in play) and NO
@@ -131,7 +131,7 @@ func TestTUIInit_SeedsMenuFromDisk_BeforeClientsReady(t *testing.T) {
 // returns beyond this first level: Init()'s cmd tree is exactly
 // tea.Batch(connectCmd, seedCmd) (plus an optional flash cmd) — applying the
 // seed leg's resulting messages.AvailabilityCacheLoaded to Update is enough
-// to observe DEF-13's "does the disk seed reach the menu on the very first
+// to observe the startup disk seed's "does the disk seed reach the menu on the very first
 // frame" contract. Recursively draining every FOLLOW-ON cmd (as
 // tui_savecache_routing_test.go's runCmdTree does for a full sweep-completion
 // scenario) would additionally execute the real background availability
@@ -176,7 +176,7 @@ func applyNonConnectLeg(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestTUIInit_EmptyRegion_ResolvesConfigDefaultForSeed pins the secondary
-// DEF-13 hole: session.Region == "" (as it is with no -r flag until the AWS
+// startup-disk-seed hole: session.Region == "" (as it is with no -r flag until the AWS
 // connect settles it) must not block the disk seed entirely. The profile's
 // default region is resolvable synchronously from a local AWS config file
 // via awsclient.GetDefaultRegion(awsclient.DefaultConfigPath(), profile) —

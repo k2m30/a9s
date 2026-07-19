@@ -15,28 +15,12 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Inline fake CloudFront client used by checkCfLambda / checkCfLogs tests.
-// Implements CloudFrontAPI (ListDistributions + GetDistributionConfig).
-// ---------------------------------------------------------------------------
-
-type fakeCFClient struct {
-	listOut *cloudfront.ListDistributionsOutput
-	listErr error
-	getOut  *cloudfront.GetDistributionConfigOutput
-	getErr  error
-}
-
-func (f *fakeCFClient) ListDistributions(_ context.Context, _ *cloudfront.ListDistributionsInput, _ ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsOutput, error) {
-	return f.listOut, f.listErr
-}
-
-func (f *fakeCFClient) GetDistributionConfig(_ context.Context, _ *cloudfront.GetDistributionConfigInput, _ ...func(*cloudfront.Options)) (*cloudfront.GetDistributionConfigOutput, error) {
-	return f.getOut, f.getErr
-}
+// The fake CloudFront client used by checkCfLambda / checkCfLogs tests now
+// lives in fakes_cloudfront_test.go (fakeCloudFrontAPI) — see that file's
+// header for the one-fake-per-interface convention.
 
 // fakeCFServiceClients builds a *awsclient.ServiceClients with only CloudFront populated.
-func fakeCFServiceClients(cf *fakeCFClient) *awsclient.ServiceClients {
+func fakeCFServiceClients(cf *fakeCloudFrontAPI) *awsclient.ServiceClients {
 	return &awsclient.ServiceClients{CloudFront: cf}
 }
 
@@ -965,8 +949,8 @@ func TestRelated_CF_Lambda_DefaultBehaviorAssociation(t *testing.T) {
 	const distID = "E1LAMBDA123"
 	const lambdaARN = "arn:aws:lambda:us-east-1:123456789012:function:my-edge-fn:3"
 
-	clients := fakeCFServiceClients(&fakeCFClient{
-		getOut: &cloudfront.GetDistributionConfigOutput{
+	clients := fakeCFServiceClients(&fakeCloudFrontAPI{
+		GetConfigOutput: &cloudfront.GetDistributionConfigOutput{
 			DistributionConfig: &cftypes.DistributionConfig{
 				DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
 					LambdaFunctionAssociations: &cftypes.LambdaFunctionAssociations{
@@ -998,8 +982,8 @@ func TestRelated_CF_Lambda_CacheBehaviorAssociation(t *testing.T) {
 	const distID = "E1LAMBDA456"
 	const lambdaARN = "arn:aws:lambda:us-east-1:123456789012:function:cb-edge-fn:1"
 
-	clients := fakeCFServiceClients(&fakeCFClient{
-		getOut: &cloudfront.GetDistributionConfigOutput{
+	clients := fakeCFServiceClients(&fakeCloudFrontAPI{
+		GetConfigOutput: &cloudfront.GetDistributionConfigOutput{
 			DistributionConfig: &cftypes.DistributionConfig{
 				CacheBehaviors: &cftypes.CacheBehaviors{
 					Quantity: aws.Int32(1),
@@ -1033,8 +1017,8 @@ func TestRelated_CF_Lambda_CacheBehaviorAssociation(t *testing.T) {
 // TestRelated_CF_Lambda_NoAssociations: DistributionConfig has no Lambda@Edge
 // associations → Count: 0.
 func TestRelated_CF_Lambda_NoAssociations(t *testing.T) {
-	clients := fakeCFServiceClients(&fakeCFClient{
-		getOut: &cloudfront.GetDistributionConfigOutput{
+	clients := fakeCFServiceClients(&fakeCloudFrontAPI{
+		GetConfigOutput: &cloudfront.GetDistributionConfigOutput{
 			DistributionConfig: &cftypes.DistributionConfig{
 				DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{},
 			},
@@ -1053,8 +1037,8 @@ func TestRelated_CF_Lambda_NoAssociations(t *testing.T) {
 // TestRelated_CF_Lambda_NilDistributionConfig: GetDistributionConfig returns nil
 // DistributionConfig → Count: 0 (no panic).
 func TestRelated_CF_Lambda_NilDistributionConfig(t *testing.T) {
-	clients := fakeCFServiceClients(&fakeCFClient{
-		getOut: &cloudfront.GetDistributionConfigOutput{DistributionConfig: nil},
+	clients := fakeCFServiceClients(&fakeCloudFrontAPI{
+		GetConfigOutput: &cloudfront.GetDistributionConfigOutput{DistributionConfig: nil},
 	})
 
 	res := resource.Resource{ID: "E1NILCFG", Fields: map[string]string{}}
@@ -1069,8 +1053,8 @@ func TestRelated_CF_Lambda_NilDistributionConfig(t *testing.T) {
 // TestRelated_CF_Lambda_APIError: GetDistributionConfig returns an error
 // → State: RelatedError, Err set.
 func TestRelated_CF_Lambda_APIError(t *testing.T) {
-	clients := fakeCFServiceClients(&fakeCFClient{
-		getErr: errors.New("cloudfront: GetDistributionConfig throttled"),
+	clients := fakeCFServiceClients(&fakeCloudFrontAPI{
+		GetConfigErr: errors.New("cloudfront: GetDistributionConfig throttled"),
 	})
 
 	res := resource.Resource{ID: "E1APIERR", Fields: map[string]string{}}
@@ -1092,8 +1076,8 @@ func TestRelated_CF_Lambda_APIError(t *testing.T) {
 // TestRelated_CF_Logs_LoggingEnabled: Logging.Enabled=true, bucket set →
 // bucket name is extracted (stripping ".s3..." suffix).
 func TestRelated_CF_Logs_LoggingEnabled(t *testing.T) {
-	clients := fakeCFServiceClients(&fakeCFClient{
-		getOut: &cloudfront.GetDistributionConfigOutput{
+	clients := fakeCFServiceClients(&fakeCloudFrontAPI{
+		GetConfigOutput: &cloudfront.GetDistributionConfigOutput{
 			DistributionConfig: &cftypes.DistributionConfig{
 				Logging: &cftypes.LoggingConfig{
 					Enabled: aws.Bool(true),
@@ -1117,8 +1101,8 @@ func TestRelated_CF_Logs_LoggingEnabled(t *testing.T) {
 
 // TestRelated_CF_Logs_LoggingDisabled: Logging.Enabled=false → Count: 0.
 func TestRelated_CF_Logs_LoggingDisabled(t *testing.T) {
-	clients := fakeCFServiceClients(&fakeCFClient{
-		getOut: &cloudfront.GetDistributionConfigOutput{
+	clients := fakeCFServiceClients(&fakeCloudFrontAPI{
+		GetConfigOutput: &cloudfront.GetDistributionConfigOutput{
 			DistributionConfig: &cftypes.DistributionConfig{
 				Logging: &cftypes.LoggingConfig{
 					Enabled: aws.Bool(false),
@@ -1139,8 +1123,8 @@ func TestRelated_CF_Logs_LoggingDisabled(t *testing.T) {
 
 // TestRelated_CF_Logs_NilLoggingConfig: Logging is nil → Count: 0.
 func TestRelated_CF_Logs_NilLoggingConfig(t *testing.T) {
-	clients := fakeCFServiceClients(&fakeCFClient{
-		getOut: &cloudfront.GetDistributionConfigOutput{
+	clients := fakeCFServiceClients(&fakeCloudFrontAPI{
+		GetConfigOutput: &cloudfront.GetDistributionConfigOutput{
 			DistributionConfig: &cftypes.DistributionConfig{Logging: nil},
 		},
 	})
