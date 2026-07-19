@@ -94,6 +94,20 @@ tree|audit)
 		printf '%s\n' "$report" | sed 's/^/  /'
 		fail=1
 	fi
+	# Tree mode also term-scans NEW content (worktree vs merge-base with
+	# origin/main) so the gate enforces the term list even when git hooks are
+	# not installed. Whole-tree term scanning stays audit-only by design.
+	if [ "$MODE" = tree ] && [ -n "$EFF" ]; then
+		base=$(git merge-base origin/main HEAD 2>/dev/null)
+		if [ -n "$base" ]; then
+			nt=$(git diff "$base" -U0 --no-color -- $PATHSPEC | grep -E '^\+' | grep -vE '^\+\+\+' | sed 's/^+//' | term_check)
+			if [ -n "$nt" ]; then
+				echo "BLOCKED: forbidden term in new content (vs merge-base with origin/main) —"
+				printf '%s\n' "$nt" | sed 's/^/    /'
+				fail=1
+			fi
+		fi
+	fi
 	;;
 esac
 

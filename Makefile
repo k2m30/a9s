@@ -1,4 +1,4 @@
-.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security coverage verify-readonly verify-zero-init demo readme check-readme mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live smoke-costs check-no-real-data install-hooks ready-to-push ready-to-release generate
+.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security coverage verify-readonly verify-zero-init verify-renderer-free verify-hooks demo readme check-readme mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live smoke-costs check-no-real-data install-hooks ready-to-push ready-to-release generate
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -91,30 +91,30 @@ coverage:
 
 cover: coverage
 
-# False-positive exclusions (line 56+):
-#   CreateDate/CreateTime/StartRecord/StartTime/StopTime/StopDate — timestamp field names, not API calls
-#   ExecuteCommandConfiguration — ECS cluster struct field read via NavigableField, not an API call
-#   CreateServiceClients — local helper in core/aws/client.go that constructs SDK client structs, not an API call
-#   ExecuteTaskAt — local runtime executor helper, not an API call
+# Token-based scan (scripts/verify-readonly.sh): comments are stripped before
+# matching and exemptions are exact method names, so a trailing // or a read
+# verb elsewhere on the line can no longer hide a write call.
 verify-readonly:
-	@echo "Checking for write API calls in core/aws/ and core/runtime/..."
-	@if grep -rn '\.\(Create\|Delete\|Update\|Put\|Modify\|Terminate\|Stop\|Reboot\|RunInstances\|Execute\|Send\|Publish\|Remove\)[A-Z][A-Za-z0-9]*(' core/aws/*.go core/runtime/*.go \
-		| grep -v '_test.go' \
-		| grep -v 'errors.go' \
-		| grep -v 'interfaces.go' \
-		| grep -v '_interfaces.go' \
-		| grep -v 'client.go' \
-		| grep -v 'profile.go' \
-		| grep -v 'regions.go' \
-		| grep -v '\/\/' \
-		| grep -v 'Describe\|List\|Get\|Search\|Lookup\|BatchGet\|Scan' \
-		| grep -v 'CreateDate\|CreateTime\|StartRecord\|StartTime\|StopTime\|StopDate' \
-		| grep -v 'ExecuteCommandConfiguration' \
-		| grep -v 'CreateServiceClients' \
-		| grep -v 'ExecuteTaskAt' ; then \
-		echo "FAIL: Write API calls detected!"; exit 1; \
+	@./scripts/verify-readonly.sh
+
+# The renderer-agnostic boundary (docs/architecture.md, invariant 1): core/
+# must compile with zero Bubble Tea / Lipgloss / internal/ dependencies.
+verify-renderer-free:
+	@echo "Checking core/ stays renderer-free (no charm.land or internal/ deps)..."
+	@if go list -deps ./core/... | grep -E 'charm\.land/|github\.com/k2m30/a9s/v3/internal/'; then \
+		echo "FAIL: core/ depends on a renderer or internal/ package — renderer-agnostic boundary broken"; exit 1; \
 	else \
-		echo "PASS: All API calls are read-only"; \
+		echo "PASS: core/ is renderer-free"; \
+	fi
+
+# The sensitive-term half of check-no-real-data lives in git hooks; a clone
+# without hooks silently loses it, so the gate refuses to run unhooked.
+verify-hooks:
+	@hp="$$(git config core.hooksPath || true)"; \
+	if [ "$$hp" != ".githooks" ]; then \
+		echo "FAIL: git hooks not installed (core.hooksPath='$$hp') — run 'make install-hooks'"; exit 1; \
+	else \
+		echo "PASS: .githooks active"; \
 	fi
 
 # AS-820: lock in AS-795 invariant. init() bodies must not return to
@@ -213,7 +213,7 @@ install-hooks:
 
 # Stage 6 — Pre-push gate. The single command every PR must pass before push.
 # See docs/development-process.md.
-ready-to-push: check-no-real-data test-race lint security gofix verify-readonly verify-zero-init check-readme snapshot mdlint smoke smoke-related smoke-costs
+ready-to-push: verify-hooks check-no-real-data test-race lint security gofix verify-readonly verify-zero-init verify-renderer-free check-readme snapshot mdlint smoke smoke-related smoke-costs
 	@echo "PASS: ready-to-push gate green"
 
 # Stage 7 — Pre-release gate. ADDITIVE on top of Stage 6: it does NOT re-run
