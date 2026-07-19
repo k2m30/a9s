@@ -91,11 +91,10 @@ func TestNamingContract_Wave2Accessors_Shape(t *testing.T) {
 // TestNamingContract_InFetcherWave2Sentinel_ReturnsEmptyResult pins the
 // in-fetcher Wave 2 sentinel used for resource types whose Wave 2 work is
 // performed by the fetcher itself (e.g. EKS DescribeCluster, EKS Node Group
-// DescribeNodegroup, CloudTrail GetTrailStatus). The sentinel Fn is wired
-// into IssueEnricher{} so TestAttentionSignalsDoc sees a non-nil Wave2
-// without scheduling a redundant background enrichment pass.
-// Renamed from NoOpIssueEnricher in AS-731 to make the in-fetcher
-// contract explicit and to satisfy the zero-hits grep on `NoOpIssueEnricher`.
+// DescribeNodegroup, CloudTrail GetTrailStatus). The sentinel marks those
+// catalog entries as Wave-2-covered while its Fn returns zero findings, so
+// the background enrichment pass for them is a no-op. See the sentinel's doc
+// comment in core/aws/issue_enrichment.go for what guards that wiring.
 func TestNamingContract_InFetcherWave2Sentinel_ReturnsEmptyResult(t *testing.T) {
 	res, err := awsclient.InFetcherWave2Sentinel(context.Background(), nil, nil, nil)
 	if err != nil {

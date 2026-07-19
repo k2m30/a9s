@@ -9,7 +9,8 @@ import (
 
 // TestReview_DBC_RegistersCTEvents confirms that ct-events is present in dbc's
 // related-def list. Relevant to reviewer P2 claim that dbc lost ct-events.
-// ct-events is auto-appended for every resource type by zzz_ct_events_all_related.go.
+// ct-events is declared in dbc's own catalog entry Related list
+// (core/aws/catalog_databases.go), like every top-level type.
 func TestReview_DBC_RegistersCTEvents(t *testing.T) {
 	defs := resource.GetRelated("dbc")
 	found := false

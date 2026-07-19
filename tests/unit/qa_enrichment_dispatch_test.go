@@ -23,10 +23,11 @@ import (
 )
 
 // originalIssue196Enrichers lists the foundational enrichers from issue #196.
-// These must remain registered (real, not noop). The full Wave 2 contract is
-// enforced by TestAttentionSignalsDoc (per docs/attention-signals.md), so this
-// allowlist is no longer the source of truth — it's a regression pin for the
-// initial enricher set.
+// These must remain registered (real, not noop). Broader Wave 2 alignment
+// with docs/attention-signals.md is guarded by `make check-catalogen` and
+// tests/unit/docs_attention_signals_sync_test.go (both track FindingDef
+// declarations against the doc), so this allowlist is not the source of
+// truth — it's a regression pin for the initial enricher set.
 //
 // Registry-shape guard only — catches absence, not completeness.
 // A feature can still be disabled, inert, or half-fed and pass.

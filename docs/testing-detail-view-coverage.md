@@ -21,7 +21,16 @@ Six distinct layers must be tested independently. Each layer catches a class of 
 | **5. End-to-end navigation** — run the dispatched `tea.Cmd` through the root `Model.Update` and inspect the resulting view stack | Bugs in `handleRelatedNavigate`, child-type resolution, filter propagation | — (this is the deepest layer) |
 | **6. Related column coverage** — right-panel typed groups + pivot rows | All right-column behavior | — |
 
-**Every layer is non-negotiable for full coverage.** Skipping layer 4 is how "links lead to random resources" bugs ship. Skipping layer 6 is how the right panel breaks silently.
+**All six layers are required before claiming full detail-view coverage for a type** — apply the full stack when a type's detail view gets a dedicated coverage push; for smaller changes, cover the layers the change touches. Skipping layer 4 is how "links lead to random resources" bugs ship. Skipping layer 6 is how the right panel breaks silently.
+
+### Current state
+
+Two types have the full six-layer stack today:
+
+- **ct-events** — golden set `tests/testdata/golden/ctdetail_demo/` (cases A–I), plus the right-column dispatch/resolution/e2e tests (`ct_events_rightcol_dispatch_test.go`, `ct_events_rightcol_e2e_test.go`, `ctdetail_demo_rightcol_nav_test.go`, `ctevent_demo_invariants_test.go` in `tests/unit/`). Layer 4 uses explicit `demo.GetResources` fixture lookups.
+- **ec2** — golden sets `tests/testdata/golden/issue140/` and `ec2_related_view/`, plus the end-to-end chains in `tests/unit/ec2_stories_nav_chains_test.go` and `tests/integration/ec2_nav_chain_spec008_test.go`. Layer 4 is proven through the chain assertions on the target view's rendered content rather than a separate fixture lookup.
+
+All other resource types rely on layer-6-style related-panel unit tests plus the integration `scenario_*_visual` tests in `tests/integration/` (backup, dbc, dbc-snap, dbi, dbi-snap, ddb, efs, lt, mwaa, opensearch, redis, redshift, s3, ses, transfer, vpcpeer, and the all-types sweeps), which walk list → detail → related panel per type without golden snapshots.
 
 ---
 
@@ -140,7 +149,7 @@ The correct end of a test dispatch batch: "N tests passing, 0 failing, here's th
 
 ### 4.5 Rebuild the binary after production code changes
 
-Per `CLAUDE.md`: `go build -o a9s ./cmd/a9s/` after every production change. Otherwise the `--demo` run uses a stale binary and the user sees the old buggy behavior. Multiple fix dispatches during this session got blamed for "not fixing anything" because the coder didn't rebuild at the end.
+Per `CLAUDE.md`: `make build` after every production change (version is resolved via ldflags at build time — a bare `go build` produces a version-less binary). Otherwise the `--demo` run uses a stale binary and the user sees the old buggy behavior. Multiple fix dispatches during this session got blamed for "not fixing anything" because the coder didn't rebuild at the end.
 
 ---
 
@@ -224,7 +233,7 @@ Looking up `TargetID` in `demo.GetResources(TargetType)` is Layer 4 — it verif
 
 ### 6.6 "Nothing changed" = you didn't rebuild the binary
 
-If the user runs `--demo` and says "nothing changed," 90% of the time it's because no one ran `go build -o a9s ./cmd/a9s/` after the last fix. Put the rebuild in the verification checklist of every coder dispatch.
+If the user runs `--demo` and says "nothing changed," 90% of the time it's because no one ran `make build` after the last fix. Put the rebuild in the verification checklist of every coder dispatch.
 
 ### 6.7 Async agent file collisions
 

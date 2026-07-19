@@ -35,9 +35,12 @@ type IssueEnricher struct {
 // docs/attention-signals.md is non-None but is populated synchronously by the
 // fetcher (e.g. EKS DescribeCluster, EKS Node Group DescribeNodegroup,
 // CloudTrail GetTrailStatus per-resource). Setting `Wave2: IssueEnricher{Fn:
-// InFetcherWave2Sentinel, Priority: 100}` keeps TestAttentionSignalsDoc happy
-// (it sees a non-nil Wave2 wiring) without scheduling a redundant background
-// enrichment pass — the sentinel returns zero findings.
+// InFetcherWave2Sentinel, Priority: 100}` marks the type as Wave-2-covered in
+// the catalog without doing real background work — the sentinel returns zero
+// findings. No gate enforces the sentinel's presence: the doc-sync guards
+// (`make check-catalogen` and tests/unit/docs_attention_signals_sync_test.go)
+// track FindingDef declarations, not the Wave2 field, so this wiring holds by
+// convention only.
 //
 // Resource types whose Wave 2 column is "None" in docs/attention-signals.md
 // must omit the Wave2 field entirely; this sentinel is reserved for the

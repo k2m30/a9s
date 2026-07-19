@@ -10,11 +10,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ctEventsCheckerFor returns the RelatedChecker used for the CloudTrail Events
-// pivot on every top-level resource type. Migrated types embed this in their
-// catalog struct literal; zzz_ct_events_all_related.go falls back to
-// AppendRelated for non-migrated types. The returned closure captures the
-// owning resource type's short name so BuildCloudTrailFilter routes the
+// ctEventsCheckerFor returns the generic RelatedChecker for the CloudTrail
+// Events pivot. Every top-level catalog entry declares its ct-events
+// RelatedDef in its own struct literal, wiring either this checker or a
+// bespoke check*CTEvents function. The returned closure captures the owning
+// resource type's short name so BuildCloudTrailFilter routes the
 // LookupEvents call against the right ResourceName/Fields key.
 func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 	sn := shortName
@@ -43,10 +43,11 @@ func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 func Install() {
 	catalog.SetTypes(allTopLevelTypes())
 	catalog.SetChildTypes(allChildTypes())
-	// Production consumers read the catalog directly via resource.Get*
-	// wrappers, which fall back to catalog fields when their legacy registry
-	// map is empty. Tests that override behavior continue to use
-	// resource.Register* on the legacy maps for scoped, undo-able injection.
+	// Production consumers read the catalog via resource.Get* wrappers.
+	// Those wrappers consult per-surface test-only override tables first
+	// (populated via resource.Set*ForTest / AppendRelated, which panic
+	// outside test binaries), so in production the catalog installed here is
+	// the only source.
 }
 
 // allTopLevelTypes concatenates the per-category top-level catalog slices into

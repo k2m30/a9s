@@ -97,8 +97,9 @@ var containersTypes = []catalog.ResourceTypeDef{
 		},
 		// In-fetcher Wave 2: the eks fetcher already issues per-cluster
 		// DescribeCluster calls and populates health_issues_count / health_issues
-		// at fetch time. InFetcherWave2Sentinel makes the contract explicit so
-		// TestAttentionSignalsDoc sees a Wave 2 wiring.
+		// at fetch time. InFetcherWave2Sentinel records that contract in the
+		// catalog; see its doc comment in issue_enrichment.go for what does
+		// (and does not) guard this wiring.
 		Wave2: IssueEnricher{Fn: InFetcherWave2Sentinel, Priority: 100},
 		Related: []domain.RelatedDef{
 			{TargetType: "ng", DisplayName: "Node Groups", Checker: checkEKSNodeGroups, NeedsTargetCache: true, Truncated: true},
@@ -149,8 +150,9 @@ var containersTypes = []catalog.ResourceTypeDef{
 		Fetcher: fetchNodeGroupsPage,
 		// In-fetcher Wave 2: the ng fetcher already issues per-node-group
 		// DescribeNodegroup calls and populates health_issues_count /
-		// health_issues at fetch time. InFetcherWave2Sentinel records the contract
-		// explicitly so TestAttentionSignalsDoc sees a Wave 2 wiring.
+		// health_issues at fetch time. InFetcherWave2Sentinel records that
+		// contract in the catalog; see its doc comment in issue_enrichment.go
+		// for what does (and does not) guard this wiring.
 		Wave2: IssueEnricher{Fn: InFetcherWave2Sentinel, Priority: 100},
 		FieldKeys: []string{
 			"nodegroup_name", "cluster_name", "status", "instance_types",

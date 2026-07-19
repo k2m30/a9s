@@ -22,10 +22,9 @@ package unit
 // and parses to at least one row (guards against the block being deleted).
 //
 // It does not check that the generated block itself is fresh relative to
-// the catalog: nothing in this repository currently runs
-// `go run ./cmd/catalogen` in a diff/check mode against a clean tree, so a
-// developer who adds a FindingDef without re-running catalogen would not
-// be caught by this test, or by any other test or Makefile target today.
+// the catalog: freshness is guarded by `make check-catalogen` (part of
+// `make ready-to-push`), which re-runs cmd/catalogen against a clean tree
+// and fails on any resulting diff.
 
 import (
 	"os"

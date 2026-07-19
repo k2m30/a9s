@@ -194,8 +194,12 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		}),
 		// In-fetcher Wave 2: the trail fetcher already issues GetTrailStatus
 		// per-trail and populates is_logging / latest_delivery_error /
-		// log_file_validation_enabled at fetch time. InFetcherWave2Sentinel makes
-		// the Wave 2 contract explicit for TestAttentionSignalsDoc.
+		// log_file_validation_enabled at fetch time. The wave2-source
+		// FindingDefs below feed the generated table in
+		// docs/attention-signals.md, kept in sync by `make check-catalogen` and
+		// tests/unit/docs_attention_signals_sync_test.go. InFetcherWave2Sentinel
+		// records the in-fetcher contract itself; see its doc comment in
+		// issue_enrichment.go for what does (and does not) guard that wiring.
 		Wave2:     IssueEnricher{Fn: InFetcherWave2Sentinel, Priority: 100},
 		FieldKeys: []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled"},
 		Related: []domain.RelatedDef{

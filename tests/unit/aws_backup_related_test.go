@@ -288,7 +288,8 @@ func TestBackup_Related_EmptyPlanID_AllPivotsReturnUnknown(t *testing.T) {
 
 // TestBackup_Related_RegistryComplete verifies that backup has registered
 // related definitions for role, kms, and sns — and that none have nil checkers.
-// ct-events is auto-registered via the universal zzz_ct_events_all_related.go init.
+// ct-events is declared directly in backup's catalog entry Related list
+// (core/aws/catalog_backup.go).
 func TestBackup_Related_RegistryComplete(t *testing.T) {
 	defs := resource.GetRelated("backup")
 	if len(defs) == 0 {

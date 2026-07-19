@@ -196,7 +196,8 @@ func TestBuildCloudTrailFilter_SQSUsesFieldsArn(t *testing.T) {
 
 // TestAllResourceTypesHaveCloudTrailRelated verifies that every registered
 // resource type (except ct-events itself) has a CloudTrail Events related entry.
-// This exercises the bulk registration in zzz_ct_events_all_related.go.
+// Each top-level catalog entry declares its own ct-events RelatedDef in its
+// struct literal; this sweep catches a type whose declaration was dropped.
 func TestAllResourceTypesHaveCloudTrailRelated(t *testing.T) {
 	shortNames := resource.AllShortNames()
 	if len(shortNames) == 0 {

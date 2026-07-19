@@ -561,8 +561,11 @@ func TestCR273_Item13_CodeBuild_STOPPED_WithFailed_OnlyFailedCounted(t *testing.
 //
 // Types with statusField="" are skipped — they either have no lifecycle
 // state (config-only) or use multi-field Color checks tested by dedicated
-// per-type Color tests (qa_*_color_test.go). The doc-grounded test
-// TestAttentionSignalsDoc ensures Wave 1/Wave 2 alignment for ALL types.
+// per-type Color tests (qa_*_color_test.go). Wave 1/Wave 2 alignment with
+// docs/attention-signals.md for ALL types is guarded by `make check-catalogen`
+// (regenerates the doc's findings table from catalog FindingDefs) and
+// tests/unit/docs_attention_signals_sync_test.go (generated table vs the
+// hand-written prose table).
 func TestCR273_Item18_TrivialColor_MustClassify(t *testing.T) {
 	statusFieldTypes := make(map[string]string)
 	for _, c := range typeContracts {
