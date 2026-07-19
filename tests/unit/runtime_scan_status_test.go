@@ -23,11 +23,13 @@ package unit
 // a demo-mode Core with real fake AWS clients wired via
 // SetPreSuppliedClients + HandleClientsReady, which is what makes the
 // executor-driven sweep in the first test produce real, non-zero
-// Durations.
+// Durations on fine-grained clocks (Linux/macOS); Windows only asserts
+// non-negative.
 
 import (
 	"context"
 	"fmt"
+	stdruntime "runtime"
 	"testing"
 	"time"
 
@@ -96,7 +98,15 @@ func TestScanStatus_DemoSweep_OneEntryPerTypeWithDuration(t *testing.T) {
 			t.Errorf("ScanStatus missing entry for %q", td.ShortName)
 			continue
 		}
-		if st.Duration <= 0 {
+		// Windows' wall-clock granularity (~1-15ms) rounds a sub-tick demo probe
+		// to 0, so a strictly-positive Duration is only assertable where the clock
+		// is fine-grained (Linux/macOS). ponytail: GOOS guard; drop it if the
+		// executor ever gains an injectable clock.
+		if stdruntime.GOOS == "windows" {
+			if st.Duration < 0 {
+				t.Errorf("%s: Duration = %v, want >= 0", td.ShortName, st.Duration)
+			}
+		} else if st.Duration <= 0 {
 			t.Errorf("%s: Duration = %v, want > 0", td.ShortName, st.Duration)
 		}
 		if st.At.IsZero() {
