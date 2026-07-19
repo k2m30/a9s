@@ -28,6 +28,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
@@ -297,6 +298,111 @@ func TestListBodyMemoSeq_EnrichmentLandsAfterFirstRender_DecoratorFlipsOnNextRen
 	}
 	if render2.Rows[0].Severity != "broken" {
 		t.Errorf("render2 (after enrichment): Severity: got %q want %q", render2.Rows[0].Severity, "broken")
+	}
+}
+
+// ===========================================================================
+// (f) background RowStore write while ls.Rows is nil — the listScreenResources
+//     fallback branch (list_state.go:152-157)
+// ===========================================================================
+//
+// wave3ListController pushes a resource-list screen via ActionCommand but
+// never calls ApplyResourcesLoaded, so the pushed ListState's Rows field
+// stays nil (core/app/navigate.go's NavigateKindPushResourceList only seeds
+// ls.Rows when HandleNavigate attaches a CachedEntry, which a fresh
+// session.New() session with an empty RowStore and no on-disk availability
+// cache never does). With ls.Rows nil, listScreenResources falls through to
+// c.cachedResources(typeName), which reads the session-owned RowStore
+// directly (core.AnyOriginResourceCache) rather than the screen's own state.
+//
+// A live availability sweep result for that type lands as a
+// messages.AvailabilityChecked event, routed by Controller.Handle straight
+// to Core.HandleEvent → handleAvailabilityChecked, which writes the RowStore
+// via Core.ObserveRows(canonType, freshResources, ..., session.OriginProbe,
+// false) — unlike messages.ResourcesLoaded, Controller.Handle does NOT
+// special-case AvailabilityChecked through applyResourcesLoaded, so nothing
+// touches the pushed screen's ListState fields directly (ls.rowsVersion,
+// ls.Filter, ls.AttentionOnly, ls.SortCol/SortDir all stay untouched).
+//
+// rebuildListBodyMemo's key also watches Core.AnyOriginResourceCacheGen(typeName)
+// (list_body.go's fallbackRowsGen) specifically to invalidate on exactly this
+// RowStore-fallback write — both sequences below pin that behavior: render
+// once (populating/validating listBodyMemo), deliver an AvailabilityChecked
+// purely through Controller.Handle, then render again and assert the
+// RowStore's new rows are visible. Gen: domain.Gen(1) is session.New()'s
+// AvailabilityGen seed (session.go:395) — wave3ListController never bumps
+// it, so the same literal satisfies messages.IsStale's exact-match guard on
+// both deliveries in a test.
+func TestListBodyMemoSeq_BackgroundAvailabilityReplace_FallbackRowsStaleAcrossRenders(t *testing.T) {
+	c := wave3ListController(t, "ec2")
+
+	r1 := []resource.Resource{
+		{ID: "i-r1-aaaa", Name: "batch-1-alpha", Type: "ec2",
+			Fields: map[string]string{"instance_id": "i-r1-aaaa", "name": "batch-1-alpha", "state": "running"}},
+		{ID: "i-r1-bbbb", Name: "batch-1-beta", Type: "ec2",
+			Fields: map[string]string{"instance_id": "i-r1-bbbb", "name": "batch-1-beta", "state": "running"}},
+	}
+	c.Handle(messages.AvailabilityChecked{
+		ResourceType: "ec2",
+		HasResources: true,
+		Count:        len(r1),
+		Resources:    r1,
+		Gen:          domain.Gen(1),
+	})
+
+	render1 := *c.Snapshot().Body.List
+	wantR1 := []string{"i-r1-aaaa", "i-r1-bbbb"}
+	if got := rowIDs(render1.Rows); !idsEqual(got, wantR1) {
+		t.Fatalf("render1 (ls.Rows nil, first background AvailabilityChecked write): got %v want %v", got, wantR1)
+	}
+
+	r2 := []resource.Resource{
+		{ID: "i-r2-cccc", Name: "batch-2-gamma", Type: "ec2",
+			Fields: map[string]string{"instance_id": "i-r2-cccc", "name": "batch-2-gamma", "state": "running"}},
+		{ID: "i-r2-dddd", Name: "batch-2-delta", Type: "ec2",
+			Fields: map[string]string{"instance_id": "i-r2-dddd", "name": "batch-2-delta", "state": "running"}},
+	}
+	c.Handle(messages.AvailabilityChecked{
+		ResourceType: "ec2",
+		HasResources: true,
+		Count:        len(r2),
+		Resources:    r2,
+		Gen:          domain.Gen(1),
+	})
+
+	render2 := *c.Snapshot().Body.List
+	wantR2 := []string{"i-r2-cccc", "i-r2-dddd"}
+	if got := rowIDs(render2.Rows); !idsEqual(got, wantR2) {
+		t.Fatalf("render2 (second background AvailabilityChecked replaced the RowStore's ec2 rows while ls.Rows stayed nil the whole time): got %v want %v — a stale listBodyMemo (its key never saw the RowStore write since none of rowsVersion/Filter/AttentionOnly/SortCol/SortDir/enrichmentGen changed) would still return render1's rows", got, wantR2)
+	}
+}
+
+func TestListBodyMemoSeq_BackgroundAvailabilityFirstWrite_EmptyFallbackStaysStaleAfterPopulate(t *testing.T) {
+	c := wave3ListController(t, "ec2")
+
+	render1 := *c.Snapshot().Body.List
+	if len(render1.Rows) != 0 {
+		t.Fatalf("render1 (ls.Rows nil, RowStore never written for ec2): Rows count: got %d want 0, rows=%v", len(render1.Rows), rowIDs(render1.Rows))
+	}
+
+	r1 := []resource.Resource{
+		{ID: "i-eb-aaaa", Name: "empty-batch-alpha", Type: "ec2",
+			Fields: map[string]string{"instance_id": "i-eb-aaaa", "name": "empty-batch-alpha", "state": "running"}},
+		{ID: "i-eb-bbbb", Name: "empty-batch-beta", Type: "ec2",
+			Fields: map[string]string{"instance_id": "i-eb-bbbb", "name": "empty-batch-beta", "state": "running"}},
+	}
+	c.Handle(messages.AvailabilityChecked{
+		ResourceType: "ec2",
+		HasResources: true,
+		Count:        len(r1),
+		Resources:    r1,
+		Gen:          domain.Gen(1),
+	})
+
+	render2 := *c.Snapshot().Body.List
+	want := []string{"i-eb-aaaa", "i-eb-bbbb"}
+	if got := rowIDs(render2.Rows); !idsEqual(got, want) {
+		t.Fatalf("render2 (RowStore's first-ever ec2 write landed via a background AvailabilityChecked, ls.Rows still nil): got %v want %v — render1 cached the empty fallback and the memo key never saw the write", got, want)
 	}
 }
 

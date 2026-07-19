@@ -515,12 +515,64 @@ func (c *Core) refillEnrichSweep() []TaskRequest {
 	return nil
 }
 
+// removeEnrichQueuedType removes name from the pending sweep queue, preserving
+// the remaining order. It is used when an independently dispatched list-open
+// enrichment completion has already covered a type that the active sweep had
+// not reached yet.
+func (c *Core) removeEnrichQueuedType(name string) bool {
+	for i, queued := range c.session.EnrichQueue {
+		if queued != name {
+			continue
+		}
+		copy(c.session.EnrichQueue[i:], c.session.EnrichQueue[i+1:])
+		c.session.EnrichQueue = c.session.EnrichQueue[:len(c.session.EnrichQueue)-1]
+		return true
+	}
+	return false
+}
+
+func (c *Core) finishEnrichmentSweepIfDone(intents []UIIntent, tasks []TaskRequest, refillTasks []TaskRequest) ([]UIIntent, []TaskRequest) {
+	// All enrichment done — clear progress, save cache. RowStore retains its
+	// rows for the session (task #17 wave 1 stage 2 — no enrichment-completion
+	// free; see RowStore.Amend's doc comment), so unlike the removed
+	// session.ProbeResources/ProbeTruncated free this branch used to perform,
+	// there is nothing to nil out here.
+	//
+	// Gated on len(refillTasks)==0 rather than re-reading EnrichQueue: the
+	// slot-freeing step above (refillEnrichSweep) already drained the queue as
+	// far as this completion's refill can take it — mirrors the pre-fix "if
+	// queue still has entries, fire next and return early; else check all-done"
+	// structure, just computed up front so a stale-payload completion can still
+	// return its refill task (see the TypeGen guard in handleEnrichmentChecked).
+	if len(refillTasks) == 0 && c.session.EnrichChecked >= c.session.EnrichTotal {
+		intents = append(intents, PatchMenuEnrichProgress{Checked: 0, Total: 0})
+		// Dispatch-time payload freeze (restated on RowStore): SnapshotAll captures a defensive,
+		// by-construction-isolated copy (see RowStore.SnapshotAll's doc
+		// comment) at THIS dispatch instant, immune to any later Amend the live
+		// store still accepts for this type. On the normal completion path this
+		// carries the final Wave-2-enriched findings applyEnrichment folded onto
+		// retained rows. On a stale progress-only completion, it persists the
+		// latest currently retained rows; any newer rerun completion will save
+		// again when it lands.
+		// wave2Complete=true (C6b): this save IS the fresh enrichment result
+		// and must supersede any carried Wave-2 data wholesale so a
+		// healed/resolved issue can clear.
+		saveSnapshot := c.snapshotRowStoreForSave(true)
+		tasks = append(tasks, TaskRequest{
+			Key:     TaskKey{Kind: TaskKindSaveCache},
+			Payload: saveSnapshot,
+		})
+	}
+	return intents, tasks
+}
+
 // handleEnrichmentChecked processes a single Wave-2 enrichment result.
 func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIIntent, []TaskRequest) {
 	originalType := msg.ResourceType
 	if td := resource.FindResourceType(msg.ResourceType); td != nil {
 		msg.ResourceType = td.ShortName
 	}
+	payloadStale := msg.TypeGen != 0 && msg.TypeGen != c.session.EnrichmentTypeGenGet(msg.ResourceType)
 
 	// Sweep-slot freeing is split from payload staleness (#462/#463 defect
 	// 1): a sweep member's slot frees up — and the queue refills — the
@@ -529,23 +581,42 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	// its sweep probe was still in flight). Skipping this refill on a stale
 	// completion is exactly the bug: every such rerun would strand the rest
 	// of EnrichQueue. A non-member completion (e.g. a list-open probe,
-	// #462/#463 defect 2) never touches the queue — see refillEnrichSweep's
-	// doc comment for how a queued entry racing a list-open probe is
-	// reconciled without a double dispatch.
+	// #462/#463 defect 2) never steals a refill slot; when its own current
+	// payload covers a type still sitting in EnrichQueue, it removes exactly
+	// that queued entry and advances progress so the later refill cannot
+	// dispatch the same type a second time.
 	isSweepMember := c.session.EnrichSweepMembers[msg.ResourceType]
 	var refillTasks []TaskRequest
+	sweepProgressAdvanced := false
 	if isSweepMember {
 		delete(c.session.EnrichSweepMembers, msg.ResourceType)
+		c.session.EnrichChecked++
+		sweepProgressAdvanced = true
 		refillTasks = c.refillEnrichSweep()
 	} else {
 		delete(c.session.EnrichListOpenPending, msg.ResourceType)
+		if !payloadStale && c.removeEnrichQueuedType(msg.ResourceType) {
+			c.session.EnrichChecked++
+			sweepProgressAdvanced = true
+		}
 	}
 
 	// Per-type generation guard — discards a stale PAYLOAD only; the sweep
-	// slot above has already been freed (and refilled) regardless of this
-	// check.
-	if msg.TypeGen != 0 && msg.TypeGen != c.session.EnrichmentTypeGenGet(msg.ResourceType) {
-		return nil, refillTasks
+	// slot/progress above has already been freed (and refilled) regardless of
+	// this check. When a stale sweep-member completion is the last outstanding
+	// item, still emit progress/all-done bookkeeping so the sweep cannot strand
+	// the menu in "Enriching N/N-1".
+	if payloadStale {
+		var intents []UIIntent
+		tasks := refillTasks
+		if sweepProgressAdvanced {
+			intents = append(intents, PatchMenuEnrichProgress{
+				Checked: c.session.EnrichChecked,
+				Total:   c.session.EnrichTotal,
+			})
+			return c.finishEnrichmentSweepIfDone(intents, tasks, refillTasks)
+		}
+		return nil, tasks
 	}
 
 	// #462/#463 defect 1: fold this Wave-2 result onto the type's Wave-1
@@ -572,15 +643,6 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		time.Now(),
 		ProbeOutcome(prevStatus.AvailOutcome), prevStatus.AvailDuration, prevStatus.AvailErr,
 	)
-
-	// EnrichChecked backs the menu's "Enriching X/Y" progress badge against
-	// EnrichTotal (the sweep's queue size at kickoff) — it must advance only
-	// for sweep members, never for a non-member (list-open) completion, or a
-	// racing list-open probe would inflate the count past EnrichTotal
-	// (#462/#463 defect 2b).
-	if isSweepMember {
-		c.session.EnrichChecked++
-	}
 
 	var intents []UIIntent
 	tasks := refillTasks
@@ -722,40 +784,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		})
 	}
 
-	// All enrichment done — clear progress, save cache. RowStore retains its
-	// rows for the session (task #17 wave 1 stage 2 — no
-	// enrichment-completion free; see RowStore.Amend's doc comment), so
-	// unlike the removed session.ProbeResources/ProbeTruncated free this
-	// branch used to perform, there is nothing to nil out here.
-	//
-	// Gated on len(refillTasks)==0 rather than re-reading EnrichQueue: the
-	// slot-freeing step above (refillEnrichSweep) already drained the queue
-	// as far as this completion's refill can take it — mirrors the pre-fix
-	// "if queue still has entries, fire next and return early; else check
-	// all-done" structure, just computed up front so a stale-payload
-	// completion can still return its refill task (see the TypeGen guard
-	// above).
-	if len(refillTasks) == 0 && c.session.EnrichChecked >= c.session.EnrichTotal {
-		intents = append(intents, PatchMenuEnrichProgress{Checked: 0, Total: 0})
-		// Dispatch-time payload freeze (restated on RowStore): SnapshotAll captures a defensive,
-		// by-construction-isolated copy (see RowStore.SnapshotAll's doc
-		// comment) at THIS dispatch instant, immune to any later Amend the
-		// live store still accepts for this type. This is the completion path
-		// that carries the FINAL Wave-2-enriched findings (applyEnrichment
-		// above already folded r.Findings/r.AttentionDetails onto every
-		// retained row of this type via AmendRows), so it must not be lost to
-		// a later mutation of the live store.
-		// wave2Complete=true (C6b): this save IS the fresh enrichment result
-		// and must supersede any carried Wave-2 data wholesale so a
-		// healed/resolved issue can clear.
-		saveSnapshot := c.snapshotRowStoreForSave(true)
-		tasks = append(tasks, TaskRequest{
-			Key:     TaskKey{Kind: TaskKindSaveCache},
-			Payload: saveSnapshot,
-		})
-	}
-
-	return intents, tasks
+	return c.finishEnrichmentSweepIfDone(intents, tasks, refillTasks)
 }
 
 // snapshotRowStoreForSave builds a TaskKindSaveCache payload from RowStore's

@@ -296,6 +296,18 @@ func (c *Core) AnyOriginResourceCache(rt string) (*domain.ListViewCacheEntry, bo
 	return listViewCacheEntryFromTypeRows(tr), true
 }
 
+// AnyOriginResourceCacheGen returns the RowStore generation for the full
+// any-origin cache entry for rt, or zero when no such entry exists. Unlike
+// AnyOriginResourceCache it does not clone rows, so render memo keys can check
+// invalidation cheaply on cache hits.
+func (c *Core) AnyOriginResourceCacheGen(rt string) domain.Gen {
+	gen, partial := c.session.RowStore.SnapshotMeta(rt)
+	if gen == 0 || partial {
+		return 0
+	}
+	return gen
+}
+
 // AnyLaneResources returns a type's RowStore rows from EITHER lane — full or
 // Partial — ignoring the Gen/Partial gate AnyOriginResourceCache applies. It is
 // the render-time row source for a related-FILTERED list: because the list is

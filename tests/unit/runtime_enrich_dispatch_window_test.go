@@ -338,26 +338,29 @@ func TestHandleEnrichmentChecked_StaleTypeGenCompletion_StillRefillsQueueByOne(t
 // defect #2a (external review, 2026-07-19): the refill branch
 // (core/runtime/handlers_availability.go ~:658-665) fires for ANY
 // current-gen TaskKindProbeEnrich completion, not just a completion for a
-// type that is actually a member of the active sweep's window. A list-open
-// enrichment probe (HandleResourcesLoaded's list-open dispatch,
-// handlers_resources.go ~:130-147) completing while a sweep still has queued
-// types must not pop one off the queue — that queued type's eventual sweep
-// dispatch is unrelated to this list-open probe's lifecycle.
+// type that is actually part of the active sweep. A list-open enrichment probe
+// for a type that is not in the active sweep at all
+// (HandleResourcesLoaded's list-open dispatch, handlers_resources.go
+// ~:130-147) completing while a sweep still has queued types must not pop one
+// off the queue — those queued types' eventual sweep dispatch is unrelated to
+// this list-open probe's lifecycle.
 //
-// RED today: session.EnrichQueue loses its head entry and an extra
-// TaskKindProbeEnrich task is dispatched, even though listOpenType was never
-// one of the sweep's four windowed types.
+// Regression shape: session.EnrichQueue must not lose its head entry or
+// dispatch a follow-up TaskKindProbeEnrich when listOpenType was never part of
+// the sweep.
 func TestHandleEnrichmentChecked_NonSweepCompletion_DoesNotStealQueueRefill(t *testing.T) {
 	sess := session.New()
 	core := runtime.New(sess, catalog.All())
 	names := allWave2ShortNames(t, core)
-	if len(names) <= enrichDispatchWindow {
-		t.Fatalf("test requires more than %d registered Wave2 enrichers to leave a queue behind the window, found %d", enrichDispatchWindow, len(names))
+	if len(names) <= enrichDispatchWindow+1 {
+		t.Fatalf("test requires more than %d registered Wave2 enrichers to leave a queue behind the window and one non-sweep list-open type, found %d", enrichDispatchWindow+1, len(names))
 	}
+	sweepNames := names[:len(names)-1]
+	listOpenType := names[len(names)-1]
 
 	_, initialTasks := core.HandleEvent(messages.AvailabilityPrefetched{
 		Entries:   map[string]int{},
-		Resources: seedProbeEnrichResources(names),
+		Resources: seedProbeEnrichResources(sweepNames),
 		Gen:       sess.AvailabilityGen,
 	})
 	if got := countProbeEnrichTasks(initialTasks); got != enrichDispatchWindow {
@@ -368,7 +371,6 @@ func TestHandleEnrichmentChecked_NonSweepCompletion_DoesNotStealQueueRefill(t *t
 	if len(queueBefore) < 2 {
 		t.Fatalf("test requires at least 2 queued types (found %d) so the list-open victim type can be distinct from the queue head", len(queueBefore))
 	}
-	listOpenType := queueBefore[len(queueBefore)-1]
 
 	_, dispatchTasks := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
 		ResourceType: listOpenType,
@@ -477,6 +479,119 @@ func TestHandleEnrichmentChecked_ListOpenDuringSweep_NoDoubleDispatchNoCounterOv
 	}
 }
 
+// TestHandleEnrichmentChecked_ListOpenQueuedCompletionBeforeRefill_CoversQueueEntry
+// pins the opposite ordering from
+// TestHandleEnrichmentChecked_ListOpenDuringSweep_NoDoubleDispatchNoCounterOvercounts:
+// the list-open probe for a type still in EnrichQueue completes BEFORE any
+// sweep-member completion reaches refillEnrichSweep. That completion has
+// already covered the queued type, so the later refill must not dispatch the
+// same type again.
+func TestHandleEnrichmentChecked_ListOpenQueuedCompletionBeforeRefill_CoversQueueEntry(t *testing.T) {
+	sess := session.New()
+	core := runtime.New(sess, catalog.All())
+	names := allWave2ShortNames(t, core)
+	if len(names) <= enrichDispatchWindow {
+		t.Fatalf("test requires more than %d registered Wave2 enrichers to leave a queue behind the window, found %d", enrichDispatchWindow, len(names))
+	}
+
+	_, initialTasks := core.HandleEvent(messages.AvailabilityPrefetched{
+		Entries:   map[string]int{},
+		Resources: seedProbeEnrichResources(names),
+		Gen:       sess.AvailabilityGen,
+	})
+	dispatched := probeEnrichScopes(initialTasks)
+	if len(dispatched) != enrichDispatchWindow {
+		t.Fatalf("setup: initial window dispatched %d TaskKindProbeEnrich tasks, want %d", len(dispatched), enrichDispatchWindow)
+	}
+	if len(core.Session().EnrichQueue) == 0 {
+		t.Fatalf("setup: session.EnrichQueue is empty after the initial window dispatch")
+	}
+	listOpenType := core.Session().EnrichQueue[0]
+
+	_, dispatchTasks := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
+		ResourceType: listOpenType,
+		Resources:    []resource.Resource{{ID: listOpenType + "-list-open-r1"}},
+	})
+	if got := countProbeEnrichTasks(dispatchTasks); got != 1 {
+		t.Fatalf("setup: list-open dispatch for %q produced %d TaskKindProbeEnrich tasks, want 1", listOpenType, got)
+	}
+
+	checkedBefore := core.Session().EnrichChecked
+	_, completionTasks := core.HandleEvent(messages.EnrichmentChecked{
+		ResourceType: listOpenType,
+		TypeGen:      0,
+		Gen:          0,
+	})
+	if got := countProbeEnrichTasks(completionTasks); got != 0 {
+		t.Fatalf("list-open completion for queued %q dispatched %d follow-up enrich tasks, want 0 because no sweep slot was freed; returned scopes: %v",
+			listOpenType, got, probeEnrichScopes(completionTasks))
+	}
+	if got, want := core.Session().EnrichChecked, checkedBefore+1; got != want {
+		t.Fatalf("list-open completion for queued %q left EnrichChecked=%d, want %d — the queued sweep entry was covered by this completion",
+			listOpenType, got, want)
+	}
+	if slices.Contains(core.Session().EnrichQueue, listOpenType) {
+		t.Fatalf("list-open completion for queued %q left it in EnrichQueue: %v — the next sweep refill would dispatch a duplicate",
+			listOpenType, core.Session().EnrichQueue)
+	}
+
+	_, followup := core.HandleEvent(messages.EnrichmentChecked{
+		ResourceType: dispatched[0],
+		TypeGen:      0,
+		Gen:          0,
+	})
+	if scopes := probeEnrichScopes(followup); slices.Contains(scopes, listOpenType) {
+		t.Fatalf("next sweep refill dispatched %q again after its list-open completion had already covered it; returned scopes: %v",
+			listOpenType, scopes)
+	}
+}
+
+func enrichProgressIntent(intents []runtime.UIIntent, checked, total int) bool {
+	for _, intent := range intents {
+		progress, ok := intent.(runtime.PatchMenuEnrichProgress)
+		if ok && progress.Checked == checked && progress.Total == total {
+			return true
+		}
+	}
+	return false
+}
+
+// TestHandleEnrichmentChecked_StaleSweepMemberCompletion_AdvancesProgressToDone
+// pins the progress half of stale sweep completions: even when TypeGen makes
+// the payload obsolete, the task that occupied a sweep slot did complete, so
+// EnrichChecked must advance and the done signal must be emitted when it was
+// the last outstanding member.
+func TestHandleEnrichmentChecked_StaleSweepMemberCompletion_AdvancesProgressToDone(t *testing.T) {
+	sess := session.New()
+	core := runtime.New(sess, catalog.All())
+	names := allWave2ShortNames(t, core)
+	staleType := names[0]
+
+	dispatchTypeGen := sess.EnrichmentTypeGenBump(staleType)
+	sess.EnrichSweepMembers = map[string]bool{staleType: true}
+	sess.EnrichChecked = 0
+	sess.EnrichTotal = 1
+	sess.EnrichQueue = nil
+	sess.EnrichmentTypeGenBump(staleType)
+
+	intents, tasks := core.HandleEvent(messages.EnrichmentChecked{
+		ResourceType: staleType,
+		TypeGen:      dispatchTypeGen,
+		Gen:          0,
+	})
+
+	if got := sess.EnrichChecked; got != 1 {
+		t.Fatalf("stale sweep-member completion left EnrichChecked=%d, want 1 — stale payload must not strand sweep progress", got)
+	}
+	if got := countProbeEnrichTasks(tasks); got != 0 {
+		t.Fatalf("stale final completion dispatched %d TaskKindProbeEnrich tasks with an empty queue, want 0; returned scopes: %v",
+			got, probeEnrichScopes(tasks))
+	}
+	if !enrichProgressIntent(intents, 0, 0) {
+		t.Fatalf("stale final completion did not emit PatchMenuEnrichProgress{0,0}; intents=%v", intents)
+	}
+}
+
 // TestHandleEnrichmentChecked_RotateMidSweep_OldCompletionNoRefillNoCounterMovement
 // pins the rotation boundary a fix for defects #1/#2 must not break: a
 // completion for a type dispatched by a sweep that a profile/region switch
@@ -534,5 +649,213 @@ func TestHandleEnrichmentChecked_RotateMidSweep_OldCompletionNoRefillNoCounterMo
 	}
 	if got := core.Session().EnrichChecked; got != 0 {
 		t.Errorf("post-rotation completion for %q moved session.EnrichChecked to %d, want 0 (must not advance the new pair's progress counter)", oldSweepType, got)
+	}
+}
+
+// TestHandleEnrichmentChecked_ListOpenDeepInQueue_EarlyCompletionCausesRedundantDispatch
+// pins a race the existing
+// TestHandleEnrichmentChecked_ListOpenDuringSweep_NoDoubleDispatchNoCounterOvercounts
+// pin cannot reach: that pin's list-open type sits at the queue HEAD, so the
+// very next refill absorbs it (session.EnrichListOpenPending is still true
+// when refillEnrichSweep pops it) before its own completion is ever
+// processed. Here the list-open type sits at the queue TAIL instead — deep
+// enough that its own list-open completion lands well before any refill
+// walks the queue that far.
+//
+// The queued entry must be removed and counted as covered when that current
+// list-open completion arrives. Otherwise, by the time refillEnrichSweep
+// finally pops the type's queue entry, nothing marks it as already covered and
+// it dispatches a second, redundant TaskKindProbeEnrich for a type whose
+// enrichment already landed this sweep.
+func TestHandleEnrichmentChecked_ListOpenDeepInQueue_EarlyCompletionCausesRedundantDispatch(t *testing.T) {
+	sess := session.New()
+	core := runtime.New(sess, catalog.All())
+	names := allWave2ShortNames(t, core)
+	if len(names) <= enrichDispatchWindow+1 {
+		t.Fatalf("test requires more than %d registered Wave2 enrichers so a list-open type can sit deep in the queue, unreachable by the next refill, found %d", enrichDispatchWindow+1, len(names))
+	}
+
+	_, initialTasks := core.HandleEvent(messages.AvailabilityPrefetched{
+		Entries:   map[string]int{},
+		Resources: seedProbeEnrichResources(names),
+		Gen:       sess.AvailabilityGen,
+	})
+	dispatchCount := map[string]int{}
+	var pending []string
+	for _, name := range probeEnrichScopes(initialTasks) {
+		dispatchCount[name]++
+		pending = append(pending, name)
+	}
+	if len(dispatchCount) != enrichDispatchWindow {
+		t.Fatalf("setup: initial window dispatched %d TaskKindProbeEnrich tasks, want %d", len(dispatchCount), enrichDispatchWindow)
+	}
+
+	queueBefore := append([]string(nil), core.Session().EnrichQueue...)
+	if len(queueBefore) < 2 {
+		t.Fatalf("test requires at least 2 queued types behind the window (found %d) so the list-open type can sit deep, unreachable by the immediate next refill", len(queueBefore))
+	}
+	listOpenType := queueBefore[len(queueBefore)-1]
+
+	_, listOpenDispatch := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
+		ResourceType: listOpenType,
+		Resources:    []resource.Resource{{ID: listOpenType + "-list-open-r1"}},
+	})
+	if got := countProbeEnrichTasks(listOpenDispatch); got != 1 {
+		t.Fatalf("setup: list-open dispatch for %q produced %d TaskKindProbeEnrich tasks, want 1", listOpenType, got)
+	}
+	dispatchCount[listOpenType]++
+
+	// The list-open probe's own completion lands FIRST — current gen, well
+	// before any sweep refill has walked the queue anywhere near
+	// listOpenType's slot at the tail. This is the ordering the queue-head
+	// existing pin cannot exercise.
+	_, earlyFollowup := core.HandleEvent(messages.EnrichmentChecked{
+		ResourceType: listOpenType,
+		TypeGen:      0,
+		Gen:          0,
+	})
+	if got := countProbeEnrichTasks(earlyFollowup); got != 0 {
+		t.Fatalf("setup: the list-open completion for %q itself dispatched %d TaskKindProbeEnrich tasks (not a sweep member yet), want 0; returned scopes: %v", listOpenType, got, probeEnrichScopes(earlyFollowup))
+	}
+
+	// Drive the sweep's own completions (and any further refills) to
+	// exhaustion so every refill gets a chance to walk the queue as far as
+	// listOpenType's slot at the tail.
+	maxIterations := len(names) * 2
+	iterations := 0
+	for len(pending) > 0 && iterations < maxIterations {
+		iterations++
+		name := pending[0]
+		pending = pending[1:]
+
+		_, followup := core.HandleEvent(messages.EnrichmentChecked{
+			ResourceType: name,
+			TypeGen:      0,
+			Gen:          0,
+		})
+		for _, next := range probeEnrichScopes(followup) {
+			dispatchCount[next]++
+			pending = append(pending, next)
+		}
+	}
+	if iterations >= maxIterations {
+		t.Fatalf("full drain did not terminate within %d completions for %d queued types plus one early list-open completion — suspect an unbounded refill loop (dispatchCount so far: %v)", maxIterations, len(names), dispatchCount)
+	}
+
+	if got := dispatchCount[listOpenType]; got != 1 {
+		t.Errorf("type %q (list-open probe deep in queue, early completion) was dispatched %d TaskKindProbeEnrich tasks across the sweep, want exactly 1 — its early list-open completion must be recognized by the time refillEnrichSweep later pops its queue slot, not redispatched", listOpenType, got)
+	}
+
+	if remaining := len(core.Session().EnrichQueue); remaining != 0 {
+		t.Errorf("after the full drain, session.EnrichQueue has %d entries left, want 0", remaining)
+	}
+
+	if got, want := core.Session().EnrichChecked, core.Session().EnrichTotal; got != want {
+		t.Errorf("session.EnrichChecked ended at %d after the full drain, want exactly %d (session.EnrichTotal) — this must stay exact through any fix for the redundant dispatch above", got, want)
+	}
+}
+
+// TestHandleEnrichmentChecked_ListOpenDeepInQueue_StaleCompletionStillDispatchesFreshProbe
+// is the companion GREEN case to
+// TestHandleEnrichmentChecked_ListOpenDeepInQueue_EarlyCompletionCausesRedundantDispatch:
+// the list-open probe's early completion carries a STALE TypeGen (something
+// else — a second rerun/refresh racing the same list-open probe — bumps the
+// type's generation again between dispatch and completion), so its payload
+// never lands (msg.TypeGen != session.EnrichmentTypeGenGet(...) discards it,
+// handlers_availability.go ~:547-549). The type's queue entry must NOT be
+// treated as already covered by that discarded completion — the sweep still
+// needs a real probe for it later.
+//
+// Regression shape: a fix for the sibling redundant-dispatch defect must not
+// absorb on ANY non-member completion regardless of staleness. A stale payload
+// did not cover the queued type, so refillEnrichSweep must later dispatch a
+// genuine probe for it.
+func TestHandleEnrichmentChecked_ListOpenDeepInQueue_StaleCompletionStillDispatchesFreshProbe(t *testing.T) {
+	sess := session.New()
+	core := runtime.New(sess, catalog.All())
+	names := allWave2ShortNames(t, core)
+	if len(names) <= enrichDispatchWindow+1 {
+		t.Fatalf("test requires more than %d registered Wave2 enrichers so a list-open type can sit deep in the queue, unreachable by the next refill, found %d", enrichDispatchWindow+1, len(names))
+	}
+
+	_, initialTasks := core.HandleEvent(messages.AvailabilityPrefetched{
+		Entries:   map[string]int{},
+		Resources: seedProbeEnrichResources(names),
+		Gen:       sess.AvailabilityGen,
+	})
+	dispatchCount := map[string]int{}
+	var pending []string
+	for _, name := range probeEnrichScopes(initialTasks) {
+		dispatchCount[name]++
+		pending = append(pending, name)
+	}
+	if len(dispatchCount) != enrichDispatchWindow {
+		t.Fatalf("setup: initial window dispatched %d TaskKindProbeEnrich tasks, want %d", len(dispatchCount), enrichDispatchWindow)
+	}
+
+	queueBefore := append([]string(nil), core.Session().EnrichQueue...)
+	if len(queueBefore) < 2 {
+		t.Fatalf("test requires at least 2 queued types behind the window (found %d) so the list-open type can sit deep, unreachable by the immediate next refill", len(queueBefore))
+	}
+	listOpenType := queueBefore[len(queueBefore)-1]
+	core.Session().EnrichmentTypeGenBump(listOpenType)
+
+	_, listOpenDispatch := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
+		ResourceType: listOpenType,
+		Resources:    []resource.Resource{{ID: listOpenType + "-list-open-r1"}},
+	})
+	if got := countProbeEnrichTasks(listOpenDispatch); got != 1 {
+		t.Fatalf("setup: list-open dispatch for %q produced %d TaskKindProbeEnrich tasks, want 1", listOpenType, got)
+	}
+	dispatchCount[listOpenType]++
+	dispatchTypeGen := core.Session().EnrichmentTypeGenGet(listOpenType)
+
+	// Something else (a second rerun/refresh racing the same list-open
+	// probe) bumps listOpenType's generation before its completion lands —
+	// the completion below is now stale, and its payload must be discarded.
+	core.Session().EnrichmentTypeGenBump(listOpenType)
+
+	_, staleFollowup := core.HandleEvent(messages.EnrichmentChecked{
+		ResourceType: listOpenType,
+		TypeGen:      dispatchTypeGen,
+		Gen:          0,
+	})
+	if got := countProbeEnrichTasks(staleFollowup); got != 0 {
+		t.Fatalf("setup: the stale list-open completion for %q itself dispatched %d TaskKindProbeEnrich tasks, want 0", listOpenType, got)
+	}
+
+	// Drive the sweep's own completions to exhaustion so a refill walks the
+	// queue as far as listOpenType's slot at the tail.
+	maxIterations := len(names) * 2
+	iterations := 0
+	for len(pending) > 0 && iterations < maxIterations {
+		iterations++
+		name := pending[0]
+		pending = pending[1:]
+
+		_, followup := core.HandleEvent(messages.EnrichmentChecked{
+			ResourceType: name,
+			TypeGen:      0,
+			Gen:          0,
+		})
+		for _, next := range probeEnrichScopes(followup) {
+			dispatchCount[next]++
+			pending = append(pending, next)
+		}
+	}
+	if iterations >= maxIterations {
+		t.Fatalf("full drain did not terminate within %d completions for %d queued types plus one stale list-open completion — suspect an unbounded refill loop (dispatchCount so far: %v)", maxIterations, len(names), dispatchCount)
+	}
+
+	if got := dispatchCount[listOpenType]; got != 2 {
+		t.Errorf("type %q (stale list-open completion, payload discarded) was dispatched %d TaskKindProbeEnrich tasks across the sweep, want exactly 2 (the original stale/discarded probe plus one genuine, required fresh probe) — a stale completion must not cause the queue entry to be silently absorbed as 'already covered'", listOpenType, got)
+	}
+
+	if remaining := len(core.Session().EnrichQueue); remaining != 0 {
+		t.Errorf("after the full drain, session.EnrichQueue has %d entries left, want 0", remaining)
+	}
+
+	if got, want := core.Session().EnrichChecked, core.Session().EnrichTotal; got != want {
+		t.Errorf("session.EnrichChecked ended at %d after the full drain, want exactly %d (session.EnrichTotal)", got, want)
 	}
 }

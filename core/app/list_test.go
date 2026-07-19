@@ -179,6 +179,55 @@ func listBodyOrFail(t *testing.T, c *app.Controller) *app.ListBody {
 	return vs.Body.List
 }
 
+func TestBuildListBodyMemo_RowStoreFallbackInvalidatesOnRowStoreChange(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	s := session.New()
+	s.Profile = "demo"
+	s.Region = "us-east-1"
+	core := runtime.New(s, nil)
+	c := app.New(core)
+	t.Cleanup(c.Close)
+
+	first := []resource.Resource{{
+		ID:   "i-fallback-old",
+		Name: "fallback-old",
+		Type: "ec2",
+		Fields: map[string]string{
+			"instance_id": "i-fallback-old",
+			"name":        "fallback-old",
+			"state":       "running",
+			"type":        "t3.micro",
+			"private_ip":  "10.0.0.10",
+		},
+	}}
+	core.ObserveRows("ec2", first, nil, session.OriginProbe, false)
+
+	c.PushChildListScreen("ec2")
+	lb := listBodyOrFail(t, c)
+	if len(lb.Rows) != 1 || lb.Rows[0].ResourceID != "i-fallback-old" {
+		t.Fatalf("initial fallback rows = %+v, want only i-fallback-old", lb.Rows)
+	}
+
+	second := []resource.Resource{{
+		ID:   "i-fallback-new",
+		Name: "fallback-new",
+		Type: "ec2",
+		Fields: map[string]string{
+			"instance_id": "i-fallback-new",
+			"name":        "fallback-new",
+			"state":       "running",
+			"type":        "t3.small",
+			"private_ip":  "10.0.0.11",
+		},
+	}}
+	core.ObserveRows("ec2", second, nil, session.OriginProbe, false)
+
+	lb = listBodyOrFail(t, c)
+	if len(lb.Rows) != 1 || lb.Rows[0].ResourceID != "i-fallback-new" {
+		t.Fatalf("fallback rows after RowStore update = %+v, want only i-fallback-new", lb.Rows)
+	}
+}
+
 // intStr converts a non-negative int to its decimal string (test helper for
 // large-list ID generation — avoids importing strconv).
 func intStr(n int) string {

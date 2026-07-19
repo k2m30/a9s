@@ -436,6 +436,17 @@ func (s *RowStore) Snapshot(canon string) TypeRows {
 	return tr
 }
 
+// SnapshotMeta returns just the generation and Partial flag for canon without
+// cloning rows. Use this for cache keys that only need to know whether a prior
+// row snapshot was invalidated by a later RowStore write.
+func (s *RowStore) SnapshotMeta(canon string) (domain.Gen, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tr := s.types[canon]
+	return tr.Gen, tr.Partial
+}
+
 // SnapshotAll returns a snapshot of every retained type's TypeRows, keyed by
 // canonical short name. When includePartial is false, types whose current
 // entry is Partial-only are omitted — mirrors the target design's "canonical

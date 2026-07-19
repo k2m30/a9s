@@ -338,13 +338,14 @@ func (c *Controller) materializeListFieldsForType(typeName string, resources []r
 // (and the controller's enrichment maps) on every call, cache or no cache,
 // so buildListBody always sets them directly on the returned ListBody.
 type listBodyMemo struct {
-	valid       bool
-	rowsVersion uint64
-	filter      string
-	attnOnly    bool
-	sortCol     string
-	sortDir     string
-	enrichGen   uint64
+	valid           bool
+	rowsVersion     uint64
+	fallbackRowsGen domain.Gen
+	filter          string
+	attnOnly        bool
+	sortCol         string
+	sortDir         string
+	enrichGen       uint64
 
 	columns   []ColumnDef
 	rows      []ListRow
@@ -383,14 +384,19 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 	}
 
 	memo := &ls.bodyMemo
+	fallbackRowsGen := domain.Gen(0)
+	if ls.Rows == nil {
+		fallbackRowsGen = c.core.AnyOriginResourceCacheGen(typeName)
+	}
 	if !memo.valid ||
 		memo.rowsVersion != ls.rowsVersion ||
+		memo.fallbackRowsGen != fallbackRowsGen ||
 		memo.filter != ls.Filter ||
 		memo.attnOnly != ls.AttentionOnly ||
 		memo.sortCol != ls.SortCol ||
 		memo.sortDir != ls.SortDir ||
 		memo.enrichGen != c.enrichmentGen {
-		*memo = c.rebuildListBodyMemo(ls, typeName, td)
+		*memo = c.rebuildListBodyMemo(ls, typeName, td, fallbackRowsGen)
 	}
 
 	// Clamp selected row against the (possibly cached) visible row count.
@@ -438,7 +444,7 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 // extraction/decoration pass that buildListBody used to run unconditionally
 // on every call, returning a fresh listBodyMemo stamped with the input key
 // that produced it. Callers must hold c.mu (write).
-func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *resource.ResourceTypeDef) listBodyMemo {
+func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *resource.ResourceTypeDef, fallbackRowsGen domain.Gen) listBodyMemo {
 	// Resolve column definitions mirroring resolveColumns() in table_render.go,
 	// using the already-resolved fallback td (not the catalog) for the superset
 	// first-column-title check. This ensures test typeDefs with non-standard
@@ -508,17 +514,18 @@ func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *res
 	markerCol := resolveListMarkerCol(columns, td)
 
 	return listBodyMemo{
-		valid:       true,
-		rowsVersion: ls.rowsVersion,
-		filter:      ls.Filter,
-		attnOnly:    ls.AttentionOnly,
-		sortCol:     ls.SortCol,
-		sortDir:     ls.SortDir,
-		enrichGen:   c.enrichmentGen,
-		columns:     columns,
-		rows:        rows,
-		markerCol:   markerCol,
-		statusCol:   statusCol,
+		valid:           true,
+		rowsVersion:     ls.rowsVersion,
+		fallbackRowsGen: fallbackRowsGen,
+		filter:          ls.Filter,
+		attnOnly:        ls.AttentionOnly,
+		sortCol:         ls.SortCol,
+		sortDir:         ls.SortDir,
+		enrichGen:       c.enrichmentGen,
+		columns:         columns,
+		rows:            rows,
+		markerCol:       markerCol,
+		statusCol:       statusCol,
 	}
 }
 
