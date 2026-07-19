@@ -1,14 +1,17 @@
 package unit_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
@@ -16,46 +19,20 @@ import (
 
 // Issue #140 / docs/qa/ec2-related-navigation-stories.md
 // Render-contract style coverage for key EC2 QA stories.
-
-func TestIssue140_Story_EC2_001_InitialDetailRenderContract(t *testing.T) {
-	d := makePreviewEC2Detail(t, 120, 35)
-	plain := stripAnsi(d.View())
-	lines := strings.Split(plain, "\n")
-	if len(lines) == 0 {
-		t.Fatal("empty detail view")
-	}
-
-	if !strings.Contains(lines[0], "InstanceId:") {
-		t.Fatalf("EC2-001: first row must be InstanceId; got: %q", lines[0])
-	}
-
-	m := tui.New("demo", "us-east-1",
-		tui.WithClients(demo.NewServiceClients()),
-		tui.WithIsDemo(true),
-		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
-	m2, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 35})
-	m = m2.(tui.Model)
-	ec2 := mustDemoEC2(t)
-	m2, _ = m.Update(messages.Navigate{Target: messages.TargetDetail, ResourceType: "ec2", Resource: &ec2[0]})
-	m = m2.(tui.Model)
-	frame := stripAnsi(m.View().Content)
-
-	if !strings.Contains(frame, "detail --") {
-		t.Fatalf("EC2-001: frame title must include 'detail --'; got:\n%s", frame)
-	}
-	if !strings.Contains(frame, ec2[0].ID) {
-		t.Fatalf("EC2-001: frame title must include id %q; got:\n%s", ec2[0].ID, frame)
-	}
-}
+//
+// TestIssue140_Story_EC2_001_InitialDetailRenderContract and
+// TestIssue140_Story_EC2_020_CountsRenderAsResultsArrive deleted (round 5,
+// specs/022-codebase-cleanup, DetailModel core cleanup): both duplicate
+// issue140_scenarios_golden_test.go's CI-verified golden scenarios
+// ec2_001_initial_detail / ec2_020_counts_arrived on the live tui.New() root
+// path — same fixture, same assertions, same resource IDs/counts.
 
 func TestIssue140_Story_EC2_017_UnderlineVisibilityOnNavigableRow(t *testing.T) {
 	tuitest.ForceColor(t)
 	withIssue140EC2RelatedDefs(t)
 
-	d := makePreviewEC2Detail(t, 120, 35)
-	viewBefore := d.View()
+	c := makePreviewEC2Detail(t, 120, 35)
+	viewBefore := previewDetailView(t, c, 120, 35)
 
 	lineBefore := findLineContaining(viewBefore, "VpcId:")
 	if lineBefore == "" {
@@ -68,17 +45,17 @@ func TestIssue140_Story_EC2_017_UnderlineVisibilityOnNavigableRow(t *testing.T) 
 	// Move until the selected row is VpcId.
 	foundSelectedVpc := false
 	for range 80 {
-		sel := findSelectedLine(d.View())
+		sel := findSelectedLine(previewDetailView(t, c, 120, 35))
 		if strings.Contains(sel, "VpcId:") {
 			foundSelectedVpc = true
 			break
 		}
-		d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "j"})
+		c.Apply(app.Action{Kind: app.ActionMoveDown})
 	}
 	if !foundSelectedVpc {
-		t.Fatalf("EC2-017: could not move selection to VpcId row\n%s", stripAnsi(d.View()))
+		t.Fatalf("EC2-017: could not move selection to VpcId row\n%s", stripAnsi(previewDetailView(t, c, 120, 35)))
 	}
-	viewSelected := d.View()
+	viewSelected := previewDetailView(t, c, 120, 35)
 	lineSelected := findSelectedLine(viewSelected)
 	if lineSelected == "" {
 		t.Fatalf("EC2-017: could not find VpcId row when selected\n%s", stripAnsi(viewSelected))
@@ -93,8 +70,8 @@ func TestIssue140_Story_EC2_017_UnderlineVisibilityOnNavigableRow(t *testing.T) 
 
 func TestIssue140_Story_EC2_018_RightColumnTypeSetContract(t *testing.T) {
 	withIssue140EC2RelatedDefs(t)
-	d := makePreviewEC2Detail(t, 120, 35)
-	plain := stripAnsi(d.View())
+	c := makePreviewEC2Detail(t, 120, 35)
+	plain := stripAnsi(previewDetailView(t, c, 120, 35))
 
 	mustContain := []string{
 		"RELATED",
@@ -122,96 +99,178 @@ func TestIssue140_Story_EC2_018_RightColumnTypeSetContract(t *testing.T) {
 	}
 }
 
-func TestIssue140_Story_EC2_020_CountsRenderAsResultsArrive(t *testing.T) {
-	d, cleanup := ec2StoryDetail(t, 120, 30, true)
-	defer cleanup()
-
-	d = deliverRelatedResult(d, "asg", 1)
-	d = deliverRelatedResult(d, "alarm", 2)
-	d = deliverRelatedResult(d, "tg", 0)
-	plain := stripAnsi(d.View())
-
-	if !strings.Contains(plain, "Auto Scaling Groups (1)") {
-		t.Fatalf("EC2-020: expected 'Auto Scaling Groups (1)' after count update; got:\n%s", plain)
-	}
-	if !strings.Contains(plain, "CloudWatch Alarms (2)") {
-		t.Fatalf("EC2-020: expected 'CloudWatch Alarms (2)' after count update; got:\n%s", plain)
-	}
-	if !strings.Contains(plain, "Target Groups (0)") {
-		t.Fatalf("EC2-020: expected zero-count row marker '(0)' for Target Groups; got:\n%s", plain)
-	}
-}
-
+// TestIssue140_Story_EC2_023_ToggleRightColumnRenderContract drives the real
+// root tui.Model "r" keypress (not raw Controller.Apply(ActionToggleRelated)):
+// the TUI adapter syncs the renderer's auto-show state into the controller
+// before dispatching the toggle, a step a bare Controller.Apply call skips.
 func TestIssue140_Story_EC2_023_ToggleRightColumnRenderContract(t *testing.T) {
-	d, cleanup := ec2StoryDetail(t, 120, 30, true)
-	defer cleanup()
+	m := newPreviewDemoModel(t, 120, 30)
+	ec2Res := previewEC2Resource()
+	m, _ = previewApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: "ec2",
+		Resource:     &ec2Res,
+	})
 
-	before := stripAnsi(d.View())
+	before := previewView(m)
 	if !strings.Contains(before, "RELATED") {
 		t.Fatalf("EC2-023: precondition failed, expected RELATED panel visible; got:\n%s", before)
 	}
 
-	d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "r"})
-	hidden := stripAnsi(d.View())
+	m, _ = previewApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "r"})
+	hidden := previewView(m)
 	if strings.Contains(hidden, "RELATED") {
 		t.Fatalf("EC2-023: first r press should hide right column; got:\n%s", hidden)
 	}
 
-	d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "r"})
-	restored := stripAnsi(d.View())
+	m, _ = previewApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "r"})
+	restored := previewView(m)
 	if !strings.Contains(restored, "RELATED") {
 		t.Fatalf("EC2-023: pressing r again should restore right column; got:\n%s", restored)
 	}
 }
 
+// issue140SetupRightColumnFocus registers a 4-def "tg/asg/alarm/cfn" related
+// set for ec2, opens the detail screen for previewEC2Resource, delivers the
+// given counts, then presses Tab (right-column focus) and Enter — the live
+// replacement for the retired views.NewDetail(...).Update(RelatedCheckResult)
+// .Update(KeyTab).Update(KeyEnter) chain shared by EC2-021/EC2-033.
+func issue140SetupRightColumnFocus(t *testing.T, counts map[string]int) (m tui.Model, cmd tea.Cmd) {
+	t.Helper()
+	oldDefs := append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
+	t.Cleanup(func() { resource.SetRelatedForTest("ec2", oldDefs) })
+	resource.SetRelatedForTest("ec2", []resource.RelatedDef{
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: resource.NoopChecker},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopChecker},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: resource.NoopChecker},
+	})
+
+	m = newPreviewDemoModel(t, 120, 30)
+	ec2Res := previewEC2Resource()
+	m, _ = previewApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: "ec2",
+		Resource:     &ec2Res,
+	})
+	// SourceResourceID and Generation must be set — a compliant adapter drops
+	// any RelatedCheckResult missing the source ID or carrying a stale
+	// generation. Generation: 1 is the fresh session's initial RelatedGen
+	// (session.New() seeds it at 1, never 0; bumped only on refresh/profile/
+	// region switch — neither happens here). ResourceIDs must also match
+	// Count — a real RelatedChecker always returns exactly Count IDs; a
+	// Count>0 result with no IDs is a data shape production never produces,
+	// and downstream (runtime_adapter_related.go's NavigationKindFilteredList
+	// branch) keys its title-suffix/pendingFilter wiring off len(RelatedIDs),
+	// not Count alone.
+	for _, target := range []string{"tg", "asg", "alarm", "cfn"} {
+		ids := make([]string, counts[target])
+		for i := range ids {
+			ids[i] = fmt.Sprintf("%s-%d", target, i)
+		}
+		m, _ = previewApplyMsg(m, messages.RelatedCheckResult{
+			ResourceType:     "ec2",
+			SourceResourceID: ec2Res.ID,
+			Generation:       1,
+			Result:           resource.RelatedCheckResult{TargetType: target, Count: counts[target], ResourceIDs: ids},
+		})
+	}
+
+	m, _ = previewApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyTab})
+	m, cmd = previewApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	return m, cmd
+}
+
 func TestIssue140_Story_EC2_021_TabFocusMovesToFirstAvailableRightRow(t *testing.T) {
-	d, cleanup := ec2StoryDetail(t, 120, 30, true)
-	defer cleanup()
-
 	// Make first row dim/unavailable and second row available.
-	d = deliverRelatedResult(d, "tg", 0)
-	d = deliverRelatedResult(d, "asg", 1)
-	d = deliverRelatedResult(d, "alarm", 0)
-	d = deliverRelatedResult(d, "cfn", 0)
-
-	d, _ = d.Update(tea.KeyPressMsg{Code: tea.KeyTab})
-	_, cmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, cmd := issue140SetupRightColumnFocus(t, map[string]int{"tg": 0, "asg": 1, "alarm": 0, "cfn": 0})
 	if cmd == nil {
-		t.Fatalf("EC2-021: pressing Enter on right-focused column should emit RelatedNavigateMsg")
+		t.Fatalf("EC2-021: pressing Enter on right-focused column should dispatch a navigation command")
 	}
-	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigate)
-	if !ok {
-		t.Fatalf("EC2-021: expected RelatedNavigateMsg after Enter on right column, got %T", msg)
+	// The Enter cmd resolves to messages.RelatedNavigate, which itself
+	// dispatches the demo fetch as a further tea.Cmd — one more
+	// previewApplyMsg round-trip resolves it (tui.Model.Update's own
+	// tea.BatchMsg case, internal/tui/app.go, drains every sub-command) so
+	// the title's TitleSuffix breadcrumb is actually rendered (buildListFrameTitle
+	// returns the bare type name while ls.Loading is still true).
+	m, cmd = previewApplyMsg(m, cmd())
+	if cmd != nil {
+		m, _ = previewApplyMsg(m, cmd())
 	}
-	if nav.TargetType != "asg" {
-		t.Fatalf("EC2-021: right-column focus should land on first available row (asg), got %q", nav.TargetType)
+
+	view := previewView(m)
+	// A bare Contains(view, "asg"/asgRT.ListTitle) can pass without real
+	// navigation (the EC2 detail's own RELATED panel already renders the
+	// asg row's display name). Require the source-scoped title breadcrumb
+	// runtime.RelatedTitleSuffix produces — unique to the navigated-to
+	// screen — plus proof the EC2 detail's RELATED panel is actually gone.
+	wantSuffix := runtime.RelatedTitleSuffix(previewEC2Resource())
+	if !strings.Contains(view, wantSuffix) {
+		t.Errorf("EC2-021: right-column focus should land on first available row (asg), showing title suffix %q; got:\n%s", wantSuffix, view)
+	}
+	if strings.Contains(view, "RELATED") {
+		t.Errorf("EC2-021: navigating to asg should leave the EC2 detail's RELATED panel behind; got:\n%s", view)
+	}
+	// The suffix + RELATED-gone checks above prove SOME navigation happened;
+	// they don't prove it landed on asg specifically rather than another
+	// child type sharing the same suffix format. Require the destination's
+	// own frame-title type marker too (asg has no catalog ListTitle override,
+	// core/aws/catalog_compute.go, so buildListFrameTitle falls back to
+	// ShortName "asg").
+	if wantMarker := relatedNavListTitleMarker(t, "asg"); !strings.Contains(view, wantMarker) {
+		t.Errorf("EC2-021: expected destination frame-title marker %q for asg; got:\n%s", wantMarker, view)
 	}
 }
 
 func TestIssue140_Story_EC2_033_DimRowsAreSkippedInRightColumn(t *testing.T) {
-	d, cleanup := ec2StoryDetail(t, 120, 30, true)
-	defer cleanup()
-
 	// Only alarm row is actionable; dim rows should be skipped by right-column cursor.
-	d = deliverRelatedResult(d, "tg", 0)
-	d = deliverRelatedResult(d, "asg", 0)
-	d = deliverRelatedResult(d, "alarm", 2)
-	d = deliverRelatedResult(d, "cfn", 0)
-
-	d, _ = d.Update(tea.KeyPressMsg{Code: tea.KeyTab})
-	_, cmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, cmd := issue140SetupRightColumnFocus(t, map[string]int{"tg": 0, "asg": 0, "alarm": 2, "cfn": 0})
 	if cmd == nil {
 		t.Fatalf("EC2-033: Enter on right column should navigate to first non-dim row")
 	}
-	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigate)
-	if !ok {
-		t.Fatalf("EC2-033: expected RelatedNavigateMsg, got %T", msg)
+	// See EC2-021 above: one more drain round-trip is needed for the
+	// TitleSuffix breadcrumb to actually render (not just "Loading...").
+	m, cmd = previewApplyMsg(m, cmd())
+	if cmd != nil {
+		m, _ = previewApplyMsg(m, cmd())
 	}
-	if nav.TargetType != "alarm" {
-		t.Fatalf("EC2-033: cursor should skip dim rows and navigate to alarm, got %q", nav.TargetType)
+
+	view := previewView(m)
+	// Same collision risk as EC2-021 above: require the source-scoped title
+	// breadcrumb plus proof the RELATED panel is gone, not a bare name match.
+	wantSuffix := runtime.RelatedTitleSuffix(previewEC2Resource())
+	if !strings.Contains(view, wantSuffix) {
+		t.Errorf("EC2-033: cursor should skip dim rows and land on alarm, showing title suffix %q; got:\n%s", wantSuffix, view)
 	}
+	if strings.Contains(view, "RELATED") {
+		t.Errorf("EC2-033: navigating to alarm should leave the EC2 detail's RELATED panel behind; got:\n%s", view)
+	}
+	// Destination-type proof, same reasoning as EC2-021: the suffix format
+	// is identical for every child type, so also require alarm's own
+	// frame-title marker (alarm DOES have a catalog ListTitle override,
+	// core/aws/catalog_monitoring.go: ListTitle "alarms").
+	if wantMarker := relatedNavListTitleMarker(t, "alarm"); !strings.Contains(view, wantMarker) {
+		t.Errorf("EC2-033: expected destination frame-title marker %q for alarm; got:\n%s", wantMarker, view)
+	}
+}
+
+// relatedNavListTitleMarker returns the frame-title type marker
+// buildListFrameTitle (core/app/list_body.go) renders for typeName: its
+// catalog ListTitle override when set, else its bare ShortName — the same
+// fallback production uses, so the returned marker matches what a real
+// related navigation to typeName actually shows regardless of whether a
+// ListTitle override exists.
+func relatedNavListTitleMarker(t *testing.T, typeName string) string {
+	t.Helper()
+	td := resource.FindResourceType(typeName)
+	if td == nil {
+		t.Fatalf("resource type %q not registered", typeName)
+	}
+	marker := td.ShortName
+	if td.ListTitle != "" {
+		marker = td.ListTitle
+	}
+	return marker + "("
 }
 
 func TestIssue140_Story_EC2_029_FilteredAlarmListTitleAndScope(t *testing.T) {

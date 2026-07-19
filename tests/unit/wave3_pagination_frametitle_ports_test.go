@@ -183,3 +183,66 @@ func TestWave3PaginationFrameTitle_RapidRefresh_ReplaceClean(t *testing.T) {
 		t.Errorf("frame title should not show '+' after non-truncated refresh, got %q", title)
 	}
 }
+
+// ===========================================================================
+// Additional PORT — buildListFrameTitle's LoadingMore and text-filter branches
+// (list_body.go ~line 513, 518-525), ported from qa_pagination_view_test.go.
+// The CtrlR/refresh scenarios above only exercise the bare "(N)"/"(N+)"
+// format; neither branch below is exercised by any other test at the live
+// seam.
+// ===========================================================================
+
+// TestWave3PaginationFrameTitle_LoadingMore_ShowsAndClears ports
+// TestResourceList_FrameTitle_LoadingMore + TestResourceList_LoadMore_
+// SetsAndClearsLoadingMore: the "(N+ loading...)" inline suffix appears
+// while ActionLoadMore is in flight and disappears (replaced by the plain
+// count) once the appended page lands.
+func TestWave3PaginationFrameTitle_LoadingMore_ShowsAndClears(t *testing.T) {
+	c := wave3ListControllerWithConfig(t, "ec2", configForType("ec2"))
+	c.ApplyResourcesLoaded("ec2", wave3PagResources(200), &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-p2"}, false)
+
+	c.Apply(app.Action{Kind: app.ActionLoadMore})
+	if title := c.ListFrameTitle(); title != "ec2(200+ loading...)" {
+		t.Fatalf("while load-more in flight: expected %q, got %q", "ec2(200+ loading...)", title)
+	}
+
+	c.ApplyResourcesLoaded("ec2", wave3PagResourcesFrom(200, 50), &resource.PaginationMeta{IsTruncated: false}, true)
+	title := c.ListFrameTitle()
+	if strings.Contains(title, "loading...") {
+		t.Errorf("after append lands: title must not still show 'loading...', got %q", title)
+	}
+	if title != "ec2(250)" {
+		t.Errorf("after append lands: expected %q, got %q", "ec2(250)", title)
+	}
+}
+
+// TestWave3PaginationFrameTitle_TruncatedWithFilter ports
+// TestResourceList_FrameTitle_TruncatedWithFilter: an active text filter on a
+// still-truncated list shows "(filtered/total+)".
+func TestWave3PaginationFrameTitle_TruncatedWithFilter(t *testing.T) {
+	c := wave3ListControllerWithConfig(t, "ec2", configForType("ec2"))
+	c.ApplyResourcesLoaded("ec2", wave3PagResources(200), &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-p2"}, false)
+
+	// "i-0000" matches i-00000..i-00009 = 10 of the 200 loaded rows.
+	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "i-0000"})
+
+	if title := c.ListFrameTitle(); title != "ec2(10/200+)" {
+		t.Errorf("expected exact title %q, got %q", "ec2(10/200+)", title)
+	}
+}
+
+// TestWave3PaginationFrameTitle_AllLoadedWithFilter ports
+// TestResourceList_FrameTitle_AllLoadedWithFilter: an active text filter on a
+// fully-loaded (non-truncated) list shows the exact "(filtered/total)" pair,
+// with no trailing "+".
+func TestWave3PaginationFrameTitle_AllLoadedWithFilter(t *testing.T) {
+	c := wave3ListControllerWithConfig(t, "ec2", configForType("ec2"))
+	c.ApplyResourcesLoaded("ec2", wave3PagResources(523), &resource.PaginationMeta{IsTruncated: false}, false)
+
+	// "i-0000" matches i-00000..i-00009 = 10 of the 523 loaded rows.
+	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "i-0000"})
+
+	if title := c.ListFrameTitle(); title != "ec2(10/523)" {
+		t.Errorf("expected %q, got %q", "ec2(10/523)", title)
+	}
+}

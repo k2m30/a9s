@@ -5,10 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.55.0] - 2026-07-16
+## [3.54.1] - 2026-07-19
 
 ### Changed
 
+- Replaced the retired Go Report Card badge (goreportcard.com globally
+  retired its hosted badge service) with a golangci-lint badge in the README.
 - **BREAKING (`core/resource`)**: `FormatApproximate` and
   `CellKindApproximate` are renamed to `FormatTruncated` and
   `CellKindTruncated`. External importers of the now-public `core/resource`
@@ -45,6 +47,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Status column skipped the lifecycle-aware decoration sibling types get and
   the generated docs mislabeled the lifecycle key as "none". All four now
   declare it.
+- Cost Explorer no longer overflows its pane at a one-row height:
+  `RenderCosts` appended a blank line plus footer (2 lines) even at height
+  1; it now renders a single pinned footer row.
+
+### Removed
+
+- ~70 unreachable view-model functions left by the headless-controller
+  migration (old stateful `DetailModel`/`MainMenuModel`/`ResourceListModel`
+  lifecycles and accessors). Pure internal cleanup, no behavior change;
+  `deadcode` reports zero dead functions in `internal/tui`, and unit-test
+  coverage of `internal/tui` rose from 76% to 90.7%.
 
 ## [3.54.0] - 2026-07-15
 

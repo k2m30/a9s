@@ -567,9 +567,23 @@ func (c *Core) saveResourceListCache(shortName string, rows []cache.Row, count i
 		// (including any Wave-2 carry it performed), against the pre-save
 		// on-disk generation (existing.Rows) — the single chokepoint both
 		// SaveResourceListCache and saveResourceListCacheWave2Complete share.
+		// #463 defect 2: a Wave-2-completion save diffs against the
+		// just-written Wave-1 generation, so its own newPairs only ever
+		// covers Wave-2-sourced codes — REPLACING the type's delta here
+		// would wipe the Wave-1 new-pair counts that same sweep's earlier,
+		// non-authoritative save just recorded. Non-authoritative saves keep
+		// REPLACE semantics (each is a fresh one-step scan baseline);
+		// wave2Authoritative saves MERGE onto whatever the sweep's Wave-1
+		// save already recorded this cycle. Cannot double-count: a pair
+		// stamps fresh at most once per cycle (stampFindingFirstSeen's own
+		// old-vs-new diff), so the two saves' newPairs sets are disjoint.
 		var newPairs map[domain.FindingCode]int
 		tf.Rows, newPairs = stampFindingFirstSeen(existing.Rows, tf.Rows, time.Now())
-		c.session.SetNewFindingPairs(canon, newPairs)
+		if wave2Authoritative {
+			c.session.MergeNewFindingPairs(canon, newPairs)
+		} else {
+			c.session.SetNewFindingPairs(canon, newPairs)
+		}
 		if issuesKnown {
 			tf.Issues = issues
 			tf.IssuesKnown = true

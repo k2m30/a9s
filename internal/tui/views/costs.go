@@ -49,6 +49,11 @@ func RenderCosts(body app.CostsBody, width, height int) string {
 	if height <= 0 {
 		height = 1
 	}
+	// A one-row viewport fits only a single pinned line; render the footer
+	// alone so total output never exceeds height (blank+footer would be 2).
+	if height == 1 {
+		return renderCostsFooter(body)
+	}
 
 	labelW := costsLabelWidth(width)
 	colW := costsColWidth(width, labelW, len(body.Columns))
@@ -196,15 +201,25 @@ func styleForCostCell(cell app.CostCell, selected bool) lipgloss.Style {
 // always visible, vertically scrolling the data rows in between around
 // cursorRow when they exceed height (wireframe.md: "TOTAL stays pinned").
 func clipCostsRows(lines []string, cursorRow, height int) []string {
-	if height <= 0 || len(lines) <= height {
+	if height <= 0 {
+		return nil
+	}
+	if len(lines) <= height {
 		return lines
 	}
 	header := lines[0]
 	total := lines[len(lines)-1]
 	data := lines[1 : len(lines)-1]
 
+	if height == 1 {
+		return []string{total}
+	}
+
 	budget := height - 2
-	if budget <= 0 || len(data) <= budget {
+	if budget <= 0 {
+		return []string{header, total}
+	}
+	if len(data) <= budget {
 		out := make([]string, 0, len(lines))
 		out = append(out, header)
 		out = append(out, data...)

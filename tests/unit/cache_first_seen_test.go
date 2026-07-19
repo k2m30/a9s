@@ -3,6 +3,7 @@
 package unit_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,6 +15,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/cache"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // Issue #463 — per-finding FirstSeen persisted in the availability cache
@@ -321,5 +324,90 @@ func TestFindingsOverview_FirstSeenAndNewSincePrev(t *testing.T) {
 	}
 	if !g2.OldestFirstSeen.Equal(g1.OldestFirstSeen) {
 		t.Errorf("save 2: OldestFirstSeen = %v, want unchanged from save 1's %v", g2.OldestFirstSeen, g1.OldestFirstSeen)
+	}
+}
+
+// TestNewFindingPairs_SurviveWave2CompletionSave pins the fix for the defect
+// external review found in probes.go's #463 wiring: saveResourceListCache
+// called session.SetNewFindingPairs unconditionally on every save,
+// wholesale-replacing the type's delta — so a Wave-2-completion save (which
+// diffs against the just-written Wave-1 generation, where the Wave-1 pair
+// already has FirstSeen and is therefore no longer "new") stomped out the
+// Wave-1 sweep's own new-pair record before FindingsOverview ever read it.
+//
+// Intended contract: a non-authoritative (Wave-1-style) save REPLACES the
+// type's delta (a fresh one-step scan baseline); a Wave-2-authoritative save
+// (Wave2Complete=true, the handleEnrichmentChecked "all done" dispatch) MERGES
+// into it instead. Drives the real executor entry point
+// (Core.ExecuteTask(TaskKindSaveCache)) directly, the same production seam
+// TestExecuteTask_SaveCache_ExactIssueCount_SurvivesRowDerivedRecomputation in
+// runtime_savecache_regressions_test.go uses, toggling
+// SaveCachePayload.Wave2Complete for the two save kinds under test — this
+// package's TestFindingsOverview_FirstSeenAndNewSincePrev never exercises a
+// Wave2Complete=true save at all, only saveResourceListCache's non-
+// authoritative branch via Controller.ApplyResourcesLoaded.
+func TestNewFindingPairs_SurviveWave2CompletionSave(t *testing.T) {
+	const shortName = "ec2"
+	c := newSaveCacheRegressionCore(t, false)
+	ctx := context.Background()
+
+	wave1Finding := domain.Finding{Code: "ec2-impaired", Phrase: "instance status check failed", Severity: domain.SevBroken, Source: "wave1"}
+	row1 := resource.Resource{ID: saveRegID("nfp", 0), Name: saveRegID("nfp", 0), Type: shortName, Findings: []domain.Finding{wave1Finding}}
+
+	execSaveCache := func(resources []resource.Resource, wave2Complete bool) {
+		t.Helper()
+		payload := &runtime.SaveCachePayload{
+			Resources:     map[string][]resource.Resource{shortName: resources},
+			Truncated:     map[string]bool{shortName: false},
+			Wave2Complete: wave2Complete,
+		}
+		ev, err := c.ExecuteTask(ctx, runtime.TaskRequest{
+			Key:     runtime.TaskKey{Kind: runtime.TaskKindSaveCache},
+			Payload: payload,
+		})
+		if err != nil {
+			t.Fatalf("ExecuteTask(TaskKindSaveCache, Wave2Complete=%v): %v", wave2Complete, err)
+		}
+		if flash, ok := ev.(messages.Flash); ok && flash.IsError {
+			t.Fatalf("ExecuteTask(TaskKindSaveCache, Wave2Complete=%v) returned an error flash: %s", wave2Complete, flash.Text)
+		}
+	}
+
+	// Save 1 — Wave-1-style sweep completion introduces a new wave1-sourced
+	// pair on row1.
+	execSaveCache([]resource.Resource{row1}, false)
+	pairs1 := c.NewFindingPairsSincePrev()[shortName]
+	if pairs1[wave1Finding.Code] < 1 {
+		t.Fatalf("save 1: NewFindingPairsSincePrev()[%q][%q] = %d, want >= 1", shortName, wave1Finding.Code, pairs1[wave1Finding.Code])
+	}
+
+	// Save 2 — Wave-2 completion for the SAME type: row1/wave1Finding is
+	// unchanged (already in the previous generation, so NOT a new pair on
+	// this save's own diff), and a second row carries a genuinely new
+	// wave2-sourced finding.
+	wave2Finding := domain.Finding{Code: "ec2-untagged", Phrase: "missing required tags", Severity: domain.SevWarn, Source: "wave2:ec2"}
+	row2 := resource.Resource{ID: saveRegID("nfp", 1), Name: saveRegID("nfp", 1), Type: shortName, Findings: []domain.Finding{wave2Finding}}
+	execSaveCache([]resource.Resource{row1, row2}, true)
+
+	pairs2 := c.NewFindingPairsSincePrev()[shortName]
+	if pairs2[wave1Finding.Code] < 1 {
+		t.Errorf("save 2 (Wave2Complete): NewFindingPairsSincePrev()[%q][%q] = %d, want >= 1 — a Wave-2-authoritative save must MERGE into the type's delta, not replace it and drop the Wave-1 sweep's own new pair", shortName, wave1Finding.Code, pairs2[wave1Finding.Code])
+	}
+	if pairs2[wave2Finding.Code] < 1 {
+		t.Errorf("save 2 (Wave2Complete): NewFindingPairsSincePrev()[%q][%q] = %d, want >= 1 — the new Wave-2 finding's own pair must also be recorded", shortName, wave2Finding.Code, pairs2[wave2Finding.Code])
+	}
+
+	// Save 3 — a subsequent Wave-1-style save with no new findings: both
+	// rows/findings are unchanged from save 2, so this save's own diff is
+	// empty. Non-authoritative saves REPLACE the delta, so the type's
+	// recorded delta must reset to empty here, not keep carrying save 2's
+	// (now-stale) counts forward.
+	execSaveCache([]resource.Resource{row1, row2}, false)
+	pairs3 := c.NewFindingPairsSincePrev()[shortName]
+	if n := pairs3[wave1Finding.Code]; n != 0 {
+		t.Errorf("save 3: NewFindingPairsSincePrev()[%q][%q] = %d, want 0 — a non-authoritative save with no new pairs must REPLACE (reset) the type's delta, not carry save 2's stale count forward", shortName, wave1Finding.Code, n)
+	}
+	if n := pairs3[wave2Finding.Code]; n != 0 {
+		t.Errorf("save 3: NewFindingPairsSincePrev()[%q][%q] = %d, want 0 — a non-authoritative save with no new pairs must REPLACE (reset) the type's delta, not carry save 2's stale count forward", shortName, wave2Finding.Code, n)
 	}
 }

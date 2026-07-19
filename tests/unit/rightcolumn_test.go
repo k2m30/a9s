@@ -1,20 +1,20 @@
-package unit
+package unit_test
 
-// rightcolumn_test.go tests the right column sub-component via the exported
-// DetailModel interface. rightColumnModel is unexported, so all assertions are
-// made on DetailModel.View() output and state after Update() calls.
+// rightcolumn_test.go tests the right column panel via the live
+// Controller + NewTransientDetail.RenderDetail(body) seam (022-codebase-cleanup
+// wave 3, DetailModel cluster — views.NewDetail/.Update()/.View() are
+// production-dead; RenderDetail is the only reachable render entry point,
+// see internal/tui/renderer.go).
 //
 // Design spec: docs/design/related-resources.md v4.3
 // QA stories:  docs/qa/related-resources-stories.md
 //
 // Key design facts:
-//   - `r` (ToggleRelated) toggles the right column ON/OFF
+//   - `r` (ActionToggleRelated) toggles the right column ON/OFF
 //   - Right column shows display names for registered RelatedDefs
-//   - Right column fixed width: 32 chars (adjusts proportionally below 100 cols); separator: 1 char
 //   - Side-by-side layout for all widths >= 60; below 60 the column is hidden
-//   - After toggle, before any RelatedCheckResultMsg: rows show display names (loading state)
-//   - RelatedCheckResultMsg delivers async check results (count, err)
-//   - Count ≥ 0 shown as "(N)"; err → "—" (em dash)
+//   - After toggle, before any related result: rows show display names (loading state)
+//   - Count >= 0 shown as "(N)"; err -> "—" (em dash)
 //   - "RELATED" header section marker appears in the right column
 //   - Empty RelatedDefs (no registered defs): hint text shown
 
@@ -23,11 +23,13 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -35,11 +37,10 @@ import (
 // Shared test helpers
 // ---------------------------------------------------------------------------
 
-// makeDetailForRelatedTest creates a DetailModel with a Fields-only resource,
-// sets the given width/height, and returns it ready for testing.
-func makeDetailForRelatedTest(t *testing.T, width int) views.DetailModel {
-	t.Helper()
-	res := resource.Resource{
+// rightColEC2Resource returns the Fields-only ec2 resource shared by every
+// test below.
+func rightColEC2Resource() resource.Resource {
+	return resource.Resource{
 		ID:   "i-test123",
 		Name: "test-instance",
 		Fields: map[string]string{
@@ -48,48 +49,90 @@ func makeDetailForRelatedTest(t *testing.T, width int) views.DetailModel {
 			"type":        "t3.micro",
 		},
 	}
-	k := keys.Default()
-	d := views.NewDetail(res, "ec2", nil, k)
-	d.SetSize(width, 30)
-	return d
 }
 
-// toggleRelatedKeyMsg returns the tea.KeyPressMsg for the `r` key binding
-// used by ToggleRelated.
-func toggleRelatedKeyMsg() tea.KeyPressMsg {
-	return tea.KeyPressMsg{Code: -1, Text: "r"}
+// newRightColController builds a detail controller for rightColEC2Resource
+// and primes ds.RelatedRows/RelatedVisible via InitDetailRelatedRows —
+// mirroring what real navigation does (core/app/navigate.go calls
+// InitDetailRelatedRows right after EnsureDetailState). Without this priming,
+// newDetailController alone leaves ds.RelatedRows empty, so buildDetailBody
+// falls back to synthesizing loading blocks straight from the registered
+// defs (detail_body.go's "len(ds.RelatedRows) == 0" branch) while
+// ds.RelatedVisible itself stays false — a real but narrower fallback path
+// that never reflects the toggle semantics a real user hits, since on real
+// entry ds.RelatedVisible is already true by the time any render happens.
+// Calling InitDetailRelatedRows here closes that gap so ActionToggleRelated
+// exercises the same starting condition production does.
+func newRightColController(t *testing.T, resourceType string) *app.Controller {
+	t.Helper()
+	c := newDetailController(t, rightColEC2Resource(), resourceType)
+	c.InitDetailRelatedRows(resourceType)
+	return c
 }
 
-// sendToggleRelated sends the ToggleRelated key to a DetailModel and returns
-// the updated model.
-func sendToggleRelated(d views.DetailModel) views.DetailModel {
-	updated, _ := d.Update(toggleRelatedKeyMsg())
-	return updated
-}
-
-// showRelatedPanel ensures the related panel ends in the visible state.
-// On wide layouts the first press hides the auto-shown panel, so we may need
-// a second press to reopen it explicitly.
-func showRelatedPanel(d views.DetailModel) views.DetailModel {
-	updated := sendToggleRelated(d)
-	if strings.Contains(updated.View(), "RELATED") {
-		return updated
+// renderRightCol renders c's current detail state at width w, height h via
+// the live NewTransientDetail+RenderDetail seam, ANSI-stripped: every caller
+// in this file does textual (Contains/equality) assertions, not raw-style
+// comparisons, so the normalized form is what they should actually compare.
+func renderRightCol(t *testing.T, c *app.Controller, w, h int) string {
+	t.Helper()
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil")
 	}
-	return sendToggleRelated(updated)
+	vp := viewport.New(viewport.WithWidth(w), viewport.WithHeight(h))
+	m := views.NewTransientDetail(w, h, vp)
+	return stripAnsi(m.RenderDetail(*body))
 }
 
-// sendRelatedResult delivers a RelatedCheckResultMsg to a DetailModel and
-// returns the updated model.
-func sendRelatedResult(d views.DetailModel, msg messages.RelatedCheckResult) views.DetailModel {
-	updated, _ := d.Update(msg)
-	return updated
+// showRightColPanel establishes a definite "related panel visible" state for
+// callers that need one as setup. It normalizes from whatever the CURRENT
+// render shows rather than assuming a fixed starting state: registered
+// RelatedDefs auto-show the panel on entry (ActionToggleRelated is then the
+// FIRST flip, from visible to hidden — core/app/detail_cursor.go's
+// ActionToggleRelated is a plain `ds.RelatedVisible = !ds.RelatedVisible`),
+// while TestRightColumn_EmptyDefsShowsHint deliberately has no defs
+// registered and starts hidden (first flip goes hidden -> visible). Reading
+// the render before touching the toggle, and only toggling-then-asserting
+// the OPPOSITE state, asserts the real inversion regardless of which side it
+// starts on — a no-op or otherwise broken ActionToggleRelated fails at the
+// very first toggle it's exercised through, instead of silently landing on
+// "RELATED is present" by coincidence of toggle count.
+func showRightColPanel(t *testing.T, c *app.Controller, w, h int) string {
+	t.Helper()
+
+	initial := renderRightCol(t, c, w, h)
+	if strings.Contains(initial, "RELATED") {
+		c.Apply(app.Action{Kind: app.ActionToggleRelated})
+		hidden := renderRightCol(t, c, w, h)
+		if strings.Contains(hidden, "RELATED") {
+			t.Fatalf("ActionToggleRelated on an initially-visible related panel should hide it; got:\n%s", hidden)
+		}
+	}
+
+	c.Apply(app.Action{Kind: app.ActionToggleRelated})
+	shown := renderRightCol(t, c, w, h)
+	if !strings.Contains(shown, "RELATED") {
+		t.Fatalf("ActionToggleRelated should show the related panel; got:\n%s", shown)
+	}
+	return shown
+}
+
+// deliverRightColResult applies a RelatedCheckResult for "ec2" to c via the
+// live ApplyDetailRelatedResultForResource seam (mirrors what
+// DetailModel.Update's controller-backed path does for messages.RelatedCheckResult).
+func deliverRightColResult(c *app.Controller, displayName, targetType string, count int, err error) {
+	errMsg := ""
+	state := domain.RelatedResolved
+	if err != nil {
+		errMsg = err.Error()
+		state = domain.RelatedError
+	}
+	c.ApplyDetailRelatedResultForResource("ec2", "i-test123", displayName, targetType, state, count, false, errMsg, false, nil, nil)
 }
 
 // ---------------------------------------------------------------------------
 // TestRightColumn_ToggleShowsRelatedHeader
-// Given: width=140, RelatedDefs registered for "ec2"
-// When:  ToggleRelated key pressed
-// Then:  View() contains "RELATED"
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_ToggleShowsRelatedHeader(t *testing.T) {
@@ -98,20 +141,15 @@ func TestRightColumn_ToggleShowsRelatedHeader(t *testing.T) {
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 
-	d := makeDetailForRelatedTest(t, 140)
-	d = showRelatedPanel(d)
-
-	view := d.View()
+	c := newRightColController(t, "ec2")
+	view := showRightColPanel(t, c, 140, 30)
 	if !strings.Contains(view, "RELATED") {
-		t.Errorf("after ToggleRelated, View() should contain \"RELATED\"; got:\n%s", view)
+		t.Errorf("after ActionToggleRelated, render should contain \"RELATED\"; got:\n%s", view)
 	}
 }
 
 // ---------------------------------------------------------------------------
 // TestRightColumn_ShowsLoadingState
-// Given: width=140, RelatedDefs registered for "ec2", toggle pressed
-// When:  no RelatedCheckResultMsg delivered yet
-// Then:  View() contains display names of registered related types
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_ShowsLoadingState(t *testing.T) {
@@ -120,23 +158,18 @@ func TestRightColumn_ShowsLoadingState(t *testing.T) {
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 
-	d := makeDetailForRelatedTest(t, 140)
-	d = showRelatedPanel(d)
-
-	view := d.View()
+	c := newRightColController(t, "ec2")
+	view := showRightColPanel(t, c, 140, 30)
 	if !strings.Contains(view, "Target Groups") {
-		t.Errorf("loading state should show \"Target Groups\" in View(); got:\n%s", view)
+		t.Errorf("loading state should show \"Target Groups\"; got:\n%s", view)
 	}
 	if !strings.Contains(view, "Auto Scaling Groups") {
-		t.Errorf("loading state should show \"Auto Scaling Groups\" in View(); got:\n%s", view)
+		t.Errorf("loading state should show \"Auto Scaling Groups\"; got:\n%s", view)
 	}
 }
 
 // ---------------------------------------------------------------------------
 // TestRightColumn_CountUpdatesOnResult
-// Given: width=140, RelatedDefs registered, toggle pressed
-// When:  RelatedCheckResultMsg{TargetType:"tg", Count:2} delivered
-// Then:  View() contains "(2)"
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_CountUpdatesOnResult(t *testing.T) {
@@ -145,29 +178,18 @@ func TestRightColumn_CountUpdatesOnResult(t *testing.T) {
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 
-	d := makeDetailForRelatedTest(t, 140)
-	d = showRelatedPanel(d)
-	d = sendRelatedResult(d, messages.RelatedCheckResult{
-		ResourceType: "ec2",
-		Result: resource.RelatedCheckResult{
-			TargetType:  "tg",
-			Count:       2,
-			ResourceIDs: []string{"tg-aaa111", "tg-bbb222"},
-			Err:         nil,
-		},
-	})
+	c := newRightColController(t, "ec2")
+	showRightColPanel(t, c, 140, 30)
+	deliverRightColResult(c, "Target Groups", "tg", 2, nil)
 
-	view := d.View()
+	view := renderRightCol(t, c, 140, 30)
 	if !strings.Contains(view, "(2)") {
-		t.Errorf("after RelatedCheckResultMsg with Count=2, View() should contain \"(2)\"; got:\n%s", view)
+		t.Errorf("after Count=2 result, render should contain \"(2)\"; got:\n%s", view)
 	}
 }
 
 // ---------------------------------------------------------------------------
 // TestRightColumn_ZeroCountDim
-// Given: width=140, RelatedDefs registered, toggle pressed
-// When:  RelatedCheckResultMsg{TargetType:"tg", Count:0} delivered
-// Then:  View() contains "(0)"
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_ZeroCountDim(t *testing.T) {
@@ -175,29 +197,18 @@ func TestRightColumn_ZeroCountDim(t *testing.T) {
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 
-	d := makeDetailForRelatedTest(t, 140)
-	d = showRelatedPanel(d)
-	d = sendRelatedResult(d, messages.RelatedCheckResult{
-		ResourceType: "ec2",
-		Result: resource.RelatedCheckResult{
-			TargetType:  "tg",
-			Count:       0,
-			ResourceIDs: nil,
-			Err:         nil,
-		},
-	})
+	c := newRightColController(t, "ec2")
+	showRightColPanel(t, c, 140, 30)
+	deliverRightColResult(c, "Target Groups", "tg", 0, nil)
 
-	view := d.View()
+	view := renderRightCol(t, c, 140, 30)
 	if !strings.Contains(view, "(0)") {
-		t.Errorf("after RelatedCheckResultMsg with Count=0, View() should contain \"(0)\"; got:\n%s", view)
+		t.Errorf("after Count=0 result, render should contain \"(0)\"; got:\n%s", view)
 	}
 }
 
 // ---------------------------------------------------------------------------
 // TestRightColumn_ErrorShowsDash
-// Given: width=140, RelatedDefs registered, toggle pressed
-// When:  RelatedCheckResultMsg with Err!=nil delivered
-// Then:  View() contains "—" (em dash U+2014)
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_ErrorShowsDash(t *testing.T) {
@@ -205,25 +216,18 @@ func TestRightColumn_ErrorShowsDash(t *testing.T) {
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 
-	d := makeDetailForRelatedTest(t, 140)
-	d = showRelatedPanel(d)
-	d = sendRelatedResult(d, messages.RelatedCheckResult{
-		ResourceType: "ec2",
-		Result:       resource.ErrorRelated("tg", errors.New("permission denied")),
-	})
+	c := newRightColController(t, "ec2")
+	showRightColPanel(t, c, 140, 30)
+	deliverRightColResult(c, "Target Groups", "tg", 0, errors.New("permission denied"))
 
-	view := d.View()
-	// Em dash (U+2014) is rendered for error states per design spec
-	if !strings.Contains(view, "\u2014") {
-		t.Errorf("after RelatedCheckResultMsg with Err!=nil, View() should contain em dash \"—\"; got:\n%s", view)
+	view := renderRightCol(t, c, 140, 30)
+	if !strings.Contains(view, "—") {
+		t.Errorf("after an error result, render should contain em dash \"—\"; got:\n%s", view)
 	}
 }
 
 // ---------------------------------------------------------------------------
 // TestRightColumn_ToggleOffHidesPanel
-// Given: width=140, RelatedDefs registered, toggle pressed (right column ON)
-// When:  toggle pressed again (right column OFF)
-// Then:  View() no longer contains "RELATED"
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_ToggleOffHidesPanel(t *testing.T) {
@@ -232,77 +236,90 @@ func TestRightColumn_ToggleOffHidesPanel(t *testing.T) {
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 
-	d := makeDetailForRelatedTest(t, 140)
-	// Toggle ON
-	d = showRelatedPanel(d)
-	viewOn := d.View()
+	c := newRightColController(t, "ec2")
+	viewOn := showRightColPanel(t, c, 140, 30)
 	if !strings.Contains(viewOn, "RELATED") {
-		t.Skip("right column not shown after first toggle; skipping off-toggle test")
+		t.Fatalf("precondition: right column should be shown after showRightColPanel; got:\n%s", viewOn)
 	}
 
-	// Toggle OFF
-	d = sendToggleRelated(d)
-	viewOff := d.View()
+	c.Apply(app.Action{Kind: app.ActionToggleRelated})
+	viewOff := renderRightCol(t, c, 140, 30)
 	if strings.Contains(viewOff, "RELATED") {
-		t.Errorf("after second ToggleRelated, View() should NOT contain \"RELATED\"; got:\n%s", viewOff)
+		t.Errorf("after second ActionToggleRelated, render should NOT contain \"RELATED\"; got:\n%s", viewOff)
 	}
 }
 
 // ---------------------------------------------------------------------------
 // TestRightColumn_NarrowTerminalIgnoresToggle
-// Given: width=59 (below minimum width for related panel)
-// When:  ToggleRelated key pressed
-// Then:  View() is unchanged — toggle is a no-op below the width threshold
 // ---------------------------------------------------------------------------
 
+// TestRightColumn_NarrowTerminalIgnoresToggle drives the real full-TUI 'r'
+// key (via the demo root model), not a bare Controller.Apply(ActionToggleRelated) —
+// the headless Apply call has no terminal-width context at all, so comparing
+// two Apply-then-render results at width=59 only proves the panel stays
+// hidden at that width (RenderDetail's own width gate), never that the 'r'
+// keypress itself was ignored. handleToggleRelated
+// (internal/tui/runtime_adapter_navigate.go) has its own width guard
+// (rs.width < layout.MinInnerContentWidth returns before touching
+// rightColVisible) — proven here by toggling narrow, resizing back wide, and
+// requiring the panel to be in exactly the state it was in before the narrow
+// toggle attempt.
 func TestRightColumn_NarrowTerminalIgnoresToggle(t *testing.T) {
-	replaceEC2Related(t, []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
+	oldDefs := append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
+	t.Cleanup(func() { resource.SetRelatedForTest("ec2", oldDefs) })
+	resource.SetRelatedForTest("ec2", []resource.RelatedDef{
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: resource.NoopChecker},
 	})
 
-	d := makeDetailForRelatedTest(t, 59)
-	viewBefore := d.View()
-	d = showRelatedPanel(d)
-	viewAfter := d.View()
+	m := newPreviewDemoModel(t, 120, 30)
+	ec2Res := previewEC2Resource()
+	m, _ = previewApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: "ec2",
+		Resource:     &ec2Res,
+	})
 
-	if viewBefore != viewAfter {
-		t.Errorf("at width=59 (below related-panel threshold), ToggleRelated should be a no-op; view changed:\nbefore:\n%s\nafter:\n%s", viewBefore, viewAfter)
+	wideBefore := previewView(m)
+	if !strings.Contains(wideBefore, "RELATED") {
+		t.Fatalf("precondition: RELATED panel should be visible at width=120; got:\n%s", wideBefore)
+	}
+
+	// 59 < layout.MinTerminalWidth(60); inner width 57 < MinInnerContentWidth(58).
+	m, _ = previewApplyMsg(m, tea.WindowSizeMsg{Width: 59, Height: 30})
+	m, _ = previewApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "r"})
+
+	m, _ = previewApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
+	wideAfter := previewView(m)
+
+	if wideAfter != wideBefore {
+		t.Errorf("'r' at a narrow width should be ignored; after resizing back to width=120 the panel state changed:\nbefore:\n%s\nafter:\n%s", wideBefore, wideAfter)
 	}
 }
 
 // ---------------------------------------------------------------------------
 // TestRightColumn_EmptyDefsShowsHint
-// Given: width=140, NO RelatedDefs registered for "ec2"
-// When:  ToggleRelated key pressed
-// Then:  View() contains hint text indicating no related types
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_EmptyDefsShowsHint(t *testing.T) {
-	// Ensure "ec2" has no related defs registered (clean state)
 	unregisterEC2Related(t)
 
-	d := makeDetailForRelatedTest(t, 140)
-	d = showRelatedPanel(d)
+	c := newRightColController(t, "ec2")
+	view := showRightColPanel(t, c, 140, 30)
 
-	view := d.View()
-	// When no RelatedDefs exist, the right column should show a hint that no
-	// related resource types are configured. The exact text is implementation-
-	// defined, but the column must appear (RELATED header) and show some hint.
 	if !strings.Contains(view, "RELATED") {
-		t.Errorf("even with empty defs, ToggleRelated should show the right column with RELATED header; got:\n%s", view)
+		t.Errorf("even with empty defs, ActionToggleRelated should show the right column with RELATED header; got:\n%s", view)
 	}
-	// The panel should NOT contain actual type names when none are registered
 	if strings.Contains(view, "Target Groups") || strings.Contains(view, "Auto Scaling Groups") {
-		t.Errorf("with empty defs, View() should NOT contain type names; got:\n%s", view)
+		t.Errorf("with empty defs, render should NOT contain type names; got:\n%s", view)
+	}
+	if !strings.Contains(view, "No related types registered") {
+		t.Errorf("with empty defs, render should show the empty-state hint 'No related types registered'; got:\n%s", view)
 	}
 }
 
 // ---------------------------------------------------------------------------
 // TestRightColumn_MultipleResults_EachUpdatesIndependently
-// Given: width=140, two RelatedDefs registered
-// When:  two separate RelatedCheckResultMsgs delivered (one for each type)
-// Then:  View() contains both counts
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_MultipleResults_EachUpdatesIndependently(t *testing.T) {
@@ -311,72 +328,24 @@ func TestRightColumn_MultipleResults_EachUpdatesIndependently(t *testing.T) {
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
 
-	d := makeDetailForRelatedTest(t, 140)
-	d = showRelatedPanel(d)
-	d = sendRelatedResult(d, messages.RelatedCheckResult{
-		ResourceType: "ec2",
-		Result: resource.RelatedCheckResult{
-			TargetType:  "tg",
-			Count:       3,
-			ResourceIDs: []string{"tg-1", "tg-2", "tg-3"},
-			Err:         nil,
-		},
-	})
-	d = sendRelatedResult(d, messages.RelatedCheckResult{
-		ResourceType: "ec2",
-		Result: resource.RelatedCheckResult{
-			TargetType:  "asg",
-			Count:       1,
-			ResourceIDs: []string{"asg-xyz"},
-			Err:         nil,
-		},
-	})
+	c := newRightColController(t, "ec2")
+	showRightColPanel(t, c, 140, 30)
+	deliverRightColResult(c, "Target Groups", "tg", 3, nil)
+	deliverRightColResult(c, "Auto Scaling Groups", "asg", 1, nil)
 
-	view := d.View()
-	if !strings.Contains(view, "(3)") {
-		t.Errorf("View() should contain \"(3)\" for tg count; got:\n%s", view)
+	view := renderRightCol(t, c, 140, 30)
+	tgLine := findLineContaining(view, "Target Groups")
+	if !strings.Contains(tgLine, "(3)") {
+		t.Errorf("Target Groups row should show \"(3)\"; got line:\n%s\nfull view:\n%s", tgLine, view)
 	}
-	if !strings.Contains(view, "(1)") {
-		t.Errorf("View() should contain \"(1)\" for asg count; got:\n%s", view)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// TestRightColumn_WrongResourceType_ResultIgnored
-// Given: width=140, RelatedDefs registered for "ec2", toggle pressed
-// When:  RelatedCheckResultMsg with ResourceType="rds" (wrong type) delivered
-// Then:  View() does NOT update with the count — wrong-type result is ignored
-// ---------------------------------------------------------------------------
-
-func TestRightColumn_WrongResourceType_ResultIgnored(t *testing.T) {
-	replaceEC2Related(t, []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
-	})
-
-	d := makeDetailForRelatedTest(t, 140)
-	d = sendToggleRelated(d)
-	// Deliver a result for "rds" — should be ignored by the ec2 detail model
-	d = sendRelatedResult(d, messages.RelatedCheckResult{
-		ResourceType: "rds",
-		Result: resource.RelatedCheckResult{
-			TargetType:  "tg",
-			Count:       99,
-			ResourceIDs: nil,
-			Err:         nil,
-		},
-	})
-
-	view := d.View()
-	if strings.Contains(view, "(99)") {
-		t.Errorf("result for wrong resource type \"rds\" should be ignored; View() should not contain \"(99)\"; got:\n%s", view)
+	asgLine := findLineContaining(view, "Auto Scaling Groups")
+	if !strings.Contains(asgLine, "(1)") {
+		t.Errorf("Auto Scaling Groups row should show \"(1)\"; got line:\n%s\nfull view:\n%s", asgLine, view)
 	}
 }
 
 // ---------------------------------------------------------------------------
 // TestRightColumn_ToggleDefaultState_OnEntry
-// Given: width=140, RelatedDefs registered for "ec2"
-// When:  DetailModel created and SetSize called (no toggle sent)
-// Then:  View() contains "RELATED" — right column is ON by default
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_ToggleDefaultState_OnEntry(t *testing.T) {
@@ -384,20 +353,16 @@ func TestRightColumn_ToggleDefaultState_OnEntry(t *testing.T) {
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 
-	d := makeDetailForRelatedTest(t, 140)
-	view := d.View()
+	c := newRightColController(t, "ec2")
+	view := renderRightCol(t, c, 140, 30)
 
 	if !strings.Contains(view, "RELATED") {
-		t.Errorf("right column should be ON by default (no toggle needed); View() should contain \"RELATED\"; got:\n%s", view)
+		t.Errorf("right column should be ON by default (no toggle needed); render should contain \"RELATED\"; got:\n%s", view)
 	}
 }
 
 // ---------------------------------------------------------------------------
 // TestRightColumn_View_WideTerminalShowsSideBySide
-// Given: width=140 (≥ 100 column threshold)
-// When:  ToggleRelated pressed, RelatedDefs registered
-// Then:  View() contains both field content AND related type names in same output
-//        (side-by-side layout — both columns visible simultaneously)
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_View_WideTerminalShowsSideBySide(t *testing.T) {
@@ -405,12 +370,9 @@ func TestRightColumn_View_WideTerminalShowsSideBySide(t *testing.T) {
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
 
-	d := makeDetailForRelatedTest(t, 140)
-	d = showRelatedPanel(d)
-	view := d.View()
+	c := newRightColController(t, "ec2")
+	view := showRightColPanel(t, c, 140, 30)
 
-	// At 140 columns, both the resource field content (left col) and related
-	// types (right col) should appear in the same View() output.
 	if !strings.Contains(view, "instance_id") && !strings.Contains(view, "running") && !strings.Contains(view, "t3.micro") {
 		t.Errorf("at width=140, left column should show resource fields; got:\n%s", view)
 	}
