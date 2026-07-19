@@ -284,6 +284,7 @@ func (c *Controller) reapplyCheckerAgainst(ls *ListState, typeName string, newPa
 			ls.RelatedIDSet[id] = struct{}{}
 		}
 	}
+	ls.rowsVersion++
 }
 
 // ApplyEnrichmentState stores Wave-2 enrichment results for typeName.
@@ -318,6 +319,7 @@ func (c *Controller) applyEnrichmentState(typeName string, issueCount int, trunc
 	c.enrichmentStore[typeName] = findings
 	c.enrichmentDetails[typeName] = details
 	c.enrichmentTruncated[typeName] = truncated
+	c.enrichmentGen++
 
 	// DEF-20-follow-up: the in-list Wave-2 enrichment lane is the ONLY
 	// in-session source of the menu issue badge for renderers that run no

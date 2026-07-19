@@ -186,6 +186,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			c.enrichmentStore = nil
 			c.enrichmentDetails = nil
 			c.enrichmentTruncated = nil
+			c.enrichmentGen++
 
 		case runtime.PatchResourceList:
 			// Apply enrichment data (findings + issue badge) to the controller's

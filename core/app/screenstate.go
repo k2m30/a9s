@@ -99,6 +99,28 @@ type ListState struct {
 	// len(Rows) == the authoritative total. Cleared by the next genuine
 	// fetch-result landing in applyResourcesLoaded, same trigger as Refreshing.
 	TotalCount int `json:"total_count,omitempty"`
+
+	// rowsVersion counts every content-changing mutation of Rows/RelatedIDSet
+	// on this screen: applyResourcesLoaded's non-stale write branches,
+	// seedRelatedExactRows, seedFilteredListFromCache, applyListFieldUpdates,
+	// applyRowFindings, clearRowFindings, PatchListRelatedIDSet,
+	// patchListReapplyChecker, and reapplyCheckerAgainst (core/app/list_body.go,
+	// list_state.go, list_filter.go, navigate.go). buildListBody's memo
+	// (list_body.go) keys on this rather than RowsGen because RowsGen only
+	// advances for the canonical top-level list path (Core.ObserveRows) and
+	// stays zero for a child/related/filtered screen or an in-place
+	// Fields/Findings mutation — exactly the cases a RowsGen-only key would
+	// miss. In-memory only, like reapplyChecker/reapplySource below — not
+	// part of the JSON snapshot.
+	rowsVersion uint64
+
+	// bodyMemo caches the expensive part of the last buildListBody result for
+	// this screen (resolved columns, the filtered+sorted+decorated row set,
+	// and the marker/status column indices) so a frame whose row-affecting
+	// inputs are unchanged — the common cursor-move/spinner-tick render —
+	// skips the O(n log n) sort and O(n·cols) cell extraction. See
+	// listBodyMemo in list_body.go.
+	bodyMemo listBodyMemo
 }
 
 // DetailState holds the mutable display state for a resource-detail screen.

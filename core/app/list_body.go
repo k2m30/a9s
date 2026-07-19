@@ -148,12 +148,17 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 			accepted, gen := c.core.ObserveRows(typeName, resources, pagination, session.OriginFetch, appendPage)
 			ls.Rows = accepted
 			ls.RowsGen = gen
+			ls.rowsVersion++
 		case appendPage:
 			ls.Rows = append(ls.Rows, dedupAgainstExisting(ls.Rows, resources)...)
+			ls.rowsVersion++
 		case stale:
-			// Discard: see the DEF-18 mechanism A comment above.
+			// Discard: see the DEF-18 mechanism A comment above. ls.Rows is
+			// unchanged, so the buildListBody memo (list_body.go) must not be
+			// invalidated either — no rowsVersion bump.
 		default:
 			ls.Rows = resources
+			ls.rowsVersion++
 		}
 	}
 
@@ -318,10 +323,45 @@ func (c *Controller) materializeListFieldsForType(typeName string, resources []r
 	return out
 }
 
+// listBodyMemo caches the expensive part of buildListBody's output — the
+// resolved columns, the filtered+sorted+decorated row set, and the two
+// column-index lookups derived from that column set — keyed on every input
+// that can change what they contain. Rebuilt only on a key mismatch; a
+// cursor move, spinner tick, or any other re-render whose inputs are
+// unchanged reuses columns/rows/markerCol/statusCol verbatim.
+//
+// Selected/ScrollX/Filter/Sort/AttentionOnly/Loading/Truncated/Pagination/
+// EnrichmentFindings/EnrichmentTruncated/LoadingMore/Refreshing/
+// LastFetchError are NOT cached here — they are cheap to read fresh from ls
+// (and the controller's enrichment maps) on every call, cache or no cache,
+// so buildListBody always sets them directly on the returned ListBody.
+type listBodyMemo struct {
+	valid       bool
+	rowsVersion uint64
+	filter      string
+	attnOnly    bool
+	sortCol     string
+	sortDir     string
+	enrichGen   uint64
+
+	columns   []ColumnDef
+	rows      []ListRow
+	markerCol int
+	statusCol int
+}
+
 // buildListBody constructs a ListBody from the top list screen's ListState and
 // the controller's resource + enrichment caches. Mirrors applySortAndFilter +
 // the row/cell extraction in ResourceListModel — producing the same logical
 // rows/cells/order/decorators so RenderList parity holds.
+//
+// The expensive part (column resolution, filter+sort, per-row cell
+// extraction/decoration) runs only when ls.bodyMemo's key does not match the
+// current inputs — see listBodyMemo. Callers must hold c.mu for WRITE (not
+// just read): a cache miss populates ls.bodyMemo, which is a Controller-owned
+// mutation of ListState, not a pure read. Controller.Snapshot (the sole
+// external entry point that reaches here) acquires c.mu.Lock() for exactly
+// this reason.
 func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *ListBody {
 	typeName := ctx.ResourceType
 
@@ -340,6 +380,63 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 		td = catalogTD
 	}
 
+	memo := &ls.bodyMemo
+	if !memo.valid ||
+		memo.rowsVersion != ls.rowsVersion ||
+		memo.filter != ls.Filter ||
+		memo.attnOnly != ls.AttentionOnly ||
+		memo.sortCol != ls.SortCol ||
+		memo.sortDir != ls.SortDir ||
+		memo.enrichGen != c.enrichmentGen {
+		*memo = c.rebuildListBodyMemo(ls, typeName, td)
+	}
+
+	// Clamp selected row against the (possibly cached) visible row count.
+	selected := ls.SelectedRow
+	if len(memo.rows) > 0 && selected >= len(memo.rows) {
+		selected = len(memo.rows) - 1
+	}
+	if selected < 0 {
+		selected = 0
+	}
+
+	enrichTruncated := map[string]bool{}
+	if c.enrichmentTruncated != nil {
+		maps.Copy(enrichTruncated, c.enrichmentTruncated)
+	}
+
+	pagination := PaginationInfo{}
+	if ls.HasPagination {
+		pagination.HasMore = true
+		pagination.Cursor = ls.PaginationCursor
+	}
+
+	return &ListBody{
+		Columns:             memo.columns,
+		Rows:                memo.rows,
+		Selected:            selected,
+		ScrollX:             ls.ScrollX,
+		Filter:              ls.Filter,
+		Sort:                SortSpec{Col: ls.SortCol, Dir: ls.SortDir},
+		AttentionOnly:       ls.AttentionOnly,
+		Loading:             ls.Loading,
+		Truncated:           ls.HasPagination,
+		Pagination:          pagination,
+		EnrichmentFindings:  c.listEnrichmentFindings(typeName),
+		EnrichmentTruncated: enrichTruncated,
+		MarkerCol:           memo.markerCol,
+		StatusCol:           memo.statusCol,
+		LoadingMore:         ls.LoadingMore,
+		Refreshing:          ls.Refreshing,
+		LastFetchError:      ls.LastFetchError,
+	}
+}
+
+// rebuildListBodyMemo runs the O(n log n) filter+sort and the O(n·cols) cell
+// extraction/decoration pass that buildListBody used to run unconditionally
+// on every call, returning a fresh listBodyMemo stamped with the input key
+// that produced it. Callers must hold c.mu (write).
+func (c *Controller) rebuildListBodyMemo(ls *ListState, typeName string, td *resource.ResourceTypeDef) listBodyMemo {
 	// Resolve column definitions mirroring resolveColumns() in table_render.go,
 	// using the already-resolved fallback td (not the catalog) for the superset
 	// first-column-title check. This ensures test typeDefs with non-standard
@@ -358,21 +455,8 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 	// resolve correctly (Bug 3 fix).
 	visible = listSortResources(c.viewConfig, ls, typeName, visible)
 
-	// Clamp selected row.
-	selected := ls.SelectedRow
-	if len(visible) > 0 && selected >= len(visible) {
-		selected = len(visible) - 1
-	}
-	if selected < 0 {
-		selected = 0
-	}
-
 	// Enrichment data.
 	findings := c.listEnrichmentFindings(typeName)
-	enrichTruncated := map[string]bool{}
-	if c.enrichmentTruncated != nil {
-		maps.Copy(enrichTruncated, c.enrichmentTruncated)
-	}
 
 	// Build rows.
 	statusCol := resolveListStatusCol(columns, td)
@@ -417,35 +501,22 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 		})
 	}
 
-	// Pagination.
-	pagination := PaginationInfo{}
-	if ls.HasPagination {
-		pagination.HasMore = true
-		pagination.Cursor = ls.PaginationCursor
-	}
-
 	// Resolve the identity column index (full column list, before hscroll),
 	// mirroring resolveIdentityColumn in table_render.go.
 	markerCol := resolveListMarkerCol(columns, td)
 
-	return &ListBody{
-		Columns:             columns,
-		Rows:                rows,
-		Selected:            selected,
-		ScrollX:             ls.ScrollX,
-		Filter:              ls.Filter,
-		Sort:                SortSpec{Col: ls.SortCol, Dir: ls.SortDir},
-		AttentionOnly:       ls.AttentionOnly,
-		Loading:             ls.Loading,
-		Truncated:           ls.HasPagination,
-		Pagination:          pagination,
-		EnrichmentFindings:  findings,
-		EnrichmentTruncated: enrichTruncated,
-		MarkerCol:           markerCol,
-		StatusCol:           statusCol,
-		LoadingMore:         ls.LoadingMore,
-		Refreshing:          ls.Refreshing,
-		LastFetchError:      ls.LastFetchError,
+	return listBodyMemo{
+		valid:       true,
+		rowsVersion: ls.rowsVersion,
+		filter:      ls.Filter,
+		attnOnly:    ls.AttentionOnly,
+		sortCol:     ls.SortCol,
+		sortDir:     ls.SortDir,
+		enrichGen:   c.enrichmentGen,
+		columns:     columns,
+		rows:        rows,
+		markerCol:   markerCol,
+		statusCol:   statusCol,
 	}
 }
 
@@ -734,6 +805,7 @@ func (c *Controller) applyListFieldUpdates(typeName string, updates map[string]m
 			continue
 		}
 		applyFieldUpdatesToSlice(s.State.List.Rows, updates)
+		s.State.List.rowsVersion++
 	}
 	// Also update the RowStore-backed type cache so GetListAllResources etc.
 	// see the same values. Amend's copy-on-write contract (RowStore.Amend's
@@ -810,6 +882,7 @@ func (c *Controller) clearRowFindings(typeName string) {
 			continue
 		}
 		clearSlice(s.State.List.Rows)
+		s.State.List.rowsVersion++
 	}
 
 	// RowStore-backed type cache (GetListAllResources and other
@@ -878,6 +951,7 @@ func (c *Controller) applyRowFindings(typeName string, findings map[string][]dom
 			continue
 		}
 		applySlice(s.State.List.Rows)
+		s.State.List.rowsVersion++
 	}
 
 	// RowStore-backed type cache. Unlike clearRowFindings' stripWave2Findings

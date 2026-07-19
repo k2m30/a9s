@@ -166,6 +166,7 @@ func (c *Controller) PatchListRelatedIDSet(ids []string) {
 	}
 	if len(ids) == 0 {
 		ls.RelatedIDSet = nil
+		ls.rowsVersion++
 		return
 	}
 	set := make(map[string]struct{}, len(ids))
@@ -175,6 +176,7 @@ func (c *Controller) PatchListRelatedIDSet(ids []string) {
 		}
 	}
 	ls.RelatedIDSet = set
+	ls.rowsVersion++
 }
 
 // seedRelatedExactRows sets the exact-ID related filter on ls and seeds its rows
@@ -208,6 +210,7 @@ func (c *Controller) seedRelatedExactRows(ls *ListState, targetType string, ids 
 		ls.Rows = seeded
 		ls.Loading = false
 	}
+	ls.rowsVersion++
 	return len(seen) == len(set)
 }
 
@@ -254,6 +257,7 @@ func (c *Controller) patchListReapplyChecker(checker resource.RelatedChecker, sr
 	// navigations hide all rows immediately rather than showing an unfiltered list.
 	if ls.RelatedIDSet == nil {
 		ls.RelatedIDSet = make(map[string]struct{})
+		ls.rowsVersion++
 	}
 }
 

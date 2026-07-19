@@ -355,6 +355,7 @@ func (c *Controller) seedFilteredListFromCache(targetType string, filter map[str
 	ls.HasPagination = entry.Truncated
 	ls.PaginationCursor = entry.Cursor
 	ls.Refreshing = true
+	ls.rowsVersion++
 	return true
 }
 

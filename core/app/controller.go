@@ -27,9 +27,12 @@ import (
 //
 // Concurrency: mu guards stack and all map fields. Public mutating methods
 // (Apply, Handle, ApplyIntents, ApplyEnrichmentState, RegisterFallbackTypeDef,
-// etc.) acquire a write lock on entry. Public read-only methods (Snapshot,
-// GetMenu*, GetList*) acquire a read lock. Internal helpers called while a
-// lock is already held must NOT lock — Go mutexes are not reentrant.
+// etc.) acquire a write lock on entry. Public read-only methods (GetMenu*,
+// GetList*) acquire a read lock. Snapshot acquires a WRITE lock — despite
+// being read-only from the caller's perspective, it may populate a list
+// screen's buildListBody memo cache (list_body.go), which is a mutation of
+// ListState.bodyMemo/rowsVersion. Internal helpers called while a lock is
+// already held must NOT lock — Go mutexes are not reentrant.
 type Controller struct {
 	mu    sync.RWMutex
 	core  *runtime.Core
@@ -56,6 +59,15 @@ type Controller struct {
 	// enrichmentTruncated stores the truncation flag per resource type from
 	// ApplyEnrichmentState, parallel to enrichmentStore.
 	enrichmentTruncated map[string]bool
+
+	// enrichmentGen counts every mutation of enrichmentStore/enrichmentDetails/
+	// enrichmentTruncated: applyEnrichmentState's write and the profile/
+	// region-rotation reset in intents.go's MenuClearAvailabilityIntent case.
+	// buildListBody's memo (list_body.go) includes this in its cache key
+	// because resolveListDecoratorFull and the S4 status-cell override read
+	// these maps directly — a change invisible to a ListState's own
+	// rowsVersion, since the maps are controller-level, not per-screen.
+	enrichmentGen uint64
 
 	// viewConfig is the per-session view configuration used by
 	// resolveListColumnsForBuild to pick the correct column set for each

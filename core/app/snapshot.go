@@ -13,14 +13,21 @@ import (
 //
 // Snapshot never panics on an empty stack — it returns a ViewState with
 // BodyKindUnknown.
+//
+// Takes a WRITE lock, not a read lock: buildListBody (list_body.go) may
+// populate a list screen's ListState.bodyMemo cache on a miss, which is a
+// mutation. Two goroutines calling Snapshot concurrently on the same
+// Controller (e.g. two web requests against the same session) must not race
+// that write — see Controller's Concurrency doc comment.
 func (c *Controller) Snapshot() ViewState {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.snapshot()
 }
 
 // snapshot is the lock-free implementation of Snapshot.
-// Callers must hold c.mu (at least read).
+// Callers must hold c.mu for WRITE — buildListBody (reached via
+// vs.Body.List below) may populate ListState.bodyMemo on a cache miss.
 func (c *Controller) snapshot() ViewState {
 	vs := ViewState{
 		Header: Header{
