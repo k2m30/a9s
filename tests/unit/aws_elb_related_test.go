@@ -2,13 +2,14 @@ package unit_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
-	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -279,6 +280,131 @@ func TestRelated_ELB_Alarms_CacheMissNoClients(t *testing.T) {
 
 	if result.State != domain.RelatedUnknown {
 		t.Errorf("State = %v, want RelatedUnknown", result.State)
+	}
+}
+
+// TestRelated_ELB_Alarms_WrongDimensionName_NotCounted verifies that an
+// alarm whose dimensions carry a different name entirely (not
+// "LoadBalancer") is not counted, distinct from the existing wrong-value
+// coverage in TestRelated_ELB_Alarms_NotFound.
+func TestRelated_ELB_Alarms_WrongDimensionName_NotCounted(t *testing.T) {
+	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/abc123"
+	const dimensionValue = "app/my-lb/abc123"
+
+	alarmRes := resource.Resource{
+		ID: "target-group-alarm",
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName: aws.String("target-group-alarm"),
+			Dimensions: []cwtypes.Dimension{
+				{Name: aws.String("TargetGroup"), Value: aws.String(dimensionValue)},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{alarmRes}},
+	}
+	source := resource.Resource{
+		ID:   "my-lb",
+		Name: "my-lb",
+		Fields: map[string]string{
+			"load_balancer_arn": elbARN,
+		},
+		RawStruct: elbv2types.LoadBalancer{
+			LoadBalancerName: aws.String("my-lb"),
+			LoadBalancerArn:  aws.String(elbARN),
+		},
+	}
+
+	checker := elbCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (dimension name is TargetGroup, not LoadBalancer)", result.Count)
+	}
+}
+
+// TestRelated_ELB_Alarms_Error verifies that a fetch error for the "alarm"
+// target propagates as RelatedError, never a silently resolved count.
+func TestRelated_ELB_Alarms_Error(t *testing.T) {
+	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/abc123"
+	source := resource.Resource{
+		ID:   "my-lb",
+		Name: "my-lb",
+		Fields: map[string]string{
+			"load_balancer_arn": elbARN,
+		},
+		RawStruct: elbv2types.LoadBalancer{
+			LoadBalancerName: aws.String("my-lb"),
+			LoadBalancerArn:  aws.String(elbARN),
+		},
+	}
+	wantErr := errors.New("boom: DescribeAlarms throttled")
+
+	original := resource.GetPaginatedFetcher("alarm")
+	resource.SetPaginatedForTest("alarm", func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+		return resource.FetchResult{}, wantErr
+	})
+	t.Cleanup(func() {
+		if original != nil {
+			resource.SetPaginatedForTest("alarm", original)
+		} else {
+			resource.CleanupPaginatedForTest("alarm")
+		}
+	})
+
+	checker := elbCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), &awsclient.ServiceClients{}, source, resource.ResourceCache{})
+
+	if result.State != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError", result.State)
+	}
+	if result.Err == nil {
+		t.Error("Err = nil, want the propagated fetch error")
+	}
+}
+
+// TestRelated_ELB_Alarms_Truncated_PropagatesTrue verifies that a truncated
+// "alarm" cache page with a real match still sets Truncated=true — the
+// match must render "(1+)", not a definitive "(1)".
+func TestRelated_ELB_Alarms_Truncated_PropagatesTrue(t *testing.T) {
+	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/abc123"
+	const dimensionValue = "app/my-lb/abc123"
+
+	alarmRes := resource.Resource{
+		ID: "elb-5xx-errors",
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName: aws.String("elb-5xx-errors"),
+			Dimensions: []cwtypes.Dimension{
+				{Name: aws.String("LoadBalancer"), Value: aws.String(dimensionValue)},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{alarmRes},
+			IsTruncated: true,
+		},
+	}
+	source := resource.Resource{
+		ID:   "my-lb",
+		Name: "my-lb",
+		Fields: map[string]string{
+			"load_balancer_arn": elbARN,
+		},
+		RawStruct: elbv2types.LoadBalancer{
+			LoadBalancerName: aws.String("my-lb"),
+			LoadBalancerArn:  aws.String(elbARN),
+		},
+	}
+
+	checker := elbCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if !result.Truncated {
+		t.Error("Truncated = false, want true (truncated cache page with a match must render as '(1+)')")
 	}
 }
 

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -63,9 +62,6 @@ func checkELBAlarms(ctx context.Context, clients any, res resource.Resource, cac
 			elbARN = *raw.LoadBalancerArn
 		}
 	}
-	if elbARN == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-	}
 
 	// Compute the ARN suffix: everything after "loadbalancer/"
 	const prefix = "loadbalancer/"
@@ -74,28 +70,7 @@ func checkELBAlarms(ctx context.Context, clients any, res resource.Resource, cac
 		arnSuffix = after
 	}
 
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		raw, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, d := range raw.Dimensions {
-			if d.Name != nil && *d.Name == "LoadBalancer" && d.Value != nil && *d.Value == arnSuffix {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "", "LoadBalancer", arnSuffix)
 }
 
 // checkELBSG extracts security group IDs from the ELBv2 LoadBalancer's

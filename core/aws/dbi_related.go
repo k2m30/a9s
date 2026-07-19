@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
@@ -78,33 +77,7 @@ func checkDbiSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 // matching this DB instance's identifier.
 // Pattern D — dimension-based lookup.
 func checkDbiAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	dbIdentifier := res.ID
-	if dbIdentifier == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-	}
-
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return relatedResultTrunc("alarm", nil, true)
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		alarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, d := range alarm.Dimensions {
-			if d.Name != nil && *d.Name == "DBInstanceIdentifier" && d.Value != nil && *d.Value == dbIdentifier {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "", "DBInstanceIdentifier", res.ID)
 }
 
 // checkDbiDBISnap searches the dbi-snap cache for snapshots whose DBInstanceIdentifier

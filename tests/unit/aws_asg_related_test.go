@@ -2,6 +2,7 @@ package unit_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -186,6 +187,113 @@ func TestRelated_ASG_Alarm_NilCache(t *testing.T) {
 
 	if result.State != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
+	}
+}
+
+// TestRelated_ASG_Alarm_WrongDimensionName_NotCounted verifies that an alarm
+// whose dimensions do not include "AutoScalingGroupName" at all (a different
+// dimension name entirely) is not counted, distinct from the existing
+// wrong-value coverage in TestRelated_ASG_Alarm_NoMatch.
+func TestRelated_ASG_Alarm_WrongDimensionName_NotCounted(t *testing.T) {
+	alarmRes := resource.Resource{
+		ID:     "instance-cpu-alarm",
+		Fields: map[string]string{},
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName: aws.String("instance-cpu-alarm"),
+			Dimensions: []cwtypes.Dimension{
+				{
+					Name:  aws.String("InstanceId"),
+					Value: aws.String("my-asg"),
+				},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{alarmRes}},
+	}
+
+	res := resource.Resource{
+		ID:     "my-asg",
+		Fields: map[string]string{},
+	}
+
+	checker := asgCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (dimension name is InstanceId, not AutoScalingGroupName)", result.Count)
+	}
+}
+
+// TestRelated_ASG_Alarm_Error verifies that a fetch error for the "alarm"
+// target propagates as RelatedError, never a silently resolved count.
+func TestRelated_ASG_Alarm_Error(t *testing.T) {
+	res := resource.Resource{
+		ID:     "my-asg",
+		Fields: map[string]string{},
+	}
+	wantErr := errors.New("boom: DescribeAlarms throttled")
+
+	original := resource.GetPaginatedFetcher("alarm")
+	resource.SetPaginatedForTest("alarm", func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+		return resource.FetchResult{}, wantErr
+	})
+	t.Cleanup(func() {
+		if original != nil {
+			resource.SetPaginatedForTest("alarm", original)
+		} else {
+			resource.CleanupPaginatedForTest("alarm")
+		}
+	})
+
+	checker := asgCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), &awsclient.ServiceClients{}, res, resource.ResourceCache{})
+
+	if result.State != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError", result.State)
+	}
+	if result.Err == nil {
+		t.Error("Err = nil, want the propagated fetch error")
+	}
+}
+
+// TestRelated_ASG_Alarm_Truncated_PropagatesTrue verifies that a truncated
+// "alarm" cache page with a real match still sets Truncated=true — the match
+// must render "(1+)", not a definitive "(1)".
+func TestRelated_ASG_Alarm_Truncated_PropagatesTrue(t *testing.T) {
+	alarmRes := resource.Resource{
+		ID:     "asg-cpu-alarm",
+		Fields: map[string]string{},
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName: aws.String("asg-cpu-alarm"),
+			Dimensions: []cwtypes.Dimension{
+				{
+					Name:  aws.String("AutoScalingGroupName"),
+					Value: aws.String("my-asg"),
+				},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{alarmRes},
+			IsTruncated: true,
+		},
+	}
+
+	res := resource.Resource{
+		ID:     "my-asg",
+		Fields: map[string]string{},
+	}
+
+	checker := asgCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if !result.Truncated {
+		t.Error("Truncated = false, want true (truncated cache page with a match must render as '(1+)')")
 	}
 }
 

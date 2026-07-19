@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	lambdapkg "github.com/aws/aws-sdk-go-v2/service/lambda"
 
@@ -259,33 +258,7 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, _ re
 // checkApigwAlarm reports CloudWatch alarms on this API. API Gateway alarms
 // use dimension "ApiId". Scans the alarm cache.
 func checkApigwAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	apiID := res.ID
-	if apiID == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-	}
-
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		raw, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, d := range raw.Dimensions {
-			if d.Name != nil && *d.Name == "ApiId" && d.Value != nil && *d.Value == apiID {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "", "ApiId", res.ID)
 }
 
 // checkApigwCF reports CloudFront distributions fronting this API. Distribution

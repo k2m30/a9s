@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -54,33 +53,7 @@ func checkECSServices(ctx context.Context, clients any, res resource.Resource, c
 
 // checkECSAlarms checks the cache for CloudWatch alarms with ClusterName dimension matching this cluster.
 func checkECSAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	clusterName := res.ID
-	if clusterName == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-	}
-
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		rawAlarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, d := range rawAlarm.Dimensions {
-			if d.Name != nil && *d.Name == "ClusterName" && d.Value != nil && *d.Value == clusterName {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "", "ClusterName", res.ID)
 }
 
 // checkECSCFN checks the ECS cluster's tags for aws:cloudformation:stack-name and finds the matching CFN stack.

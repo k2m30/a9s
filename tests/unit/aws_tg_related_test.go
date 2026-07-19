@@ -2,6 +2,7 @@ package unit_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
@@ -9,7 +10,7 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
-	_ "github.com/k2m30/a9s/v3/core/aws"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -244,6 +245,109 @@ func TestRelated_TG_Alarm_NoMatch(t *testing.T) {
 
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (alarm with different TargetGroup dimension)", result.Count)
+	}
+}
+
+// TestRelated_TG_Alarm_NilCache verifies that checkTGAlarm returns
+// RelatedUnknown when the "alarm" cache has not been loaded (cache miss, no
+// clients) — the same canonical nil-cache contract as checkSQSAlarm. Unlike
+// checkDbiAlarm/checkDdbAlarm, checkTGAlarm is NOT one of the divergent
+// clones, so this pins currently-passing behavior that must survive the
+// alarmIDsByDimension extraction.
+func TestRelated_TG_Alarm_NilCache(t *testing.T) {
+	res := tgSrcResource()
+
+	checker := tgCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if result.State != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (nil alarm cache is not a proven zero)", result.State)
+	}
+}
+
+// TestRelated_TG_Alarm_WrongDimensionName_NotCounted verifies that an alarm
+// whose dimensions carry a different name entirely (not "TargetGroup") is
+// not counted, distinct from the existing wrong-value coverage in
+// TestRelated_TG_Alarm_NoMatch.
+func TestRelated_TG_Alarm_WrongDimensionName_NotCounted(t *testing.T) {
+	res := tgSrcResource()
+	tgARNSuffix := "targetgroup/my-tg/abc123"
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{{
+			ID: "load-balancer-alarm",
+			RawStruct: cwtypes.MetricAlarm{
+				Dimensions: []cwtypes.Dimension{
+					{Name: new("LoadBalancer"), Value: new(tgARNSuffix)},
+				},
+			},
+		}}},
+	}
+
+	checker := tgCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (dimension name is LoadBalancer, not TargetGroup)", result.Count)
+	}
+}
+
+// TestRelated_TG_Alarm_Error verifies that a fetch error for the "alarm"
+// target propagates as RelatedError, never a silently resolved count.
+func TestRelated_TG_Alarm_Error(t *testing.T) {
+	res := tgSrcResource()
+	wantErr := errors.New("boom: DescribeAlarms throttled")
+
+	original := resource.GetPaginatedFetcher("alarm")
+	resource.SetPaginatedForTest("alarm", func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+		return resource.FetchResult{}, wantErr
+	})
+	t.Cleanup(func() {
+		if original != nil {
+			resource.SetPaginatedForTest("alarm", original)
+		} else {
+			resource.CleanupPaginatedForTest("alarm")
+		}
+	})
+
+	checker := tgCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), &awsclient.ServiceClients{}, res, resource.ResourceCache{})
+
+	if result.State != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError", result.State)
+	}
+	if result.Err == nil {
+		t.Error("Err = nil, want the propagated fetch error")
+	}
+}
+
+// TestRelated_TG_Alarm_Truncated_PropagatesTrue verifies that a truncated
+// "alarm" cache page with a real match still sets Truncated=true — the
+// match must render "(1+)", not a definitive "(1)".
+func TestRelated_TG_Alarm_Truncated_PropagatesTrue(t *testing.T) {
+	res := tgSrcResource()
+	tgARNSuffix := "targetgroup/my-tg/abc123"
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{{
+				ID: "tg-unhealthy-alarm",
+				RawStruct: cwtypes.MetricAlarm{
+					Dimensions: []cwtypes.Dimension{
+						{Name: new("TargetGroup"), Value: new(tgARNSuffix)},
+					},
+				},
+			}},
+			IsTruncated: true,
+		},
+	}
+
+	checker := tgCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if !result.Truncated {
+		t.Error("Truncated = false, want true (truncated cache page with a match must render as '(1+)')")
 	}
 }
 

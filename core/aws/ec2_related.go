@@ -12,7 +12,6 @@ import (
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -100,30 +99,7 @@ func checkEC2Alarms(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 	instanceID, _, _ := ec2Identity(res)
-	if instanceID == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-	}
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-	var ids []string
-	for _, alarmRes := range alarmList {
-		raw, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, d := range raw.Dimensions {
-			if d.Name != nil && *d.Name == "InstanceId" && d.Value != nil && *d.Value == instanceID {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "", "InstanceId", instanceID)
 }
 
 // checkEC2CFN checks instance tags for aws:cloudformation:stack-name.

@@ -47,7 +47,7 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		return relatedResultTrunc("alarm", nil, true)
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string

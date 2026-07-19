@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -125,6 +126,46 @@ func relatedResultTrunc(target string, ids []string, truncated bool) resource.Re
 	r := relatedResult(target, ids)
 	r.Truncated = truncated
 	return r
+}
+
+// alarmIDsByDimension is the shared body of every check*Alarm function whose
+// match rule is "one CloudWatch dimension name/value pair, exact equality,
+// first match wins". namespace, when non-empty, additionally restricts
+// matches to alarms in that AWS/* namespace (the sqs/cb/mwaa pattern); pass
+// "" to skip the namespace guard (the dbi pattern). An empty dimValue means
+// the caller had nothing to match against — reported as a proven zero, not
+// unknown. A nil alarm list means the alarm cache/fetcher gave no answer at
+// all — reported as unknown, never as a proven zero.
+func alarmIDsByDimension(ctx context.Context, clients any, cache resource.ResourceCache, namespace, dimName, dimValue string) resource.RelatedCheckResult {
+	if dimValue == "" {
+		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
+	}
+
+	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
+	if err != nil {
+		return resource.ErrorRelated("alarm", err)
+	}
+	if alarmList == nil {
+		return resource.UnknownRelated("alarm")
+	}
+
+	var ids []string
+	for _, alarmRes := range alarmList {
+		alarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
+		if !ok {
+			continue
+		}
+		if namespace != "" && (alarm.Namespace == nil || *alarm.Namespace != namespace) {
+			continue
+		}
+		for _, d := range alarm.Dimensions {
+			if d.Name != nil && *d.Name == dimName && d.Value != nil && *d.Value == dimValue {
+				ids = append(ids, alarmRes.ID)
+				break
+			}
+		}
+	}
+	return relatedResultTrunc("alarm", ids, truncated)
 }
 
 // typedRow pairs a cached Resource's ID with its RawStruct already asserted

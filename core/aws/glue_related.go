@@ -9,7 +9,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 
@@ -40,32 +39,7 @@ func checkGlueAlarms(ctx context.Context, clients any, res resource.Resource, ca
 	if jobName == "" {
 		jobName = res.ID
 	}
-	if jobName == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-	}
-
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		rawAlarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, d := range rawAlarm.Dimensions {
-			if d.Name != nil && *d.Name == "JobName" && d.Value != nil && *d.Value == jobName {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "", "JobName", jobName)
 }
 
 // checkGlueLogs searches the logs cache for the shared Glue job log groups.

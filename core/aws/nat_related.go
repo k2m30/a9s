@@ -6,7 +6,6 @@ package aws
 import (
 	"context"
 
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -121,30 +120,5 @@ func checkNATAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	if ok && raw.NatGatewayId != nil && *raw.NatGatewayId != "" {
 		natID = *raw.NatGatewayId
 	}
-	if natID == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-	}
-
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		alarmRaw, aOk := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !aOk {
-			continue
-		}
-		for _, d := range alarmRaw.Dimensions {
-			if d.Name != nil && *d.Name == "NatGatewayId" && d.Value != nil && *d.Value == natID {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "", "NatGatewayId", natID)
 }

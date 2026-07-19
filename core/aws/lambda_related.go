@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strings"
 
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
@@ -39,32 +38,7 @@ func checkLambdaAlarms(ctx context.Context, clients any, res resource.Resource, 
 	if functionName == "" {
 		functionName = res.Name
 	}
-	if functionName == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-	}
-
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		rawAlarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, d := range rawAlarm.Dimensions {
-			if d.Name != nil && *d.Name == "FunctionName" && d.Value != nil && *d.Value == functionName {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "", "FunctionName", functionName)
 }
 
 // checkLambdaLogs searches the logs cache for the CloudWatch log group for this function.

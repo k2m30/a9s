@@ -7,7 +7,6 @@ import (
 	"context"
 	"strings"
 
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
@@ -88,37 +87,7 @@ func checkVPCEVPC(_ context.Context, _ any, res resource.Resource, _ resource.Re
 // PrivateLink interface endpoints have per-endpoint alarms using dimension
 // "VpcEndpointId". The endpoint ID is the res.ID; alarm cache is scanned.
 func checkVPCEAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	vpceID := res.ID
-	if vpceID == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-	}
-
-	alarmList, truncated, err := FetchRelatedTarget(ctx, clients, cache, "alarm")
-	if err != nil {
-		if _, sok := clients.(*ServiceClients); !sok {
-			alarmList, truncated, err = nil, false, nil
-		}
-	}
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-	var ids []string
-	for _, alarmRes := range alarmList {
-		raw, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		for _, d := range raw.Dimensions {
-			if d.Name != nil && *d.Name == "VpcEndpointId" && d.Value != nil && *d.Value == vpceID {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "", "VpcEndpointId", res.ID)
 }
 
 // checkVPCELogs reports CloudWatch Logs groups receiving VPC Flow Logs for

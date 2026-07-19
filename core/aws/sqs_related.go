@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"strings"
 
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 
@@ -118,37 +117,7 @@ func checkSQSSNSSub(ctx context.Context, clients any, res resource.Resource, cac
 // namespace with a QueueName dimension matching this queue's name.
 // Pattern C — reverse lookup in alarm cache.
 func checkSQSAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	queueName := res.ID
-	if queueName == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-	}
-
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		alarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		if alarm.Namespace == nil || *alarm.Namespace != "AWS/SQS" {
-			continue
-		}
-		for _, dim := range alarm.Dimensions {
-			if dim.Name != nil && *dim.Name == "QueueName" &&
-				dim.Value != nil && *dim.Value == queueName {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "AWS/SQS", "QueueName", res.ID)
 }
 
 // sqsRedriveTarget extracts the deadLetterTargetArn from a RedrivePolicy JSON string.

@@ -2,6 +2,7 @@ package unit_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -826,5 +827,76 @@ func TestRelated_Lambda_Alarms_EmptyFunctionName(t *testing.T) {
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (empty function name)", result.Count)
+	}
+}
+
+// TestRelated_Lambda_Alarms_WrongDimensionName_NotCounted verifies that an
+// alarm whose dimensions carry a different name entirely (not
+// "FunctionName") is not counted, distinct from the existing wrong-value
+// coverage in TestRelated_Lambda_Alarms_NotFound.
+func TestRelated_Lambda_Alarms_WrongDimensionName_NotCounted(t *testing.T) {
+	const fnName = "my-function"
+
+	alarmRes := resource.Resource{
+		ID: "queue-depth-alarm",
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName: aws.String("queue-depth-alarm"),
+			Dimensions: []cwtypes.Dimension{
+				{Name: aws.String("QueueName"), Value: aws.String(fnName)},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{alarmRes}},
+	}
+	source := resource.Resource{
+		ID:   fnName,
+		Name: fnName,
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String(fnName),
+		},
+	}
+
+	checker := lambdaCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, source, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (dimension name is QueueName, not FunctionName)", result.Count)
+	}
+}
+
+// TestRelated_Lambda_Alarms_Error verifies that a fetch error for the
+// "alarm" target propagates as RelatedError, never a silently resolved count.
+func TestRelated_Lambda_Alarms_Error(t *testing.T) {
+	const fnName = "my-function"
+	source := resource.Resource{
+		ID:   fnName,
+		Name: fnName,
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String(fnName),
+		},
+	}
+	wantErr := errors.New("boom: DescribeAlarms throttled")
+
+	original := resource.GetPaginatedFetcher("alarm")
+	resource.SetPaginatedForTest("alarm", func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+		return resource.FetchResult{}, wantErr
+	})
+	t.Cleanup(func() {
+		if original != nil {
+			resource.SetPaginatedForTest("alarm", original)
+		} else {
+			resource.CleanupPaginatedForTest("alarm")
+		}
+	})
+
+	checker := lambdaCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), &awsclient.ServiceClients{}, source, resource.ResourceCache{})
+
+	if result.State != domain.RelatedError {
+		t.Errorf("State = %v, want RelatedError", result.State)
+	}
+	if result.Err == nil {
+		t.Error("Err = nil, want the propagated fetch error")
 	}
 }

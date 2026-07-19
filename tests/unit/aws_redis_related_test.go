@@ -26,6 +26,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -246,6 +247,25 @@ func TestRelated_Redis_Alarm(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("ResourceIDs = %v, expected to contain %q", result.ResourceIDs, "redis-cpu-alarm")
+	}
+}
+
+// TestRelated_Redis_Alarm_NilCache_ReturnsUnknown pins the canonical
+// nil-cache contract from docs/related-resources-engine.md §7: a nil alarm
+// cache (cache miss — the "alarm" key is entirely absent, not present with
+// IsTruncated=true) is not a proven zero and must resolve to
+// UnknownRelated("alarm") — the same contract checkSQSAlarm already honors.
+//
+// checkRedisAlarms (core/aws/redis_related.go:52-56) currently diverges: it
+// returns relatedResultTrunc("alarm", nil, true) instead — a false
+// proven-zero-with-truncation. This test is expected to FAIL until that
+// divergence is fixed (by hand or by the alarmIDsByDimension extraction).
+func TestRelated_Redis_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
+	checker := redisCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, redisGraphRoot(), resource.ResourceCache{})
+
+	if result.State != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (nil alarm cache is not a proven zero — canonical per docs/related-resources-engine.md §7)", result.State)
 	}
 }
 

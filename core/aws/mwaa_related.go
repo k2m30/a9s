@@ -12,7 +12,6 @@ import (
 	"context"
 	"strings"
 
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	mwaatypes "github.com/aws/aws-sdk-go-v2/service/mwaa/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -24,33 +23,7 @@ import (
 // field usable for a forward lookup, so this is a workflow pivot (cache
 // scan), not a Pattern F read — docs/resources/mwaa.md §2 `alarm`.
 func checkMWAAAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	envName := res.ID
-
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-
-	var ids []string
-	for _, alarmRes := range alarmList {
-		rawAlarm, ok := assertStruct[cwtypes.MetricAlarm](alarmRes.RawStruct)
-		if !ok {
-			continue
-		}
-		if rawAlarm.Namespace == nil || *rawAlarm.Namespace != "AWS/MWAA" {
-			continue
-		}
-		for _, d := range rawAlarm.Dimensions {
-			if d.Name != nil && *d.Name == "EnvironmentName" && d.Value != nil && *d.Value == envName {
-				ids = append(ids, alarmRes.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "AWS/MWAA", "EnvironmentName", res.ID)
 }
 
 // checkMWAAKMS reads Environment.KmsKey directly (Pattern F).

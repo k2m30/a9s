@@ -50,9 +50,7 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 		return resource.ErrorRelated("alarm", err)
 	}
 	if alarmList == nil {
-		// Nil list from an unregistered / empty target cache is an honest zero,
-		// not an error. Matches commit 51b6646 truncated-zero contract.
-		return relatedResultTrunc("alarm", nil, true)
+		return resource.UnknownRelated("alarm")
 	}
 
 	var ids []string

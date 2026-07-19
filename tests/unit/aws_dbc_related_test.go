@@ -225,6 +225,31 @@ func TestRelated_DBC_Alarm_NotFound(t *testing.T) {
 	}
 }
 
+// TestRelated_DBC_Alarm_NilCache_ReturnsUnknown pins the canonical nil-cache
+// contract from docs/related-resources-engine.md §7: a nil alarm cache is
+// not a proven zero and must resolve to UnknownRelated("alarm") — the same
+// contract checkSQSAlarm already honors.
+//
+// checkDbcAlarm (core/aws/dbc_related.go:140-142) currently diverges: it
+// returns relatedResultTrunc("alarm", nil, true) instead — a false
+// proven-zero-with-truncation. This test is expected to FAIL until that
+// divergence is fixed (by hand or by the alarmIDsByDimension extraction).
+func TestRelated_DBC_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
+	src := resource.Resource{
+		ID: "acme-docdb-prod",
+		RawStruct: docdb_types.DBCluster{
+			DBClusterIdentifier: aws.String("acme-docdb-prod"),
+		},
+	}
+
+	checker := dbcCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.State != domain.RelatedUnknown {
+		t.Errorf("State = %v, want RelatedUnknown (nil alarm cache is not a proven zero — canonical per docs/related-resources-engine.md §7)", result.State)
+	}
+}
+
 // TestRelated_DBC_Alarm_EmptyID verifies that a cluster with an empty ID
 // short-circuits and returns Count=0.
 func TestRelated_DBC_Alarm_EmptyID(t *testing.T) {

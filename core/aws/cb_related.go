@@ -7,7 +7,6 @@ import (
 	"context"
 	"strings"
 
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -133,34 +132,7 @@ func checkCbSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 // checkCbAlarm scans the alarm cache for CloudWatch alarms with a "ProjectName"
 // dimension matching this project's name. Pattern D.
 func checkCbAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	projectName := res.ID
-	if projectName == "" {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
-	}
-	alarmList, truncated, err := relatedResourcesFor(ctx, clients, cache, "alarm")
-	if err != nil {
-		return resource.ErrorRelated("alarm", err)
-	}
-	if alarmList == nil {
-		return resource.UnknownRelated("alarm")
-	}
-	var ids []string
-	for _, a := range alarmList {
-		alarm, ok := assertStruct[cwtypes.MetricAlarm](a.RawStruct)
-		if !ok {
-			continue
-		}
-		if alarm.Namespace == nil || *alarm.Namespace != "AWS/CodeBuild" {
-			continue
-		}
-		for _, d := range alarm.Dimensions {
-			if d.Name != nil && *d.Name == "ProjectName" && d.Value != nil && *d.Value == projectName {
-				ids = append(ids, a.ID)
-				break
-			}
-		}
-	}
-	return relatedResultTrunc("alarm", ids, truncated)
+	return alarmIDsByDimension(ctx, clients, cache, "AWS/CodeBuild", "ProjectName", res.ID)
 }
 
 // checkCbECR maps the CodeBuild project's build image to an ECR repository when the
