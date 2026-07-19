@@ -19,11 +19,11 @@ import (
 )
 
 // fetchTimeout bounds every interactive Core fetch lane below (FetchResources,
-// FetchChildResources, FetchMoreResources, FetchRevealValue, FetchIdentity,
-// ConnectAWS). These are blocking calls invoked from inside a tea.Cmd/HTTP
-// handler goroutine, so a stalled AWS call must not hang the caller forever;
-// classifyProbeErr (scan_status.go) already maps context.DeadlineExceeded to
-// a "timeout" ProbeStatus.
+// FetchResourcesFiltered, FetchChildResources, FetchMoreResources,
+// FetchRevealValue, FetchIdentity, ConnectAWS). These are blocking calls
+// invoked from inside a tea.Cmd/HTTP handler goroutine, so a stalled AWS call
+// must not hang the caller forever; classifyProbeErr (scan_status.go) already
+// maps context.DeadlineExceeded to a "timeout" ProbeStatus.
 const fetchTimeout = 30 * time.Second
 
 // ConnectResult carries the resolved AWS clients and effective region returned
@@ -57,6 +57,8 @@ func (c *Core) FetchResources(ctx context.Context, clients *awsclient.ServiceCli
 // FetchResourcesFiltered calls the registered FilteredPaginatedFetcher for
 // resourceType with the provided filter parameters.
 func (c *Core) FetchResourcesFiltered(ctx context.Context, clients *awsclient.ServiceClients, resourceType string, filter map[string]string) (resource.FetchResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	defer cancel()
 	if clients == nil {
 		return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 	}

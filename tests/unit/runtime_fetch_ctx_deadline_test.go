@@ -16,10 +16,11 @@
 // itself set up.
 //
 // Capture strategy per lane:
-//   - FetchResources / FetchChildResources / FetchMoreResources /
-//     FetchRevealValue: a test-only fetcher registered via
-//     resource.SetPaginatedForTest / SetPaginatedChildForTest /
-//     SetRevealFetcherForTest (the established fake-fetcher seam, see
+//   - FetchResources / FetchResourcesFiltered / FetchChildResources /
+//     FetchMoreResources / FetchRevealValue: a test-only fetcher registered
+//     via resource.SetPaginatedForTest / SetFilteredPaginatedForTest /
+//     SetPaginatedChildForTest / SetRevealFetcherForTest (the established
+//     fake-fetcher seam, see
 //     reference in tests/unit/aws_related_fetch_empty_test.go and friends)
 //     captures the ctx it actually receives.
 //   - FetchIdentity: Core.FetchIdentity forwards ctx to
@@ -108,6 +109,24 @@ func TestFetchResources_WrapsCtxWithBoundedDeadline(t *testing.T) {
 	_, _ = core.FetchResources(context.Background(), nil, shortName)
 
 	assertBoundedDeadline(t, "FetchResources", captured)
+}
+
+// TestFetchResourcesFiltered_WrapsCtxWithBoundedDeadline pins
+// FetchResourcesFiltered.
+func TestFetchResourcesFiltered_WrapsCtxWithBoundedDeadline(t *testing.T) {
+	const shortName = "deadline-test-fetchresourcesfiltered"
+	var captured context.Context
+	resource.SetFilteredPaginatedForTest(shortName, func(ctx context.Context, clients any, filter map[string]string, token string) (resource.FetchResult, error) {
+		captured = ctx
+		return resource.FetchResult{}, errors.New("stub filtered fetcher: no real AWS call in this test")
+	})
+	t.Cleanup(func() { resource.CleanupFilteredPaginatedForTest(shortName) })
+
+	core := runtime.New(session.New(), nil)
+	clients := &awsclient.ServiceClients{}
+	_, _ = core.FetchResourcesFiltered(context.Background(), clients, shortName, map[string]string{"resource": "r-1"})
+
+	assertBoundedDeadline(t, "FetchResourcesFiltered", captured)
 }
 
 // TestFetchChildResources_WrapsCtxWithBoundedDeadline pins
