@@ -19,8 +19,8 @@ import (
 
 func TestFetchAthenaWorkgroups_ParsesMultipleWorkgroups(t *testing.T) {
 	now := time.Now()
-	mock := &mockAthenaClient{
-		output: &athena.ListWorkGroupsOutput{
+	mock := &fakeAthenaListWorkGroups{
+		Output: &athena.ListWorkGroupsOutput{
 			WorkGroups: []athenatypes.WorkGroupSummary{
 				{
 					Name:         aws.String("primary"),
@@ -88,8 +88,8 @@ func TestFetchAthenaWorkgroups_ParsesMultipleWorkgroups(t *testing.T) {
 }
 
 func TestFetchAthenaWorkgroups_EmptyResponse(t *testing.T) {
-	mock := &mockAthenaClient{
-		output: &athena.ListWorkGroupsOutput{
+	mock := &fakeAthenaListWorkGroups{
+		Output: &athena.ListWorkGroupsOutput{
 			WorkGroups: []athenatypes.WorkGroupSummary{},
 		},
 	}
@@ -107,8 +107,8 @@ func TestFetchAthenaWorkgroups_EmptyResponse(t *testing.T) {
 }
 
 func TestFetchAthenaWorkgroups_APIError(t *testing.T) {
-	mock := &mockAthenaClient{
-		err: &mockAPIError{code: "InternalServerException", message: "internal error"},
+	mock := &fakeAthenaListWorkGroups{
+		Err: &mockAPIError{code: "InternalServerException", message: "internal error"},
 	}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -120,8 +120,8 @@ func TestFetchAthenaWorkgroups_APIError(t *testing.T) {
 }
 
 func TestFetchAthenaWorkgroups_NilEngineVersion(t *testing.T) {
-	mock := &mockAthenaClient{
-		output: &athena.ListWorkGroupsOutput{
+	mock := &fakeAthenaListWorkGroups{
+		Output: &athena.ListWorkGroupsOutput{
 			WorkGroups: []athenatypes.WorkGroupSummary{
 				{
 					Name:  aws.String("no-engine"),

@@ -139,20 +139,13 @@ func assertErrorPropagated(t *testing.T, err error, want error) {
 // ---------------------------------------------------------------------------
 // Mock: S3 ListObjectsV2
 // ---------------------------------------------------------------------------
-
-type mockS3ListObjectsV2APIChildPaginated struct {
-	PageFunc func(call int) (*s3.ListObjectsV2Output, error)
-	calls    int
-}
-
-func (m *mockS3ListObjectsV2APIChildPaginated) ListObjectsV2(_ context.Context, _ *s3.ListObjectsV2Input, _ ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
-	m.calls++
-	return m.PageFunc(m.calls)
-}
+// The fake client for this operation now lives in fakes_s3_test.go
+// (fakeS3ListObjectsV2) — see that file's header for the one-fake-per-
+// interface convention.
 
 func TestQA_ChildPagination_FetchS3Objects_FirstPage(t *testing.T) {
 	truncated := true
-	mock := &mockS3ListObjectsV2APIChildPaginated{
+	mock := &fakeS3ListObjectsV2{
 		PageFunc: func(_ int) (*s3.ListObjectsV2Output, error) {
 			return &s3.ListObjectsV2Output{
 				Contents:              []s3types.Object{{Key: aws.String("reports/jan.csv"), Size: aws.Int64(4096)}},
@@ -167,7 +160,7 @@ func TestQA_ChildPagination_FetchS3Objects_FirstPage(t *testing.T) {
 
 func TestQA_ChildPagination_FetchS3Objects_Continuation(t *testing.T) {
 	truncated := false
-	mock := &mockS3ListObjectsV2APIChildPaginated{
+	mock := &fakeS3ListObjectsV2{
 		PageFunc: func(_ int) (*s3.ListObjectsV2Output, error) {
 			return &s3.ListObjectsV2Output{
 				Contents:    []s3types.Object{{Key: aws.String("reports/feb.csv"), Size: aws.Int64(8192)}},
@@ -181,7 +174,7 @@ func TestQA_ChildPagination_FetchS3Objects_Continuation(t *testing.T) {
 
 func TestQA_ChildPagination_FetchS3Objects_Empty(t *testing.T) {
 	truncated := false
-	mock := &mockS3ListObjectsV2APIChildPaginated{
+	mock := &fakeS3ListObjectsV2{
 		PageFunc: func(_ int) (*s3.ListObjectsV2Output, error) {
 			return &s3.ListObjectsV2Output{IsTruncated: &truncated}, nil
 		},
@@ -192,7 +185,7 @@ func TestQA_ChildPagination_FetchS3Objects_Empty(t *testing.T) {
 
 func TestQA_ChildPagination_FetchS3Objects_Error(t *testing.T) {
 	wantErr := errors.New("list objects failed")
-	mock := &mockS3ListObjectsV2APIChildPaginated{
+	mock := &fakeS3ListObjectsV2{
 		PageFunc: func(_ int) (*s3.ListObjectsV2Output, error) {
 			return nil, wantErr
 		},

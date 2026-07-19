@@ -55,7 +55,7 @@ func TestFetchS3Objects_Paginated(t *testing.T) {
 	}
 
 	// Call 1: no continuation token — returns page 0 with IsTruncated=true
-	mock1 := &mockPaginatedS3ListObjectsV2Client{pages: page0}
+	mock1 := &fakeS3ListObjectsV2{Pages: page0}
 	result1, err := awsclient.FetchS3Objects(context.Background(), mock1, "test-bucket", "", "")
 	if err != nil {
 		t.Fatalf("call 1: unexpected error: %v", err)
@@ -65,8 +65,8 @@ func TestFetchS3Objects_Paginated(t *testing.T) {
 	if len(result1.Resources) != 2 {
 		t.Errorf("call 1: expected 2 resources (1 folder + 1 file), got %d", len(result1.Resources))
 	}
-	if mock1.calls != 1 {
-		t.Errorf("call 1: expected 1 API call, got %d", mock1.calls)
+	if mock1.Calls != 1 {
+		t.Errorf("call 1: expected 1 API call, got %d", mock1.Calls)
 	}
 	if result1.Pagination == nil {
 		t.Fatal("call 1: Pagination is nil")
@@ -79,7 +79,7 @@ func TestFetchS3Objects_Paginated(t *testing.T) {
 	}
 
 	// Call 2: use NextToken from call 1 — returns page 1 with IsTruncated=false
-	mock2 := &mockPaginatedS3ListObjectsV2Client{pages: page1}
+	mock2 := &fakeS3ListObjectsV2{Pages: page1}
 	result2, err := awsclient.FetchS3Objects(context.Background(), mock2, "test-bucket", "", result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("call 2: unexpected error: %v", err)
@@ -89,8 +89,8 @@ func TestFetchS3Objects_Paginated(t *testing.T) {
 	if len(result2.Resources) != 3 {
 		t.Errorf("call 2: expected 3 resources (1 folder + 2 files), got %d", len(result2.Resources))
 	}
-	if mock2.calls != 1 {
-		t.Errorf("call 2: expected 1 API call, got %d", mock2.calls)
+	if mock2.Calls != 1 {
+		t.Errorf("call 2: expected 1 API call, got %d", mock2.Calls)
 	}
 	if result2.Pagination == nil {
 		t.Fatal("call 2: Pagination is nil")

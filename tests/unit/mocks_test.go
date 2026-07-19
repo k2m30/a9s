@@ -42,19 +42,9 @@ func (m *mockS3ListBucketsClient) ListBuckets(
 	return m.output, m.err
 }
 
-// mockS3ListObjectsV2Client implements awsclient.S3ListObjectsV2API for testing.
-type mockS3ListObjectsV2Client struct {
-	output *s3.ListObjectsV2Output
-	err    error
-}
-
-func (m *mockS3ListObjectsV2Client) ListObjectsV2(
-	ctx context.Context,
-	params *s3.ListObjectsV2Input,
-	optFns ...func(*s3.Options),
-) (*s3.ListObjectsV2Output, error) {
-	return m.output, m.err
-}
+// S3 ListObjectsV2 mocks: the fake client for this operation now lives in
+// fakes_s3_test.go (fakeS3ListObjectsV2) — see that file's header for the
+// one-fake-per-interface convention.
 
 // mockPaginatedS3ListBucketsClient returns multiple pages of S3 buckets.
 type mockPaginatedS3ListBucketsClient struct {
@@ -417,29 +407,6 @@ func (e *mockAPIError) Error() string                 { return e.message }
 func (e *mockAPIError) ErrorCode() string             { return e.code }
 func (e *mockAPIError) ErrorMessage() string          { return e.message }
 func (e *mockAPIError) ErrorFault() smithy.ErrorFault { return e.fault }
-
-// ---------------------------------------------------------------------------
-// S3 object pagination mock
-// ---------------------------------------------------------------------------
-
-// mockPaginatedS3ListObjectsV2Client returns multiple pages of S3 objects.
-type mockPaginatedS3ListObjectsV2Client struct {
-	pages []*s3.ListObjectsV2Output
-	calls int
-}
-
-func (m *mockPaginatedS3ListObjectsV2Client) ListObjectsV2(
-	ctx context.Context,
-	params *s3.ListObjectsV2Input,
-	optFns ...func(*s3.Options),
-) (*s3.ListObjectsV2Output, error) {
-	idx := m.calls
-	if idx >= len(m.pages) {
-		return &s3.ListObjectsV2Output{}, nil
-	}
-	m.calls++
-	return m.pages[idx], nil
-}
 
 // ---------------------------------------------------------------------------
 // Subnet mocks

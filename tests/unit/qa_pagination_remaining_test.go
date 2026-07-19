@@ -901,25 +901,16 @@ func TestQA_Pagination_FetchGlueJobsPage_Error(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Mock: Athena ListWorkGroups (paginated, NextToken)
 // ---------------------------------------------------------------------------
-
-type mockAthenaListWorkGroupsAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*athena.ListWorkGroupsOutput, error)
-	lastInput *athena.ListWorkGroupsInput
-}
-
-func (m *mockAthenaListWorkGroupsAPIPaginated) ListWorkGroups(_ context.Context, in *athena.ListWorkGroupsInput, _ ...func(*athena.Options)) (*athena.ListWorkGroupsOutput, error) {
-	m.Calls++
-	m.lastInput = in
-	return m.PageFunc(m.Calls)
-}
+// The fake client for this operation now lives in fakes_athena_test.go
+// (fakeAthenaListWorkGroups) — see that file's header for the one-fake-per-
+// interface convention.
 
 // ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchAthenaWorkgroupsPage
 // ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchAthenaWorkgroupsPage_FirstPage(t *testing.T) {
-	mock := &mockAthenaListWorkGroupsAPIPaginated{
+	mock := &fakeAthenaListWorkGroups{
 		PageFunc: func(_ int) (*athena.ListWorkGroupsOutput, error) {
 			return &athena.ListWorkGroupsOutput{
 				WorkGroups: []athenatypes.WorkGroupSummary{
@@ -958,7 +949,7 @@ func TestQA_Pagination_FetchAthenaWorkgroupsPage_FirstPage(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchAthenaWorkgroupsPage_Continuation(t *testing.T) {
-	mock := &mockAthenaListWorkGroupsAPIPaginated{
+	mock := &fakeAthenaListWorkGroups{
 		PageFunc: func(_ int) (*athena.ListWorkGroupsOutput, error) {
 			return &athena.ListWorkGroupsOutput{
 				WorkGroups: []athenatypes.WorkGroupSummary{
@@ -991,16 +982,16 @@ func TestQA_Pagination_FetchAthenaWorkgroupsPage_Continuation(t *testing.T) {
 	if result.Resources[0].ID != "last-workgroup" {
 		t.Errorf("resource ID: expected %q, got %q", "last-workgroup", result.Resources[0].ID)
 	}
-	if mock.lastInput == nil {
+	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-athena-page-2" {
-		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-athena-page-2")
+	if mock.LastInput.NextToken == nil || *mock.LastInput.NextToken != "token-athena-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.LastInput.NextToken, "token-athena-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchAthenaWorkgroupsPage_Empty(t *testing.T) {
-	mock := &mockAthenaListWorkGroupsAPIPaginated{
+	mock := &fakeAthenaListWorkGroups{
 		PageFunc: func(_ int) (*athena.ListWorkGroupsOutput, error) {
 			return &athena.ListWorkGroupsOutput{
 				WorkGroups: []athenatypes.WorkGroupSummary{},
@@ -1028,7 +1019,7 @@ func TestQA_Pagination_FetchAthenaWorkgroupsPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchAthenaWorkgroupsPage_Error(t *testing.T) {
-	mock := &mockAthenaListWorkGroupsAPIPaginated{
+	mock := &fakeAthenaListWorkGroups{
 		PageFunc: func(_ int) (*athena.ListWorkGroupsOutput, error) {
 			return nil, errors.New("athena: workgroup not found")
 		},

@@ -8,7 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
-	"github.com/aws/aws-sdk-go-v2/service/athena"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
@@ -706,18 +705,9 @@ func (m *mockCloudTrailClient) GetTrailStatus(ctx context.Context, params *cloud
 	return &cloudtrail.GetTrailStatusOutput{}, nil
 }
 
-// ---------------------------------------------------------------------------
-// Athena mocks
-// ---------------------------------------------------------------------------
-
-type mockAthenaClient struct {
-	output *athena.ListWorkGroupsOutput
-	err    error
-}
-
-func (m *mockAthenaClient) ListWorkGroups(ctx context.Context, params *athena.ListWorkGroupsInput, optFns ...func(*athena.Options)) (*athena.ListWorkGroupsOutput, error) {
-	return m.output, m.err
-}
+// Athena mocks: the fake client for ListWorkGroups now lives in
+// fakes_athena_test.go (fakeAthenaListWorkGroups) — see that file's header
+// for the one-fake-per-interface convention.
 
 // ---------------------------------------------------------------------------
 // CodeArtifact mocks

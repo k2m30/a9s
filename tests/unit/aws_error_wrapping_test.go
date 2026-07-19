@@ -52,7 +52,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "S3 objects",
 			contains: "fetching S3 objects",
 			call: func() error {
-				_, err := awsclient.FetchS3Objects(ctx, &mockS3ListObjectsV2Client{err: sentinel}, "test-bucket", "", "")
+				_, err := awsclient.FetchS3Objects(ctx, &fakeS3ListObjectsV2{Err: sentinel}, "test-bucket", "", "")
 				return err
 			},
 		},
@@ -609,7 +609,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching Athena workgroups",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchAthenaWorkgroupsPage(ctx, &mockAthenaClient{err: sentinel}, token)
+					return awsclient.FetchAthenaWorkgroupsPage(ctx, &fakeAthenaListWorkGroups{Err: sentinel}, token)
 				})
 				return err
 			},
