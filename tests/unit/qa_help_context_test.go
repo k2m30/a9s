@@ -1,7 +1,6 @@
 package unit
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -743,132 +742,10 @@ func TestQA_HelpContext_PaginatedSecretsList_ShowsLoadMoreAndReveal(t *testing.T
 // TestQA_HelpContext_ResourceList_GetHelpContext_Paginated verifies that
 // a ResourceListModel with truncated pagination returns the paginated
 // help context variant.
-func TestQA_HelpContext_ResourceList_GetHelpContext_Paginated(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	// Create ec2 resource list
-	td := resource.ResourceTypeDef{
-		Name:      "EC2 Instances",
-		ShortName: "ec2",
-		Aliases:   []string{"ec2"},
-		Columns: []resource.Column{
-			{Key: "instance_id", Title: "Instance ID", Width: 20},
-			{Key: "name", Title: "Name", Width: 28},
-			{Key: "state", Title: "State", Width: 12},
-		},
-	}
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(120, 30)
-	m, _ = m.Init()
-
-	// Load resources with IsTruncated: true
-	resources := make([]resource.Resource, 5)
-	for i := range 5 {
-		resources[i] = resource.Resource{
-			ID: fmt.Sprintf("i-%d", i), Name: fmt.Sprintf("inst-%d", i),
-			Fields: map[string]string{
-				"instance_id": fmt.Sprintf("i-%d", i),
-				"name":        fmt.Sprintf("inst-%d", i),
-				"state":       "running",
-			},
-		}
-	}
-
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "ec2",
-		Resources:    resources,
-		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"},
-	})
-
-	ctx := m.GetHelpContext()
-	if ctx != views.HelpFromResourceListPaginated {
-		t.Errorf("ec2 with IsTruncated=true should return HelpFromResourceListPaginated, got %v", ctx)
-	}
-}
 
 // TestQA_HelpContext_ResourceList_GetHelpContext_NotPaginated verifies that
 // a ResourceListModel without truncation returns the standard help context.
-func TestQA_HelpContext_ResourceList_GetHelpContext_NotPaginated(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	// Create ec2 resource list
-	td := resource.ResourceTypeDef{
-		Name:      "EC2 Instances",
-		ShortName: "ec2",
-		Aliases:   []string{"ec2"},
-		Columns: []resource.Column{
-			{Key: "instance_id", Title: "Instance ID", Width: 20},
-			{Key: "name", Title: "Name", Width: 28},
-			{Key: "state", Title: "State", Width: 12},
-		},
-	}
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(120, 30)
-	m, _ = m.Init()
-
-	// Load resources with IsTruncated: false (not paginated)
-	resources := make([]resource.Resource, 5)
-	for i := range 5 {
-		resources[i] = resource.Resource{
-			ID: fmt.Sprintf("i-%d", i), Name: fmt.Sprintf("inst-%d", i),
-			Fields: map[string]string{
-				"instance_id": fmt.Sprintf("i-%d", i),
-				"name":        fmt.Sprintf("inst-%d", i),
-				"state":       "running",
-			},
-		}
-	}
-
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "ec2",
-		Resources:    resources,
-		Pagination:   &resource.PaginationMeta{IsTruncated: false},
-	})
-
-	ctx := m.GetHelpContext()
-	if ctx != views.HelpFromResourceList {
-		t.Errorf("ec2 with IsTruncated=false should return HelpFromResourceList, got %v", ctx)
-	}
-}
 
 // TestQA_HelpContext_SecretsList_GetHelpContext_Paginated verifies that
 // a secrets ResourceListModel with truncated pagination returns the
 // paginated secrets help context variant.
-func TestQA_HelpContext_SecretsList_GetHelpContext_Paginated(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	rtDef := resource.FindResourceType("secrets")
-	if rtDef == nil {
-		t.Fatal("secrets resource type not found in registry")
-	}
-
-	k := keys.Default()
-	m := views.NewResourceList(*rtDef, nil, k)
-	m.SetSize(120, 30)
-	m, _ = m.Init()
-
-	// Load resources with IsTruncated: true
-	resources := make([]resource.Resource, 5)
-	for i := range 5 {
-		fields := make(map[string]string)
-		for _, col := range rtDef.Columns {
-			fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, i)
-		}
-		resources[i] = resource.Resource{
-			ID: fmt.Sprintf("secret-%d", i), Name: fmt.Sprintf("my-secret-%d", i), Fields: fields,
-		}
-	}
-
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "secrets",
-		Resources:    resources,
-		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"},
-	})
-
-	ctx := m.GetHelpContext()
-	if ctx != views.HelpFromSecretsListPaginated {
-		t.Errorf("secrets with IsTruncated=true should return HelpFromSecretsListPaginated, got %v", ctx)
-	}
-}

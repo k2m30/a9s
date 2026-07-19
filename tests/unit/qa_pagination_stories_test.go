@@ -1,15 +1,17 @@
 package unit
 
-// qa_pagination_stories_test.go — Tests for QA stories sections D, F, G, H, I
+// qa_pagination_stories_test.go — Tests for QA stories sections C, D, K
 // from docs/qa/pagination_stories.md.
 //
 // Sections A, B (basic), and E (retry) are already covered elsewhere.
+// Sections F/G/H/I's ResourceListModel-driven pins have been ported onto the
+// live Controller seam — see wave3_pagination_frametitle_ports_test.go and
+// wave3_list_loadmore_ports_test.go — since ResourceListModel.FrameTitle()
+// is dead code.
 // This file tests:
 //   - D: Top-Level Pagination Correctness (large-count multi-page fetchers)
-//   - F: Refresh Behavior (Ctrl+R resets pagination)
-//   - G: Navigation Across Views with Pagination State
-//   - H: Demo Mode (no pagination in demo)
-//   - I: Edge Cases (sort preservation, cursor at bottom)
+//   - C: Help View -- M Key Visibility (HelpModel, not ResourceListModel)
+//   - K: Log Events Time Range
 
 import (
 	"context"
@@ -30,62 +32,11 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
-	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
-
-// effectiveTitleName returns the name FrameTitle() uses: ListTitle if set, else ShortName.
-func effectiveTitleName(rt resource.ResourceTypeDef) string {
-	if rt.ListTitle != "" {
-		return rt.ListTitle
-	}
-	return rt.ShortName
-}
-
-// expectedIssueSuffix derives the " !N" frame-title suffix the pagination
-// contract (docs/attention-signals.md §Visualization Surfaces / §S1) mandates
-// for the given page of resources, independent of buildListFrameTitle's
-// internals (Controller.listIssueCount, core/app/list_body.go).
-//
-// It mirrors listIssueCount's exact per-resource predicate: a resource counts
-// as an issue when it carries an issue-severity Finding (listHasIssueFinding,
-// core/app/list_filter.go), or — when it has no Findings at all — when
-// rt.ResolveColor(r).IsIssue() is true (Warning/Broken). These tests never
-// trigger Wave-2 enrichment (no AvailabilityCheckedMsg is sent), so the
-// enrichment-findings-map branch of listIssueCount is always empty here and
-// intentionally omitted. Returns "" when N == 0 (no suffix), matching the
-// contract's "Healthy list: no suffix" rule; this harness sends the page in
-// one shot (no incremental load-more), so the "+" truncated-count suffix
-// never applies to these derivations.
-func expectedIssueSuffix(rt resource.ResourceTypeDef, page []resource.Resource) string {
-	if rt.ExcludeFromIssueBadge || rt.Color == nil {
-		return ""
-	}
-	n := 0
-	for _, r := range page {
-		hasIssueFinding := false
-		for _, f := range r.Findings {
-			if f.Severity.IsIssue() {
-				hasIssueFinding = true
-				break
-			}
-		}
-		switch {
-		case hasIssueFinding:
-			n++
-		case len(r.Findings) == 0 && rt.ResolveColor(r).IsIssue():
-			n++
-		}
-	}
-	if n == 0 {
-		return ""
-	}
-	return " !" + fmt.Sprintf("%d", n)
-}
 
 // ===========================================================================
 // Section D: Top-Level Pagination Correctness
@@ -547,217 +498,6 @@ func TestStoryD6_SG_1200Groups_CurrentBehavior(t *testing.T) {
 }
 
 // ===========================================================================
-// Section F: Refresh Behavior
-//
-// Ctrl+R is handled at the app level (app_handlers.go), not at the
-// ResourceListModel level. At the model level, a refresh results in:
-//   1. Model enters loading state (loading=true set by ClearLoading or re-init)
-//   2. A new ResourcesLoadedMsg arrives with Append=false (replacing old data)
-//
-// These tests verify the view-level behavior: that replacing data resets
-// pagination state and counts.
-// ===========================================================================
-
-// ===========================================================================
-// Section H: Demo Mode
-//
-// These tests verify ResourceList pagination UX by simulating first-page
-// pagination (page size 5) from demo fixture data. Types with >5 items show
-// the + suffix and enable the M key for load-more. Types with ≤5 items return
-// all items without truncation.
-// ===========================================================================
-
-func TestStoryH1_DemoMode_PaginationForLargeTypes(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	clients := demo.NewServiceClients()
-	ctx := context.Background()
-
-	for _, rt := range resource.AllResourceTypes() {
-		t.Run(rt.ShortName, func(t *testing.T) {
-			// Simulate first-page pagination from demo fixture data.
-			fetcher := resource.GetPaginatedFetcher(rt.ShortName)
-			if fetcher == nil {
-				t.Skipf("no demo data for %s", rt.ShortName)
-			}
-			fetchResult, fetchErr := fetcher(ctx, clients, "")
-			if fetchErr != nil || len(fetchResult.Resources) == 0 {
-				t.Skipf("no demo data for %s (err=%v)", rt.ShortName, fetchErr)
-			}
-			allResources := fetchResult.Resources
-			total := len(allResources)
-
-			// Simulate first-page pagination (page size 5)
-			pageSize := 5
-			page := allResources
-			isTruncated := false
-			if total > pageSize {
-				page = allResources[:pageSize]
-				isTruncated = true
-			}
-			result := resource.FetchResult{
-				Resources: page,
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: isTruncated,
-					TotalHint:   total,
-					PageSize:    len(page),
-				},
-			}
-
-			// Create a model and load demo data (as the app does)
-			k := keys.Default()
-			m := views.NewResourceList(rt, nil, k)
-			m.SetSize(120, 30)
-			m, _ = m.Init()
-
-			// Demo mode now sends ResourcesLoadedMsg WITH pagination metadata
-			m, _ = m.Update(messages.ResourcesLoaded{
-				ResourceType: rt.ShortName,
-				Resources:    result.Resources,
-				Pagination:   result.Pagination,
-			})
-
-			title := m.FrameTitle()
-			pageCount := len(result.Resources)
-			issueSuffix := expectedIssueSuffix(rt, result.Resources)
-
-			if total <= pageSize {
-				// Small type: all items returned, no truncation
-				expected := fmt.Sprintf("%s(%d)%s", effectiveTitleName(rt), pageCount, issueSuffix)
-				if title != expected {
-					t.Errorf("demo %s (small): expected title %q, got %q", rt.ShortName, expected, title)
-				}
-
-				// M key should be a no-op (not truncated)
-				_, cmd := m.Update(pgKeyPress("M"))
-				if cmd != nil {
-					t.Errorf("demo %s (small): M key should be a no-op, got non-nil cmd", rt.ShortName)
-				}
-			} else {
-				// Large type: first page returned with truncation
-				expected := fmt.Sprintf("%s(%d+)%s", effectiveTitleName(rt), pageCount, issueSuffix)
-				if title != expected {
-					t.Errorf("demo %s (large): expected title %q, got %q", rt.ShortName, expected, title)
-				}
-
-				// M key should produce a command (load more)
-				_, cmd := m.Update(pgKeyPress("M"))
-				if cmd == nil {
-					t.Errorf("demo %s (large): M key should produce a load-more cmd, got nil", rt.ShortName)
-				}
-			}
-		})
-	}
-}
-
-func TestStoryH1_DemoMode_ChildViews_Pagination(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	// Test a selection of child view types that have demo data.
-	childTypes := []struct {
-		childType string
-		parentCtx map[string]string
-	}{
-		{"cfn_events", map[string]string{"StackName": "payment-service-prod"}},
-		{"log_streams", map[string]string{"log_group_name": "/aws/lambda/payment-processor"}},
-		{"sfn_executions", map[string]string{"StateMachineArn": "arn:aws:states:us-east-1:111122223333:stateMachine:order-workflow"}},
-		{"ecr_images", map[string]string{"RepositoryName": "payment-api"}},
-		{"cb_builds", map[string]string{"ProjectName": "payment-build"}},
-		{"glue_runs", map[string]string{"JobName": "etl-daily"}},
-		{"alarm_history", map[string]string{"AlarmName": "cpu-alarm"}},
-		{"asg_activities", map[string]string{"AutoScalingGroupName": "web-asg"}},
-	}
-
-	clients2 := demo.NewServiceClients()
-	ctx2 := context.Background()
-
-	for _, tc := range childTypes {
-		t.Run(tc.childType, func(t *testing.T) {
-			// Simulate first-page pagination from demo fixture data.
-			childFetcher := resource.GetPaginatedChildFetcher(tc.childType)
-			if childFetcher == nil {
-				t.Skipf("no demo data for child type %s", tc.childType)
-			}
-			childResult, childErr := childFetcher(ctx2, clients2, resource.ParentContext(tc.parentCtx), "")
-			if childErr != nil || len(childResult.Resources) == 0 {
-				t.Skipf("no demo data for child type %s (err=%v)", tc.childType, childErr)
-			}
-			allResources := childResult.Resources
-			total := len(allResources)
-
-			pageSize := 5
-			page := allResources
-			isTruncated := false
-			if total > pageSize {
-				page = allResources[:pageSize]
-				isTruncated = true
-			}
-			result := resource.FetchResult{
-				Resources: page,
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: isTruncated,
-					TotalHint:   total,
-					PageSize:    len(page),
-				},
-			}
-
-			rt := resource.FindResourceType(tc.childType)
-			if rt == nil {
-				// Use a synthetic type def for child types
-				rt = &resource.ResourceTypeDef{
-					ShortName: tc.childType,
-					Name:      tc.childType,
-					Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
-				}
-			}
-
-			k := keys.Default()
-			m := views.NewResourceList(*rt, nil, k)
-			m.SetSize(120, 30)
-			m, _ = m.Init()
-
-			// Demo mode now sends paginated data for child views too.
-			m, _ = m.Update(messages.ResourcesLoaded{
-				ResourceType: tc.childType,
-				Resources:    result.Resources,
-				Pagination:   result.Pagination,
-			})
-
-			title := m.FrameTitle()
-
-			if total <= pageSize {
-				// Small child type: no truncation
-				if strings.Contains(title, "+)") {
-					t.Errorf("demo child %s (small, total=%d): title %q should not contain truncation indicator",
-						tc.childType, total, title)
-				}
-				// M key should be no-op
-				_, cmd := m.Update(pgKeyPress("M"))
-				if cmd != nil {
-					t.Errorf("demo child %s (small): M key should be no-op, got non-nil cmd", tc.childType)
-				}
-			} else {
-				// Large child type: truncation expected
-				if !strings.Contains(title, "+)") {
-					t.Errorf("demo child %s (large, total=%d): title %q should contain truncation indicator",
-						tc.childType, total, title)
-				}
-				// M key should produce a command
-				_, cmd := m.Update(pgKeyPress("M"))
-				if cmd == nil {
-					t.Errorf("demo child %s (large): M key should produce a load-more cmd, got nil", tc.childType)
-				}
-			}
-		})
-	}
-}
-
-// ===========================================================================
-// Cross-section: Verify all resource types have consistent pagination behavior
-// at the view level.
-// ===========================================================================
-
-// ===========================================================================
 // Section C: Help View -- M Key Visibility
 //
 // The help view conditionally shows "M" / "load more" only when the active
@@ -954,99 +694,3 @@ func TestStoryK2_LogEvents_ContinuationToken(t *testing.T) {
 // Cross-section: Verify all resource types have consistent pagination behavior
 // at the view level.
 // ===========================================================================
-
-func TestStoryDFGI_AllResourceTypes_PaginationViewConsistency(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	for _, rt := range resource.AllResourceTypes() {
-		t.Run(rt.ShortName+"_pagination_lifecycle", func(t *testing.T) {
-			k := keys.Default()
-			m := views.NewResourceList(rt, nil, k)
-			m.SetSize(120, 30)
-			m, _ = m.Init()
-
-			// 1. Loading state: FrameTitle returns just the effective title name
-			if m.FrameTitle() != effectiveTitleName(rt) {
-				t.Errorf("loading: expected %q, got %q", effectiveTitleName(rt), m.FrameTitle())
-			}
-
-			// 2. Load truncated page
-			resources := make([]resource.Resource, 100)
-			for i := range 100 {
-				fields := make(map[string]string)
-				for _, col := range rt.Columns {
-					fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, i)
-				}
-				resources[i] = resource.Resource{
-					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i), Fields: fields,
-				}
-			}
-
-			m, _ = m.Update(messages.ResourcesLoaded{
-				ResourceType: rt.ShortName,
-				Resources:    resources,
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: true,
-					NextToken:   "tok",
-				},
-			})
-			wantTruncated := effectiveTitleName(rt) + "(100+)" + expectedIssueSuffix(rt, resources)
-			if m.FrameTitle() != wantTruncated {
-				t.Errorf("truncated: expected %q, got %q", wantTruncated, m.FrameTitle())
-			}
-
-			// 3. Press M → loading more
-			m, _ = m.Update(pgKeyPress("M"))
-			if !strings.Contains(m.FrameTitle(), "loading...") {
-				t.Errorf("loading more: expected 'loading...' in %q", m.FrameTitle())
-			}
-
-			// 4. Append page 2 (final) — a genuinely distinct 100-row page
-			// with IDs starting at 100 (disjoint from page 1's id-0..id-99),
-			// mirroring real AWS pagination (never repeats an ID across
-			// pages) and exercising the append-time ID-dedup guard
-			// correctly instead of tripping it. Post-append set is 200 rows
-			// total; the issue suffix is derived over that combined set.
-			page2 := make([]resource.Resource, 100)
-			for i := range 100 {
-				fields := make(map[string]string)
-				for _, col := range rt.Columns {
-					fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, 100+i)
-				}
-				page2[i] = resource.Resource{
-					ID: fmt.Sprintf("id-%d", 100+i), Name: fmt.Sprintf("name-%d", 100+i), Fields: fields,
-				}
-			}
-			m, _ = m.Update(messages.ResourcesLoaded{
-				ResourceType: rt.ShortName,
-				Resources:    page2,
-				Pagination:   &resource.PaginationMeta{IsTruncated: false},
-				Append:       true,
-			})
-			combined := append(append([]resource.Resource{}, resources...), page2...)
-			wantComplete := effectiveTitleName(rt) + "(200)" + expectedIssueSuffix(rt, combined)
-			if m.FrameTitle() != wantComplete {
-				t.Errorf("complete: expected %q, got %q", wantComplete, m.FrameTitle())
-			}
-
-			// 5. M should be no-op now
-			_, cmd := m.Update(pgKeyPress("M"))
-			if cmd != nil {
-				t.Errorf("M after complete should be no-op")
-			}
-
-			// 6. Replace (simulate refresh) resets — a non-Append ResourcesLoaded
-			// replaces ls.Rows outright, so the issue suffix is derived over
-			// just the new 50-row page, not the prior 200.
-			m, _ = m.Update(messages.ResourcesLoaded{
-				ResourceType: rt.ShortName,
-				Resources:    resources[:50],
-				Pagination:   nil,
-			})
-			wantRefresh := effectiveTitleName(rt) + "(50)" + expectedIssueSuffix(rt, resources[:50])
-			if m.FrameTitle() != wantRefresh {
-				t.Errorf("refresh: expected %q, got %q", wantRefresh, m.FrameTitle())
-			}
-		})
-	}
-}

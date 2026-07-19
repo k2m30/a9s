@@ -1,114 +1,47 @@
 package unit
 
-// qa_enrichment_review_fixes_test.go — regression tests for two review
-// findings landed on top of feature 018-enrichment-visibility:
+// qa_enrichment_review_fixes_test.go — regression test for a review finding
+// landed on top of feature 018-enrichment-visibility: Ctrl+R on a top-level
+// list must NOT clear the active ResourceListModel's findings immediately —
+// they stay applied (stale-until-replaced) until the rerun's fresh
+// EnrichmentChecked result actually lands, avoiding a user-visible flicker
+// across the full AWS round-trip. See the corrected test below for both
+// halves: no blank window before the fresh result lands, and real removal
+// once it genuinely omits the finding.
 //
-//   1. resolveIdentityColumn must run on the full column list (pre-hscroll) so
-//      horizontal scrolling cannot make the marker jump to a different semantic
-//      column (e.g. State when Name is scrolled off).
-//   2. Ctrl+R on a top-level list must clear the active ResourceListModel's
-//      findings immediately, not only the root-model copies.
+// A second review finding this file used to pin (resolveIdentityColumn
+// running on the full pre-hscroll column list, so the marker doesn't jump to
+// a different semantic column when scrolled) is now covered by
+// wave3_list_ports_test.go's TestWave3MarkerColParity_
+// EnrichmentFindingsWithHScroll_AllResourceTypes, which pins the live
+// RenderList seam (this file's ResourceListModel.View() harness is dead
+// code).
 
 import (
 	"strings"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // -----------------------------------------------------------------------------
-// Fix 1: resolveIdentityColumn runs on full columns; marker hidden when identity
-// column is hscrolled off-screen
+// Ctrl+R keeps findings visible until the fresh result lands, rather than
+// blanking them at keypress time
 // -----------------------------------------------------------------------------
 
-// TestRowMarker_HiddenWhenIdentityColumnScrolledOff asserts that when the user
-// scrolls horizontally so the identity column (Name) is not in the visible
-// column slice, the row marker is NOT rendered on a different column.
-//
-// Pre-fix: resolveIdentityColumn ran on the post-hscroll cols, so it cascaded
-// to a different column (e.g. one whose path contained "Name") and the dot
-// jumped to that column.
-//
-// Approach: create a list with a narrow terminal so the full column set doesn't
-// fit, then send "l" (ScrollRight) key to advance hscroll. After scrolling,
-// check that the Name column values are gone from the output AND the dot is
-// also gone.
-func TestRowMarker_HiddenWhenIdentityColumnScrolledOff(t *testing.T) {
-	td := resource.ResourceTypeDef{
-		Name:      "Test",
-		ShortName: "test",
-		Columns: []resource.Column{
-			{Key: "name", Title: "Name", Width: 30},
-			{Key: "state", Title: "State", Width: 12},
-			{Key: "type", Title: "Type", Width: 12},
-			{Key: "region", Title: "Region", Width: 12},
-		},
-	}
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	// Narrow width: forces at least one column to overflow so ScrollRight is allowed.
-	m.SetSize(50, 10)
-	m, _ = m.Init()
-
-	resources := []resource.Resource{
-		{ID: "r-1", Name: "alpha-instance-with-distinctive-name", Fields: map[string]string{"name": "alpha-instance-with-distinctive-name", "state": "available", "type": "m5", "region": "us-east-1"}},
-	}
-	m, _ = m.Update(messages.ResourcesLoaded{ResourceType: "test", Resources: resources})
-
-	findings := map[string][]domain.Finding{
-		"r-1": {{Code: "ec2.system.status.impaired", Phrase: "broken", Severity: domain.SevBroken, Source: "wave2:ec2"}},
-	}
-	m.SetEnrichmentState(len(findings), false, findings, nil)
-
-	// Baseline: prefix marker present at hScrollOffset=0.
-	baseline := m.View()
-	if !strings.Contains(baseline, "! ") {
-		t.Fatalf("pre-condition failed: expected '! ' prefix marker in baseline render; output:\n%s", baseline)
-	}
-
-	// Scroll right repeatedly until the Name column value is off-screen.
-	scrollRight := tea.KeyPressMsg{Code: 'l', Text: "l"}
-	var scrolled string
-	for i := 0; i < 3; i++ {
-		m, _ = m.Update(scrollRight)
-		scrolled = m.View()
-		if !strings.Contains(scrolled, "alpha-instance-with-distinctive-name") {
-			break
-		}
-	}
-
-	if strings.Contains(scrolled, "alpha-instance-with-distinctive-name") {
-		t.Skip("could not scroll Name column off-screen; terminal width too wide for this test")
-	}
-
-	// Key assertion: prefix marker must not render when the identity column is not visible.
-	if strings.Contains(scrolled, "! ") {
-		t.Errorf("marker must not render when identity column is scrolled off-screen (would jump to wrong column); output:\n%s", scrolled)
-	}
-}
-
-// -----------------------------------------------------------------------------
-// Fix 2 (superseded): Ctrl+R keeps findings visible until the fresh result
-// lands, rather than blanking them at keypress time
-// -----------------------------------------------------------------------------
-
-// TestCtrlR_ClearsActiveListFindingsImmediately asserted that pressing Ctrl+R
-// on a top-level list blanked the active ResourceListModel's findings
-// immediately, before the wrapped fetch even returned. That contract is
-// superseded: eagerly blanking findings at keypress time produced a real,
+// TestCtrlR_RetainsActiveListFindingsUntilFreshEnrichment pins the corrected
+// contract: pressing Ctrl+R on a top-level list must NOT blank the active
+// ResourceListModel's findings immediately, before the wrapped fetch even
+// returns. Eagerly blanking findings at keypress time produced a real,
 // user-visible flicker for the full AWS round-trip between the keypress and
 // the rerun's EnrichmentChecked arrival — findings must be stale-until-
 // replaced, not blank-until-replaced (see qa_glyph_continuity_test.go's
-// TestRerunStart_KeepsVisibleFindingsUntilReplaced for the corrected pin,
-// which asserts BOTH halves: no blank window before the fresh result lands,
-// and real removal once the fresh result genuinely omits the finding).
+// TestRerunStart_KeepsVisibleFindingsUntilReplaced for a second pin of the
+// same contract, asserting BOTH halves: no blank window before the fresh
+// result lands, and real removal once the fresh result genuinely omits the
+// finding).
 //
 // Uses the test helpers defined in qa_enrichment_rerun_overlap_test.go:
 // newRootSizedModel, rootApplyMsg, navigateToEC2List, ctrlRKeyMsg.
@@ -130,7 +63,7 @@ func isVisibleUnderCtrlZ(m tui.Model, needle string) (tui.Model, bool) {
 	return m, visible
 }
 
-func TestCtrlR_ClearsActiveListFindingsImmediately(t *testing.T) {
+func TestCtrlR_RetainsActiveListFindingsUntilFreshEnrichment(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 	m = navigateToEC2List(m)
@@ -154,7 +87,17 @@ func TestCtrlR_ClearsActiveListFindingsImmediately(t *testing.T) {
 		t.Fatal("pre-condition failed: expected web-server-1 to survive ctrl+z (finding applied) before Ctrl+R")
 	}
 
-	// Dispatch Ctrl+R via the real key path.
+	// Dispatch Ctrl+R via the real key path. "ec2" has a registered Wave-2
+	// issue enricher (EnrichEC2InstanceStatus, core/aws/catalog_compute.go),
+	// so handleRefresh's rsKindList branch calls
+	// m.core.BumpEnrichmentTypeGen("ec2") — EnrichmentTypeGen["ec2"] goes
+	// from 0 (set by the enrichmentCheckedWithFindings(0,0) probe above) to
+	// 1. The real rerun's eventual EnrichmentChecked carries that same
+	// bumped value (refreshActiveListWithEnrichmentRerun stamps tok onto the
+	// wrapped ResourcesLoaded, and handlers_resources.go's TypeGen-match
+	// branch is what fires the next probeEnrichment with it) — see
+	// core/runtime/handlers_availability.go's per-type generation guard
+	// (`msg.TypeGen != 0 && msg.TypeGen != EnrichmentTypeGen[rt]`).
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	// Assertion (corrected): the finding must still be applied immediately
@@ -165,21 +108,25 @@ func TestCtrlR_ClearsActiveListFindingsImmediately(t *testing.T) {
 		t.Error("Ctrl+R must NOT blank the active list's findings before the fresh result lands; web-server-1 no longer survives ctrl+z immediately after keypress")
 	}
 
-	// Once a fresh EnrichmentCheckedMsg lands and genuinely omits the
-	// finding (resource recovered), the finding MUST be removed — this test
-	// still confirms removal works, just not before the result lands.
+	// Once a fresh EnrichmentCheckedMsg lands with the generation the real
+	// rerun actually produced (TypeGen=1, matching the bump above) and
+	// genuinely omits the finding (resource recovered), the finding MUST be
+	// removed. TypeGen=0 here would be a false positive: the per-type
+	// generation guard treats TypeGen=0 as "not a tracked rerun" and accepts
+	// it unconditionally regardless of the real EnrichmentTypeGen value, so
+	// it would prove nothing about generation-matched replacement.
 	recovered := messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       0,
 		Truncated:    false,
 		Findings:     map[string][]domain.Finding{},
 		Gen:          0,
-		TypeGen:      0,
+		TypeGen:      1,
 	}
 	m, _ = rootApplyMsg(m, recovered)
 
 	_, visible = isVisibleUnderCtrlZ(m, "web-server-1")
 	if visible {
-		t.Error("a finding absent from the fresh enrichment result must be removed once that result lands; web-server-1 still survives ctrl+z")
+		t.Error("a finding absent from the fresh, generation-matched enrichment result must be removed once that result lands; web-server-1 still survives ctrl+z")
 	}
 }

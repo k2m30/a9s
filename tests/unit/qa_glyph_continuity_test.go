@@ -4,17 +4,17 @@
 // come back. Two candidate mechanisms, pinned separately:
 //
 //  1. RerunStart_KeepsVisibleFindingsUntilReplaced: internal/tui's
-//     handleRefresh (runtime_adapter_navigate.go) clears a list's row
-//     findings SYNCHRONOUSLY on Ctrl+R — before the rerun fetch has even
-//     dispatched, let alone landed — via m.ctrl.ClearRowFindings(rt) plus
-//     m.ctrl.ApplyEnrichmentState(rt, 0, false, nil). This is deliberate,
-//     load-bearing behavior: TestCtrlR_ClearsActiveListFindingsImmediately
-//     in qa_enrichment_review_fixes_test.go asserts the SAME clear-on-start
-//     is correct and pins it as the fix for a prior bug (marker persisting
-//     stale until the next SetEnrichmentState). This pin therefore documents
-//     the current, intentional behavior instead of re-asserting the opposite
-//     against an already-passing counter-test — see the doc comment on the
-//     test func for exactly what is and is not claimed.
+//     handleRefresh (runtime_adapter_navigate.go) deliberately does NOT
+//     clear a list's rendered row findings on Ctrl+R. Wave-2 state is
+//     stale-until-replaced, not blank-until-replaced: the glyphs stay on
+//     screen for the rerun's AWS round-trip and are reconciled per resource
+//     ID when the fresh EnrichmentChecked lands (ApplyWave2ToRow strips-
+//     then-conditionally-reappends against the full fresh findings map).
+//     Pre-clearing via ClearRowFindings used to blank every glyph for that
+//     whole round-trip — a real, user-visible flicker (see the handleRefresh
+//     comment). TestCtrlR_RetainsActiveListFindingsUntilFreshEnrichment in
+//     qa_enrichment_review_fixes_test.go pins this retain-until-replaced
+//     contract; this pin documents the same intentional behavior.
 //
 //  2. Swap_MergesWave2ForWave1CarryingRows: applyResourcesLoaded's carry-
 //     forward (core/app/list_body.go:80-89) only re-applies a prior
@@ -161,7 +161,7 @@ func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 		Truncated:    false,
 		Findings:     map[string][]domain.Finding{},
 		Gen:          0,
-		TypeGen:      0,
+		TypeGen:      1,
 	}
 	m, _ = rootApplyMsg(m, recovered)
 

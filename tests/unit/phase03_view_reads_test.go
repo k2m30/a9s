@@ -13,10 +13,9 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 
+	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
@@ -86,18 +85,41 @@ func minimalTypeDefWithLifecycleKey() resource.ResourceTypeDef {
 	}
 }
 
-// loadList builds a ResourceListModel pre-populated with resources.
-func loadList(td resource.ResourceTypeDef, rs []resource.Resource) views.ResourceListModel {
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(120, 30)
-	m, _ = m.Update(messages.ResourcesLoaded{Resources: rs, ResourceType: td.ShortName})
-	return m
+// loadListController builds a Controller (via the blessed newTestController
+// helper) pre-populated with rs under td — the live replacement for
+// loadList/renderList/IssueCount()'s dead ResourceListModel.{View,IssueCount}
+// harness. RegisterFallbackTypeDef + PushChildListScreen mirror exactly what
+// views.NewResourceList itself falls back to for an unregistered typeDef
+// (resourcelist.go's newResourceListCtrl), so a synthetic test-only ShortName
+// (never a real catalog/menu entry) still renders.
+func loadListController(t *testing.T, td resource.ResourceTypeDef, rs []resource.Resource) *app.Controller {
+	t.Helper()
+	c := newTestController(t)
+	c.RegisterFallbackTypeDef(td)
+	c.PushChildListScreen(td.ShortName)
+	c.ApplyResourcesLoaded(td.ShortName, rs, nil, false)
+	return c
 }
 
-// renderList returns the stripANSI-cleaned View() output of the list.
-func renderList(m views.ResourceListModel) string {
-	return stripAnsi(m.View())
+// renderListRaw renders the top list screen exactly as production's
+// renderList() free function does (views.NewTransientResourceList +
+// RenderList), without stripping ANSI — some callers need the raw escape
+// codes (e.g. row-color comparisons).
+func renderListRaw(t *testing.T, c *app.Controller, td resource.ResourceTypeDef) string {
+	t.Helper()
+	lb := c.Snapshot().Body.List
+	if lb == nil {
+		t.Fatal("expected a non-nil list body")
+	}
+	m := views.NewTransientResourceList(td, 120, 30)
+	return m.RenderList(*lb)
+}
+
+// renderListBody is renderListRaw with ANSI stripped, the direct replacement
+// for the old renderList(m) helper's stripAnsi(m.View()).
+func renderListBody(t *testing.T, c *app.Controller, td resource.ResourceTypeDef) string {
+	t.Helper()
+	return stripAnsi(renderListRaw(t, c, td))
 }
 
 // ---------------------------------------------------------------------------
@@ -151,8 +173,8 @@ func TestViews_ListStatusColumn_ReadsFindingsPhrase(t *testing.T) {
 				},
 			}
 
-			m := loadList(td, []resource.Resource{r})
-			out := renderList(m)
+			c := loadListController(t, td, []resource.Resource{r})
+			out := renderListBody(t, c, td)
 
 			if !strings.Contains(out, tc.canonical) {
 				t.Errorf("[%s] rendered list does not contain canonical phrase %q; got:\n%s",
@@ -187,8 +209,8 @@ func TestViews_ListStatusColumn_FallsBackToLifecycleKey(t *testing.T) {
 		Findings: nil,
 	}
 
-	m := loadList(td, []resource.Resource{r})
-	out := renderList(m)
+	c := loadListController(t, td, []resource.Resource{r})
+	out := renderListBody(t, c, td)
 
 	if !strings.Contains(out, "running") {
 		t.Errorf("list view should display lifecycle fallback value \"running\" when Findings is nil; got:\n%s", out)
@@ -255,9 +277,9 @@ func TestViews_ListColor_DelegatesToTypeColor(t *testing.T) {
 		},
 	}
 
-	m := loadList(td, []resource.Resource{padding, healthyRow, findingsBrokenRow})
+	c := loadListController(t, td, []resource.Resource{padding, healthyRow, findingsBrokenRow})
 
-	rawOut := m.View()
+	rawOut := renderListRaw(t, c, td)
 	lines := strings.Split(rawOut, "\n")
 
 	var healthyLine, brokenFindingsLine string
@@ -457,11 +479,11 @@ func TestViews_IssueCount_ReadsFindingsBySeverity(t *testing.T) {
 		Findings: nil,
 	}
 
-	m := loadList(td, []resource.Resource{resA, resB, resC})
-	got := m.IssueCount()
+	c := loadListController(t, td, []resource.Resource{resA, resB, resC})
+	got := c.GetListIssueCount()
 
 	if got != 2 {
-		t.Errorf("IssueCount() = %d, want 2 (resources with Findings.Severity.IsIssue()); "+
+		t.Errorf("GetListIssueCount() = %d, want 2 (resources with Findings.Severity.IsIssue()); "+
 			"pre-fix value is 0 (no legacy Status issues)", got)
 	}
 }
@@ -501,13 +523,12 @@ func TestViews_AttentionFilter_ReadsFindings(t *testing.T) {
 		Findings: nil,
 	}
 
-	m := loadList(td, []resource.Resource{resA, resB})
+	c := loadListController(t, td, []resource.Resource{resA, resB})
 
 	// Enable the attention filter.
-	m.SetEnabled(true)
-	m.SetFilter("")
+	c.Apply(app.Action{Kind: app.ActionToggleAttention})
 
-	out := renderList(m)
+	out := renderListBody(t, c, td)
 
 	if !strings.Contains(out, "filter-A") {
 		t.Errorf("attention filter must show resource A (Findings.Severity=SevBroken); got:\n%s", out)
@@ -625,8 +646,8 @@ func TestViews_ListStatusColumn_Wave2OverridesLifecycle(t *testing.T) {
 		},
 	}
 
-	m := loadList(td, []resource.Resource{r})
-	out := renderList(m)
+	c := loadListController(t, td, []resource.Resource{r})
+	out := renderListBody(t, c, td)
 
 	if !strings.Contains(out, "pending maintenance") {
 		t.Errorf("list Status column must show wave2 phrase \"pending maintenance\" when Findings[0] is wave2; got:\n%s", out)
@@ -681,8 +702,8 @@ func TestViews_ListStatusColumn_LifecycleKeyDefaultIsState(t *testing.T) {
 				Findings: nil,
 			}
 
-			m := loadList(td, []resource.Resource{r})
-			out := renderList(m)
+			c := loadListController(t, td, []resource.Resource{r})
+			out := renderListBody(t, c, td)
 
 			if !strings.Contains(out, "running") {
 				t.Errorf("[%s] Status column must show Fields[\"state\"]=\"running\" when Findings=nil and LifecycleKey is empty (default=\"state\"); got:\n%s",
@@ -734,11 +755,11 @@ func TestViews_IssueCount_RespectsTypeColorOverride(t *testing.T) {
 		Findings: nil,
 	}
 
-	m := loadList(td, []resource.Resource{r})
-	got := m.IssueCount()
+	c := loadListController(t, td, []resource.Resource{r})
+	got := c.GetListIssueCount()
 
 	if got != 1 {
-		t.Errorf("IssueCount() = %d, want 1 (td.Color classifies \"terminated\" as ColorBroken → IsIssue()=true; "+
+		t.Errorf("GetListIssueCount() = %d, want 1 (td.Color classifies \"terminated\" as ColorBroken → IsIssue()=true; "+
 			"pre-fix value is 0 because FallbackColor(\"terminated\") = ColorDim)", got)
 	}
 }
@@ -809,10 +830,10 @@ func TestViews_HasIssueFinding_ScansAllFindings(t *testing.T) {
 		Fields: map[string]string{"state": "running"},
 	}
 
-	m := loadList(td, []resource.Resource{resA, resB, resC})
+	c := loadListController(t, td, []resource.Resource{resA, resB, resC})
 
-	if got := m.IssueCount(); got != 2 {
-		t.Errorf("IssueCount() = %d, want 2 (A has SevBroken at index 1, B has SevWarn at index 0 — both IsIssue()). "+
+	if got := c.GetListIssueCount(); got != 2 {
+		t.Errorf("GetListIssueCount() = %d, want 2 (A has SevBroken at index 1, B has SevWarn at index 0 — both IsIssue()). "+
 			"Pre-fix value is 1 because hasIssueFinding only checks Findings[0] and A.Findings[0].Severity=SevOK.", got)
 	}
 }
@@ -867,11 +888,11 @@ func TestViews_ListColor_ECSInactiveIsBroken(t *testing.T) {
 		Findings: nil,
 	}
 
-	m := loadList(*td, []resource.Resource{r})
-	got := m.IssueCount()
+	c := loadListController(t, *td, []resource.Resource{r})
+	got := c.GetListIssueCount()
 
 	if got != 1 {
-		t.Errorf("IssueCount() = %d, want 1 (ECS INACTIVE is ColorBroken per td.Color; "+
+		t.Errorf("GetListIssueCount() = %d, want 1 (ECS INACTIVE is ColorBroken per td.Color; "+
 			"pre-fix value is 0 because FallbackColor(\"INACTIVE\") = ColorDim)", got)
 	}
 }
@@ -932,11 +953,11 @@ func TestViews_IssueCount_UsesTypeResolveColor(t *testing.T) {
 		Findings: stoppedServerFinding,
 	}
 
-	m := loadList(*td, []resource.Resource{r})
-	got := m.IssueCount()
+	c := loadListController(t, *td, []resource.Resource{r})
+	got := c.GetListIssueCount()
 
 	if got != 1 {
-		t.Errorf("IssueCount() = %d, want 1 (td.ResolveColor derives ColorBroken from the "+
+		t.Errorf("GetListIssueCount() = %d, want 1 (td.ResolveColor derives ColorBroken from the "+
 			"Server.*-forced-stop Finding)", got)
 	}
 }

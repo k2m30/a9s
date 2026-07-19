@@ -1,13 +1,14 @@
 package unit
 
-// Regression tests for 5 bugs surfaced during code review of ct-events v2.
+// Regression tests for 4 bugs surfaced during code review of ct-events v2.
 //
-// ALL 5 top-level tests are expected to FAIL on current code.
 // Each test is labelled with the bug it locks.
 //
-// Bug 1 (TestCTSort_RFC3339_AcrossMonthBoundary):
-//   sortColKey="time" → lexicographic compare on display strings, breaks month boundaries.
-//   Fix: sort by event_time (RFC3339) instead.
+// Bug 1 (sort uses display-formatted time string, breaking month boundaries;
+// sortColKey="time" → lexicographic compare, fix: sort by event_time
+// RFC3339 instead) is ported onto the live seam in wave3_list_ports_test.go's
+// TestWave3CTEventsSort_RFC3339_AcrossMonthBoundary — this file's
+// ResourceListModel.SelectedResource() harness is dead code.
 //
 // Bug 2 (TestCTVerb_BatchDeleteAttributes_IsDestructive):
 //   "Batch" is in the write-prefix table AFTER the BatchGet* short-circuit.
@@ -35,119 +36,8 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
-	"github.com/k2m30/a9s/v3/core/config"
-	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
-
-// ===========================================================================
-// Bug 1: sort uses display-formatted time string, breaking month boundaries.
-//
-// Default TIME-column descending sort should produce C (Apr 07), A (Apr 02), B (Mar 28).
-// The bug produces A (Apr 02), C (Apr 07), B (Mar 28) because "Apr 02" < "Apr 07"
-// < "Mar 28" lexicographically — March sorts AFTER April.
-// ===========================================================================
-
-func TestCTSort_RFC3339_AcrossMonthBoundary(t *testing.T) {
-	td := resource.FindResourceType("ct-events")
-	if td == nil {
-		t.Fatal("ct-events resource type not found in registry")
-	}
-
-	// Synthetic events spanning March → April. IDs encode expected order for
-	// easy assertion: "newest-C" should be first, "oldest-B" last.
-	resources := []resource.Resource{
-		{
-			// Event A: Apr 02 — second-newest
-			ID:   "event-a",
-			Name: "GetObject",
-			Fields: map[string]string{
-				"time":       "Apr 02 10:00:00",
-				"event_time": "2026-04-02T10:00:00Z",
-				"status":     "ct-info",
-			},
-		},
-		{
-			// Event B: Mar 28 — oldest
-			ID:   "event-b",
-			Name: "DescribeInstances",
-			Fields: map[string]string{
-				"time":       "Mar 28 10:00:00",
-				"event_time": "2026-03-28T10:00:00Z",
-				"status":     "ct-info",
-			},
-		},
-		{
-			// Event C: Apr 07 — newest
-			ID:   "event-c",
-			Name: "PutObject",
-			Fields: map[string]string{
-				"time":       "Apr 07 17:00:59",
-				"event_time": "2026-04-07T17:00:59Z",
-				"status":     "ct-info",
-			},
-		},
-	}
-
-	cfg := config.DefaultConfig()
-	k := keys.Default()
-	m := views.NewResourceList(*td, cfg, k)
-	m.SetSize(200, 20)
-	m, _ = m.Init()
-
-	// ResourcesLoadedMsg triggers applySortAndFilter() with the default
-	// TIME column descending sort that NewResourceList sets when the view
-	// config declares one (ct-events always does).
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "ct-events",
-		Resources:    resources,
-	})
-
-	// After sort, cursor is at position 0 (first row = newest event).
-	sel := m.SelectedResource()
-	if sel == nil {
-		t.Fatal("SelectedResource() returned nil after loading resources")
-	}
-
-	// The newest event is Apr 07 (event-c). The bug produces Apr 02 (event-a)
-	// because lexicographic comparison on "Apr 02" < "Apr 07" < "Mar 28"
-	// would place "Apr 07" at index 0 but "Mar 28" erroneously beats "Apr 02".
-	//
-	// Specifically: descending sort on display strings gives:
-	//   "Mar 28 10:00:00" > "Apr 07 17:00:59" > "Apr 02 10:00:00"
-	// because 'M' > 'A' in ASCII. So the buggy order is B, C, A —
-	// the FIRST item (cursor pos 0) is event-b (Mar 28), not event-c (Apr 07).
-	if sel.ID != "event-c" {
-		t.Errorf("SelectedResource().ID = %q, want %q — sort by display string breaks month boundaries; "+
-			"sort must use event_time (RFC3339) not time (display string)",
-			sel.ID, "event-c")
-	}
-
-	// Also assert the full order: C, A, B (newest first).
-	// We do this by moving the cursor down and checking each position.
-	m, _ = m.Update(rlKeyPress("j")) // move down to position 1
-	sel1 := m.SelectedResource()
-	if sel1 == nil {
-		t.Fatal("SelectedResource() returned nil at position 1")
-	}
-	if sel1.ID != "event-a" {
-		t.Errorf("position 1: ID = %q, want %q (second-newest: Apr 02)",
-			sel1.ID, "event-a")
-	}
-
-	m, _ = m.Update(rlKeyPress("j")) // move down to position 2
-	sel2 := m.SelectedResource()
-	if sel2 == nil {
-		t.Fatal("SelectedResource() returned nil at position 2")
-	}
-	if sel2.ID != "event-b" {
-		t.Errorf("position 2: ID = %q, want %q (oldest: Mar 28)",
-			sel2.ID, "event-b")
-	}
-}
 
 // ===========================================================================
 // Bug 2: BatchDelete* classified as W instead of D.

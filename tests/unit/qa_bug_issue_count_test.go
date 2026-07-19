@@ -12,8 +12,6 @@ package unit
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -22,46 +20,16 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // ---------------------------------------------------------------------------
 // Bug 1: Main menu FrameTitle should show filtered/total when ctrl+z active
 // ---------------------------------------------------------------------------
 
-func TestMainMenuFrameTitle_CtrlZShowsFilteredCount(t *testing.T) {
-	m := views.NewMainMenu(keys.Default())
-	// +1: the permanent synthetic "costs" (Cost Explorer) main-menu entry is
-	// not in resource.AllResourceTypes() but always appears in MenuBody.Entries.
-	total := len(resource.AllResourceTypes()) + 1
-
-	// Mark ec2 and rds as having issues, everything else as zero
-	m.SetIssues("ec2", 1, false)
-	m.SetIssues("dbi", 2, false)
-	for _, rt := range resource.AllResourceTypes() {
-		if rt.ShortName != "ec2" && rt.ShortName != "dbi" {
-			m.SetIssues(rt.ShortName, 0, false)
-		}
-	}
-
-	// Enable ctrl+z
-	m.Toggle()
-	// Re-trigger applyFilter
-	m.SetIssues("ec2", 1, false)
-
-	title := m.FrameTitle()
-
-	// Should show something like "resource-types(2/66) [!]"
-	// The 2 is the number of visible (issue) types, 66 is total
-	expectedFiltered := fmt.Sprintf("2/%d", total)
-	if !strings.Contains(title, expectedFiltered) {
-		t.Errorf("FrameTitle() = %q, want to contain %q (filtered/total)", title, expectedFiltered)
-	}
-	if !strings.Contains(title, "[!]") {
-		t.Errorf("FrameTitle() = %q, want '[!]'", title)
-	}
-}
+// TestMainMenuFrameTitle_CtrlZShowsFilteredCount (dead views.MainMenuModel
+// SetIssues/Toggle/FrameTitle) removed — live-seam replacement:
+// TestMenuFrameTitle_CtrlZShowsFilteredCount in app_menu_test.go, driven
+// through Controller.MenuFrameTitle + ActionToggleAttention.
 
 // ---------------------------------------------------------------------------
 // Bug 2: dbi enricher counts all maintenance ARNs, not matching resources

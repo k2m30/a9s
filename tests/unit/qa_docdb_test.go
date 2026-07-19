@@ -6,6 +6,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"charm.land/bubbles/v2/viewport"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 
@@ -21,31 +23,6 @@ import (
 // ===========================================================================
 // Helpers for DocumentDB tests
 // ===========================================================================
-
-func docdbTypeDef() resource.ResourceTypeDef {
-	for _, rt := range resource.AllResourceTypes() {
-		if rt.ShortName == "dbc" {
-			return rt
-		}
-	}
-	panic("docdb resource type not found")
-}
-
-func loadedDocDBModel(t *testing.T) views.ResourceListModel {
-	t.Helper()
-	tuitest.ForceColor(t)
-	td := docdbTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "dbc",
-		Resources:    fixtureDocDBClusters(),
-	})
-	return m
-}
-
 // multiStatusDocDBFixtures returns DocumentDB clusters with different statuses for color tests.
 func multiStatusDocDBFixtures() []resource.Resource {
 	return []resource.Resource{
@@ -101,279 +78,28 @@ func multiStatusDocDBFixtures() []resource.Resource {
 }
 
 // ===========================================================================
-// DOCDB-LIST-02: DocumentDB list displays correct columns
-// ===========================================================================
-
-func TestQA_DocDB_ListColumns(t *testing.T) {
-	m := loadedDocDBModel(t)
-	out := m.View()
-
-	expectedHeaders := []string{"Cluster ID", "Version", "Status", "Instances", "Endpoint"}
-	for _, header := range expectedHeaders {
-		if !strings.Contains(out, header) {
-			t.Errorf("DocumentDB list view missing column header %q", header)
-		}
-	}
-}
-
-// ===========================================================================
-// DOCDB-LIST-03: DocumentDB list populates column data from correct fields
-// ===========================================================================
-
-func TestQA_DocDB_ListColumnData(t *testing.T) {
-	fixtures := fixtureDocDBClusters()
-	m := loadedDocDBModel(t)
-	out := m.View()
-
-	for _, r := range fixtures {
-		id := r.Fields["cluster_id"]
-		if id != "" && !strings.Contains(out, id) {
-			t.Errorf("DocumentDB list missing cluster_id %q", id)
-		}
-	}
-
-	// Verify specific data fields appear
-	r := fixtures[0]
-	for _, field := range []string{"engine_version", "status", "instances"} {
-		val := r.Fields[field]
-		if val == "" {
-			continue
-		}
-		if !strings.Contains(out, val) {
-			t.Errorf("DocumentDB list missing field %q value %q", field, val)
-		}
-	}
-}
-
-// ===========================================================================
-// DOCDB-LIST-04: DocumentDB list row count appears in frame title
-// ===========================================================================
-
-func TestQA_DocDB_FrameTitle(t *testing.T) {
-	m := loadedDocDBModel(t)
-	title := m.FrameTitle()
-
-	expected := "dbc(2)"
-	if title != expected {
-		t.Errorf("expected FrameTitle() = %q, got %q", expected, title)
-	}
-}
-
-// ===========================================================================
-// DOCDB-LIST-05: DocumentDB list shows member count for Instances column
-// ===========================================================================
-
-func TestQA_DocDB_InstancesCount(t *testing.T) {
-	m := loadedDocDBModel(t)
-	out := m.View()
-
-	// Fixture has "instances": "1" -- verify it shows as "1" not as array data
-	if !strings.Contains(out, "1") {
-		t.Error("DocumentDB Instances column should show count '1'")
-	}
-}
-
-// ===========================================================================
-// DOCDB-LIST-07: DocumentDB list row coloring by status
-// ===========================================================================
-
-func TestQA_DocDB_StatusColoring(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := docdbTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "dbc",
-		Resources:    multiStatusDocDBFixtures(),
-	})
-
-	out := m.View()
-
-	for _, status := range []string{"available", "creating", "deleting"} {
-		if !strings.Contains(out, status) {
-			t.Errorf("DocumentDB list missing status %q in rendered output", status)
-		}
-	}
-
-	if !strings.Contains(out, "\x1b[") {
-		t.Error("DocumentDB list with status colors should contain ANSI escape sequences")
-	}
-}
-
-// ===========================================================================
-// DOCDB-LIST-08: DocumentDB list cursor navigation
-// ===========================================================================
-
-func TestQA_DocDB_CursorNavigation(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := docdbTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "dbc",
-		Resources:    multiStatusDocDBFixtures(),
-	})
-
-	// Initial selection
-	sel := m.SelectedResource()
-	if sel == nil || sel.ID != "docdb-available" {
-		t.Fatalf("expected initial selection to be docdb-available, got %v", sel)
-	}
-
-	// Move down
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "j"})
-	sel = m.SelectedResource()
-	if sel == nil || sel.ID != "docdb-creating" {
-		t.Errorf("after 'j', expected docdb-creating, got %v", sel)
-	}
-
-	// Move up
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "k"})
-	sel = m.SelectedResource()
-	if sel == nil || sel.ID != "docdb-available" {
-		t.Errorf("after 'k', expected docdb-available, got %v", sel)
-	}
-
-	// Jump to bottom
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "G"})
-	sel = m.SelectedResource()
-	if sel == nil || sel.ID != "docdb-deleting" {
-		t.Errorf("after 'G', expected docdb-deleting, got %v", sel)
-	}
-
-	// Jump to top
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "g"})
-	sel = m.SelectedResource()
-	if sel == nil || sel.ID != "docdb-available" {
-		t.Errorf("after 'g', expected docdb-available, got %v", sel)
-	}
-}
-
-// ===========================================================================
-// DOCDB-LIST-10: DocumentDB list filter
-// ===========================================================================
-
-func TestQA_DocDB_ListFilter(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := docdbTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "dbc",
-		Resources:    multiStatusDocDBFixtures(),
-	})
-
-	m.SetFilter("creating")
-	out := m.View()
-
-	if !strings.Contains(out, "docdb-creating") {
-		t.Error("filtered DocumentDB list should contain 'docdb-creating'")
-	}
-	if strings.Contains(out, "docdb-available") {
-		t.Error("filtered DocumentDB list should NOT contain 'docdb-available'")
-	}
-
-	title := m.FrameTitle()
-	if title != "dbc(1/3)" {
-		t.Errorf("expected filtered FrameTitle = %q, got %q", "dbc(1/3)", title)
-	}
-
-	m.SetFilter("")
-	title = m.FrameTitle()
-	if title != "dbc(3)" {
-		t.Errorf("expected unfiltered FrameTitle = %q, got %q", "dbc(3)", title)
-	}
-}
-
-// ===========================================================================
-// DOCDB-LIST-11: DocumentDB list sorting
-// ===========================================================================
-
-func TestQA_DocDB_ListSort(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := docdbTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "dbc",
-		Resources:    multiStatusDocDBFixtures(),
-	})
-
-	// Sort by column 0 ('1') -- "Cluster ID" column (key "cluster_id", index 0, 1-indexed key "1")
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "1"})
-	out := m.View()
-	if !strings.Contains(out, "\u2191") && !strings.Contains(out, "\u2193") {
-		t.Error("expected sort indicator arrow after pressing 1 for DocumentDB Cluster ID column")
-	}
-
-	// Toggle sort direction
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "1"})
-	out2 := m.View()
-	if !strings.Contains(out2, "\u2191") && !strings.Contains(out2, "\u2193") {
-		t.Error("expected sort indicator to remain after toggling DocumentDB sort direction")
-	}
-
-	// Sort by column 1 ('2') -- "Version" column; verify sort happens (selected resource may change)
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "2"})
-	sel := m.SelectedResource()
-	if sel == nil {
-		t.Error("after sort by column 2, should still have a selected DocumentDB resource")
-	}
-}
-
-// ===========================================================================
-// DOCDB-LIST-13: DocumentDB list with no clusters
-// ===========================================================================
-
-func TestQA_DocDB_EmptyList(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := docdbTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "dbc",
-		Resources:    []resource.Resource{},
-	})
-
-	out := m.View()
-	if !strings.Contains(out, "No resources found") {
-		t.Errorf("empty DocumentDB list should show 'No resources found', got: %q", out)
-	}
-
-	title := m.FrameTitle()
-	if title != "dbc(0)" {
-		t.Errorf("expected empty FrameTitle = %q, got %q", "dbc(0)", title)
-	}
-}
-
-// ===========================================================================
 // DOCDB-DETAIL-01 / DOCDB-DETAIL-02: DocumentDB detail view
 // ===========================================================================
 
+// TestQA_DocDB_DetailView is the live-seam replacement for the retired
+// views.NewDetail(...).View() call (DetailModel.View is dead; see
+// specs/022-codebase-cleanup/wave3-map-detail.md) — drives
+// Controller.EnsureDetailState + NewTransientDetail.RenderDetail instead.
+// Uses a wide viewport to avoid truncation of long endpoint values (right
+// panel auto-shows at width>=60 when related defs are registered, reducing
+// left column).
 func TestQA_DocDB_DetailView(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	k := keys.Default()
 	res := fixtures[0]
-	// Use wide viewport to avoid truncation of long endpoint values
-	// (right panel auto-shows at width>=60 when related defs are registered, reducing left column)
-	m := views.NewDetail(res, "dbc", nil, k)
-	m.SetSize(200, 20)
-	out := m.View()
+	c := newDetailControllerUnit(t, res, "dbc")
+
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil")
+	}
+	vp := viewport.New(viewport.WithWidth(200), viewport.WithHeight(20))
+	m := views.NewTransientDetail(200, 20, vp)
+	out := m.RenderDetail(*body)
 
 	if out == "" || out == "Initializing..." {
 		t.Fatal("DocumentDB detail view returned empty or initializing")
@@ -389,12 +115,15 @@ func TestQA_DocDB_DetailView(t *testing.T) {
 	}
 }
 
+// TestQA_DocDB_DetailFrameTitle is the live-seam replacement for the retired
+// views.NewDetail(...).FrameTitle() call (DetailModel.FrameTitle is dead) —
+// drives Controller.Snapshot().FrameTitle instead (detailFrameTitleLocked
+// mirrors the legacy Name-else-ID semantics exactly).
 func TestQA_DocDB_DetailFrameTitle(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
-	k := keys.Default()
 	res := fixtures[0]
-	m := views.NewDetail(res, "dbc", nil, k)
-	title := m.FrameTitle()
+	c := newDetailControllerUnit(t, res, "dbc")
+	title := c.Snapshot().FrameTitle
 
 	expected := res.Name
 	if expected == "" {
@@ -668,59 +397,6 @@ func TestQA_DocDB_CommandNavigation(t *testing.T) {
 }
 
 // ===========================================================================
-// DOCDB: Horizontal scroll
-// ===========================================================================
-
-func TestQA_DocDB_HorizontalScroll(t *testing.T) {
-	fixtures := fixtureDocDBClusters()
-
-	tuitest.ForceColor(t)
-
-	td := docdbTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(50, 20) // very narrow
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "dbc",
-		Resources:    fixtures,
-	})
-
-	outBefore := m.View()
-
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "l"})
-	outAfter := m.View()
-
-	if outBefore == outAfter {
-		t.Error("expected horizontal scroll to change DocumentDB list output")
-	}
-}
-
-// ===========================================================================
-// DOCDB: Loading shows spinner
-// ===========================================================================
-
-func TestQA_DocDB_LoadingSpinner(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := docdbTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-
-	out := m.View()
-	if !strings.Contains(out, "Loading") {
-		t.Error("DocumentDB list in loading state should show 'Loading'")
-	}
-
-	title := m.FrameTitle()
-	if title != "dbc" {
-		t.Errorf("DocumentDB loading FrameTitle = %q, want %q", title, "dbc")
-	}
-}
-
-// ===========================================================================
 // CROSS-CMD-01: Switch between Redis and DocumentDB via command
 // ===========================================================================
 
@@ -783,67 +459,6 @@ func TestQA_CrossCommand_SwitchDocDBToRedis(t *testing.T) {
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "redis") {
 		t.Errorf("after :redis command from DocumentDB, should navigate to Redis, got: %s", plain)
-	}
-}
-
-// ===========================================================================
-// DOCDB-LIST-06: DocumentDB list shows zero for cluster with no members
-// ===========================================================================
-
-func TestQA_DocDB_ZeroInstancesCount(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := docdbTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-
-	fixtures := []resource.Resource{
-		{
-			ID: "docdb-empty", Name: "docdb-empty",
-			Fields: map[string]string{
-				"cluster_id": "docdb-empty", "engine_version": "5.0.0",
-				"status": "creating", "instances": "0",
-				"endpoint": "",
-			},
-		},
-	}
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "dbc",
-		Resources:    fixtures,
-	})
-
-	out := m.View()
-	if !strings.Contains(out, "0") {
-		t.Error("DocumentDB Instances column should show '0' for empty members")
-	}
-}
-
-// ===========================================================================
-// DOCDB: No separator row below headers
-// ===========================================================================
-
-func TestQA_DocDB_NoSeparatorBelowHeaders(t *testing.T) {
-	m := loadedDocDBModel(t)
-	out := m.View()
-
-	lines := strings.SplitSeq(out, "\n")
-	for line := range lines {
-		stripped := strings.TrimSpace(line)
-		if stripped == "" {
-			continue
-		}
-		allDash := true
-		for _, ch := range stripped {
-			if ch != '-' && ch != '_' && ch != '=' && ch != ' ' {
-				allDash = false
-				break
-			}
-		}
-		if allDash && len(stripped) > 5 {
-			t.Errorf("found what looks like a separator row in DocumentDB list: %q", stripped)
-		}
 	}
 }
 
