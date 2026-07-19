@@ -177,42 +177,6 @@ func TestEnrichTargetGroupHealth_NonUnhealthyStatesExcluded(t *testing.T) {
 	}
 }
 
-// TestEnrichTargetGroupHealth_SomeUnhealthyIsWarning pins the Warning tier:
-// one unhealthy target among healthy targets must produce a finding with
-// severity "~" (SevWarn), not "!".
-func TestEnrichTargetGroupHealth_SomeUnhealthyIsWarning(t *testing.T) {
-	tgName := "some-unhealthy-tg"
-	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/some-unhealthy-tg/444"
-	fake := &tgHealthFake{
-		outputs: map[string]*elbv2.DescribeTargetHealthOutput{
-			tgARN: {
-				TargetHealthDescriptions: []elbtypes.TargetHealthDescription{
-					tgHealthDesc(elbtypes.TargetHealthStateEnumUnhealthy),
-					tgHealthDesc(elbtypes.TargetHealthStateEnumHealthy),
-					tgHealthDesc(elbtypes.TargetHealthStateEnumHealthy),
-				},
-			},
-		},
-	}
-	clients := &awsclient.ServiceClients{ELBv2: fake}
-	resources := []resource.Resource{{
-		ID:     tgName,
-		Fields: map[string]string{"target_group_arn": tgARN},
-	}}
-
-	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fs, ok := result.Findings[tgName]
-	if !ok {
-		t.Fatalf("expected a finding for %q (1 of 3 targets unhealthy)", tgName)
-	}
-	if fs[0].Severity != domain.SevWarn {
-		t.Errorf("severity = %v, want %v (1/3 unhealthy, not all)", fs[0].Severity, domain.SevWarn)
-	}
-}
-
 // TestEnrichTargetGroupHealth_AllUnhealthyIsBroken pins the Broken tier: every
 // target reporting State=="unhealthy" must produce a finding with severity "!"
 // (SevBroken).

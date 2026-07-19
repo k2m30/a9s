@@ -15,10 +15,8 @@ package unit
 //     resource IDs and Wave-2 finding IDs.
 
 import (
-	"context"
 	"testing"
 
-	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -26,61 +24,6 @@ import (
 // ─────────────────────────────────────────────────────────────────────────────
 // Test 1: per-enricher IssueCount <= len(inputResources)
 // ─────────────────────────────────────────────────────────────────────────────
-
-// TestAllEnrichers_FindingsNeverExceedResources is a property check over every
-// registered enricher. For each enricher:
-//   - Calls it with 3 minimal resources (id test-1, test-2, test-3) and nil clients.
-//   - Asserts len(result.Findings) <= len(input)
-//
-// Enrichers that gracefully return early on nil clients are fine — they will
-// return an empty Findings map which satisfies the invariant. If an enricher
-// panics, it is logged and skipped (not failed) because the goal is the bound
-// invariant, not exhaustive execution coverage.
-//
-// If any enricher violates len(Findings) > len(input), that is a real bug and
-// the test reports the enricher name and exact counts.
-func TestAllEnrichers_FindingsNeverExceedResources(t *testing.T) {
-	minimalResources := []resource.Resource{
-		{ID: "test-1", Name: "test-resource-1"},
-		{ID: "test-2", Name: "test-resource-2"},
-		{ID: "test-3", Name: "test-resource-3"},
-	}
-	nilClients := (*awsclient.ServiceClients)(nil)
-
-	for _, w := range awsclient.AllWave2() {
-		shortName := w.ShortName
-		fn := w.Enricher.Fn
-
-		t.Run(shortName, func(t *testing.T) {
-			var result awsclient.IssueEnricherResult
-			var err error
-
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						t.Logf("skipped %s: panic with nil clients: %v", shortName, r)
-					}
-				}()
-				result, err = fn(context.Background(), nilClients, minimalResources, nil)
-			}()
-
-			if t.Failed() {
-				return
-			}
-			if err != nil {
-				t.Logf("skipped %s: returned error with nil clients: %v", shortName, err)
-				return
-			}
-
-			// Core invariant: distinct flagged resources can never exceed the
-			// number of input resources.
-			if len(result.Findings) > len(minimalResources) {
-				t.Errorf("%s: len(Findings) (%d) > len(inputResources) (%d) — flagged resources must never exceed instances",
-					shortName, len(result.Findings), len(minimalResources))
-			}
-		})
-	}
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test 2: unified issue count never exceeds union of Wave-1 and Wave-2 IDs

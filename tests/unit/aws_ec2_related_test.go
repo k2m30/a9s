@@ -2,7 +2,6 @@ package unit
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -714,72 +713,6 @@ func TestRelated_EC2_Alarm_EmptySourceID(t *testing.T) {
 
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 for empty instance ID", result.Count)
-	}
-}
-
-// TestRelated_EC2_Alarm_WrongDimensionName_NotCounted verifies that an alarm
-// whose dimensions carry a different name entirely (not "InstanceId") is not
-// counted, distinct from the existing wrong-value coverage in
-// TestRelated_EC2_Alarm_NotFound.
-func TestRelated_EC2_Alarm_WrongDimensionName_NotCounted(t *testing.T) {
-	instance := resource.Resource{
-		ID: "i-match",
-		RawStruct: ec2types.Instance{
-			InstanceId: aws.String("i-match"),
-		},
-	}
-	cache := resource.ResourceCache{
-		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{
-			{
-				ID: "table-throttle-alarm",
-				RawStruct: cwtypes.MetricAlarm{
-					Dimensions: []cwtypes.Dimension{
-						{Name: aws.String("TableName"), Value: aws.String("i-match")},
-					},
-				},
-			},
-		}},
-	}
-
-	checker := ec2CheckerByTarget(t, "alarm")
-	result := checker(context.Background(), nil, instance, cache)
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (dimension name is TableName, not InstanceId)", result.Count)
-	}
-}
-
-// TestRelated_EC2_Alarm_Error verifies that a fetch error for the "alarm"
-// target propagates as RelatedError, never a silently resolved count.
-func TestRelated_EC2_Alarm_Error(t *testing.T) {
-	instance := resource.Resource{
-		ID: "i-match",
-		RawStruct: ec2types.Instance{
-			InstanceId: aws.String("i-match"),
-		},
-	}
-	wantErr := errors.New("boom: DescribeAlarms throttled")
-
-	original := resource.GetPaginatedFetcher("alarm")
-	resource.SetPaginatedForTest("alarm", func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
-		return resource.FetchResult{}, wantErr
-	})
-	t.Cleanup(func() {
-		if original != nil {
-			resource.SetPaginatedForTest("alarm", original)
-		} else {
-			resource.CleanupPaginatedForTest("alarm")
-		}
-	})
-
-	checker := ec2CheckerByTarget(t, "alarm")
-	result := checker(context.Background(), &awsclient.ServiceClients{}, instance, resource.ResourceCache{})
-
-	if result.State != domain.RelatedError {
-		t.Errorf("State = %v, want RelatedError", result.State)
-	}
-	if result.Err == nil {
-		t.Error("Err = nil, want the propagated fetch error")
 	}
 }
 

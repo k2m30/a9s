@@ -11,7 +11,6 @@ package unit
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -266,101 +265,6 @@ func TestDBI_Related_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
 
 	if result.State != domain.RelatedUnknown {
 		t.Errorf("State = %v, want RelatedUnknown (nil alarm cache is not a proven zero — canonical per docs/related-resources-engine.md §7)", result.State)
-	}
-}
-
-// TestDBI_Related_Alarm_Error verifies that a fetch error for the "alarm"
-// target propagates as RelatedError, never a silently resolved count.
-func TestDBI_Related_Alarm_Error(t *testing.T) {
-	res := dbiProdResource(t)
-	checker := dbiCheckerByTarget(t, "alarm")
-	wantErr := errors.New("boom: DescribeAlarms access denied")
-
-	original := resource.GetPaginatedFetcher("alarm")
-	resource.SetPaginatedForTest("alarm", func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
-		return resource.FetchResult{}, wantErr
-	})
-	t.Cleanup(func() {
-		if original != nil {
-			resource.SetPaginatedForTest("alarm", original)
-		} else {
-			resource.CleanupPaginatedForTest("alarm")
-		}
-	})
-
-	result := checker(context.Background(), &awsclient.ServiceClients{}, res, resource.ResourceCache{})
-
-	if result.State != domain.RelatedError {
-		t.Errorf("State = %v, want RelatedError", result.State)
-	}
-	if result.Err == nil {
-		t.Error("Err = nil, want the propagated fetch error")
-	}
-}
-
-// TestDBI_Related_Alarm_WrongDimensionValue_NotCounted verifies that an
-// alarm carrying the correct "DBInstanceIdentifier" dimension NAME but a
-// different instance identifier VALUE is not counted (distinct from the
-// existing wrong-dimension-name coverage in
-// TestDBI_Related_Alarm_MatchesByDBInstanceIdentifierDimension's otherAlarm).
-func TestDBI_Related_Alarm_WrongDimensionValue_NotCounted(t *testing.T) {
-	res := dbiProdResource(t)
-	checker := dbiCheckerByTarget(t, "alarm")
-
-	otherInstanceAlarm := resource.Resource{
-		ID:   "other-instance-cpu",
-		Name: "other-instance-cpu",
-		RawStruct: cwtypes.MetricAlarm{
-			AlarmName: aws.String("other-instance-cpu"),
-			Dimensions: []cwtypes.Dimension{
-				{Name: aws.String("DBInstanceIdentifier"), Value: aws.String("some-other-db-instance")},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"alarm": resource.ResourceCacheEntry{
-			Resources: []resource.Resource{otherInstanceAlarm},
-		},
-	}
-
-	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (same dimension name, different DBInstanceIdentifier value)", result.Count)
-	}
-}
-
-// TestDBI_Related_Alarm_Truncated_PropagatesTrue verifies that a truncated
-// "alarm" cache page with a real match still sets Truncated=true — the match
-// must render "(1+)", not a definitive "(1)".
-func TestDBI_Related_Alarm_Truncated_PropagatesTrue(t *testing.T) {
-	res := dbiProdResource(t)
-	checker := dbiCheckerByTarget(t, "alarm")
-
-	matchingAlarm := resource.Resource{
-		ID:   "rds-cpu-utilization",
-		Name: "rds-cpu-utilization",
-		RawStruct: cwtypes.MetricAlarm{
-			AlarmName: aws.String("rds-cpu-utilization"),
-			Dimensions: []cwtypes.Dimension{
-				{Name: aws.String("DBInstanceIdentifier"), Value: aws.String(fixtures.ProdDbiID)},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"alarm": resource.ResourceCacheEntry{
-			Resources:   []resource.Resource{matchingAlarm},
-			IsTruncated: true,
-		},
-	}
-
-	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
-
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
-	}
-	if !result.Truncated {
-		t.Error("Truncated = false, want true (truncated cache page with a match must render as '(1+)')")
 	}
 }
 

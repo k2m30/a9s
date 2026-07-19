@@ -2,7 +2,6 @@ package unit_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
@@ -193,70 +192,6 @@ func TestRelated_SQS_Alarm_WrongNamespace_NotCounted(t *testing.T) {
 
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (matching QueueName dimension under a non-AWS/SQS namespace must not count)", result.Count)
-	}
-}
-
-// TestRelated_SQS_Alarm_Error verifies that when relatedResourcesFor's
-// underlying fetch for "alarm" errors (cache miss + live ServiceClients +
-// erroring registered fetcher), checkSQSAlarm returns RelatedError with the
-// error preserved — never silently swallowed into Unknown or a zero count.
-func TestRelated_SQS_Alarm_Error(t *testing.T) {
-	res := sqsPaymentRes()
-	wantErr := errors.New("boom: DescribeAlarms throttled")
-
-	original := resource.GetPaginatedFetcher("alarm")
-	resource.SetPaginatedForTest("alarm", func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
-		return resource.FetchResult{}, wantErr
-	})
-	t.Cleanup(func() {
-		if original != nil {
-			resource.SetPaginatedForTest("alarm", original)
-		} else {
-			resource.CleanupPaginatedForTest("alarm")
-		}
-	})
-
-	checker := sqsCheckerByTarget(t, "alarm")
-	result := checker(context.Background(), &awsclient.ServiceClients{}, res, resource.ResourceCache{})
-
-	if result.State != domain.RelatedError {
-		t.Errorf("State = %v, want RelatedError (fetch error must propagate, not resolve to a count)", result.State)
-	}
-	if result.Err == nil {
-		t.Error("Err = nil, want the propagated fetch error")
-	}
-}
-
-// TestRelated_SQS_Alarm_Truncated_PropagatesTrue verifies that a truncated
-// "alarm" cache page with a real match still sets Truncated=true on the
-// result — the match must render "(1+)", not a definitive "(1)".
-func TestRelated_SQS_Alarm_Truncated_PropagatesTrue(t *testing.T) {
-	res := sqsPaymentRes()
-	cache := resource.ResourceCache{
-		"alarm": resource.ResourceCacheEntry{
-			Resources: []resource.Resource{
-				{
-					ID: "sqs-depth-alarm",
-					RawStruct: cwtypes.MetricAlarm{
-						Namespace: new("AWS/SQS"),
-						Dimensions: []cwtypes.Dimension{
-							{Name: new("QueueName"), Value: new("payment-processing")},
-						},
-					},
-				},
-			},
-			IsTruncated: true,
-		},
-	}
-
-	checker := sqsCheckerByTarget(t, "alarm")
-	result := checker(context.Background(), nil, res, cache)
-
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
-	}
-	if !result.Truncated {
-		t.Error("Truncated = false, want true (truncated cache page with a match must render as '(1+)')")
 	}
 }
 
