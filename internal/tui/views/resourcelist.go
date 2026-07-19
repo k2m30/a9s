@@ -492,16 +492,6 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 	return m, nil
 }
 
-// View renders the table content. Caller wraps in RenderFrame.
-// Pointer receiver so that row caches persist across frames.
-func (m *ResourceListModel) View() string {
-	snap := m.ctrl.Snapshot()
-	if snap.Body.List == nil {
-		return m.spinner.View() + " Loading..."
-	}
-	return m.RenderList(*snap.Body.List)
-}
-
 // RenderList renders the list body from a controller-supplied ListBody,
 // byte-identical to View()'s output. The renderer owns scrollOffset/width/height
 // (read from m); all data comes from body.
@@ -844,11 +834,5 @@ func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated bool, f
 // Delegated to the controller.
 func (m *ResourceListModel) SetTruncatedIDs(truncatedIDs map[string]bool) {
 	m.ctrl.ApplyListTruncatedIDs(m.typeDef.ShortName, truncatedIDs)
-	m.styledRowCache = nil
-}
-
-// InvalidateStyleCache clears the styled row cache, forcing re-render
-// with current styles. Called after theme changes.
-func (m *ResourceListModel) InvalidateStyleCache() {
 	m.styledRowCache = nil
 }

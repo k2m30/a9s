@@ -4,14 +4,12 @@ import (
 	"strings"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/core/app"
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // defaultEC2RelatedDefs returns a snapshot of the production ec2 RelatedDefs
@@ -22,101 +20,62 @@ func defaultEC2RelatedDefs() []resource.RelatedDef {
 	return append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
 }
 
+// TestBug_AllZeroRelatedRows_DoNotAllowRightColumnFocus and
+// TestBug_FirstToggleRelated_HidesAutoShownColumn (dead views.DetailModel
+// Update/View) removed — 022-codebase-cleanup wave 3, DetailModel cluster.
+// No port needed: right-column focus/toggle mechanics are covered on the
+// live controller path by app_related_cursor_skip_test.go and
+// app_related_focus_entry_test.go (cursor-skip/Tab-focus-entry), and the
+// actionability decision itself by TestIsRelatedActionable_Table
+// (rightcolumn_actionable_test.go) against resource.IsRelatedActionable —
+// isActionableRow in rightcolumn.go is a thin wrapper over that same table.
+//
+// TestBug_RightColumnFilter_SlashFiltersAndEscapeClears WAS also dropped in
+// that same cleanup with the same "covered elsewhere" claim, but nothing
+// else in the suite actually drives ActionSetFilter against a detail
+// screen's related panel end to end — app_related_cursor_skip_test.go only
+// covers dimmed-row cursor-skip, not filtering. Ported below directly
+// against the live Controller + RenderDetail seam (rightcolumn_test.go's
+// helpers, same package).
+
+// TestBug_RightColumnFilter_SlashFiltersAndEscapeClears verifies that
+// ActionSetFilter narrows the related panel to matching DisplayNames (the
+// production effect of the '/' key while the panel is focused — see
+// core/app/detail_cursor.go's ActionSetFilter case), and that clearing the
+// filter (Arg="", the effect of Escape via rs.rightCol.Update in
+// internal/tui/app_stack.go) restores every row.
 func TestBug_RightColumnFilter_SlashFiltersAndEscapeClears(t *testing.T) {
-	ensureNoColor(t)
-
 	replaceEC2Related(t, []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopChecker},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: resource.NoopChecker},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: noopChecker},
 	})
 
-	d := makeDetailForFocusTest(t, 140)
-	d = makeExplicitlyVisible(d)
-	d, _ = d.Update(tabKeyMsg())
+	c := newRightColController(t, "ec2")
+	showRightColPanel(t, c, 140, 30)
 
-	d, _ = d.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
-	for _, ch := range "trail" {
-		d, _ = d.Update(tea.KeyPressMsg{Code: ch, Text: string(ch)})
+	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "target"})
+	filtered := renderRightCol(t, c, 140, 30)
+	if !strings.Contains(filtered, "Target Groups") {
+		t.Errorf("filter %q should keep matching row \"Target Groups\"; got:\n%s", "target", filtered)
+	}
+	if strings.Contains(filtered, "Auto Scaling Groups") || strings.Contains(filtered, "Security Groups") {
+		t.Errorf("filter %q should hide non-matching rows; got:\n%s", "target", filtered)
 	}
 
-	filtered := stripAnsi(d.View())
-	if !strings.Contains(filtered, "CloudTrail Events") {
-		t.Fatalf("right-column filter should keep matching rows visible, got:\n%s", filtered)
-	}
-	if strings.Contains(filtered, "CloudWatch Alarms") {
-		t.Fatalf("right-column filter should hide non-matching rows, got:\n%s", filtered)
-	}
-
-	d, _ = d.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
-	cleared := stripAnsi(d.View())
-	if !strings.Contains(cleared, "CloudWatch Alarms") {
-		t.Fatalf("escaping right-column filter should restore hidden rows, got:\n%s", cleared)
-	}
-}
-
-func TestBug_AllZeroRelatedRows_DoNotAllowRightColumnFocus(t *testing.T) {
-	ensureNoColor(t)
-
-	replaceEC2Related(t, []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopChecker},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: resource.NoopChecker},
-	})
-
-	d := makeDetailForFocusTest(t, 140)
-	d = makeExplicitlyVisible(d)
-	d, _ = d.Update(messages.RelatedCheckResult{
-		ResourceType: "ec2",
-		Result:       resource.RelatedCheckResult{TargetType: "alarm", Count: 0},
-	})
-	d, _ = d.Update(messages.RelatedCheckResult{
-		ResourceType: "ec2",
-		Result:       resource.RelatedCheckResult{TargetType: "ct-events", Count: 0},
-	})
-
-	beforeTab := stripAnsi(d.View())
-	d, _ = d.Update(tabKeyMsg())
-	afterTab := stripAnsi(d.View())
-	if beforeTab != afterTab {
-		t.Fatalf("when every related row resolves to zero, Tab should not move focus into the right column")
-	}
-
-	_, cmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	if cmd != nil {
-		if _, ok := cmd().(messages.RelatedNavigate); ok {
-			t.Fatal("when every related row resolves to zero, Enter should not navigate from the right column")
+	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: ""})
+	cleared := renderRightCol(t, c, 140, 30)
+	for _, want := range []string{"Target Groups", "Auto Scaling Groups", "Security Groups"} {
+		if !strings.Contains(cleared, want) {
+			t.Errorf("clearing the filter (Escape) should restore %q; got:\n%s", want, cleared)
 		}
 	}
 }
 
-func TestBug_FirstToggleRelated_HidesAutoShownColumn(t *testing.T) {
-	ensureNoColor(t)
-
-	replaceEC2Related(t, []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopChecker},
-	})
-
-	d := makeDetailForFocusTest(t, 140)
-	if !strings.Contains(stripAnsi(d.View()), "RELATED") {
-		t.Fatal("precondition failed: related column should be auto-shown on wide EC2 detail")
-	}
-
-	d, firstCmd := d.Update(detailKeyPress("r"))
-	if strings.Contains(stripAnsi(d.View()), "RELATED") {
-		t.Fatalf("first press of r should hide the auto-shown related column")
-	}
-	if firstCmd != nil {
-		t.Fatalf("first press of r should hide the column without refreshing related rows")
-	}
-
-	d, secondCmd := d.Update(detailKeyPress("r"))
-	if !strings.Contains(stripAnsi(d.View()), "RELATED") {
-		t.Fatalf("second press of r should show the related column again")
-	}
-	if secondCmd == nil {
-		t.Fatalf("second press of r should re-open and refresh the related column")
-	}
-}
-
+// TestBug_EC2DefaultDetail_ShowsAttachedEBSVolumeIDs is the live-seam
+// replacement for the dead-View()-driven original: verifies the live
+// RenderDetail path extracts a nested BlockDeviceMappings[].Ebs.VolumeId
+// from RawStruct via the ec2 view config.
 func TestBug_EC2DefaultDetail_ShowsAttachedEBSVolumeIDs(t *testing.T) {
 	ensureNoColor(t)
 
@@ -132,8 +91,8 @@ func TestBug_EC2DefaultDetail_ShowsAttachedEBSVolumeIDs(t *testing.T) {
 		},
 	}
 
-	m := newDetailModel(buildResource("i-0abc123456def7890", "ec2-with-volume", inst), "ec2", configForType("ec2"))
-	plain := stripAnsi(m.View())
+	res := buildResource("i-0abc123456def7890", "ec2-with-volume", inst)
+	plain := stripAnsi(wave3RenderDetailFor(t, res, "ec2", 120, 40))
 	if !strings.Contains(plain, "vol-0abc123456def7890") {
 		t.Fatalf("default EC2 detail should show attached EBS volume IDs, got:\n%s", plain)
 	}
@@ -148,6 +107,11 @@ func TestBug_EC2DefaultRelatedDefinitions_IncludeEBSVolumes(t *testing.T) {
 	t.Fatal("EC2 related definitions should include EBS volumes")
 }
 
+// TestBug_AMIDetail_ShowsUsefulImageMetadata is the live-seam replacement for
+// the dead-View()-driven original: verifies the live RenderDetail path
+// extracts AMI's uncommon nested fields (Hypervisor, SriovNetSupport,
+// ImageOwnerAlias, BlockDeviceMappings[].Ebs.SnapshotId) via the ami view
+// config.
 func TestBug_AMIDetail_ShowsUsefulImageMetadata(t *testing.T) {
 	ensureNoColor(t)
 
@@ -185,8 +149,8 @@ func TestBug_AMIDetail_ShowsUsefulImageMetadata(t *testing.T) {
 		},
 	}
 
-	m := newDetailModel(buildResource("ami-0aaa111111111111a", "ami-0aaa111111111111a", img), "ami", configForType("ami"))
-	plain := stripAnsi(m.View())
+	res := buildResource("ami-0aaa111111111111a", "ami-0aaa111111111111a", img)
+	plain := stripAnsi(wave3RenderDetailFor(t, res, "ami", 120, 40))
 	for _, want := range []string{
 		"RunInstances",
 		"/dev/sda1",

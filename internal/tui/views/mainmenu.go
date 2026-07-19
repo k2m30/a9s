@@ -14,7 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
@@ -48,11 +47,6 @@ func NewMainMenu(k keys.Map, ctrl ...*app.Controller) MainMenuModel {
 		keys: k,
 		ctrl: c,
 	}
-}
-
-// Init implements tea.Model. No async work needed.
-func (m MainMenuModel) Init() (MainMenuModel, tea.Cmd) {
-	return m, nil
 }
 
 // Update handles navigation keys by translating them into controller actions.
@@ -127,169 +121,10 @@ func (m *MainMenuModel) adjustScrollForBody(body app.MenuBody) {
 	}
 }
 
-// View renders the menu by delegating entirely to the controller snapshot.
-// The controller is the single source of truth; no data is read from the model.
-func (m *MainMenuModel) View() string {
-	body := m.ctrl.Snapshot().Body.Menu
-	if body == nil {
-		return "No resource types"
-	}
-	m.adjustScrollForBody(*body)
-	return m.RenderBody(*body)
-}
-
 // SetSize updates terminal dimensions.
 func (m *MainMenuModel) SetSize(w, h int) {
 	m.width = w
 	m.height = h
-}
-
-// FrameTitle delegates to the controller.
-func (m MainMenuModel) FrameTitle() string {
-	return m.ctrl.MenuFrameTitle()
-}
-
-// BottomHints implements Hintable for MainMenuModel.
-// Single-sourced in app.MenuFooterHintsFor, shared with the web footer
-// (ViewState.Footer) so the two renderers cannot drift. The TUI always
-// renders in terminal mode ("" — non-web), so it passes "" regardless of
-// demo mode; MenuFooterHintsFor keys on web-vs-not-web, not on demo.
-func (m MainMenuModel) BottomHints() []layout.KeyHint {
-	src := app.MenuFooterHintsFor("")
-	hints := make([]layout.KeyHint, len(src))
-	for i, h := range src {
-		hints[i] = layout.KeyHint{Key: h.Key, Desc: h.Help}
-	}
-	return hints
-}
-
-// SelectedItem returns the resource type at the current cursor.
-func (m MainMenuModel) SelectedItem() resource.ResourceTypeDef {
-	item, _ := m.ctrl.MenuSelected()
-	return item
-}
-
-// SetFilter delegates filter updates to the controller.
-func (m *MainMenuModel) SetFilter(filterText string) {
-	m.ctrl.Apply(app.Action{Kind: app.ActionSetFilter, Arg: filterText})
-	m.scrollOffset = 0
-}
-
-// SetAvailability updates the resource count for a resource type.
-// Paired with the current truncated value from the controller to satisfy the
-// PatchMenuAvailability pairing requirement (Count + Truncated travel together).
-func (m *MainMenuModel) SetAvailability(shortName string, count int) {
-	truncated := m.ctrl.GetMenuTruncated()[shortName]
-	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenuAvailability{
-		ResourceType: shortName,
-		Count:        count,
-		Truncated:    truncated,
-	}})
-}
-
-// ClearAvailability resets all availability and issue state via the controller.
-func (m *MainMenuModel) ClearAvailability() {
-	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
-}
-
-// GetAvailability returns a copy of the availability map from the controller.
-func (m *MainMenuModel) GetAvailability() map[string]int {
-	return m.ctrl.GetMenuAvailability()
-}
-
-// SetTruncated records whether a resource type's count is truncated.
-// Paired with the current availability count from the controller (PatchMenuAvailability
-// carries Count + Truncated together).
-func (m *MainMenuModel) SetTruncated(shortName string, truncated bool) {
-	count := m.ctrl.GetMenuAvailability()[shortName]
-	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenuAvailability{
-		ResourceType: shortName,
-		Count:        count,
-		Truncated:    truncated,
-	}})
-}
-
-// GetTruncated returns a copy of the truncated map from the controller.
-func (m *MainMenuModel) GetTruncated() map[string]bool {
-	return m.ctrl.GetMenuTruncated()
-}
-
-// SetCheckProgress updates the background check progress indicator.
-func (m *MainMenuModel) SetCheckProgress(checked, total int) {
-	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenuCheckProgress{
-		Checked: checked,
-		Total:   total,
-	}})
-}
-
-// SetIssues updates the issue count for a resource type.
-func (m *MainMenuModel) SetIssues(shortName string, count int, truncated bool) {
-	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenu{
-		ResourceType: shortName,
-		Issues:       count,
-		Truncated:    truncated,
-	}})
-}
-
-// SetIssuesFromCache bulk-loads issue counts from cache.
-// A nil known map is a no-op; an empty (non-nil) known map initializes
-// the issue maps to empty, matching the pre-controller behavior.
-func (m *MainMenuModel) SetIssuesFromCache(counts map[string]int, truncated map[string]bool, known map[string]bool) {
-	if known == nil {
-		return
-	}
-	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenuIssueBatch{
-		Counts:    counts,
-		Truncated: truncated,
-		Known:     known,
-	}})
-}
-
-// GetIssueCounts returns a copy of the issue-count map from the controller.
-func (m *MainMenuModel) GetIssueCounts() map[string]int {
-	return m.ctrl.GetMenuIssueCounts()
-}
-
-// GetIssueTruncated returns a copy of the issue-truncated map from the controller.
-func (m *MainMenuModel) GetIssueTruncated() map[string]bool {
-	return m.ctrl.GetMenuIssueTruncated()
-}
-
-// GetIssueKnown returns a copy of the issue-known map from the controller.
-func (m *MainMenuModel) GetIssueKnown() map[string]bool {
-	return m.ctrl.GetMenuIssueKnown()
-}
-
-// SetEnrichProgress updates Wave 2 enrichment progress counters.
-func (m *MainMenuModel) SetEnrichProgress(checked, total int) {
-	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenuEnrichProgress{
-		Checked: checked,
-		Total:   total,
-	}})
-}
-
-// Toggle flips the attention-only filter via the controller.
-func (m *MainMenuModel) Toggle() {
-	m.ctrl.Apply(app.Action{Kind: app.ActionToggleAttention})
-}
-
-// IsEnabled reports whether the attention-only filter is currently active.
-func (m MainMenuModel) IsEnabled() bool {
-	body := m.ctrl.Snapshot().Body.Menu
-	if body == nil {
-		return false
-	}
-	return body.AttentionOnly
-}
-
-// SetEnabled sets the attention-only filter to the given state via the controller.
-// Calling SetEnabled(true) when already true (or false when already false) is a
-// no-op because ActionToggleAttention flips the current state; this method reads
-// the current state and only applies the toggle when it would change the value.
-func (m *MainMenuModel) SetEnabled(enabled bool) {
-	if m.IsEnabled() != enabled {
-		m.ctrl.Apply(app.Action{Kind: app.ActionToggleAttention})
-	}
 }
 
 // renderLine represents a single line in the menu: either a category header or a selectable item.

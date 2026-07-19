@@ -9,7 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // ===========================================================================
@@ -1283,97 +1282,16 @@ func TestQA_EC2_D8_DetailToYAMLAndBackToDetail(t *testing.T) {
 }
 
 // ===========================================================================
-// E. FilterResources unit tests (direct function test)
+// E. FilterResources — legacy views.FilterResources pins removed
+// (022-codebase-cleanup wave 3). Fields-value / Findings-phrase / ID / Name /
+// no-match / empty-query branches are now pinned on the live
+// app.Controller+ActionSetFilter seam: see
+// TestWave3ListFilter_MatchesFieldsValue_{PrivateIP,PublicIP,InstanceType},
+// TestWave3ListFilter_MatchesFindingsPhrase_CaseInsensitive
+// (tests/unit/wave3_list_ports_test.go), and TestListFilter_MatchingRowsOnly,
+// TestListFilter_NoMatchProducesZeroRows, TestListFilter_EmptyFilterShowsAll,
+// TestListFilter_S3_MatchesBucketName (core/app/list_test.go).
 // ===========================================================================
-
-func TestQA_EC2_FilterResources_ByInstanceID(t *testing.T) {
-	instances := fixtureEC2Instances()
-	result := views.FilterResources("i-0aaa", instances)
-	if len(result) != 1 {
-		t.Errorf("filter by 'i-0aaa' should return 1 instance, got %d", len(result))
-	}
-	if len(result) == 1 && result[0].ID != "i-0aaa111111111111a" {
-		t.Errorf("filtered instance should be i-0aaa111111111111a, got %s", result[0].ID)
-	}
-}
-
-func TestQA_EC2_FilterResources_ByStatus(t *testing.T) {
-	instances := fixtureEC2Instances()
-	result := views.FilterResources("terminated", instances)
-	if len(result) != 1 {
-		t.Errorf("filter by 'terminated' should return 1 instance, got %d", len(result))
-	}
-}
-
-func TestQA_EC2_FilterResources_ByType(t *testing.T) {
-	instances := fixtureEC2Instances()
-	result := views.FilterResources("g4dn", instances)
-	if len(result) != 1 {
-		t.Errorf("filter by 'g4dn' should return 1 instance, got %d", len(result))
-	}
-}
-
-func TestQA_EC2_FilterResources_ByIP(t *testing.T) {
-	instances := fixtureEC2Instances()
-	result := views.FilterResources("10.0.48", instances)
-	if len(result) != 2 {
-		t.Errorf("filter by '10.0.48' should return 2 instances, got %d", len(result))
-	}
-}
-
-func TestQA_EC2_FilterResources_CaseInsensitive(t *testing.T) {
-	instances := fixtureEC2Instances()
-	result := views.FilterResources("RUNNING", instances)
-	runningCount := 0
-	for _, inst := range instances {
-		if inst.Fields["state"] == "running" {
-			runningCount++
-		}
-	}
-	if len(result) != runningCount {
-		t.Errorf("case-insensitive filter 'RUNNING' should return %d instances, got %d", runningCount, len(result))
-	}
-}
-
-func TestQA_EC2_FilterResources_NoMatch(t *testing.T) {
-	instances := fixtureEC2Instances()
-	result := views.FilterResources("zzzznotexist", instances)
-	if len(result) != 0 {
-		t.Errorf("filter with no match should return 0, got %d", len(result))
-	}
-}
-
-func TestQA_EC2_FilterResources_EmptyQuery(t *testing.T) {
-	instances := fixtureEC2Instances()
-	result := views.FilterResources("", instances)
-	if len(result) != len(instances) {
-		t.Errorf("empty filter should return all %d instances, got %d", len(instances), len(result))
-	}
-}
-
-func TestQA_EC2_FilterResources_ByName(t *testing.T) {
-	instances := fixtureEC2Instances()
-	result := views.FilterResources("kafka", instances)
-	if len(result) != 1 {
-		t.Errorf("filter by 'kafka' should return 1 instance, got %d", len(result))
-	}
-}
-
-func TestQA_EC2_FilterResources_ByPublicIP(t *testing.T) {
-	instances := fixtureEC2Instances()
-	result := views.FilterResources("203.0.113.20", instances)
-	if len(result) != 1 {
-		t.Errorf("filter by '203.0.113.20' should return 1 instance, got %d", len(result))
-	}
-}
-
-func TestQA_EC2_FilterResources_ByLaunchTime(t *testing.T) {
-	instances := fixtureEC2Instances()
-	result := views.FilterResources("2026-03-17", instances)
-	if len(result) != 1 {
-		t.Errorf("filter by '2026-03-17' should return 1 instance, got %d", len(result))
-	}
-}
 
 // ===========================================================================
 // Flash message
@@ -1416,18 +1334,10 @@ func TestQA_EC2_LifecycleColumnData(t *testing.T) {
 	}
 }
 
-func TestQA_EC2_FilterByLifecycle(t *testing.T) {
-	instances := fixtureEC2Instances()
-	result := views.FilterResources("spot", instances)
-
-	// Only the first instance (i-0aaa, GPU) has lifecycle "spot"
-	if len(result) != 1 {
-		t.Errorf("filter by 'spot' should return 1 instance, got %d", len(result))
-	}
-	if len(result) == 1 && result[0].ID != "i-0aaa111111111111a" {
-		t.Errorf("filtered instance should be i-0aaa111111111111a, got %s", result[0].ID)
-	}
-}
+// TestQA_EC2_FilterByLifecycle (views.FilterResources("spot", ...)) removed —
+// same Fields-value substring-match branch already pinned generically by
+// TestWave3ListFilter_MatchesFieldsValue_InstanceType (wave3_list_ports_test.go)
+// on the live app.Controller+ActionSetFilter seam.
 
 func TestQA_EC2_DetailShowsLifecycle(t *testing.T) {
 	instances := fixtureEC2Instances()

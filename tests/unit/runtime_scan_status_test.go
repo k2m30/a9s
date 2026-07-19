@@ -355,3 +355,89 @@ func TestScanStatus_ResetOnRotate(t *testing.T) {
 		t.Errorf("ScanStatus after Rotate() = %v, want empty — a profile/region switch must clear the prior pair's scan status", got)
 	}
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// 5 — enrichment rerun without a fresh availability probe
+// ────────────────────────────────────────────────────────────────────────────
+
+// TestScanStatus_EnrichmentRerun_ReflectsLatestProbe pins the intended
+// contract for a type re-enriched (list re-open, Ctrl+R re-enrich) without
+// an intervening AvailabilityChecked: each EnrichmentChecked must recompute
+// the exposed Outcome/Err from the availability baseline plus THIS
+// enrichment probe only — not fold onto whatever the previous
+// EnrichmentChecked left behind. A stale partial/Err from an earlier failed
+// enrichment must not survive a subsequent clean rerun, and Duration must
+// stay availability-baseline + latest-enrichment, never accumulate every
+// enrichment rerun this type has ever had.
+func TestScanStatus_EnrichmentRerun_ReflectsLatestProbe(t *testing.T) {
+	accessDeniedErr := func(resourceID string) error {
+		return fmt.Errorf("describe %s: %w", resourceID, &smithy.GenericAPIError{
+			Code:    "AccessDeniedException",
+			Message: "not authorized",
+		})
+	}
+	oneResource := []resource.Resource{{ID: "res-1", Name: "res-1", Type: "synthetic"}}
+
+	t.Run("failed_enrichment_then_clean_rerun_recovers_ok", func(t *testing.T) {
+		c := newExecutorCore(t)
+		const shortName = "scan-status-rerun-recover"
+
+		c.HandleEvent(messages.AvailabilityChecked{
+			ResourceType: shortName, HasResources: true, Resources: oneResource,
+			Gen: c.AvailabilityGen(), Duration: 10 * time.Millisecond,
+		})
+		c.HandleEvent(messages.EnrichmentChecked{
+			ResourceType: shortName, Err: accessDeniedErr("res-1"),
+			Gen: c.EnrichmentGen(), Duration: 3 * time.Millisecond,
+		})
+		c.HandleEvent(messages.EnrichmentChecked{
+			ResourceType: shortName,
+			Gen:          c.EnrichmentGen(), Duration: 4 * time.Millisecond,
+		})
+
+		got, ok := scanStatusFor(c, shortName)
+		if !ok {
+			t.Fatalf("ScanStatus has no entry for %q", shortName)
+		}
+		if got.Outcome != runtime.ProbeOK {
+			t.Errorf("Outcome = %q, want %q — a clean rerun must clear a stale partial from an earlier failed enrichment", got.Outcome, runtime.ProbeOK)
+		}
+		if got.Err != "" {
+			t.Errorf("Err = %q, want %q — a clean rerun must clear the stale classification from an earlier failed enrichment", got.Err, "")
+		}
+		wantDur := 10*time.Millisecond + 4*time.Millisecond
+		if got.Duration != wantDur {
+			t.Errorf("Duration = %v, want %v (availability + LATEST enrichment only, not every enrichment rerun summed)", got.Duration, wantDur)
+		}
+	})
+
+	t.Run("two_clean_reruns_dont_accumulate_duration", func(t *testing.T) {
+		c := newExecutorCore(t)
+		const shortName = "scan-status-rerun-clean"
+
+		c.HandleEvent(messages.AvailabilityChecked{
+			ResourceType: shortName, HasResources: true, Resources: oneResource,
+			Gen: c.AvailabilityGen(), Duration: 10 * time.Millisecond,
+		})
+		c.HandleEvent(messages.EnrichmentChecked{
+			ResourceType: shortName,
+			Gen:          c.EnrichmentGen(), Duration: 3 * time.Millisecond,
+		})
+		c.HandleEvent(messages.EnrichmentChecked{
+			ResourceType: shortName,
+			Gen:          c.EnrichmentGen(), Duration: 4 * time.Millisecond,
+		})
+
+		got, ok := scanStatusFor(c, shortName)
+		if !ok {
+			t.Fatalf("ScanStatus has no entry for %q", shortName)
+		}
+		if got.Outcome != runtime.ProbeOK {
+			t.Errorf("Outcome = %q, want %q", got.Outcome, runtime.ProbeOK)
+		}
+		wantDur := 10*time.Millisecond + 4*time.Millisecond
+		if got.Duration != wantDur {
+			t.Errorf("Duration = %v, want %v (availability + LATEST enrichment only, not accumulated across reruns)", got.Duration, wantDur)
+		}
+	})
+}

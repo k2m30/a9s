@@ -76,6 +76,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"charm.land/bubbles/v2/viewport"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/config"
@@ -1155,5 +1156,405 @@ func TestWave3_DetailCursor_ClearFinding_PreservesCursorIdentity(t *testing.T) {
 	if postRow.Key != preRow.Key || postRow.Path != preRow.Path {
 		t.Errorf("cursor jumped on finding clear:\n  before: FieldCursor=%d Key=%q Path=%q\n  after:  FieldCursor=%d Key=%q Path=%q",
 			preCursor, preRow.Key, preRow.Path, postCursor, postRow.Key, postRow.Path)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 5. ct-events render-level ports — live-seam replacements for
+//    views_detail_ct_events_test.go (022-codebase-cleanup wave 3, DetailModel
+//    cluster, now deleted). Section-order/severity/target-navigability pins
+//    already have MORE precise pure-logic equivalents (ctevent_sections_test.go,
+//    ctevent_target_test.go) and were deleted rather than ported. These 5
+//    render-only behaviors have no pure-logic equivalent — they depend on
+//    buildDetailFieldItems' fallback/error wiring and the RenderDetail frame
+//    composition, so they stay pinned on the live NewTransientDetail seam.
+// ---------------------------------------------------------------------------
+
+// minimalCTJSON is the minimum valid CloudTrail event JSON for a Management
+// AwsApiCall. Uses synthetic account ID 111111111111 (no real data). Moved
+// here from the deleted views_detail_ct_events_test.go — still needed by
+// TestWave3_CTEvents_LiveProjector_SectionHeadersPresentInOrder/DataRowsBetweenSections.
+const minimalCTJSON = `{
+	"eventVersion":"1.08",
+	"eventTime":"2026-04-07T14:02:11Z",
+	"eventSource":"ec2.amazonaws.com",
+	"eventName":"DescribeInstances",
+	"awsRegion":"us-east-1",
+	"sourceIPAddress":"10.0.14.221",
+	"userAgent":"aws-sdk-go-v2/1.30.3",
+	"userIdentity":{
+		"type":"IAMUser",
+		"arn":"arn:aws:iam::111111111111:user/test",
+		"accountId":"111111111111",
+		"userName":"test"
+	},
+	"eventCategory":"Management",
+	"eventType":"AwsApiCall"
+}`
+
+// buildCTEventsResource builds a resource.Resource whose RawStruct is a
+// cloudtrailtypes.Event (the AWS SDK type), exactly as buildCTResource does in
+// core/aws/ct_events.go. The CloudTrailEvent field holds the raw JSON blob.
+// Moved here from the deleted views_detail_ct_events_test.go.
+func buildCTEventsResource(id, eventName, status, rawJSON string) resource.Resource {
+	ct := cloudtrailtypes.Event{
+		EventId:         new(id),
+		EventName:       new(eventName),
+		CloudTrailEvent: new(rawJSON),
+	}
+	return resource.Resource{
+		ID:        id,
+		Name:      eventName,
+		RawStruct: ct,
+		Fields: map[string]string{
+			"event_name": eventName,
+			"status":     status,
+		},
+	}
+}
+
+func wave3RenderDetailFor(t *testing.T, res resource.Resource, resourceType string, w, h int) string {
+	t.Helper()
+	c := newDetailController(t, res, resourceType)
+	c.SetViewConfig(configForType(resourceType))
+	c.InitDetailRelatedRows(resourceType)
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatalf("Body.Detail is nil for %s", resourceType)
+	}
+	vp := viewport.New(viewport.WithWidth(w), viewport.WithHeight(h))
+	m := views.NewTransientDetail(w, h, vp)
+	return m.RenderDetail(*body)
+}
+
+// TestWave3_CTEvents_NoRawJSON_FallsBackToGenericFields is the live-seam
+// replacement for TestDetailViewCTEvents_NoRawJSON_RendersFlatFields: a bare
+// ct-events stub (no CloudTrailEvent JSON — e.g. a cached drill-in stub)
+// must fall back to the generic Fields projector via buildDetailFieldItems'
+// "sections empty -> generic(r)" branch, not render "No detail data available".
+func TestWave3_CTEvents_NoRawJSON_FallsBackToGenericFields(t *testing.T) {
+	res := resource.Resource{
+		ID:   "evt-fallback-000",
+		Name: "FallbackEvent",
+		Fields: map[string]string{
+			"event_name": "FallbackEvent",
+			// A value distinct from res.Name, on a DIFFERENT curated
+			// ct-events detail field ("Username", defaults_monitoring.go) —
+			// the detail header already renders the resource Name
+			// regardless of whether the generic Fields projector ran at
+			// all, so asserting on "FallbackEvent" alone would pass even
+			// with a broken projector. This value can only appear by the
+			// generic projector actually reading r.Fields["username"].
+			"username": "generic-only-value",
+		},
+	}
+	plain := stripAnsi(wave3RenderDetailFor(t, res, "ct-events", 120, 40))
+
+	if strings.Contains(plain, "No detail data available") {
+		t.Errorf("stub ct-events resource rendered as 'No detail data available'; expected fallback to generic projector. View:\n%s", plain)
+	}
+	if !strings.Contains(plain, "generic-only-value") {
+		t.Errorf("stub ct-events resource missing generic-projector-only field value 'generic-only-value'. View:\n%s", plain)
+	}
+}
+
+// TestWave3_CTEvents_BrokenRawJSON_SurfacesExplicitError is the live-seam
+// replacement for TestDetailViewCTEvents_BrokenRawJSON_SurfacesExplicitError
+// (#280): a non-empty but unparseable CloudTrailEvent JSON blob must surface
+// ctevent.Project's explicit "unable to parse" error section rather than
+// silently degrading to the flat Fields path.
+func TestWave3_CTEvents_BrokenRawJSON_SurfacesExplicitError(t *testing.T) {
+	broken := `{"eventVersion":"1.08","eventName":` // truncated — parser should error
+	ct := cloudtrailtypes.Event{
+		EventId:         new("abc12345-0000-0000-0000-00000000bad1"),
+		EventName:       new("BrokenEvent"),
+		CloudTrailEvent: new(broken),
+	}
+	res := resource.Resource{ID: "abc12345-0000-0000-0000-00000000bad1", Name: "BrokenEvent", RawStruct: ct}
+
+	plain := stripAnsi(wave3RenderDetailFor(t, res, "ct-events", 120, 40))
+	if !strings.Contains(strings.ToLower(plain), "unable to parse") {
+		t.Errorf("expected explicit parse-failure message in view, got:\n%s", plain)
+	}
+}
+
+// TestWave3_CTEvents_NonCTEventsUnaffected is the live-seam replacement for
+// TestDetailViewCTEvents_NonCTEventsUnaffected: an ec2 resource's detail
+// render must not contain ct-events section labels — the ctevent.Project
+// branch is gated strictly on resourceType == "ct-events".
+func TestWave3_CTEvents_NonCTEventsUnaffected(t *testing.T) {
+	res := resource.Resource{
+		ID:   "i-0aabbccdd11223344",
+		Name: "web-server",
+		Fields: map[string]string{
+			"InstanceId":       "i-0aabbccdd11223344",
+			"InstanceType":     "t3.medium",
+			"PrivateIpAddress": "10.0.1.42",
+		},
+	}
+	plain := stripAnsi(wave3RenderDetailFor(t, res, "ec2", 120, 40))
+
+	for _, label := range []string{"ACTOR", "ACTION", "CONTEXT"} {
+		if strings.Contains(plain, label) {
+			t.Errorf("ec2 detail render must NOT contain ct-events section label %q; view:\n%s", label, plain)
+		}
+	}
+}
+
+// TestWave3_CTEvents_FrameBorderPresent is the live-seam replacement for
+// TestDetailViewCTEvents_Regression_FrameBorder: a regression guard for the
+// hasSectionItems() bypass bug where section-based field lists skipped the
+// frame wrapper entirely (no │ border character in the output).
+func TestWave3_CTEvents_FrameBorderPresent(t *testing.T) {
+	ct := cloudtrailtypes.Event{
+		EventId:         new("abc12345-0000-0000-0000-000000000009"),
+		EventName:       new("DescribeInstances"),
+		CloudTrailEvent: new(minimalCTJSON),
+	}
+	res := resource.Resource{ID: "abc12345-0000-0000-0000-000000000009", Name: "DescribeInstances", RawStruct: ct}
+
+	plain := stripAnsi(wave3RenderDetailFor(t, res, "ct-events", 120, 40))
+	if !strings.Contains(plain, "│") {
+		t.Errorf("ct-events detail render missing frame border character │ — hasSectionItems() bypass regression; view:\n%s", plain)
+	}
+}
+
+// TestWave3_CTEvents_RelatedRightColumnVisibleOnWideTerminal is the live-seam
+// replacement for TestDetailViewCTEvents_Regression_RelatedRightColumn: the
+// RELATED right-column panel must be composed into the render for a
+// ct-events detail on a wide terminal, relying on production's real
+// resource.GetRelated("ct-events") registration (no test-only defs).
+// ---------------------------------------------------------------------------
+// 21. Scalar NavID extraction — ported from internal/tui/views/
+// detail_scalar_navid_test.go (round 5, specs/022-codebase-cleanup, DetailModel
+// core cleanup): buildFieldList is dead; the live equivalent is
+// buildDetailFieldItems (detail_body.go), which populates the same
+// NavID-from-value post-processing on app.FieldRow. Regression pin: NavID was
+// only applied to YAML sub-fields (IsSubField=true), not top-level scalar
+// navigable fields, so a Lambda Role ARN's NavID stayed "" and navigation used
+// the full ARN as the target ID instead of the bare role name.
+// ---------------------------------------------------------------------------
+
+func wave3LambdaViewConfig() *config.ViewsConfig {
+	return &config.ViewsConfig{
+		Views: map[string]config.ViewDef{
+			"lambda": {
+				Detail: []config.DetailField{
+					{Path: "Role"},
+					{Path: "Runtime"},
+					{Path: "Handler"},
+					{Path: "MemorySize"},
+					{Path: "Timeout"},
+				},
+			},
+		},
+	}
+}
+
+func wave3FindFieldRow(fields []app.FieldRow, pathOrKey string) *app.FieldRow {
+	for i := range fields {
+		f := &fields[i]
+		if f.Path == pathOrKey || f.Key == pathOrKey {
+			return f
+		}
+	}
+	return nil
+}
+
+// TestWave3_DetailFieldItems_ScalarNavigableField_AppliesNavIDFromValue is the
+// live-seam replacement for detail_scalar_navid_test.go's
+// TestBuildFieldList_ScalarNavigableField_AppliesNavIDFromValue.
+func TestWave3_DetailFieldItems_ScalarNavigableField_AppliesNavIDFromValue(t *testing.T) {
+	const roleARN = "arn:aws:iam::123456789012:role/my-lambda-role"
+	const wantNavID = "my-lambda-role"
+
+	res := resource.Resource{
+		ID:   "arn:aws:lambda:us-east-1:123456789012:function:my-fn",
+		Name: "my-fn",
+		Fields: map[string]string{
+			"Role":        roleARN,
+			"Runtime":     "go1.x",
+			"Handler":     "bootstrap",
+			"MemorySize":  "128",
+			"Timeout":     "30",
+			"FunctionArn": "arn:aws:lambda:us-east-1:123456789012:function:my-fn",
+		},
+	}
+
+	resource.SetNavigableFieldsForTest("lambda", []resource.NavigableField{
+		{FieldPath: "Role", TargetType: "role"},
+	})
+	t.Cleanup(func() { resource.CleanupNavigableFieldsForTest("lambda") })
+
+	c := newDetailController(t, res, "lambda")
+	c.SetViewConfig(wave3LambdaViewConfig())
+
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil")
+	}
+
+	roleField := wave3FindFieldRow(body.Fields, "Role")
+	if roleField == nil {
+		t.Fatalf("Fields does not contain a FieldRow with Path/Key='Role'; fields: %+v", body.Fields)
+	}
+	if !roleField.IsNavigable {
+		t.Errorf("Role FieldRow.IsNavigable = false, want true (registered as NavigableField)")
+	}
+	if roleField.TargetType != "role" {
+		t.Errorf("Role FieldRow.TargetType = %q, want %q", roleField.TargetType, "role")
+	}
+	if roleField.Value != roleARN {
+		t.Errorf("Role FieldRow.Value = %q, want %q", roleField.Value, roleARN)
+	}
+	if roleField.NavID != wantNavID {
+		t.Errorf("Role FieldRow.NavID = %q, want %q\n"+
+			"buildDetailFieldItems must apply NavIDFromValue to top-level scalar navigable fields, "+
+			"not just YAML sub-fields", roleField.NavID, wantNavID)
+	}
+}
+
+// TestWave3_DetailFieldItems_ScalarNavigableField_NoExtractor_NavIDEmpty is
+// the live-seam replacement for detail_scalar_navid_test.go's
+// TestBuildFieldList_ScalarNavigableField_NoExtractor_NavIDEmpty.
+func TestWave3_DetailFieldItems_ScalarNavigableField_NoExtractor_NavIDEmpty(t *testing.T) {
+	const subnetID = "subnet-0aaa111111111111a"
+
+	res := resource.Resource{
+		ID:   "i-0a1b2c3d4e5f60001",
+		Name: "web-prod-01",
+		Fields: map[string]string{
+			"SubnetId":     subnetID,
+			"InstanceType": "t3.large",
+		},
+	}
+
+	resource.SetNavigableFieldsForTest("ec2", []resource.NavigableField{
+		{FieldPath: "SubnetId", TargetType: "subnet"},
+	})
+	t.Cleanup(func() { resource.CleanupNavigableFieldsForTest("ec2") })
+
+	c := newDetailController(t, res, "ec2")
+	c.SetViewConfig(&config.ViewsConfig{
+		Views: map[string]config.ViewDef{
+			"ec2": {
+				Detail: []config.DetailField{
+					{Path: "SubnetId"},
+					{Path: "InstanceType"},
+				},
+			},
+		},
+	})
+
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil")
+	}
+
+	subnetField := wave3FindFieldRow(body.Fields, "SubnetId")
+	if subnetField == nil {
+		t.Fatalf("Fields does not contain a FieldRow with Path/Key='SubnetId'; fields: %+v", body.Fields)
+	}
+	if !subnetField.IsNavigable {
+		t.Errorf("SubnetId FieldRow.IsNavigable = false, want true")
+	}
+	// "subnet" has no NavID extractor — NavID must remain empty.
+	if subnetField.NavID != "" {
+		t.Errorf("SubnetId FieldRow.NavID = %q, want %q "+
+			"(subnet has no NavID extractor; full value is used for navigation)",
+			subnetField.NavID, "")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 22. Attention color-cap rule — ported from internal/tui/views/
+// attention_color_cap_test.go (round 5, specs/022-codebase-cleanup, DetailModel
+// core cleanup): capTierToRowBucket/resolveRowColorBucket are dead; the live
+// equivalents are capTierToRowBucketDetail + ResourceTypeDef.ResolveColor
+// (core/app/detail_body.go), unexported/package-app so not directly callable
+// from tests/unit — exercised end-to-end instead via the public
+// ApplyDetailFinding + Snapshot().Body.Detail seam. Pins the universal rule: a
+// `!` severity tier caps to `~` unless the row's own S2 color bucket is
+// Broken, so the detail view never contradicts the list row's severity.
+// ---------------------------------------------------------------------------
+
+func wave3AttentionPhraseRowColorTier(t *testing.T, body *app.DetailBody, phraseSubstr string) string {
+	t.Helper()
+	rows := wave3AttentionRowsForCode(body, phraseSubstr)
+	if len(rows) == 0 {
+		t.Fatalf("no Attention row found for phrase substring %q", phraseSubstr)
+	}
+	return rows[0].ColorTier
+}
+
+// TestWave3_AttentionColorCap_BrokenSeverity_CapsToWarnOnHealthyBucket pins
+// the cap direction: a SevBroken finding ("!" tier) on a resource whose S2
+// color bucket is Healthy (dbc status "") must render capped to "~".
+func TestWave3_AttentionColorCap_BrokenSeverity_CapsToWarnOnHealthyBucket(t *testing.T) {
+	res := resource.Resource{ID: "dbc-cap-healthy", Fields: map[string]string{"status": ""}}
+	c := newDetailController(t, res, "dbc")
+	c.ApplyDetailFinding(&domain.Finding{
+		Code: "dbc.test-broken", Phrase: "encryption key unreachable", Severity: domain.SevBroken, Source: "wave2:test",
+	}, nil)
+
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil")
+	}
+	if got := wave3AttentionPhraseRowColorTier(t, body, "encryption key unreachable"); got != "~" {
+		t.Errorf("ColorTier = %q, want %q (Broken-severity finding on a Healthy-bucket dbc must cap to ~)", got, "~")
+	}
+}
+
+// TestWave3_AttentionColorCap_BrokenSeverity_StaysBrokenOnBrokenBucket pins
+// the non-cap direction: the same SevBroken finding on a resource whose S2
+// color bucket is ALSO Broken (dbc status "failed: cluster operation") must
+// stay "!" — capping only kicks in when it would contradict a less-severe row.
+func TestWave3_AttentionColorCap_BrokenSeverity_StaysBrokenOnBrokenBucket(t *testing.T) {
+	res := resource.Resource{ID: "dbc-cap-broken", Fields: map[string]string{"status": "failed: cluster operation"}}
+	c := newDetailController(t, res, "dbc")
+	c.ApplyDetailFinding(&domain.Finding{
+		Code: "dbc.test-broken", Phrase: "encryption key unreachable", Severity: domain.SevBroken, Source: "wave2:test",
+	}, nil)
+
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil")
+	}
+	if got := wave3AttentionPhraseRowColorTier(t, body, "encryption key unreachable"); got != "!" {
+		t.Errorf("ColorTier = %q, want %q (Broken-severity finding on an already-Broken-bucket dbc must stay !)", got, "!")
+	}
+}
+
+// TestWave3_AttentionColorCap_UnregisteredType_FallsBackToHealthy pins the
+// safe default for an unregistered resource type (ResourceTypeDef nil):
+// treated as Healthy, so a SevBroken finding still caps to ~.
+func TestWave3_AttentionColorCap_UnregisteredType_FallsBackToHealthy(t *testing.T) {
+	res := resource.Resource{ID: "unreg-cap"}
+	c := newDetailController(t, res, "wave3_no_such_type_cap_test")
+	c.ApplyDetailFinding(&domain.Finding{
+		Code: "unreg.test-broken", Phrase: "broken finding on unregistered type", Severity: domain.SevBroken, Source: "wave2:test",
+	}, nil)
+
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil")
+	}
+	if got := wave3AttentionPhraseRowColorTier(t, body, "broken finding on unregistered type"); got != "~" {
+		t.Errorf("ColorTier = %q, want %q (unregistered type falls back to Healthy, capping ! to ~)", got, "~")
+	}
+}
+
+func TestWave3_CTEvents_RelatedRightColumnVisibleOnWideTerminal(t *testing.T) {
+	defs := resource.GetRelated("ct-events")
+	if len(defs) == 0 {
+		t.Fatal(`resource.GetRelated("ct-events") returned no defs — SetRelatedForTest not called in production init`)
+	}
+
+	res := resource.Resource{ID: "abc12345-0000-0000-0000-00000000000a", Name: "DescribeInstances"}
+	plain := stripAnsi(wave3RenderDetailFor(t, res, "ct-events", 180, 40))
+
+	if !strings.Contains(plain, "RELATED") {
+		t.Errorf(`ct-events detail render missing "RELATED" header on wide terminal (180 cols); view snippet:\n%.500s`, plain)
 	}
 }

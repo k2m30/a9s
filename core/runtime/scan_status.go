@@ -140,11 +140,21 @@ func degradeForEnrichment(prev ProbeOutcome, err error, truncated bool) ProbeOut
 
 // setProbeStatus is the shared write path both handleAvailabilityChecked
 // and handleEnrichmentChecked use to update a type's scan-status record.
-func (c *Core) setProbeStatus(shortName string, outcome ProbeOutcome, duration time.Duration, errClass string, at time.Time) {
+// outcome/duration/errClass are the AGGREGATE fields (ScanStatus's public
+// shape); availOutcome/availDuration/availErr are the Wave-1 baseline this
+// aggregate was computed from — handleAvailabilityChecked passes its own
+// values for both (a fresh probe IS the new baseline), while
+// handleEnrichmentChecked passes through the baseline it read from the PRIOR
+// record, unchanged, so a later enrichment rerun folds from the same
+// baseline rather than the previous rerun's aggregate (#462/#463 defect 1).
+func (c *Core) setProbeStatus(shortName string, outcome ProbeOutcome, duration time.Duration, errClass string, at time.Time, availOutcome ProbeOutcome, availDuration time.Duration, availErr string) {
 	c.session.SetProbeStatus(shortName, session.ProbeStatusRecord{
-		Outcome:  string(outcome),
-		Duration: duration,
-		Err:      errClass,
-		At:       at,
+		Outcome:       string(outcome),
+		Duration:      duration,
+		Err:           errClass,
+		At:            at,
+		AvailOutcome:  string(availOutcome),
+		AvailDuration: availDuration,
+		AvailErr:      availErr,
 	})
 }

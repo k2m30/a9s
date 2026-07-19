@@ -59,7 +59,6 @@ package unit
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -72,80 +71,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
-	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
-	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
-// 1. S4 in list: a flagged row's Status column shows the concrete Phrase.
-// ---------------------------------------------------------------------------
-
-// wave2S4TypeDef mirrors markerTypeDef (qa_enrichment_marker_test.go) — a
-// "name"+"state" column pair so the Status/lifecycle column is unambiguous.
-func wave2S4TypeDef() resource.ResourceTypeDef {
-	return resource.ResourceTypeDef{
-		ShortName: "ec2",
-		Name:      "EC2 Instances",
-		Columns: []resource.Column{
-			{Key: "name", Title: "Name", Width: 28},
-			{Key: "state", Title: "State", Width: 30},
-		},
-	}
-}
-
-// TestWave2_ListStatusColumn_ShowsConcretePhrase_ForIssueFinding verifies bug
-// (3): a resource carrying an issue-severity enrichment finding
-// ("no automated backups") must show that concrete Phrase in the rendered
-// Status/lifecycle column — not the raw AWS state ("available") the row was
-// seeded with. This is the LIST S4 surface (docs/resources/*.md §4 "S4").
-func TestWave2_ListStatusColumn_ShowsConcretePhrase_ForIssueFinding(t *testing.T) {
-	tuitest.NoColor(t)
-
-	td := wave2S4TypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(120, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "ec2",
-		Resources: []resource.Resource{
-			{
-				ID:     "i-flagged-1",
-				Name:   "billing-db-01",
-				Fields: map[string]string{"name": "billing-db-01", "state": "available"},
-			},
-		},
-	})
-
-	findings := map[string][]domain.Finding{
-		"i-flagged-1": {{
-			Code:     "dbi.no-backups",
-			Phrase:   "no automated backups",
-			Severity: domain.SevWarn,
-			Source:   "wave2:dbi",
-		}},
-	}
-	m.SetEnrichmentState(0, false, findings, nil)
-
-	rendered := m.View()
-	plain := stripANSI(rendered)
-	line := findLineContaining(plain, "billing-db-01")
-	if line == "" {
-		t.Fatal("could not find rendered row for billing-db-01")
-	}
-	if !strings.Contains(line, "no automated backups") {
-		t.Errorf("flagged row's Status column must show the concrete cause %q; got row: %q", "no automated backups", line)
-	}
-	if strings.Contains(line, "available") {
-		t.Errorf("flagged row must NOT still show the raw AWS state %q once an issue finding exists for it; got row: %q", "available", line)
-	}
-}
-
-// ---------------------------------------------------------------------------
+// 1 (S4 in list: a flagged row's Status column shows the concrete Phrase) was
+// TestWave2_ListStatusColumn_ShowsConcretePhrase_ForIssueFinding, a legacy
+// views.ResourceListModel.SetEnrichmentState()/.View()-driven pin. Ported to
+// wave3_list_ports_test.go's TestWave3ListStatusColumn_
+// EnrichmentMapOnlyFinding_OverridesRawState, which drives the same
+// enrichment-map-only status-cell-override branch (list_body.go) through the
+// live Controller.ApplyEnrichmentState seam.
+//
 // 2 and 3 (S5-in-detail full sentence, and Detail=="" fallback) were legacy
 // views.DetailModel.PlainContent()-driven pins for the same claim
 // TestWave3_DetailAttention_RendersFullDetailSentence_AlongsidePhrase /

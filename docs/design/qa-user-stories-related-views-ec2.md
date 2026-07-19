@@ -1018,11 +1018,13 @@ Expected fields visible: InstanceId, State, InstanceType, InstanceLifecycle, Ima
 aws ec2 describe-instances --instance-ids i-...
 Expected fields visible: InstanceId, State, InstanceType, InstanceLifecycle, ImageId, KeyName, Placement, VpcId, SubnetId, PrivateIpAddress, PrivateDnsName, PublicIpAddress, IamInstanceProfile, SecurityGroups, EbsOptimized, MetadataOptions, LaunchTime, Architecture, Platform, Tags
 
-### Story: Shift-Tab also flips focus between the two visible columns
+### Story: Tab flips focus between the two visible columns in both directions
 
 **Given:** EC2 detail is visible with both columns shown
-**When:** the user presses `Shift+Tab`
-**Then:** focus moves to the other column in the same two-column detail screen
+**When:** the user presses `Tab`
+**Then:** focus moves to the other column; pressing `Tab` again returns it. The
+detail screen has exactly two columns, so a single `Tab` toggles focus in both
+directions — no separate `Shift+Tab` binding is provided (it would be redundant).
 
 **AWS comparison:**
 aws ec2 describe-instances --instance-ids i-...
