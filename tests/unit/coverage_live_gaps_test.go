@@ -586,44 +586,38 @@ func TestLiveGap_HandleDetailKeyMsg_RelatedPanelEnter_OnActionableRow_NavigatesU
 }
 
 // ---------------------------------------------------------------------------
-// handleDetailKeyMsg's right-column Up/Down/Enter routing hole while the
-// RELATED panel's filter is active (app_stack.go:367-421 guards those three
-// cases with !rs.rightCol.IsFiltering(), so while filtering they fall into
-// the default branch and reach ONLY RightColumnModel.Update).
-// RightColumnModel.moveCursor (rightcolumn.go) mutates a widget-local
-// m.cursor field that RenderDetail never reads (it reads
-// app.DetailBody.RelatedCursor) and that Controller.SelectedRelatedRow never
-// reads either (core/app/detail_state.go walks DetailState.RelatedCursor via
-// focusedRelatedRow) — so Up/Down/Enter while filtering are silent no-ops on
-// the real navigable state, even though the identical keys work correctly
-// once filtering ends. The widget legitimately owns filter TEXT input
-// (typing/backspace/Escape — pinned by the six
+// handleDetailKeyMsg's right-column Up/Down/Enter routing while the RELATED
+// panel's filter is active (app_stack.go's right-column block in
+// handleDetailKeyMsg). Down must move DetailState.RelatedCursor while
+// filtering (not RightColumnModel's widget-local cursor, which
+// RenderDetail/SelectedRelatedRow never read). Enter's contract is the
+// product's deliberate, list-filter-matching convention, pinned as the
+// authority by
+// TestDemoScenarioHarness_DetailRelatedAndYAMLSearch
+// (tests/integration/scripted_scenario_smoke_test.go): the FIRST Enter while
+// filtering only CONFIRMS the filter text and stays on the detail screen —
+// it must NOT navigate. Only a SECOND, no-longer-filtering Enter navigates,
+// to the row under the (post-confirm) cursor. The widget legitimately owns
+// filter TEXT input (typing/backspace/Escape — pinned by the six
 // TestTopUp_RightColumn_Update_FilterMode_* tests in
-// coverage_topup_whitebox_test.go); only cursor movement/confirmation must
-// reach the controller, exactly like the non-filtering Up/Down/Enter cases
+// coverage_topup_whitebox_test.go); non-filtering Up/Down/Enter routing is
 // already covered above by
-// TestLiveGap_HandleDetailKeyMsg_RelatedPanelEnter_OnActionableRow_NavigatesUsingControllerRow.
-//
-// Non-filtering ActionMoveDown/Up's cursor-skip logic itself
-// (core/app/detail_cursor.go's applyDetailActions) is already pinned
-// headless by TestRelatedCursor_MoveDown_SkipsDimmedRow
-// (app_related_cursor_skip_test.go) and
-// TestRelatedCursor_MoveDown_LandsOnTruncatedResultRow
-// (tui_related_dim_parity_test.go); app_stack.go's non-filtering Down/Up
-// cases are a direct, unconditional m.ctrl.Apply(ActionMoveDown/Up)
-// pass-through to that same logic, so a duplicate full-chain non-filtering
-// Down/Up test would not add coverage beyond what those two tests plus the
-// existing full-chain Enter test above already prove.
+// TestLiveGap_HandleDetailKeyMsg_RelatedPanelEnter_OnActionableRow_NavigatesUsingControllerRow,
+// and non-filtering ActionMoveDown/Up's cursor-skip logic itself
+// (core/app/detail_cursor.go's applyDetailActions) is pinned headless by
+// TestRelatedCursor_MoveDown_SkipsDimmedRow (app_related_cursor_skip_test.go)
+// and TestRelatedCursor_MoveDown_LandsOnTruncatedResultRow
+// (tui_related_dim_parity_test.go).
 // ---------------------------------------------------------------------------
 
-// relatedFilterGapEnterFor builds an EC2 detail with two RELATED rows
+// relatedFilterGapModel builds an EC2 detail with two RELATED rows
 // ("Target Groups" and "Auto Scaling Groups") resolved to a single
 // actionable result each, focuses the RELATED panel, and activates the
 // filter with a query ("groups") that matches both plus three still-Loading
 // (non-actionable, hence skipped-over) rows — "EKS Node Groups", "Security
-// Groups", "Log Groups". extraKeys are sent after the filter text and
-// before the final Enter (e.g. a Down press).
-func relatedFilterGapEnterFor(t *testing.T, extraKeys ...tea.KeyMsg) tea.Cmd {
+// Groups", "Log Groups". extraKeys are sent after the filter text (e.g. a
+// Down press), before the caller drives Enter itself.
+func relatedFilterGapModel(t *testing.T, extraKeys ...tea.KeyMsg) tui.Model {
 	t.Helper()
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -655,63 +649,91 @@ func relatedFilterGapEnterFor(t *testing.T, extraKeys ...tea.KeyMsg) tea.Cmd {
 	for _, k := range extraKeys {
 		m, _ = chainApplyMsg(m, k)
 	}
-
-	_, cmd := chainApplyMsg(m, livegapSpecialKey(tea.KeyEnter))
-	return cmd
+	return m
 }
 
-// TestLiveGap_HandleDetailKeyMsg_RelatedPanelFilterMode_DownMovesControllerCursor_EnterNavigatesSecondMatch
-// is the RED reproduction of the reported regression: while the RELATED
-// panel's filter is active, Down must move DetailState.RelatedCursor (not
-// RightColumnModel's dead local cursor) so that Enter navigates to the
-// SECOND filtered match ("Auto Scaling Groups"), not the first
-// ("Target Groups").
-func TestLiveGap_HandleDetailKeyMsg_RelatedPanelFilterMode_DownMovesControllerCursor_EnterNavigatesSecondMatch(t *testing.T) {
-	cmd := relatedFilterGapEnterFor(t, livegapSpecialKey(tea.KeyDown))
-	if cmd == nil {
-		t.Fatal("Enter after Down while filtering returned a nil cmd, want messages.RelatedNavigate for the second match (Auto Scaling Groups) — Down must move DetailState.RelatedCursor, not RightColumnModel's dead local cursor")
+// TestLiveGap_HandleDetailKeyMsg_RelatedPanelFilterMode_EnterConfirmsFilterWithoutNavigating
+// asserts the FIRST Enter while filtering: no messages.RelatedNavigate cmd,
+// and — after letting any cmd it did return run (mirroring how the real
+// bubbletea runtime would auto-continue it) — the detail screen is still
+// showing the source EC2 resource, matching
+// TestDemoScenarioHarness_DetailRelatedAndYAMLSearch's ConfirmInput() step,
+// which stays on the detail view and asserts the (still-filtered) related
+// row text, never a navigated-away list/detail.
+func TestLiveGap_HandleDetailKeyMsg_RelatedPanelFilterMode_EnterConfirmsFilterWithoutNavigating(t *testing.T) {
+	m := relatedFilterGapModel(t)
+
+	m, cmd := chainApplyMsg(m, livegapSpecialKey(tea.KeyEnter))
+	if cmd != nil {
+		if msg := cmd(); msg != nil {
+			if nav, ok := msg.(messages.RelatedNavigate); ok {
+				t.Errorf("Enter #1 while filtering returned messages.RelatedNavigate{TargetType:%q}, want no navigation — Enter must only confirm the filter and stay on the detail screen", nav.TargetType)
+			}
+			m, _ = chainApplyMsg(m, msg)
+		}
 	}
-	nav, ok := cmd().(messages.RelatedNavigate)
+
+	res, ok := m.ActiveDetailResource()
 	if !ok {
-		t.Fatalf("cmd() = %T, want messages.RelatedNavigate", nav)
+		t.Fatal("expected the detail screen to still be active after the filter-confirm Enter, got no active detail resource")
 	}
-	if nav.TargetType != "asg" {
-		t.Errorf("RelatedNavigate.TargetType = %q, want %q (Down should have moved the cursor off the first match, Target Groups)", nav.TargetType, "asg")
-	}
-	if len(nav.RelatedIDs) != 1 || nav.RelatedIDs[0] != "asg-web-prod-01" {
-		t.Errorf("RelatedNavigate.RelatedIDs = %v, want [asg-web-prod-01]", nav.RelatedIDs)
-	}
-	if nav.TargetID != "asg-web-prod-01" {
-		t.Errorf("RelatedNavigate.TargetID = %q, want %q", nav.TargetID, "asg-web-prod-01")
+	if res.ID != ec2TestResource().ID {
+		t.Errorf("ActiveDetailResource().ID = %q, want %q (filter-confirm Enter must not navigate away from the source EC2 detail)", res.ID, ec2TestResource().ID)
 	}
 }
 
-// TestLiveGap_HandleDetailKeyMsg_RelatedPanelFilterMode_EnterWithoutDown_NavigatesFirstMatch
-// is the baseline companion to the Down test above: with no Down pressed,
-// the cursor must still sit on the FIRST filtered match ("Target Groups"),
-// so Enter — which while filtering must also reach
-// Controller.SelectedRelatedRow instead of only closing the widget's filter
-// input — navigates there. Without this baseline, a fix that reaches
-// SelectedRelatedRow but forgets to move RelatedCursor on Down could produce
-// a false green on the test above for the wrong reason (falling back to
-// whatever the cursor already defaulted to).
-func TestLiveGap_HandleDetailKeyMsg_RelatedPanelFilterMode_EnterWithoutDown_NavigatesFirstMatch(t *testing.T) {
-	cmd := relatedFilterGapEnterFor(t)
-	if cmd == nil {
-		t.Fatal("Enter while filtering (no Down) returned a nil cmd, want messages.RelatedNavigate for the first match (Target Groups) — the RELATED panel's filter-mode Enter must reach Controller.SelectedRelatedRow like the non-filtering Enter case")
+// TestLiveGap_HandleDetailKeyMsg_RelatedPanelFilterMode_SecondEnterNavigatesToSurvivingCursorRow
+// is the confirm-then-navigate half of the same contract: after a first
+// Enter confirms the filter (see the test above — its returned cmd is
+// deliberately NOT executed here, to isolate whether the cursor SURVIVES the
+// confirm from whether that first Enter also, incorrectly, tries to
+// navigate), a SECOND Enter — no longer filtering — navigates to whichever
+// row the cursor points at. This also guards the ActionSetFilter reset trap
+// (core/app/detail_cursor.go's ActionSetFilter case unconditionally resets
+// DetailState.RelatedCursor to 0 whenever it runs, including the confirm
+// sync): a Down press before the confirm must survive it, landing the
+// second Enter on the SECOND filtered match ("Auto Scaling Groups"), not
+// silently back on the first ("Target Groups").
+func TestLiveGap_HandleDetailKeyMsg_RelatedPanelFilterMode_SecondEnterNavigatesToSurvivingCursorRow(t *testing.T) {
+	cases := []struct {
+		name           string
+		down           bool
+		wantTargetType string
+		wantID         string
+	}{
+		{name: "NoDown_FirstMatch", down: false, wantTargetType: "tg", wantID: "tg-web-prod-01"},
+		{name: "AfterDown_SecondMatch", down: true, wantTargetType: "asg", wantID: "asg-web-prod-01"},
 	}
-	nav, ok := cmd().(messages.RelatedNavigate)
-	if !ok {
-		t.Fatalf("cmd() = %T, want messages.RelatedNavigate", nav)
-	}
-	if nav.TargetType != "tg" {
-		t.Errorf("RelatedNavigate.TargetType = %q, want %q (cursor should still be on the first match, Target Groups, with no Down pressed)", nav.TargetType, "tg")
-	}
-	if len(nav.RelatedIDs) != 1 || nav.RelatedIDs[0] != "tg-web-prod-01" {
-		t.Errorf("RelatedNavigate.RelatedIDs = %v, want [tg-web-prod-01]", nav.RelatedIDs)
-	}
-	if nav.TargetID != "tg-web-prod-01" {
-		t.Errorf("RelatedNavigate.TargetID = %q, want %q", nav.TargetID, "tg-web-prod-01")
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var m tui.Model
+			if tc.down {
+				m = relatedFilterGapModel(t, livegapSpecialKey(tea.KeyDown))
+			} else {
+				m = relatedFilterGapModel(t)
+			}
+
+			m, _ = chainApplyMsg(m, livegapSpecialKey(tea.KeyEnter)) // Enter #1: confirm
+
+			_, cmd := chainApplyMsg(m, livegapSpecialKey(tea.KeyEnter)) // Enter #2: navigate
+			if cmd == nil {
+				t.Fatal("Enter #2 (no longer filtering) returned a nil cmd, want messages.RelatedNavigate for the row under the surviving cursor")
+			}
+			nav, ok := cmd().(messages.RelatedNavigate)
+			if !ok {
+				t.Fatalf("cmd() = %T, want messages.RelatedNavigate", nav)
+			}
+			if nav.TargetType != tc.wantTargetType {
+				t.Errorf("RelatedNavigate.TargetType = %q, want %q", nav.TargetType, tc.wantTargetType)
+			}
+			if len(nav.RelatedIDs) != 1 || nav.RelatedIDs[0] != tc.wantID {
+				t.Errorf("RelatedNavigate.RelatedIDs = %v, want [%s]", nav.RelatedIDs, tc.wantID)
+			}
+			if nav.TargetID != tc.wantID {
+				t.Errorf("RelatedNavigate.TargetID = %q, want %q", nav.TargetID, tc.wantID)
+			}
+		})
 	}
 }
 

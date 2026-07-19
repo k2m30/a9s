@@ -206,10 +206,19 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 		// related panel while it is focused, so we trust that intent rather than
 		// re-checking ds.RelatedFocus (which can lag the renderer's focus state).
 		if ds.RelatedVisible {
+			// Only a genuine TEXT change (typing, or Escape clearing to "")
+			// invalidates the current cursor/scroll position against the new
+			// match set. A re-issue with the SAME text — e.g. app_stack.go's
+			// filter-confirm sync on Enter — must leave the cursor where a
+			// prior Down press put it, or confirming the filter would silently
+			// undo the move.
+			textChanged := a.Arg != ds.RelatedFilter
 			ds.RelatedFilter = a.Arg
 			ds.RelatedFilterActive = a.Arg != ""
-			ds.RelatedCursor = 0
-			ds.RelatedScroll = 0
+			if textChanged {
+				ds.RelatedCursor = 0
+				ds.RelatedScroll = 0
+			}
 		}
 		return c.snapshot(), nil, true
 	}
