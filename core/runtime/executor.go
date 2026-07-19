@@ -394,13 +394,14 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		gen := snap.AvailabilityGen
 		res, err := c.FetchChildResources(ctx, snap.Clients, p.ChildType, p.ParentContext)
-		if err != nil {
+		if err != nil && len(res.Resources) == 0 {
 			return messages.APIError{ResourceType: p.ChildType, Err: err, Gen: gen}, nil
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: p.ChildType,
 			Resources:    res.Resources,
 			Pagination:   res.Pagination,
+			Err:          err,
 			Gen:          gen,
 		}, nil
 

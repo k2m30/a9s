@@ -61,13 +61,20 @@ func SaveTheme(filename string) error {
 	}
 	path := filepath.Join(dir, "config.yaml")
 
-	// Read existing config to preserve other keys.
-	var data map[string]any
-	if existing, err := os.ReadFile(path); err == nil {
-		_ = yaml.Unmarshal(existing, &data)
-	}
-	if data == nil {
-		data = make(map[string]any)
+	// Read existing config to preserve other keys. A missing file is fine
+	// (first run creates config.yaml). Any other read error, or a file that
+	// exists but fails to parse, means we cannot safely preserve the
+	// existing keys — return before touching the file rather than silently
+	// discarding it.
+	data := make(map[string]any)
+	existing, err := os.ReadFile(path)
+	switch {
+	case err == nil:
+		if unmarshalErr := yaml.Unmarshal(existing, &data); unmarshalErr != nil {
+			return fmt.Errorf("parsing existing config %s: %w", path, unmarshalErr)
+		}
+	case !os.IsNotExist(err):
+		return fmt.Errorf("reading existing config %s: %w", path, err)
 	}
 	data["theme"] = filename
 
@@ -75,7 +82,32 @@ func SaveTheme(filename string) error {
 	if err != nil {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
-	return os.WriteFile(path, out, 0600)
+
+	// Atomic replace: write to a temp file in the same directory, then
+	// rename over the target, matching core/cache.Store.SaveType's pattern.
+	tmpFile, err := os.CreateTemp(dir, "config.yaml.tmp.*")
+	if err != nil {
+		return fmt.Errorf("creating config temp file in %s: %w", dir, err)
+	}
+	tmpPath := tmpFile.Name()
+	if _, err := tmpFile.Write(out); err != nil {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("writing config %s: %w", tmpPath, err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("closing config %s: %w", tmpPath, err)
+	}
+	if err := os.Chmod(tmpPath, 0600); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("setting permissions on config %s: %w", tmpPath, err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("renaming config %s: %w", path, err)
+	}
+	return nil
 }
 
 // ThemePath resolves a theme filename to an absolute file path within the themes directory.

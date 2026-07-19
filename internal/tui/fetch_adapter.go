@@ -117,13 +117,14 @@ func (m *Model) fetchChildResources(childType string, parentCtx map[string]strin
 	gen := m.core.AvailabilityGen()
 	return func() tea.Msg {
 		res, err := m.core.FetchChildResources(ctx, clients, childType, parentCtx)
-		if err != nil {
+		if err != nil && len(res.Resources) == 0 {
 			return messages.APIError{ResourceType: childType, Err: err, Gen: gen}
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: childType,
 			Resources:    res.Resources,
 			Pagination:   res.Pagination,
+			Err:          err,
 			Gen:          gen,
 		}
 	}

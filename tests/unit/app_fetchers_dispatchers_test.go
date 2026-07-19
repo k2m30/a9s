@@ -30,6 +30,7 @@ package unit
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -229,6 +230,74 @@ func TestFetchChildResources_UnknownChildType(t *testing.T) {
 	}
 	if apiErr.ResourceType != noFetcherChild {
 		t.Errorf("APIErrorMsg.ResourceType = %q, want %q", apiErr.ResourceType, noFetcherChild)
+	}
+}
+
+// TestFetchChildResources_PartialSuccess_ReturnsResourcesLoadedWithErr pins the
+// contract-alignment fix: fetchChildResources must follow the same
+// partial-success rule as its siblings in this file (fetchResources,
+// fetchResourcesFiltered, fetchMoreResources — fetch_adapter.go lines 44, 63,
+// 146: `if err != nil && len(res.Resources) == 0 { return APIError }`, else
+// ResourcesLoaded carrying both Resources and Err). Today fetchChildResources
+// (fetch_adapter.go:119-121) hard-fails on any err != nil regardless of
+// len(Resources), dropping partial rows behind a bare APIError — RED.
+func TestFetchChildResources_PartialSuccess_ReturnsResourcesLoadedWithErr(t *testing.T) {
+	withTuiVersion(t, "test")
+	clients := demo.NewServiceClients()
+	m := tui.New(demo.DemoProfile, demo.DemoRegion,
+		tui.WithClients(clients),
+		tui.WithNoCache(true),
+	)
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: demo.DemoRegion, Gen: 0})
+
+	const childType = "test_child_partial_success"
+	partialErr := errors.New("partial: 1 of 2 child objects failed to fetch")
+	partialResources := []resource.Resource{
+		{ID: "child-001", Name: "child-001"},
+		{ID: "child-002", Name: "child-002"},
+	}
+	resource.SetChildTypeForTest(resource.ResourceTypeDef{
+		Name:      "Test Child Partial Success",
+		ShortName: childType,
+		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
+	})
+	resource.SetPaginatedChildForTest(childType, func(_ context.Context, _ any, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
+		return resource.FetchResult{Resources: partialResources}, partialErr
+	})
+	t.Cleanup(func() {
+		resource.CleanupChildTypeForTest(childType)
+		resource.CleanupPaginatedChildForTest(childType)
+	})
+
+	_, cmd := rootApplyMsg(m, messages.EnterChildView{
+		ChildType:     childType,
+		ParentContext: map[string]string{"bucket": "test-bucket"},
+		DisplayName:   "test-bucket",
+	})
+	if cmd == nil {
+		t.Fatal("EnterChildViewMsg should return a cmd")
+	}
+	msg := extractMsg(t, cmd, func(m tea.Msg) bool {
+		switch v := m.(type) {
+		case messages.ResourcesLoaded:
+			return v.ResourceType == childType
+		case messages.APIError:
+			return v.ResourceType == childType
+		default:
+			return false
+		}
+	})
+
+	loaded, ok := msg.(messages.ResourcesLoaded)
+	if !ok {
+		t.Fatalf("fetchChildResources partial success: expected messages.ResourcesLoaded carrying the rows AND the error, got %T (%+v) — fetchChildResources hard-fails on any err != nil instead of following the partial-success contract used by fetchResources/fetchResourcesFiltered/fetchMoreResources", msg, msg)
+	}
+	if loaded.Err == nil {
+		t.Error("fetchChildResources partial success: ResourcesLoaded.Err must be set so the partial failure surfaces via Flash")
+	}
+	if len(loaded.Resources) != len(partialResources) {
+		t.Errorf("fetchChildResources partial success: len(Resources) = %d, want %d — partial rows must not be dropped", len(loaded.Resources), len(partialResources))
 	}
 }
 

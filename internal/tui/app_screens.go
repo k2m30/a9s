@@ -30,8 +30,11 @@ func (m Model) handleValueRevealed(msg messages.ValueRevealed) (tea.Model, tea.C
 // handleEnterChildView delegates to runtime.Core.HandleEnterChildView.
 // The Core validates ChildType via resource.GetChildType; unknown
 // types flash an error, known types emit PushScreen{ScreenChildList}
-// paired with a TaskKindFetchChildResources whose payload the adapter
-// translates into the existing fetchChildResources closure.
+// paired with a TaskKindFetchChildResources, executed via
+// m.executeTaskCmd through core/runtime/executor.go's own
+// TaskKindFetchChildResources case — not the fetchChildResources closure
+// in fetch_adapter.go, which only serves the LoadResources/refresh path
+// (messages.LoadResources with a parent context, and refreshActiveList).
 func (m Model) handleEnterChildView(msg messages.EnterChildView) (tea.Model, tea.Cmd) {
 	intents, tasks := m.core.HandleEnterChildView(runtime.EnterChildViewEvent{
 		ChildType: msg.ChildType, ParentContext: msg.ParentContext, DisplayName: msg.DisplayName,
