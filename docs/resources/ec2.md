@@ -294,6 +294,9 @@ ec2 — COMPUTE. Lifecycle key: `state`.
 | ec2.state.stopped.server | stopped | broken | wave1 |
 | ec2.state.terminated | terminated | dim | wave1 |
 | ec2.instance-status-impaired | impaired: system checks failing | broken | wave2 |
+| ec2.instance-status.initializing | initializing: checks in progress | warn | wave2 |
+| ec2.instance-status.insufficient-data | status unknown: AWS insufficient-data | warn | wave2 |
+| ec2.scheduled-event | scheduled event: <code> at <date> | warn | wave2 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

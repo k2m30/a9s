@@ -411,6 +411,33 @@ func buildTargetHealth(f *ELBFixtures) {
 			},
 		},
 	}
+	// acme-grpc-tg — every target reports literal "unhealthy": the sole demo
+	// witness for the tg Broken color bucket (EnrichTargetGroupHealth: "!"
+	// only when every reporting target is unhealthy, not merely a mix).
+	f.TargetHealth["arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-grpc-tg/1111111111111111"] = []elbv2types.TargetHealthDescription{
+		{
+			Target: &elbv2types.TargetDescription{
+				Id:   aws.String("10.0.6.80"),
+				Port: aws.Int32(50051),
+			},
+			TargetHealth: &elbv2types.TargetHealth{
+				State:       elbv2types.TargetHealthStateEnumUnhealthy,
+				Reason:      elbv2types.TargetHealthReasonEnumFailedHealthChecks,
+				Description: aws.String("Health checks failed"),
+			},
+		},
+		{
+			Target: &elbv2types.TargetDescription{
+				Id:   aws.String("10.0.6.81"),
+				Port: aws.Int32(50051),
+			},
+			TargetHealth: &elbv2types.TargetHealth{
+				State:       elbv2types.TargetHealthStateEnumUnhealthy,
+				Reason:      elbv2types.TargetHealthReasonEnumFailedHealthChecks,
+				Description: aws.String("Health checks failed"),
+			},
+		},
+	}
 	// Lambda-type target — Target.Id is the function ARN (no Port for
 	// lambda targets). process-orders is a real lambda.go fixture; matches
 	// the lambda:tg related-panel pivot witness (checkLambdaTG).

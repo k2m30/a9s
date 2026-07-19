@@ -7,12 +7,13 @@ package integration
 // Verifies the rendered TUI output (not fetcher return values) matches the
 // universal UI rules and the §4 contract in docs/resources/s3.md.
 //
-// s3 has zero Wave-1 signals and one Wave-2 signal (`!` severity via
-// GetPublicAccessBlock). colorS3 (catalog_databases.go) resolves color via
-// colorFromAnyFinding, so a PAB finding now renders its bucket row Broken
-// directly — no Healthy-with-glyph rows for this resource. The rule-7
-// multi-finding cases (U7a/U7b/U7c/U7d/U7e/U7f) are therefore N/A for this
-// resource and skipped with a per-item justification below.
+// s3 has zero Wave-1 signals and one Wave-2 signal (`~` SevWarn via
+// GetPublicAccessBlock, per docs/attention-signals.md). colorS3
+// (catalog_databases.go) resolves color via colorFromAnyFinding, so a PAB
+// finding renders its bucket row Warn directly — no Healthy-with-glyph rows
+// for this resource. The rule-7 multi-finding cases (U7a/U7b/U7c/U7d/U7e/U7f)
+// are therefore N/A for this resource and skipped with a per-item
+// justification below.
 
 import (
 	"testing"
@@ -27,8 +28,11 @@ const (
 	s3NoPABBucketID    = "a9s-demo-nopab"
 	s3PartialPABID     = "a9s-demo-partial-pab"
 	s3MultiFailPABID   = "a9s-demo-multifail-pab"
-	s3NilCfgPABID      = "a9s-demo-nilcfg"
-	s3ExpectedIssueBkt = 4
+	s3NilCfgPABID = "a9s-demo-nilcfg"
+	// S1 rule: the issues badge counts only `!`-severity findings plus
+	// wave-1 issue-colored rows. All 4 PAB findings are `~` SevWarn and s3
+	// has no wave-1 signals, so the s3 entry renders no badge at all.
+	s3ExpectedIssueBkt = 0
 
 	// Wave-2 Rows row labels/values emitted by EnrichS3PublicAccessBlock.
 	s3Row_BlockPublicAcls    = "BlockPublicAcls"
@@ -48,9 +52,9 @@ func TestScenario_S3Visual(t *testing.T) {
 
 	// ---------------------------------------------------------------
 	// S1 menu badge — assert BEFORE OpenList while the main menu is
-	// still the current view. 4 finding fixtures → issues:4. (All
-	// other buckets fall through the fake's healthy-default path,
-	// contributing 0 findings.)
+	// still the current view. The 4 PAB finding fixtures are all `~`
+	// SevWarn, which never bumps the badge → no issues badge on the
+	// s3 entry.
 	// ---------------------------------------------------------------
 	scenario.ExpectMenuIssueCount("s3", s3ExpectedIssueBkt)
 
@@ -77,8 +81,8 @@ func TestScenario_S3Visual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(s3NilCfgPABID, s3S4Phrase)
 
 	// Rule 3 — glyph rules. colorS3 resolves color via colorFromAnyFinding,
-	// so every PAB-finding bucket renders Broken row color directly instead
-	// of staying Healthy-with-`!`-glyph.
+	// so every PAB-finding bucket renders Warn row color directly instead
+	// of staying Healthy-with-`~`-glyph.
 	for _, id := range []string{s3NoPABBucketID, s3PartialPABID, s3MultiFailPABID, s3NilCfgPABID} {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}

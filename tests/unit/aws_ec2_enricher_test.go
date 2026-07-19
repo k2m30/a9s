@@ -10,6 +10,17 @@ package unit
 //   - All status checks ok, no events → 0 findings.
 //   - clients.EC2 == nil → (EnricherResult{Findings: non-nil empty}, nil).
 //   - API error → (EnricherResult{}, error propagated).
+//
+// docs/attention-signals.md `ec2` Wave 2 mandates FOUR distinct, severity-
+// stamped FindingCodes rather than one code reused across conditions:
+//   - "ec2.instance-status-impaired" (SevBroken) — impaired status check.
+//   - "ec2.instance-status.initializing" (SevWarn) — initializing status check.
+//   - "ec2.instance-status.insufficient-data" (SevWarn) — insufficient-data status check.
+//   - "ec2.scheduled-event" (SevWarn) — scheduled retirement/reboot within 7d.
+//
+// Current code stamps every condition under the single
+// "ec2.instance-status-impaired" code (core/aws/ec2_issue_enrichment.go:20-25),
+// which breaks per-rule grouping in FindingsOverview (commit 06c1d646).
 
 import (
 	"context"
@@ -23,8 +34,16 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+)
+
+const (
+	ec2CodeInstanceStatusImpaired     = domain.FindingCode("ec2.instance-status-impaired")
+	ec2CodeInstanceStatusInitializing = domain.FindingCode("ec2.instance-status.initializing")
+	ec2CodeInstanceStatusInsufficient = domain.FindingCode("ec2.instance-status.insufficient-data")
+	ec2CodeScheduledEvent             = domain.FindingCode("ec2.scheduled-event")
 )
 
 // ec2InstanceStatusFake implements EC2API for enrichment testing.
@@ -324,5 +343,235 @@ func TestEnrichEC2InstanceStatus_APIErrorIsPropagated(t *testing.T) {
 	}
 	if !errors.Is(err, apiErr) {
 		t.Errorf("error = %v, want to wrap %v", err, apiErr)
+	}
+}
+
+// TestEnrichEC2InstanceStatus_ImpairedUsesImpairedCode pins that an impaired
+// status check keeps the "ec2.instance-status-impaired" code (SevBroken) —
+// this is the one condition that keeps its historical code.
+func TestEnrichEC2InstanceStatus_ImpairedUsesImpairedCode(t *testing.T) {
+	fake := &ec2InstanceStatusFake{
+		statuses: []ec2types.InstanceStatus{
+			{
+				InstanceId:     aws.String("i-0impaired0000001"),
+				SystemStatus:   &ec2types.InstanceStatusSummary{Status: ec2types.SummaryStatusImpaired},
+				InstanceStatus: &ec2types.InstanceStatusSummary{Status: ec2types.SummaryStatusOk},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{EC2: fake}
+	resources := []resource.Resource{{ID: "i-0impaired0000001", Fields: map[string]string{"state": "running"}}}
+
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fs, ok := result.Findings["i-0impaired0000001"]
+	if !ok || len(fs) == 0 {
+		t.Fatalf("expected a finding for i-0impaired0000001")
+	}
+	if fs[0].Code != ec2CodeInstanceStatusImpaired {
+		t.Errorf("Code = %q, want %q", fs[0].Code, ec2CodeInstanceStatusImpaired)
+	}
+	if fs[0].Severity != domain.SevBroken {
+		t.Errorf("Severity = %v, want %v", fs[0].Severity, domain.SevBroken)
+	}
+}
+
+// TestEnrichEC2InstanceStatus_InitializingUsesDistinctCode pins that
+// "initializing" gets its OWN FindingCode ("ec2.instance-status.initializing"),
+// distinct from the impaired code. Today both are stamped
+// "ec2.instance-status-impaired", which breaks FindingsOverview's per-rule
+// grouping (commit 06c1d646).
+func TestEnrichEC2InstanceStatus_InitializingUsesDistinctCode(t *testing.T) {
+	fake := &ec2InstanceStatusFake{
+		statuses: []ec2types.InstanceStatus{
+			{
+				InstanceId:     aws.String("i-0initializing00001"),
+				SystemStatus:   &ec2types.InstanceStatusSummary{Status: ec2types.SummaryStatusInitializing},
+				InstanceStatus: &ec2types.InstanceStatusSummary{Status: ec2types.SummaryStatusOk},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{EC2: fake}
+	resources := []resource.Resource{{ID: "i-0initializing00001", Fields: map[string]string{"state": "running"}}}
+
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fs, ok := result.Findings["i-0initializing00001"]
+	if !ok || len(fs) == 0 {
+		t.Fatalf("expected a finding for i-0initializing00001")
+	}
+	if fs[0].Code != ec2CodeInstanceStatusInitializing {
+		t.Errorf("Code = %q, want %q (must NOT reuse %q)", fs[0].Code, ec2CodeInstanceStatusInitializing, ec2CodeInstanceStatusImpaired)
+	}
+	if fs[0].Severity != domain.SevWarn {
+		t.Errorf("Severity = %v, want %v", fs[0].Severity, domain.SevWarn)
+	}
+}
+
+// TestEnrichEC2InstanceStatus_InsufficientDataUsesDistinctCode pins that
+// "insufficient-data" gets its OWN FindingCode
+// ("ec2.instance-status.insufficient-data"), distinct from both the impaired
+// and initializing codes.
+func TestEnrichEC2InstanceStatus_InsufficientDataUsesDistinctCode(t *testing.T) {
+	fake := &ec2InstanceStatusFake{
+		statuses: []ec2types.InstanceStatus{
+			{
+				InstanceId:     aws.String("i-0insufficient00001"),
+				SystemStatus:   &ec2types.InstanceStatusSummary{Status: ec2types.SummaryStatusOk},
+				InstanceStatus: &ec2types.InstanceStatusSummary{Status: ec2types.SummaryStatusInsufficientData},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{EC2: fake}
+	resources := []resource.Resource{{ID: "i-0insufficient00001", Fields: map[string]string{"state": "running"}}}
+
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fs, ok := result.Findings["i-0insufficient00001"]
+	if !ok || len(fs) == 0 {
+		t.Fatalf("expected a finding for i-0insufficient00001")
+	}
+	if fs[0].Code != ec2CodeInstanceStatusInsufficient {
+		t.Errorf("Code = %q, want %q (must NOT reuse %q)", fs[0].Code, ec2CodeInstanceStatusInsufficient, ec2CodeInstanceStatusImpaired)
+	}
+	if fs[0].Severity != domain.SevWarn {
+		t.Errorf("Severity = %v, want %v", fs[0].Severity, domain.SevWarn)
+	}
+}
+
+// TestEnrichEC2InstanceStatus_ScheduledEventUsesDistinctCode pins that a
+// scheduled retirement/reboot event on an otherwise-ok instance gets its OWN
+// FindingCode ("ec2.scheduled-event"), distinct from the impaired code. Today
+// the scheduled-event row is folded into whatever "ec2.instance-status-impaired"
+// finding exists for the resource (or creates one under that same code if no
+// status-check finding exists).
+func TestEnrichEC2InstanceStatus_ScheduledEventUsesDistinctCode(t *testing.T) {
+	fake := &ec2InstanceStatusFake{
+		statuses: []ec2types.InstanceStatus{
+			{
+				InstanceId:     aws.String("i-0scheduledevent0001"),
+				SystemStatus:   &ec2types.InstanceStatusSummary{Status: ec2types.SummaryStatusOk},
+				InstanceStatus: &ec2types.InstanceStatusSummary{Status: ec2types.SummaryStatusOk},
+				Events: []ec2types.InstanceStatusEvent{
+					{
+						Code:        ec2types.EventCodeSystemReboot,
+						Description: aws.String("Scheduled reboot"),
+						NotBefore:   daysFromNow(3),
+					},
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{EC2: fake}
+	resources := []resource.Resource{{ID: "i-0scheduledevent0001", Fields: map[string]string{"state": "running"}}}
+
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fs, ok := result.Findings["i-0scheduledevent0001"]
+	if !ok || len(fs) == 0 {
+		t.Fatalf("expected a finding for i-0scheduledevent0001")
+	}
+	if fs[0].Code != ec2CodeScheduledEvent {
+		t.Errorf("Code = %q, want %q (must NOT reuse %q)", fs[0].Code, ec2CodeScheduledEvent, ec2CodeInstanceStatusImpaired)
+	}
+	if fs[0].Severity != domain.SevWarn {
+		t.Errorf("Severity = %v, want %v", fs[0].Severity, domain.SevWarn)
+	}
+}
+
+// TestEnrichEC2InstanceStatus_ImpairedAndScheduledEventProduceTwoFindings pins
+// that an instance with BOTH an impaired status check AND a scheduled event
+// produces TWO separate findings — one per FindingCode — rather than one
+// finding whose Rows merge both conditions under a single code. Findings is
+// map[string][]domain.Finding (multi-finding-per-resource, see commit history
+// around the "AllFindings" -> "Findings" rename), so this is a supported shape.
+func TestEnrichEC2InstanceStatus_ImpairedAndScheduledEventProduceTwoFindings(t *testing.T) {
+	fake := &ec2InstanceStatusFake{
+		statuses: []ec2types.InstanceStatus{
+			{
+				InstanceId:     aws.String("i-0impairedandevent01"),
+				SystemStatus:   &ec2types.InstanceStatusSummary{Status: ec2types.SummaryStatusImpaired},
+				InstanceStatus: &ec2types.InstanceStatusSummary{Status: ec2types.SummaryStatusOk},
+				Events: []ec2types.InstanceStatusEvent{
+					{
+						Code:        ec2types.EventCodeSystemReboot,
+						Description: aws.String("Scheduled reboot"),
+						NotBefore:   daysFromNow(3),
+					},
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{EC2: fake}
+	resources := []resource.Resource{{ID: "i-0impairedandevent01", Fields: map[string]string{"state": "running"}}}
+
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fs, ok := result.Findings["i-0impairedandevent01"]
+	if !ok {
+		t.Fatalf("expected findings for i-0impairedandevent01")
+	}
+	if len(fs) != 2 {
+		t.Fatalf("expected 2 distinct findings (impaired + scheduled-event), got %d: %v", len(fs), fs)
+	}
+	seen := map[domain.FindingCode]domain.Severity{}
+	for _, f := range fs {
+		seen[f.Code] = f.Severity
+	}
+	sev, ok := seen[ec2CodeInstanceStatusImpaired]
+	if !ok {
+		t.Errorf("missing finding with code %q; got codes %v", ec2CodeInstanceStatusImpaired, seen)
+	} else if sev != domain.SevBroken {
+		t.Errorf("[%s] Severity = %v, want %v", ec2CodeInstanceStatusImpaired, sev, domain.SevBroken)
+	}
+	sev, ok = seen[ec2CodeScheduledEvent]
+	if !ok {
+		t.Errorf("missing finding with code %q; got codes %v", ec2CodeScheduledEvent, seen)
+	} else if sev != domain.SevWarn {
+		t.Errorf("[%s] Severity = %v, want %v", ec2CodeScheduledEvent, sev, domain.SevWarn)
+	}
+}
+
+// TestEC2Catalog_FindingDefsDeclareDistinctCodesAndSeverities pins the
+// catalog-declaration side (core/aws/catalog_compute.go "ec2" entry's
+// Findings []catalog.FindingDef): each of the four Wave 2 conditions must be
+// declared under its OWN code with its real severity, so FindingsOverview
+// (commit 06c1d646, groups findings by rule across types) reports them as
+// four distinct rules instead of one. Today the catalog declares only
+// ec2CodeInstanceStatusImpaired for Wave 2.
+func TestEC2Catalog_FindingDefsDeclareDistinctCodesAndSeverities(t *testing.T) {
+	td := catalog.Find("ec2")
+	if td == nil {
+		t.Fatal(`catalog.Find("ec2") returned nil`)
+	}
+	want := map[domain.FindingCode]domain.Severity{
+		ec2CodeInstanceStatusImpaired:     domain.SevBroken,
+		ec2CodeInstanceStatusInitializing: domain.SevWarn,
+		ec2CodeInstanceStatusInsufficient: domain.SevWarn,
+		ec2CodeScheduledEvent:             domain.SevWarn,
+	}
+	got := map[domain.FindingCode]domain.Severity{}
+	for _, fd := range td.Findings {
+		got[fd.Code] = fd.Severity
+	}
+	for code, wantSev := range want {
+		gotSev, ok := got[code]
+		if !ok {
+			t.Errorf("catalog.Find(%q).Findings missing declaration for code %q", "ec2", code)
+			continue
+		}
+		if gotSev != wantSev {
+			t.Errorf("catalog.Find(%q).Findings[%q].Severity = %v, want %v", "ec2", code, gotSev, wantSev)
+		}
 	}
 }

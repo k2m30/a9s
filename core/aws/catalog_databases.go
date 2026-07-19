@@ -407,7 +407,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		IssueEnricherFieldKeys: []string{"status"},
 		Findings: []catalog.FindingDef{
-			{Code: s3CodePublicAccessBlockIncomplete, Phrase: "public access block incomplete", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: s3CodePublicAccessBlockIncomplete, Phrase: "public access block incomplete", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{

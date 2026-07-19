@@ -23,8 +23,11 @@ const (
 )
 
 // EnrichTargetGroupHealth calls DescribeTargetHealth for each target group (1 per TG, cap ~50).
-// Returns a Finding for each TG with at least one unhealthy target.
-// Severity is "!" (broken/degraded). Summary: "unhealthy targets: X/Y".
+// Returns a Finding for each TG with at least one target whose TargetHealth.State
+// is literally "unhealthy" ("initial", "draining", "unused", and other non-"unhealthy"
+// states do not count toward the numerator). Severity is graduated: "~" when
+// 0 < unhealthy < total, "!" when every reporting target is unhealthy.
+// Summary: "unhealthy targets: X/Y".
 // Per-TG errors are aggregated and returned as a composite error alongside partial findings (E3, E4, E5).
 func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
@@ -70,11 +73,23 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 			return
 		}
 		targetCount := len(out.TargetHealthDescriptions)
-		unhealthy := 0
+		// notHealthy drives the health_summary display field (any state other
+		// than "healthy" counts) — unrelated to the Finding numerator below.
+		notHealthy := 0
+		// literalUnhealthy is the Finding numerator: only State=="unhealthy"
+		// counts. "initial", "draining", "unused", etc. are transitional or
+		// intentional states, not failures, and must not trigger a finding.
+		literalUnhealthy := 0
 		var firstReason string
 		for _, t := range out.TargetHealthDescriptions {
-			if t.TargetHealth != nil && t.TargetHealth.State != elbtypes.TargetHealthStateEnumHealthy {
-				unhealthy++
+			if t.TargetHealth == nil {
+				continue
+			}
+			if t.TargetHealth.State != elbtypes.TargetHealthStateEnumHealthy {
+				notHealthy++
+			}
+			if t.TargetHealth.State == elbtypes.TargetHealthStateEnumUnhealthy {
+				literalUnhealthy++
 				if firstReason == "" && t.TargetHealth.Reason != "" {
 					// humanizeTargetHealthReason (tg_health.go) strips the
 					// Target./Elb. namespace prefix before humanizing — plain
@@ -84,7 +99,7 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 				}
 			}
 		}
-		healthy := targetCount - unhealthy
+		healthy := targetCount - notHealthy
 		healthSummary := ""
 		if targetCount == 0 {
 			healthSummary = "ORPHAN"
@@ -94,14 +109,18 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		result.FieldUpdates[r.ID] = map[string]string{
 			"health_summary": healthSummary,
 		}
-		if unhealthy > 0 {
+		if literalUnhealthy > 0 {
+			severity := "~"
+			if literalUnhealthy == targetCount {
+				severity = "!"
+			}
 			rows := []domain.DetailRow{
-				{Label: "Unhealthy Targets", Value: fmt.Sprintf("%d/%d", unhealthy, targetCount), Tier: "!"},
+				{Label: "Unhealthy Targets", Value: fmt.Sprintf("%d/%d", literalUnhealthy, targetCount), Tier: severity},
 			}
 			if firstReason != "" {
 				rows = append(rows, domain.DetailRow{Label: "Reason", Value: firstReason, Tier: "~"})
 			}
-			setWave2Finding(&result, r.ID, tgCodeUnhealthyTargets, fmt.Sprintf("unhealthy targets: %d/%d", unhealthy, targetCount), "!", "tg", rows, "")
+			setWave2Finding(&result, r.ID, tgCodeUnhealthyTargets, fmt.Sprintf("unhealthy targets: %d/%d", literalUnhealthy, targetCount), severity, "tg", rows, "")
 		}
 	})
 	sort.Strings(failures)

@@ -2,8 +2,10 @@ package unit
 
 // aws_s3_issue_enrichment_test.go — Wave 2 enricher tests for s3.
 //
-// Tests drive aws.EnrichS3PublicAccessBlock and assert the post-rewrite contract:
-//   - Severity == "!" for all PAB-missing cases (no "~").
+// Tests drive aws.EnrichS3PublicAccessBlock and assert the
+// docs/attention-signals.md `s3` Wave 2 contract:
+//   - Severity == "~" (SevWarn) for ALL PAB-missing cases. s3 Wave 2 has NO
+//     Broken tier — "!"/SevBroken must never appear on a PAB finding.
 //   - Summary == "public access block incomplete" verbatim, always (U11 stable phrase).
 //   - Summary never contains the Row detail values (U11 Summary≠Rows separation).
 //   - Rows carry the per-case structured detail.
@@ -12,7 +14,7 @@ package unit
 //   - Unknown API error (non-NoSuchPublicAccessBlock) emits no finding but sets
 //     TruncatedIDs[bucket] = true.
 //   - Nil S3 client returns empty result gracefully.
-//   - S1 badge: IssueCount equals the number of buckets with "!" findings.
+//   - S1 badge: IssueCount equals the number of buckets with "~" findings.
 
 import (
 	"context"
@@ -116,6 +118,11 @@ func pabResource(name string) resource.Resource {
 // assertFindingShape is a shared assertion helper for the stable finding contract.
 // It fails the test if the finding at key does not have the expected severity
 // and the verbatim stable Phrase.
+//
+// s3 Wave 2 PAB findings are always "~" (SevWarn) — docs/attention-signals.md
+// `s3` Wave 2 has no Broken tier for this signal (account-level PAB may still
+// override, so a missing/partial bucket-level PAB block is never certain
+// public exposure).
 func assertFindingShape(t *testing.T, findings map[string][]domain.Finding, key string) domain.Finding {
 	t.Helper()
 	fs, ok := findings[key]
@@ -123,8 +130,8 @@ func assertFindingShape(t *testing.T, findings map[string][]domain.Finding, key 
 		t.Fatalf("expected finding for %q; Findings keys = %v", key, findingKeys(findings))
 	}
 	f := fs[0]
-	if f.Severity != domain.SevBroken {
-		t.Errorf("[%s] Severity = %v, want SevBroken", key, f.Severity)
+	if f.Severity != domain.SevWarn {
+		t.Errorf("[%s] Severity = %v, want SevWarn (s3 Wave 2 PAB findings have no Broken tier)", key, f.Severity)
 	}
 	const wantPhrase = "public access block incomplete"
 	if f.Phrase != wantPhrase {
@@ -405,9 +412,11 @@ func TestS3_Enrich_NilS3Client_GracefulEmpty(t *testing.T) {
 }
 
 // TestS3_Enrich_IssueCount_FourBuckets verifies that IssueCount equals the
-// number of "!" findings across the four spec fixtures (U6 reconciliation:
+// number of "~" findings across the four spec fixtures (U6 reconciliation:
 // 4 is the correct count from the fixture file — no-pab, partial-pab,
-// multi-false-pab, nil-pab-cfg). The healthy bucket must NOT contribute.
+// multi-false-pab, nil-pab-cfg). The healthy bucket must NOT contribute, and
+// none of the four PAB-issue findings may be "!" (SevBroken) — s3 Wave 2 has
+// no Broken tier.
 func TestS3_Enrich_IssueCount_FourBuckets(t *testing.T) {
 	fake := &s3PABFake{
 		configs: map[string]*s3.GetPublicAccessBlockOutput{
@@ -460,23 +469,71 @@ func TestS3_Enrich_IssueCount_FourBuckets(t *testing.T) {
 		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
 	}
 
-	// Count SevBroken findings manually to decouple from IssueCount field name choices.
+	// Count SevWarn findings manually to decouple from IssueCount field name choices.
+	tildeCount := 0
 	bangCount := 0
 	for _, fs := range result.Findings {
 		for _, f := range fs {
-			if f.Severity == domain.SevBroken {
+			switch f.Severity {
+			case domain.SevWarn:
+				tildeCount++
+			case domain.SevBroken:
 				bangCount++
 			}
 		}
 	}
-	if bangCount != 4 {
-		t.Errorf("expected 4 '!' findings (4 PAB-issue fixtures), got %d; Findings keys = %v",
-			bangCount, findingKeys(result.Findings))
+	if tildeCount != 4 {
+		t.Errorf("expected 4 '~' findings (4 PAB-issue fixtures), got %d; Findings keys = %v",
+			tildeCount, findingKeys(result.Findings))
+	}
+	if bangCount != 0 {
+		t.Errorf("expected 0 '!' findings — s3 Wave 2 PAB findings have no Broken tier, got %d", bangCount)
 	}
 
 	// Healthy bucket must not appear in Findings.
 	if _, ok := result.Findings["a9s-demo-healthy"]; ok {
 		t.Error("healthy bucket must not have a finding")
+	}
+}
+
+// TestS3_Enrich_NeverEmitsBrokenSeverity is a dedicated regression guard for
+// docs/attention-signals.md `s3` Wave 2: "GetPublicAccessBlock per bucket:
+// NoSuchPublicAccessBlockConfiguration error or any flag false -> Warning."
+// There is no Broken tier for this signal — a missing/partial bucket-level
+// PAB block is a risk, not a certainty (account-level PAB may still apply),
+// so it must never paint a row red.
+func TestS3_Enrich_NeverEmitsBrokenSeverity(t *testing.T) {
+	fake := &s3PABFake{
+		configs: map[string]*s3.GetPublicAccessBlockOutput{
+			"a9s-demo-nopab": nil,
+			"a9s-demo-allflagsfalse": {
+				PublicAccessBlockConfiguration: &s3types.PublicAccessBlockConfiguration{
+					BlockPublicAcls:       aws.Bool(false),
+					IgnorePublicAcls:      aws.Bool(false),
+					BlockPublicPolicy:     aws.Bool(false),
+					RestrictPublicBuckets: aws.Bool(false),
+				},
+			},
+			"a9s-demo-nilcfg": {PublicAccessBlockConfiguration: nil},
+		},
+	}
+	clients := &awsclient.ServiceClients{S3: fake}
+	resources := []resource.Resource{
+		pabResource("a9s-demo-nopab"),
+		pabResource("a9s-demo-allflagsfalse"),
+		pabResource("a9s-demo-nilcfg"),
+	}
+
+	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
+	}
+	for id, fs := range result.Findings {
+		for _, f := range fs {
+			if f.Severity == domain.SevBroken {
+				t.Errorf("[%s] Severity = SevBroken, want SevWarn — s3 Wave 2 PAB findings have no Broken tier (even all four flags false)", id)
+			}
+		}
 	}
 }
 

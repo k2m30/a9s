@@ -185,7 +185,17 @@ var knownStateCoverageGaps = map[string]bool{
 	"redshift:dim": true,
 	"role:dim":     true,
 	"rtb:dim":      true,
-	"s3:dim":       true, "s3:warning": true,
+	"s3:dim":       true,
+	// colorS3 (core/aws/catalog_databases.go) is colorFromAnyFinding-only with
+	// a ColorHealthy fallback — no structural branch of its own. s3's sole
+	// registered FindingDef (s3.public-access-block-incomplete) is now
+	// permanently SevWarn (docs/attention-signals.md `s3` Wave 2: flat
+	// "Warning" with no Broken tier — a missing/partial bucket-level PAB
+	// block is a risk, not a certainty, since account-level PAB may still
+	// apply). With no other Broken-driving path, s3 structurally cannot
+	// resolve ColorBroken via any fixture — this is the spec-mandated end
+	// state, not a fixture gap.
+	"s3:broken":   true,
 	"secrets:dim": true,
 	"ses:dim":     true,
 	"sfn:dim":     true, "sfn:warning": true,
@@ -193,9 +203,9 @@ var knownStateCoverageGaps = map[string]bool{
 	"sns:broken": true, "sns:dim": true,
 	"sns-sub:broken": true,
 	"sqs:broken":     true, "sqs:dim": true,
-	"ssm:dim":    true,
-	"subnet:dim": true,
-	"tg:dim":     true, "tg:warning": true,
+	"ssm:dim":      true,
+	"subnet:dim":   true,
+	"tg:dim":       true,
 	"trail:dim":    true,
 	"transfer:dim": true, // colorTransfer (core/aws/catalog_networking.go) is colorFromAnyFinding-only, and no registered FindingDef carries SevDim — structurally, AWS Transfer Family's DescribeServer State enum (OFFLINE|ONLINE|STARTING|STOPPING|START_FAILED|STOP_FAILED per docs.aws.amazon.com/transfer/latest/APIReference/API_DescribeServer.html) has no deleted/terminal value at all, so no fixture of any shape could ever witness a Dim row for this type.
 	"vpc:broken":   true, "vpc:dim": true,

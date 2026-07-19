@@ -143,7 +143,6 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchACMCertificatesPage(ctx, c.ACM, continuationToken)
 		}),
-		Wave2:     IssueEnricher{Fn: EnrichACMCertificate, Priority: 100},
 		FieldKeys: []string{"domain_name", "status", "type", "not_after", "in_use", "days_left"},
 		Related: []domain.RelatedDef{
 			{TargetType: "cf", DisplayName: "CloudFront Distros", Checker: checkACMCF, NeedsTargetCache: true, Truncated: true},
@@ -154,8 +153,9 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		},
 		// No NavigableFields — CertificateSummary has no forward refs to other resource types
 		Findings: []catalog.FindingDef{
-			{Code: acmCodeExpiresSoon, Phrase: "expires in <N> days", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: acmCodeOrphan, Phrase: "certificate not in use (orphan)", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: acmCodeExpiresCritical, Phrase: "expires in <N> days", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: acmCodeExpiresSoon, Phrase: "expires in <N> days", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: acmCodeOrphan, Phrase: "certificate not in use (orphan)", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{

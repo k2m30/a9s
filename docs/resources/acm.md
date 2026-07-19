@@ -195,8 +195,9 @@ acm — DNS & CDN. Lifecycle key: `status`.
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
-| acm.expires-soon | expires in <N> days | broken | wave2 |
-| acm.orphan | certificate not in use (orphan) | warn | wave2 |
+| acm.expires-critical | expires in <N> days | broken | wave1 |
+| acm.expires-soon | expires in <N> days | warn | wave1 |
+| acm.orphan | certificate not in use (orphan) | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

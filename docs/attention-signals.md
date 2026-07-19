@@ -195,6 +195,9 @@ resource-list frame title. The frame-title rules:
 | ec2 | ec2.state.stopped.server | stopped | broken | wave1 |
 | ec2 | ec2.state.terminated | terminated | dim | wave1 |
 | ec2 | ec2.instance-status-impaired | impaired: system checks failing | broken | wave2 |
+| ec2 | ec2.instance-status.initializing | initializing: checks in progress | warn | wave2 |
+| ec2 | ec2.instance-status.insufficient-data | status unknown: AWS insufficient-data | warn | wave2 |
+| ec2 | ec2.scheduled-event | scheduled event: <code> at <date> | warn | wave2 |
 | ecs-svc | ecs-svc.state.inactive | inactive | broken | wave1 |
 | ecs-svc | ecs-svc.state.draining | draining | warn | wave1 |
 | ecs-svc | ecs-svc.deployment-failed | deployment failed | broken | wave2 |
@@ -333,7 +336,7 @@ resource-list frame title. The frame-title rules:
 | dbi | dbi.warn.unencrypted\_storage | unencrypted storage | warn | wave1 |
 | dbi | dbi.warn.deletion\_protection\_off | deletion protection off | warn | wave1 |
 | dbi | dbi.pending-maintenance | maintenance scheduled | warn | wave2 |
-| s3 | s3.public-access-block-incomplete | public access block incomplete | broken | wave2 |
+| s3 | s3.public-access-block-incomplete | public access block incomplete | warn | wave2 |
 | redis | redis.broken.create\_failed | create failed — see events | broken | wave1 |
 | redis | redis.warn.creating | creating — new group | warn | wave1 |
 | redis | redis.warn.deleting | deleting — teardown | warn | wave1 |
@@ -468,8 +471,9 @@ resource-list frame title. The frame-title rules:
 | r53 | r53.zone.unused | only default NS/SOA records remain | warn | wave1 |
 | r53 | r53.orphan-private-zone | private zone with no VPC associations (orphan) | warn | wave2 |
 | cf | cf.insecure-protocol | no HTTPS redirect (insecure); origin without TLS | warn | wave2 |
-| acm | acm.expires-soon | expires in <N> days | broken | wave2 |
-| acm | acm.orphan | certificate not in use (orphan) | warn | wave2 |
+| acm | acm.expires-critical | expires in <N> days | broken | wave1 |
+| acm | acm.expires-soon | expires in <N> days | warn | wave1 |
+| acm | acm.orphan | certificate not in use (orphan) | warn | wave1 |
 | apigw | apigw.no-deployed-stages | no deployed stages | warn | wave2 |
 | apigw | apigw.stage-config-issues | no throttling configured (DoS risk); access logs disabled | warn | wave2 |
 | role | role.trust.wildcard-principal | anyone can assume this role | broken | wave1 |

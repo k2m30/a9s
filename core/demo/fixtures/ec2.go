@@ -665,7 +665,15 @@ func buildInstanceStatuses(reservations []ec2types.Reservation) []ec2types.Insta
 		"i-0a1b2c3d4e5f60003": {"ok", "impaired"},
 		"i-0a1b2c3d4e5f60005": {"ok", "ok"},
 		"i-0a1b2c3d4e5f60006": {"initializing", "initializing"},
+		// api-worker-01 — witness for ec2.instance-status.insufficient-data
+		// (AWS could not determine status from the hypervisor).
+		"i-0aaa111111111111a": {"ok", "insufficient-data"},
 	}
+	// eventInstanceID is the sole witness for ec2.scheduled-event: a running
+	// instance with ok status checks but a AWS-scheduled reboot within the
+	// enricher's 7-day cutoff. Computed relative to time.Now() so the
+	// fixture stays inside the window regardless of when the demo runs.
+	const eventInstanceID = "i-0bbb222222222222b"
 
 	var statuses []ec2types.InstanceStatus
 	for _, r := range reservations {
@@ -680,7 +688,7 @@ func buildInstanceStatuses(reservations []ec2types.Reservation) []ec2types.Insta
 				systemStatus = s[0]
 				instanceStatus = s[1]
 			}
-			statuses = append(statuses, ec2types.InstanceStatus{
+			status := ec2types.InstanceStatus{
 				InstanceId:       aws.String(id),
 				AvailabilityZone: inst.Placement.AvailabilityZone,
 				InstanceState:    inst.State,
@@ -690,7 +698,18 @@ func buildInstanceStatuses(reservations []ec2types.Reservation) []ec2types.Insta
 				InstanceStatus: &ec2types.InstanceStatusSummary{
 					Status: ec2types.SummaryStatus(instanceStatus),
 				},
-			})
+			}
+			if id == eventInstanceID {
+				status.Events = []ec2types.InstanceStatusEvent{
+					{
+						Code:        ec2types.EventCodeSystemReboot,
+						Description: aws.String("Scheduled reboot for AWS hardware maintenance"),
+						NotBefore:   aws.Time(time.Now().Add(3 * 24 * time.Hour)),
+						NotAfter:    aws.Time(time.Now().Add(3*24*time.Hour + 4*time.Hour)),
+					},
+				}
+			}
+			statuses = append(statuses, status)
 		}
 	}
 	return statuses

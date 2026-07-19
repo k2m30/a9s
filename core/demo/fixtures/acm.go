@@ -180,7 +180,7 @@ var sharedACMFixtures = sync.OnceValue(func() *ACMFixtures {
 				},
 				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
 			},
-			// Issue: ISSUED but NotAfter in ~5 days → Broken (imminent expiry)
+			// Issue: ISSUED but NotAfter in the past → Broken (acm.expires-critical)
 			{
 				DomainName:     aws.String("expiring-soon.acme-corp.com"),
 				CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/b8c9d0e1-2345-67ab-cdef-888888888888"),
@@ -196,6 +196,43 @@ var sharedACMFixtures = sync.OnceValue(func() *ACMFixtures {
 					"expiring-soon.acme-corp.com",
 				},
 				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
+			},
+			// Issue: ISSUED, NotAfter ~20 days out → Warning (acm.expires-soon —
+			// inside the 30d window, outside the 7d critical threshold). Computed
+			// relative to time.Now() so the fixture stays in the warn window
+			// regardless of when the demo runs.
+			{
+				DomainName:     aws.String("renewal-window.acme-corp.com"),
+				CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/0d0d0d0d-0d0d-0d0d-0d0d-0d0d0d0d0d0d"),
+				Status:         acmtypes.CertificateStatusIssued,
+				Type:           acmtypes.CertificateTypeAmazonIssued,
+				NotAfter:       aws.Time(time.Now().Add(20 * 24 * time.Hour)),
+				NotBefore:      aws.Time(time.Now().Add(-345 * 24 * time.Hour)),
+				IssuedAt:       aws.Time(time.Now().Add(-345 * 24 * time.Hour)),
+				InUse:          aws.Bool(true),
+				CreatedAt:      aws.Time(time.Now().Add(-345 * 24 * time.Hour)),
+				KeyAlgorithm:   acmtypes.KeyAlgorithmRsa2048,
+				SubjectAlternativeNameSummaries: []string{
+					"renewal-window.acme-corp.com",
+				},
+				RenewalEligibility: acmtypes.RenewalEligibilityEligible,
+			},
+			// Issue: ISSUED, healthy expiry, InUse=false → Warning (acm.orphan).
+			{
+				DomainName:     aws.String("orphaned-cert.acme-corp.com"),
+				CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/0e0e0e0e-0e0e-0e0e-0e0e-0e0e0e0e0e0e"),
+				Status:         acmtypes.CertificateStatusIssued,
+				Type:           acmtypes.CertificateTypeAmazonIssued,
+				NotAfter:       aws.Time(time.Now().Add(200 * 24 * time.Hour)),
+				NotBefore:      aws.Time(time.Now().Add(-165 * 24 * time.Hour)),
+				IssuedAt:       aws.Time(time.Now().Add(-165 * 24 * time.Hour)),
+				InUse:          aws.Bool(false),
+				CreatedAt:      aws.Time(time.Now().Add(-165 * 24 * time.Hour)),
+				KeyAlgorithm:   acmtypes.KeyAlgorithmRsa2048,
+				SubjectAlternativeNameSummaries: []string{
+					"orphaned-cert.acme-corp.com",
+				},
+				RenewalEligibility: acmtypes.RenewalEligibilityEligible,
 			},
 		},
 		// InUseBy — backs the acm→elb and acm→apigw related-panel pivots.

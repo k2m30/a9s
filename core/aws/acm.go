@@ -15,6 +15,29 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
+// acm canonical FindingCodes.
+const (
+	// acmCodeExpiresCritical — ISSUED cert with NotAfter - now() < 7 days
+	// (including already expired). Read straight off ListCertificates'
+	// CertificateSummary (NotAfter) — zero extra API calls.
+	acmCodeExpiresCritical domain.FindingCode = "acm.expires-critical"
+	// acmCodeExpiresSoon — ISSUED cert with 7d <= NotAfter - now() < 30d.
+	acmCodeExpiresSoon domain.FindingCode = "acm.expires-soon"
+	// acmCodeOrphan — ISSUED cert with InUse==false and NotAfter outside the
+	// expiry windows above. Expiry takes priority over orphan.
+	acmCodeOrphan domain.FindingCode = "acm.orphan"
+
+	// acmCodeStatusPendingValidation — Status==PENDING_VALIDATION. The
+	// certificate is awaiting DNS/email validation before ACM can issue it.
+	acmCodeStatusPendingValidation domain.FindingCode = "acm.status.pending-validation"
+	// acmCodeStatusFailed — Status is one of EXPIRED, REVOKED, FAILED, or
+	// VALIDATION_TIMED_OUT. The certificate cannot be used for TLS.
+	acmCodeStatusFailed domain.FindingCode = "acm.status.failed"
+	// acmCodeStatusInactive — Status==INACTIVE. An imported certificate no
+	// longer attached to any resource for TLS termination.
+	acmCodeStatusInactive domain.FindingCode = "acm.status.inactive"
+)
+
 // FetchACMCertificatesPage fetches a single page of ACM certificates.
 func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &acm.ListCertificatesInput{
@@ -30,6 +53,7 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 	}
 
 	var resources []resource.Resource
+	now := time.Now()
 
 	for _, cert := range output.CertificateSummaryList {
 		domainName := ""
@@ -56,7 +80,6 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 		// "expired" rather than truncating to "0 days".
 		daysLeft := ""
 		if cert.NotAfter != nil {
-			now := time.Now()
 			if !cert.NotAfter.After(now) {
 				daysLeft = "expired"
 			} else {
@@ -92,11 +115,11 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 				"in_use":          inUse,
 				"days_left":       daysLeft,
 			},
-			// emit canonical Findings for every non-ISSUED status branch
-			// acmColor reads, mirroring acmColor's own precedence — ISSUED
-			// certs are covered by EnrichACMCertificate's expiry/orphan Wave-2
-			// findings instead, so their status never reaches this switch.
-			Findings:  acmStatusFindings(status),
+			// ISSUED certs get their expiry/orphan Wave 1 Finding
+			// (acmIssuedFindings) read straight off this CertificateSummary;
+			// every other status keeps its own status Finding
+			// (acmStatusFindings), mirroring acmColor's own precedence.
+			Findings:  acmFindings(status, cert.NotAfter, cert.InUse != nil && *cert.InUse, now),
 			RawStruct: cert,
 		}
 
@@ -126,11 +149,55 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 	}, nil
 }
 
+// acmFindings routes a certificate to its Wave 1 Finding by status: ISSUED
+// certs get the expiry/orphan check (acmIssuedFindings); every other status
+// keeps its own status Finding (acmStatusFindings). acm has no Wave 2
+// IssueEnricher — every signal it carries is readable straight off
+// ListCertificates, zero extra API calls.
+func acmFindings(status string, notAfter *time.Time, inUse bool, now time.Time) []domain.Finding {
+	if status == "ISSUED" {
+		return acmIssuedFindings(notAfter, inUse, now)
+	}
+	return acmStatusFindings(status)
+}
+
+// acmIssuedFindings returns the wave1 expiry/orphan Finding for an ISSUED
+// certificate, read straight off ListCertificates' CertificateSummary
+// (NotAfter, InUse). Expiry takes priority over orphan: an expiring orphan
+// cert is still primarily an expiry problem.
+func acmIssuedFindings(notAfter *time.Time, inUse bool, now time.Time) []domain.Finding {
+	if notAfter != nil {
+		remaining := notAfter.Sub(now)
+		switch {
+		case remaining < 7*24*time.Hour:
+			phrase := "expired"
+			if remaining >= 0 {
+				phrase = fmt.Sprintf("expires in %d days", int(remaining.Hours()/24))
+			}
+			return []domain.Finding{{
+				Code: acmCodeExpiresCritical, Phrase: phrase,
+				Severity: domain.SevBroken, Source: "wave1",
+			}}
+		case remaining < 30*24*time.Hour:
+			return []domain.Finding{{
+				Code: acmCodeExpiresSoon, Phrase: fmt.Sprintf("expires in %d days", int(remaining.Hours()/24)),
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
+		}
+	}
+	if !inUse {
+		return []domain.Finding{{
+			Code: acmCodeOrphan, Phrase: "certificate not in use (orphan)",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	}
+	return nil
+}
+
 // acmStatusFindings returns the wave1 Finding for a non-ISSUED certificate
 // status, mirroring acmColor's (catalog_color_helpers.go) own precedence so
-// the Findings list and the row color never disagree. ISSUED certs return no
-// finding here — their color (and any "in use" / expiry signal) comes from
-// EnrichACMCertificate's Wave-2 findings instead.
+// the Findings list and the row color never disagree. ISSUED certs are
+// routed to acmIssuedFindings by acmFindings instead.
 func acmStatusFindings(status string) []domain.Finding {
 	switch status {
 	case "PENDING_VALIDATION":

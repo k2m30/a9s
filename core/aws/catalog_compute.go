@@ -428,6 +428,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeEC2StateStoppedServer, Phrase: "stopped", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeEC2StateTerminated, Phrase: "terminated", Severity: domain.SevDim, Source: "wave1"},
 			{Code: ec2CodeInstanceStatusImpaired, Phrase: "impaired: system checks failing", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: ec2CodeInstanceStatusInitializing, Phrase: "initializing: checks in progress", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ec2CodeInstanceStatusInsufficient, Phrase: "status unknown: AWS insufficient-data", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ec2CodeScheduledEvent, Phrase: "scheduled event: <code> at <date>", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{

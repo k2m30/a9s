@@ -2,14 +2,22 @@ package unit
 
 // enrichment_tg_findings_test.go — Behavioral tests for EnrichTargetGroupHealth.
 //
-// Contract assertions (enricher-contract.md):
+// Contract assertions (docs/attention-signals.md `tg` Wave 2 row):
 //   - Returns EnricherResult.Findings keyed by r.ID (target group name set by tg fetcher).
 //   - DescribeTargetHealth is called with r.Fields["target_group_arn"] (full ARN required by AWS).
-//   - Severity "!" for all findings.
+//   - Only literal TargetHealth.State == "unhealthy" counts toward the unhealthy
+//     numerator — "initial", "draining", "unused", "unavailable", and
+//     "unhealthy.draining" targets are NOT unhealthy and must not trigger a
+//     finding by themselves.
+//   - Severity is graduated: any target State=="unhealthy" (numerator > 0) →
+//     "~" (SevWarn); EVERY target reporting State=="unhealthy" (numerator ==
+//     denominator, i.e. no healthy/initial/draining/unused/unavailable target
+//     present) → "!" (SevBroken). A single non-"unhealthy" target in the mix
+//     blocks the "!" escalation even if every other target is unhealthy.
 //   - Summary format: "unhealthy targets: X/Y".
 //   - IssueCount = len(Findings) (one entry per TG with any unhealthy targets).
 //   - Truncated = true when len(resources) > EnrichmentCap.
-//   - TG with all-healthy targets must NOT appear in Findings.
+//   - TG with zero literally-unhealthy targets must NOT appear in Findings.
 //   - Empty resources slice → non-nil empty Findings map.
 
 import (
@@ -23,6 +31,7 @@ import (
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -121,6 +130,159 @@ func TestEnrichTargetGroupHealth_SummaryUnhealthyXofY(t *testing.T) {
 	}
 	if !strings.Contains(f.Phrase, "2/3") {
 		t.Errorf("summary %q must contain %q (2 of 3 unhealthy)", f.Phrase, "2/3")
+	}
+	// 2 of 3 unhealthy is NOT "every target unhealthy" — must be Warning, not
+	// Broken (docs/attention-signals.md `tg` Wave 2: "any target unhealthy ->
+	// Warning; all unhealthy -> Broken"). Current code always stamps "!".
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v (2/3 unhealthy is partial, not all)", f.Severity, domain.SevWarn)
+	}
+}
+
+// TestEnrichTargetGroupHealth_NonUnhealthyStatesExcluded pins that targets in
+// "initial", "draining", or "unused" state are NOT counted as unhealthy — only
+// literal State=="unhealthy" is. A TG with zero literally-unhealthy targets
+// must not appear in Findings at all, even though every target here is
+// non-"healthy".
+//
+// Current code treats State != Healthy as unhealthy, so this TG would
+// (wrongly) get a finding today.
+func TestEnrichTargetGroupHealth_NonUnhealthyStatesExcluded(t *testing.T) {
+	tgName := "mixed-nonunhealthy-tg"
+	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/mixed-nonunhealthy-tg/333"
+	fake := &tgHealthFake{
+		outputs: map[string]*elbv2.DescribeTargetHealthOutput{
+			tgARN: {
+				TargetHealthDescriptions: []elbtypes.TargetHealthDescription{
+					tgHealthDesc(elbtypes.TargetHealthStateEnumHealthy),
+					tgHealthDesc(elbtypes.TargetHealthStateEnumInitial),
+					tgHealthDesc(elbtypes.TargetHealthStateEnumDraining),
+					tgHealthDesc(elbtypes.TargetHealthStateEnumUnused),
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{ELBv2: fake}
+	resources := []resource.Resource{{
+		ID:     tgName,
+		Fields: map[string]string{"target_group_arn": tgARN},
+	}}
+
+	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := result.Findings[tgName]; ok {
+		t.Errorf("TG with [healthy, initial, draining, unused] targets (zero literally-unhealthy) must NOT appear in Findings; got %v", result.Findings[tgName])
+	}
+}
+
+// TestEnrichTargetGroupHealth_SomeUnhealthyIsWarning pins the Warning tier:
+// one unhealthy target among healthy targets must produce a finding with
+// severity "~" (SevWarn), not "!".
+func TestEnrichTargetGroupHealth_SomeUnhealthyIsWarning(t *testing.T) {
+	tgName := "some-unhealthy-tg"
+	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/some-unhealthy-tg/444"
+	fake := &tgHealthFake{
+		outputs: map[string]*elbv2.DescribeTargetHealthOutput{
+			tgARN: {
+				TargetHealthDescriptions: []elbtypes.TargetHealthDescription{
+					tgHealthDesc(elbtypes.TargetHealthStateEnumUnhealthy),
+					tgHealthDesc(elbtypes.TargetHealthStateEnumHealthy),
+					tgHealthDesc(elbtypes.TargetHealthStateEnumHealthy),
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{ELBv2: fake}
+	resources := []resource.Resource{{
+		ID:     tgName,
+		Fields: map[string]string{"target_group_arn": tgARN},
+	}}
+
+	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fs, ok := result.Findings[tgName]
+	if !ok {
+		t.Fatalf("expected a finding for %q (1 of 3 targets unhealthy)", tgName)
+	}
+	if fs[0].Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v (1/3 unhealthy, not all)", fs[0].Severity, domain.SevWarn)
+	}
+}
+
+// TestEnrichTargetGroupHealth_AllUnhealthyIsBroken pins the Broken tier: every
+// target reporting State=="unhealthy" must produce a finding with severity "!"
+// (SevBroken).
+func TestEnrichTargetGroupHealth_AllUnhealthyIsBroken(t *testing.T) {
+	tgName := "all-unhealthy-tg"
+	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/all-unhealthy-tg/555"
+	fake := &tgHealthFake{
+		outputs: map[string]*elbv2.DescribeTargetHealthOutput{
+			tgARN: {
+				TargetHealthDescriptions: []elbtypes.TargetHealthDescription{
+					tgHealthDesc(elbtypes.TargetHealthStateEnumUnhealthy),
+					tgHealthDesc(elbtypes.TargetHealthStateEnumUnhealthy),
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{ELBv2: fake}
+	resources := []resource.Resource{{
+		ID:     tgName,
+		Fields: map[string]string{"target_group_arn": tgARN},
+	}}
+
+	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fs, ok := result.Findings[tgName]
+	if !ok {
+		t.Fatalf("expected a finding for %q (all targets unhealthy)", tgName)
+	}
+	if fs[0].Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v (every target unhealthy)", fs[0].Severity, domain.SevBroken)
+	}
+}
+
+// TestEnrichTargetGroupHealth_MixedUnhealthyAndNonReportingIsWarning pins the
+// "honest reading" of the all-unhealthy escalation: a target group with one
+// unhealthy target and one "initial" target (zero healthy targets) must stay
+// at Warning, NOT escalate to Broken, because not every target reporting is
+// unhealthy — the "initial" target breaks the "all unhealthy" condition even
+// though it isn't "healthy" either.
+func TestEnrichTargetGroupHealth_MixedUnhealthyAndNonReportingIsWarning(t *testing.T) {
+	tgName := "mixed-unhealthy-initial-tg"
+	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/mixed-unhealthy-initial-tg/666"
+	fake := &tgHealthFake{
+		outputs: map[string]*elbv2.DescribeTargetHealthOutput{
+			tgARN: {
+				TargetHealthDescriptions: []elbtypes.TargetHealthDescription{
+					tgHealthDesc(elbtypes.TargetHealthStateEnumUnhealthy),
+					tgHealthDesc(elbtypes.TargetHealthStateEnumInitial),
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{ELBv2: fake}
+	resources := []resource.Resource{{
+		ID:     tgName,
+		Fields: map[string]string{"target_group_arn": tgARN},
+	}}
+
+	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fs, ok := result.Findings[tgName]
+	if !ok {
+		t.Fatalf("expected a finding for %q (1 unhealthy target present)", tgName)
+	}
+	if fs[0].Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v (unhealthy+initial: not every target is unhealthy, must not escalate to Broken)", fs[0].Severity, domain.SevWarn)
 	}
 }
 

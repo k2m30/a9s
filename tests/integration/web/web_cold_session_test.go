@@ -57,14 +57,15 @@ const (
 	// tests/integration/scenario_s3_visual_test.go (s3S4Phrase).
 	coldS3Wave2Phrase = "public access block incomplete"
 
-	// coldS3ExpectedIssueCount is the canonical s3 demo-fixture issue count:
-	// exactly 4 buckets in core/demo/fixtures/s3.go carry a PAB "!"
-	// finding — a9s-demo-nopab (nil → NoSuchPublicAccessBlockConfiguration),
-	// a9s-demo-partial-pab (BlockPublicAcls=false), a9s-demo-multifail-pab
-	// (two flags false), a9s-demo-nilcfg (nil inner config); every other
-	// bucket falls through the fake's healthy-default path. Pinned as
-	// s3ExpectedIssueBkt=4 in tests/integration/scenario_s3_visual_test.go.
-	coldS3ExpectedIssueCount = 4
+	// coldS3ExpectedIssueCount is the canonical s3 demo-fixture badge count.
+	// The 4 PAB-finding buckets in core/demo/fixtures/s3.go — a9s-demo-nopab
+	// (nil → NoSuchPublicAccessBlockConfiguration), a9s-demo-partial-pab
+	// (BlockPublicAcls=false), a9s-demo-multifail-pab (two flags false),
+	// a9s-demo-nilcfg (nil inner config) — all carry `~` SevWarn findings,
+	// and the S1 badge counts only `!`-severity findings plus wave-1
+	// issue-colored rows, so the s3 badge is 0. Pinned as
+	// s3ExpectedIssueBkt=0 in tests/integration/scenario_s3_visual_test.go.
+	coldS3ExpectedIssueCount = 0
 )
 
 // coldSessionCoreTypes are the resource types whose availability counts must
@@ -228,7 +229,7 @@ func TestWebColdSession_MenuPopulatesFromInSessionSweepAlone(t *testing.T) {
 			t.Fatalf("step 3: s3 entry missing from menu after back — %s", coldMenuDump(vs))
 		}
 		if e.IssueBadge.Count != coldS3ExpectedIssueCount {
-			t.Errorf("step 3: s3 issue_badge=%d, want %d (the 4 PAB-finding fixture buckets; "+
+			t.Errorf("step 3: s3 issue_badge=%d, want %d (PAB findings are `~` SevWarn and never bump the badge; "+
 				"see coldS3ExpectedIssueCount citation) — %s",
 				e.IssueBadge.Count, coldS3ExpectedIssueCount, coldMenuDump(vs))
 		}

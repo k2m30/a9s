@@ -34,7 +34,9 @@ const s3PABIncompleteDetail = "Bucket-level public access block is missing or pa
 // four PAB flags is false.
 //
 // Contract (Finding):
-//   - Severity is always "!" (important background concern on a Healthy row).
+//   - Severity is always "~" (a missing/partial bucket-level PAB is a risk,
+//     not a certainty — account-level PAB may still apply — so this signal
+//     never paints a row Broken).
 //   - Summary is always "public access block incomplete" — stable across all instances.
 //   - Rows carry the per-case detail (never duplicated in Summary).
 //
@@ -97,7 +99,7 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 		if err != nil {
 			var apiErr smithy.APIError
 			if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchPublicAccessBlockConfiguration" {
-				setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "!", "s3", []domain.DetailRow{
+				setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "~", "s3", []domain.DetailRow{
 					{Label: "Status", Value: "no public access block configuration"},
 					{Label: "Account-level PAB", Value: "may still apply"},
 				}, s3PABIncompleteDetail)
@@ -124,7 +126,7 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 			return
 		}
 		if out.PublicAccessBlockConfiguration == nil {
-			setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "!", "s3", []domain.DetailRow{
+			setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "~", "s3", []domain.DetailRow{
 				{Label: "Status", Value: "no public access block configuration"},
 				{Label: "Account-level PAB", Value: "may still apply"},
 			}, s3PABIncompleteDetail)
@@ -153,7 +155,7 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 			return
 		}
 		falseFlags = append(falseFlags, domain.DetailRow{Label: "Account-level PAB", Value: "may still apply"})
-		setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "!", "s3", falseFlags, s3PABIncompleteDetail)
+		setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "~", "s3", falseFlags, s3PABIncompleteDetail)
 		result.FieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 	})
 	sort.Strings(failures)
