@@ -70,7 +70,7 @@ import (
 func TestIsBackgroundFetchTask_CachedRowsSeeded_IsBackground(t *testing.T) {
 	req := runtime.TaskRequest{Key: runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "s3"}}
 	if !app.IsBackgroundFetchTask(req, true) {
-		t.Error("IsBackgroundFetchTask(KindFetchResources, screenAlreadyRenderable=true) = false, want true — DEF-1/C4: a list-content fetch over an already-renderable screen (cached rows or Loading shell present) must never block the transport")
+		t.Error("IsBackgroundFetchTask(KindFetchResources, screenAlreadyRenderable=true) = false, want true — C4: a list-content fetch over an already-renderable screen (cached rows or Loading shell present) must never block the transport")
 	}
 }
 
@@ -179,7 +179,7 @@ func TestWebBoot_WarmListOpen_FetchTaskDeferredAsBackground(t *testing.T) {
 		}
 	}
 	if !hasDeferredFetch {
-		t.Error("KindFetchResources was not deferred to the background partition for a warm (already-renderable) list open — DEF-1/C4: the transport must not block on this fetch when cached rows are already on screen")
+		t.Error("KindFetchResources was not deferred to the background partition for a warm (already-renderable) list open — C4: the transport must not block on this fetch when cached rows are already on screen")
 	}
 }
 
@@ -238,7 +238,7 @@ func TestAvailabilityChecked_TruncatedProbe_NeverDowngradesExactMenuTotal(t *tes
 
 	entry := findMenuEntryPilot(t, vs, "s3")
 	if entry.Availability != 55 {
-		t.Errorf("s3 menu Availability = %d, want unchanged 55 — DEF-2/C5: a truncated sweep probe must never downgrade an already-exact stored total", entry.Availability)
+		t.Errorf("s3 menu Availability = %d, want unchanged 55 — C5: a truncated sweep probe must never downgrade an already-exact stored total", entry.Availability)
 	}
 	if entry.AvailTruncated {
 		t.Error("s3 menu AvailTruncated = true, want false — the exact badge must stay intact (no '+' suffix) when a truncated probe lands after an exact observation")
@@ -322,7 +322,7 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 		t.Fatalf("persisted s3 TypeFile.Rows has %d entries, want 1", len(tf.Rows))
 	}
 	if len(tf.Rows[0].Findings) != 1 || tf.Rows[0].Findings[0].Code != "s3-public-read" {
-		t.Errorf("persisted s3 TypeFile.Rows[0].Findings = %+v, want 1 finding with Code=%q — DEF-3: per-row findings must survive the production save wiring, not just a manually-constructed cache.Row", tf.Rows[0].Findings, "s3-public-read")
+		t.Errorf("persisted s3 TypeFile.Rows[0].Findings = %+v, want 1 finding with Code=%q — C6: per-row findings must survive the production save wiring, not just a manually-constructed cache.Row", tf.Rows[0].Findings, "s3-public-read")
 	}
 
 	// Cold-boot half: a brand-new controller for the SAME pair must seed the
@@ -353,7 +353,7 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 		if lb.Rows[i].ResourceID == "bucket-def3-1" {
 			found = true
 			if lb.Rows[i].Severity == "" {
-				t.Error("cold-boot seeded row for bucket-def3-1 has empty Severity — DEF-3: the seeded row's persisted Findings must drive render-time severity classification, not just the raw Fields")
+				t.Error("cold-boot seeded row for bucket-def3-1 has empty Severity — C6: the seeded row's persisted Findings must drive render-time severity classification, not just the raw Fields")
 			}
 		}
 	}
@@ -427,7 +427,7 @@ func TestProductionRefresh_OneType_LeavesSiblingTypeFilesByteIdentical(t *testin
 		t.Fatalf("reading ec2 fixture file after the s3-only production refresh: %v", err)
 	}
 	if before != after {
-		t.Error("ec2.yaml bytes changed after refreshing ONLY s3 through the production controller path — DEF-4a: a per-type refresh must leave every sibling type file byte-identical")
+		t.Error("ec2.yaml bytes changed after refreshing ONLY s3 through the production controller path — sibling-file isolation (C7): a per-type refresh must leave every sibling type file byte-identical")
 	}
 }
 
@@ -476,7 +476,7 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 		t.Fatal(`reloaded.Type("s3") missing after the truncated refetch`)
 	}
 	if !tf.Exact {
-		t.Error("s3 TypeFile.Exact = false after a truncated refetch over a prior EXACT 55 — DEF-4b: exactness (like C5) must only ever advance, a truncated observation must not downgrade it")
+		t.Error("s3 TypeFile.Exact = false after a truncated refetch over a prior EXACT 55 — persisted-pair invariant: exactness (like C5) must only ever advance, a truncated observation must not downgrade it")
 	}
 	if tf.Count != 55 {
 		t.Errorf("s3 TypeFile.Count = %d, want unchanged 55 — a truncated 50-row refetch must not shrink an already-exact stored total", tf.Count)
@@ -577,13 +577,13 @@ func TestAPIError_OverCachedList_ClearsRefreshing_SetsErrorMarker(t *testing.T) 
 		t.Fatal("Body.List is nil after APIError over a cached list")
 	}
 	if lb.Refreshing {
-		t.Error("Refreshing = true after APIError landed, want false — DEF-5/C4: a fetch failure over cached content must stop the refreshing marker")
+		t.Error("Refreshing = true after APIError landed, want false — C4: a fetch failure over cached content must stop the refreshing marker")
 	}
 	if lb.LastFetchError == "" {
-		t.Error("LastFetchError is empty after APIError landed, want a non-empty error marker — DEF-5/C4: the marker must swap to an error marker, not just disappear")
+		t.Error("LastFetchError is empty after APIError landed, want a non-empty error marker — C4: the marker must swap to an error marker, not just disappear")
 	}
 	if len(lb.Rows) != seededRowCount {
-		t.Errorf("len(Rows) = %d after APIError, want unchanged %d — DEF-5/C4: cached content must remain on screen, nothing goes blank on a fetch failure", len(lb.Rows), seededRowCount)
+		t.Errorf("len(Rows) = %d after APIError, want unchanged %d — C4: cached content must remain on screen, nothing goes blank on a fetch failure", len(lb.Rows), seededRowCount)
 	}
 }
 
@@ -615,7 +615,7 @@ func TestMenuEntry_Origin_CacheBeforeVerification_FlipsOnAvailabilityChecked(t *
 	})
 	seeded := findMenuEntryPilot(t, vs, "s3")
 	if seeded.Origin != "cache" {
-		t.Errorf("s3 menu entry Origin = %q immediately after AvailabilityCacheLoaded, want %q — DEF-6/C3: a cache-seeded, not-yet-verified entry must be distinguishable from a verified one", seeded.Origin, "cache")
+		t.Errorf("s3 menu entry Origin = %q immediately after AvailabilityCacheLoaded, want %q — C3: a cache-seeded, not-yet-verified entry must be distinguishable from a verified one", seeded.Origin, "cache")
 	}
 
 	vs2, _ := ctrl.Handle(messages.AvailabilityChecked{
@@ -626,7 +626,7 @@ func TestMenuEntry_Origin_CacheBeforeVerification_FlipsOnAvailabilityChecked(t *
 	})
 	verified := findMenuEntryPilot(t, vs2, "s3")
 	if verified.Origin != "verified" {
-		t.Errorf("s3 menu entry Origin = %q after AvailabilityChecked landed, want %q — DEF-6/C3: origin must flip once a live probe confirms the type this session", verified.Origin, "verified")
+		t.Errorf("s3 menu entry Origin = %q after AvailabilityChecked landed, want %q — C3: origin must flip once a live probe confirms the type this session", verified.Origin, "verified")
 	}
 }
 
@@ -717,10 +717,10 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 	store := cache.LoadDir("pilot-def7-prof", "us-east-1")
 	tf, ok := store.Type("s3")
 	if !ok {
-		t.Fatal(`store.Type("s3") missing after a sweep+enrichment completion — DEF-7/C7: per-type persistence must not require a list screen to have been opened`)
+		t.Fatal(`store.Type("s3") missing after a sweep+enrichment completion — C7: per-type persistence must not require a list screen to have been opened`)
 	}
 	if len(tf.Rows) == 0 {
-		t.Error("s3 TypeFile.Rows is empty after a sweep completion with no list ever opened — DEF-7: the sweep's fetched rows (with findings) must persist per-type without requiring a list-open, so a corrupt file self-heals on the next sweep, not only on the next list visit")
+		t.Error("s3 TypeFile.Rows is empty after a sweep completion with no list ever opened — C7: the sweep's fetched rows (with findings) must persist per-type without requiring a list-open, so a corrupt file self-heals on the next sweep, not only on the next list visit")
 	}
 	found := false
 	for _, r := range tf.Rows {
@@ -847,7 +847,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 		t.Fatalf("persisted s3 TypeFile.Rows has %d entries, want 1", len(tf.Rows))
 	}
 	if len(tf.Rows[0].Findings) != 1 || tf.Rows[0].Findings[0].Code != "s3-public-read" {
-		t.Errorf("persisted s3 TypeFile.Rows[0].Findings = %+v, want 1 finding with Code=%q — DEF-8/C6: Wave-2 findings applied to an OPEN live list via the real EnrichmentChecked seam must reach ls.Rows/resourceCache so the list-open save path persists them, not just the session-side stores applyEnrichment writes to", tf.Rows[0].Findings, "s3-public-read")
+		t.Errorf("persisted s3 TypeFile.Rows[0].Findings = %+v, want 1 finding with Code=%q — C6: Wave-2 findings applied to an OPEN live list via the real EnrichmentChecked seam must reach ls.Rows/resourceCache so the list-open save path persists them, not just the session-side stores applyEnrichment writes to", tf.Rows[0].Findings, "s3-public-read")
 	}
 
 	// Cold-boot half: a brand-new controller for the SAME pair must seed the
@@ -877,7 +877,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 		if lb.Rows[i].ResourceID == "bucket-def8-1" {
 			found = true
 			if lb.Rows[i].Severity == "" {
-				t.Error("cold-boot seeded row for bucket-def8-1 has empty Severity — DEF-8: the seeded row's persisted Findings must drive render-time severity classification, closing the loop back to DEF-3's glyph rendering")
+				t.Error("cold-boot seeded row for bucket-def8-1 has empty Severity — C6: the seeded row's persisted Findings must drive render-time severity classification, closing the loop back to render-time glyph classification")
 			}
 		}
 	}

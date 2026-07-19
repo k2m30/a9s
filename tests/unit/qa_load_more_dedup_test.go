@@ -231,20 +231,20 @@ func TestLoadMore_TUI_ColdOpen_NoDuplicates(t *testing.T) {
 	firstID := def17BucketID(0)
 	occurrences := strings.Count(content, firstID)
 	if occurrences > 1 {
-		t.Errorf("row ID %q appears %d times in the rendered list after 'm' — DEF-17: load-more duplicated page 1 instead of fetching page 2:\n%s", firstID, occurrences, content)
+		t.Errorf("row ID %q appears %d times in the rendered list after 'm' — D13: load-more duplicated page 1 instead of fetching page 2:\n%s", firstID, occurrences, content)
 	}
 	if !strings.Contains(content, def17BucketID(54)) {
 		t.Errorf("rendered list after 'm' is missing page 2's last row %q — page 2 was never actually fetched:\n%s", def17BucketID(54), content)
 	}
 	if !strings.Contains(content, "s3(55)") {
-		t.Errorf("rendered frame title after 'm' does not contain \"s3(55)\" — DEF-17: the title must reflect exactly 55 total rows (50 + 5), not a duplicated ~100:\n%s", content)
+		t.Errorf("rendered frame title after 'm' does not contain \"s3(55)\" — D13: the title must reflect exactly 55 total rows (50 + 5), not a duplicated ~100:\n%s", content)
 	}
 	totalOccurrences := 0
 	for i := range 55 {
 		totalOccurrences += strings.Count(content, def17BucketID(i))
 	}
 	if totalOccurrences != 55 {
-		t.Errorf("rendered list after 'm' contains %d total row-ID occurrences across the 55 distinct IDs, want exactly 55 (no duplicates) — DEF-17:\n%s", totalOccurrences, content)
+		t.Errorf("rendered list after 'm' contains %d total row-ID occurrences across the 55 distinct IDs, want exactly 55 (no duplicates) — D13:\n%s", totalOccurrences, content)
 	}
 }
 
@@ -316,7 +316,7 @@ func TestLoadMore_TokenPresent_AfterColdOpen(t *testing.T) {
 
 	got := ctrl.GetListPaginationCursor()
 	if got != "p2" {
-		t.Errorf("GetListPaginationCursor() = %q, want %q — DEF-17: the 'm' key path reads this exact accessor to build messages.LoadMore.ContinuationToken; a lost/blank token here would cause the next load-more fetch to re-request token \"\" (page 1 again) instead of \"p2\"", got, "p2")
+		t.Errorf("GetListPaginationCursor() = %q, want %q — D13: the 'm' key path reads this exact accessor to build messages.LoadMore.ContinuationToken; a lost/blank token here would cause the next load-more fetch to re-request token \"\" (page 1 again) instead of \"p2\"", got, "p2")
 	}
 }
 
@@ -377,7 +377,7 @@ func TestLoadMore_AppendDedup_Backstop(t *testing.T) {
 	for id, n := range seen {
 		if n > 1 {
 			dupCount++
-			t.Errorf("row ID %q appears %d times after an append carrying already-present IDs — DEF-17: ApplyResourcesLoaded(append=true) must dedup by ID, not blindly concatenate", id, n)
+			t.Errorf("row ID %q appears %d times after an append carrying already-present IDs — D13: ApplyResourcesLoaded(append=true) must dedup by ID, not blindly concatenate", id, n)
 		}
 	}
 	if dupCount == 0 && len(lb.Rows) != 50 {
@@ -441,7 +441,7 @@ func TestLoadMore_PersistedPair_NeverMismatched(t *testing.T) {
 		t.Fatal(`store.Type("s3") missing after the poisoning sequence — cannot validate the persisted-pair invariant`)
 	}
 	if tf.Exact && tf.Count != len(tf.Rows) {
-		t.Errorf("persisted s3 TypeFile: Exact=true but Count=%d != len(Rows)=%d — DEF-4b violation: a double-append must never leave the persisted pair mismatched", tf.Count, len(tf.Rows))
+		t.Errorf("persisted s3 TypeFile: Exact=true but Count=%d != len(Rows)=%d — persisted-pair invariant violation: a double-append must never leave the persisted pair mismatched", tf.Count, len(tf.Rows))
 	}
 	if tf.Count > len(tf.Rows) {
 		t.Errorf("persisted s3 TypeFile: Count=%d > len(Rows)=%d — the on-disk pair claims more rows than are actually stored (the live-observed \"count:100 with 50 rows\" symptom)", tf.Count, len(tf.Rows))
@@ -453,6 +453,6 @@ func TestLoadMore_PersistedPair_NeverMismatched(t *testing.T) {
 	}
 	distinct := len(seen)
 	if distinct != len(tf.Rows) {
-		t.Errorf("persisted s3 TypeFile.Rows has %d entries but only %d distinct IDs — DEF-17: the persisted rows contain duplicates (the live-observed \"count:100 with 50 [distinct] rows\" symptom: Count/len(Rows) matched at %d, but only %d of those rows are actually unique buckets)", len(tf.Rows), distinct, tf.Count, distinct)
+		t.Errorf("persisted s3 TypeFile.Rows has %d entries but only %d distinct IDs — D13: the persisted rows contain duplicates (the live-observed \"count:100 with 50 [distinct] rows\" symptom: Count/len(Rows) matched at %d, but only %d of those rows are actually unique buckets)", len(tf.Rows), distinct, tf.Count, distinct)
 	}
 }

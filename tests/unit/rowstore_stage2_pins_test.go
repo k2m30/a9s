@@ -243,7 +243,7 @@ func TestStage2Pin_DEF7_SavePayloadFrozenAtDispatch_SurvivesLaterAmend(t *testin
 		}
 	}
 	if payload == nil {
-		t.Fatal("no TaskKindSaveCache task dispatched by the sweep-completion EnrichmentChecked — precondition for DEF-7 pin failed")
+		t.Fatal("no TaskKindSaveCache task dispatched by the sweep-completion EnrichmentChecked — precondition for the payload-freeze pin failed")
 	}
 	dispatchedRows := payload.Resources[stage2PinType]
 	if len(dispatchedRows) != 1 || dispatchedRows[0].Fields["cost_estimate"] != "10.00" {
@@ -267,7 +267,7 @@ func TestStage2Pin_DEF7_SavePayloadFrozenAtDispatch_SurvivesLaterAmend(t *testin
 	})
 
 	if dispatchedRows[0].Fields["cost_estimate"] != "10.00" {
-		t.Errorf("dispatched payload rows[0].Fields[cost_estimate] = %q after a later Amend, want unchanged 10.00 — DEF-7: a dispatched save payload must be frozen at dispatch time, immune to any later store mutation", dispatchedRows[0].Fields["cost_estimate"])
+		t.Errorf("dispatched payload rows[0].Fields[cost_estimate] = %q after a later Amend, want unchanged 10.00 — the dispatch-time payload freeze: a dispatched save payload must be frozen at dispatch time, immune to any later store mutation", dispatchedRows[0].Fields["cost_estimate"])
 	}
 
 	storeSnap := s.RowStore.Snapshot(stage2PinType)
@@ -389,7 +389,7 @@ func TestStage2Pin_DEF21_D16_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *t
 
 	sweepLaneTF := stage2PinReadTypeFile(t, s.Profile, s.Region, "s3")
 	if len(sweepLaneTF.Rows) != len(listLaneTF.Rows) {
-		t.Fatalf("sweep-completion save persisted %d rows, want the SAME accumulated depth the list lane saved (%d) — DEF-21/D16: an independent, shallower sweep observation must not stomp the deeper list-lane rows", len(sweepLaneTF.Rows), len(listLaneTF.Rows))
+		t.Fatalf("sweep-completion save persisted %d rows, want the SAME accumulated depth the list lane saved (%d) — D16: an independent, shallower sweep observation must not stomp the deeper list-lane rows", len(sweepLaneTF.Rows), len(listLaneTF.Rows))
 	}
 	listIDs := make(map[string]bool, len(listLaneTF.Rows))
 	for _, r := range listLaneTF.Rows {
@@ -523,7 +523,7 @@ func TestStage2Pin_DEF15_ObservedEmptyProbe_BeatsStaleDiskRows(t *testing.T) {
 		t.Fatal("Body.List is nil after opening the list for an observed-empty type")
 	}
 	if len(lb.Rows) != 0 {
-		t.Errorf("Rows = %+v, want empty — DEF-15: a live observed-empty probe result must beat a stale populated disk cache, not resurrect its rows", lb.Rows)
+		t.Errorf("Rows = %+v, want empty — the observed-empty guard: a live observed-empty probe result must beat a stale populated disk cache, not resurrect its rows", lb.Rows)
 	}
 	for _, r := range lb.Rows {
 		if r.ResourceID == "i-0staledisk0001" {

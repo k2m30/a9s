@@ -161,10 +161,10 @@ func TestTUISaveCache_PersistsRowsToTypeFile(t *testing.T) {
 	store := cache.LoadDir(profile, region)
 	tf, ok := store.Type("s3")
 	if !ok {
-		t.Fatal(`store.Type("s3") missing after a TUI-driven sweep completion — DEF-11: the TUI save-cache dispatch must persist a per-type file just like the headless executor path does`)
+		t.Fatal(`store.Type("s3") missing after a TUI-driven sweep completion — save-cache routing: the TUI save-cache dispatch must persist a per-type file just like the headless executor path does`)
 	}
 	if len(tf.Rows) == 0 {
-		t.Fatal("s3 TypeFile.Rows is empty after a TUI-driven sweep completion — DEF-11: internal/tui/app_dispatch.go's TaskKindSaveCache case intercepts the task via m.saveAvailabilityCache() (counts-only), bypassing the shared executor path that also persists rows via saveProbeResourcesToTypeFiles")
+		t.Fatal("s3 TypeFile.Rows is empty after a TUI-driven sweep completion — save-cache routing: internal/tui/app_dispatch.go's TaskKindSaveCache case intercepts the task via m.saveAvailabilityCache() (counts-only), bypassing the shared executor path that also persists rows via saveProbeResourcesToTypeFiles")
 	}
 	found := false
 	for _, r := range tf.Rows {
@@ -200,13 +200,13 @@ func TestTUISaveCache_AvailabilityCountsStillPersist(t *testing.T) {
 	store := cache.LoadDir(profile, region)
 	tf, ok := store.Type("s3")
 	if !ok {
-		t.Fatal(`store.Type("s3") missing after a TUI-driven sweep completion — availability counts must persist regardless of the DEF-11 rows regression`)
+		t.Fatal(`store.Type("s3") missing after a TUI-driven sweep completion — availability counts must persist regardless of the rows-persistence regression`)
 	}
 	if !tf.HasResources {
-		t.Error("s3 TypeFile.HasResources = false, want true — availability count persistence must survive the DEF-11 routing fix")
+		t.Error("s3 TypeFile.HasResources = false, want true — availability count persistence must survive the save-cache routing fix")
 	}
 	if tf.Count != 1 {
-		t.Errorf("s3 TypeFile.Count = %d, want 1 — availability count persistence must survive the DEF-11 routing fix", tf.Count)
+		t.Errorf("s3 TypeFile.Count = %d, want 1 — availability count persistence must survive the save-cache routing fix", tf.Count)
 	}
 	// Issues is intentionally NOT asserted here: post-fix, TaskKindSaveCache's
 	// issue count is derived from c.session.ResourceCache via

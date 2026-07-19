@@ -91,9 +91,9 @@ func TestTUI_APIError_OverListWithRows_RendersErrorMarker_KeepsRows(t *testing.T
 
 	afterContent := stripANSI(rootViewContent(m))
 	if !strings.Contains(afterContent, "── error:") {
-		t.Errorf("rendered view after messages.APIError does not contain the DEF-5 fetch-error marker (\"── error: ...\"):\n%s", afterContent)
+		t.Errorf("rendered view after messages.APIError does not contain the C4 fetch-error marker (\"── error: ...\"):\n%s", afterContent)
 	}
 	if !strings.Contains(afterContent, "errmarker-bucket-1") || !strings.Contains(afterContent, "errmarker-bucket-2") {
-		t.Errorf("rendered view after messages.APIError is missing previously-loaded rows — DEF-5/C4: cached content must remain on screen, nothing goes blank on a fetch failure:\n%s", afterContent)
+		t.Errorf("rendered view after messages.APIError is missing previously-loaded rows — C4: cached content must remain on screen, nothing goes blank on a fetch failure:\n%s", afterContent)
 	}
 }

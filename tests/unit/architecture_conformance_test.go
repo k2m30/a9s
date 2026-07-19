@@ -376,7 +376,7 @@ func TestConformance_Wave2RowMutators_HaveNoUnvettedCallSites(t *testing.T) {
 					"%s: calls ApplyWave2ToRow/applyWave2ToRow but is not in rowStoreMutationSeamFiles — "+
 						"a new call site must be manually verified to route any RowStore-backed mutation "+
 						"through Amend/AmendRows (never mutate a bare Snapshot/SnapshotAll result in place, "+
-						"per RowStore.Amend's DEF-7 doc comment) and then added to that allowlist",
+						"per RowStore.Amend's copy-on-write doc comment) and then added to that allowlist",
 					rel,
 				)
 			}

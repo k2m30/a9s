@@ -1,8 +1,8 @@
 // runtime_cache_rows_exact_totals_test.go — RED tests for the CACHE-FIRST
-// LIST UX epic, Contract D (exact totals on load-more exhaustion, moved to
-// the controller level).
+// LIST UX epic's exact-total menu sync-back (exact totals on load-more
+// exhaustion, moved to the controller level).
 //
-// Contract D: when load-more exhausts pagination (no next token), the exact
+// Exact-total menu sync-back: when load-more exhausts pagination (no next token), the exact
 // total becomes authoritative: menu availability for that type updates to
 // the exact count with Truncated=false (both in-session AND persisted via
 // the disk cache), survives returning to the menu and — via the cache file —
@@ -54,7 +54,7 @@ import (
 )
 
 // -----------------------------------------------------------------------
-// Contract D — exact totals move to the controller (no TUI involvement)
+// Exact-total menu sync-back — exact totals move to the controller (no TUI involvement)
 // -----------------------------------------------------------------------
 
 // TestLoadMoreExhausted_UpdatesMenuAvailability_ExactNoTUI pins the core
@@ -138,7 +138,7 @@ func TestLoadMoreExhausted_SurvivesReturnToMenu(t *testing.T) {
 	})
 
 	// Pop back to the menu — a plain controller-level ActionBack, not a TUI
-	// popRS call. If Contract D is correctly moved to the controller, the
+	// popRS call. If the sync-back is correctly moved to the controller, the
 	// exact total set above must already be in MenuState and popping must
 	// not need to (re)compute it.
 	c.Apply(app.Action{Kind: app.ActionBack})
@@ -159,7 +159,7 @@ func TestLoadMoreExhausted_SurvivesReturnToMenu(t *testing.T) {
 // (e.g. a stale/short load-more page racing a larger already-recorded
 // count), while a load-more that DOES exceed the known count must still win.
 // Both sub-cases are asserted together so this test cannot pass merely
-// because Contract D is entirely unimplemented (an unimplemented sync-back
+// because the exact-total sync-back is entirely unimplemented (an unimplemented sync-back
 // would leave availability untouched in BOTH sub-cases, which the "wins"
 // sub-case catches).
 func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {

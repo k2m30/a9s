@@ -106,7 +106,7 @@ func newHermeticLiveController(t *testing.T, profile, region string) (*runtime.C
 func TestSessionNew_PendingRefreshTrue(t *testing.T) {
 	s := session.New()
 	if !s.PendingRefresh {
-		t.Error("session.New().PendingRefresh = false, want true — DEF-10/C10: a fresh session must arm the post-connect replay at startup, not only after a profile/region switch")
+		t.Error("session.New().PendingRefresh = false, want true — C10: a fresh session must arm the post-connect replay at startup, not only after a profile/region switch")
 	}
 }
 
@@ -180,7 +180,7 @@ func TestPreConnectNavigate_ReplaysFetchOnClientsReady(t *testing.T) {
 		}
 	}
 	if !hasReplayFetch {
-		t.Errorf("Controller.Handle(messages.ClientsReady) follow-up tasks = %+v, want a KindFetchResources task scoped to \"s3\" — DEF-10/C10: the last pre-connect navigation must replay automatically once the AWS connect lands, instead of leaving the list on cached rows with no fetch ever retried", followUp)
+		t.Errorf("Controller.Handle(messages.ClientsReady) follow-up tasks = %+v, want a KindFetchResources task scoped to \"s3\" — C10: the last pre-connect navigation must replay automatically once the AWS connect lands, instead of leaving the list on cached rows with no fetch ever retried", followUp)
 	}
 }
 
@@ -266,7 +266,7 @@ func TestPreConnectNavigate_ReplayDrain_ClearsLastFetchError(t *testing.T) {
 	})
 	preReplay := ctrl.Snapshot().Body.List
 	if preReplay == nil || preReplay.LastFetchError == "" {
-		t.Skip("test setup could not reproduce a non-empty LastFetchError via messages.APIError — skipping the drain half of DEF-10/C4 as disproportionate to reproduce hermetically without the coder's fixed wiring")
+		t.Skip("test setup could not reproduce a non-empty LastFetchError via messages.APIError — skipping the drain half of the pre-connect replay (C4) as disproportionate to reproduce hermetically without the coder's fixed wiring")
 	}
 
 	_, followUp := ctrl.Handle(messages.ClientsReady{
@@ -284,7 +284,7 @@ func TestPreConnectNavigate_ReplayDrain_ClearsLastFetchError(t *testing.T) {
 		}
 	}
 	if replayTask == nil {
-		t.Fatal("no replay KindFetchResources task returned — cannot exercise the drain half of DEF-10/C4 (test 1 already pins the missing-replay defect directly)")
+		t.Fatal("no replay KindFetchResources task returned — cannot exercise the drain half of the pre-connect replay (C4) (test 1 already pins the missing-replay defect directly)")
 	}
 
 	freshRows := []resource.Resource{
@@ -302,7 +302,7 @@ func TestPreConnectNavigate_ReplayDrain_ClearsLastFetchError(t *testing.T) {
 		t.Fatal("Body.List is nil after draining the replay fetch")
 	}
 	if postReplay.LastFetchError != "" {
-		t.Errorf("LastFetchError = %q, want \"\" — DEF-10/C4: the replayed fetch's ResourcesLoaded result must clear the permanent error marker left by the pre-connect failure", postReplay.LastFetchError)
+		t.Errorf("LastFetchError = %q, want \"\" — the pre-connect replay (C4): the replayed fetch's ResourcesLoaded result must clear the permanent error marker left by the pre-connect failure", postReplay.LastFetchError)
 	}
 	if len(postReplay.Rows) != 2 {
 		t.Errorf("len(Rows) = %d, want 2 — the replayed fetch's fresh rows must land on screen", len(postReplay.Rows))

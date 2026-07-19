@@ -130,7 +130,7 @@ func TestFalseExact_PageOneEntryWithoutPagination_NeverDowngradesExact(t *testin
 		t.Fatal(`cache.LoadDir(...).Type("s3") missing after TaskKindSaveCache`)
 	}
 	if tf.Count != 55 || !tf.Exact || len(tf.Rows) != 55 {
-		t.Errorf("persisted s3 TypeFile after a page-1-without-Pagination entry raced a save = {Count:%d Exact:%v len(Rows):%d}, want {Count:55 Exact:true len(Rows):55} — DEF-18: a page-1 entry stored without its Pagination must never be treated as an exact observation that downgrades an already-persisted true-exact total", tf.Count, tf.Exact, len(tf.Rows))
+		t.Errorf("persisted s3 TypeFile after a page-1-without-Pagination entry raced a save = {Count:%d Exact:%v len(Rows):%d}, want {Count:55 Exact:true len(Rows):55} — D14: a page-1 entry stored without its Pagination must never be treated as an exact observation that downgrades an already-persisted true-exact total", tf.Count, tf.Exact, len(tf.Rows))
 	}
 }
 
@@ -188,7 +188,7 @@ func TestNilPaginationEntry_IsNotExact(t *testing.T) {
 		t.Fatal(`cache.LoadDir(...).Type("s3") missing after TaskKindSaveCache`)
 	}
 	if tf.Exact && tf.Count == 50 {
-		t.Errorf("persisted s3 TypeFile = {Count:%d Exact:%v}, want the prior exact 55 preserved (Exact=true, Count=55) — DEF-18: a nil-Pagination session.ResourceCache entry must never be treated as an exact observation", tf.Count, tf.Exact)
+		t.Errorf("persisted s3 TypeFile = {Count:%d Exact:%v}, want the prior exact 55 preserved (Exact=true, Count=55) — D14: a nil-Pagination session.ResourceCache entry must never be treated as an exact observation", tf.Count, tf.Exact)
 	}
 	if tf.Count != 55 || !tf.Exact || len(tf.Rows) != 55 {
 		t.Errorf("persisted s3 TypeFile after a nil-Pagination entry raced a save = {Count:%d Exact:%v len(Rows):%d}, want {Count:55 Exact:true len(Rows):55} (prior exact state preserved)", tf.Count, tf.Exact, len(tf.Rows))
@@ -202,7 +202,7 @@ func TestNilPaginationEntry_IsNotExact(t *testing.T) {
 
 // TestLateReplace_DoesNotStompDeeperList drives the headless controller via
 // Controller.Handle(messages.ResourcesLoaded{...}) — the real task-result
-// lane (per runtime_cache_rows_exact_totals_test.go's Contract D precedent),
+// lane (per runtime_cache_rows_exact_totals_test.go's exact-total sync-back precedent),
 // not the ApplyResourcesLoaded test-only bypass, so syncExactTotalToMenu
 // fires and the menu-availability/title-derived count is also exercised:
 // page 1 (50, truncated, token) lands with Append=false, then page 2 (5,
@@ -298,7 +298,7 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 		t.Fatal("Body.List is nil after the late-replace sequence")
 	}
 	if len(lb.Rows) != 55 {
-		t.Errorf("Body.List.Rows has %d entries after a late page-1 replace, want 55 (unchanged) — DEF-18: a staler page-1 replace must not stomp a deeper, already-loaded list", len(lb.Rows))
+		t.Errorf("Body.List.Rows has %d entries after a late page-1 replace, want 55 (unchanged) — D14: a staler page-1 replace must not stomp a deeper, already-loaded list", len(lb.Rows))
 	}
 	avail := ctrl.GetMenuAvailability()
 	trunc := ctrl.GetMenuTruncated()

@@ -112,7 +112,7 @@ func TestHandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask(t *testing.T)
 		t.Fatalf("result.Kind = %v, want NavigateKindPushResourceList — this is a genuine cache miss, not a cache hit", result.Kind)
 	}
 	if result.CachedEntry == nil {
-		t.Fatal("result.CachedEntry = nil, want a synthetic entry seeded from session.RowStore.Snapshot(s3) — DEF-12: warm list-open must not render a bare Loading shell when probe rows are already known")
+		t.Fatal("result.CachedEntry = nil, want a synthetic entry seeded from session.RowStore.Snapshot(s3) — D9: warm list-open must not render a bare Loading shell when probe rows are already known")
 	}
 	if len(result.CachedEntry.Resources) != 2 {
 		t.Fatalf("len(result.CachedEntry.Resources) = %d, want 2 (the retained probe rows)", len(result.CachedEntry.Resources))
@@ -229,7 +229,7 @@ func TestTUI_WarmOpen_RendersSeededRows_NotLoading(t *testing.T) {
 
 	content := stripANSI(rootViewContent(m))
 	if strings.Contains(content, "Loading...") {
-		t.Errorf("rendered view after warm-opening s3 (with probe rows already retained) still shows the bare Loading shell — DEF-12: known rows must render instantly:\n%s", content)
+		t.Errorf("rendered view after warm-opening s3 (with probe rows already retained) still shows the bare Loading shell — D9: known rows must render instantly:\n%s", content)
 	}
 	if !strings.Contains(content, "def12-tui-warm-bucket-1") {
 		t.Errorf("rendered view after warm-opening s3 does not contain the seeded row %q:\n%s", "def12-tui-warm-bucket-1", content)

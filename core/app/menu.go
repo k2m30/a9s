@@ -227,8 +227,8 @@ func (c *Controller) markMenuSweepAcked(shortName string) {
 // Wave-2 enrichment result and the current call is not itself authoritative
 // (see authoritative below, axis 2). canon must already be the canonical
 // resource short name — callers resolve aliases before calling in. Mirrors
-// the issue-count half of the availability sync Contract D pins for
-// syncExactTotalToMenu; extracted as the single chokepoint both the sweep
+// the issue-count half of the exact-total menu sync-back
+// (syncExactTotalToMenu); extracted as the single chokepoint both the sweep
 // lane (handle.go's syncExactTotalToMenu) and the in-list Wave-2 enrichment
 // lane (list_filter.go's applyEnrichmentState) call, so a session with no
 // background sweep (e.g. the web/headless lane) still gets the menu badge
@@ -317,7 +317,8 @@ func (c *Controller) syncMenuIssueCount(ms *MenuState, canon string, newIssues i
 }
 
 // persistMenuAvailabilityCache best-effort persists ms's availability/issue
-// state to disk (Contract D: the badge must survive a restart). No-op when
+// state to disk (the exact-total menu sync-back's restart half: the badge
+// must survive a restart). No-op when
 // profile or region is unset (no cache file identity to write to). Shared by
 // both callers of syncMenuIssueCount — syncExactTotalToMenu (handle.go) and
 // applyEnrichmentState (list_filter.go) — which used to each carry their own
@@ -339,7 +340,7 @@ func (c *Controller) syncMenuIssueCount(ms *MenuState, canon string, newIssues i
 // as best-effort.
 //
 // Close (below) is the deterministic shutdown hook: it stops the writer and
-// blocks until the last queued snapshot has been persisted, so Contract D's
+// blocks until the last queued snapshot has been persisted, so the sync-back's
 // "survives a restart" guarantee holds even though no write here ever blocks
 // a live key event. Every real Controller owner (TUI, web session) must call
 // Close on its own shutdown path — see Close's doc comment for the current
@@ -385,7 +386,7 @@ func (c *Controller) queueAvailabilitySave(p availabilitySavePayload) {
 		// Dropping here is safe — Close's own drain step already persisted
 		// whatever was queued at the time it was called, and no code path
 		// depends on a save queued strictly after Close for correctness
-		// (Contract D's restart guarantee only concerns the LAST save before
+		// (the restart guarantee only concerns the LAST save before
 		// a real shutdown, which Close itself owns).
 		return
 	default:
@@ -437,7 +438,7 @@ func (c *Controller) runAvailabilitySaveLoop() {
 // Close deterministically shuts down the availability-cache writer: it
 // signals runAvailabilitySaveLoop to stop, and blocks until that goroutine
 // has persisted any snapshot still queued and returned — so the menu badge's
-// final state durably lands on disk (Contract D) even though no write along
+// final state durably lands on disk (the sync-back's restart guarantee) even though no write along
 // the way ever blocked a live key event. Idempotent and safe to call on a
 // Controller that never queued a save (returns immediately without ever
 // having started the goroutine). Safe to call more than once or
@@ -466,7 +467,7 @@ func (c *Controller) Close() {
 // menuRefreshing reports whether a background availability sweep is still in
 // flight: true when RowStore holds at least one OriginProbe/OriginDisk type
 // whose probe result has not yet been acked via markMenuSweepAcked. This is
-// Contract C's MenuBody.Refreshing signal — a cache-seeded startup (RowStore
+// the MenuBody.Refreshing menu-refreshing signal — a cache-seeded startup (RowStore
 // populated from the on-disk availability cache before any live probe
 // completes) shows Refreshing=true until every retained type's
 // AvailabilityChecked result lands. Caller must hold c.mu (at least read).

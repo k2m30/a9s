@@ -230,7 +230,7 @@ func TestAllTypes_SilentSwap(t *testing.T) {
 				t.Errorf("%s: ListBody.Loading = true after the swap — no Loading flash is permitted between a cache-seeded render and its fetch-confirmed swap", td.ShortName)
 			}
 			if lb.Refreshing {
-				t.Errorf("%s: ListBody.Refreshing = true after ResourcesLoaded landed, want false — Contract A: a fetch result clears the staleness marker", td.ShortName)
+				t.Errorf("%s: ListBody.Refreshing = true after ResourcesLoaded landed, want false — cache-first seeding: a fetch result clears the staleness marker", td.ShortName)
 			}
 			if len(lb.Rows) != 3 {
 				t.Fatalf("%s: ListBody.Rows = %d rows after the swap, want 3 (the fresh fetch result, not the 2 seeded rows)", td.ShortName, len(lb.Rows))
@@ -441,7 +441,7 @@ func TestAllTypes_StructuralClass_ZeroResource(t *testing.T) {
 		t.Fatalf("Body.List is nil after opening the zero-resource-seeded %q", td.ShortName)
 	}
 	if len(lb.Rows) != 0 {
-		t.Errorf("%s: ListBody.Rows = %d, want 0 — DEF-16: a zero-resource cache must never show phantom stale rows", td.ShortName, len(lb.Rows))
+		t.Errorf("%s: ListBody.Rows = %d, want 0 — empty-not-stale: a zero-resource cache must never show phantom stale rows", td.ShortName, len(lb.Rows))
 	}
 	if lb.Refreshing {
 		t.Errorf("%s: ListBody.Refreshing = true for a zero-resource seed, want false — an empty cache is not a 'stale content' state, it is a 'nothing known yet' state", td.ShortName)

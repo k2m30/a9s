@@ -118,7 +118,7 @@ func TestTUIInit_SeedsMenuFromDisk_BeforeClientsReady(t *testing.T) {
 
 	content := stripANSI(rootViewContent(m))
 	if !strings.Contains(content, "(7)") {
-		t.Errorf("rendered menu after Init() (no ClientsReady delivered) does not contain the disk-seeded count %q — DEF-13: the disk seed must reach the menu before AWS connect completes:\n%s", "(7)", content)
+		t.Errorf("rendered menu after Init() (no ClientsReady delivered) does not contain the disk-seeded count %q — D10: the disk seed must reach the menu before AWS connect completes:\n%s", "(7)", content)
 	}
 }
 
@@ -227,7 +227,7 @@ func TestTUIInit_EmptyRegion_ResolvesConfigDefaultForSeed(t *testing.T) {
 
 	content := stripANSI(rootViewContent(m))
 	if !strings.Contains(content, "(3)") {
-		t.Errorf("rendered menu after Init() with an unresolved session.Region does not contain the config-default-region-seeded count %q — DEF-13: an empty region must still resolve the profile's config-file default for the disk seed:\n%s", "(3)", content)
+		t.Errorf("rendered menu after Init() with an unresolved session.Region does not contain the config-default-region-seeded count %q — D10: an empty region must still resolve the profile's config-file default for the disk seed:\n%s", "(3)", content)
 	}
 }
 
@@ -273,7 +273,7 @@ func TestCoreLoadAvailabilityCache_EmptyRegion_ResolvesConfigDefault(t *testing.
 
 	store := core.LoadAvailabilityCache()
 	if store == nil {
-		t.Fatal("Core.LoadAvailabilityCache() returned nil for an empty session.Region — DEF-13: an unresolved region must still resolve the profile's config-file default and load that pair's disk cache")
+		t.Fatal("Core.LoadAvailabilityCache() returned nil for an empty session.Region — D10: an unresolved region must still resolve the profile's config-file default and load that pair's disk cache")
 	}
 	tf, ok := store.Type("rds")
 	if !ok {

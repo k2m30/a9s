@@ -680,7 +680,7 @@ func TestHandleClientsReady_Success_Command_StackDepth1(t *testing.T) {
 	})
 
 	if hasTaskKind(tasks, TaskKindEmitNavigate) {
-		t.Error("unexpected TaskKindEmitNavigate directly from HandleClientsReady on the live path — the one-shot -c navigation must be armed and deferred to handleAvailabilityCacheLoaded, not fired here (DEF-14/D11 Cause B)")
+		t.Error("unexpected TaskKindEmitNavigate directly from HandleClientsReady on the live path — the one-shot -c navigation must be armed and deferred to handleAvailabilityCacheLoaded, not fired here (the navigation-race half of D11)")
 	}
 	if !s.CommandArmed {
 		t.Error("session.CommandArmed = false, want true — Command set + StackDepth==1 must arm the deferred navigation")

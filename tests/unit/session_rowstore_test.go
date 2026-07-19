@@ -139,7 +139,7 @@ func TestRowStore_Observe_StaleTruncatedSubsetRejectedOnceExact(t *testing.T) {
 	stalePage1 := full[:50]
 	accepted, genAfterStale := store.Observe("s3", stalePage1, &resource.PaginationMeta{IsTruncated: true}, session.OriginFetch, false)
 	if len(accepted) != 55 {
-		t.Errorf("Observe(stale truncated ID-subset replace) returned %d rows, want 55 (existing rows unchanged, rejected) — DEF-18/D14", len(accepted))
+		t.Errorf("Observe(stale truncated ID-subset replace) returned %d rows, want 55 (existing rows unchanged, rejected) — D14", len(accepted))
 	}
 	if genAfterStale != genAfterFull {
 		t.Errorf("Gen after rejected stale replace = %d, want unchanged %d — a rejected observation must not bump Gen", genAfterStale, genAfterFull)
@@ -425,7 +425,7 @@ func TestRowStore_Amend_CopyOnWrite_EarlierSnapshotUnchanged(t *testing.T) {
 	})
 
 	if len(before.Rows[0].Findings) != 0 {
-		t.Errorf("earlier Snapshot's row Findings = %+v, want unchanged (empty) — Amend must be copy-on-write, never mutate a prior Snapshot's rows (DEF-7)", before.Rows[0].Findings)
+		t.Errorf("earlier Snapshot's row Findings = %+v, want unchanged (empty) — Amend must be copy-on-write, never mutate a prior Snapshot's rows (the dispatch-time payload freeze)", before.Rows[0].Findings)
 	}
 
 	after := store.Snapshot("ec2")

@@ -208,7 +208,7 @@ func TestQA_CLICommand_LivePath_ClientsReady_ArmsButDoesNotEmitNavigateYet(t *te
 	})
 
 	if nav := findNavigateMsg(cmd); nav != nil {
-		t.Fatalf("live-path ClientsReadyMsg emitted a NavigateMsg immediately (Target:%v, ResourceType:%q) — the -c navigation must be armed and deferred to the post-seed AvailabilityCacheLoaded event, not fired here (DEF-14/D11 Cause B)", nav.Target, nav.ResourceType)
+		t.Fatalf("live-path ClientsReadyMsg emitted a NavigateMsg immediately (Target:%v, ResourceType:%q) — the -c navigation must be armed and deferred to the post-seed AvailabilityCacheLoaded event, not fired here (the navigation-race half of D11)", nav.Target, nav.ResourceType)
 	}
 }
 

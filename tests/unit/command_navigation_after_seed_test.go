@@ -155,7 +155,7 @@ func TestCommandNavigation_AfterSeed_Deterministic(t *testing.T) {
 		t.Errorf("HandleNavigate(s3) Kind = %v, want NavigateKindPushResourceList (cache-miss branch with a ProbeResources-seeded CachedEntry fallback)", navResult.Kind)
 	}
 	if navResult.CachedEntry == nil || len(navResult.CachedEntry.Resources) == 0 {
-		t.Error("HandleNavigate(s3) CachedEntry is nil/empty — this is the exact DEF-14/D11 symptom: a bare Loading list with no rows because the seed had not landed when navigation fired")
+		t.Error("HandleNavigate(s3) CachedEntry is nil/empty — this is the exact D11 symptom: a bare Loading list with no rows because the seed had not landed when navigation fired")
 	}
 }
 
@@ -192,7 +192,7 @@ func TestCommandNavigation_NoCacheDir_StillFires(t *testing.T) {
 	_, afterSeedTasks := c.HandleEvent(event)
 	found, count := hasEmitNavigateTask(afterSeedTasks)
 	if !found {
-		t.Fatal("HandleEvent(AvailabilityCacheLoaded) with an empty/cold cache did not emit TaskKindEmitNavigate — the -c flag must never be silently lost on a cold machine (DEF-14/D11 goal)")
+		t.Fatal("HandleEvent(AvailabilityCacheLoaded) with an empty/cold cache did not emit TaskKindEmitNavigate — the -c flag must never be silently lost on a cold machine (the D11 goal)")
 	}
 	if count != 1 {
 		t.Errorf("TaskKindEmitNavigate emitted %d times on a cold-cache machine, want exactly 1", count)

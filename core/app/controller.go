@@ -132,7 +132,8 @@ type Controller struct {
 
 	// menuSweepAcked tracks, per resource type, whether an AvailabilityChecked
 	// result has landed for a type currently retained in
-	// core.Session().ProbeResources. MenuBody.Refreshing (Contract C) is true
+	// core.Session().ProbeResources. MenuBody.Refreshing (the menu-refreshing
+	// signal) is true
 	// while any type present in ProbeResources has not yet been acked here —
 	// i.e. a background availability sweep is still confirming/replacing a
 	// cache-seeded startup. Handle marks a type acked unconditionally on any

@@ -36,7 +36,7 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// applyIntents does not act on it, so route it through the shared helper.
 	tasks = append(tasks, c.refreshTasksForIntents(intents)...)
 
-	// Contract C: mark the type's availability sweep acked the moment its
+	// Menu-refreshing signal: mark the type's availability sweep acked the moment its
 	// AvailabilityChecked result arrives, regardless of whether HandleEvent's
 	// central gen-guard treated it as stale. MenuBody.Refreshing tracks
 	// wall-clock probe completion (has this type's background check landed
@@ -221,7 +221,7 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 			continue
 		}
 		c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append, isTopLevelCanonicalList(s.ID, s.State.List))
-		// Contract D: sync the list's now-current row count to the root menu's
+		// Exact-total menu sync-back: sync the list's now-current row count to the root menu's
 		// availability badge here, at the controller level, so both the TUI and
 		// web renderer get it — this replaces the TUI-only sync-back that used
 		// to run only on pop, in internal/tui/app_stack.go's popRS. Firing on
@@ -246,7 +246,7 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 }
 
 // syncExactTotalToMenu applies the load-more-exhaustion exact-total sync-back
-// (Contract D) to the root menu's availability + issue-badge state. screen is
+// to the root menu's availability + issue-badge state. screen is
 // the list screen whose ResourcesLoaded just landed; canon is its canonical
 // resource type. Skipped for related/filtered/child-context lists (EscPops or
 // a non-nil ParentContext) — those show a filtered subset, not the global
@@ -265,7 +265,8 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 //
 // This differs from the TUI's original popRS guard
 // (`!newTrunc || !known || newCount > curCount`), which would also let ANY
-// untruncated result overwrite a larger already-EXACT count. Contract D pins
+// untruncated result overwrite a larger already-EXACT count. The exact-total
+// sync-back pins
 // the stricter rule 3 explicitly (a smaller exact result must not regress a
 // larger already-exact one, e.g. a concurrent fuller probe already landed a
 // bigger number) while still requiring rule 2 (an exact result must replace
@@ -308,7 +309,7 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 	c.syncMenuIssueCount(ms, canon, newIssues, newTrunc, false)
 
 	// Persist the updated availability to disk, mirroring the "survives an
-	// app restart" half of Contract D. Best-effort — a write failure here
+	// app restart" half of the exact-total menu sync-back. Best-effort — a write failure here
 	// must not surface as a controller error.
 	c.persistMenuAvailabilityCache(ms)
 }

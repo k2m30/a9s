@@ -185,7 +185,7 @@ func TestPostSweepWarmOpen_SeedsFromStore(t *testing.T) {
 		t.Fatalf("result.Kind = %v, want NavigateKindPushResourceList (still a session.ResourceCache miss)", result.Kind)
 	}
 	if result.CachedEntry == nil {
-		t.Fatal("result.CachedEntry = nil, want a synthetic entry seeded from the on-disk per-type store — DEF-15: a post-sweep list-open must not render a bare Loading shell when the disk cache holds complete, fresh rows")
+		t.Fatal("result.CachedEntry = nil, want a synthetic entry seeded from the on-disk per-type store — D12: a post-sweep list-open must not render a bare Loading shell when the disk cache holds complete, fresh rows")
 	}
 	if len(result.CachedEntry.Resources) != 2 {
 		t.Fatalf("len(result.CachedEntry.Resources) = %d, want 2 (the disk store's persisted rows)", len(result.CachedEntry.Resources))
@@ -285,7 +285,7 @@ func TestPostSweepWarmOpen_TUI_RendersRows(t *testing.T) {
 
 	content := stripANSI(rootViewContent(m))
 	if strings.Contains(content, "Loading...") {
-		t.Errorf("rendered view after post-sweep opening s3 (RowStore fully seeded) still shows the bare Loading shell — DEF-15:\n%s", content)
+		t.Errorf("rendered view after post-sweep opening s3 (RowStore fully seeded) still shows the bare Loading shell — D12:\n%s", content)
 	}
 	if !strings.Contains(content, "def15-tui-bucket-1") {
 		t.Errorf("rendered view after post-sweep opening s3 does not contain the RowStore-seeded row %q:\n%s", "def15-tui-bucket-1", content)
@@ -359,7 +359,7 @@ func TestColonCommand_WarmOpen_RendersRows(t *testing.T) {
 	content := stripANSI(rootViewContent(m))
 	if strings.Contains(content, "Loading...") {
 		t.Logf("FINDING: :s3 mid-sweep (ProbeResources populated) renders the bare Loading shell through the colon-command lane. Since Test 2 proves the messages.Navigate path renders seeded rows once ProbeResources is populated, this divergence is specific to the colon-command key-mode input path (rootKeyPress(':') + chars + KeyEnter) versus a directly-injected messages.Navigate — the command-mode submit handler is not reaching the same HandleNavigate call, or is racing/dropping the seed. Needs deeper tracing in the TUI command-mode submit handler, not HandleNavigate itself.")
-		t.Errorf("rendered view after :s3 mid-sweep still shows the bare Loading shell — DEF-15 live-tmux symptom:\n%s", content)
+		t.Errorf("rendered view after :s3 mid-sweep still shows the bare Loading shell — the D12 live-tmux symptom:\n%s", content)
 	}
 	if !strings.Contains(content, "def15-tui-bucket-1") && !strings.Contains(content, "def15-store-bucket-1") {
 		t.Errorf("rendered view after :s3 mid-sweep does not contain a seeded row (neither ProbeResources' def15-tui-bucket-1 nor a disk-store fallback row):\n%s", content)
@@ -429,7 +429,7 @@ func TestMenuEnter_PostSweep_RendersRows(t *testing.T) {
 
 	content := stripANSI(rootViewContent(m))
 	if strings.Contains(content, "Loading...") {
-		t.Errorf("rendered view after menu-Enter on ec2 post-sweep still shows the bare Loading shell — DEF-15:\n%s", content)
+		t.Errorf("rendered view after menu-Enter on ec2 post-sweep still shows the bare Loading shell — D12:\n%s", content)
 	}
 	if !strings.Contains(content, "def15-menu-instance-1") {
 		t.Errorf("rendered view after menu-Enter on ec2 post-sweep does not contain the disk-seeded row %q:\n%s", "def15-menu-instance-1", content)
@@ -585,7 +585,7 @@ func TestObservedEmpty_DoesNotSeedStaleDiskRows(t *testing.T) {
 		t.Fatalf("result.Kind = %v, want NavigateKindPushResourceList (still a session.ResourceCache miss)", result.Kind)
 	}
 	if result.CachedEntry != nil {
-		t.Fatalf("result.CachedEntry = %+v, want nil — this session observed s3 as empty via a live probe; seeding from the stale on-disk store rows (%d rows) would render resources the current session already knows do not exist (Codex P2 on DEF-15)", result.CachedEntry, len(result.CachedEntry.Resources))
+		t.Fatalf("result.CachedEntry = %+v, want nil — this session observed s3 as empty via a live probe; seeding from the stale on-disk store rows (%d rows) would render resources the current session already knows do not exist (the observed-empty guard on the disk-store fallback)", result.CachedEntry, len(result.CachedEntry.Resources))
 	}
 	if len(tasks) != 1 || tasks[0].Key.Kind != runtime.KindFetchResources {
 		t.Errorf("tasks = %+v, want exactly one KindFetchResources task — an observed-empty seed still requires the verify-on-sight fetch (C1)", tasks)
@@ -636,7 +636,7 @@ func TestObservedEmpty_TUI_DoesNotRenderStaleRows(t *testing.T) {
 	content := stripANSI(rootViewContent(m))
 	for _, stale := range []string{"def15p2-tui-stale-1", "def15p2-tui-stale-2", "def15p2-tui-stale-3"} {
 		if strings.Contains(content, stale) {
-			t.Errorf("rendered view after opening s3 (observed empty this session via live probe) contains stale disk-store row %q — Codex P2 on DEF-15:\n%s", stale, content)
+			t.Errorf("rendered view after opening s3 (observed empty this session via live probe) contains stale disk-store row %q — the observed-empty guard on the disk-store fallback:\n%s", stale, content)
 		}
 	}
 }
@@ -672,7 +672,7 @@ func TestUnobserved_StillSeedsFromStore(t *testing.T) {
 		t.Fatalf("result.Kind = %v, want NavigateKindPushResourceList (still a session.ResourceCache miss)", result.Kind)
 	}
 	if result.CachedEntry == nil {
-		t.Fatal("result.CachedEntry = nil, want a synthetic entry seeded from the on-disk per-type store — DEF-15 base behavior: an unobserved type (key absent) must still fall back to disk-store rows")
+		t.Fatal("result.CachedEntry = nil, want a synthetic entry seeded from the on-disk per-type store — disk-store fallback base behavior: an unobserved type (key absent) must still fall back to disk-store rows")
 	}
 	if len(result.CachedEntry.Resources) != 2 {
 		t.Fatalf("len(result.CachedEntry.Resources) = %d, want 2 (the disk store's persisted rows)", len(result.CachedEntry.Resources))

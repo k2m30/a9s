@@ -221,7 +221,7 @@ func TestListOpen_NoProbeResourcesButDiskStoreHasRows_SeedsFromDiskStore(t *test
 		t.Fatal("Body.List is nil after opening ec2 list with a disk-store-only seed")
 	}
 	if lb.Loading {
-		t.Error("Loading = true, want false — a populated on-disk per-type cache must seed the list immediately even with no RowStore rows known (DEF-15)")
+		t.Error("Loading = true, want false — a populated on-disk per-type cache must seed the list immediately even with no RowStore rows known (the disk-store fallback)")
 	}
 	if !lb.Refreshing {
 		t.Error("Refreshing = false, want true — a fresh fetch must still run to confirm/replace the disk-seeded rows")
@@ -311,11 +311,11 @@ func TestListOpen_ResourcesLoaded_ClearsRefreshingAndSwapsRows(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
-// Contract C — menu Refreshing signal during background availability sweep
+// Menu-refreshing signal during background availability sweep
 // -----------------------------------------------------------------------
 
-// TestMenu_Refreshing_TrueDuringBackgroundSweep_FalseOnComplete pins Contract
-// C: MenuBody.Refreshing=true while a background availability sweep runs
+// TestMenu_Refreshing_TrueDuringBackgroundSweep_FalseOnComplete pins the
+// menu-refreshing signal: MenuBody.Refreshing=true while a background availability sweep runs
 // after a cache-seeded startup, flipping false when the sweep completes.
 //
 // Ambiguity resolution: "sweep running" is modeled the same way the rest of
