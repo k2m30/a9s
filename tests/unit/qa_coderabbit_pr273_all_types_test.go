@@ -348,7 +348,6 @@ func TestCR273_AllTypes_MenuCtrlZ_NoFalsePositives(t *testing.T) {
 				}
 				m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 					ResourceType: c.shortName,
-					Issues:       0,
 					Truncated:    false,
 					Findings:     map[string][]domain.Finding{},
 					Err:          nil,
@@ -396,10 +395,9 @@ func TestCR273_AllTypes_MenuCtrlZ_Wave2ErroredSubCall_NoFalsePositives(t *testin
 				IssueTruncated: map[string]bool{c.shortName: false},
 				IssueKnown:     map[string]bool{c.shortName: true},
 			})
-			// Wave 2: one sub-call errored → Truncated=true, but Issues=0 and Findings={}.
+			// Wave 2: one sub-call errored → Truncated=true, but Findings={}.
 			m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: c.shortName,
-				Issues:       0,
 				Truncated:    true,
 				Findings:     map[string][]domain.Finding{},
 				Err:          nil,

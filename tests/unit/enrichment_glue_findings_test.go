@@ -169,9 +169,6 @@ func TestEnrichGlueJobStatus_SucceededExcluded(t *testing.T) {
 	if _, ok := result.Findings["ok-job"]; ok {
 		t.Error("SUCCEEDED job must NOT appear in Findings")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichGlueJobStatus_RunningExcluded verifies RUNNING jobs do not appear in Findings.
@@ -191,13 +188,12 @@ func TestEnrichGlueJobStatus_RunningExcluded(t *testing.T) {
 	if _, ok := result.Findings["running-job"]; ok {
 		t.Error("RUNNING job must NOT appear in Findings")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
-// TestEnrichGlueJobStatus_IssueCountEqualsFindings verifies IssueCount = len(Findings).
-func TestEnrichGlueJobStatus_IssueCountEqualsFindings(t *testing.T) {
+// TestEnrichGlueJobStatus_MultipleFailedJobs_AllKeyedInFindings verifies that
+// when several jobs are probed together, every failed/errored job gets its
+// own Findings entry and the succeeded one is excluded.
+func TestEnrichGlueJobStatus_MultipleFailedJobs_AllKeyedInFindings(t *testing.T) {
 	fake := &glueJobFake{
 		jobRuns: map[string]gluetypes.JobRunState{
 			"fail-a": gluetypes.JobRunStateFailed,
@@ -216,11 +212,17 @@ func TestEnrichGlueJobStatus_IssueCountEqualsFindings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.IssueCount != 2 {
-		t.Errorf("IssueCount = %d, want 2", result.IssueCount)
+	if len(result.Findings) != 2 {
+		t.Errorf("len(Findings) = %d, want 2 (fail-a, fail-b)", len(result.Findings))
 	}
-	if result.IssueCount != len(result.Findings) {
-		t.Errorf("IssueCount (%d) != len(Findings) (%d)", result.IssueCount, len(result.Findings))
+	if _, ok := result.Findings["fail-a"]; !ok {
+		t.Error("expected finding keyed by \"fail-a\"")
+	}
+	if _, ok := result.Findings["fail-b"]; !ok {
+		t.Error("expected finding keyed by \"fail-b\"")
+	}
+	if _, ok := result.Findings["ok-c"]; ok {
+		t.Error("SUCCEEDED job \"ok-c\" must NOT appear in Findings")
 	}
 }
 

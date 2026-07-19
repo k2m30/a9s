@@ -93,7 +93,6 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			}, "")
 		}
 	})
-	result.IssueCount = 0
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false
 	return result, nil

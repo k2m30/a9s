@@ -164,9 +164,6 @@ func TestEnrichStepFunctionsStatus_SucceededExcluded(t *testing.T) {
 	if _, ok := result.Findings[smName]; ok {
 		t.Error("SUCCEEDED state machine must NOT appear in Findings")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichStepFunctionsStatus_RunningExcluded verifies RUNNING state machines
@@ -184,9 +181,6 @@ func TestEnrichStepFunctionsStatus_RunningExcluded(t *testing.T) {
 	}
 	if _, ok := result.Findings[smName]; ok {
 		t.Error("RUNNING state machine must NOT appear in Findings")
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
 	}
 }
 

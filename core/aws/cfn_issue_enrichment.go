@@ -111,7 +111,6 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 			fmt.Sprintf("recent resource failure: %s", failedRows[0].Label), "!", "cfn", failedRows, "")
 	})
 	sort.Strings(failures)
-	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	return result, AggregateFailures("cfn-enrich: DescribeStackEvents", failures, total)
 }
@@ -120,7 +119,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 // CFNStackEvents provides "!" findings for recent resource failures; EnrichCFNDrift
 // adds "~" findings for stacks that have drifted from their template.
 // On ID conflict, CFNStackEvents findings take precedence (they carry "!" severity).
-// IssueCount = CFNStackEvents.IssueCount (drift adds 0). Truncated = either truncated.
+// Truncated = either truncated.
 // Partial findings from each sub-enricher are preserved even when they return an error (E5).
 func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	eventsResult, eventsErr := EnrichCFNStackEvents(ctx, clients, resources, nil)
@@ -159,7 +158,6 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 	maps.Copy(mergedTruncatedIDs, eventsResult.TruncatedIDs)
 	maps.Copy(mergedTruncatedIDs, driftResult.TruncatedIDs)
 	return IssueEnricherResult{
-		IssueCount:   eventsResult.IssueCount,
 		Truncated:    eventsResult.Truncated || driftResult.Truncated,
 		TruncatedIDs: mergedTruncatedIDs,
 		Findings:     merged,
@@ -170,7 +168,6 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 // EnrichCFNDrift calls DescribeStacks per stack (up to EnrichmentCap stacks) to
 // read DriftInformation.StackDriftStatus. A status of DRIFTED produces a "~" finding
 // "stack drifted from template". IN_SYNC and NOT_CHECKED stacks produce no finding.
-// Severity "~" findings do not contribute to IssueCount.
 func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -232,8 +229,6 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		}
 	})
 	sort.Strings(failures)
-	// "~" findings do not contribute to IssueCount per the IssueEnricherResult contract.
-	result.IssueCount = 0
 	result.Truncated = truncated
 	return result, AggregateFailures("cfn-enrich: DescribeStacks", failures, total)
 }

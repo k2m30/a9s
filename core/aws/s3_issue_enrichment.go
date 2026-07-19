@@ -64,7 +64,6 @@ const s3PABIncompleteDetail = "Bucket-level public access block is missing or pa
 //
 // On any other API error: no finding emitted; TruncatedIDs[id] = true and
 // the failure aggregates into the returned composite error.
-// IssueCount stays 0 (framework counts "!" findings directly).
 func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -158,7 +157,6 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 		result.FieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 	})
 	sort.Strings(failures)
-	result.IssueCount = 0
 	result.Truncated = truncated
 	return result,
 		AggregateFailures("s3-enrich: GetPublicAccessBlock", failures, total)

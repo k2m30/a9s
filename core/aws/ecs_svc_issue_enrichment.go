@@ -175,7 +175,6 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 
-	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	err := Finish(&result, failures, total, op)
 	return result, err

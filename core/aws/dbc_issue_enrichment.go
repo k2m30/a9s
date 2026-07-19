@@ -26,8 +26,7 @@ const (
 
 // EnrichDBCMaintenance calls DescribePendingMaintenanceActions (account-wide,
 // paginated) and emits one Finding per dbc cluster with overdue maintenance.
-// Severity "!" — IssueCount increments for every overdue finding (Wave 2 "!"
-// bumps the S1 menu badge). A finding is "overdue" when either:
+// Severity "!" (Wave 2 "!" bumps the S1 menu badge). A finding is "overdue" when either:
 //   - AutoAppliedAfterDate is non-nil AND in the past, OR
 //   - ForcedApplyDate is non-nil AND in the past.
 //
@@ -59,7 +58,6 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 	var marker *string
 	truncated := false
 	pages := 0
-	issueCount := 0
 	now := nowFunc()
 	var failures []string
 
@@ -136,7 +134,6 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 			}
 
 			setWave2Finding(&result, key, dbcCodeMaintenanceOverdue, "maintenance overdue", "!", "dbc", rows, "")
-			issueCount++
 		}
 
 		if out.Marker == nil || *out.Marker == "" {
@@ -145,7 +142,6 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 		marker = out.Marker
 	}
 
-	result.IssueCount = issueCount // "!" findings bump the S1 badge
 	result.Truncated = truncated
 	return result, AggregateFailures("dbc-enrich: DescribePendingMaintenanceActions", failures, pages)
 }

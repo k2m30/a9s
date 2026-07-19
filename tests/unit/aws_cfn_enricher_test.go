@@ -147,10 +147,6 @@ func TestEnrichCFNDrift_DriftedStackProducesFindingSevTilde(t *testing.T) {
 	if _, ok := result.Findings[cfnDriftStack2]; ok {
 		t.Error("stack-2 must NOT appear in Findings — it is IN_SYNC")
 	}
-	// "~" findings do NOT contribute to IssueCount per the EnricherResult contract.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
-	}
 }
 
 // TestEnrichCFNDrift_InSyncStackProducesNoFinding verifies that when both stacks have
@@ -177,9 +173,6 @@ func TestEnrichCFNDrift_InSyncStackProducesNoFinding(t *testing.T) {
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
 	}
 }
 

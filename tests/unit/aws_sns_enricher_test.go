@@ -129,9 +129,6 @@ func TestEnrichSNSSubscriptions_BothWithSubsProducesNoFindings(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichSNSSubscriptions_OrphanTopicProducesFindingSevTilde verifies that

@@ -172,11 +172,6 @@ func TestDBC_Enrich_MaintenanceOverdue_HealthyRow(t *testing.T) {
 		t.Errorf("Phrase = %q, want %q", finding.Phrase, "maintenance overdue")
 	}
 
-	// "!" findings increment the issue count.
-	if result.IssueCount < 1 {
-		t.Errorf("IssueCount = %d, want ≥1 (! severity bumps badge)", result.IssueCount)
-	}
-
 	// AS-140: FieldUpdates must be nil/empty — the merged display phrase is
 	// computed by phraseFromFindings(r.Findings) at render time.
 	if updates, ok := result.FieldUpdates[fixtures.MaintDbcOverdueID]; ok && len(updates) != 0 {
@@ -213,9 +208,6 @@ func TestDBC_Enrich_FutureDate_NoFinding(t *testing.T) {
 	}
 	if _, ok := result.Findings[clusterID]; ok {
 		t.Errorf("expected no finding for future-dated action; got one for %q", clusterID)
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (future-dated action not overdue)", result.IssueCount)
 	}
 }
 
@@ -278,8 +270,8 @@ func TestDBC_Enrich_NilDocDBClient(t *testing.T) {
 	if result.Findings == nil {
 		t.Error("Findings must not be nil even when DocDB client is nil")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0 (nil DocDB client, no resources)", len(result.Findings))
 	}
 }
 
@@ -405,9 +397,6 @@ func TestDBC_Enrich_Pagination(t *testing.T) {
 	}
 	if _, ok := result.Findings[cluster2]; !ok {
 		t.Error("expected finding for dbc-page2 (from page 2)")
-	}
-	if result.IssueCount != 2 {
-		t.Errorf("IssueCount = %d, want 2 (two overdue clusters)", result.IssueCount)
 	}
 }
 

@@ -88,7 +88,6 @@ func TestHandleEnrichmentChecked_DetailAlreadyOpen_MultiFinding_BothFindingsReac
 
 	snap, _ := ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "ecs-svc",
-		Issues:       1,
 		Truncated:    false,
 		// Findings carries every independently-evaluated condition — what a
 		// real enricher's IssueEnricherResult.Findings now holds per-resource

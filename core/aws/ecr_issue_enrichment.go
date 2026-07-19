@@ -154,16 +154,6 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	})
 	sort.Strings(failures)
 
-	issueCount := 0
-	for _, fs := range result.Findings {
-		for _, f := range fs {
-			if f.Severity == domain.SevBroken {
-				issueCount++
-				break
-			}
-		}
-	}
-	result.IssueCount = issueCount
 	result.Truncated = truncated
 	return result, AggregateFailures("ecr-enrich: DescribeImages", failures, total)
 }

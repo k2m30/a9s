@@ -257,7 +257,6 @@ func (AvailabilityChecked) AcceptZeroGen() bool    { return false } // session c
 // EnrichmentChecked reports one resource type's Wave 2 enrichment result.
 type EnrichmentChecked struct {
 	ResourceType string
-	Issues       int  // updated issue count after enrichment (menu badge — ! severity only)
 	Truncated    bool // whether the enrichment count is a lower bound
 	// Findings carries every independently-evaluated Wave-2 Finding per
 	// Resource.ID (IssueEnricherResult.Findings, unfiltered), keyed by

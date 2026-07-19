@@ -38,7 +38,6 @@ const (
 //   - NotAfter within 30 days → "!" finding "expires in <N> days" (or "expired" if past)
 //   - ISSUED certificate with no InUseBy entries → "~" finding "certificate not in use (orphan)"
 //
-// IssueCount counts only "!" severity findings — "~" (informational) are excluded from the badge.
 // Skip if clients.ACM == nil. Per-cert errors → Truncated.
 func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
@@ -50,7 +49,6 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 	}
 	truncated := len(resources) > EnrichmentCap
 	now := time.Now()
-	bangCount := 0
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -90,17 +88,14 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 					summary = fmt.Sprintf("expires in %d days", days)
 				}
 				setWave2Finding(&result, r.ID, acmCodeExpiresSoon, summary, "!", "acm", nil, "")
-				bangCount++
 				return
 			}
 		}
 		// Orphan check — only for ISSUED certs not already flagged.
 		if cert.Status == acmtypes.CertificateStatusIssued && len(cert.InUseBy) == 0 {
 			setWave2Finding(&result, r.ID, acmCodeOrphan, "certificate not in use (orphan)", "~", "acm", nil, "")
-			// "~" is informational — not counted in IssueCount.
 		}
 	})
-	result.IssueCount = bangCount
 	result.Truncated = truncated
 	return result, nil
 }

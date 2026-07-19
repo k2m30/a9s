@@ -69,7 +69,7 @@ func classifyEC2Status(status ec2types.SummaryStatus) (ec2StatusFinding, bool) {
 // EnrichEC2InstanceStatus calls DescribeInstanceStatus(IncludeAllInstances=true) (account-wide,
 // paginated) and returns a Finding for every instance whose system or instance status is not "ok".
 // Scheduled events with NotBeforeDeadline within the next 7 days also produce a Finding.
-// Severity "!" for status != ok; "~" for scheduled events. IssueCount counts "!" findings only.
+// Severity "!" for status != ok; "~" for scheduled events.
 // Pagination uses NextToken; walks up to EnrichmentCap pages.
 func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
@@ -201,16 +201,6 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 		setWave2Finding(&result, id, ec2CodeInstanceStatusImpaired, summary, severity, "ec2", rows, detail)
 	}
 
-	issueCount := 0
-	for _, fs := range result.Findings {
-		for _, f := range fs {
-			if f.Severity == domain.SevBroken {
-				issueCount++
-				break
-			}
-		}
-	}
-	result.IssueCount = issueCount
 	result.Truncated = truncated
 	return result, nil
 }

@@ -25,18 +25,14 @@ func TestIssueEnricherFuncSignatureReturnsResult(t *testing.T) {
 		_ resource.ResourceCache,
 	) (awsclient.IssueEnricherResult, error) {
 		return awsclient.IssueEnricherResult{
-			IssueCount: 3,
-			Truncated:  true,
-			Findings:   make(map[string][]domain.Finding),
+			Truncated: true,
+			Findings:  make(map[string][]domain.Finding),
 		}, nil
 	})
 
 	result, err := fn(context.Background(), nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from test enricher: %v", err)
-	}
-	if result.IssueCount != 3 {
-		t.Errorf("IssueCount = %d, want 3", result.IssueCount)
 	}
 	if !result.Truncated {
 		t.Error("Truncated = false, want true")
@@ -56,18 +52,14 @@ func TestIssueEnricherFuncSignatureReturnsFalseWhenNotTruncated(t *testing.T) {
 		_ resource.ResourceCache,
 	) (awsclient.IssueEnricherResult, error) {
 		return awsclient.IssueEnricherResult{
-			IssueCount: 0,
-			Truncated:  false,
-			Findings:   make(map[string][]domain.Finding),
+			Truncated: false,
+			Findings:  make(map[string][]domain.Finding),
 		}, nil
 	})
 
 	result, err := fn(context.Background(), nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
 	}
 	if result.Truncated {
 		t.Error("Truncated = true, want false")
@@ -93,9 +85,8 @@ func TestEnrichmentCapTruncation(t *testing.T) {
 		_ resource.ResourceCache,
 	) (awsclient.IssueEnricherResult, error) {
 		return awsclient.IssueEnricherResult{
-			IssueCount: 0,
-			Truncated:  len(resources) > awsclient.EnrichmentCap,
-			Findings:   make(map[string][]domain.Finding),
+			Truncated: len(resources) > awsclient.EnrichmentCap,
+			Findings:  make(map[string][]domain.Finding),
 		}, nil
 	})
 

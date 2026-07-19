@@ -197,10 +197,6 @@ func TestEnrichWAFLogging_NoLoggingProducesFindingSevTilde(t *testing.T) {
 	if _, ok := result.Findings[wafACLARN2]; ok {
 		t.Error("acl-2 must NOT appear in Findings — it has logging configured")
 	}
-	// "~" findings do NOT contribute to IssueCount per the EnricherResult contract.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
-	}
 }
 
 // TestEnrichWAFLogging_OrphanACLProducesFindingSevTilde verifies that when acl-1
@@ -237,9 +233,6 @@ func TestEnrichWAFLogging_OrphanACLProducesFindingSevTilde(t *testing.T) {
 	}
 	if _, ok := result.Findings[wafACLARN2]; ok {
 		t.Error("acl-2 must NOT appear in Findings — it is associated with a resource")
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
 	}
 }
 

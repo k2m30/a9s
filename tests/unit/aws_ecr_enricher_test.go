@@ -156,9 +156,6 @@ func TestEnrichECRRepository_NoFindingsWhenAllCountsZero(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichECRRepository_CriticalFindingsProduceSevBang verifies that when repo-1
@@ -195,9 +192,6 @@ func TestEnrichECRRepository_CriticalFindingsProduceSevBang(t *testing.T) {
 	}
 	if _, ok := result.Findings[ecrRepo2]; ok {
 		t.Error("repo-2 must NOT appear in Findings — no critical vulnerabilities")
-	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
 	}
 }
 
@@ -236,10 +230,6 @@ func TestEnrichECRRepository_HighFindingsProduceSevTilde(t *testing.T) {
 	if _, ok := result.Findings[ecrRepo2]; ok {
 		t.Error("repo-2 must NOT appear in Findings — no vulnerabilities")
 	}
-	// "~" findings do NOT contribute to IssueCount per the EnricherResult contract.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
-	}
 }
 
 // TestEnrichECRRepository_UnscannedImagesSkipped verifies that when a repo's
@@ -273,9 +263,6 @@ func TestEnrichECRRepository_UnscannedImagesSkipped(t *testing.T) {
 	}
 	if result.Truncated {
 		t.Error("Truncated must be false — missing scan data is operational, not an error")
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
 	}
 }
 

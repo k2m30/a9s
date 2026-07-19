@@ -135,9 +135,6 @@ func TestEnrichACMCertificate_ValidInUseProducesNoFindings(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichACMCertificate_ExpiringSoonProducesFindingSevBang verifies that when
@@ -175,9 +172,6 @@ func TestEnrichACMCertificate_ExpiringSoonProducesFindingSevBang(t *testing.T) {
 	if _, ok := result.Findings[acmDomain3]; ok {
 		t.Error("cert-3 must NOT appear in Findings — it is not expiring soon")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
-	}
 }
 
 // TestEnrichACMCertificate_ExpiredProducesFindingSevBang verifies that when cert-1
@@ -212,9 +206,6 @@ func TestEnrichACMCertificate_ExpiredProducesFindingSevBang(t *testing.T) {
 	if _, ok := result.Findings[acmDomain3]; ok {
 		t.Error("cert-3 must NOT appear in Findings — it is valid")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
-	}
 }
 
 // TestEnrichACMCertificate_OrphanIssuedProducesFindingSevTilde verifies that when
@@ -248,10 +239,6 @@ func TestEnrichACMCertificate_OrphanIssuedProducesFindingSevTilde(t *testing.T) 
 	}
 	if _, ok := result.Findings[acmDomain3]; ok {
 		t.Error("cert-3 must NOT appear in Findings — it is in use")
-	}
-	// "~" findings do NOT contribute to IssueCount per the EnricherResult contract.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
 	}
 }
 

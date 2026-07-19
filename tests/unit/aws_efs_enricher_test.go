@@ -48,9 +48,6 @@ func TestEnrichEFSMountTargets_AllAvailableProducesNoFindings(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichEFSMountTargets_OneUnavailableMTProducesFindingSevBang verifies that
@@ -83,9 +80,6 @@ func TestEnrichEFSMountTargets_OneUnavailableMTProducesFindingSevBang(t *testing
 	}
 	if _, ok := result.Findings["fs-00000002"]; ok {
 		t.Error("fs-00000002 must NOT appear in Findings — all its MTs are available")
-	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
 	}
 }
 

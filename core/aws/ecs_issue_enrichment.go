@@ -25,10 +25,6 @@ const (
 //   - pendingTasksCount > 0 → "~" finding (pending tasks indicate scheduling pressure)
 //   - runningTasksCount == 0 && registeredContainerInstancesCount > 0 → "~" finding
 //     (instances registered but nothing running — likely stuck deployment or misconfiguration)
-//
-// Note: IssueCount is 0 for this enricher because all findings are severity "~"
-// (informational) and do not contribute to the attention menu badge per the
-// IssueEnricherResult contract.
 func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -115,9 +111,6 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 
-	// IssueCount is 0: all ECS cluster findings are "~" (informational) and
-	// do not contribute to the attention menu badge.
-	result.IssueCount = 0
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false
 	return result, nil

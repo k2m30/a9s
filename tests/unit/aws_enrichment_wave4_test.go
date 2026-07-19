@@ -928,7 +928,7 @@ func TestEnrichEBSVolumeStatus_NilVolumeIdSkipped(t *testing.T) {
 	if _, ok := result.Findings["vol-real"]; !ok {
 		t.Error("vol-real must appear in Findings")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1 (nil VolumeId entry must be skipped)", result.IssueCount)
+	if len(result.Findings) != 1 {
+		t.Errorf("len(Findings) = %d, want 1 (nil VolumeId entry must be skipped, not written under an empty-string key)", len(result.Findings))
 	}
 }

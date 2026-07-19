@@ -6,7 +6,6 @@ package unit
 //   - Returns EnricherResult.Findings keyed by project name (r.ID).
 //   - Severity "!" for all findings.
 //   - Summary format: "latest build failed (<YYYY-MM-DD>)" (humanized phrase, not raw enum).
-//   - IssueCount = len(Findings).
 //   - Truncated = true when len(resources) > EnrichmentCap (50).
 //   - Empty resources slice → non-nil empty Findings map.
 //   - Successful builds (SUCCEEDED) must NOT appear in Findings.
@@ -159,13 +158,13 @@ func TestEnrichCodeBuildStatus_SucceededBuildExcluded(t *testing.T) {
 	if _, ok := result.Findings["ok-project"]; ok {
 		t.Error("SUCCEEDED build must NOT appear in Findings")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 for all-succeeded projects", result.IssueCount)
-	}
 }
 
-// TestEnrichCodeBuildStatus_IssueCountEqualsFailedProjectCount verifies IssueCount.
-func TestEnrichCodeBuildStatus_IssueCountEqualsFailedProjectCount(t *testing.T) {
+// TestEnrichCodeBuildStatus_MultipleFailedProjects_AllKeyedInFindings verifies
+// that when several projects are probed together, every failed project gets
+// its own Findings entry and the healthy one is excluded — no cross-resource
+// contamination or dropped entries from the concurrent per-resource walk.
+func TestEnrichCodeBuildStatus_MultipleFailedProjects_AllKeyedInFindings(t *testing.T) {
 	fake := &codeBuildEnrichFake{
 		projectBuilds: map[string]string{
 			"fail-a": "fail-a:b1",
@@ -189,11 +188,17 @@ func TestEnrichCodeBuildStatus_IssueCountEqualsFailedProjectCount(t *testing.T) 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.IssueCount != 2 {
-		t.Errorf("IssueCount = %d, want 2", result.IssueCount)
+	if len(result.Findings) != 2 {
+		t.Errorf("len(Findings) = %d, want 2 (fail-a, fail-b)", len(result.Findings))
 	}
-	if result.IssueCount != len(result.Findings) {
-		t.Errorf("IssueCount (%d) != len(Findings) (%d)", result.IssueCount, len(result.Findings))
+	if _, ok := result.Findings["fail-a"]; !ok {
+		t.Error("expected finding keyed by \"fail-a\"")
+	}
+	if _, ok := result.Findings["fail-b"]; !ok {
+		t.Error("expected finding keyed by \"fail-b\"")
+	}
+	if _, ok := result.Findings["ok-c"]; ok {
+		t.Error("SUCCEEDED project \"ok-c\" must NOT appear in Findings")
 	}
 }
 

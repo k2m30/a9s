@@ -42,7 +42,6 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
-	issueCount := 0
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -113,7 +112,6 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 			if _, ok := errors.AsType[*codeartifacttypes.ResourceNotFoundException](err); ok {
 				// No policy set — default open within the domain.
 				setWave2Finding(&result, key, codeartifactCodeNoPermissionsPolicy, "no permissions policy", "~", "codeartifact", nil, "")
-				// "~" does not contribute to IssueCount.
 				return
 			}
 			// Any other error — skip this repo but flag truncation.
@@ -130,10 +128,8 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 				[]domain.DetailRow{
 					{Label: "Principal", Value: "*", Tier: "!"},
 				}, "")
-			issueCount++
 		}
 	})
-	result.IssueCount = issueCount
 	result.Truncated = truncated
 	return result, nil
 }

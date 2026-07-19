@@ -131,9 +131,6 @@ func TestEnrichAthenaWorkGroup_EnforcedEncryptedProducesNoFindings(t *testing.T)
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichAthenaWorkGroup_NotEnforcedProducesFindingSevTilde verifies that when WG-1
@@ -168,10 +165,6 @@ func TestEnrichAthenaWorkGroup_NotEnforcedProducesFindingSevTilde(t *testing.T) 
 	if _, ok := result.Findings[athenaWG2]; ok {
 		t.Error("WG-2 must NOT appear in Findings — it is correctly configured")
 	}
-	// "~" severity does NOT contribute to IssueCount per the EnricherResult contract.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
-	}
 }
 
 // TestEnrichAthenaWorkGroup_NoEncryptionProducesFindingSevTilde verifies that when WG-1
@@ -205,10 +198,6 @@ func TestEnrichAthenaWorkGroup_NoEncryptionProducesFindingSevTilde(t *testing.T)
 	}
 	if _, ok := result.Findings[athenaWG2]; ok {
 		t.Error("WG-2 must NOT appear in Findings — it has encryption configured")
-	}
-	// "~" severity does NOT contribute to IssueCount per the EnricherResult contract.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
 	}
 }
 

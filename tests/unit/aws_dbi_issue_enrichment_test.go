@@ -159,9 +159,6 @@ func TestDBI_Enrich_MaintenancePending_HealthyRow(t *testing.T) {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fixtures.MaintDbiScheduledID, updates)
 	}
 
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (~ severity must not bump S1 badge)", result.IssueCount)
-	}
 }
 
 // TestDBI_Enrich_MaintenancePending_NilDescription verifies that when the
@@ -313,8 +310,8 @@ func TestDBI_Enrich_NilRDSClient(t *testing.T) {
 	if result.Findings == nil {
 		t.Error("Findings must not be nil even when RDS client is nil")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0 (nil RDS client, no resources)", len(result.Findings))
 	}
 }
 
@@ -414,10 +411,6 @@ func TestDBI_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", resourceID, updates)
 	}
 
-	// "~" severity must not bump the S1 badge.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestDBI_Enrich_Wave1PlusWave2_PostPR03eShape_NoFieldUpdates verifies AS-140

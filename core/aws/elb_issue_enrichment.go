@@ -27,8 +27,7 @@ const (
 // elbCodeMisconfigured FindingDef declared at SevWarn in
 // catalog_networking.go. Both flags missing at once is the AWS
 // create-load-balancer default and must not escalate to SevBroken; doing so
-// previously painted every freshly-created, unhardened LB red. IssueCount
-// counts findings with Severity SevBroken, which this enricher never emits.
+// previously painted every freshly-created, unhardened LB red.
 //
 // Per-LB API failures aggregate into a composite error returned alongside
 // the partial findings (E1–E6 contract). LoadBalancerArn is read from
@@ -98,16 +97,6 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		setWave2Finding(&result, r.ID, elbCodeMisconfigured, phrases[0], "~", "elb", rows, "")
 	})
 	sort.Strings(failures)
-	issueCount := 0
-	for _, fs := range result.Findings {
-		for _, f := range fs {
-			if f.Severity == domain.SevBroken {
-				issueCount++
-				break
-			}
-		}
-	}
-	result.IssueCount = issueCount
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false
 	return result, AggregateFailures("elb-enrich: DescribeLoadBalancerAttributes", failures, total)

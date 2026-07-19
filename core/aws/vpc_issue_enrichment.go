@@ -26,7 +26,6 @@ const (
 // Findings:
 //   - No ACTIVE flow log for the VPC → "~" finding "no active VPC flow logs"
 //
-// IssueCount stays 0 (severity "~" only).
 // Skip when clients.EC2 == nil.
 func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
@@ -96,7 +95,6 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 			"flow_logs": flowLogsVal,
 		}
 	})
-	result.IssueCount = 0
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false
 	return result, nil

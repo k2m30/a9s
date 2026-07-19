@@ -111,9 +111,6 @@ func TestEnrichTGWAttachments_AllAvailableProducesNoFindings(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichTGWAttachments_FailedAttachmentProducesFindingSevBang verifies that
@@ -144,9 +141,6 @@ func TestEnrichTGWAttachments_FailedAttachmentProducesFindingSevBang(t *testing.
 	if _, ok := result.Findings["tgw-00000002"]; ok {
 		t.Error("tgw-00000002 must NOT appear in Findings — all its attachments are available")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
-	}
 }
 
 // TestEnrichTGWAttachments_ModifyingAttachmentProducesFindingSevTilde verifies that
@@ -174,8 +168,8 @@ func TestEnrichTGWAttachments_ModifyingAttachmentProducesFindingSevTilde(t *test
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
+	if len(result.Findings) != 1 {
+		t.Errorf("len(Findings) = %d, want 1 (only tgw-00000001, the available one must not appear)", len(result.Findings))
 	}
 }
 

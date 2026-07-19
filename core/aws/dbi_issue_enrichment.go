@@ -21,8 +21,8 @@ const (
 )
 
 // EnrichDBIMaintenance calls DescribePendingMaintenanceActions (account-wide, paginated)
-// and emits one Finding per dbi instance with pending maintenance. Severity "~" —
-// IssueCount is always 0 (Wave 2 ~ does not bump the S1 menu badge). The merged
+// and emits one Finding per dbi instance with pending maintenance. Severity "~"
+// (Wave 2 ~ does not bump the S1 menu badge). The merged
 // S4 status phrase (e.g. "maintenance scheduled" alone, or "stopped (+1)" stacked
 // over a Wave-1 finding) is computed at render time from r.Findings via
 // phraseFromFindings; this enricher only emits Findings.
@@ -121,7 +121,6 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		setWave2Finding(&result, key, dbiCodePendingMaintenance, "maintenance scheduled", "~", "dbi", rows, detail)
 	}
 
-	result.IssueCount = 0 // "~" findings never bump the S1 badge
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false
 	return result, nil

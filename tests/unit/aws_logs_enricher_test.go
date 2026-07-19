@@ -96,9 +96,6 @@ func TestEnrichLogsMetricFilters_AuditWithFiltersProducesNoFindings(t *testing.T
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichLogsMetricFilters_AuditNoFiltersProducesFindingSevTilde verifies that
@@ -131,10 +128,6 @@ func TestEnrichLogsMetricFilters_AuditNoFiltersProducesFindingSevTilde(t *testin
 	}
 	if _, ok := result.Findings[lambdaGroup]; ok {
 		t.Error("lambda group must NOT appear in Findings — non-audit groups are skipped")
-	}
-	// "~" findings do not contribute to IssueCount.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
 	}
 }
 

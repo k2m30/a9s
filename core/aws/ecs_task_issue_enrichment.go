@@ -140,7 +140,6 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 		}
 	}
 
-	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	err := Finish(&result, failures, total, op)
 	return result, err

@@ -151,16 +151,6 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		setWave2Finding(&result, ruleName, ebRuleCodeTargetIssue, rows[0].Value, severity, "eb-rule", rows, "")
 	})
 
-	issueCount := 0
-	for _, fs := range result.Findings {
-		for _, f := range fs {
-			if f.Severity == domain.SevBroken {
-				issueCount++
-				break
-			}
-		}
-	}
-	result.IssueCount = issueCount
 	result.Truncated = truncated
 	return result, nil
 }

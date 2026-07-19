@@ -140,9 +140,6 @@ func TestEnrichIAMGroup_PopulatedGroupProducesNoFindings(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichIAMGroup_NoMembersProducesFindingSevTilde verifies that a group with
@@ -177,10 +174,6 @@ func TestEnrichIAMGroup_NoMembersProducesFindingSevTilde(t *testing.T) {
 	}
 	if _, ok := result.Findings["ops-team"]; ok {
 		t.Error("ops-team must NOT appear in Findings — it has members")
-	}
-	// "~" findings do not contribute to IssueCount.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
 	}
 }
 
@@ -217,9 +210,6 @@ func TestEnrichIAMGroup_NoPoliciesProducesFindingSevTilde(t *testing.T) {
 	}
 	if _, ok := result.Findings["ops-team"]; ok {
 		t.Error("ops-team must NOT appear in Findings — it has a policy")
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
 	}
 }
 

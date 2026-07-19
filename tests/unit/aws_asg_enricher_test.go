@@ -98,9 +98,6 @@ func TestEnrichASGScalingActivities_AllSuccessfulProducesNoFindings(t *testing.T
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings for all-successful ASGs, got %d", len(result.Findings))
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichASGScalingActivities_OneFailedProducesFindingSevBang verifies that
@@ -147,9 +144,6 @@ func TestEnrichASGScalingActivities_OneFailedProducesFindingSevBang(t *testing.T
 	}
 	if _, ok := result.Findings["my-web-asg"]; ok {
 		t.Error("successful ASG must NOT appear in Findings")
-	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
 	}
 }
 

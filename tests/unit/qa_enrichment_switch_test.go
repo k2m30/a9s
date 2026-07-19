@@ -40,7 +40,6 @@ func seedEnrichmentFindings(m tui.Model) tui.Model {
 	// 0 is the correct value for a freshly constructed model.
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Issues:       2,
 		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
@@ -51,7 +50,6 @@ func seedEnrichmentFindings(m tui.Model) tui.Model {
 	// rds: same gens
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
-		Issues:       0,
 		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"arn:aws:rds:us-east-1:123456789012:db:prod-db": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update", Severity: domain.SevWarn, Source: "wave2:rds"}},
@@ -102,7 +100,6 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 	// new re-enrichment probe or refetch.
 	_, dropEC2Cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Issues:       2,
 		Findings: map[string][]domain.Finding{
 			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		},
@@ -116,7 +113,6 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 	// Step 4: same check for rds.
 	_, dropRDSCmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
-		Issues:       0,
 		Findings: map[string][]domain.Finding{
 			"arn:aws:rds:us-east-1:123456789012:db:prod-db": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:rds"}},
 		},
@@ -149,7 +145,6 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 		// check should return early safely.
 		m2, _ := m.Update(messages.EnrichmentChecked{
 			ResourceType: "ec2",
-			Issues:       1,
 			Findings:     map[string][]domain.Finding{},
 			Gen:          0,  // stale
 			TypeGen:      99, // stale
@@ -212,7 +207,6 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 	// see hasReenrichOrRefetch doc in qa_enrichment_rerun_overlap_test.go).
 	_, dropEC2Cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Issues:       2,
 		Findings: map[string][]domain.Finding{
 			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		},
@@ -226,7 +220,6 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 	// Step 4: same check for rds.
 	_, dropRDSCmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
-		Issues:       0,
 		Findings: map[string][]domain.Finding{
 			"arn:aws:rds:us-east-1:123456789012:db:prod-db": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:rds"}},
 		},

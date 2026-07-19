@@ -113,7 +113,6 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		}
 	})
 	sort.Strings(failures)
-	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	return result,
 		AggregateFailures("sfn-enrich: ListExecutions", failures, total)

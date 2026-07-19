@@ -209,9 +209,6 @@ func TestEnrichDBIMaintenance_EmptyReturnsNonNilMap(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected empty Findings, got %d entries", len(result.Findings))
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichDBIMaintenance_NilRDSClientReturnsEmptyFindings verifies nil client
@@ -225,8 +222,8 @@ func TestEnrichDBIMaintenance_NilRDSClientReturnsEmptyFindings(t *testing.T) {
 	if result.Findings == nil {
 		t.Error("Findings must not be nil even when RDS client is nil")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0 (nil RDS client, no resources)", len(result.Findings))
 	}
 }
 

@@ -24,8 +24,8 @@ const (
 // EnrichEBEnvironmentHealth calls DescribeEnvironmentHealth for each Elastic
 // Beanstalk environment (1 per environment, cap 50). Returns an informational
 // "~" finding for each environment with a non-empty Causes slice.
-// Summary: "EB causes: <first cause>". IssueCount is always 0 — causes are
-// informational signals, not broken-state indicators.
+// Summary: "EB causes: <first cause>" — causes are informational signals,
+// not broken-state indicators.
 func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -74,7 +74,6 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		}
 		setWave2Finding(&result, key, ebCodeEnvironmentCauses, fmt.Sprintf("EB causes: %s", firstCause), "~", "eb", rows, "")
 	})
-	result.IssueCount = 0
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false
 	return result, nil

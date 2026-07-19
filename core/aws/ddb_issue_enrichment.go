@@ -68,7 +68,6 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 			setWave2Finding(&result, r.ID, ddbCodePITROff, "point-in-time recovery disabled", "~", "ddb", nil, "")
 		}
 	})
-	result.IssueCount = 0
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false
 	return result, nil

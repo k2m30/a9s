@@ -99,7 +99,6 @@ func TestHandleEnrichmentChecked_UpdatesActiveDetailWhenFindingPresent(t *testin
 	// Send a valid EnrichmentCheckedMsg (Gen=0, TypeGen=0 match a fresh model).
 	findingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
-		Issues:       1,
 		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"db-live-001": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update — live update test", Severity: domain.SevBroken, Source: "wave2:rds"}},
@@ -138,7 +137,6 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 	// Step 1: Set a finding via the first EnrichmentCheckedMsg.
 	setFindingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
-		Issues:       1,
 		Findings: map[string][]domain.Finding{
 			"db-live-002": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update — will recover", Severity: domain.SevBroken, Source: "wave2:rds"}},
 		},
@@ -160,7 +158,6 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 	// (it's only bumped on rerun start, not on receipt). So TypeGen=0 still matches.
 	clearFindingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
-		Issues:       0,
 		Findings:     map[string][]domain.Finding{}, // empty — "db-live-002" recovered
 		Gen:          0,
 		TypeGen:      0, // still matches (TypeGen only changes on rerun start)
@@ -189,7 +186,6 @@ func TestHandleEnrichmentChecked_StaleTypeGenDoesNotUpdateDetail(t *testing.T) {
 
 	staleMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
-		Issues:       1,
 		Findings: map[string][]domain.Finding{
 			"db-live-003": {{Code: "rds.pending-maintenance", Phrase: "stale finding — should not appear", Severity: domain.SevBroken, Source: "wave2:rds"}},
 		},
@@ -229,7 +225,6 @@ func TestHandleEnrichmentChecked_FindingNotAppliedWhenDetailInactive(t *testing.
 	// Send valid EnrichmentCheckedMsg while a list (not detail) is active.
 	findingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
-		Issues:       1,
 		Findings: map[string][]domain.Finding{
 			"db-not-in-detail": {{Code: "rds.pending-maintenance", Phrase: "finding for list-only scenario", Severity: domain.SevBroken, Source: "wave2:rds"}},
 		},

@@ -136,9 +136,6 @@ func TestEnrichCloudFrontDistribution_HTTPSRedirectAndTLSOriginsProducesNoFindin
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichCloudFrontDistribution_AllowAllViewerProtocolProducesFindingSevTilde verifies
@@ -193,10 +190,6 @@ func TestEnrichCloudFrontDistribution_AllowAllViewerProtocolProducesFindingSevTi
 	}
 	if _, ok := result.Findings[cfDistroID2]; ok {
 		t.Error("distro-2 must NOT appear in Findings — it has redirect-to-https")
-	}
-	// "~" findings do NOT contribute to IssueCount per the EnricherResult contract.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
 	}
 }
 
@@ -255,10 +248,6 @@ func TestEnrichCloudFrontDistribution_HTTPOnlyOriginProducesFindingSevTilde(t *t
 	}
 	if _, ok := result.Findings[cfDistroID2]; ok {
 		t.Error("distro-2 must NOT appear in Findings — all its origins use https-only")
-	}
-	// "~" findings do NOT contribute to IssueCount per the EnricherResult contract.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
 	}
 }
 

@@ -136,10 +136,6 @@ func TestOpenSearch_Enrich_UpdateAvailable_EmitsBangFinding(t *testing.T) {
 	// U11 — Phrase must not contain any row value.
 	u11SummaryRowCheck(t, finding, rows)
 
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1 (! bumps menu badge)", result.IssueCount)
-	}
-
 	// Verify rows contain "Automated Update" and "Current Version".
 	hasAutomatedUpdate := false
 	hasCurrentVersion := false
@@ -203,9 +199,6 @@ func TestOpenSearch_Enrich_EncryptionOff_EmitsTildeFinding(t *testing.T) {
 	// U11 — Phrase must not contain any row value.
 	u11SummaryRowCheck(t, finding, result.AttentionDetails[id][finding.Code].Rows)
 
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (~ never bumps badge)", result.IssueCount)
-	}
 }
 
 // Test 3 (enricher_multi_background_top_wins_hidden_surfaces_as_row) retired:
@@ -266,9 +259,6 @@ func TestOpenSearch_Enrich_HardStatePlusBackground_NoFieldUpdate(t *testing.T) {
 		}
 	}
 
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -301,9 +291,6 @@ func TestOpenSearch_Enrich_NoSignals_NoFinding(t *testing.T) {
 
 	if len(result.Findings) != 0 {
 		t.Errorf("len(Findings) = %d, want 0 (healthy domain has no findings)", len(result.Findings))
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
 	}
 }
 

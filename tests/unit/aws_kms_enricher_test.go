@@ -128,9 +128,6 @@ func TestEnrichKMSRotation_EnabledProducesNoFinding(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d", len(result.Findings))
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichKMSRotation_AWSManagedKeySkippedSilently verifies that

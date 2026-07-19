@@ -143,9 +143,6 @@ func TestEnrichMSKCluster_ModernTLSProducesNoFindings(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichMSKCluster_OutdatedVersionProducesFindingSevTilde verifies that when
@@ -175,10 +172,6 @@ func TestEnrichMSKCluster_OutdatedVersionProducesFindingSevTilde(t *testing.T) {
 	}
 	if _, ok := result.Findings[mskName2]; ok {
 		t.Error("cluster-2 must NOT appear in Findings — it uses modern Kafka version")
-	}
-	// "~" findings do NOT contribute to IssueCount per the EnricherResult contract.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
 	}
 }
 
@@ -210,9 +203,6 @@ func TestEnrichMSKCluster_PlaintextEncryptionProducesFindingSevTilde(t *testing.
 	if _, ok := result.Findings[mskName2]; ok {
 		t.Error("cluster-2 must NOT appear in Findings — it uses TLS")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
-	}
 }
 
 // TestEnrichMSKCluster_ServerlessClusterSkipped verifies that when cluster-1 is
@@ -236,9 +226,6 @@ func TestEnrichMSKCluster_ServerlessClusterSkipped(t *testing.T) {
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings for serverless skip, got %d", len(result.Findings))
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
 	}
 }
 

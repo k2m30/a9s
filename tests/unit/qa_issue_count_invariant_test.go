@@ -1,12 +1,14 @@
 package unit
 
-// qa_issue_count_invariant_test.go — property invariant: IssueCount never exceeds instance count.
+// qa_issue_count_invariant_test.go — property invariant: issue counts never
+// exceed instance count.
 //
 // Two invariants enforced:
 //
-//  1. Per-enricher: result.IssueCount <= len(inputResources) for every entry in
-//     EnricherRegistry. An enricher emits at most one finding per resource (keyed by
-//     resource ID), so the issue count can never exceed the number of distinct inputs.
+//  1. Per-enricher: len(result.Findings) <= len(inputResources) for every
+//     entry in EnricherRegistry. An enricher emits at most one Findings entry
+//     per resource (keyed by resource ID), so the number of distinct flagged
+//     resources can never exceed the number of distinct inputs.
 //
 //  2. Unified (Wave-1 + Wave-2): Controller.GetListIssueCount() (fed via
 //     ApplyEnrichmentState) must never exceed the union of Wave-1 issue
@@ -25,20 +27,19 @@ import (
 // Test 1: per-enricher IssueCount <= len(inputResources)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// TestAllEnrichers_IssueCountNeverExceedsResources is a property check over every
+// TestAllEnrichers_FindingsNeverExceedResources is a property check over every
 // registered enricher. For each enricher:
 //   - Calls it with 3 minimal resources (id test-1, test-2, test-3) and nil clients.
-//   - Asserts result.IssueCount <= len(input)
-//   - Asserts result.IssueCount <= len(result.Findings)
+//   - Asserts len(result.Findings) <= len(input)
 //
 // Enrichers that gracefully return early on nil clients are fine — they will
-// return IssueCount=0 which satisfies the invariant. If an enricher panics,
-// it is logged and skipped (not failed) because the goal is the bound invariant,
-// not exhaustive execution coverage.
+// return an empty Findings map which satisfies the invariant. If an enricher
+// panics, it is logged and skipped (not failed) because the goal is the bound
+// invariant, not exhaustive execution coverage.
 //
-// If any enricher violates IssueCount > len(input), that is a real bug and the
-// test reports the enricher name and exact counts.
-func TestAllEnrichers_IssueCountNeverExceedsResources(t *testing.T) {
+// If any enricher violates len(Findings) > len(input), that is a real bug and
+// the test reports the enricher name and exact counts.
+func TestAllEnrichers_FindingsNeverExceedResources(t *testing.T) {
 	minimalResources := []resource.Resource{
 		{ID: "test-1", Name: "test-resource-1"},
 		{ID: "test-2", Name: "test-resource-2"},
@@ -71,17 +72,11 @@ func TestAllEnrichers_IssueCountNeverExceedsResources(t *testing.T) {
 				return
 			}
 
-			// Core invariant: IssueCount can never exceed the number of input resources.
-			if result.IssueCount > len(minimalResources) {
-				t.Errorf("%s: IssueCount (%d) > len(inputResources) (%d) — issues must never exceed instances",
-					shortName, result.IssueCount, len(minimalResources))
-			}
-
-			// Secondary invariant: IssueCount cannot exceed the number of distinct findings.
-			// (Findings map is keyed by resource ID; each resource contributes at most one entry.)
-			if result.IssueCount > len(result.Findings) {
-				t.Errorf("%s: IssueCount (%d) > len(Findings) (%d) — issues must not exceed unique resource findings",
-					shortName, result.IssueCount, len(result.Findings))
+			// Core invariant: distinct flagged resources can never exceed the
+			// number of input resources.
+			if len(result.Findings) > len(minimalResources) {
+				t.Errorf("%s: len(Findings) (%d) > len(inputResources) (%d) — flagged resources must never exceed instances",
+					shortName, len(result.Findings), len(minimalResources))
 			}
 		})
 	}

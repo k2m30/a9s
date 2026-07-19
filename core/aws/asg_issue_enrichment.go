@@ -91,7 +91,6 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed, summary, "!", "asg", rows, "")
 	})
 	sort.Strings(failures)
-	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	return result, AggregateFailures("asg-enrich: DescribeScalingActivities", failures, total)
 }

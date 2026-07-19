@@ -96,7 +96,6 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 	// We use TypeGen=0 (startup probe, not a rerun).
 	enrichMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
-		Issues:       1,
 		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"db-stacked-a-001": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update", Severity: domain.SevBroken, Source: "wave2:rds"}},
@@ -206,7 +205,6 @@ func TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive(t *testing.T) {
 	// Step 5: Wave 2 enrichment completes with findings for BOTH A and B.
 	enrichMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
-		Issues:       2,
 		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"db-stacked-a-001": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update on A", Severity: domain.SevBroken, Source: "wave2:rds"}},

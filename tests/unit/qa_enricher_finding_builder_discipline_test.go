@@ -104,12 +104,14 @@ const efbdFindingsFieldName = "Findings"
 //
 // msk_issue_enrichment.go:EnrichMSKCluster#1 is intentionally ABSENT — see
 // file header "KNOWN DEBT vs. TARGET" for why.
-var knownFindingMapInspectionDebt = map[string]bool{
-	"eb_rule_issue_enrichment.go:EnrichEventBridgeRuleTargets#1": true,
-	"ec2_issue_enrichment.go:EnrichEC2InstanceStatus#1":          true,
-	"ecr_issue_enrichment.go:EnrichECRRepository#1":              true,
-	"elb_issue_enrichment.go:EnrichELBAttributes#1":              true,
-}
+//
+// PRUNED (IssueEnricherResult.IssueCount field deletion): the four sites
+// below were each the enclosing function's post-append `result.IssueCount =
+// issueCount` aggregation — removed by production alongside the field, so
+// none of the four `for _, fs := range result.Findings { ... }` blocks exist
+// in core/aws/*_issue_enrichment.go anymore. Pruning rather than leaving them
+// allowlisted-but-unfound, which would trip this gate's own BURN-DOWN case.
+var knownFindingMapInspectionDebt = map[string]bool{}
 
 // efbdSite is one direct .Findings index/range access site the scanner found.
 type efbdSite struct {

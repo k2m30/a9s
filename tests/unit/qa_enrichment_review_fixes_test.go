@@ -117,7 +117,6 @@ func TestCtrlR_RetainsActiveListFindingsUntilFreshEnrichment(t *testing.T) {
 	// it would prove nothing about generation-matched replacement.
 	recovered := messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Issues:       0,
 		Truncated:    false,
 		Findings:     map[string][]domain.Finding{},
 		Gen:          0,

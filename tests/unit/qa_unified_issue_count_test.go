@@ -2,35 +2,20 @@ package unit
 
 // qa_unified_issue_count_test.go — Tests for the unified issue count contract:
 //
-//  1. Every enricher returns IssueCount == len(Findings).
-//  2. The menu count for a type after EnrichmentCheckedMsg equals the list's
+//  1. The menu count for a type after EnrichmentCheckedMsg equals the list's
 //     FrameTitle count.
-//  3. Wave-1/Wave-2 dedup and "~"-severity exclusion (unifiedIssueCount /
+//  2. Wave-1/Wave-2 dedup and "~"-severity exclusion (unifiedIssueCount /
 //     Controller.GetListIssueCount) are covered by
 //     qa_issue_count_invariant_test.go (direct Controller assertions) and by
 //     TestUnifiedIssueCount_IgnoresTildeSeverityFindings below (live
 //     EnrichmentChecked → menu badge path).
 
 import (
-	"context"
 	"strings"
 	"testing"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
-	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
-	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
-	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
-	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
-	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
-
-	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
@@ -38,140 +23,7 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 1: Every enricher returns IssueCount == len(Findings)
-// ─────────────────────────────────────────────────────────────────────────────
-
-type allEnrichersCase struct {
-	name    string
-	clients *awsclient.ServiceClients
-	probes  []resource.Resource
-	call    func(context.Context, *awsclient.ServiceClients, []resource.Resource, resource.ResourceCache) (awsclient.IssueEnricherResult, error)
-}
-
-// TestAllEnrichers_IssueCountMatchesFindings verifies that every registered enricher
-// that produces severity "!" findings returns result.IssueCount == len(result.Findings)
-// when seeded with one finding. Enrichers that only produce severity "~" (informational)
-// findings are excluded because "~" findings do not contribute to IssueCount — they are
-// tested separately in TestEnrichDBIMaintenance_OnlyEmitsForProbedResources.
-func TestAllEnrichers_IssueCountMatchesFindings(t *testing.T) {
-	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg/abc123"
-	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:sm"
-
-	cases := []allEnrichersCase{
-		{
-			name: "ebs/EnrichEBSVolumeStatus",
-			clients: &awsclient.ServiceClients{
-				EC2: &ebsStatusFake{
-					volumeOutput: &ec2.DescribeVolumeStatusOutput{
-						VolumeStatuses: []ec2types.VolumeStatusItem{
-							{
-								VolumeId: aws.String("vol-001"),
-								VolumeStatus: &ec2types.VolumeStatusInfo{
-									Status: ec2types.VolumeStatusInfoStatusImpaired,
-								},
-							},
-						},
-					},
-				},
-			},
-			probes: nil,
-			call:   awsclient.EnrichEBSVolumeStatus,
-		},
-		{
-			name: "cb/EnrichCodeBuildStatus",
-			clients: &awsclient.ServiceClients{
-				CodeBuild: &codeBuildEnrichFake{
-					projectBuilds: map[string]string{"my-project": "build-1"},
-					builds: map[string]cbtypes.Build{
-						"build-1": {
-							Id:          aws.String("build-1"),
-							BuildStatus: cbtypes.StatusTypeFailed,
-							EndTime:     aws.Time(time.Now()),
-						},
-					},
-				},
-			},
-			probes: []resource.Resource{{ID: "my-project", Name: "my-project"}},
-			call:   awsclient.EnrichCodeBuildStatus,
-		},
-		{
-			name: "tg/EnrichTargetGroupHealth",
-			clients: &awsclient.ServiceClients{
-				ELBv2: &tgHealthFake{
-					outputs: map[string]*elbv2.DescribeTargetHealthOutput{
-						tgARN: {
-							TargetHealthDescriptions: []elbtypes.TargetHealthDescription{
-								tgHealthDesc(elbtypes.TargetHealthStateEnumUnhealthy),
-							},
-						},
-					},
-				},
-			},
-			probes: []resource.Resource{{ID: "ucm-tg", Fields: map[string]string{"target_group_arn": tgARN}}},
-			call:   awsclient.EnrichTargetGroupHealth,
-		},
-		{
-			name: "pipeline/EnrichCodePipelineStatus",
-			clients: &awsclient.ServiceClients{
-				CodePipeline: &pipelineStateFake{
-					states: map[string]*codepipeline.GetPipelineStateOutput{
-						"my-pipeline": {
-							StageStates: []cptypes.StageState{
-								stageState("Deploy", cptypes.StageExecutionStatusFailed),
-							},
-						},
-					},
-				},
-			},
-			probes: []resource.Resource{{ID: "my-pipeline", Name: "my-pipeline"}},
-			call:   awsclient.EnrichCodePipelineStatus,
-		},
-		{
-			name: "sfn/EnrichStepFunctionsStatus",
-			clients: &awsclient.ServiceClients{
-				SFN: &sfnEnrichFake{
-					executions: map[string]sfntypes.ExecutionStatus{
-						smARN: sfntypes.ExecutionStatusFailed,
-					},
-				},
-			},
-			probes: []resource.Resource{{ID: "ucm-sm", Fields: map[string]string{"arn": smARN}}},
-			call:   awsclient.EnrichStepFunctionsStatus,
-		},
-		{
-			name: "glue/EnrichGlueJobStatus",
-			clients: &awsclient.ServiceClients{
-				Glue: &glueJobFake{
-					jobRuns: map[string]gluetypes.JobRunState{
-						"my-job": gluetypes.JobRunStateFailed,
-					},
-				},
-			},
-			probes: []resource.Resource{{ID: "my-job", Name: "my-job"}},
-			call:   awsclient.EnrichGlueJobStatus,
-		},
-	}
-
-	for _, tc := range cases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			result, err := tc.call(context.Background(), tc.clients, tc.probes, nil)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if result.IssueCount != len(result.Findings) {
-				t.Errorf("IssueCount = %d, want %d (len(Findings)); enricher: %s",
-					result.IssueCount, len(result.Findings), tc.name)
-			}
-			if len(result.Findings) == 0 {
-				t.Errorf("expected at least 1 finding from seeded fake; enricher: %s", tc.name)
-			}
-		})
-	}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Test 3: Menu count == list count after Wave 2 (EnrichmentCheckedMsg)
+// Test 1: Menu count == list count after Wave 2 (EnrichmentCheckedMsg)
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TestMenuCount_MatchesListCount_AfterWave2 verifies that after handleEnrichmentChecked
@@ -200,7 +52,6 @@ func TestMenuCount_MatchesListCount_AfterWave2(t *testing.T) {
 	// Gen=0 and TypeGen=0 match a fresh model's initial generation counters.
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Issues:       1,
 		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
@@ -307,7 +158,6 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 		// Correct (after fix): only "!" findings → issues:1.
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: "ec2",
-			Issues:       1,
 			Truncated:    false,
 			Findings: map[string][]domain.Finding{
 				"i-aaa": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
@@ -357,7 +207,6 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 		// Correct (after fix): no "!" findings → no badge.
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: "ec2",
-			Issues:       0,
 			Truncated:    false,
 			Findings: map[string][]domain.Finding{
 				"i-aaa": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"}},
@@ -410,7 +259,6 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 		// catches the case where a DIFFERENT id has a "~" finding that inflates count.
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: "ec2",
-			Issues:       0, // enricher excludes ~ from IssueCount
 			Truncated:    false,
 			Findings: map[string][]domain.Finding{
 				"i-stopped": {{Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"}},

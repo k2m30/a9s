@@ -175,9 +175,6 @@ func TestS3_Enrich_HealthyBucket_NoFinding(t *testing.T) {
 	if _, ok := result.FieldUpdates["healthy-bucket"]; ok {
 		t.Error("expected no FieldUpdates for healthy bucket with all PAB flags true")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 for healthy bucket", result.IssueCount)
-	}
 }
 
 // TestS3_Enrich_NoPAB_Configuration verifies the no-PAB case:

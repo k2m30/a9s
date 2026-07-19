@@ -24,7 +24,6 @@ const (
 // EnrichBackupJobs calls ListBackupJobs (account-wide, paginated) and returns a Finding
 // for each BackupPlanId that has a failed/aborted/expired/partial job in the last 24h.
 // Severity "!" for FAILED/ABORTED/EXPIRED, "~" for PARTIAL.
-// IssueCount counts only "!" findings.
 //
 // Rule-7 (+N) stacking is N/A for backup — spec §3.1 has zero Wave-1 signals so
 // there are no coexisting Wave-1 warnings to stack with the Wave-2 finding.
@@ -109,7 +108,6 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 		}
 	}
 
-	issueCount := 0
 	for planID, b := range planBuckets {
 		failedCount := len(b.failedJobs)
 		partialCount := len(b.partialJobs)
@@ -156,7 +154,6 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 				result.FieldUpdates[planID] = make(map[string]string)
 			}
 			result.FieldUpdates[planID]["status"] = summary
-			issueCount++
 		} else if partialCount >= 1 {
 			summary := fmt.Sprintf("partial: %d of %d resources skipped", partialCount, totalCount)
 			rows := []domain.DetailRow{
@@ -168,12 +165,10 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 				result.FieldUpdates[planID] = make(map[string]string)
 			}
 			result.FieldUpdates[planID]["status"] = summary
-			// "~" findings do not count toward issueCount.
 		}
 		// Else: only COMPLETED jobs — no finding, no FieldUpdate.
 	}
 
-	result.IssueCount = issueCount
 	result.Truncated = truncated
 	return result, AggregateFailures("backup-enrich: ListBackupJobs", failures, pages)
 }

@@ -270,11 +270,6 @@ func TestEnrichBackupJobs_PaginatesListBackupJobs(t *testing.T) {
 		t.Errorf("len(result.Findings) = %d, want %d", len(result.Findings), wantFindings)
 	}
 
-	// IssueCount must match the 5 severity-"!" findings.
-	if result.IssueCount != wantFindings {
-		t.Errorf("result.IssueCount = %d, want %d", result.IssueCount, wantFindings)
-	}
-
 	// Each failed plan must have a finding.
 	for i := range 5 {
 		key := fmt.Sprintf("plan-failed-%d", i)

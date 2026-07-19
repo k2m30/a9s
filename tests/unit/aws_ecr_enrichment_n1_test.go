@@ -173,9 +173,6 @@ func TestEnrichECRRepository_N1_CriticalAggregatesAcrossImages(t *testing.T) {
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
-	}
 	if got := result.FieldUpdates[repo]["critical_vulns"]; got != "3" {
 		t.Errorf("critical_vulns = %q, want 3 (aggregate across both images)", got)
 	}
@@ -215,9 +212,6 @@ func TestEnrichECRRepository_N1_HighOnlyEmitsTilde(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (~ never bumps badge)", result.IssueCount)
-	}
 }
 
 // TestEnrichECRRepository_N1_CleanRepoEmitsNoFinding verifies a repo whose
@@ -243,9 +237,6 @@ func TestEnrichECRRepository_N1_CleanRepoEmitsNoFinding(t *testing.T) {
 	}
 	if _, ok := result.Findings[repo]; ok {
 		t.Errorf("clean repo must not appear in findings; got: %v", result.Findings[repo])
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
 	}
 	// FieldUpdates still set (even on clean repos) for render-path predictability.
 	if got := result.FieldUpdates[repo]["critical_vulns"]; got != "0" {

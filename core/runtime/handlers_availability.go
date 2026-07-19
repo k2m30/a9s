@@ -560,6 +560,15 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 			})
 		}
 
+		// td is never nil here in practice: every TaskKindProbeEnrich task is
+		// scoped to a ResourceType that already passed a FindResourceType != nil
+		// check at dispatch time (HandleResourcesLoaded's list-open branch,
+		// startEnrichment's queue, and this handler's own canonicalization
+		// above), and unifiedIssueCount needs *td (ExcludeFromIssueBadge,
+		// ResolveColor) to compute anything meaningful — there is no
+		// findings-only fallback that would produce a comparable count. The nil
+		// guard stays only to avoid a *td panic on a malformed/unresolvable
+		// message; unified simply stays 0 in that unreached case.
 		td := resource.FindResourceType(msg.ResourceType)
 		var unified int
 		if td != nil {
@@ -571,8 +580,6 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 			// per-type row state this call produced.
 			rows, _ := c.ProbeResources(msg.ResourceType)
 			unified = unifiedIssueCount(rows, *td, allFindings)
-		} else {
-			unified = msg.Issues
 		}
 
 		// Truncation precedence (behavior-preserving with the deleted

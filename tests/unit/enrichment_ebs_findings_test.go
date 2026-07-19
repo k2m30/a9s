@@ -127,8 +127,10 @@ func TestEnrichEBSVolumeStatus_OkVolumesExcluded(t *testing.T) {
 	}
 }
 
-// TestEnrichEBSVolumeStatus_IssueCountEqualsFindings verifies IssueCount = len(Findings).
-func TestEnrichEBSVolumeStatus_IssueCountEqualsImpairedVolumeCount(t *testing.T) {
+// TestEnrichEBSVolumeStatus_MultipleImpairedVolumes_AllKeyedInFindings verifies
+// that when several volumes are probed together, every impaired volume gets
+// its own Findings entry and the ok one is excluded.
+func TestEnrichEBSVolumeStatus_MultipleImpairedVolumes_AllKeyedInFindings(t *testing.T) {
 	out := &ec2.DescribeVolumeStatusOutput{
 		VolumeStatuses: []ec2types.VolumeStatusItem{
 			{VolumeId: aws.String("vol-a"), VolumeStatus: &ec2types.VolumeStatusInfo{Status: "impaired"}},
@@ -142,11 +144,17 @@ func TestEnrichEBSVolumeStatus_IssueCountEqualsImpairedVolumeCount(t *testing.T)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.IssueCount != 2 {
-		t.Errorf("IssueCount = %d, want 2", result.IssueCount)
+	if len(result.Findings) != 2 {
+		t.Errorf("len(Findings) = %d, want 2 (vol-a, vol-b)", len(result.Findings))
 	}
-	if result.IssueCount != len(result.Findings) {
-		t.Errorf("IssueCount (%d) != len(Findings) (%d)", result.IssueCount, len(result.Findings))
+	if _, ok := result.Findings["vol-a"]; !ok {
+		t.Error("expected finding keyed by \"vol-a\"")
+	}
+	if _, ok := result.Findings["vol-b"]; !ok {
+		t.Error("expected finding keyed by \"vol-b\"")
+	}
+	if _, ok := result.Findings["vol-c"]; ok {
+		t.Error("ok-status volume \"vol-c\" must NOT appear in Findings")
 	}
 }
 

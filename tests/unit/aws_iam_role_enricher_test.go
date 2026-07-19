@@ -135,9 +135,6 @@ func TestEnrichIAMRoleLastUsed_RecentlyUsedProducesNoFindings(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichIAMRoleLastUsed_DormantProducesFindingSevTilde verifies that when
@@ -172,10 +169,6 @@ func TestEnrichIAMRoleLastUsed_DormantProducesFindingSevTilde(t *testing.T) {
 	if _, ok := result.Findings["role-3"]; ok {
 		t.Error("role-3 must NOT appear in Findings — it was recently used")
 	}
-	// "~" findings do not contribute to IssueCount.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
-	}
 }
 
 // TestEnrichIAMRoleLastUsed_NeverUsedProducesFindingSevTilde verifies that when
@@ -209,9 +202,6 @@ func TestEnrichIAMRoleLastUsed_NeverUsedProducesFindingSevTilde(t *testing.T) {
 	}
 	if _, ok := result.Findings["role-3"]; ok {
 		t.Error("role-3 must NOT appear in Findings — it was recently used")
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
 	}
 }
 

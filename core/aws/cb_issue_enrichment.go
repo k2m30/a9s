@@ -132,7 +132,6 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		setWave2Finding(&result, projectName, cbCodeLatestBuildFailed, summary, "!", "cb", rows, "")
 		result.FieldUpdates[projectName] = map[string]string{"last_build": lastBuildVal}
 	}
-	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	return result, nil
 }

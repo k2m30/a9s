@@ -126,7 +126,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		r := c.ProbeEnrichment(ctx, snap.Clients, shortName)
 		return messages.EnrichmentChecked{
 			ResourceType:     shortName,
-			Issues:           r.Issues,
 			Truncated:        r.Truncated,
 			Findings:         r.Findings,
 			AttentionDetails: r.AttentionDetails,

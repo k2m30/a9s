@@ -122,9 +122,6 @@ func TestEnrichAPIGatewayStage_ThrottledWithLogsProducesNoFindings(t *testing.T)
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichAPIGatewayStage_NoThrottlingProducesFindingSevTilde verifies that when api-1
@@ -168,10 +165,6 @@ func TestEnrichAPIGatewayStage_NoThrottlingProducesFindingSevTilde(t *testing.T)
 	if _, ok := result.Findings[apigwAPIID2]; ok {
 		t.Error("api-2 must NOT appear in Findings — it has throttling configured")
 	}
-	// "~" findings do NOT contribute to IssueCount per the EnricherResult contract.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
-	}
 }
 
 // TestEnrichAPIGatewayStage_NoAccessLogsProducesFindingSevTilde verifies that when api-1
@@ -212,10 +205,6 @@ func TestEnrichAPIGatewayStage_NoAccessLogsProducesFindingSevTilde(t *testing.T)
 	}
 	if _, ok := result.Findings[apigwAPIID2]; ok {
 		t.Error("api-2 must NOT appear in Findings — it has access logs configured")
-	}
-	// "~" findings do NOT contribute to IssueCount per the EnricherResult contract.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
 	}
 }
 

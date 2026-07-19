@@ -862,7 +862,6 @@ func TestRowStoreControllerPin_EnrichmentChecked_FieldUpdates_FoldsIntoRowStore(
 
 	_, _ = c.Handle(messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Issues:       1,
 		Gen:          s.EnrichmentGen,
 		TypeGen:      s.EnrichmentTypeGen["ec2"],
 		FieldUpdates: map[string]map[string]string{
@@ -907,7 +906,6 @@ func TestRowStoreControllerPin_EnrichmentChecked_AllDone_RowStoreSurvives(t *tes
 
 	_, _ = c.Handle(messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Issues:       1,
 		Gen:          s.EnrichmentGen,
 		TypeGen:      s.EnrichmentTypeGen["ec2"],
 		FieldUpdates: map[string]map[string]string{

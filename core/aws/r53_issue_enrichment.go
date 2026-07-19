@@ -82,7 +82,6 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 	})
 	sort.Strings(failures)
 	// All Route53 findings are severity "~" (informational).
-	result.IssueCount = 0
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false
 	return result,

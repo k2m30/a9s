@@ -49,7 +49,6 @@ type ProbeAvailabilityResult struct {
 // r.Findings entry when writing onto cached rows.
 type ProbeEnrichmentResult struct {
 	ResourceType     string
-	Issues           int
 	Truncated        bool
 	Findings         map[string][]domain.Finding
 	AttentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail
@@ -870,7 +869,6 @@ func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceCl
 	// contract: never-silent-skip).
 	return ProbeEnrichmentResult{
 		ResourceType:     shortName,
-		Issues:           result.IssueCount,
 		Truncated:        result.Truncated,
 		Findings:         result.Findings,
 		AttentionDetails: result.AttentionDetails,

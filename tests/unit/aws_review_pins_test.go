@@ -194,9 +194,6 @@ func TestOpenSearch_Enrich_DeletedDomain_SkipsFinding(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("Findings = %v, want none (deleted domain must not emit findings)", result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (deleted domain's pending update must not bump badge)", result.IssueCount)
-	}
 
 	// Sanity: without the Deleted flag the same domain WOULD emit a finding.
 	// This anchors the pin: what we're guarding is the guard, not the absence

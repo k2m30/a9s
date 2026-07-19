@@ -50,7 +50,6 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 	}
 
 	truncated := len(resources) > EnrichmentCap
-	issueCount := 0
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -90,7 +89,6 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		severity := "~"
 		hasMFA := false
 		riskLabel := ""
-		localIssue := false
 
 		// Check MFA only for console users.
 		if hasConsolePassword {
@@ -112,7 +110,6 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 					Tier:  "!",
 				})
 				severity = "!"
-				localIssue = true
 				riskLabel = "NO_MFA"
 			}
 		}
@@ -162,9 +159,6 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 
 		mu.Lock()
 		defer mu.Unlock()
-		if localIssue {
-			issueCount++
-		}
 		consolePasswordVal := "false"
 		if hasConsolePassword {
 			consolePasswordVal = "true"
@@ -186,7 +180,6 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		}
 		setWave2Finding(&result, r.ID, code, rows[0].Value, severity, "iam-user", rows, "")
 	})
-	result.IssueCount = issueCount
 	result.Truncated = truncated
 	return result, nil
 }

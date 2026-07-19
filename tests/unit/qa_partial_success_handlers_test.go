@@ -202,7 +202,6 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 	m, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Err:          partialErr,
-		Issues:       1,
 		Truncated:    true,
 		Findings:     findings,
 		FieldUpdates: fieldUpdates,
@@ -264,7 +263,6 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 	m, cmd2 := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Err:          partialErr,
-		Issues:       1,
 		Findings:     findings,
 		FieldUpdates: fieldUpdates,
 		Gen:          0,
@@ -303,7 +301,6 @@ func TestHandleEnrichmentChecked_PartialErrEmptyFindings_OnlyFlash(t *testing.T)
 	_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Err:          hardErr,
-		Issues:       0,
 		Findings:     nil,
 		FieldUpdates: nil,
 		Gen:          0,

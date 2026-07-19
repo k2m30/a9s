@@ -213,9 +213,6 @@ func TestEnrichEFSMountTargets_AllHealthyMounts_NoFinding(t *testing.T) {
 	if _, ok := result.Findings[fixtures.ProdEFSID]; ok {
 		t.Errorf("unexpected finding for %q — all 3 MTs are available", fixtures.ProdEFSID)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (all healthy)", result.IssueCount)
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -337,13 +334,14 @@ func TestEnrichEFSMountTargets_FieldUpdates_EmptyAS140(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TEST: TestEnrichEFSMountTargets_IssueCount
+// TEST: TestEnrichEFSMountTargets_BothMTDownFixtures_ProduceSevBrokenFindings
 //
-// Verifies IssueCount reflects "!" findings: two fixtures produce findings
-// (healthy-mt-down and updating-mt-down). Non-finding fixtures produce 0.
+// Verifies that when two independent MT-down fixtures (healthy-mt-down and
+// updating-mt-down) are enriched together, BOTH get their own "!" finding —
+// neither is dropped or miscounted by the concurrent per-resource walk.
 // ---------------------------------------------------------------------------
 
-func TestEnrichEFSMountTargets_IssueCount(t *testing.T) {
+func TestEnrichEFSMountTargets_BothMTDownFixtures_ProduceSevBrokenFindings(t *testing.T) {
 	fake := efsMTFakeFromFixtures()
 	clients := &awsclient.ServiceClients{EFS: fake}
 
@@ -363,8 +361,18 @@ func TestEnrichEFSMountTargets_IssueCount(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result.IssueCount != 2 {
-		t.Errorf("IssueCount = %d, want 2 (both MT-down fixtures produce ! findings)", result.IssueCount)
+	if len(result.Findings) != 2 {
+		t.Errorf("len(Findings) = %d, want 2 (both MT-down fixtures)", len(result.Findings))
+	}
+	for _, fsID := range findingFSIDs {
+		fs, ok := result.Findings[fsID]
+		if !ok || len(fs) == 0 {
+			t.Errorf("expected a finding keyed by %q", fsID)
+			continue
+		}
+		if fs[0].Severity != domain.SevBroken {
+			t.Errorf("Findings[%q][0].Severity = %v, want SevBroken (mount target down)", fsID, fs[0].Severity)
+		}
 	}
 }
 

@@ -199,11 +199,6 @@ func TestBackup_Enricher_OneFailed_ShowsBrokenPhrase(t *testing.T) {
 		t.Fatal("FieldUpdates must not contain the banned 'last_status' key")
 	}
 
-	// S1: IssueCount must be bumped (one "!" finding).
-	if result.IssueCount < 1 {
-		t.Fatalf("IssueCount must be >= 1 when a '!' finding exists: got %d", result.IssueCount)
-	}
-
 	// U11: Phrase must not contain any Row.Value (skip pure-integer counts — they appear in
 	// both Phrase phrases and count rows by design — and skip the humanized job-state word
 	// "failed", which legitimately appears in both the Row.Value and the "N job(s) failed..."

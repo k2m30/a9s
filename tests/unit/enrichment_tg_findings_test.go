@@ -152,9 +152,6 @@ func TestEnrichTargetGroupHealth_AllHealthyExcluded(t *testing.T) {
 	if _, ok := result.Findings[tgName]; ok {
 		t.Error("all-healthy TG must NOT appear in Findings")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 for all-healthy TG", result.IssueCount)
-	}
 }
 
 // TestEnrichTargetGroupHealth_TruncatedWhenResourcesExceedCap verifies Truncated=true.

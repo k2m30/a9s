@@ -157,9 +157,6 @@ func TestEnrichECSServices_StuckServiceEmitsBangFinding(t *testing.T) {
 	if !strings.Contains(f.Phrase, "desired") {
 		t.Errorf("summary %q should contain %q", f.Phrase, "desired")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
-	}
 }
 
 // TestEnrichECSServices_DeploymentRolloutFailedEmitsFinding verifies that a
@@ -378,10 +375,6 @@ func TestEnrichECSClusters_PendingTasksEmitsFinding(t *testing.T) {
 	if !strings.Contains(f.Phrase, "pending") {
 		t.Errorf("summary %q should contain %q", f.Phrase, "pending")
 	}
-	// IssueCount must be 0 — all ECS cluster findings are informational.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (all cluster findings are ~)", result.IssueCount)
-	}
 }
 
 // TestEnrichECSClusters_NoRunningTasksWithInstancesEmitsFinding verifies that
@@ -541,9 +534,6 @@ func TestEnrichECSTasks_TaskFailedToStartEmitsFinding(t *testing.T) {
 	}
 	if !strings.Contains(f.Phrase, "TaskFailedToStart") {
 		t.Errorf("summary %q should contain %q", f.Phrase, "TaskFailedToStart")
-	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
 	}
 }
 
@@ -791,9 +781,6 @@ func TestEnrichCFNStackEvents_FailedEventEmitsBangFinding(t *testing.T) {
 	if !strings.Contains(f.Phrase, "recent resource failure") {
 		t.Errorf("summary %q should contain %q", f.Phrase, "recent resource failure")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
-	}
 }
 
 // TestEnrichCFNStackEvents_APIErrorSetsPerResourceTruncation verifies that an
@@ -938,9 +925,6 @@ func TestEnrichELBAttributes_BothMisconfigurations_TildeFinding(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %q (both misconfigured must NOT promote to broken)", f.Severity, "~")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 for ~ findings", result.IssueCount)
-	}
 }
 
 // TestEnrichELBAttributes_OnlyDeletionProtectionMissing_TildeFinding verifies
@@ -970,10 +954,6 @@ func TestEnrichELBAttributes_OnlyDeletionProtectionMissing_TildeFinding(t *testi
 	f := fs[0]
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %q (single misconfiguration → ~)", f.Severity, "~")
-	}
-	// Single "~" finding must NOT contribute to IssueCount.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 for ~ findings", result.IssueCount)
 	}
 }
 
@@ -1096,10 +1076,6 @@ func TestEnrichEBEnvironmentHealth_CausesEmitsTildeFinding(t *testing.T) {
 	if !strings.Contains(f.Phrase, "EB causes:") {
 		t.Errorf("summary %q should contain %q", f.Phrase, "EB causes:")
 	}
-	// IssueCount must be 0 — EB health findings are always informational.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichEBEnvironmentHealth_APIErrorMarksRowTruncatedIDNotBadge verifies
@@ -1214,16 +1190,14 @@ func TestEnrichCFNCombined_EventsAndDriftMerged(t *testing.T) {
 	if len(result.Findings) == 0 {
 		t.Fatal("expected findings in combined result; got none")
 	}
-	// IssueCount > 0 because the _FAILED event produces a "!" finding.
-	if result.IssueCount == 0 {
-		t.Errorf("IssueCount = %d, want > 0 (event failure should count)", result.IssueCount)
-	}
 	// Events win on ID conflict: the stackID finding must be "!".
-	if fs, ok := result.Findings[stackID]; ok {
-		f := fs[0]
-		if f.Severity != domain.SevBroken {
-			t.Errorf("expected events finding (severity !) to win over drift finding; got severity %v", f.Severity)
-		}
+	fs, ok := result.Findings[stackID]
+	if !ok {
+		t.Fatalf("expected finding keyed by %q (event failure must produce a finding)", stackID)
+	}
+	f := fs[0]
+	if f.Severity != domain.SevBroken {
+		t.Errorf("expected events finding (severity !) to win over drift finding; got severity %v", f.Severity)
 	}
 }
 
@@ -1266,11 +1240,12 @@ func TestEnrichCFNCombined_DriftOnlyNoEventFailure_TildeFinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result.Findings) == 0 {
+	fs, ok := result.Findings[stackID]
+	if !ok || len(fs) == 0 {
 		t.Fatal("expected drift finding in combined result; got none")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (drift finding is ~, not !)", result.IssueCount)
+	if fs[0].Severity != domain.SevWarn {
+		t.Errorf("drift-only finding Severity = %v, want SevWarn (drift finding is ~, not !)", fs[0].Severity)
 	}
 }
 

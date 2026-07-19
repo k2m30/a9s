@@ -94,7 +94,6 @@ func TestProbeEnrichment_FetchOriginRows_ReachesRealEnricher(t *testing.T) {
 	captureFn := func(_ context.Context, _ *awsclient.ServiceClients, rows []resource.Resource, _ resource.ResourceCache) (awsclient.IssueEnricherResult, error) {
 		seenRows = rows
 		return awsclient.IssueEnricherResult{
-			IssueCount: 1,
 			Findings: map[string][]domain.Finding{
 				fetchRow.ID: {{
 					Code:     "fetch-origin-pin-finding",
@@ -122,9 +121,6 @@ func TestProbeEnrichment_FetchOriginRows_ReachesRealEnricher(t *testing.T) {
 		t.Errorf("enricher saw row Fields[engine] = %q, want %q — fetch-origin row content must pass through unchanged", seenRows[0].Fields["engine"], "postgres")
 	}
 
-	if result.Issues != 1 {
-		t.Errorf("ProbeEnrichmentResult.Issues = %d, want 1 — the enricher DID run and DID emit a finding once it received the fetch-origin row", result.Issues)
-	}
 	findings, ok := result.Findings[fetchRow.ID]
 	if !ok {
 		t.Fatalf("ProbeEnrichmentResult.Findings missing entry for %q", fetchRow.ID)
@@ -166,7 +162,6 @@ func TestEnrichmentChecked_FetchOriginFindings_SurviveToCompletionSavePayload(t 
 	captureFn := func(_ context.Context, _ *awsclient.ServiceClients, rows []resource.Resource, _ resource.ResourceCache) (awsclient.IssueEnricherResult, error) {
 		seenRows = rows
 		return awsclient.IssueEnricherResult{
-			IssueCount: 1,
 			Findings: map[string][]domain.Finding{
 				fetchRow.ID: {{
 					Code:     "fetch-origin-completion-finding",
@@ -202,7 +197,6 @@ func TestEnrichmentChecked_FetchOriginFindings_SurviveToCompletionSavePayload(t 
 
 	_, tasks := ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType:     sentinelType,
-		Issues:           result.Issues,
 		Findings:         result.Findings,
 		AttentionDetails: result.AttentionDetails,
 		FieldUpdates:     result.FieldUpdates,

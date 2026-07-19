@@ -78,7 +78,6 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 			}
 		}
 	})
-	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	return result, nil
 }

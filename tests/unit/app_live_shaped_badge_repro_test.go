@@ -203,7 +203,6 @@ func TestLiveShapedBadgeRepro_S3_SurvivesEscapeToMenu(t *testing.T) {
 	findings := liveShapedBadgeReproWave2Findings(4)
 	ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "s3",
-		Issues:       4,
 		Truncated:    true,
 		Findings:     findings,
 		Gen:          0,
@@ -291,7 +290,6 @@ func TestLiveShapedBadgeRepro_S3_LateDiskCacheReplayDoesNotClobberFreshBadge(t *
 	findings := liveShapedBadgeReproWave2Findings(4)
 	ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "s3",
-		Issues:       4,
 		Truncated:    true,
 		Findings:     findings,
 		Gen:          0,

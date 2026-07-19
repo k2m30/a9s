@@ -372,7 +372,6 @@ func TestStage4Pin_D16_ListLaneAndSweepLaneSaveByteIdenticalRows_UserReorderedCo
 
 	_, enrichTasks := ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: stage4PinType,
-		Issues:       0,
 		Gen:          1, // session.New() seeds EnrichmentGen at 1.
 		TypeGen:      0,
 	})

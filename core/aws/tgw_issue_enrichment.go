@@ -162,7 +162,6 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 		}
 	})
 	sort.Strings(failures)
-	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	return result,
 		AggregateFailures("tgw-enrich: DescribeTransitGatewayAttachments", failures, total)

@@ -143,9 +143,6 @@ func TestDDB_Enrich_PITREnabled_NoFinding(t *testing.T) {
 			t.Errorf("FieldUpdates[orders-prod][status] = %q, want empty (no finding)", updates["status"])
 		}
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (~ finding does not bump badge)", result.IssueCount)
-	}
 }
 
 // TestDDB_Enrich_PITRDisabled_HealthyRow verifies a Healthy ACTIVE table with
@@ -185,9 +182,6 @@ func TestDDB_Enrich_PITRDisabled_HealthyRow(t *testing.T) {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fixtures.AuditPITROffID, updates)
 	}
 
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (~ severity must not bump S1 badge)", result.IssueCount)
-	}
 }
 
 // TestDDB_Enrich_PITRDisabled_NonHealthyRow verifies that a table already
@@ -231,9 +225,6 @@ func TestDDB_Enrich_PITRDisabled_NonHealthyRow(t *testing.T) {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fixtures.LegacyArchivedID, updates)
 	}
 
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (~ must not bump S1 badge)", result.IssueCount)
-	}
 }
 
 // TestDDB_Enrich_SummaryNotRows_Contract (covers U11): Finding.Summary is
@@ -352,8 +343,8 @@ func TestDDB_Enrich_NilDynamoDBClient(t *testing.T) {
 	if result.Findings == nil {
 		t.Error("Findings must not be nil even when DynamoDB client is nil")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
+	if len(result.Findings) != 0 {
+		t.Errorf("len(Findings) = %d, want 0 (nil DynamoDB client, no resources)", len(result.Findings))
 	}
 }
 

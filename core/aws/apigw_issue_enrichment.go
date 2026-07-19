@@ -157,8 +157,6 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues, strings.Join(uniqueSummaries, "; "), "~", "apigw", rows, "")
 	})
 	// All API Gateway findings are severity "~" (informational).
-	// IssueCount counts only "!" severity findings; "~" do not contribute.
-	result.IssueCount = 0
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false
 	return result, nil

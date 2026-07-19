@@ -130,7 +130,6 @@ func TestStage2Pin_D12_PostSweepListOpen_SeedsTitleRowsAndEnrichedField(t *testi
 
 	_, _ = c.Handle(messages.EnrichmentChecked{
 		ResourceType: stage2PinType,
-		Issues:       1,
 		Gen:          s.EnrichmentGen,
 		TypeGen:      s.EnrichmentTypeGen[stage2PinType],
 		FieldUpdates: map[string]map[string]string{
@@ -225,7 +224,6 @@ func TestStage2Pin_DEF7_SavePayloadFrozenAtDispatch_SurvivesLaterAmend(t *testin
 
 	_, tasks := c.Handle(messages.EnrichmentChecked{
 		ResourceType: stage2PinType,
-		Issues:       1,
 		Gen:          s.EnrichmentGen,
 		TypeGen:      s.EnrichmentTypeGen[stage2PinType],
 		FieldUpdates: map[string]map[string]string{
@@ -384,7 +382,6 @@ func TestStage2Pin_DEF21_D16_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *t
 	}
 	_, _ = c.Handle(messages.EnrichmentChecked{
 		ResourceType: "s3",
-		Issues:       0,
 		Gen:          s.EnrichmentGen,
 		TypeGen:      s.EnrichmentTypeGen["s3"],
 	})
@@ -608,7 +605,6 @@ func TestStage2Pin_IssueCountParity_MenuBadgeMatchesStoreRowAggregation(t *testi
 	}
 	_, _ = c.Handle(messages.EnrichmentChecked{
 		ResourceType: stage2PinType,
-		Issues:       2,
 		Gen:          s.EnrichmentGen,
 		TypeGen:      s.EnrichmentTypeGen[stage2PinType],
 		Findings:     findings,

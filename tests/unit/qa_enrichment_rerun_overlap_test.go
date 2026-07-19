@@ -145,7 +145,6 @@ func rerunEBSResources() []resource.Resource {
 func enrichmentCheckedWithFindings(sessionGen, typeGen domain.Gen) messages.EnrichmentChecked {
 	return messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Issues:       1,
 		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
@@ -403,7 +402,6 @@ func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
 	// enrichmentTypeGen["ebs"]=0 on fresh model; Gen=0 is the fresh session gen.
 	ebsFinding := messages.EnrichmentChecked{
 		ResourceType: "ebs",
-		Issues:       1,
 		Findings: map[string][]domain.Finding{
 			"vol-0abc1111aaa11111a": {{Code: "ebs.volume.degraded", Phrase: "volume degraded", Severity: domain.SevBroken, Source: "wave2:ebs"}},
 		},
@@ -423,7 +421,6 @@ func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
 	// probe or refetch.
 	_, dropCmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ebs",
-		Issues:       1,
 		Findings: map[string][]domain.Finding{
 			"vol-0abc1111aaa11111a": {{Code: "ebs.volume.degraded", Phrase: "volume degraded", Severity: domain.SevBroken, Source: "wave2:ebs"}},
 		},
@@ -446,7 +443,6 @@ func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
 	// Verify: TypeGen=1 EnrichmentCheckedMsg must STILL be accepted (gen not corrupted).
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ebs",
-		Issues:       1,
 		Findings: map[string][]domain.Finding{
 			"vol-0abc1111aaa11111a": {{Code: "ebs.volume.degraded", Phrase: "volume degraded", Severity: domain.SevBroken, Source: "wave2:ebs"}},
 		},
@@ -515,7 +511,6 @@ func TestHandleEnrichmentChecked_DropsStaleTypeGen(t *testing.T) {
 	// Simulate stale startup probe: TypeGen=0 (captured before Ctrl+R).
 	staleProbeMsg := messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Issues:       3,
 		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},

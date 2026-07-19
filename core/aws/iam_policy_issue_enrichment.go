@@ -42,7 +42,6 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
-	issueCount := 0
 	n := min(len(resources), EnrichmentCap)
 	var mu sync.Mutex
 	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
@@ -82,13 +81,11 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 				{Label: "Action", Value: "*", Tier: "!"},
 				{Label: "Resource", Value: "*", Tier: "!"},
 			}, "")
-			issueCount++
 		}
 		result.FieldUpdates[r.ID] = map[string]string{
 			"risk": riskVal,
 		}
 	})
-	result.IssueCount = issueCount
 	result.Truncated = truncated
 	return result, nil
 }

@@ -44,9 +44,6 @@ func TestEnrichCodeBuildStatus_InProgressBuild_NotAnIssue(t *testing.T) {
 	if _, ok := result.Findings["active-project"]; ok {
 		t.Error("IN_PROGRESS build must NOT appear in Findings — was the IN_PROGRESS skip reverted?")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 for IN_PROGRESS build", result.IssueCount)
-	}
 }
 
 // TestEnrichCodeBuildStatus_InProgressAndFailed_OnlyFailedIsIssue verifies that
@@ -86,7 +83,7 @@ func TestEnrichCodeBuildStatus_InProgressAndFailed_OnlyFailedIsIssue(t *testing.
 	if _, ok := result.Findings["failed-project"]; !ok {
 		t.Error("FAILED build must appear in Findings")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1 (only the FAILED build)", result.IssueCount)
+	if len(result.Findings) != 1 {
+		t.Errorf("len(Findings) = %d, want 1 (only the FAILED build)", len(result.Findings))
 	}
 }

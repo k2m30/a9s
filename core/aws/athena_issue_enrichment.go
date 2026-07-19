@@ -92,9 +92,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 			summary = fmt.Sprintf("%s (%d findings)", rows[0].Label, len(rows))
 		}
 		setWave2Finding(&result, key, athenaCodeGovernanceMisconfigured, summary, "~", "athena", rows, "")
-		// "~" severity does not contribute to IssueCount.
 	})
-	result.IssueCount = 0
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false
 	return result, nil

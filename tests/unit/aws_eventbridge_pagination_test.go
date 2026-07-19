@@ -377,9 +377,4 @@ func TestEnrichEventBridgeRule_EnabledWithZeroTargetsAcrossPages(t *testing.T) {
 	if !strings.Contains(f.Phrase, "no targets") {
 		t.Errorf("finding summary %q must contain \"no targets\"", f.Phrase)
 	}
-
-	// IssueCount must be 1
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
-	}
 }

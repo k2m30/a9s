@@ -105,7 +105,6 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		}
 	})
 	sort.Strings(failures)
-	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	return result,
 		AggregateFailures("tg-enrich: DescribeTargetHealth", failures, total)

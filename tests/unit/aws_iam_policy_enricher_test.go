@@ -178,9 +178,6 @@ func TestEnrichIAMPolicy_SafePolicyProducesNoFindings(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichIAMPolicy_AdminStarProducesFindingSevBang verifies that when policy-2
@@ -224,9 +221,6 @@ func TestEnrichIAMPolicy_AdminStarProducesFindingSevBang(t *testing.T) {
 	if _, ok := result.Findings[iamPolicyARN3]; ok {
 		t.Error("policy-3 must NOT appear in Findings — it is a safe policy")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
-	}
 }
 
 // TestEnrichIAMPolicy_AWSManagedSkipped verifies that a policy with an
@@ -268,9 +262,6 @@ func TestEnrichIAMPolicy_AWSManagedSkipped(t *testing.T) {
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings for AWS-managed policy, got %d: %v", len(result.Findings), result.Findings)
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (AWS-managed policy skipped)", result.IssueCount)
 	}
 }
 

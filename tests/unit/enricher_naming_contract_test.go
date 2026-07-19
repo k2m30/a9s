@@ -101,9 +101,6 @@ func TestNamingContract_InFetcherWave2Sentinel_ReturnsEmptyResult(t *testing.T) 
 	if err != nil {
 		t.Fatalf("InFetcherWave2Sentinel must not error, got %v", err)
 	}
-	if res.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", res.IssueCount)
-	}
 	if res.Truncated {
 		t.Error("InFetcherWave2Sentinel must not be truncated")
 	}

@@ -244,7 +244,6 @@ func TestReconcileTypeFile_Wave2SourcedObservation_ClearsCarriedData(t *testing.
 	// enrichment probe re-ran and found nothing.
 	_, tasks := ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "s3",
-		Issues:       0,
 		Findings:     nil,
 	})
 

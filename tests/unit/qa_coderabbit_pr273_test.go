@@ -116,7 +116,6 @@ func TestCR273_Item18_MenuCtrlZ_NoFalsePositives_AllTypes(t *testing.T) {
 	for _, ent := range awsclient.AllWave2() {
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: ent.ShortName,
-			Issues:       0,
 			Truncated:    false,
 			Findings:     map[string][]domain.Finding{},
 			Err:          nil,
@@ -178,7 +177,6 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 	for _, ent := range awsclient.AllWave2() {
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: ent.ShortName,
-			Issues:       0,
 			Truncated:    false,
 			Findings:     map[string][]domain.Finding{},
 			Err:          nil,
@@ -248,7 +246,6 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 	for _, ent := range awsclient.AllWave2() {
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: ent.ShortName,
-			Issues:       0,
 			Truncated:    true,
 			Findings:     map[string][]domain.Finding{},
 			Err:          nil,
@@ -401,7 +398,6 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 	// Step 4: send Gen=0 injection message — must bypass session guard.
 	injected := messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Issues:       1,
 		Truncated:    false,
 		Findings: map[string][]domain.Finding{
 			"i-0abc1111aaa111111": {{Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
@@ -467,9 +463,6 @@ func TestCR273_Item12_CodeBuild_STOPPED_ExcludedFromFindings(t *testing.T) {
 	if _, ok := result.Findings["cancelled-pipeline"]; ok {
 		t.Errorf("STOPPED build must NOT appear in Findings — intentionally cancelled builds are not issues; got finding: %+v", result.Findings["cancelled-pipeline"])
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d for STOPPED build, want 0", result.IssueCount)
-	}
 }
 
 // TestCR273_Item13_CodeBuild_STOPPED_WithFailed_OnlyFailedCounted asserts that
@@ -513,8 +506,8 @@ func TestCR273_Item13_CodeBuild_STOPPED_WithFailed_OnlyFailedCounted(t *testing.
 	if _, ok := result.Findings["broken-job"]; !ok {
 		t.Errorf("FAILED build 'broken-job' must appear in Findings")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1 (only the FAILED build); STOPPED builds inflate the count", result.IssueCount)
+	if len(result.Findings) != 1 {
+		t.Errorf("len(Findings) = %d, want 1 (only the FAILED build); STOPPED builds must not inflate the count", len(result.Findings))
 	}
 }
 

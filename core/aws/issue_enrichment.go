@@ -49,7 +49,6 @@ func InFetcherWave2Sentinel(_ context.Context, _ *ServiceClients, _ []resource.R
 		AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{},
 		TruncatedIDs:     map[string]bool{},
 		FieldUpdates:     map[string]map[string]string{},
-		IssueCount:       0,
 		Truncated:        false,
 	}, nil
 }
@@ -186,15 +185,12 @@ func Finish(result *IssueEnricherResult, failures []string, total int, op string
 
 // IssueEnricherResult is the typed return value of a Wave 2 issue enricher.
 //
-//   - IssueCount: number of resources classified issue-worthy for the menu badge
-//     (severity "!" findings; "~" informational do NOT count).
-//
 //   - Truncated: true when the ISSUE count (severity "!") is a lower bound —
 //     the enricher's walk was cut short (EnrichmentCap/page cap/API errors) AND
 //     this enricher can emit "!" findings. Enrichers that emit only "~"
-//     informational findings (IssueCount stays 0) MUST leave Truncated false:
-//     capping their walk hides no issues, only informational coverage. Use
-//     TruncatedIDs for per-resource "?" coverage gaps regardless of severity.
+//     informational findings MUST leave Truncated false: capping their walk
+//     hides no issues, only informational coverage. Use TruncatedIDs for
+//     per-resource "?" coverage gaps regardless of severity.
 //
 //   - TruncatedIDs: per-resource truncation. Key = Resource.ID that could not be
 //     fully inspected (API error on that resource, page cap hit during a
@@ -223,7 +219,6 @@ func Finish(result *IssueEnricherResult, failures []string, total int, op string
 // MAY have empty maps but MUST NOT be nil for any reference field on
 // success — initialize each with `make(...)` before returning.
 type IssueEnricherResult struct {
-	IssueCount   int
 	Truncated    bool
 	TruncatedIDs map[string]bool
 	Findings     map[string][]domain.Finding

@@ -72,7 +72,6 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_Wave1Wins(t *testing.T) {
 
 	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
-		Issues:       0,
 		Truncated:    false,
 		Findings:     nil,
 	})
@@ -97,7 +96,6 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_NoWave1NoIssues_ClearsToFa
 
 	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
-		Issues:       0,
 		Truncated:    true, // Wave-2 thinks it's truncated, but no issues observed
 		Findings:     nil,
 	})
@@ -122,7 +120,6 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_Wave2WithFindings_StaysTru
 
 	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
-		Issues:       3,
 		Truncated:    true,
 		Findings: map[string][]domain.Finding{
 			"id-1": {{Code: "test.broken", Phrase: "broken", Severity: domain.SevBroken, Source: "wave2:" + rt}},

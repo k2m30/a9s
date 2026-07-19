@@ -112,31 +112,8 @@ func TestEnrichSESAccount_ShutdownFindingPerRow(t *testing.T) {
 	}
 }
 
-// TestEnrichSESAccount_ShutdownIssueCountIsOneNotN verifies that IssueCount is 1
-// regardless of how many identity rows are in the input (counted once per account).
-func TestEnrichSESAccount_ShutdownIssueCountIsOneNotN(t *testing.T) {
-	fake := &sesEnrichmentFake{enforcementStatus: aws.String("SHUTDOWN")}
-	clients := &awsclient.ServiceClients{SESv2: fake}
-	// Five identity rows — IssueCount must still be 1.
-	rows := []resource.Resource{
-		sesResourceRow("id1@acme-corp.com", ""),
-		sesResourceRow("id2@acme-corp.com", ""),
-		sesResourceRow("id3@acme-corp.com", ""),
-		sesResourceRow("id4@acme-corp.com", ""),
-		sesResourceRow("id5@acme-corp.com", ""),
-	}
-
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1 (counted once for account, not per identity)", result.IssueCount)
-	}
-}
-
 // TestEnrichSESAccount_ShutdownNilResources verifies that when resources is nil,
-// no findings are produced (nothing to replicate onto), but IssueCount is still 1.
+// no findings are produced (nothing to replicate onto).
 func TestEnrichSESAccount_ShutdownNilResources(t *testing.T) {
 	fake := &sesEnrichmentFake{enforcementStatus: aws.String("SHUTDOWN")}
 	clients := &awsclient.ServiceClients{SESv2: fake}
@@ -148,9 +125,6 @@ func TestEnrichSESAccount_ShutdownNilResources(t *testing.T) {
 	// Findings are replicated per row; no rows means no findings.
 	if len(result.Findings) != 0 {
 		t.Errorf("Findings count = %d, want 0 (nil resources — nothing to replicate onto)", len(result.Findings))
-	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1 (account-level count independent of row count)", result.IssueCount)
 	}
 }
 
@@ -221,21 +195,6 @@ func TestEnrichSESAccount_ProbationFindingPerRow(t *testing.T) {
 	}
 }
 
-// TestEnrichSESAccount_ProbationIssueCountIsOne verifies IssueCount=1 for PROBATION.
-func TestEnrichSESAccount_ProbationIssueCountIsOne(t *testing.T) {
-	fake := &sesEnrichmentFake{enforcementStatus: aws.String("PROBATION")}
-	clients := &awsclient.ServiceClients{SESv2: fake}
-	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")}
-
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1 (PROBATION is severity !, counted once)", result.IssueCount)
-	}
-}
-
 // TestEnrichSESAccount_ProbationFindingRowActionable verifies the PROBATION
 // finding carries an actionable Row. U11 contract forbids Row.Value duplicating
 // the Summary enum.
@@ -300,27 +259,6 @@ func TestEnrichSESAccount_QuotaOver80PercentProducesTildeFindings(t *testing.T) 
 	}
 	if f.Phrase != "quota 80%+ used" {
 		t.Errorf("Summary = %q, want %q", f.Phrase, "quota 80%+ used")
-	}
-}
-
-// TestEnrichSESAccount_QuotaOver80PercentIssueCountIsZero verifies that quota
-// findings (severity "~") do NOT increment IssueCount.
-func TestEnrichSESAccount_QuotaOver80PercentIssueCountIsZero(t *testing.T) {
-	fake := &sesEnrichmentFake{
-		sendQuota: &sesv2types.SendQuota{
-			Max24HourSend:   10000.0,
-			SentLast24Hours: 8500.0, // 85%
-		},
-	}
-	clients := &awsclient.ServiceClients{SESv2: fake}
-	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")}
-
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (quota severity ~ excluded from badge counter)", result.IssueCount)
 	}
 }
 
@@ -473,9 +411,6 @@ func TestEnrichSESAccount_HealthyNoQuotaProducesNoFindings(t *testing.T) {
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("Findings = %d, want 0 (HEALTHY account below quota threshold)", len(result.Findings))
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
 	}
 }
 
@@ -645,9 +580,6 @@ func TestEnrichSESAccount_FixtureHealthyAccountProducesNoFindings(t *testing.T) 
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings for fixture healthy account, got %d: %+v", len(result.Findings), result.Findings)
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 for fixture healthy account", result.IssueCount)
 	}
 }
 

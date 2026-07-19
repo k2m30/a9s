@@ -45,9 +45,6 @@ const (
 // operator reading either surface sees two distinct problems, not one
 // problem with an appendix.
 //
-// IssueCount counts resources with update_available ("!" severity); "~"-only
-// instances never bump.
-//
 // No FieldUpdates — the fetcher is authoritative for Status on opensearch.
 // clients may be nil; no API calls are made.
 func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
@@ -55,7 +52,6 @@ func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []r
 		Findings:     make(map[string][]domain.Finding),
 		TruncatedIDs: make(map[string]bool),
 	}
-	bangCount := 0
 
 	for _, r := range resources {
 		if r.ID == "" {
@@ -92,19 +88,16 @@ func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []r
 				rows = append(rows, domain.DetailRow{Label: "New Version", Value: nv})
 			}
 			setWave2Finding(&result, r.ID, opensearchCodeUpdateForced, "software update forced soon", "!", "opensearch", rows, opensearchUpdateForcedDetail)
-			bangCount++
 		}
 		if encOff {
 			// "~" condition — encryption at rest off, evaluated independently of
 			// updateAvailable. When updateAvailable also fired above, this
 			// survives as its own Finding alongside it (setWave2Finding's
-			// append-style same-resourceID handling), not folded into it. "~"
-			// never bumps bangCount.
+			// append-style same-resourceID handling), not folded into it.
 			setWave2Finding(&result, r.ID, opensearchCodeEncryptionOff, "encryption at rest off", "~", "opensearch", nil, opensearchEncryptionOffDetail)
 		}
 	}
 
-	result.IssueCount = bangCount
 	// FieldUpdates intentionally nil — fetcher is authoritative for Status.
 	return result, nil
 }

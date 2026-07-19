@@ -138,7 +138,6 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		}, "")
 	})
 	sort.Strings(failures)
-	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	result.FieldUpdates = make(map[string]map[string]string)
 	return result, AggregateFailures("efs-enrich: DescribeMountTargets", failures, total)

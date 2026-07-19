@@ -143,9 +143,6 @@ func TestEnrichCodePipelineStatus_NoFailedStageExcluded(t *testing.T) {
 	if _, ok := result.Findings["ok-pipeline"]; ok {
 		t.Error("pipeline with no failed stages must NOT appear in Findings")
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichCodePipelineStatus_TruncatedWhenResourcesExceedCap verifies Truncated.

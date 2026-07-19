@@ -826,7 +826,6 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	// per-type gen guard only fires when msg.TypeGen != 0.
 	ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "s3",
-		Issues:       1,
 		Findings:     map[string][]domain.Finding{"bucket-def8-1": {finding}},
 	})
 

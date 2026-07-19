@@ -157,7 +157,6 @@ func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 	// must be removed — this is real replacement, not merely "never clear".
 	recovered := messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		Issues:       0,
 		Truncated:    false,
 		Findings:     map[string][]domain.Finding{},
 		Gen:          0,

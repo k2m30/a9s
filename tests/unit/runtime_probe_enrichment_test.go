@@ -55,7 +55,6 @@ func TestCoreProbeEnrichment_DispatchesRegisteredEnricher(t *testing.T) {
 	sentinelTruncatedIDs := map[string]bool{"sentinel-res-1": true}
 
 	sentinelResult := awsclient.IssueEnricherResult{
-		IssueCount:       3,
 		Truncated:        true,
 		TruncatedIDs:     sentinelTruncatedIDs,
 		Findings:         sentinelFindings,
@@ -78,9 +77,6 @@ func TestCoreProbeEnrichment_DispatchesRegisteredEnricher(t *testing.T) {
 	}
 	if result.Err != nil {
 		t.Fatalf("ProbeEnrichment(...).Err = %v; want nil", result.Err)
-	}
-	if result.Issues != sentinelResult.IssueCount {
-		t.Errorf("ProbeEnrichment(...).Issues = %d; want sentinel %d", result.Issues, sentinelResult.IssueCount)
 	}
 	if result.Truncated != sentinelResult.Truncated {
 		t.Errorf("ProbeEnrichment(...).Truncated = %v; want sentinel %v", result.Truncated, sentinelResult.Truncated)
@@ -106,7 +102,14 @@ func TestCoreProbeEnrichment_NilClients_ReturnsErr(t *testing.T) {
 	const sentinelType = "dbi-snap-probe-demo-guard-prod-pin"
 
 	sentinelFn := func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (awsclient.IssueEnricherResult, error) {
-		return awsclient.IssueEnricherResult{IssueCount: 42}, nil
+		return awsclient.IssueEnricherResult{
+			Findings: map[string][]domain.Finding{
+				"sentinel-res": {{
+					Code: "guard-must-not-reach-enricher", Phrase: "sentinel leaked",
+					Severity: domain.SevBroken, Source: "wave2:" + sentinelType,
+				}},
+			},
+		}, nil
 	}
 	awsclient.SetWave2EnricherForTest(t, sentinelType, awsclient.IssueEnricher{Fn: sentinelFn, Priority: 100})
 
@@ -116,8 +119,8 @@ func TestCoreProbeEnrichment_NilClients_ReturnsErr(t *testing.T) {
 	if result.Err == nil {
 		t.Fatalf("ProbeEnrichment(...) with nil clients should set Err, got nil")
 	}
-	if result.Issues != 0 {
-		t.Errorf("ProbeEnrichment(...).Issues with nil clients = %d, want 0 (guard must short-circuit before the sentinel enricher runs)", result.Issues)
+	if len(result.Findings) != 0 {
+		t.Errorf("ProbeEnrichment(...).Findings with nil clients = %#v, want empty (guard must short-circuit before the sentinel enricher runs)", result.Findings)
 	}
 }
 
@@ -126,22 +129,27 @@ func TestCoreProbeEnrichment_NilClients_ReturnsErr(t *testing.T) {
 // sibling rows into the cache the enricher sees, even when no list has been
 // opened yet (Codex P1 regression — see Core.ProbeEnrichment's doc comment).
 //
-// The registered test enricher returns one sentinel IssueCount when
+// The registered test enricher returns one sentinel Finding Code when
 // cache["dbi"] carries exactly the RowStore sibling row, and a different
-// sentinel otherwise — so the assertion below (checking the RETURNED
-// ProbeEnrichmentResult.Issues) can only pass if ProbeEnrichment actually
+// sentinel Code otherwise — so the assertion below (checking the RETURNED
+// ProbeEnrichmentResult.Findings) can only pass if ProbeEnrichment actually
 // built and passed the merged cache snapshot to the enricher.
 func TestCoreProbeEnrichment_CacheSnapshotMergesRowStore(t *testing.T) {
 	const sentinelType = "dbi-snap-probe-cache-pin"
-	const cacheMergedIssues = 7
-	const cacheMissingOrWrongIssues = 999
+	const cacheMergedCode = domain.FindingCode("cache-merged")
+	const cacheMissingOrWrongCode = domain.FindingCode("cache-missing-or-wrong")
 
 	sentinelFn := func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource, cache resource.ResourceCache) (awsclient.IssueEnricherResult, error) {
 		dbiEntry, ok := cache["dbi"]
+		code := cacheMissingOrWrongCode
 		if ok && len(dbiEntry.Resources) == 1 && dbiEntry.Resources[0].ID == "prod-dbi-1" {
-			return awsclient.IssueEnricherResult{IssueCount: cacheMergedIssues}, nil
+			code = cacheMergedCode
 		}
-		return awsclient.IssueEnricherResult{IssueCount: cacheMissingOrWrongIssues}, nil
+		return awsclient.IssueEnricherResult{
+			Findings: map[string][]domain.Finding{
+				"sentinel-res": {{Code: code, Severity: domain.SevBroken, Source: "wave2:" + sentinelType}},
+			},
+		}, nil
 	}
 	awsclient.SetWave2EnricherForTest(t, sentinelType, awsclient.IssueEnricher{Fn: sentinelFn, Priority: 100})
 
@@ -159,9 +167,13 @@ func TestCoreProbeEnrichment_CacheSnapshotMergesRowStore(t *testing.T) {
 	if result.Err != nil {
 		t.Fatalf("ProbeEnrichment(...).Err = %v; want nil", result.Err)
 	}
-	if result.Issues != cacheMergedIssues {
-		t.Errorf("ProbeEnrichment(...).Issues = %d, want %d — the sentinel enricher only returns %d when cache[dbi] carries the RowStore sibling row.\n"+
+	fs, ok := result.Findings["sentinel-res"]
+	if !ok || len(fs) == 0 {
+		t.Fatalf("ProbeEnrichment(...).Findings missing entry for \"sentinel-res\"")
+	}
+	if fs[0].Code != cacheMergedCode {
+		t.Errorf("ProbeEnrichment(...).Findings[sentinel-res][0].Code = %q, want %q — the sentinel enricher only returns %q when cache[dbi] carries the RowStore sibling row.\n"+
 			"This is the Codex P1 regression: ProbeEnrichment must merge RowStore's retained rows into the cache snapshot, "+
-			"not just ResourceCache (which is empty until the user opens a list).", result.Issues, cacheMergedIssues, cacheMergedIssues)
+			"not just ResourceCache (which is empty until the user opens a list).", fs[0].Code, cacheMergedCode, cacheMergedCode)
 	}
 }

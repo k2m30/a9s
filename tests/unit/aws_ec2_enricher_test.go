@@ -87,9 +87,6 @@ func TestEnrichEC2InstanceStatus_InstanceStatusImpairedProducesFindingSevBang(t 
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
-	}
 }
 
 // TestEnrichEC2InstanceStatus_SystemStatusImpairedProducesFindingSevBang verifies
@@ -192,9 +189,6 @@ func TestEnrichEC2InstanceStatus_HealthyInstanceProducesNoFinding(t *testing.T) 
 	}
 	if _, ok := result.Findings["i-0dddd4444eeeee555"]; ok {
 		t.Error("healthy instance must NOT appear in Findings")
-	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
 	}
 }
 

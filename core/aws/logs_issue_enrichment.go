@@ -31,7 +31,6 @@ const (
 //   - CloudTrail log group (prefix "/aws/cloudtrail/") with no metric filters → "~"
 //     finding "audit log group missing metric filters"
 //
-// IssueCount stays 0 (severity "~" only).
 // Skip when clients.CloudWatchLogs == nil or does not implement CWLogsDescribeMetricFiltersAPI.
 func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
@@ -127,8 +126,6 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		}, "")
 	})
 	sort.Strings(failures)
-	// Metric filter findings are severity "~" (informational); IssueCount stays 0.
-	result.IssueCount = 0
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false
 	return result,

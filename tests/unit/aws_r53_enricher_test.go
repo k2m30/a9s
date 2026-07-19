@@ -179,10 +179,6 @@ func TestEnrichRoute53Zone_PrivateOrphanZoneProducesFindingSevTilde(t *testing.T
 	if _, ok := result.Findings[r53ZoneID2]; ok {
 		t.Error("zone-2 (public) must NOT appear in Findings")
 	}
-	// "~" findings do NOT contribute to IssueCount per the EnricherResult contract.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
-	}
 }
 
 // TestEnrichRoute53Zone_NilClientReturnsEmptyFindingsNoError verifies that when

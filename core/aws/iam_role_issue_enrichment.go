@@ -77,8 +77,6 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 			setWave2Finding(&result, r.ID, iamRoleCodeDormant, "dormant role (>90d)", "~", "iam-role", nil, "")
 		}
 	})
-	// Dormant-role findings are severity "~" (informational); IssueCount stays 0.
-	result.IssueCount = 0
 	// "~"-only enrichment: EnrichmentCap bounds informational coverage, never the issue count — so it never lower-bounds the issue badge (cf. EnrichSESAccount).
 	result.Truncated = false
 	return result, nil

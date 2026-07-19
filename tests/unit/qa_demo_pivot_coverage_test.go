@@ -339,7 +339,6 @@ func TestDemoIssueCoverage_EveryIssueCapableTypeHasAFlaggedFixture(t *testing.T)
 				}
 			}
 
-			var issueCount int
 			var findingsLen int
 			if !flagged {
 				enricher, ok := awsclient.Wave2EnricherFor(td.ShortName)
@@ -351,9 +350,8 @@ func TestDemoIssueCoverage_EveryIssueCapableTypeHasAFlaggedFixture(t *testing.T)
 				if err != nil {
 					t.Fatalf("%s: Wave-2 enricher returned error: %v", td.ShortName, err)
 				}
-				issueCount = result.IssueCount
 				findingsLen = len(result.Findings)
-				flagged = result.IssueCount > 0 || len(result.Findings) > 0
+				flagged = findingsLen > 0
 			}
 
 			allowlisted := knownIssueCoverageGaps[td.ShortName]
@@ -372,18 +370,18 @@ func TestDemoIssueCoverage_EveryIssueCapableTypeHasAFlaggedFixture(t *testing.T)
 				stillGapped = append(stillGapped, td.ShortName)
 				t.Skipf(
 					"KNOWN GAP (allowlisted): %s: none of %d demo fixtures carry a Wave-1 Finding, and the Wave-2 "+
-						"enricher flagged zero issues (IssueCount=%d, len(Findings)=%d) — pre-existing debt, see "+
+						"enricher flagged zero issues (len(Findings)=%d) — pre-existing debt, see "+
 						"knownIssueCoverageGaps",
-					td.ShortName, len(fixtures), issueCount, findingsLen,
+					td.ShortName, len(fixtures), findingsLen,
 				)
 			default:
 				newlyRegressed = append(newlyRegressed, td.ShortName)
 				t.Errorf(
 					"NEW REGRESSION (not allowlisted): %s: none of %d demo fixtures carry a Wave-1 Finding, and the "+
-						"Wave-2 enricher flagged zero issues (IssueCount=%d, len(Findings)=%d) — ctrl+z / the issue "+
+						"Wave-2 enricher flagged zero issues (len(Findings)=%d) — ctrl+z / the issue "+
 						"badge has nothing to demonstrate for this type in demo mode. Either fix the fixtures or, if "+
 						"this is pre-existing debt, add %q to knownIssueCoverageGaps",
-					td.ShortName, len(fixtures), issueCount, findingsLen, td.ShortName,
+					td.ShortName, len(fixtures), findingsLen, td.ShortName,
 				)
 			}
 		})

@@ -122,7 +122,7 @@ func TestProbeAvailability_HardFailure_FetcherReturnsNoResources(t *testing.T) {
 // TestProbeEnrichment_PartialSuccess verifies that when the registered enricher
 // returns (IssueEnricherResult{Findings: {...}, ...}, err), probeEnrichment
 // returns EnrichmentCheckedMsg with BOTH Err set AND Findings/FieldUpdates/
-// TruncatedIDs/Issues/Truncated populated from the result.
+// TruncatedIDs/Truncated populated from the result.
 //
 // This test CAN be run without real AWS credentials because it drives the model
 // via AvailabilityCheckedMsg (Gen=0 bypass) which seeds probeResources and
@@ -135,8 +135,7 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 
 	partialErr := errors.New("partial: enrichment call timed out for 1 resource")
 	partialResult := awsclient.IssueEnricherResult{
-		IssueCount: 1,
-		Truncated:  true,
+		Truncated: true,
 		TruncatedIDs: map[string]bool{
 			"res-pe-002": true,
 		},
@@ -217,10 +216,6 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 	}
 	if len(gotMsg.TruncatedIDs) == 0 {
 		t.Errorf("probeEnrichment partial success: TruncatedIDs empty — PARTIAL-SUCCESS BUG: TruncatedIDs dropped on error")
-	}
-	if gotMsg.Issues != partialResult.IssueCount {
-		t.Errorf("probeEnrichment partial success: Issues = %d, want %d — PARTIAL-SUCCESS BUG: Issues dropped on error",
-			gotMsg.Issues, partialResult.IssueCount)
 	}
 	if !gotMsg.Truncated {
 		t.Errorf("probeEnrichment partial success: Truncated = false, want true — PARTIAL-SUCCESS BUG: Truncated dropped on error")

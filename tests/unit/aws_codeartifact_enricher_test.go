@@ -128,9 +128,6 @@ func TestEnrichCodeArtifactRepository_GoodPolicyProducesNoFindings(t *testing.T)
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
-	}
 }
 
 // TestEnrichCodeArtifactRepository_NoPolicyProducesFindingSevTilde verifies that when
@@ -170,10 +167,6 @@ func TestEnrichCodeArtifactRepository_NoPolicyProducesFindingSevTilde(t *testing
 	if _, ok := result.Findings[caRepo2]; ok {
 		t.Error("repo-2 must NOT appear in Findings — it has a valid policy")
 	}
-	// "~" severity does NOT contribute to IssueCount per the EnricherResult contract.
-	if result.IssueCount != 0 {
-		t.Errorf("IssueCount = %d, want 0 (sev ~ does not count)", result.IssueCount)
-	}
 }
 
 // TestEnrichCodeArtifactRepository_PublicPolicyProducesFindingSevBang verifies that when
@@ -206,9 +199,6 @@ func TestEnrichCodeArtifactRepository_PublicPolicyProducesFindingSevBang(t *test
 	}
 	if _, ok := result.Findings[caRepo2]; ok {
 		t.Error("repo-2 must NOT appear in Findings — it has a specific principal")
-	}
-	if result.IssueCount != 1 {
-		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
 	}
 }
 
