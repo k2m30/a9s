@@ -105,6 +105,7 @@ func TestCentralGuard_ZeroGenEnrichmentChecked(t *testing.T) {
 	c := newCore()
 	c.session.EnrichmentGen = domain.Gen(5)
 	c.session.EnrichTotal = 1
+	c.session.EnrichSweepMembers = map[string]bool{"s3": true}
 
 	sentinelEvent := messages.EnrichmentChecked{
 		ResourceType: "s3",

@@ -141,6 +141,16 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 		// caller reaches this method, so no explicit reseed is needed here
 		// (unlike the rerun branch above, which is invoked in a context
 		// where that write-through is not guaranteed to have happened yet).
+		// EnrichListOpenPending marks this dispatch so a concurrently running
+		// sweep's own refill (refillEnrichSweep, handlers_availability.go)
+		// recognizes resType already has an outstanding probe if it later
+		// pops the same type off session.EnrichQueue, and absorbs it into
+		// the sweep instead of dispatching a second, redundant
+		// TaskKindProbeEnrich for it (#462/#463 defect 2b).
+		if c.session.EnrichListOpenPending == nil {
+			c.session.EnrichListOpenPending = make(map[string]bool)
+		}
+		c.session.EnrichListOpenPending[resType] = true
 		tasks = append(tasks, TaskRequest{
 			Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: resType},
 		})

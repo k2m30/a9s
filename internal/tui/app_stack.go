@@ -364,20 +364,41 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 			m.ctrl.Apply(app.Action{Kind: app.ActionToggleFocus})
 			rs.rightCol.SetFocused(false)
 			return m, nil
-		case !rs.rightCol.IsFiltering() && key.Matches(msg, m.keys.Up):
-			// Cursor movement (not typing): route to controller and widget.
+		case key.Matches(msg, m.keys.Up) && (!prevFiltering || msg.Key().Text == ""):
+			// Cursor movement: route to controller and widget. While filtering,
+			// only the bare arrow key counts as navigation — the "k" vim alias
+			// must still fall through to the widget below as literal filter text.
 			m.ctrl.Apply(app.Action{Kind: app.ActionMoveUp})
 			rs.rightCol, _ = rs.rightCol.Update(msg)
 			return m, nil
-		case !rs.rightCol.IsFiltering() && key.Matches(msg, m.keys.Down):
+		case key.Matches(msg, m.keys.Down) && (!prevFiltering || msg.Key().Text == ""):
+			// Same "j" vs down-arrow distinction as Up above.
 			m.ctrl.Apply(app.Action{Kind: app.ActionMoveDown})
 			rs.rightCol, _ = rs.rightCol.Update(msg)
 			return m, nil
-		case !rs.rightCol.IsFiltering() && key.Matches(msg, m.keys.Enter):
+		case key.Matches(msg, m.keys.Enter):
 			// Related-panel Enter: navigate using ResourceIDs from controller
 			// state (the focused ds.RelatedRows row), not the right-column
-			// widget — the renderer holds no duplicate copy of the IDs.
+			// widget — the renderer holds no duplicate copy of the IDs. Read
+			// the row before the filter-exit sync below: re-issuing
+			// ActionSetFilter resets DetailState.RelatedCursor/RelatedScroll
+			// (core/app/detail_cursor.go's ActionSetFilter case), which would
+			// silently swap out the row a prior Down press had already moved to.
 			row, ok := m.ctrl.SelectedRelatedRow()
+
+			// While filtering, Enter also exits the widget's filter-input mode
+			// (mirroring the widget's own filter-mode Enter) and re-syncs the
+			// controller, so a later keypress on this detail screen isn't
+			// trapped by the IsFiltering() routing gates in app_input.go
+			// (L48, L114). The filter TEXT and its effect on the visible row
+			// set are left in place — Enter *confirms* the filter, only Escape
+			// clears it (see the Escape case above and
+			// TestBug_Root_RightColumnFilter_EscClearsConfirmedFilter).
+			if prevFiltering {
+				rs.rightCol, _ = rs.rightCol.Update(msg)
+				m.ctrl.Apply(app.Action{Kind: app.ActionSetFilter, Arg: rs.rightCol.FilterQuery()})
+			}
+
 			if !ok || !resource.IsRelatedActionable(row.State, row.Count, row.Truncated) {
 				return m, nil
 			}
@@ -420,10 +441,12 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 			}
 			return m, func() tea.Msg { return nav }
 		default:
-			// The widget owns only filter interactions: text/Backspace/Enter while
-			// the filter input is active, and '/' to start filtering. Every other
-			// key acts on the detail screen itself (y/J/t/w/g/G...) regardless of
-			// which column holds the cursor.
+			// The widget owns only filter TEXT interactions: character typing
+			// and Backspace while the filter input is active, and '/' to start
+			// filtering. Cursor movement and confirmation always route through
+			// the dedicated Up/Down/Enter cases above, even while filtering.
+			// Every other key acts on the detail screen itself (y/J/t/w/g/G...)
+			// regardless of which column holds the cursor.
 			if !rs.rightCol.IsFiltering() && !key.Matches(msg, m.keys.Search) {
 				break
 			}

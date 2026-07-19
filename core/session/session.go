@@ -250,6 +250,31 @@ type Session struct {
 	EnrichChecked int        // number of enrichment probes completed in current gen
 	EnrichTotal   int        // total enrichment probes to run in current gen
 
+	// EnrichSweepMembers is the set of resource types with a currently
+	// outstanding TaskKindProbeEnrich dispatch created by the sweep itself
+	// (startEnrichment's initial window or handleEnrichmentChecked's queue
+	// refill, core/runtime/handlers_availability.go). A completion for a
+	// member type frees its slot and drives the sweep's refill + EnrichChecked
+	// bookkeeping; a completion for a non-member (e.g. a list-open probe,
+	// core/runtime/handlers_resources.go) applies its payload but never
+	// touches EnrichQueue or this counter (#462/#463 defect 2). Rebuilt
+	// (not appended) every time a fresh sweep starts. Only touched from
+	// Core.HandleEvent's serial dispatch loop — no mutex, same convention
+	// as EnrichQueue.
+	EnrichSweepMembers map[string]bool
+
+	// EnrichListOpenPending marks a resource type with an outstanding
+	// list-open Wave-2 probe (HandleResourcesLoaded) not yet completed. When
+	// the sweep's own refill would otherwise pop the same type off
+	// EnrichQueue, it finds this flag, skips issuing a second physical
+	// dispatch, and folds the type into EnrichSweepMembers instead — so the
+	// list-open probe's own completion later drives the sweep's refill/
+	// counter bookkeeping in its place (#462/#463 defect 2b: a list-open
+	// probe racing a queued sweep entry must not be physically dispatched
+	// twice). Only touched from Core.HandleEvent's serial dispatch loop — no
+	// mutex, same convention as EnrichQueue.
+	EnrichListOpenPending map[string]bool
+
 	// Per-type Wave 2 finding state (feature 018-enrichment-visibility).
 	// NOTE: there is no parallel EnrichmentFindings map;
 	// Wave 2 findings live on each cached resource.Resource.Findings slice
@@ -738,6 +763,12 @@ func (s *Session) Rotate() {
 	s.EnrichmentRan = make(map[string]bool)
 	s.EnrichmentTypeGenReset()
 	s.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
+	// EnrichSweepMembers/EnrichListOpenPending: a prior profile/region's
+	// in-flight sweep-window/list-open bookkeeping must not leak into the
+	// next pair's scan — same rationale as EnrichmentRan/EnrichmentTypeGen
+	// just above.
+	s.EnrichSweepMembers = nil
+	s.EnrichListOpenPending = nil
 
 	// ProbeStatus: a prior profile/region's scan-status records must not
 	// leak into the next pair's scan (#462) — same rationale as the

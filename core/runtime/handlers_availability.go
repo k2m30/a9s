@@ -443,6 +443,14 @@ func (c *Core) startEnrichment() ([]UIIntent, []TaskRequest) {
 	c.session.EnrichmentGen++
 	c.session.EnrichChecked = 0
 	c.session.EnrichTotal = len(c.session.EnrichQueue)
+	// Rebuilt fresh (not appended) every sweep start: a new sweep must not
+	// inherit a prior, still-in-flight sweep's membership/pending state (the
+	// per-type EnrichmentGen bump below already makes an old sweep's own
+	// completions stale via the TypeGen guard in handleEnrichmentChecked, but
+	// this set must independently start clean too — see startEnrichment's
+	// package doc for the dispatch table this participates in).
+	c.session.EnrichSweepMembers = make(map[string]bool, enrichDispatchWindow)
+	c.session.EnrichListOpenPending = make(map[string]bool)
 
 	var intents []UIIntent
 	intents = append(intents, PatchMenuEnrichProgress{Checked: 0, Total: c.session.EnrichTotal})
@@ -467,10 +475,44 @@ func (c *Core) startEnrichment() ([]UIIntent, []TaskRequest) {
 		// one — no separate eager clear is needed to reach that end state.
 		c.session.EnrichmentTypeGenBump(name)
 		delete(c.session.EnrichmentRan, name)
+		c.session.EnrichSweepMembers[name] = true
 
 		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: name}})
 	}
 	return intents, tasks
+}
+
+// refillEnrichSweep dispatches the next queued type to keep the sweep's
+// dispatch window full, returning at most one TaskRequest.
+//
+// A popped queue entry that already has an outstanding list-open probe
+// (session.EnrichListOpenPending, set by HandleResourcesLoaded's list-open
+// branch) is silently absorbed into session.EnrichSweepMembers instead of
+// being redispatched — that list-open probe's own eventual completion will
+// drive this sweep's refill/EnrichChecked bookkeeping in its place, rather
+// than this call physically dispatching the SAME resource type a second
+// time (#462/#463 defect 2b: a list-open probe racing a queued sweep entry
+// must never be dispatched twice). The loop keeps popping past any number
+// of such already-covered entries until it finds one to actually dispatch,
+// or the queue drains empty.
+func (c *Core) refillEnrichSweep() []TaskRequest {
+	for len(c.session.EnrichQueue) > 0 {
+		next := c.session.EnrichQueue[0]
+		c.session.EnrichQueue = c.session.EnrichQueue[1:]
+
+		if c.session.EnrichListOpenPending[next] {
+			delete(c.session.EnrichListOpenPending, next)
+			c.session.EnrichSweepMembers[next] = true
+			continue
+		}
+
+		c.session.EnrichmentTypeGenBump(next)
+		delete(c.session.EnrichmentRan, next)
+		c.session.EnrichSweepMembers[next] = true
+
+		return []TaskRequest{{Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: next}}}
+	}
+	return nil
 }
 
 // handleEnrichmentChecked processes a single Wave-2 enrichment result.
@@ -480,9 +522,30 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		msg.ResourceType = td.ShortName
 	}
 
-	// Per-type generation guard.
+	// Sweep-slot freeing is split from payload staleness (#462/#463 defect
+	// 1): a sweep member's slot frees up — and the queue refills — the
+	// moment ITS completion arrives, even when the TypeGen guard below goes
+	// on to discard the payload itself (a rerun bumped the type's gen while
+	// its sweep probe was still in flight). Skipping this refill on a stale
+	// completion is exactly the bug: every such rerun would strand the rest
+	// of EnrichQueue. A non-member completion (e.g. a list-open probe,
+	// #462/#463 defect 2) never touches the queue — see refillEnrichSweep's
+	// doc comment for how a queued entry racing a list-open probe is
+	// reconciled without a double dispatch.
+	isSweepMember := c.session.EnrichSweepMembers[msg.ResourceType]
+	var refillTasks []TaskRequest
+	if isSweepMember {
+		delete(c.session.EnrichSweepMembers, msg.ResourceType)
+		refillTasks = c.refillEnrichSweep()
+	} else {
+		delete(c.session.EnrichListOpenPending, msg.ResourceType)
+	}
+
+	// Per-type generation guard — discards a stale PAYLOAD only; the sweep
+	// slot above has already been freed (and refilled) regardless of this
+	// check.
 	if msg.TypeGen != 0 && msg.TypeGen != c.session.EnrichmentTypeGenGet(msg.ResourceType) {
-		return nil, nil
+		return nil, refillTasks
 	}
 
 	// #462/#463 defect 1: fold this Wave-2 result onto the type's Wave-1
@@ -510,10 +573,17 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		ProbeOutcome(prevStatus.AvailOutcome), prevStatus.AvailDuration, prevStatus.AvailErr,
 	)
 
-	c.session.EnrichChecked++
+	// EnrichChecked backs the menu's "Enriching X/Y" progress badge against
+	// EnrichTotal (the sweep's queue size at kickoff) — it must advance only
+	// for sweep members, never for a non-member (list-open) completion, or a
+	// racing list-open probe would inflate the count past EnrichTotal
+	// (#462/#463 defect 2b).
+	if isSweepMember {
+		c.session.EnrichChecked++
+	}
 
 	var intents []UIIntent
-	var tasks []TaskRequest
+	tasks := refillTasks
 
 	// Surface enrichment failures as flash.
 	if msg.Err != nil {
@@ -652,26 +722,20 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		})
 	}
 
-	// Fire next from queue. Mirrors startEnrichment's rerun-start bookkeeping
-	// (C1/C6b: stale-until-replaced — no eager clearEnrichmentFor here either,
-	// see startEnrichment's doc comment for why).
-	if len(c.session.EnrichQueue) > 0 {
-		next := c.session.EnrichQueue[0]
-		c.session.EnrichQueue = c.session.EnrichQueue[1:]
-
-		c.session.EnrichmentTypeGenBump(next)
-		delete(c.session.EnrichmentRan, next)
-
-		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: next}})
-		return intents, tasks
-	}
-
 	// All enrichment done — clear progress, save cache. RowStore retains its
 	// rows for the session (task #17 wave 1 stage 2 — no
 	// enrichment-completion free; see RowStore.Amend's doc comment), so
 	// unlike the removed session.ProbeResources/ProbeTruncated free this
 	// branch used to perform, there is nothing to nil out here.
-	if c.session.EnrichChecked >= c.session.EnrichTotal {
+	//
+	// Gated on len(refillTasks)==0 rather than re-reading EnrichQueue: the
+	// slot-freeing step above (refillEnrichSweep) already drained the queue
+	// as far as this completion's refill can take it — mirrors the pre-fix
+	// "if queue still has entries, fire next and return early; else check
+	// all-done" structure, just computed up front so a stale-payload
+	// completion can still return its refill task (see the TypeGen guard
+	// above).
+	if len(refillTasks) == 0 && c.session.EnrichChecked >= c.session.EnrichTotal {
 		intents = append(intents, PatchMenuEnrichProgress{Checked: 0, Total: 0})
 		// Dispatch-time payload freeze (restated on RowStore): SnapshotAll captures a defensive,
 		// by-construction-isolated copy (see RowStore.SnapshotAll's doc

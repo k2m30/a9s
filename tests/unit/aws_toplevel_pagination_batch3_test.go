@@ -1688,6 +1688,211 @@ func TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// 15b. Node Groups — result-cap continuation loss
+// ---------------------------------------------------------------------------
+// fetchNodeGroupsPage (core/aws/catalog_containers.go) caps its per-call
+// result count at resource.DefaultPageSize (hitCap, checked inside the
+// per-cluster ListNodegroups drain loop). When the cap is hit while the
+// current cluster still has more ListNodegroups pages, the function only
+// ever returns the *outer* ListClusters token (clusterOutput.NextToken) as
+// its continuation token — there is no per-cluster resume state. If the
+// ListClusters call itself was not truncated (single outer page), that
+// token is empty, so the fetcher reports IsTruncated=true with NextToken=""
+// and the capped cluster's remaining node groups become unreachable. Worse,
+// the hitCap check at the top of the outer cluster loop treats "cap hit"
+// as "stop touching every remaining cluster", not just "stop draining the
+// current one" — so a capped first cluster silently swallows every cluster
+// after it in the same ListClusters page too.
+
+// assertNGSecondPageServed proves a ListNodegroups fake genuinely serves a
+// cluster's page beyond the first once given that first page's NextToken,
+// using its own throwaway mock instance so the assertion doesn't consume
+// call state the fetcher under test still needs. Without this, a RED result
+// below could be blamed on a broken fixture instead of the fetcher.
+func assertNGSecondPageServed(t *testing.T, outputs map[string][]*eks.ListNodegroupsOutput, cluster string, wantPage2 []string) {
+	t.Helper()
+	check := &mockEKSListNodegroupsPaginatedClient{outputs: outputs}
+	ctx := context.Background()
+	page1, err := check.ListNodegroups(ctx, &eks.ListNodegroupsInput{ClusterName: aws.String(cluster)})
+	if err != nil {
+		t.Fatalf("fixture self-check: %s page 1: unexpected error: %v", cluster, err)
+	}
+	if page1.NextToken == nil {
+		t.Fatalf("fixture self-check: %s page 1 has no NextToken — fixture doesn't model a multi-page cluster", cluster)
+	}
+	page2, err := check.ListNodegroups(ctx, &eks.ListNodegroupsInput{ClusterName: aws.String(cluster), NextToken: page1.NextToken})
+	if err != nil {
+		t.Fatalf("fixture self-check: %s page 2: unexpected error: %v", cluster, err)
+	}
+	if len(page2.Nodegroups) != len(wantPage2) {
+		t.Fatalf("fixture self-check: %s page 2 = %v, want %v — fake does not serve the capped page, fix the fixture before trusting the fetcher result below", cluster, page2.Nodegroups, wantPage2)
+	}
+	for i, name := range wantPage2 {
+		if page2.Nodegroups[i] != name {
+			t.Fatalf("fixture self-check: %s page 2[%d] = %q, want %q", cluster, i, page2.Nodegroups[i], name)
+		}
+	}
+}
+
+// ngNamesFrom builds n sequential node group names starting at offset+1, so
+// fixture sizes stay derived from resource.DefaultPageSize instead of a
+// hardcoded literal.
+func ngNamesFrom(prefix string, offset, n int) []string {
+	names := make([]string, n)
+	for i := 0; i < n; i++ {
+		names[i] = fmt.Sprintf("%s-%03d", prefix, offset+i+1)
+	}
+	return names
+}
+
+// ngDescribeMockFor builds a mockEKSDescribeNodegroupPaginatedClient
+// covering every name in names for one cluster.
+func ngDescribeMockFor(cluster string, names []string) *mockEKSDescribeNodegroupPaginatedClient {
+	nodegroups := make(map[string]*eks.DescribeNodegroupOutput, len(names))
+	for _, name := range names {
+		nodegroups[cluster+"/"+name] = &eks.DescribeNodegroupOutput{
+			Nodegroup: &ekstypes.Nodegroup{
+				NodegroupName: aws.String(name),
+				ClusterName:   aws.String(cluster),
+				Status:        ekstypes.NodegroupStatusActive,
+			},
+		}
+	}
+	return &mockEKSDescribeNodegroupPaginatedClient{nodegroups: nodegroups}
+}
+
+// TestFetchNodeGroups_ResultCapLosesContinuation is the RED counterpart to
+// TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups above: that test
+// deliberately keeps every cluster under resource.DefaultPageSize so it
+// never exercises hitCap. Here the cluster's node groups are sized to
+// exceed the cap across multiple ListNodegroups pages, which is exactly the
+// case the current continuation token can't represent.
+func TestFetchNodeGroups_ResultCapLosesContinuation(t *testing.T) {
+	const overflow = 5 // node groups beyond the cap, served on cluster-mega's 2nd ListNodegroups page
+
+	t.Run("single_cluster_over_cap_two_nodegroup_pages", func(t *testing.T) {
+		page1Names := ngNamesFrom("ng-mega", 0, resource.DefaultPageSize)
+		page2Names := ngNamesFrom("ng-mega", resource.DefaultPageSize, overflow)
+		allNames := append(append([]string{}, page1Names...), page2Names...)
+
+		ngOutputs := map[string][]*eks.ListNodegroupsOutput{
+			"cluster-mega": {
+				{Nodegroups: page1Names, NextToken: aws.String("ng-mega-page2")},
+				{Nodegroups: page2Names},
+			},
+		}
+		assertNGSecondPageServed(t, ngOutputs, "cluster-mega", page2Names)
+
+		// newNGFull builds a fresh set of stateful mocks (callIdx counters
+		// reset) wrapping the same static fixture data, so the diagnostic
+		// direct call below and the bounded multi-call run each start from a
+		// clean call history instead of racing each other's call-index state.
+		newNGFull := func() *ngPaginatedFullFake {
+			listClustersMock := &mockEKSListClustersPaginatedClient{
+				outputs: []*eks.ListClustersOutput{
+					{Clusters: []string{"cluster-mega"}}, // single ListClusters page — no outer NextToken
+				},
+			}
+			listNGMock := &mockEKSListNodegroupsPaginatedClient{outputs: ngOutputs}
+			describeNGMock := ngDescribeMockFor("cluster-mega", allNames)
+			return &ngPaginatedFullFake{listClustersMock, listNGMock, describeNGMock}
+		}
+		pf := resource.GetPaginatedFetcher("ng")
+		ctx := context.Background()
+
+		// Direct single-call check: the capped call must report a non-empty
+		// continuation token whenever it reports IsTruncated, regardless of
+		// whether the outer ListClusters response carried its own token.
+		first, err := pf(ctx, &awsclient.ServiceClients{EKS: newNGFull()}, "")
+		if err != nil {
+			t.Fatalf("first call: unexpected error: %v", err)
+		}
+		if first.Pagination == nil {
+			t.Fatalf("first call: nil Pagination")
+		}
+		if first.Pagination.IsTruncated && first.Pagination.NextToken == "" {
+			t.Errorf("first call reports IsTruncated=true with an empty NextToken — cluster-mega has "+
+				"%d node groups stranded past the result cap (%d) with no way to resume", overflow, resource.DefaultPageSize)
+		}
+
+		ngFull := newNGFull()
+		resources := collectNGPagesBounded(t, func(token string) (resource.FetchResult, error) {
+			return pf(ctx, &awsclient.ServiceClients{EKS: ngFull}, token)
+		})
+
+		seen := make(map[string]bool, len(resources))
+		for _, r := range resources {
+			if seen[r.ID] {
+				t.Errorf("node group %q appeared more than once in the accumulated result", r.ID)
+			}
+			seen[r.ID] = true
+		}
+		for _, wantID := range allNames {
+			if !seen[wantID] {
+				t.Errorf("node group %q missing from accumulated result — capped cluster's remaining node groups must be reachable", wantID)
+			}
+		}
+	})
+
+	t.Run("first_cluster_over_cap_second_cluster_not_skipped", func(t *testing.T) {
+		page1Names := ngNamesFrom("ng-mega", 0, resource.DefaultPageSize)
+		page2Names := ngNamesFrom("ng-mega", resource.DefaultPageSize, overflow)
+		megaNames := append(append([]string{}, page1Names...), page2Names...)
+		const secondClusterNG = "ng-b1"
+
+		ngOutputs := map[string][]*eks.ListNodegroupsOutput{
+			"cluster-mega": {
+				{Nodegroups: page1Names, NextToken: aws.String("ng-mega-page2")},
+				{Nodegroups: page2Names},
+			},
+			"cluster-b": {
+				{Nodegroups: []string{secondClusterNG}},
+			},
+		}
+		assertNGSecondPageServed(t, ngOutputs, "cluster-mega", page2Names)
+
+		listClustersMock := &mockEKSListClustersPaginatedClient{
+			outputs: []*eks.ListClustersOutput{
+				{Clusters: []string{"cluster-mega", "cluster-b"}}, // single ListClusters page, both clusters
+			},
+		}
+		listNGMock := &mockEKSListNodegroupsPaginatedClient{outputs: ngOutputs}
+		describeNGMock := ngDescribeMockFor("cluster-mega", megaNames)
+		describeNGMock.nodegroups["cluster-b/"+secondClusterNG] = &eks.DescribeNodegroupOutput{
+			Nodegroup: &ekstypes.Nodegroup{
+				NodegroupName: aws.String(secondClusterNG),
+				ClusterName:   aws.String("cluster-b"),
+				Status:        ekstypes.NodegroupStatusActive,
+			},
+		}
+		ngFull := &ngPaginatedFullFake{listClustersMock, listNGMock, describeNGMock}
+		pf := resource.GetPaginatedFetcher("ng")
+		ctx := context.Background()
+
+		resources := collectNGPagesBounded(t, func(token string) (resource.FetchResult, error) {
+			return pf(ctx, &awsclient.ServiceClients{EKS: ngFull}, token)
+		})
+
+		seen := make(map[string]bool, len(resources))
+		for _, r := range resources {
+			if seen[r.ID] {
+				t.Errorf("node group %q appeared more than once in the accumulated result", r.ID)
+			}
+			seen[r.ID] = true
+		}
+		if !seen[secondClusterNG] {
+			t.Errorf("cluster-b's node group %q never appears in the accumulated result — "+
+				"resume skipped past the capped cluster instead of returning to it", secondClusterNG)
+		}
+		for _, wantID := range megaNames {
+			if !seen[wantID] {
+				t.Errorf("cluster-mega node group %q missing from accumulated result", wantID)
+			}
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
 // 16. SNS ListSubscriptions — NextToken pagination
 // ---------------------------------------------------------------------------
 // The fake client for this operation now lives in fakes_sns_test.go

@@ -5,7 +5,9 @@ package aws
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
@@ -183,42 +185,206 @@ var containersTypes = []catalog.ResourceTypeDef{
 	},
 }
 
+// ngResumeTokenPrefix marks a fetchNodeGroupsPage continuation token as the
+// versioned composite resume format below, as opposed to a plain EKS
+// ListClusters NextToken — the only format this token held before the
+// result-cap-loses-continuation fix, and still the format returned whenever
+// the cap isn't hit. EKS's own NextToken opaque strings are not documented to
+// ever take this shape, so any token lacking the prefix — old or freshly
+// minted — falls through decodeNGResumeToken's ok=false path and is used
+// exactly as before: a plain ListClusters continuation.
+const ngResumeTokenPrefix = "ng-resume/v1?" //nolint:gosec // not a credential — a fixed marker prefix for the composite pagination resume token format
+
+// ngResumeState is the parsed form of a composite fetchNodeGroupsPage resume
+// token, built only when the DefaultPageSize result cap cuts a cluster's
+// ListNodegroups drain short:
+//   - resumeCluster: the cluster whose drain was interrupted.
+//   - pendingNGNames: node group names already listed but not yet described —
+//     the tail of the ListNodegroups page in flight when the cap hit.
+//   - ngToken: that cluster's own ListNodegroups NextToken for any pages
+//     after pendingNGNames; empty once the cluster has no more pages.
+//   - pendingClusters: clusters from the same ListClusters page not yet
+//     visited, in ListClusters' own order.
+//   - outerToken: the outer ListClusters NextToken, for continuing past this
+//     page once resumeCluster and every pendingClusters entry are drained.
+type ngResumeState struct {
+	resumeCluster   string
+	ngToken         string
+	pendingNGNames  []string
+	pendingClusters []string
+	outerToken      string
+}
+
+// encodeNGResumeToken serializes s as url.Values — a collision-safe,
+// self-describing encoding, so caller-controlled cluster/node-group names
+// (which could otherwise contain "=" or "&") are always percent-encoded
+// rather than risk being misread as token structure.
+func encodeNGResumeToken(s ngResumeState) string {
+	v := url.Values{}
+	v.Set("rc", s.resumeCluster)
+	if s.ngToken != "" {
+		v.Set("ngt", s.ngToken)
+	}
+	for _, name := range s.pendingNGNames {
+		v.Add("pn", name)
+	}
+	for _, cluster := range s.pendingClusters {
+		v.Add("pc", cluster)
+	}
+	if s.outerToken != "" {
+		v.Set("ot", s.outerToken)
+	}
+	return ngResumeTokenPrefix + v.Encode()
+}
+
+// decodeNGResumeToken reports ok=false for any token not carrying
+// ngResumeTokenPrefix (including a malformed query or one missing the
+// required resume-cluster field), which is the compatibility path for a
+// plain ListClusters token minted before this composite format existed.
+func decodeNGResumeToken(token string) (ngResumeState, bool) {
+	if !strings.HasPrefix(token, ngResumeTokenPrefix) {
+		return ngResumeState{}, false
+	}
+	v, err := url.ParseQuery(strings.TrimPrefix(token, ngResumeTokenPrefix))
+	if err != nil || v.Get("rc") == "" {
+		return ngResumeState{}, false
+	}
+	return ngResumeState{
+		resumeCluster:   v.Get("rc"),
+		ngToken:         v.Get("ngt"),
+		pendingNGNames:  v["pn"],
+		pendingClusters: v["pc"],
+		outerToken:      v.Get("ot"),
+	}, true
+}
+
 // fetchNodeGroupsPage is the registered Wave 1 fetcher for the ng resource
 // type. It walks ListClusters → ListNodegroups → DescribeNodegroup with
 // per-call retry-on-throttle, capping the page at DefaultPageSize so the
 // background fetcher pool keeps a bounded blast radius regardless of how many
-// clusters/nodegroups exist in the account.
+// clusters/nodegroups exist in the account. When the cap cuts a cluster's
+// ListNodegroups drain short, the returned continuation token is a composite
+// ngResumeState (encodeNGResumeToken) that resumes exactly where the drain
+// stopped, instead of the outer ListClusters token alone — which cannot
+// represent a paused per-cluster drain and, on a single-page cluster list,
+// would come back empty even though the result is truncated. If the resume
+// cluster no longer exists by the time the token is redeemed, its
+// ListNodegroups/DescribeNodegroup calls fail like any other AWS error:
+// recorded via AggregateFailures, not a hard error, and every other cluster
+// named in the token is still visited.
 func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 	c, err := svcClients(clients)
 	if err != nil {
 		return resource.FetchResult{}, err
 	}
 
-	clusterInput := &eks.ListClustersInput{MaxResults: aws.Int32(DefaultPageSize)}
-	if continuationToken != "" {
-		clusterInput.NextToken = aws.String(continuationToken)
+	var clusters []string
+	var pendingNGNames []string
+	var resumeNGToken string
+	var resuming bool
+	var outerToken string
+
+	if state, ok := decodeNGResumeToken(continuationToken); ok {
+		resuming = true
+		clusters = append([]string{state.resumeCluster}, state.pendingClusters...)
+		pendingNGNames = state.pendingNGNames
+		resumeNGToken = state.ngToken
+		outerToken = state.outerToken
+	} else {
+		clusterInput := &eks.ListClustersInput{MaxResults: aws.Int32(DefaultPageSize)}
+		if continuationToken != "" {
+			clusterInput.NextToken = aws.String(continuationToken)
+		}
+
+		clusterOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListClustersOutput, error) {
+			return c.EKS.ListClusters(ctx, clusterInput)
+		})
+		if err != nil {
+			return resource.FetchResult{}, fmt.Errorf("listing EKS clusters: %w", err)
+		}
+		clusters = clusterOutput.Clusters
+		if clusterOutput.NextToken != nil {
+			outerToken = *clusterOutput.NextToken
+		}
 	}
 
-	clusterOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListClustersOutput, error) {
-		return c.EKS.ListClusters(ctx, clusterInput)
-	})
-	if err != nil {
-		return resource.FetchResult{}, fmt.Errorf("listing EKS clusters: %w", err)
-	}
-
-	moreClusters := clusterOutput.NextToken != nil
-	moreNodegroups := false
-	hitCap := false
 	var resources []resource.Resource
 	var failures []string
 	totalAttempted := 0
 
-	for _, cluster := range clusterOutput.Clusters {
-		if hitCap {
-			moreNodegroups = true
-			break
+	// processNGNames describes and appends resources for names, stopping the
+	// instant the DefaultPageSize result cap is reached and returning the
+	// slice tail that never got a DescribeNodegroup call — the exact set a
+	// resume token must carry forward so no name is skipped or repeated.
+	processNGNames := func(cluster string, names []string) (leftover []string, hitCap bool) {
+		for i, ngName := range names {
+			if len(resources) >= DefaultPageSize {
+				return names[i:], true
+			}
+			totalAttempted++
+			descOutput, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
+				return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
+					ClusterName:   aws.String(cluster),
+					NodegroupName: aws.String(ngName),
+				})
+			})
+			if descErr != nil {
+				failures = append(failures, fmt.Sprintf("%s/%s: %s", cluster, ngName, descErr.Error()))
+				resources = append(resources, DegradedDetails("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}, descErr))
+				continue
+			}
+			if descOutput.Nodegroup == nil {
+				failures = append(failures, fmt.Sprintf("%s/%s: nil nodegroup in response", cluster, ngName))
+				resources = append(resources, DegradedDetails("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}, nil))
+				continue
+			}
+			res := buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup)
+			if lt := descOutput.Nodegroup.LaunchTemplate; lt != nil && lt.Id != nil {
+				res.Fields["image_id"] = resolveNGImageID(ctx, c.EC2, lt)
+			}
+			resources = append(resources, res)
 		}
+		return nil, false
+	}
+
+	capResult := func(cluster string, leftoverNames []string, ngtok string, remainingClusters []string) resource.FetchResult {
+		var pending []string
+		if len(remainingClusters) > 0 {
+			pending = append([]string{}, remainingClusters...)
+		}
+		nextToken := encodeNGResumeToken(ngResumeState{
+			resumeCluster:   cluster,
+			ngToken:         ngtok,
+			pendingNGNames:  leftoverNames,
+			pendingClusters: pending,
+			outerToken:      outerToken,
+		})
+		return resource.FetchResult{
+			Resources: resources,
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: true,
+				NextToken:   nextToken,
+				PageSize:    len(resources),
+				TotalHint:   -1,
+			},
+		}
+	}
+
+	for i, cluster := range clusters {
 		var ngToken *string
+		if i == 0 && resuming {
+			if len(pendingNGNames) > 0 {
+				leftover, hitCap := processNGNames(cluster, pendingNGNames)
+				if hitCap {
+					return capResult(cluster, leftover, resumeNGToken, clusters[i+1:]), AggregateFailures("ng: DescribeNodegroup", failures, totalAttempted)
+				}
+			}
+			if resumeNGToken == "" {
+				continue
+			}
+			ngToken = aws.String(resumeNGToken)
+		}
+
 		for {
 			ngOutput, ngErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListNodegroupsOutput, error) {
 				return c.EKS.ListNodegroups(ctx, &eks.ListNodegroupsInput{
@@ -231,53 +397,26 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 				failures = append(failures, fmt.Sprintf("%s: %s", cluster, ngErr.Error()))
 				break
 			}
-			for _, ngName := range ngOutput.Nodegroups {
-				if len(resources) >= DefaultPageSize {
-					hitCap = true
-					moreNodegroups = true
-					break
+			leftover, hitCap := processNGNames(cluster, ngOutput.Nodegroups)
+			if hitCap {
+				var nextNGToken string
+				if ngOutput.NextToken != nil {
+					nextNGToken = *ngOutput.NextToken
 				}
-				totalAttempted++
-				descOutput, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
-					return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
-						ClusterName:   aws.String(cluster),
-						NodegroupName: aws.String(ngName),
-					})
-				})
-				if descErr != nil {
-					failures = append(failures, fmt.Sprintf("%s/%s: %s", cluster, ngName, descErr.Error()))
-					resources = append(resources, DegradedDetails("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}, descErr))
-					continue
-				}
-				if descOutput.Nodegroup == nil {
-					failures = append(failures, fmt.Sprintf("%s/%s: nil nodegroup in response", cluster, ngName))
-					resources = append(resources, DegradedDetails("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}, nil))
-					continue
-				}
-				res := buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup)
-				if lt := descOutput.Nodegroup.LaunchTemplate; lt != nil && lt.Id != nil {
-					res.Fields["image_id"] = resolveNGImageID(ctx, c.EC2, lt)
-				}
-				resources = append(resources, res)
+				return capResult(cluster, leftover, nextNGToken, clusters[i+1:]), AggregateFailures("ng: DescribeNodegroup", failures, totalAttempted)
 			}
-			if hitCap || ngOutput.NextToken == nil {
+			if ngOutput.NextToken == nil {
 				break
 			}
 			ngToken = ngOutput.NextToken
 		}
 	}
 
-	isTruncated := moreClusters || moreNodegroups
-	var nextToken string
-	if clusterOutput.NextToken != nil {
-		nextToken = *clusterOutput.NextToken
-	}
-
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{
-			IsTruncated: isTruncated,
-			NextToken:   nextToken,
+			IsTruncated: outerToken != "",
+			NextToken:   outerToken,
 			PageSize:    len(resources),
 			TotalHint:   -1,
 		},

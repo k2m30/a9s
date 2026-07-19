@@ -239,6 +239,7 @@ func TestReconcileTypeFile_Wave2SourcedObservation_ClearsCarriedData(t *testing.
 	core.Session().EnrichTotal = 1
 	core.Session().EnrichChecked = 0
 	core.Session().EnrichQueue = nil
+	core.Session().EnrichSweepMembers = map[string]bool{"s3": true}
 
 	// Healed observation: no Findings for s3-bucket-x this time — the
 	// enrichment probe re-ran and found nothing.

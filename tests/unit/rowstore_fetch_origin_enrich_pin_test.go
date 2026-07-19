@@ -194,6 +194,7 @@ func TestEnrichmentChecked_FetchOriginFindings_SurviveToCompletionSavePayload(t 
 		s.EnrichmentTypeGen = map[string]domain.Gen{}
 	}
 	s.EnrichmentTypeGen[sentinelType]++
+	s.EnrichSweepMembers = map[string]bool{sentinelType: true}
 
 	_, tasks := ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType:     sentinelType,
