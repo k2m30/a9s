@@ -3,10 +3,13 @@ package unit
 // qa_unified_issue_count_test.go — Tests for the unified issue count contract:
 //
 //  1. Every enricher returns IssueCount == len(Findings).
-//  2. unifiedIssueCount deduplicates Wave-1 issue resources and Wave-2 findings
-//     so the same instance ID is not double-counted.
-//  3. The menu count for a type after EnrichmentCheckedMsg equals the list's
+//  2. The menu count for a type after EnrichmentCheckedMsg equals the list's
 //     FrameTitle count.
+//  3. Wave-1/Wave-2 dedup and "~"-severity exclusion (unifiedIssueCount /
+//     Controller.GetListIssueCount) are covered by
+//     qa_issue_count_invariant_test.go (direct Controller assertions) and by
+//     TestUnifiedIssueCount_IgnoresTildeSeverityFindings below (live
+//     EnrichmentChecked → menu badge path).
 
 import (
 	"context"
@@ -32,8 +35,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -170,103 +171,6 @@ func TestAllEnrichers_IssueCountMatchesFindings(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 2: unifiedIssueCount deduplication — tested via ResourceListModel
-// ─────────────────────────────────────────────────────────────────────────────
-
-// buildUnifiedModel builds a ResourceListModel loaded with the given resources and
-// enrichment state, returning the FrameTitle for count inspection.
-func buildUnifiedModel(t *testing.T, resources []resource.Resource, enrichIC int, findings map[string][]domain.Finding) string {
-	t.Helper()
-	td := resource.ResourceTypeDef{
-		ShortName: "ec2",
-		Name:      "EC2 Instances",
-		Columns: []resource.Column{
-			{Key: "name", Title: "Name", Width: 28},
-			{Key: "state", Title: "State", Width: 12},
-		},
-	}
-	m := views.NewResourceList(td, nil, keys.Default())
-	m.SetSize(120, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "ec2",
-		Resources:    resources,
-	})
-	m.SetEnrichmentState(enrichIC, false, findings, nil)
-	return m.FrameTitle()
-}
-
-// TestUnifiedIssueCount_DedupesAcrossWaves verifies that the unified count is the
-// distinct union of Wave-1 issue resource IDs and Wave-2 finding IDs.
-// Four sub-cases: disjoint sets, fully overlapping, empty Wave-1, empty findings.
-//
-// The dedup logic lives in the unexported unifiedIssueCount helper; we exercise it
-// indirectly via ResourceListModel.FrameTitle which reflects the unified count when
-// enrichmentIssueCount > 0.
-func TestUnifiedIssueCount_DedupesAcrossWaves(t *testing.T) {
-	t.Run("disjoint: Wave-2 only (enrichIC=1) on running resource → count=1", func(t *testing.T) {
-		resources := []resource.Resource{
-			{ID: "i-bbb", Name: "running-server",
-				Fields: map[string]string{"name": "running-server", "state": "running"}},
-		}
-		findings := map[string][]domain.Finding{
-			"i-bbb": {{Code: "ec2.system.status.impaired", Phrase: "status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
-		}
-		// enrichIC=1 reflects the correct distinct count from unifiedIssueCount on the production side.
-		title := buildUnifiedModel(t, resources, 1, findings)
-		if !strings.Contains(title, "1") {
-			t.Errorf("FrameTitle() = %q, want count 1 (Wave-2 only, no Wave-1 issues)", title)
-		}
-	})
-
-	t.Run("fully overlapping: same resource in Wave-1 and Wave-2 → enrichIC=1 not 2", func(t *testing.T) {
-		resources := []resource.Resource{
-			{ID: "i-aaa", Name: "stopped-server",
-				Fields: map[string]string{"name": "stopped-server", "state": "stopped"}},
-		}
-		findings := map[string][]domain.Finding{
-			"i-aaa": {{Code: "ec2.system.status.impaired", Phrase: "status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
-		}
-		// unifiedIssueCount({i-aaa(stopped)}, findings{i-aaa}) = 1, not 2.
-		title := buildUnifiedModel(t, resources, 1, findings)
-		if !strings.Contains(title, "1") {
-			t.Errorf("FrameTitle() = %q, want deduplicated count 1 (same ID in both waves)", title)
-		}
-		// Must not contain "2" (double-counting would show 2).
-		if strings.Contains(stripANSI(title), "(2)") || strings.Contains(stripANSI(title), "[2]") {
-			t.Errorf("FrameTitle() = %q, must not show count 2 (double-counting guard)", title)
-		}
-	})
-
-	t.Run("multiple disjoint findings → enrichIC=3", func(t *testing.T) {
-		resources := []resource.Resource{
-			{ID: "i-aaa", Name: "s1", Fields: map[string]string{"name": "s1"}},
-			{ID: "i-bbb", Name: "s2", Fields: map[string]string{"name": "s2"}},
-			{ID: "i-ccc", Name: "s3", Fields: map[string]string{"name": "s3"}},
-		}
-		findings := map[string][]domain.Finding{
-			"i-aaa": {{Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
-			"i-bbb": {{Code: "rds.pending-maintenance", Phrase: "maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"}},
-			"i-ccc": {{Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
-		}
-		title := buildUnifiedModel(t, resources, 3, findings)
-		if !strings.Contains(title, "3") {
-			t.Errorf("FrameTitle() = %q, want count 3 (3 distinct findings)", title)
-		}
-	})
-
-	t.Run("empty findings → enrichIC=0 → FrameTitle has no issue badge", func(t *testing.T) {
-		resources := []resource.Resource{
-			{ID: "i-aaa", Name: "server", Fields: map[string]string{"name": "server"}},
-		}
-		title := buildUnifiedModel(t, resources, 0, map[string][]domain.Finding{})
-		if strings.Contains(title, "[!]") {
-			t.Errorf("FrameTitle() = %q; no issue badge expected when enrichIC=0 and no findings", title)
-		}
-	})
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Test 3: Menu count == list count after Wave 2 (EnrichmentCheckedMsg)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -306,20 +210,37 @@ func TestMenuCount_MatchesListCount_AfterWave2(t *testing.T) {
 	})
 
 	// The list FrameTitle should reflect enrichmentIssueCount=1 (Wave-2 count).
-	listContent := m.View().Content
-	if !strings.Contains(listContent, "1") {
-		t.Errorf("list view does not contain issue count 1 after EnrichmentCheckedMsg; output:\n%s", listContent)
+	// A bare Contains(listContent, "1") would pass even with the count
+	// missing entirely — both loaded resource IDs already contain "1"
+	// ("i-0abc1111aaa111111", "i-0abc2222bbb222222"). Assert the exact
+	// frame-title token buildListFrameTitle produces for this input
+	// (total=2, issueCount=1, no filter/attention/truncation): "ec2(2) !1".
+	listContent := stripANSI(m.View().Content)
+	if !strings.Contains(listContent, "ec2(2) !1") {
+		t.Errorf("list view does not contain the exact frame title token \"ec2(2) !1\" after EnrichmentCheckedMsg; output:\n%s", listContent)
 	}
 
-	// Navigate back to the main menu by pressing the back key ("q").
-	backKey := tea.KeyPressMsg{Code: -1, Text: "q"}
-	m, _ = rootApplyMsg(m, backKey)
-	menuContent := m.View().Content
+	// Navigate back to the main menu via the actual back key (esc, not "q" —
+	// "q" is bound to Quit in keys.Default(), so the previous "q" press left
+	// the model on the SAME list screen; menuContent was byte-identical to
+	// listContent, and the old Contains(menuContent, "1") check passed
+	// vacuously against the still-visible list, never exercising the menu at
+	// all).
+	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	menuContent := stripANSI(m.View().Content)
+	if strings.Contains(menuContent, "ec2(2) !1") {
+		t.Fatalf("precondition: still on the list screen after esc; menu content unexpectedly matches the list frame title:\n%s", menuContent)
+	}
 
-	// The main menu must also show 1 for ec2.
-	// The menu renders issue counts as part of each row; "1" must appear somewhere.
-	if !strings.Contains(menuContent, "1") {
-		t.Errorf("main menu does not show issue count 1 for ec2 after Wave-2 enrichment; output:\n%s", menuContent)
+	// The menu badge for ec2 must show exactly "issues:1" on the EC2
+	// Instances row, not just a bare "1" (which the row's alias/availability
+	// digits could satisfy even with a wrong or missing count).
+	ec2Line := findLineContaining(menuContent, "EC2 Instances")
+	if !strings.Contains(ec2Line, "issues:1") {
+		t.Errorf("EC2 Instances menu row does not show \"issues:1\"; got line:\n%s\nfull menu:\n%s", ec2Line, menuContent)
+	}
+	if strings.Contains(ec2Line, "issues:2") || strings.Contains(ec2Line, "issues:0") {
+		t.Errorf("EC2 Instances menu row shows a wrong issue count, want exactly 1; got line:\n%s", ec2Line)
 	}
 }
 
@@ -403,6 +324,12 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 
 		// The menu badge format is " issues:N". Bug produces " issues:3".
 		// After fix: " issues:1" (only the "!" finding counts).
+		// A missing badge entirely (e.g. a regression that drops the "!"
+		// finding too) must also fail — checking only the wrong-count
+		// negatives would let that pass silently.
+		if !strings.Contains(menuContent, " issues:1") {
+			t.Errorf("menu does not show issues:1 — the single SevBroken finding must still count; output:\n%s", menuContent)
+		}
 		if strings.Contains(menuContent, " issues:3") {
 			t.Errorf("menu shows issues:3, want issues:1 — ~ severity must not count; output:\n%s", menuContent)
 		}
@@ -454,12 +381,18 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 	t.Run("one Wave-1 broken + ~ finding on same ID → count=1 (no double-count)", func(t *testing.T) {
 		m := newRootSizedModel()
 
-		// EC2 resource with Status=stopped → Color func returns ColorBroken (IsIssue=true).
-		// Wave-1 contributes 1 to the issue count.
+		// colorEC2 is colorFromAnyFinding-only (core/aws/catalog_compute.go,
+		// since the color-findings-conformance wave) — a raw "state":"stopped"
+		// field alone no longer makes ResolveColor return ColorBroken; the
+		// resource needs its own attached Wave-1 Finding (Source: "wave1") to
+		// be genuinely issue-colored. Wave-1 contributes 1 to the issue count.
 		brokenResource := resource.Resource{
 			ID:     "i-stopped",
 			Name:   "stopped-server",
 			Fields: map[string]string{"name": "stopped-server", "state": "stopped"},
+			Findings: []domain.Finding{
+				{Code: "ec2.state.stopped", Phrase: "stopped", Severity: domain.SevBroken, Source: "wave1"},
+			},
 		}
 		m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
 			ResourceType: "ec2",
@@ -490,6 +423,9 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 		menuContent := stripANSI(m.View().Content)
 
 		// Wave-1 broken resource contributes issues:1. ~ on same ID must not bump to 2.
+		if !strings.Contains(menuContent, " issues:1") {
+			t.Errorf("menu does not show issues:1 — the Wave-1 broken resource must still count; output:\n%s", menuContent)
+		}
 		if strings.Contains(menuContent, " issues:2") {
 			t.Errorf("menu shows issues:2, want issues:1 — ~ on broken resource must not double-count; output:\n%s", menuContent)
 		}

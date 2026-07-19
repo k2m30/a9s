@@ -41,9 +41,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
-	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -477,76 +474,13 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Tests 6–7: MainMenuModel view-level wiring for probe truncation (Bug 3)
 // ---------------------------------------------------------------------------
-
-// TestQA_MainMenu_TruncatedAvailabilityShowsPlus verifies that when the main
-// menu receives a truncated availability result for ct-events (the resource type
-// affected by the probe bug), it renders "(50+)" — not "(50)".
 //
-// This test exercises the downstream half of Bug 3: the wiring from
-// SetAvailability+SetTruncated through View() already works. The broken link
-// is in probeResourceAvailability, which never sets Truncated=true even for
-// paginated fetchers. Once that probe fix lands, the menu will automatically
-// show "(50+)" via this path.
-//
-// This test should PASS immediately (the view wiring is correct).
-func TestQA_MainMenu_TruncatedAvailabilityShowsPlus(t *testing.T) {
-	tuitest.NoColor(t)
-
-	m := views.NewMainMenu(keys.Default())
-	m.SetSize(80, 200)
-
-	// Simulate what handleAvailabilityChecked does when Truncated=true arrives.
-	m.SetAvailability("ct-events", 50)
-	m.SetTruncated("ct-events", true)
-
-	plain := stripANSI(m.View())
-
-	// The rendered line for ct-events must show "(50+)".
-	if !strings.Contains(plain, "(50+)") {
-		t.Errorf("expected main menu to contain '(50+)' for ct-events with Truncated=true and Count=50, got:\n%s", plain)
-	}
-
-	// Must NOT show a bare "(50)" — after removing "(50+)" occurrences, "(50)" must be absent.
-	withoutPlus := strings.ReplaceAll(plain, "(50+)", "")
-	if strings.Contains(withoutPlus, "(50)") {
-		t.Errorf("expected no bare '(50)' when truncated, only '(50+)', got:\n%s", plain)
-	}
-}
-
-// TestQA_MainMenu_NonTruncatedAvailabilityNoPlus verifies that when the main
-// menu receives a non-truncated availability result for ct-events, it renders
-// "(50)" — not "(50+)".
-//
-// This is the negative case for TestQA_MainMenu_TruncatedAvailabilityShowsPlus:
-// it confirms the "+" is only added when Truncated=true, preventing false positives
-// in the current probe output (which correctly returns Truncated=false for most
-// resource types that use the non-paginated GetFetcher path).
-//
-// This test should PASS immediately.
-func TestQA_MainMenu_NonTruncatedAvailabilityNoPlus(t *testing.T) {
-	tuitest.NoColor(t)
-
-	m := views.NewMainMenu(keys.Default())
-	m.SetSize(80, 200)
-
-	// Simulate what handleAvailabilityChecked does when Truncated=false arrives
-	// (the current probe behavior for ct-events — this is the bug: Truncated is
-	// always false because probeResourceAvailability never calls GetPaginatedFetcher).
-	m.SetAvailability("ct-events", 50)
-	m.SetTruncated("ct-events", false)
-
-	plain := stripANSI(m.View())
-
-	// Must show "(50)" without "+".
-	if !strings.Contains(plain, "(50)") {
-		t.Errorf("expected main menu to contain '(50)' for ct-events with Truncated=false and Count=50, got:\n%s", plain)
-	}
-
-	// Must NOT show "(50+)" — truncation is false.
-	if strings.Contains(plain, "(50+)") {
-		t.Errorf("expected no '(50+)' when Truncated=false for ct-events, got:\n%s", plain)
-	}
-}
+// TestQA_MainMenu_TruncatedAvailabilityShowsPlus / NonTruncatedAvailabilityNoPlus
+// (dead views.MainMenuModel SetAvailability/SetTruncated/View) removed —
+// live-seam replacement: TestMainMenuRenderBody_TruncatedZero_ShowsPlusSuffix /
+// TestMainMenuRenderBody_ConfirmedZero_ShowsBareZero in
+// mainmenu_renderbody_truncated_test.go, driven through
+// MainMenuModel.RenderBody(app.MenuBody{...}) — the live render entry point.
 
 // ---------------------------------------------------------------------------
 // Tests 8–10: loadingMore error transitions (CONCERNS.md #16)

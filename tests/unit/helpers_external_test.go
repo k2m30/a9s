@@ -14,8 +14,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
@@ -44,19 +42,6 @@ func ensureNoColor(t *testing.T) {
 
 func detailKeyPress(char string) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: -1, Text: char}
-}
-
-// ---------------------------------------------------------------------------
-// Detail model builders
-// ---------------------------------------------------------------------------
-
-// newDetailModel creates a DetailModel with config-driven rendering via RawStruct,
-// calls SetSize, and returns the model ready for View().
-func newDetailModel(res resource.Resource, resourceType string, cfg *config.ViewsConfig) views.DetailModel {
-	k := keys.Default()
-	m := views.NewDetail(res, resourceType, cfg, k)
-	m.SetSize(200, 100)
-	return m
 }
 
 // ---------------------------------------------------------------------------

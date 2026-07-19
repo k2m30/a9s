@@ -1155,3 +1155,99 @@ func TestCTDetailBuildSections_EventRowValue_ServiceColonEventName(t *testing.T)
 		t.Errorf("Event row value %q must contain service prefix 'ec2'", eventRow.Value)
 	}
 }
+
+// ---------- Principal row: value + navigability by ARN type ----------
+
+// TestCTDetailBuildSections_PrincipalRow_NavigabilityByARNType is the live-seam
+// replacement for views_detail_ct_events_test.go's TestDetailViewCTEvents_
+// ActorPrincipalRow and TestDetailViewCTEvents_NavigatePrincipalRow
+// (022-codebase-cleanup wave 3, DetailModel cluster): both drove the dead
+// DetailModel.View()/Update() to indirectly probe buildActorRows' Principal
+// row. This asserts the same contract directly against BuildSections'
+// output — the Principal row's Value (full ARN), IsNavigable, TargetType,
+// and NavID (bare navigable name) per ARN shape.
+func TestCTDetailBuildSections_PrincipalRow_NavigabilityByARNType(t *testing.T) {
+	cases := []struct {
+		name          string
+		arn           string
+		wantNavigable bool
+		wantTarget    string
+		wantNavID     string
+	}{
+		{
+			name:          "AssumedRole_NavigatesToRole",
+			arn:           "arn:aws:sts::111111111111:assumed-role/KarpenterRole/session",
+			wantNavigable: true,
+			wantTarget:    "role",
+			wantNavID:     "KarpenterRole",
+		},
+		{
+			name:          "IAMUser_NavigatesToIAMUser",
+			arn:           "arn:aws:iam::111111111111:user/test",
+			wantNavigable: true,
+			wantTarget:    "iam-user",
+			wantNavID:     "test",
+		},
+		{
+			name:          "Root_NotNavigable",
+			arn:           "arn:aws:iam::111111111111:root",
+			wantNavigable: false,
+			wantTarget:    "",
+			wantNavID:     "",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			event := minimalEvent()
+			event.UserIdentity = ctevent.UserIdentity{Type: "IAMUser", ARN: tc.arn}
+
+			sections := ctevent.BuildSections(event)
+			actorSec, ok := findSection(sections, ctevent.SectionActor)
+			if !ok {
+				t.Fatal("ACTOR section missing")
+			}
+			principalRow, rowOK := findRow(actorSec.Rows, "Principal")
+			if !rowOK {
+				t.Fatal("ACTOR section missing Principal row")
+			}
+
+			if principalRow.Value != tc.arn {
+				t.Errorf("Principal row Value = %q, want %q", principalRow.Value, tc.arn)
+			}
+			if principalRow.IsNavigable != tc.wantNavigable {
+				t.Errorf("Principal row IsNavigable = %v, want %v", principalRow.IsNavigable, tc.wantNavigable)
+			}
+			if principalRow.TargetType != tc.wantTarget {
+				t.Errorf("Principal row TargetType = %q, want %q", principalRow.TargetType, tc.wantTarget)
+			}
+			if principalRow.NavID != tc.wantNavID {
+				t.Errorf("Principal row NavID = %q, want %q", principalRow.NavID, tc.wantNavID)
+			}
+		})
+	}
+}
+
+// ---------- Context rows: Region + Source IP values ----------
+
+// TestCTDetailBuildSections_ContextRows_RegionAndSourceIP is the live-seam
+// replacement for views_detail_ct_events_test.go's
+// TestDetailViewCTEvents_ContextRows.
+func TestCTDetailBuildSections_ContextRows_RegionAndSourceIP(t *testing.T) {
+	event := minimalEvent()
+	event.AWSRegion = "ap-southeast-2"
+	event.SourceIPAddress = "10.0.14.221"
+
+	sections := ctevent.BuildSections(event)
+	ctxSec, ok := findSection(sections, ctevent.SectionContext)
+	if !ok {
+		t.Fatal("CONTEXT section missing")
+	}
+
+	if v := findRowValue(ctxSec.Rows, "Region"); v != "ap-southeast-2" {
+		t.Errorf("CONTEXT Region row = %q, want %q", v, "ap-southeast-2")
+	}
+	if v := findRowValue(ctxSec.Rows, "Source IP"); v != "10.0.14.221" {
+		t.Errorf("CONTEXT Source IP row = %q, want %q", v, "10.0.14.221")
+	}
+}

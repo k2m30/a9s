@@ -244,3 +244,21 @@ func TestRenderCosts_TerminalSizeEdgeCases_DoNotPanic(t *testing.T) {
 		}()
 	}
 }
+
+// TestRenderCosts_NeverExceedsHeight pins that RenderCosts output line count
+// never exceeds the requested height — the footer+blank are always appended,
+// so small heights (esp. 1) must not overflow the viewport.
+func TestRenderCosts_NeverExceedsHeight(t *testing.T) {
+	body := baseCostsBody()
+	for _, h := range []int{0, 1, 2, 3, 5, 8} {
+		out := views.RenderCosts(body, 120, h)
+		got := len(strings.Split(out, "\n"))
+		want := h
+		if want < 1 {
+			want = 1 // RenderCosts normalizes height<=0 to 1
+		}
+		if got > want {
+			t.Errorf("RenderCosts(height=%d) rendered %d lines, must not exceed %d:\n%s", h, got, want, tuitest.StripANSI(out))
+		}
+	}
+}

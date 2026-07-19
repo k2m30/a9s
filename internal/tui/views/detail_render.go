@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// detail_render.go contains YAML/plain content generation and config-driven rendering for DetailModel.
-// Specifically: RawYAML, PlainContent, renderContent, computeKeyWidth, renderFromConfig.
+// detail_render.go contains YAML generation and config-driven rendering for DetailModel.
+// Specifically: RawYAML, renderContent, computeKeyWidth, renderFromConfig.
 package views
 
 import (
 	"reflect"
 	"sort"
 	"strings"
-
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
@@ -35,14 +33,6 @@ func (m DetailModel) RawYAML() string {
 		return ""
 	}
 	return string(data)
-}
-
-// PlainContent returns the detail content as plain text (no ANSI) for clipboard copy.
-// Sets plainMode=true on a local copy so renderFromFieldList emits Attention entries
-// as "Key: Value" (raw phrase + capitalized display) rather than the shortened TUI form.
-func (m DetailModel) PlainContent() string {
-	m.plainMode = true
-	return ansi.Strip(m.renderContent())
 }
 
 // renderContent builds the styled key-value lines from the resource.
