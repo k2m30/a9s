@@ -1408,17 +1408,13 @@ func TestFetchNodeGroups_Pagination(t *testing.T) {
 		},
 	}
 
-	// ListNodegroups returns one page per cluster (the registered "ng"
-	// fetcher calls ListNodegroups exactly once per cluster within a single
-	// ListClusters page — a cluster's OWN nodegroup list is not internally
-	// re-paginated within one fetch call, so this fixture exercises the
-	// cluster-level (ListClusters) pagination this test targets without
-	// tripping the separate, real within-cluster-nodegroup-page-2
-	// truncation gap: a cluster whose nodegroups span 2+ ListNodegroups
-	// pages will only ever surface page 1 within the ListClusters page it
-	// was returned on (Pagination.IsTruncated reports it, but a caller
-	// re-driving purely off the ListClusters continuation token moves on to
-	// the next cluster rather than revisiting this one's remaining page).
+	// ListNodegroups returns one page per cluster. The registered "ng"
+	// fetcher drains each cluster's own ListNodegroups pages before moving
+	// to the next cluster; this fixture keeps every cluster to a single
+	// page so it stays focused on the cluster-level (ListClusters)
+	// pagination this test targets. Multi-page-per-cluster draining is
+	// covered separately by TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups
+	// below.
 	listNGMock := &mockEKSListNodegroupsPaginatedClient{
 		outputs: map[string][]*eks.ListNodegroupsOutput{
 			"cluster-A": {
@@ -1475,6 +1471,218 @@ func TestFetchNodeGroups_Pagination(t *testing.T) {
 	t.Run("list_clusters_called_twice", func(t *testing.T) {
 		if listClustersMock.callIdx != 2 {
 			t.Errorf("expected 2 ListClusters API calls, got %d", listClustersMock.callIdx)
+		}
+	})
+}
+
+// collectNGPagesBounded drives the paginated "ng" fetcher by following its
+// returned continuation token, same as collectAllPages, but caps the number
+// of fetch calls instead of looping until IsTruncated goes false. A fetcher
+// that reports IsTruncated forever without making forward progress fails the
+// test with a clear message instead of hanging the suite.
+func collectNGPagesBounded(t *testing.T, fetch func(token string) (resource.FetchResult, error)) []resource.Resource {
+	t.Helper()
+	const maxCalls = 10
+	var all []resource.Resource
+	token := ""
+	for i := 0; i < maxCalls; i++ {
+		result, err := fetch(token)
+		if err != nil {
+			t.Fatalf("fetch call %d: unexpected error: %v", i+1, err)
+		}
+		all = append(all, result.Resources...)
+		if result.Pagination == nil || !result.Pagination.IsTruncated {
+			return all
+		}
+		token = result.Pagination.NextToken
+	}
+	t.Fatalf("paginated ng fetch did not converge within %d calls — possible non-terminating pagination", maxCalls)
+	return nil
+}
+
+// TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups guards against a
+// cluster whose node groups span more than one ListNodegroups page losing
+// any of them: fetchNodeGroupsPage (core/aws/catalog_containers.go) fully
+// drains each cluster's own ListNodegroups pages before moving on to the
+// next cluster, so nothing goes missing even when the outer ListClusters
+// pagination also advances. It checks the observable contract only — every
+// node group of a multi-page cluster appears exactly once across bounded
+// successive fetch calls, fully enriched via DescribeNodegroup — not how the
+// draining happens, so either draining within one fetch call or across
+// calls via a per-cluster resume token in the returned continuation token
+// stays valid.
+func TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups(t *testing.T) {
+	t.Run("single_cluster_two_nodegroup_pages", func(t *testing.T) {
+		listClustersMock := &mockEKSListClustersPaginatedClient{
+			outputs: []*eks.ListClustersOutput{
+				{Clusters: []string{"cluster-solo"}},
+			},
+		}
+
+		ngSoloOutputs := map[string][]*eks.ListNodegroupsOutput{
+			"cluster-solo": {
+				{
+					Nodegroups: []string{"ng-s1", "ng-s2", "ng-s3"},
+					NextToken:  aws.String("ng-solo-page2"),
+				},
+				{
+					Nodegroups: []string{"ng-s4", "ng-s5"},
+				},
+			},
+		}
+
+		// Fixture self-check, using its own mock instance (a separate
+		// callIdx counter from the one the fetcher under test will drive)
+		// so this doesn't consume state the real call below needs: proves
+		// the fake itself correctly serves cluster-solo's second
+		// ListNodegroups page, so a RED result below can't be blamed on a
+		// fake defect.
+		selfCheckMock := &mockEKSListNodegroupsPaginatedClient{outputs: ngSoloOutputs}
+		ctx := context.Background()
+		page1, err := selfCheckMock.ListNodegroups(ctx, &eks.ListNodegroupsInput{ClusterName: aws.String("cluster-solo")})
+		if err != nil {
+			t.Fatalf("fixture self-check: page 1 call: unexpected error: %v", err)
+		}
+		if got := page1.Nodegroups; len(got) != 3 || page1.NextToken == nil {
+			t.Fatalf("fixture self-check: page 1 = %v (NextToken set: %v), want 3 names with a NextToken", got, page1.NextToken != nil)
+		}
+		page2, err := selfCheckMock.ListNodegroups(ctx, &eks.ListNodegroupsInput{ClusterName: aws.String("cluster-solo"), NextToken: page1.NextToken})
+		if err != nil {
+			t.Fatalf("fixture self-check: page 2 call: unexpected error: %v", err)
+		}
+		if got := page2.Nodegroups; len(got) != 2 || got[0] != "ng-s4" || got[1] != "ng-s5" {
+			t.Fatalf("fixture self-check: page 2 = %v, want [ng-s4 ng-s5] — fake does not serve the second page, fix the fixture before trusting the fetcher result below", got)
+		}
+
+		listNGMock := &mockEKSListNodegroupsPaginatedClient{outputs: ngSoloOutputs}
+
+		describeNGMock := &mockEKSDescribeNodegroupPaginatedClient{
+			nodegroups: map[string]*eks.DescribeNodegroupOutput{
+				"cluster-solo/ng-s1": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-s1"), ClusterName: aws.String("cluster-solo"), Status: ekstypes.NodegroupStatusActive}},
+				"cluster-solo/ng-s2": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-s2"), ClusterName: aws.String("cluster-solo"), Status: ekstypes.NodegroupStatusActive}},
+				"cluster-solo/ng-s3": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-s3"), ClusterName: aws.String("cluster-solo"), Status: ekstypes.NodegroupStatusActive}},
+				// ng-s4 and ng-s5 live on the cluster's second ListNodegroups page —
+				// the page the current fetcher never requests.
+				"cluster-solo/ng-s4": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-s4"), ClusterName: aws.String("cluster-solo"), Status: ekstypes.NodegroupStatusUpdating}},
+				"cluster-solo/ng-s5": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-s5"), ClusterName: aws.String("cluster-solo"), Status: ekstypes.NodegroupStatusActive}},
+			},
+		}
+
+		ngFull := &ngPaginatedFullFake{listClustersMock, listNGMock, describeNGMock}
+		pf := resource.GetPaginatedFetcher("ng")
+		resources := collectNGPagesBounded(t, func(token string) (resource.FetchResult, error) {
+			return pf(ctx, &awsclient.ServiceClients{EKS: ngFull}, token)
+		})
+
+		if len(resources) != 5 {
+			ids := make([]string, len(resources))
+			for i, r := range resources {
+				ids[i] = r.ID
+			}
+			t.Fatalf("expected all 5 node groups from both ListNodegroups pages, got %d: %v", len(resources), ids)
+		}
+
+		seen := make(map[string]resource.Resource, len(resources))
+		for _, r := range resources {
+			if _, dup := seen[r.ID]; dup {
+				t.Errorf("node group %q appeared more than once in the accumulated result", r.ID)
+			}
+			seen[r.ID] = r
+		}
+		for _, wantID := range []string{"ng-s1", "ng-s2", "ng-s3", "ng-s4", "ng-s5"} {
+			if _, ok := seen[wantID]; !ok {
+				t.Errorf("node group %q missing from accumulated result — page-2 node groups must not be lost", wantID)
+			}
+		}
+
+		// c) DescribeNodegroup enrichment must reach the late-page node
+		// groups too — they must not come back as bare/degraded rows.
+		if late, ok := seen["ng-s4"]; ok {
+			if got := late.Fields["status"]; got != "UPDATING" {
+				t.Errorf("ng-s4 (page-2 node group) status = %q, want %q — DescribeNodegroup enrichment not applied", got, "UPDATING")
+			}
+			foundUpdating := false
+			for _, f := range late.Findings {
+				if f.Code == awsclient.CodeNGStateUpdating {
+					foundUpdating = true
+					if f.Phrase != "updating" {
+						t.Errorf("ng-s4 CodeNGStateUpdating finding phrase = %q, want %q", f.Phrase, "updating")
+					}
+				}
+			}
+			if !foundUpdating {
+				t.Errorf("ng-s4 (page-2 node group) missing the CodeNGStateUpdating finding — buildNodeGroupResource enrichment not applied to late pages")
+			}
+		}
+	})
+
+	t.Run("first_cluster_two_nodegroup_pages_while_cluster_list_also_paginates", func(t *testing.T) {
+		listClustersMock := &mockEKSListClustersPaginatedClient{
+			outputs: []*eks.ListClustersOutput{
+				{
+					NextToken: aws.String("clusters-page2"),
+					Clusters:  []string{"cluster-A"},
+				},
+				{
+					Clusters: []string{"cluster-B"},
+				},
+			},
+		}
+
+		listNGMock := &mockEKSListNodegroupsPaginatedClient{
+			outputs: map[string][]*eks.ListNodegroupsOutput{
+				"cluster-A": {
+					{
+						Nodegroups: []string{"ng-a1", "ng-a2"},
+						NextToken:  aws.String("ng-a-page2"),
+					},
+					{
+						Nodegroups: []string{"ng-a3"},
+					},
+				},
+				"cluster-B": {
+					{
+						Nodegroups: []string{"ng-b1"},
+					},
+				},
+			},
+		}
+
+		describeNGMock := &mockEKSDescribeNodegroupPaginatedClient{
+			nodegroups: map[string]*eks.DescribeNodegroupOutput{
+				"cluster-A/ng-a1": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-a1"), ClusterName: aws.String("cluster-A"), Status: ekstypes.NodegroupStatusActive}},
+				"cluster-A/ng-a2": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-a2"), ClusterName: aws.String("cluster-A"), Status: ekstypes.NodegroupStatusActive}},
+				// ng-a3 is cluster-A's second ListNodegroups page — by the time the
+				// current fetcher would revisit it, the outer ListClusters
+				// continuation token has already moved on to cluster-B.
+				"cluster-A/ng-a3": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-a3"), ClusterName: aws.String("cluster-A"), Status: ekstypes.NodegroupStatusActive}},
+				"cluster-B/ng-b1": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-b1"), ClusterName: aws.String("cluster-B"), Status: ekstypes.NodegroupStatusActive}},
+			},
+		}
+
+		ngFull := &ngPaginatedFullFake{listClustersMock, listNGMock, describeNGMock}
+		pf := resource.GetPaginatedFetcher("ng")
+		resources := collectNGPagesBounded(t, func(token string) (resource.FetchResult, error) {
+			return pf(context.Background(), &awsclient.ServiceClients{EKS: ngFull}, token)
+		})
+
+		seen := make(map[string]bool, len(resources))
+		for _, r := range resources {
+			seen[r.ID] = true
+		}
+
+		if !seen["ng-a3"] {
+			ids := make([]string, len(resources))
+			for i, r := range resources {
+				ids[i] = r.ID
+			}
+			t.Fatalf("cluster-A's second-page node group %q is missing from the accumulated result (got %v) — "+
+				"lost once the outer ListClusters pagination advanced to cluster-B", "ng-a3", ids)
+		}
+		for _, wantID := range []string{"ng-a1", "ng-a2", "ng-b1"} {
+			if !seen[wantID] {
+				t.Errorf("node group %q missing from accumulated result", wantID)
+			}
 		}
 	})
 }

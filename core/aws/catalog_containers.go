@@ -218,47 +218,52 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 			moreNodegroups = true
 			break
 		}
-		ngOutput, ngErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListNodegroupsOutput, error) {
-			return c.EKS.ListNodegroups(ctx, &eks.ListNodegroupsInput{
-				ClusterName: aws.String(cluster),
-				MaxResults:  aws.Int32(DefaultPageSize),
-			})
-		})
-		if ngErr != nil {
-			failures = append(failures, fmt.Sprintf("%s: %s", cluster, ngErr.Error()))
-			continue
-		}
-		if ngOutput.NextToken != nil {
-			moreNodegroups = true
-		}
-		for _, ngName := range ngOutput.Nodegroups {
-			if len(resources) >= DefaultPageSize {
-				hitCap = true
-				moreNodegroups = true
-				break
-			}
-			totalAttempted++
-			descOutput, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
-				return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
-					ClusterName:   aws.String(cluster),
-					NodegroupName: aws.String(ngName),
+		var ngToken *string
+		for {
+			ngOutput, ngErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListNodegroupsOutput, error) {
+				return c.EKS.ListNodegroups(ctx, &eks.ListNodegroupsInput{
+					ClusterName: aws.String(cluster),
+					MaxResults:  aws.Int32(DefaultPageSize),
+					NextToken:   ngToken,
 				})
 			})
-			if descErr != nil {
-				failures = append(failures, fmt.Sprintf("%s/%s: %s", cluster, ngName, descErr.Error()))
-				resources = append(resources, DegradedDetails("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}, descErr))
-				continue
+			if ngErr != nil {
+				failures = append(failures, fmt.Sprintf("%s: %s", cluster, ngErr.Error()))
+				break
 			}
-			if descOutput.Nodegroup == nil {
-				failures = append(failures, fmt.Sprintf("%s/%s: nil nodegroup in response", cluster, ngName))
-				resources = append(resources, DegradedDetails("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}, nil))
-				continue
+			for _, ngName := range ngOutput.Nodegroups {
+				if len(resources) >= DefaultPageSize {
+					hitCap = true
+					moreNodegroups = true
+					break
+				}
+				totalAttempted++
+				descOutput, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
+					return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
+						ClusterName:   aws.String(cluster),
+						NodegroupName: aws.String(ngName),
+					})
+				})
+				if descErr != nil {
+					failures = append(failures, fmt.Sprintf("%s/%s: %s", cluster, ngName, descErr.Error()))
+					resources = append(resources, DegradedDetails("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}, descErr))
+					continue
+				}
+				if descOutput.Nodegroup == nil {
+					failures = append(failures, fmt.Sprintf("%s/%s: nil nodegroup in response", cluster, ngName))
+					resources = append(resources, DegradedDetails("ng", ngName, &ekstypes.Nodegroup{ClusterName: aws.String(cluster), NodegroupName: aws.String(ngName)}, nil))
+					continue
+				}
+				res := buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup)
+				if lt := descOutput.Nodegroup.LaunchTemplate; lt != nil && lt.Id != nil {
+					res.Fields["image_id"] = resolveNGImageID(ctx, c.EC2, lt)
+				}
+				resources = append(resources, res)
 			}
-			res := buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup)
-			if lt := descOutput.Nodegroup.LaunchTemplate; lt != nil && lt.Id != nil {
-				res.Fields["image_id"] = resolveNGImageID(ctx, c.EC2, lt)
+			if hitCap || ngOutput.NextToken == nil {
+				break
 			}
-			resources = append(resources, res)
+			ngToken = ngOutput.NextToken
 		}
 	}
 
