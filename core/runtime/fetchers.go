@@ -12,10 +12,19 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// fetchTimeout bounds every interactive Core fetch lane below (FetchResources,
+// FetchChildResources, FetchMoreResources, FetchRevealValue, FetchIdentity,
+// ConnectAWS). These are blocking calls invoked from inside a tea.Cmd/HTTP
+// handler goroutine, so a stalled AWS call must not hang the caller forever;
+// classifyProbeErr (scan_status.go) already maps context.DeadlineExceeded to
+// a "timeout" ProbeStatus.
+const fetchTimeout = 30 * time.Second
 
 // ConnectResult carries the resolved AWS clients and effective region returned
 // by ConnectAWS. Adapters translate this into a platform-specific "clients
@@ -36,6 +45,8 @@ type FetchMoreParams struct {
 // FetchResources calls the registered paginated fetcher for resourceType
 // and returns the first-page result.
 func (c *Core) FetchResources(ctx context.Context, clients *awsclient.ServiceClients, resourceType string) (resource.FetchResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	defer cancel()
 	pf := resource.GetPaginatedFetcher(resourceType)
 	if pf == nil {
 		return resource.FetchResult{}, fmt.Errorf("unsupported resource type: %s", resourceType)
@@ -59,6 +70,8 @@ func (c *Core) FetchResourcesFiltered(ctx context.Context, clients *awsclient.Se
 // FetchChildResources calls the registered paginated child fetcher for
 // childType with the given parent context and returns the first-page result.
 func (c *Core) FetchChildResources(ctx context.Context, clients *awsclient.ServiceClients, childType string, parentCtx map[string]string) (resource.FetchResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	defer cancel()
 	if clients == nil {
 		return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 	}
@@ -76,6 +89,8 @@ func (c *Core) FetchChildResources(ctx context.Context, clients *awsclient.Servi
 // When no fetcher is registered for the type, the returned error describes the
 // missing type.
 func (c *Core) FetchMoreResources(ctx context.Context, clients *awsclient.ServiceClients, p FetchMoreParams) (resource.FetchResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	defer cancel()
 	if clients == nil {
 		return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 	}
@@ -105,6 +120,8 @@ func (c *Core) FetchMoreResources(ctx context.Context, clients *awsclient.Servic
 
 // FetchIdentity calls STS GetCallerIdentity and IAM ListAccountAliases.
 func (c *Core) FetchIdentity(ctx context.Context, clients *awsclient.ServiceClients) (*awsclient.CallerIdentity, error) {
+	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	defer cancel()
 	if clients == nil || clients.STS == nil {
 		return nil, fmt.Errorf("AWS clients not initialized")
 	}
@@ -128,6 +145,8 @@ func (c *Core) FetchProfiles() ([]string, error) {
 // FetchRevealValue calls the registered reveal fetcher for the given resource
 // type and ID.
 func (c *Core) FetchRevealValue(ctx context.Context, clients *awsclient.ServiceClients, resourceType, resourceID string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	defer cancel()
 	if clients == nil {
 		return "", fmt.Errorf("AWS clients not initialized")
 	}
@@ -142,6 +161,8 @@ func (c *Core) FetchRevealValue(ctx context.Context, clients *awsclient.ServiceC
 // resolving the effective region from the config file or environment when the
 // caller supplies an empty string.
 func (c *Core) ConnectAWS(ctx context.Context, profile, region string) (ConnectResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	defer cancel()
 	configPath := awsclient.DefaultConfigPath()
 	bestRegion := region
 

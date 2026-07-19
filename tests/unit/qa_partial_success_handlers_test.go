@@ -98,7 +98,7 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 	// the probe cycle (triggers startEnrichment), then check the returned cmd tree
 	// for an EnrichmentCheckedMsg targeting "ec2". If probeResources["ec2"] was
 	// retained, buildEnrichQueue includes "ec2" → enrichment is dispatched.
-	_, enrichCmd := rootApplyMsg(m, messages.AvailabilityChecked{
+	finalizeModel, enrichCmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "dummy-for-finalize",
 		Gen:          m.Core().Session().AvailabilityGen,
 		Count:        0,
@@ -107,7 +107,7 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 
 	// Check if enrichment for "ec2" was dispatched (implies probeResources["ec2"] exists).
 	if enrichCmd != nil {
-		enrichMsgs := collectEnrichmentMsgs(enrichCmd)
+		enrichMsgs := collectEnrichmentMsgs(t, finalizeModel, enrichCmd)
 		ec2Dispatched := false
 		for _, em := range enrichMsgs {
 			if em.ResourceType == "ec2" {
@@ -143,12 +143,12 @@ func TestHandleAvailabilityChecked_HardErr_NoStateApplied(t *testing.T) {
 	})
 
 	// Hard failure: wave 2 must NOT be dispatched for lambda (no probe resources).
-	_, enrichCmd := rootApplyMsg(m, messages.AvailabilityChecked{
+	finalizeModel, enrichCmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "dummy-finalize",
 		Gen:          m.Core().Session().AvailabilityGen,
 	})
 	if enrichCmd != nil {
-		enrichMsgs := collectEnrichmentMsgs(enrichCmd)
+		enrichMsgs := collectEnrichmentMsgs(t, finalizeModel, enrichCmd)
 		for _, em := range enrichMsgs {
 			if em.ResourceType == "lambda" {
 				t.Errorf("handleAvailabilityChecked hard-err: lambda enrichment dispatched even though probe returned no resources")

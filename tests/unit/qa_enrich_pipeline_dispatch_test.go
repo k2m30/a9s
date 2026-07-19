@@ -44,40 +44,78 @@ func pipelineProbeResources() []resource.Resource {
 	}
 }
 
-// collectEnrichmentMsgs executes a cmd (possibly a BatchMsg) and returns all
-// EnrichmentCheckedMsg values found, up to two levels of nesting.
-// Unlike extractMsg, this helper does NOT call t.Fatal — it just returns what it finds.
-func collectEnrichmentMsgs(cmd tea.Cmd) []messages.EnrichmentChecked {
+// maxEnrichmentDrainIterations defensively bounds collectEnrichmentMsgs'
+// redeliver-until-quiescence loop. A correct windowed startEnrichment
+// dispatches at most one follow-up TaskKindProbeEnrich per EnrichmentChecked
+// completion (core/runtime/handlers_availability.go's refill branch), so a
+// full drain must terminate within roughly the total number of registered
+// Wave2 enrichers (49 in the real catalog as of this writing). A refill bug
+// that re-dispatches or never terminates fails the test instead of hanging
+// the suite.
+const maxEnrichmentDrainIterations = 200
+
+// collectEnrichmentMsgs executes cmd (recursing through nested tea.BatchMsg
+// to any depth) and collects every messages.EnrichmentChecked found.
+//
+// startEnrichment (core/runtime/handlers_availability.go) dispatches only a
+// bounded initial window of TaskKindProbeEnrich tasks
+// (enrichDispatchWindow=4); the remaining queued types are enriched only as
+// each EnrichmentChecked completion is redelivered through the model and its
+// window-refill branch (handleEnrichmentChecked) fires the next one.
+// Executing cmd exactly once therefore only ever observes the first window's
+// worth of results — this helper redelivers every collected
+// EnrichmentChecked back through m via rootApplyMsg (the established
+// send-a-message-through-Update pattern, see tests/unit/tui_root_test.go)
+// and keeps collecting from whatever cmd that redelivery produces, until no
+// new message is produced (quiescence).
+//
+// Unlike extractMsg, this helper does NOT call t.Fatal on a missing/short
+// result — it just returns what it finds; it only fails the test if the
+// drain fails to quiesce (see maxEnrichmentDrainIterations).
+func collectEnrichmentMsgs(t *testing.T, m tui.Model, cmd tea.Cmd) []messages.EnrichmentChecked {
+	t.Helper()
+	var found []messages.EnrichmentChecked
+	pending := extractEnrichmentChecked(cmd)
+
+	for iterations := 0; len(pending) > 0; iterations++ {
+		if iterations >= maxEnrichmentDrainIterations {
+			t.Fatalf("collectEnrichmentMsgs: did not quiesce within %d iterations — suspect a refill loop (collected so far: %d)", maxEnrichmentDrainIterations, len(found))
+		}
+		msg := pending[0]
+		pending = pending[1:]
+		found = append(found, msg)
+
+		var next tea.Cmd
+		m, next = rootApplyMsg(m, msg)
+		pending = append(pending, extractEnrichmentChecked(next)...)
+	}
+	return found
+}
+
+// extractEnrichmentChecked executes cmd (recursing through nested
+// tea.BatchMsg to any depth) and returns every messages.EnrichmentChecked
+// leaf found. Non-EnrichmentChecked messages are ignored — matching this
+// helper's pre-windowing behavior, which only ever cared about this one
+// message type.
+func extractEnrichmentChecked(cmd tea.Cmd) []messages.EnrichmentChecked {
 	if cmd == nil {
 		return nil
 	}
-	var found []messages.EnrichmentChecked
-	visit := func(msg tea.Msg) {
-		if m, ok := msg.(messages.EnrichmentChecked); ok {
-			found = append(found, m)
-		}
+	msg := cmd()
+	if msg == nil {
+		return nil
 	}
-	top := cmd()
-	visit(top)
-	if batch, ok := top.(tea.BatchMsg); ok {
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		var out []messages.EnrichmentChecked
 		for _, sub := range batch {
-			if sub == nil {
-				continue
-			}
-			subMsg := sub()
-			visit(subMsg)
-			if subBatch, ok := subMsg.(tea.BatchMsg); ok {
-				for _, inner := range subBatch {
-					if inner == nil {
-						continue
-					}
-					innerMsg := inner()
-					visit(innerMsg)
-				}
-			}
+			out = append(out, extractEnrichmentChecked(sub)...)
 		}
+		return out
 	}
-	return found
+	if ec, ok := msg.(messages.EnrichmentChecked); ok {
+		return []messages.EnrichmentChecked{ec}
+	}
+	return nil
 }
 
 // TestBuildEnrichQueue_DispatchesCodePipeline verifies that when probeResources
@@ -98,7 +136,7 @@ func TestBuildEnrichQueue_DispatchesCodePipeline(t *testing.T) {
 	// availTotal starts at 0; after incrementing availChecked to 1, 1 >= 0 → finalize.
 	// session.New seeds AvailabilityGen=1 (AS-659) — stamp the live value so
 	// the AvailabilityChecked stale guard (AcceptZeroGen=false) accepts it.
-	_, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
+	m, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "pipeline",
 		Count:        1,
 		Truncated:    false,
@@ -114,7 +152,7 @@ func TestBuildEnrichQueue_DispatchesCodePipeline(t *testing.T) {
 	// If buildEnrichQueue includes "pipeline", probeEnrichment is dispatched and will
 	// return EnrichmentCheckedMsg{ResourceType: "pipeline", Err: "AWS clients not initialized"}.
 	// If not dispatched (bug), no EnrichmentCheckedMsg is produced.
-	found := collectEnrichmentMsgs(cmd)
+	found := collectEnrichmentMsgs(t, m, cmd)
 
 	dispatched := false
 	for _, msg := range found {

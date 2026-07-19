@@ -101,13 +101,13 @@ func TestBuildEnrichQueue_OrdersByMetadataPriority(t *testing.T) {
 	tui.Version = "test"
 
 	m := newRootSizedModel()
-	_, enrichCmd := seedAllEnricherTypes(m)
+	m, enrichCmd := seedAllEnricherTypes(m)
 
 	if enrichCmd == nil {
 		t.Skip("no cmd returned — cannot verify queue order without enrichment dispatch")
 	}
 
-	found := collectEnrichmentMsgs(enrichCmd)
+	found := collectEnrichmentMsgs(t, m, enrichCmd)
 	if len(found) == 0 {
 		t.Skip("no EnrichmentCheckedMsg in cmd tree — skipping order check")
 	}
@@ -161,13 +161,13 @@ func TestBuildEnrichQueue_StableAlphabeticalWithinPriority(t *testing.T) {
 	}
 
 	m := newRootSizedModel()
-	_, enrichCmd := seedEnricherSubset(m, priority10Types)
+	m, enrichCmd := seedEnricherSubset(m, priority10Types)
 
 	if enrichCmd == nil {
 		t.Skip("no cmd returned — cannot verify alphabetical order")
 	}
 
-	found := collectEnrichmentMsgs(enrichCmd)
+	found := collectEnrichmentMsgs(t, m, enrichCmd)
 	if len(found) == 0 {
 		t.Skip("no EnrichmentCheckedMsg in cmd tree — skipping alphabetical check")
 	}
@@ -219,13 +219,13 @@ func TestBuildEnrichQueue_IncludesAllRegisteredEnrichers(t *testing.T) {
 	tui.Version = "test"
 
 	m := newRootSizedModel()
-	_, enrichCmd := seedAllEnricherTypes(m)
+	m, enrichCmd := seedAllEnricherTypes(m)
 
 	if enrichCmd == nil {
 		t.Skip("no cmd returned — cannot verify queue completeness")
 	}
 
-	found := collectEnrichmentMsgs(enrichCmd)
+	found := collectEnrichmentMsgs(t, m, enrichCmd)
 	dispatched := make(map[string]bool, len(found))
 	for _, msg := range found {
 		dispatched[msg.ResourceType] = true
@@ -265,13 +265,13 @@ func TestBuildEnrichQueue_SkipsTypesWithoutProbe(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Seed only "dbi" — deliberately omitting probeSkipType.
-	_, enrichCmd := seedEnricherSubset(m, []string{"dbi"})
+	m, enrichCmd := seedEnricherSubset(m, []string{"dbi"})
 
 	if enrichCmd == nil {
 		t.Skip("no cmd returned — cannot verify skip behavior")
 	}
 
-	found := collectEnrichmentMsgs(enrichCmd)
+	found := collectEnrichmentMsgs(t, m, enrichCmd)
 	for _, msg := range found {
 		if msg.ResourceType == probeSkipType {
 			t.Errorf("type %q has no probeResources entry but buildEnrichQueue dispatched it", probeSkipType)
@@ -299,13 +299,13 @@ func TestBuildEnrichQueue_NewEnricherAutoParticipates(t *testing.T) {
 	})
 
 	m := newRootSizedModel()
-	_, enrichCmd := seedAllEnricherTypes(m)
+	m, enrichCmd := seedAllEnricherTypes(m)
 
 	if enrichCmd == nil {
 		t.Skip("no cmd returned — cannot verify novel-enricher participation")
 	}
 
-	found := collectEnrichmentMsgs(enrichCmd)
+	found := collectEnrichmentMsgs(t, m, enrichCmd)
 
 	novelPos := -1
 	for i, msg := range found {

@@ -423,6 +423,15 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	return intents, tasks
 }
 
+// enrichDispatchWindow caps the number of TaskKindProbeEnrich tasks
+// startEnrichment dispatches in its initial batch; the remainder stays queued
+// in session.EnrichQueue and is drained one type per EnrichmentChecked
+// completion (see the refill branch in handleEnrichmentChecked). This is
+// deliberately its own constant rather than a reference to
+// runtime.MaxConcurrentProbes (core/runtime/related.go) — that constant caps
+// the unrelated related-checker fan-out and the two are allowed to diverge.
+const enrichDispatchWindow = 4
+
 // startEnrichment builds the enrichment queue and returns the initial batch of
 // probe tasks.  Called from handleAvailabilityPrefetched and
 // handleAvailabilityChecked once wave-1 resources are retained.
@@ -439,7 +448,7 @@ func (c *Core) startEnrichment() ([]UIIntent, []TaskRequest) {
 	intents = append(intents, PatchMenuEnrichProgress{Checked: 0, Total: c.session.EnrichTotal})
 
 	var tasks []TaskRequest
-	for len(c.session.EnrichQueue) > 0 {
+	for len(c.session.EnrichQueue) > 0 && len(tasks) < enrichDispatchWindow {
 		name := c.session.EnrichQueue[0]
 		c.session.EnrichQueue = c.session.EnrichQueue[1:]
 
