@@ -27,6 +27,7 @@
 package unit_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -1011,5 +1012,51 @@ func TestMenuSnapshot_Back_FromResourceList_ReturnsToMenu(t *testing.T) {
 	vs, _ = c.Apply(app.Action{Kind: app.ActionBack})
 	if vs.Body.Kind != app.BodyKindMenu {
 		t.Errorf("ActionBack from resource list: got BodyKind %q want BodyKindMenu", vs.Body.Kind)
+	}
+}
+
+// TestMenuFrameTitle_CtrlZShowsFilteredCount is the live-seam replacement for
+// the retired qa_bug_issue_count_test.go's TestMainMenuFrameTitle_CtrlZShowsFilteredCount
+// (022-codebase-cleanup wave 3): MainMenuModel.SetIssues/Toggle/FrameTitle are
+// production-dead (Controller.MenuFrameTitle is the only reachable frame-
+// title source — see internal/tui/renderer.go). Verifies that under
+// AttentionOnly, MenuFrameTitle() shows "<visible>/<total> [!]" where visible
+// counts only the types with known nonzero issues: the synthetic "costs"
+// entry is never explicitly probed here, and per
+// menuIsVisibleUnderIssueFilter an unknown type is visible only during true
+// cold-start (no type probed at all) — once any other type's issue state is
+// known, "costs" itself hides.
+func TestMenuFrameTitle_CtrlZShowsFilteredCount(t *testing.T) {
+	c := newMenuController(t)
+	allTypes := resource.AllResourceTypes()
+	total := len(allTypes) + 1 // +1 for the synthetic "costs" entry
+
+	counts := make(map[string]int, len(allTypes))
+	known := make(map[string]bool, len(allTypes))
+	for _, rt := range allTypes {
+		counts[rt.ShortName] = 0
+		known[rt.ShortName] = true
+	}
+	counts["ec2"] = 1
+	counts["dbi"] = 2
+
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PatchMenuIssueBatch{Counts: counts, Known: known},
+	})
+	c.Apply(app.Action{Kind: app.ActionToggleAttention})
+
+	title := c.MenuFrameTitle()
+
+	// Visible = ec2 + dbi (the only two types with known nonzero issues).
+	// Match the parenthesized token exactly (menuFrameTitle wraps it as
+	// "(filtered/total)") so a coincidental substring match — e.g. "12/50"
+	// containing "2/50" — cannot false-pass this assertion.
+	wantVisible := 2
+	expectedFiltered := fmt.Sprintf("(%d/%d)", wantVisible, total)
+	if !strings.Contains(title, expectedFiltered) {
+		t.Errorf("MenuFrameTitle() = %q, want to contain %q (filtered/total)", title, expectedFiltered)
+	}
+	if !strings.Contains(title, "[!]") {
+		t.Errorf("MenuFrameTitle() = %q, want '[!]'", title)
 	}
 }

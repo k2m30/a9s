@@ -291,7 +291,8 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	// #462: record this probe's scan status regardless of outcome — a
 	// hard-failed probe still needs to be visible via Core.ScanStatus.
 	outcome, errClass := availabilityOutcome(c, msg.ResourceType, len(msg.Resources) > 0, msg.Truncated, msg.Err)
-	c.setProbeStatus(msg.ResourceType, outcome, msg.Duration, errClass, time.Now())
+	// This probe IS the new Wave-1 baseline: aggregate == baseline.
+	c.setProbeStatus(msg.ResourceType, outcome, msg.Duration, errClass, time.Now(), outcome, msg.Duration, errClass)
 
 	var intents []UIIntent
 	var tasks []TaskRequest
@@ -475,22 +476,29 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		return nil, nil
 	}
 
-	// #462: fold this Wave-2 result onto the type's existing scan-status
-	// record. Duration accumulates (availability + enrichment probe wall
-	// time, summed — see ProbeStatus.Duration's doc comment); Err is
-	// re-classified only when this probe itself errored, otherwise the
-	// prior (availability) classification is kept.
+	// #462/#463 defect 1: fold this Wave-2 result onto the type's Wave-1
+	// BASELINE (AvailOutcome/AvailDuration/AvailErr), never onto the
+	// previous record's aggregate — folding onto the aggregate would
+	// re-accumulate Duration and keep a stale partial/Err across repeated
+	// enrichment reruns (list-open / Ctrl+R ProbeEnrich without a fresh
+	// AvailabilityChecked). Duration is baseline + THIS enrichment probe's
+	// wall time only; Err is re-classified only when this probe itself
+	// errored, otherwise the baseline's own classification is kept. The
+	// baseline fields themselves pass through unchanged, so a later rerun
+	// folds from the same Wave-1 observation, not from this rerun's result.
 	prevStatus, _ := c.session.GetProbeStatus(msg.ResourceType)
 	enrichErrClass := classifyProbeErr(msg.Err)
-	if enrichErrClass == "" {
-		enrichErrClass = prevStatus.Err
+	aggErr := enrichErrClass
+	if aggErr == "" {
+		aggErr = prevStatus.AvailErr
 	}
 	c.setProbeStatus(
 		msg.ResourceType,
-		degradeForEnrichment(ProbeOutcome(prevStatus.Outcome), msg.Err, msg.Truncated),
-		prevStatus.Duration+msg.Duration,
-		enrichErrClass,
+		degradeForEnrichment(ProbeOutcome(prevStatus.AvailOutcome), msg.Err, msg.Truncated),
+		prevStatus.AvailDuration+msg.Duration,
+		aggErr,
 		time.Now(),
+		ProbeOutcome(prevStatus.AvailOutcome), prevStatus.AvailDuration, prevStatus.AvailErr,
 	)
 
 	c.session.EnrichChecked++

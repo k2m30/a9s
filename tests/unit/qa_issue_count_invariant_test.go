@@ -8,24 +8,17 @@ package unit
 //     EnricherRegistry. An enricher emits at most one finding per resource (keyed by
 //     resource ID), so the issue count can never exceed the number of distinct inputs.
 //
-//  2. Unified (Wave-1 + Wave-2): the enrichmentIssueCount stored via SetEnrichmentState
-//     must never exceed the union of Wave-1 issue resource IDs and Wave-2 finding IDs.
-//     Tested indirectly via ResourceListModel.FrameTitle().
+//  2. Unified (Wave-1 + Wave-2): Controller.GetListIssueCount() (fed via
+//     ApplyEnrichmentState) must never exceed the union of Wave-1 issue
+//     resource IDs and Wave-2 finding IDs.
 
 import (
 	"context"
-	"fmt"
-	"regexp"
-	"strconv"
-	"strings"
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -98,12 +91,15 @@ func TestAllEnrichers_IssueCountNeverExceedsResources(t *testing.T) {
 // Test 2: unified issue count never exceeds union of Wave-1 and Wave-2 IDs
 // ─────────────────────────────────────────────────────────────────────────────
 
-// buildUnifiedModelWithBadge builds a ResourceListModel and loads resources +
-// enrichment state so that FrameTitle() includes the issue count when
-// enrichmentIssueCount > 0. The issue-count suffix is unconditional (no
-// SetShowIssueBadge/Patch gate) — it reuses buildUnifiedModel from
-// qa_unified_issue_count_test.go for loading.
-func buildUnifiedModelWithBadge(t *testing.T, resources []resource.Resource, enrichIC int, findings map[string][]domain.Finding) string {
+// unifiedIssueCount builds a Controller (via the blessed newTestController
+// helper) pre-populated with resources + enrichment state, and returns
+// Controller.GetListIssueCount() directly — the live replacement for
+// buildUnifiedModelWithBadge+extractIssueCount's dead ResourceListModel.
+// FrameTitle() round-trip-then-regex-parse. buildListFrameTitle's own issue
+// suffix reads this exact same c.listIssueCount(...) value (list_body.go),
+// so calling it directly is a strictly more precise oracle than parsing it
+// back out of a formatted string.
+func unifiedIssueCount(t *testing.T, resources []resource.Resource, enrichIC int, findings map[string][]domain.Finding) int {
 	t.Helper()
 	td := resource.ResourceTypeDef{
 		ShortName: "ec2",
@@ -113,35 +109,12 @@ func buildUnifiedModelWithBadge(t *testing.T, resources []resource.Resource, enr
 			{Key: "state", Title: "State", Width: 12},
 		},
 	}
-	m := views.NewResourceList(td, nil, keys.Default())
-	m.SetSize(120, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "ec2",
-		Resources:    resources,
-	})
-	m.SetEnrichmentState(enrichIC, false, findings, nil)
-	return m.FrameTitle()
-}
-
-// extractIssueCount parses the issue count from a FrameTitle of the form:
-//
-//	ec2(N/M issue) or ec2(N/M issues) or ec2(N/M+ issues)
-//
-// Returns -1 if no issue count badge is present (e.g. ec2(N) — no issues).
-func extractIssueCount(title string) int {
-	plain := stripANSI(title)
-	// Match: name(total/issueCount issue) or name(total/issueCount+ issue)
-	re := regexp.MustCompile(`\([\d+]+/(\d+)\+?\s+issue`)
-	m := re.FindStringSubmatch(plain)
-	if len(m) < 2 {
-		return -1
-	}
-	n, err := strconv.Atoi(m[1])
-	if err != nil {
-		return -1
-	}
-	return n
+	c := newTestController(t)
+	c.RegisterFallbackTypeDef(td)
+	c.PushChildListScreen(td.ShortName)
+	c.ApplyResourcesLoaded(td.ShortName, resources, nil, false)
+	c.ApplyEnrichmentState(td.ShortName, enrichIC, false, findings, nil)
+	return c.GetListIssueCount()
 }
 
 // unionSize returns the number of distinct IDs across the resource slice and findings map.
@@ -166,38 +139,65 @@ func unionSize(resources []resource.Resource, findings map[string][]domain.Findi
 //   - Wave-2 only: all resources healthy + 2 findings → count ≤ 2
 //   - Findings outside resource list: 2 healthy resources + 5 findings on unknown IDs
 func TestUnifiedIssueCount_NeverExceedsUnionSize(t *testing.T) {
-	t.Run("disjoint Wave-1 and Wave-2 findings on different IDs — count never exceeds 5", func(t *testing.T) {
+	t.Run("disjoint Wave-1 and Wave-2 findings on different IDs — on-page Wave-1 findings count, off-page Wave-2 findings never leak in", func(t *testing.T) {
+		// core/app/list_body.go's listIssueCount iterates ONLY
+		// c.listScreenResources(ls, typeName) — the active list's OWN loaded
+		// rows (ls.Rows) — and cross-references c.enrichmentStore[typeName]
+		// (the Wave-2 findings map) by ID against that same row set. A
+		// finding whose ID never appears in the loaded rows (here: "ebs"
+		// volume IDs against an "ec2" list) can therefore never be counted,
+		// regardless of what union of IDs exists across the account — this
+		// is a genuine architectural bound (single-list, row-keyed lookup),
+		// not a missing-clamp bug. Traced empirically: feeding these two
+		// off-page volume findings into enrichIC/ApplyEnrichmentState still
+		// yields ic==0 against them every time (verified below by their
+		// total exclusion from the exact count).
+		//
+		// Wave-1 findings (fetcher-written, no "wave2:" Source prefix) are
+		// attached directly to Resource.Findings and counted unconditionally
+		// by listHasBadgeFinding — giving the 3 on-page EC2 fixtures their
+		// own findings (rather than relying on colorEC2, which is
+		// colorFromAnyFinding-only and treats a Wave-1-finding-less
+		// "stopped" instance as healthy) makes them actually count.
+		w1 := []domain.Finding{{Code: "ec2.instance.stopped", Phrase: "instance stopped", Severity: domain.SevWarn, Source: "fetch:ec2"}}
 		resources := []resource.Resource{
-			{ID: "i-001", Name: "s1", Fields: map[string]string{"name": "s1", "state": "stopped"}},
-			{ID: "i-002", Name: "s2", Fields: map[string]string{"name": "s2", "state": "stopped"}},
-			{ID: "i-003", Name: "s3", Fields: map[string]string{"name": "s3", "state": "stopped"}},
+			{ID: "i-001", Name: "s1", Fields: map[string]string{"name": "s1", "state": "stopped"}, Findings: w1},
+			{ID: "i-002", Name: "s2", Fields: map[string]string{"name": "s2", "state": "stopped"}, Findings: w1},
+			{ID: "i-003", Name: "s3", Fields: map[string]string{"name": "s3", "state": "stopped"}, Findings: w1},
 		}
 		findings := map[string][]domain.Finding{
 			"vol-aaa": {{Code: "ebs.volume.degraded", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ebs"}},
 			"vol-bbb": {{Code: "ebs.volume.degraded", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ebs"}},
 		}
-		// The union is {i-001,i-002,i-003,vol-aaa,vol-bbb} = 5 distinct IDs.
-		// enrichIC must equal the correct unified count (not the sum).
-		union := unionSize(resources, findings)
-		title := buildUnifiedModelWithBadge(t, resources, union, findings)
-		ic := extractIssueCount(title)
-		if ic < 0 {
-			// No badge shown — count is effectively 0, invariant holds trivially.
-			return
-		}
-		if ic > union {
-			t.Errorf("disjoint: IssueCount (%d) > union size (%d); FrameTitle=%q", ic, union, title)
-		}
-		if !strings.Contains(fmt.Sprintf("%d", union), fmt.Sprintf("%d", ic)) && ic != union {
-			t.Errorf("disjoint: expected IssueCount == %d (union), got %d; FrameTitle=%q", union, ic, title)
+		union := unionSize(resources, findings) // {i-001,i-002,i-003,vol-aaa,vol-bbb} = 5, for documentation only.
+		const want = 3                          // only the 3 on-page EC2 rows can ever count for this list.
+		// enrichIC is the enricher's OWN reported IssueCount for its findings
+		// map — len(findings), the count a real Wave-2 result would carry
+		// (TestAllEnrichers_IssueCountMatchesFindings pins IssueCount ==
+		// len(Findings) for every enricher). Passing the cross-wave union (5)
+		// here would feed ApplyEnrichmentState a state no real enrichment
+		// result produces, since the enricher never sees Wave-1's on-page IDs.
+		ic := unifiedIssueCount(t, resources, len(findings), findings)
+		if ic != want {
+			t.Errorf("disjoint: IssueCount (%d) != %d — expected exactly the 3 on-page Wave-1 findings to count, with the 2 off-page EBS findings (union=%d) never leaking into an unrelated list's count", ic, want, union)
 		}
 	})
 
-	t.Run("fully overlapping — same 3 IDs in Wave-1 and Wave-2 → count must be 3 not 6", func(t *testing.T) {
+	t.Run("fully overlapping — same 3 IDs carry BOTH a Wave-1 and a Wave-2 finding → count must be 3 not 6", func(t *testing.T) {
+		// Each resource carries its OWN Wave-1 finding (attached directly to
+		// Resource.Findings, counted unconditionally by listHasBadgeFinding —
+		// see the disjoint sub-case above for why this is required instead of
+		// relying on colorEC2) AND a Wave-2 finding on the same ID. This is the
+		// genuine cross-wave dedup case: a resource that both waves flag must
+		// still count once, not twice — the previous version of this sub-case
+		// only carried Wave-2 findings, so it exercised Wave-2-vs-Wave-2
+		// dedup but never actually proved a resource with findings in BOTH
+		// waves collapses to one.
+		w1 := []domain.Finding{{Code: "ec2.instance.stopped", Phrase: "instance stopped", Severity: domain.SevWarn, Source: "fetch:ec2"}}
 		resources := []resource.Resource{
-			{ID: "i-aaa", Name: "server-a", Fields: map[string]string{"name": "server-a", "state": "stopped"}},
-			{ID: "i-bbb", Name: "server-b", Fields: map[string]string{"name": "server-b", "state": "stopped"}},
-			{ID: "i-ccc", Name: "server-c", Fields: map[string]string{"name": "server-c", "state": "stopped"}},
+			{ID: "i-aaa", Name: "server-a", Fields: map[string]string{"name": "server-a", "state": "stopped"}, Findings: w1},
+			{ID: "i-bbb", Name: "server-b", Fields: map[string]string{"name": "server-b", "state": "stopped"}, Findings: w1},
+			{ID: "i-ccc", Name: "server-c", Fields: map[string]string{"name": "server-c", "state": "stopped"}, Findings: w1},
 		}
 		findings := map[string][]domain.Finding{
 			"i-aaa": {{Code: "ec2.system.status.impaired", Phrase: "status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
@@ -209,18 +209,20 @@ func TestUnifiedIssueCount_NeverExceedsUnionSize(t *testing.T) {
 		if union != 3 {
 			t.Fatalf("test setup error: expected union size 3, got %d", union)
 		}
-		// enrichIC passed to SetEnrichmentState is the caller-computed unified count (3).
-		title := buildUnifiedModelWithBadge(t, resources, union, findings)
-		ic := extractIssueCount(title)
-		if ic < 0 {
-			return
-		}
-		if ic > union {
-			t.Errorf("overlap: IssueCount (%d) > union size (%d) — must not double-count same ID; FrameTitle=%q", ic, union, title)
+		// enrichIC passed to ApplyEnrichmentState is the caller-computed unified count (3).
+		// This must be an EXACT equality, not just <=: with 3 fully-overlapping
+		// IDs, a double-counting regression would produce 6 (still <= union
+		// would catch nothing useful here since union itself is only 3), and a
+		// silently-dropped-finding regression would produce a count < 3 that a
+		// bare "ic > union" check would never flag. Only ic == union pins the
+		// real dedup contract for this sub-case.
+		ic := unifiedIssueCount(t, resources, union, findings)
+		if ic != union {
+			t.Errorf("overlap: IssueCount (%d) != union size (%d) — must not double-count a resource carrying both a Wave-1 and a Wave-2 finding", ic, union)
 		}
 	})
 
-	t.Run("Wave-2 only — all resources healthy + 2 findings → count never exceeds 2", func(t *testing.T) {
+	t.Run("Wave-2 only — all resources healthy + 2 on-page findings → count equals exactly 2", func(t *testing.T) {
 		resources := []resource.Resource{
 			{ID: "i-r01", Name: "healthy-1", Fields: map[string]string{"name": "healthy-1", "state": "running"}},
 			{ID: "i-r02", Name: "healthy-2", Fields: map[string]string{"name": "healthy-2", "state": "running"}},
@@ -232,23 +234,28 @@ func TestUnifiedIssueCount_NeverExceedsUnionSize(t *testing.T) {
 			"i-r01": {{Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 			"i-r02": {{Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		}
-		// enrichIC = 2 (two findings, both from known resource IDs)
-		title := buildUnifiedModelWithBadge(t, resources, 2, findings)
-		ic := extractIssueCount(title)
-		if ic < 0 {
-			return
-		}
-		if ic > 2 {
-			t.Errorf("wave-2-only: IssueCount (%d) > 2 (number of findings); FrameTitle=%q", ic, title)
-		}
-		if ic > len(resources) {
-			t.Errorf("wave-2-only: IssueCount (%d) > len(resources) (%d); FrameTitle=%q", ic, len(resources), title)
+		const want = 2 // both finding IDs are on-page (i-r01, i-r02); the other 3 stay healthy.
+		ic := unifiedIssueCount(t, resources, want, findings)
+		if ic != want {
+			t.Errorf("wave-2-only: IssueCount (%d) != %d (exactly the 2 on-page SevBroken findings)", ic, want)
 		}
 	})
 
-	t.Run("findings on IDs not in resource list still count — count never exceeds union", func(t *testing.T) {
-		// 2 healthy resources visible in this page; 5 findings whose IDs are not in the list.
-		// The enrichIC passed by the production code is the true distinct union count.
+	t.Run("findings on IDs not in resource list never count — count is exactly 0", func(t *testing.T) {
+		// 2 healthy resources visible on this list's page; 5 findings whose IDs
+		// are not in the list. core/app/list_body.go's listIssueCount only
+		// ever iterates the active list's OWN loaded rows
+		// (c.listScreenResources) and looks each one up by ID in the Wave-2
+		// findings map — a finding for an ID that was never loaded into this
+		// list can never be visited by that loop, so it can never bump the
+		// count. This is traced, deterministic production behavior (verified
+		// empirically against the real Controller), not an assumption:
+		// exact 0 is the correct oracle here, not CodeRabbit's proposed
+		// union-minus-healthy value of 5 — that number assumes
+		// GetListIssueCount aggregates across the whole account like the
+		// menu badge does, but the list-title count is bound to a single
+		// list's own row set and cannot see IDs outside it, no matter which
+		// resource type the findings claim.
 		resources := []resource.Resource{
 			{ID: "i-p01", Name: "page-instance-1", Fields: map[string]string{"name": "page-instance-1", "state": "running"}},
 			{ID: "i-p02", Name: "page-instance-2", Fields: map[string]string{"name": "page-instance-2", "state": "running"}},
@@ -260,16 +267,13 @@ func TestUnifiedIssueCount_NeverExceedsUnionSize(t *testing.T) {
 			"i-x04": {{Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 			"i-x05": {{Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"}},
 		}
-		union := unionSize(resources, findings) // = 7 (2 page resources + 5 finding-only IDs)
-		// Pass union as enrichIC: the production code computes this across the full account,
-		// not just the current page. The invariant is: displayed count ≤ union.
-		title := buildUnifiedModelWithBadge(t, resources, union, findings)
-		ic := extractIssueCount(title)
-		if ic < 0 {
-			return
-		}
-		if ic > union {
-			t.Errorf("off-page findings: IssueCount (%d) > union size (%d); FrameTitle=%q", ic, union, title)
+		// Union excluding the 2 healthy page resources — the finding-only ID
+		// count, kept purely for documentation of the account-wide input size.
+		findingOnlyUnion := len(findings)
+		const want = 0
+		ic := unifiedIssueCount(t, resources, findingOnlyUnion, findings)
+		if ic != want {
+			t.Errorf("off-page findings: IssueCount (%d) != %d — off-page finding IDs (%d distinct) must never leak into this list's on-page count", ic, want, findingOnlyUnion)
 		}
 	})
 }

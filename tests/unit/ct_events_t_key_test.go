@@ -1,7 +1,6 @@
 package unit
 
 import (
-	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -129,20 +128,6 @@ func TestResourceList_TKey_IAMUser_UsesUsername(t *testing.T) {
 	}
 }
 
-func TestResourceList_TKey_NoHintOnCtEventsList(t *testing.T) {
-	td := resource.FindResourceType("ct-events")
-	if td == nil {
-		t.Fatal("ct-events type not found")
-	}
-	rl := views.NewResourceList(*td, nil, keys.Default())
-	hints := rl.BottomHints()
-	for _, h := range hints {
-		if h.Key == "t" {
-			t.Fatal("t hint should not appear on ct-events list")
-		}
-	}
-}
-
 // TestResourceList_TKey_NoopOnCtEventsList verifies that pressing "t" while
 // viewing the ct-events list is a no-op (returns nil cmd).
 func TestResourceList_TKey_NoopOnCtEventsList(t *testing.T) {
@@ -205,46 +190,14 @@ func TestTKey_WorksFromAllViews(t *testing.T) {
 		}
 	})
 
-	t.Run("Detail_LeftCol", func(t *testing.T) {
-		d := views.NewDetail(res, "ec2", nil, k)
-		d.SetSize(80, 40) // narrow — no right col
-		_, cmd := d.Update(tea.KeyPressMsg{Code: -1, Text: "t"})
-		if cmd == nil {
-			t.Fatal("Detail (left col): t key returned nil cmd")
-		}
-		msg := cmd()
-		nav, ok := msg.(messages.RelatedNavigate)
-		if !ok {
-			t.Fatalf("Detail (left col): expected RelatedNavigateMsg, got %T", msg)
-		}
-		if nav.TargetType != "ct-events" {
-			t.Errorf("Detail (left col): expected ct-events, got %s", nav.TargetType)
-		}
-	})
-
-	t.Run("Detail_RightColFocused", func(t *testing.T) {
-		d := views.NewDetail(res, "ec2", nil, k)
-		d.SetSize(120, 40)
-		if !strings.Contains(d.View(), "RELATED") {
-			t.Skip("right column not auto-shown at width=120; skipping right-col focus subtest")
-		}
-		// r → r: auto-shown → explicitly visible. Then Tab: focus right col.
-		d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "r"})
-		d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "r"})
-		d, _ = d.Update(tea.KeyPressMsg{Code: tea.KeyTab})
-		_, cmd := d.Update(tea.KeyPressMsg{Code: -1, Text: "t"})
-		if cmd == nil {
-			t.Fatal("Detail (right col focused): t key returned nil cmd")
-		}
-		msg := cmd()
-		nav, ok := msg.(messages.RelatedNavigate)
-		if !ok {
-			t.Fatalf("Detail (right col focused): expected RelatedNavigateMsg, got %T", msg)
-		}
-		if nav.TargetType != "ct-events" {
-			t.Errorf("Detail (right col focused): expected ct-events, got %s", nav.TargetType)
-		}
-	})
+	// Detail_LeftCol / Detail_RightColFocused subtests (dead views.DetailModel
+	// Update/View, 022-codebase-cleanup wave 3) removed — no port needed:
+	// TestWave3_ActionCloudTrail_Detail_DispatchesCtEventsFetchFiltered
+	// (wave3_detail_ports_test.go) already pins the same contract (ActionCloudTrail
+	// on a detail screen dispatches a KindFetchFiltered task scoped to
+	// "ct-events") more precisely, against the live controller Apply path,
+	// independent of left/right-column focus (a renderer-only concern the
+	// controller-level action does not branch on).
 
 	// The YAML case (views.NewYAML+Update, both DEAD per
 	// specs/022-codebase-cleanup/wave3-map-text.md) is retired here: it's
@@ -252,21 +205,17 @@ func TestTKey_WorksFromAllViews(t *testing.T) {
 	// wave3_text_ports_test.go's TestWave3Port_YAML_TKey_LiveCTEventsNavigate.
 }
 
+// TestResourceList_TKey_SuppressedOnChildList verifies that on a child
+// resource list (parentContext != nil), pressing "t" is a no-op. The
+// corresponding footer-hint suppression is pinned separately by
+// wave3_list_ports_test.go's TestWave3ListFooterHints_CloudTrailTKey_
+// GatedByParentContext (dead ResourceListModel.BottomHints() removed here).
 func TestResourceList_TKey_SuppressedOnChildList(t *testing.T) {
-	// Child lists (parentContext != nil) should suppress t key hint and treat key as no-op.
 	td := resource.GetChildType("s3_objects")
 	if td == nil {
 		t.Skip("s3_objects child type not registered")
 	}
 	rl := views.NewChildResourceList(*td, map[string]string{"bucket": "my-bucket"}, "my-bucket", nil, keys.Default())
-
-	// Hint should be absent
-	hints := rl.BottomHints()
-	for _, h := range hints {
-		if h.Key == "t" {
-			t.Fatal("t hint should not appear on child resource list")
-		}
-	}
 
 	// Key should be no-op
 	rl.SetSize(120, 40)
@@ -292,16 +241,10 @@ func TestMainMenu_TKey_Noop(t *testing.T) {
 	}
 }
 
-// TestBottomHints_MainMenu_NoCloudTrail verifies that the t hint is absent from
-// the main menu status bar (CloudTrail is only meaningful on resource views).
-func TestBottomHints_MainMenu_NoCloudTrail(t *testing.T) {
-	k := keys.Default()
-	m := views.NewMainMenu(k)
-	m.SetSize(120, 40)
-	hints := m.BottomHints()
-	for _, h := range hints {
-		if h.Key == "t" {
-			t.Fatal("t hint should not appear on main menu")
-		}
-	}
-}
+// TestBottomHints_MainMenu_NoCloudTrail (dead views.MainMenuModel.BottomHints)
+// removed — no live-seam port needed: the menu's live footer-hint source,
+// app.MenuFooterHintsFor (core/app/viewstate.go), is a fixed two-entry
+// literal ("ctrl+z", "ctrl+r") that can never contain a "t" hint, so the
+// no-CloudTrail-hint-on-menu invariant is now structurally guaranteed rather
+// than a runtime behavior worth pinning. See app_footer_hints_test.go for
+// MenuFooterHintsFor's live coverage.

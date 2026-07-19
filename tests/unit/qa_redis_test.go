@@ -6,6 +6,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"charm.land/bubbles/v2/viewport"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 
@@ -17,34 +19,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
-
-// ===========================================================================
-// Helpers for Redis tests
-// ===========================================================================
-
-func redisTypeDef() resource.ResourceTypeDef {
-	for _, rt := range resource.AllResourceTypes() {
-		if rt.ShortName == "redis" {
-			return rt
-		}
-	}
-	panic("redis resource type not found")
-}
-
-func loadedRedisModel(t *testing.T) views.ResourceListModel {
-	t.Helper()
-	tuitest.ForceColor(t)
-	td := redisTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "redis",
-		Resources:    fixtureRedisClusters(),
-	})
-	return m
-}
 
 // multiStatusRedisFixtures returns Redis replication groups with different statuses for color tests.
 // Post-phase-7: RawStruct is ReplicationGroup (DescribeReplicationGroups).
@@ -100,291 +74,25 @@ func multiStatusRedisFixtures() []resource.Resource {
 }
 
 // ===========================================================================
-// REDIS-LIST-02: Redis list displays correct columns
-// ===========================================================================
-
-func TestQA_Redis_ListColumns(t *testing.T) {
-	m := loadedRedisModel(t)
-	out := m.View()
-
-	expectedHeaders := []string{"Cluster ID", "Node Type", "Status", "Nodes", "Endpoint"}
-	for _, header := range expectedHeaders {
-		if !strings.Contains(out, header) {
-			t.Errorf("Redis list view missing column header %q", header)
-		}
-	}
-}
-
-// ===========================================================================
-// REDIS-LIST-03: Redis list populates column data from correct fields
-// ===========================================================================
-
-func TestQA_Redis_ListColumnData(t *testing.T) {
-	fixtures := fixtureRedisClusters()
-	m := loadedRedisModel(t)
-	out := m.View()
-
-	// Verify fixture data appears in the rendered output
-	r := fixtures[0]
-	expectedValues := []string{
-		r.Fields["cluster_id"],
-		r.Fields["node_type"],
-		r.Fields["status"],
-		r.Fields["nodes"],
-	}
-	for _, val := range expectedValues {
-		if val == "" {
-			continue
-		}
-		if !strings.Contains(out, val) {
-			t.Errorf("Redis list view missing field value %q", val)
-		}
-	}
-}
-
-// ===========================================================================
-// REDIS-LIST-04: Redis list row count appears in frame title
-// ===========================================================================
-
-func TestQA_Redis_FrameTitle(t *testing.T) {
-	m := loadedRedisModel(t)
-	title := m.FrameTitle()
-
-	expected := "redis(1)"
-	if title != expected {
-		t.Errorf("expected FrameTitle() = %q, got %q", expected, title)
-	}
-}
-
-// ===========================================================================
-// REDIS-LIST-05: Redis list row coloring by status
-// ===========================================================================
-
-func TestQA_Redis_StatusColoring(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := redisTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "redis",
-		Resources:    multiStatusRedisFixtures(),
-	})
-
-	out := m.View()
-
-	// All three statuses must be visible in the rendered output
-	for _, status := range []string{"available", "creating", "deleting"} {
-		if !strings.Contains(out, status) {
-			t.Errorf("Redis list missing status %q in rendered output", status)
-		}
-	}
-
-	// With NO_COLOR unset, the output should contain ANSI escape sequences
-	// (color codes) -- verify the output is styled
-	if !strings.Contains(out, "\x1b[") {
-		t.Error("Redis list with status colors should contain ANSI escape sequences")
-	}
-}
-
-// ===========================================================================
-// REDIS-LIST-06: Redis list cursor navigation
-// ===========================================================================
-
-func TestQA_Redis_CursorNavigation(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := redisTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "redis",
-		Resources:    multiStatusRedisFixtures(),
-	})
-
-	// Initial selection is row 0
-	sel := m.SelectedResource()
-	if sel == nil || sel.ID != "redis-available" {
-		t.Fatalf("expected initial selection to be redis-available, got %v", sel)
-	}
-
-	// Move down with 'j'
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "j"})
-	sel = m.SelectedResource()
-	if sel == nil || sel.ID != "redis-creating" {
-		t.Errorf("after 'j', expected redis-creating, got %v", sel)
-	}
-
-	// Move up with 'k'
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "k"})
-	sel = m.SelectedResource()
-	if sel == nil || sel.ID != "redis-available" {
-		t.Errorf("after 'k', expected redis-available, got %v", sel)
-	}
-
-	// Jump to bottom with 'G'
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "G"})
-	sel = m.SelectedResource()
-	if sel == nil || sel.ID != "redis-deleting" {
-		t.Errorf("after 'G', expected redis-deleting, got %v", sel)
-	}
-
-	// Jump to top with 'g'
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "g"})
-	sel = m.SelectedResource()
-	if sel == nil || sel.ID != "redis-available" {
-		t.Errorf("after 'g', expected redis-available, got %v", sel)
-	}
-}
-
-// ===========================================================================
-// REDIS-LIST-08: Redis list filter
-// ===========================================================================
-
-func TestQA_Redis_ListFilter(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := redisTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "redis",
-		Resources:    multiStatusRedisFixtures(),
-	})
-
-	// Apply a filter that matches only one resource
-	m.SetFilter("creating")
-	out := m.View()
-
-	if !strings.Contains(out, "redis-creating") {
-		t.Error("filtered Redis list should contain 'redis-creating'")
-	}
-	if strings.Contains(out, "redis-available") {
-		t.Error("filtered Redis list should NOT contain 'redis-available'")
-	}
-
-	// The " !N" issue suffix is unconditional and counts over ALL loaded rows
-	// (Controller.listIssueCount reads c.listScreenResources, not the
-	// filtered/visible set) — so it renders identically whether or not a text
-	// filter narrows what's on screen. Of the 3 multiStatusRedisFixtures rows,
-	// colorRedis (core/aws/catalog_databases.go) classifies "redis-creating"
-	// (Fields["status"]="creating — new group") and "redis-deleting"
-	// (Fields["status"]="deleting — teardown") as ColorWarning (both match the
-	// explicit Warning-phrase switch cases); "redis-available"
-	// (Fields["status"]="") falls through to the default ColorHealthy. So N=2.
-	title := m.FrameTitle()
-	if title != "redis(1/3) !2" {
-		t.Errorf("expected filtered FrameTitle = %q, got %q", "redis(1/3) !2", title)
-	}
-
-	// Clear filter
-	m.SetFilter("")
-	title = m.FrameTitle()
-	if title != "redis(3) !2" {
-		t.Errorf("expected unfiltered FrameTitle = %q, got %q", "redis(3) !2", title)
-	}
-}
-
-// ===========================================================================
-// REDIS-LIST-09: Redis list sorting
-// ===========================================================================
-
-func TestQA_Redis_ListSort(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := redisTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "redis",
-		Resources:    multiStatusRedisFixtures(),
-	})
-
-	// Sort by column 0 ('1') -- Cluster ID column (key "cluster_id", index 0, 1-indexed key "1")
-	// so the sort indicator should appear on that column.
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "1"})
-	out := m.View()
-	if !strings.Contains(out, "\u2191") && !strings.Contains(out, "\u2193") {
-		t.Error("expected sort indicator arrow in Cluster ID column header after pressing 1")
-	}
-
-	// Press 1 again to toggle sort direction
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "1"})
-	out2 := m.View()
-	// Sort should still be active (indicator present)
-	if !strings.Contains(out2, "\u2191") && !strings.Contains(out2, "\u2193") {
-		t.Error("expected sort indicator to remain after toggling sort direction")
-	}
-
-	// Sort by column 1 ('2') -- "Version" column; verify sort happens without crashing.
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "2"})
-	sel := m.SelectedResource()
-	if sel == nil {
-		t.Error("after sort by column 2, should still have a selected resource")
-	}
-}
-
-// ===========================================================================
-// REDIS-LIST-11: Redis list with no clusters
-// ===========================================================================
-
-func TestQA_Redis_EmptyList(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := redisTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "redis",
-		Resources:    []resource.Resource{},
-	})
-
-	out := m.View()
-	if !strings.Contains(out, "No resources found") {
-		t.Errorf("empty Redis list should show 'No resources found', got: %q", out)
-	}
-
-	title := m.FrameTitle()
-	if title != "redis(0)" {
-		t.Errorf("expected empty FrameTitle = %q, got %q", "redis(0)", title)
-	}
-}
-
-// ===========================================================================
-// REDIS-LIST-12: Redis list with null ConfigurationEndpoint
-// ===========================================================================
-
-func TestQA_Redis_NullEndpoint(t *testing.T) {
-	m := loadedRedisModel(t)
-	out := m.View()
-
-	// The fixture has an empty endpoint. It should NOT show "null" or "<nil>".
-	if strings.Contains(out, "null") || strings.Contains(out, "<nil>") {
-		t.Error("Redis list should not display 'null' or '<nil>' for empty endpoint")
-	}
-}
-
-// ===========================================================================
 // REDIS-DETAIL-01 / REDIS-DETAIL-02: Redis detail view
 // ===========================================================================
 
+// TestQA_Redis_DetailView is the live-seam replacement for the retired
+// views.NewDetail(...).View() call (DetailModel.View is dead; see
+// specs/022-codebase-cleanup/wave3-map-detail.md) — drives
+// Controller.EnsureDetailState + NewTransientDetail.RenderDetail instead.
 func TestQA_Redis_DetailView(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	k := keys.Default()
 	res := fixtures[0]
-	m := views.NewDetail(res, "redis", nil, k)
-	m.SetSize(80, 20)
-	out := m.View()
+	c := newDetailControllerUnit(t, res, "redis")
+
+	body := c.Snapshot().Body.Detail
+	if body == nil {
+		t.Fatal("Body.Detail is nil")
+	}
+	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	m := views.NewTransientDetail(80, 20, vp)
+	out := stripANSI(m.RenderDetail(*body))
 
 	if out == "" || out == "Initializing..." {
 		t.Fatal("Redis detail view returned empty or initializing")
@@ -401,12 +109,14 @@ func TestQA_Redis_DetailView(t *testing.T) {
 	}
 }
 
+// TestQA_Redis_DetailFrameTitle is the live-seam replacement for the retired
+// views.NewDetail(...).FrameTitle() call — drives Snapshot().FrameTitle
+// instead (detailFrameTitleLocked mirrors the legacy Name-else-ID semantics).
 func TestQA_Redis_DetailFrameTitle(t *testing.T) {
 	fixtures := fixtureRedisClusters()
-	k := keys.Default()
 	res := fixtures[0]
-	m := views.NewDetail(res, "redis", nil, k)
-	title := m.FrameTitle()
+	c := newDetailControllerUnit(t, res, "redis")
+	title := c.Snapshot().FrameTitle
 
 	// FrameTitle should be the resource Name (or ID if Name is empty)
 	expected := res.Name
@@ -691,87 +401,6 @@ func TestQA_Redis_CommandNavigation(t *testing.T) {
 
 	if cmd == nil {
 		t.Error("executeCommand('redis') should return a command (NavigateMsg)")
-	}
-}
-
-// ===========================================================================
-// REDIS: Horizontal scroll
-// ===========================================================================
-
-func TestQA_Redis_HorizontalScroll(t *testing.T) {
-	fixtures := fixtureRedisClusters()
-
-	tuitest.ForceColor(t)
-
-	td := redisTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(50, 20) // very narrow to force scrolling
-	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "redis",
-		Resources:    fixtures,
-	})
-
-	outBefore := m.View()
-
-	// Scroll right
-	m, _ = m.Update(tea.KeyPressMsg{Code: -1, Text: "l"})
-	outAfter := m.View()
-
-	if outBefore == outAfter {
-		t.Error("expected horizontal scroll to change Redis list output")
-	}
-}
-
-// ===========================================================================
-// REDIS: Loading shows spinner
-// ===========================================================================
-
-func TestQA_Redis_LoadingSpinner(t *testing.T) {
-	tuitest.ForceColor(t)
-
-	td := redisTypeDef()
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(140, 20)
-	m, _ = m.Init()
-
-	out := m.View()
-	if !strings.Contains(out, "Loading") {
-		t.Error("Redis list in loading state should show 'Loading'")
-	}
-
-	title := m.FrameTitle()
-	if title != "redis" {
-		t.Errorf("Redis loading FrameTitle = %q, want %q", title, "redis")
-	}
-}
-
-// ===========================================================================
-// REDIS: No separator row below headers
-// ===========================================================================
-
-func TestQA_Redis_NoSeparatorBelowHeaders(t *testing.T) {
-	m := loadedRedisModel(t)
-	out := m.View()
-
-	lines := strings.SplitSeq(out, "\n")
-	for line := range lines {
-		stripped := strings.TrimSpace(line)
-		if stripped == "" {
-			continue
-		}
-		allDash := true
-		for _, ch := range stripped {
-			if ch != '-' && ch != '_' && ch != '=' && ch != ' ' {
-				allDash = false
-				break
-			}
-		}
-		if allDash && len(stripped) > 5 {
-			t.Errorf("found what looks like a separator row in Redis list: %q", stripped)
-		}
 	}
 }
 
