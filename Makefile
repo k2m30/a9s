@@ -24,8 +24,8 @@ test:
 test-race:
 	go test ./... -count=1 -timeout 300s -race -shuffle=on
 
-# AS-104: capture wall time of `make test` and write test-budget.json. The
-# CI `test-budget` job (.github/workflows/ci.yml) runs this, then invokes
+# Captures wall time of `make test` and writes test-budget.json. The CI
+# `test-budget` job (.github/workflows/ci.yml) runs this, then invokes
 # `scripts/test-budget-gate.sh gate` to fail the build at the 5-minute mark.
 test-budget:
 	@scripts/test-budget-gate.sh capture
@@ -79,9 +79,9 @@ e2e-install:
 security:
 	govulncheck ./...
 
-# TODO(AS-36): drop the docs/historical/refactor/** exclusion once phase-03 lands
-# and refactor-doc churn stops. Excluding here keeps unrelated doc PRs from being
-# gated by in-flight refactor-doc lint regressions (see AS-85).
+# TODO: drop the docs/historical/refactor/** exclusion once refactor-doc churn
+# stops. Excluding here keeps unrelated doc PRs from being gated by lint
+# regressions inside in-flight refactor documents.
 mdlint:
 	markdownlint-cli2 "docs/**/*.md" "!docs/historical/refactor/**" "CLAUDE.md" "CONTRIBUTING.md" "CHANGELOG.md"
 
@@ -91,11 +91,12 @@ coverage:
 
 cover: coverage
 
-# Token-based scan (scripts/verify-readonly.sh): comments are stripped before
-# matching and exemptions are exact method names, so a trailing // or a read
-# verb elsewhere on the line can no longer hide a write call.
+# AST-based scan (cmd/readonlycheck): flags write-verb method CALL nodes in
+# core/aws and core/runtime, so comments, strings, whitespace, and line
+# breaks are structurally irrelevant. SDK-typed receivers are always
+# flagged; exemptions are exact method names on non-SDK receivers.
 verify-readonly:
-	@./scripts/verify-readonly.sh
+	@go run ./cmd/readonlycheck
 
 # The renderer-agnostic boundary (docs/architecture.md, invariant 1): core/
 # must compile with zero Bubble Tea / Lipgloss / internal/ dependencies.
@@ -117,14 +118,15 @@ verify-hooks:
 		echo "PASS: .githooks active"; \
 	fi
 
-# AS-820: lock in AS-795 invariant. init() bodies must not return to
-# core/aws/ or core/catalog/ after the AS-795b..p migration.
-# core/resource/projection_init.go is excluded — AS-731 removes that
-# package wholesale.
+# Locks in the init()-to-catalog cycle-break (design record:
+# docs/historical/refactor/landed/AS-795-init-cycle-break.md): registration
+# lives in catalog literals, so init() bodies must not return to core/aws/
+# or core/catalog/. core/resource/projection_init.go is excluded — that
+# package is scheduled for wholesale removal.
 verify-zero-init:
 	@echo "Checking for init() bodies in core/aws/ and core/catalog/..."
 	@if grep -rln '^func init()' core/aws/ core/catalog/ 2>/dev/null; then \
-		echo "FAIL: init() bodies found in core/aws/ or core/catalog/ — AS-795 invariant is migrated catalog literals, not package init()"; \
+		echo "FAIL: init() bodies found in core/aws/ or core/catalog/ — registration lives in catalog literals, not package init() (see docs/historical/refactor/landed/AS-795-init-cycle-break.md)"; \
 		exit 1; \
 	else \
 		echo "PASS: no init() bodies in core/aws/ or core/catalog/"; \

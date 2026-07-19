@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # test-budget-gate.sh — capture and gate the Stage 6 test-suite wall budget.
 #
-# AS-104: enforces the 5-minute (300s) wall budget defined in
+# Enforces the 5-minute (300s) wall budget defined in
 # docs/development-process.md §"Test suite wall budget" by failing the build
 # when `make test` (non-race) on ubuntu-latest exceeds the budget.
 #
-# AS-6 baseline (run #25618422075, 2026-05-09):
+# Recorded baseline (CI run #25618422075, 2026-05-09):
 #   ubuntu 1m07s · macos 1m05s · windows 1m44s
 # Headroom on ubuntu is ~4m, so the 5m budget is generous; if a future change
 # trips the gate, profile the slow test/package rather than raising the budget.

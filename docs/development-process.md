@@ -129,8 +129,8 @@ This target is the canonical gate. It MUST pass locally with zero edits before a
 4. `make lint` — golangci-lint.
 5. `make security` — govulncheck.
 6. `make gofix` — `//go:fix inline` directives applied.
-7. `make verify-readonly` — read-only invariant via `scripts/verify-readonly.sh`: a token-based scan that strips comments before matching, with exemptions as exact method names — a trailing `//` or a read verb elsewhere on the line cannot hide a write call.
-8. `make verify-zero-init` — zero `init()` bodies in `core/aws/` and `core/catalog/` (the AS-795 invariant: migrated catalog literals, not package `init()`).
+7. `make verify-readonly` — read-only invariant via `cmd/readonlycheck`: an AST-based scan that flags write-verb method call nodes in `core/aws/` and `core/runtime/`, so comments, strings, and formatting are structurally irrelevant; SDK-typed receivers are always flagged, and exemptions are exact method names on non-SDK receivers.
+8. `make verify-zero-init` — zero `init()` bodies in `core/aws/` and `core/catalog/`: registration lives in catalog literals, not package `init()` (design record: `docs/historical/refactor/landed/AS-795-init-cycle-break.md`).
 9. `make verify-renderer-free` — runs `go list -deps` over `core/` and fails on any `charm.land` or `internal/` dependency (the renderer-agnostic boundary, architecture invariant 1).
 10. `make check-readme` — README in sync with `docs/shared/`.
 11. `make check-catalogen` — the generated blocks in `docs/attention-signals.md`, `docs/related-resources.md`, and `docs/resources/*.md` are in sync with the catalog declarations (runs `cmd/catalogen` and fails if regeneration changes anything).
