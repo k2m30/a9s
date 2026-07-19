@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -33,10 +34,10 @@ func loadEC2Resources(t *testing.T) []domain.Resource {
 		return awsclient.FetchEC2InstancesPage(context.Background(), clients.EC2, token)
 	})
 	if err != nil {
-		t.Fatalf("FetchEC2Instances: %v", err)
+		t.Fatalf("FetchEC2InstancesPage: %v", err)
 	}
 	if len(resources) == 0 {
-		t.Fatal("FetchEC2Instances returned no demo fixtures")
+		t.Fatal("FetchEC2InstancesPage returned no demo fixtures")
 	}
 	return resources
 }
@@ -101,7 +102,7 @@ func TestProjectionFieldAudit_NavigableItem(t *testing.T) {
 		t.Skip("no EC2 fixture with a non-empty VpcId — skipping navigability audit")
 	}
 
-	sections := projection.Generic(r)
+	sections := projection.GenericWithConfig(config.DefaultConfig())(r)
 	if len(sections) == 0 {
 		t.Fatalf("projection.Generic returned zero sections for ec2")
 	}
@@ -137,7 +138,7 @@ func TestProjectionFieldAudit_ItemKindTagging(t *testing.T) {
 	}
 	r := resources[0]
 
-	sections := projection.Generic(r)
+	sections := projection.GenericWithConfig(config.DefaultConfig())(r)
 	if len(sections) == 0 {
 		t.Fatalf("projection.Generic returned zero sections for ec2")
 	}
@@ -180,7 +181,7 @@ func TestProjectionFieldAudit_TagFlattening(t *testing.T) {
 		t.Skip("no EC2 fixture with tags — skipping tag-flattening audit")
 	}
 
-	sections := projection.Generic(r)
+	sections := projection.GenericWithConfig(config.DefaultConfig())(r)
 	if len(sections) == 0 {
 		t.Fatalf("projection.Generic returned zero sections for ec2")
 	}
@@ -268,7 +269,7 @@ func TestProjectionFieldAudit_JSONExpansion(t *testing.T) {
 			"add AssumeRolePolicyDocument to core/demo/fixtures/iam.go to enable")
 	}
 
-	sections := projection.Generic(*target)
+	sections := projection.GenericWithConfig(config.DefaultConfig())(*target)
 	if len(sections) == 0 {
 		t.Fatalf("projection.Generic returned zero sections for role")
 	}
@@ -321,7 +322,7 @@ func TestProjectionFieldAudit_ListScalarExtraction(t *testing.T) {
 		t.Skip("no EC2 fixture with VPC — skipping subnet scalar extraction audit")
 	}
 
-	sections := projection.Generic(r)
+	sections := projection.GenericWithConfig(config.DefaultConfig())(r)
 	if len(sections) == 0 {
 		t.Fatalf("projection.Generic returned zero sections for ec2")
 	}
@@ -375,7 +376,7 @@ func TestProjectionFieldAudit_FieldOrdering(t *testing.T) {
 	}
 	r := resources[0]
 
-	sections := projection.Generic(r)
+	sections := projection.GenericWithConfig(config.DefaultConfig())(r)
 	if len(sections) == 0 {
 		t.Fatalf("projection.Generic returned zero sections for ec2")
 	}

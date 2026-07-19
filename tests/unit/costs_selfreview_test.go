@@ -187,9 +187,9 @@ func TestCostsSelfReview_C3_AnomalyDateFormat_RFC3339AndDateOnly_ProduceMatching
 					},
 				},
 			}}
-			marks, err := a9saws.FetchCostAnomalies(context.Background(), stub, costs.Period{Start: "2026-06-01", End: "2026-07-01"})
+			marks, _, err := a9saws.FetchCostAnomaliesCounted(context.Background(), stub, costs.Period{Start: "2026-06-01", End: "2026-07-01"})
 			if err != nil {
-				t.Fatalf("FetchCostAnomalies() error = %v", err)
+				t.Fatalf("FetchCostAnomaliesCounted() error = %v", err)
 			}
 			if len(marks) != 1 {
 				t.Fatalf("len(marks) = %d, want 1", len(marks))

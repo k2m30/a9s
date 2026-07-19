@@ -43,15 +43,6 @@ func TestFormatTruncated_AppendsPlusSuffix(t *testing.T) {
 	}
 }
 
-// TestFormatUnknown_ReturnsEmDash verifies that FormatUnknown returns the em dash
-// sentinel used to represent an indeterminate cell value.
-func TestFormatUnknown_ReturnsEmDash(t *testing.T) {
-	got := resource.FormatUnknown()
-	if got != "—" {
-		t.Errorf("FormatUnknown() = %q; want %q", got, "—")
-	}
-}
-
 // TestCellUnknownText_IsEmDash verifies that the exported constant equals the
 // em dash character used throughout the UI.
 func TestCellUnknownText_IsEmDash(t *testing.T) {

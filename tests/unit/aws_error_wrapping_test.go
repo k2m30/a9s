@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
+
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -41,7 +43,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching S3 buckets",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchS3BucketsPage(ctx, &mockS3ListBucketsClient{err: sentinel}, token)
+					return awsclient.FetchS3BucketsPageWithNotifications(ctx, &mockS3ListBucketsClient{err: sentinel}, nil, token)
 				})
 				return err
 			},
@@ -88,9 +90,8 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "EKS clusters - list error",
 			contains: "listing EKS clusters",
 			call: func() error {
-				_, err := awsclient.FetchEKSClusters(ctx,
-					&mockEKSListClustersClient{err: sentinel},
-					&mockEKSDescribeClusterClient{})
+				clients := &awsclient.ServiceClients{EKS: newMockEKSFull(&mockEKSListClustersClient{err: sentinel}, nil, nil, nil)}
+				_, err := awsclient.FetchEKSClustersPage(ctx, clients, "")
 				return err
 			},
 		},
@@ -136,10 +137,9 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "Node groups - list clusters error",
 			contains: "listing EKS clusters",
 			call: func() error {
-				_, err := awsclient.FetchNodeGroups(ctx,
-					&mockEKSListClustersClient{err: sentinel},
-					&mockEKSListNodegroupsClient{},
-					&mockEKSDescribeNodegroupClient{})
+				pf := resource.GetPaginatedFetcher("ng")
+				clients := &awsclient.ServiceClients{EKS: newMockEKSFull(&mockEKSListClustersClient{err: sentinel}, nil, nil, nil)}
+				_, err := pf(ctx, clients, "")
 				return err
 			},
 		},
@@ -434,11 +434,14 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "ECS tasks - list clusters error",
 			contains: "listing ECS clusters",
 			call: func() error {
+				fetcher := resource.GetPaginatedFetcher("ecs-task")
+				clients := &awsclient.ServiceClients{ECS: &fullECSAPI{
+					listClustersFn: func(_ *ecs.ListClustersInput) (*ecs.ListClustersOutput, error) {
+						return nil, sentinel
+					},
+				}}
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchECSTasksPage(ctx,
-						&mockECSListClustersClient{err: sentinel},
-						&mockECSListTasksClient{},
-						&mockECSDescribeTasksClient{}, token)
+					return fetcher(ctx, clients, token)
 				})
 				return err
 			},
@@ -528,7 +531,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching CodePipeline pipelines",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchCodePipelinesPage(ctx, &mockCodePipelineClient{err: sentinel}, token)
+					return awsclient.FetchCodePipelinesPageWithClients(ctx, &awsclient.ServiceClients{CodePipeline: &mockCodePipelineClient{err: sentinel}}, token)
 				})
 				return err
 			},
@@ -548,7 +551,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching WAF web ACLs",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchWAFWebACLsPage(ctx, &mockWAFv2Client{err: sentinel}, token)
+					return awsclient.FetchWAFWebACLsPageWithCloudFront(ctx, &mockWAFv2Client{err: sentinel}, nil, token)
 				})
 				return err
 			},
@@ -647,10 +650,8 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "KMS keys - list error",
 			contains: "listing KMS keys",
 			call: func() error {
-				_, err := awsclient.FetchKMSKeys(ctx,
-					&mockKMSListKeysClient{err: sentinel},
-					&mockKMSDescribeKeyClient{},
-					&mockKMSListAliasesClient{})
+				clients := &awsclient.ServiceClients{KMS: newMockKMSFull(&mockKMSListKeysClient{err: sentinel}, nil, nil)}
+				_, err := awsclient.FetchKMSKeysPage(ctx, clients, "")
 				return err
 			},
 		},

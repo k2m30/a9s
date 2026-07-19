@@ -49,19 +49,19 @@ type sdkRegionDescriptor struct {
 //
 //nolint:gochecknoglobals // process-scope region catalogue: parsed once at package load
 var (
-	allRegionsCache, awsPartitionRegionRegex = loadCommercialPartition()
+	allRegionsCache = loadCommercialPartition()
 )
 
 // loadCommercialPartition parses the embedded partitions.json and returns the
 // commercial-partition region slice (sorted by code, with each AWSRegion's
-// DisplayName already populated from the SDK description) and the region-code
-// regex. Panics on malformed input — the embedded JSON is vendored at build
-// time so any parse failure is a build-time bug.
+// DisplayName already populated from the SDK description). Panics on
+// malformed input — the embedded JSON is vendored at build time so any parse
+// failure is a build-time bug.
 //
 // AllRegions() copies the returned slice on every call (caller-mutable). Gov-cloud
 // (`aws-us-gov`) and China (`aws-cn`) partitions are skipped intentionally —
 // `TestAllRegions_NoGovOrChinaLeaks` pins the behavior.
-func loadCommercialPartition() ([]AWSRegion, *regexp.Regexp) {
+func loadCommercialPartition() []AWSRegion {
 	var parsed sdkPartitions
 	if err := json.Unmarshal(partitionsJSON, &parsed); err != nil {
 		panic(fmt.Sprintf("aws regions: parse embedded partitions.json: %v", err))
@@ -102,7 +102,7 @@ func loadCommercialPartition() ([]AWSRegion, *regexp.Regexp) {
 	if regex == nil {
 		panic("aws regions: embedded partitions.json has no 'aws' partition")
 	}
-	return regions, regex
+	return regions
 }
 
 // AllRegions returns the list of commercial-partition AWS regions in a stable
@@ -112,16 +112,6 @@ func AllRegions() []AWSRegion {
 	out := make([]AWSRegion, len(allRegionsCache))
 	copy(out, allRegionsCache)
 	return out
-}
-
-// ValidateRegionCode reports whether a region code matches the SDK's commercial
-// region regex. Returns false for an empty string or any code outside the
-// commercial partition.
-func ValidateRegionCode(code string) bool {
-	if awsPartitionRegionRegex == nil {
-		return false
-	}
-	return awsPartitionRegionRegex.MatchString(code)
 }
 
 // maxSourceProfileDepth bounds the source_profile chain walk in

@@ -427,13 +427,6 @@ func resolveListStatusCol(columns []ColumnDef, td *resource.ResourceTypeDef) int
 	return -1
 }
 
-// ResolveListColumns exports the live column-set cascade for use by
-// constructors that need to translate a 0-based column index to a column key
-// (e.g., sort restore).
-func ResolveListColumns(typeName string) []ColumnDef {
-	return resolveListColumnsForBuild(nil, typeName, resource.FindResourceType(typeName))
-}
-
 // ResolveColumnsForType resolves the column set for typeName using this
 // controller's viewConfig and fallbackTypeDefs. Mirrors resolveColumns in
 // table_render.go so that handleSortByCol and buildListBody always agree on

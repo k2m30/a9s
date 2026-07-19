@@ -173,12 +173,12 @@ func TestCostsDemo_Anomaly_RootCauseNamesServiceAndUsageType(t *testing.T) {
 	client := newDemoCostsClient()
 	window := costs.Period{Start: "2024-01-01", End: "2027-01-01"}
 
-	marks, err := a9saws.FetchCostAnomalies(context.Background(), client, window)
+	marks, _, err := a9saws.FetchCostAnomaliesCounted(context.Background(), client, window)
 	if err != nil {
-		t.Fatalf("FetchCostAnomalies: %v", err)
+		t.Fatalf("FetchCostAnomaliesCounted: %v", err)
 	}
 	if len(marks) == 0 {
-		t.Fatal("FetchCostAnomalies returned no anomaly marks")
+		t.Fatal("FetchCostAnomaliesCounted returned no anomaly marks")
 	}
 
 	var match *costs.AnomalyMark

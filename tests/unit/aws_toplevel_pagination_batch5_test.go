@@ -9,6 +9,7 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
+	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -384,6 +385,37 @@ func (m *mockPaginatedECSTaskDescribeTasksClient) DescribeTasks(
 	return &ecs.DescribeTasksOutput{Tasks: tasks}, nil
 }
 
+// ecsTaskFullPaginatedFake composes the three paginated ECS task mocks above
+// into one awsclient.ECSAPI value — the registered "ecs-task" paginated
+// fetcher reads ListClusters/ListTasks/DescribeTasks off a single
+// *ServiceClients.ECS field. DescribeTaskDefinition returns a ClientException
+// ("does not exist"), matching the pre-refactor 3-arg FetchECSTasksPage
+// contract (which never queried task definitions), so
+// Fields["task_def_join_error"] stays unset.
+type ecsTaskFullPaginatedFake struct {
+	*mockPaginatedECSTaskListClustersClient
+	*mockPaginatedECSTaskListTasksClient
+	*mockPaginatedECSTaskDescribeTasksClient
+}
+
+func (f *ecsTaskFullPaginatedFake) DescribeTaskDefinition(
+	_ context.Context, _ *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options),
+) (*ecs.DescribeTaskDefinitionOutput, error) {
+	return nil, &smithy.GenericAPIError{Code: "ClientException", Message: "task definition does not exist"}
+}
+
+func (f *ecsTaskFullPaginatedFake) DescribeClusters(_ context.Context, _ *ecs.DescribeClustersInput, _ ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error) {
+	return &ecs.DescribeClustersOutput{}, nil
+}
+
+func (f *ecsTaskFullPaginatedFake) ListServices(_ context.Context, _ *ecs.ListServicesInput, _ ...func(*ecs.Options)) (*ecs.ListServicesOutput, error) {
+	return &ecs.ListServicesOutput{}, nil
+}
+
+func (f *ecsTaskFullPaginatedFake) DescribeServices(_ context.Context, _ *ecs.DescribeServicesInput, _ ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error) {
+	return &ecs.DescribeServicesOutput{}, nil
+}
+
 func TestFetchECSTasks_PaginatedListClusters(t *testing.T) {
 	cluster1ARN := "arn:aws:ecs:us-east-1:123456789012:cluster/cluster-1"
 	cluster2ARN := "arn:aws:ecs:us-east-1:123456789012:cluster/cluster-2"
@@ -433,14 +465,10 @@ func TestFetchECSTasks_PaginatedListClusters(t *testing.T) {
 		},
 	}
 
+	fetcher := resource.GetPaginatedFetcher("ecs-task")
+	ecsFull := &ecsTaskFullPaginatedFake{listClustersMock, listTasksMock, describeTasksMock}
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchECSTasksPage(
-			context.Background(),
-			listClustersMock,
-			listTasksMock,
-			describeTasksMock,
-			token,
-		)
+		return fetcher(context.Background(), &awsclient.ServiceClients{ECS: ecsFull}, token)
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)

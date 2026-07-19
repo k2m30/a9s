@@ -19,8 +19,10 @@ import (
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -418,6 +420,42 @@ func (m *mockECSDescribeTasksAPIPaginated) DescribeTasks(_ context.Context, _ *e
 	return m.DescribeFunc(m.Calls)
 }
 
+// ecsTaskInfraFullFake composes the three paginated ECS task mocks above into
+// one awsclient.ECSAPI value — the registered "ecs-task" paginated fetcher
+// reads ListClusters/ListTasks/DescribeTasks off a single
+// *ServiceClients.ECS field. DescribeClusters/ListServices/DescribeServices
+// are stubbed since these tests never touch them. DescribeTaskDefinition
+// returns a ClientException ("does not exist"), matching the pre-refactor
+// 4-arg FetchECSTasksPage contract, so Fields["task_def_join_error"] stays
+// unset.
+type ecsTaskInfraFullFake struct {
+	*mockECSListClustersAPIPaginated
+	*mockECSListTasksAPIPaginated
+	*mockECSDescribeTasksAPIPaginated
+}
+
+func (f *ecsTaskInfraFullFake) DescribeClusters(_ context.Context, _ *ecs.DescribeClustersInput, _ ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error) {
+	return &ecs.DescribeClustersOutput{}, nil
+}
+
+func (f *ecsTaskInfraFullFake) ListServices(_ context.Context, _ *ecs.ListServicesInput, _ ...func(*ecs.Options)) (*ecs.ListServicesOutput, error) {
+	return &ecs.ListServicesOutput{}, nil
+}
+
+func (f *ecsTaskInfraFullFake) DescribeServices(_ context.Context, _ *ecs.DescribeServicesInput, _ ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error) {
+	return &ecs.DescribeServicesOutput{}, nil
+}
+
+func (f *ecsTaskInfraFullFake) DescribeTaskDefinition(_ context.Context, _ *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
+	return nil, &smithy.GenericAPIError{Code: "ClientException", Message: "task definition does not exist"}
+}
+
+func qaInfraFetchECSTasks(ctx context.Context, listClusters *mockECSListClustersAPIPaginated, listTasks *mockECSListTasksAPIPaginated, describeTasks *mockECSDescribeTasksAPIPaginated, token string) (resource.FetchResult, error) {
+	fetcher := resource.GetPaginatedFetcher("ecs-task")
+	clients := &awsclient.ServiceClients{ECS: &ecsTaskInfraFullFake{listClusters, listTasks, describeTasks}}
+	return fetcher(ctx, clients, token)
+}
+
 // ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchECSTasksPage
 // ---------------------------------------------------------------------------
@@ -457,7 +495,7 @@ func TestQA_Pagination_FetchECSTasksPage_FirstPage(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchECSTasksPage(context.Background(), listClustersMock, listTasksMock, describeTasksMock, "")
+	result, err := qaInfraFetchECSTasks(context.Background(), listClustersMock, listTasksMock, describeTasksMock, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -509,7 +547,7 @@ func TestQA_Pagination_FetchECSTasksPage_Continuation(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchECSTasksPage(context.Background(), listClustersMock, listTasksMock, describeTasksMock, "token-page-2")
+	result, err := qaInfraFetchECSTasks(context.Background(), listClustersMock, listTasksMock, describeTasksMock, "token-page-2")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -550,7 +588,7 @@ func TestQA_Pagination_FetchECSTasksPage_Empty(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchECSTasksPage(context.Background(), listClustersMock, listTasksMock, describeTasksMock, "")
+	result, err := qaInfraFetchECSTasks(context.Background(), listClustersMock, listTasksMock, describeTasksMock, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -582,7 +620,7 @@ func TestQA_Pagination_FetchECSTasksPage_Error(t *testing.T) {
 		},
 	}
 
-	_, err := awsclient.FetchECSTasksPage(context.Background(), listClustersMock, listTasksMock, describeTasksMock, "")
+	_, err := qaInfraFetchECSTasks(context.Background(), listClustersMock, listTasksMock, describeTasksMock, "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

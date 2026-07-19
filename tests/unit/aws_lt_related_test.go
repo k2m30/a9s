@@ -73,10 +73,12 @@ func ltSiblingCache(t *testing.T) resource.ResourceCache {
 	}
 
 	eksFake := fakes.NewEKS()
-	ngResources, err := awsclient.FetchNodeGroups(ctx, eksFake, eksFake, eksFake, fakes.NewEC2())
+	pf := resource.GetPaginatedFetcher("ng")
+	ngResult, err := pf(ctx, &awsclient.ServiceClients{EKS: eksFake, EC2: fakes.NewEC2()}, "")
 	if err != nil {
-		t.Fatalf("FetchNodeGroups: %v", err)
+		t.Fatalf("ng paginated fetcher: %v", err)
 	}
+	ngResources := ngResult.Resources
 
 	return resource.ResourceCache{
 		"asg": resource.ResourceCacheEntry{Resources: asgResources},

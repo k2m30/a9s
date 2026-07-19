@@ -12,6 +12,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/tests/testdata"
 )
 
@@ -93,7 +94,10 @@ func TestFetchNodeGroups_ParsesMultipleClustersAndGroups(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
+	ngFetcher := resource.GetPaginatedFetcher("ng")
+	ngClients := &awsclient.ServiceClients{EKS: newMockEKSFull(listClustersMock, nil, listNGMock, describeNGMock)}
+	ngResult, err := ngFetcher(context.Background(), ngClients, "")
+	resources := ngResult.Resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -187,7 +191,10 @@ func TestFetchNodeGroups_ListClustersError(t *testing.T) {
 	listNGMock := &mockEKSListNodegroupsClient{}
 	describeNGMock := &mockEKSDescribeNodegroupClient{}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
+	ngFetcher := resource.GetPaginatedFetcher("ng")
+	ngClients := &awsclient.ServiceClients{EKS: newMockEKSFull(listClustersMock, nil, listNGMock, describeNGMock)}
+	ngResult, err := ngFetcher(context.Background(), ngClients, "")
+	resources := ngResult.Resources
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -207,7 +214,10 @@ func TestFetchNodeGroups_ListNodegroupsError(t *testing.T) {
 	}
 	describeNGMock := &mockEKSDescribeNodegroupClient{}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
+	ngFetcher := resource.GetPaginatedFetcher("ng")
+	ngClients := &awsclient.ServiceClients{EKS: newMockEKSFull(listClustersMock, nil, listNGMock, describeNGMock)}
+	ngResult, err := ngFetcher(context.Background(), ngClients, "")
+	resources := ngResult.Resources
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -231,12 +241,24 @@ func TestFetchNodeGroups_DescribeNodegroupError(t *testing.T) {
 		err: fmt.Errorf("AWS API error: describe nodegroup failed"),
 	}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
+	ngFetcher := resource.GetPaginatedFetcher("ng")
+	ngClients := &awsclient.ServiceClients{EKS: newMockEKSFull(listClustersMock, nil, listNGMock, describeNGMock)}
+	ngResult, err := ngFetcher(context.Background(), ngClients, "")
+	resources := ngResult.Resources
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d resources", len(resources))
+	// DescribeNodegroup failing for a listed node group does not drop it —
+	// fetchNodeGroupsPage keeps a name-only degraded row (DegradedDetails)
+	// and folds the failure into the composite error instead.
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 degraded resource on describe failure, got %d resources", len(resources))
+	}
+	if resources[0].ID != "ng-web" {
+		t.Errorf("degraded resource ID: expected %q, got %q", "ng-web", resources[0].ID)
+	}
+	if resources[0].Fields["status"] != "details unavailable" {
+		t.Errorf("degraded resource Fields[status]: expected %q, got %q", "details unavailable", resources[0].Fields["status"])
 	}
 }
 
@@ -249,7 +271,10 @@ func TestFetchNodeGroups_EmptyClusters(t *testing.T) {
 	listNGMock := &mockEKSListNodegroupsClient{}
 	describeNGMock := &mockEKSDescribeNodegroupClient{}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
+	ngFetcher := resource.GetPaginatedFetcher("ng")
+	ngClients := &awsclient.ServiceClients{EKS: newMockEKSFull(listClustersMock, nil, listNGMock, describeNGMock)}
+	ngResult, err := ngFetcher(context.Background(), ngClients, "")
+	resources := ngResult.Resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -272,7 +297,10 @@ func TestFetchNodeGroups_ClustersButNoNodeGroups(t *testing.T) {
 	}
 	describeNGMock := &mockEKSDescribeNodegroupClient{}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
+	ngFetcher := resource.GetPaginatedFetcher("ng")
+	ngClients := &awsclient.ServiceClients{EKS: newMockEKSFull(listClustersMock, nil, listNGMock, describeNGMock)}
+	ngResult, err := ngFetcher(context.Background(), ngClients, "")
+	resources := ngResult.Resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -316,7 +344,10 @@ func TestFetchNodeGroups_RawStructPopulated(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
+	ngFetcher := resource.GetPaginatedFetcher("ng")
+	ngClients := &awsclient.ServiceClients{EKS: newMockEKSFull(listClustersMock, nil, listNGMock, describeNGMock)}
+	ngResult, err := ngFetcher(context.Background(), ngClients, "")
+	resources := ngResult.Resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -370,7 +401,10 @@ func TestFetchNodeGroups_NilScalingConfig(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
+	ngFetcher := resource.GetPaginatedFetcher("ng")
+	ngClients := &awsclient.ServiceClients{EKS: newMockEKSFull(listClustersMock, nil, listNGMock, describeNGMock)}
+	ngResult, err := ngFetcher(context.Background(), ngClients, "")
+	resources := ngResult.Resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -429,7 +463,10 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 		outputs: describeOutputs,
 	}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
+	ngFetcher := resource.GetPaginatedFetcher("ng")
+	ngClients := &awsclient.ServiceClients{EKS: newMockEKSFull(listClustersMock, nil, listNGMock, describeNGMock)}
+	ngResult, err := ngFetcher(context.Background(), ngClients, "")
+	resources := ngResult.Resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

@@ -12,15 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// FetchCodePipelinesPage fetches a single page of CodePipeline pipelines.
-// No client context is available here to resolve the real account, so
-// Fields["arn"] is left empty. Use FetchCodePipelinesPageWithClients (the
-// production catalog path) to construct the ARN from the session's real
-// resolved region/account.
-func FetchCodePipelinesPage(ctx context.Context, api CodePipelineListPipelinesAPI, continuationToken string) (resource.FetchResult, error) {
-	return fetchCodePipelinesPage(ctx, api, GetDefaultRegion("", ""), "", continuationToken)
-}
-
 // FetchCodePipelinesPageWithClients fetches a single page of CodePipeline
 // pipelines and constructs Fields["arn"] for each pipeline
 // (arn:aws:codepipeline:<region>:<account>:<name>) using the session's

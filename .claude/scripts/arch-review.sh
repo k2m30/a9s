@@ -284,17 +284,14 @@ else
   while IFS= read -r line; do detail "$line"; done <<< "$multi_method_aws"
 fi
 
-# View interface should have exactly 5 methods
-view_methods=$(awk '
-  /^type View interface/ { in_iface = 1; methods = 0; next }
-  in_iface && /^}/ { print methods; in_iface = 0 }
-  in_iface && /^\t[A-Z]/ { methods++ }
-' internal/tui/views/view.go 2>/dev/null || true)
-
-if [ "$view_methods" = "5" ]; then
-  pass "View interface has exactly 5 methods"
+# The per-view View interface died in the 020 refactor (headless controller +
+# renderer.go render the ViewState directly); guard against it growing back.
+view_iface=$(grep -rn '^type View interface' internal/tui/ 2>/dev/null | grep -v '_test.go' || true)
+if [ -z "$view_iface" ]; then
+  pass "No per-view View interface (020 architecture: renderer consumes ViewState)"
 else
-  fail "View interface has $view_methods methods (expected 5)"
+  fail "A View interface reappeared in internal/tui/ (020 removed it — renderers consume ViewState)"
+  while IFS= read -r line; do detail "$line"; done <<< "$view_iface"
 fi
 
 # ============================================================================
@@ -543,6 +540,40 @@ if [ "$reg_count" -le "$def_count" ]; then
   pass "All $reg_count catalog-registered types have default view definitions ($def_count defs, includes child views)"
 else
   fail "Catalog-registered types ($reg_count) exceed default view definitions ($def_count) -- missing view defs"
+fi
+
+# ============================================================================
+section "DEAD EXPORTS (deadcode vs baseline ratchet)"
+# ============================================================================
+
+# golang.org/x/tools/cmd/deadcode reports functions unreachable from the
+# shipped binary. Test seams (*ForTest and friends) are unreachable BY DESIGN,
+# so the check is a ratchet against a committed baseline rather than a bare
+# fail: new dead exports FAIL; baseline entries that came back alive or got
+# deleted WARN so the baseline gets pruned. Line numbers are stripped —
+# they churn on every edit.
+DEADCODE_BASELINE=".claude/scripts/deadcode-baseline.txt"
+deadcode_out=$(go run golang.org/x/tools/cmd/deadcode@latest ./cmd/a9s 2>/dev/null \
+  | sed -E 's/:[0-9]+:[0-9]+: unreachable func: /: /' \
+  | sort -u || true)
+
+if [ -z "$deadcode_out" ] && ! go run golang.org/x/tools/cmd/deadcode@latest ./cmd/a9s >/dev/null 2>&1; then
+  warn "deadcode tool unavailable (offline?) — dead-export ratchet skipped"
+elif [ ! -f "$DEADCODE_BASELINE" ]; then
+  warn "No deadcode baseline at $DEADCODE_BASELINE — create it: the sorted current output of this check"
+else
+  new_dead=$(comm -23 <(printf '%s\n' "$deadcode_out") <(sort -u "$DEADCODE_BASELINE") || true)
+  gone_dead=$(comm -13 <(printf '%s\n' "$deadcode_out") <(sort -u "$DEADCODE_BASELINE") || true)
+  if [ -n "$new_dead" ]; then
+    fail "NEW dead exports (not in baseline — delete them or, for a deliberate test seam, add to baseline with a review)"
+    while IFS= read -r line; do detail "$line"; done <<< "$new_dead"
+  else
+    pass "No dead exports beyond the sanctioned baseline"
+  fi
+  if [ -n "$gone_dead" ]; then
+    warn "Baseline entries no longer dead (prune $DEADCODE_BASELINE)"
+    while IFS= read -r line; do detail "$line"; done <<< "$gone_dead"
+  fi
 fi
 
 # ============================================================================

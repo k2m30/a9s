@@ -13,20 +13,13 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// FetchWAFWebACLsPage fetches a single page of REGIONAL-scope WAF web ACLs.
-// Fields["scope"] is always "REGIONAL" — use FetchWAFWebACLsPageWithCloudFront
-// (the production catalog path) to also include CLOUDFRONT-scope ACLs.
-func FetchWAFWebACLsPage(ctx context.Context, api WAFv2ListWebACLsAPI, continuationToken string) (resource.FetchResult, error) {
-	return fetchWAFWebACLsScopePage(ctx, api, wafv2types.ScopeRegional, continuationToken)
-}
-
 // FetchWAFWebACLsPageWithCloudFront fetches a single page of REGIONAL-scope
 // WAF web ACLs and, on the first page only (continuationToken == ""), also
 // fully lists CLOUDFRONT-scope ACLs and appends them. CLOUDFRONT-scope ACLs
 // are account-wide/global (not region-paginated the way REGIONAL ACLs are),
 // so folding them into page 1 avoids re-listing them on every REGIONAL page.
 // cfAPI may be nil (e.g. not yet wired) — in that case only REGIONAL ACLs
-// are returned, same as FetchWAFWebACLsPage.
+// are returned.
 func FetchWAFWebACLsPageWithCloudFront(ctx context.Context, api WAFv2ListWebACLsAPI, cfAPI WAFv2ListWebACLsAPI, continuationToken string) (resource.FetchResult, error) {
 	result, err := fetchWAFWebACLsScopePage(ctx, api, wafv2types.ScopeRegional, continuationToken)
 	if err != nil {

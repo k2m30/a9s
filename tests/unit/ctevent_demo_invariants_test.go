@@ -112,7 +112,7 @@ func buildFakeResourceCache(t *testing.T) resource.ResourceCache {
 	fetch("ec2", instances, err)
 
 	buckets, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchS3BucketsPage(ctx, clients.S3, token)
+		return awsclient.FetchS3BucketsPageWithNotifications(ctx, clients.S3, nil, token)
 	})
 	fetch("s3", buckets, err)
 
@@ -126,7 +126,9 @@ func buildFakeResourceCache(t *testing.T) resource.ResourceCache {
 	})
 	fetch("rds", rdsInstances, err)
 
-	kmsKeys, err := awsclient.FetchKMSKeys(ctx, clients.KMS, clients.KMS, clients.KMS)
+	kmsKeys, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchKMSKeysPage(ctx, clients, token)
+	})
 	fetch("kms", kmsKeys, err)
 
 	secrets, err := collectAllPages(func(token string) (resource.FetchResult, error) {

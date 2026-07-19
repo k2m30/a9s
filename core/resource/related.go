@@ -429,9 +429,9 @@ var defaultNavFieldMu sync.RWMutex
 // defaultNavFieldRegistry is an immutable-by-convention registry, currently
 // always empty (nothing writes to it). GetDefaultNavFields falls through to
 // the catalog Navigable defaults below. NavFieldsProvider (used by
-// projection.Generic) reads from this registry. DetailModel reads from the
-// mutable navigableFieldRegistry so that tests can construct models without
-// any nav field registrations.
+// projection.GenericWithConfig) reads from this registry. DetailModel reads
+// from the mutable navigableFieldRegistry so that tests can construct
+// models without any nav field registrations.
 var defaultNavFieldRegistry = map[string][]NavigableField{}
 
 // SetRelatedForTest stores related definitions for the given resource short
@@ -647,8 +647,8 @@ func CleanupNavigableFieldsForTest(shortName string) {
 
 // GetDefaultNavFields returns the default (init-time) navigable field definitions
 // for the given resource short name. Returns nil if none were registered at init.
-// Used by NavFieldsProvider so that projection.Generic always sees the canonical
-// nav fields regardless of the active-registry state.
+// Used by NavFieldsProvider so that projection.GenericWithConfig always sees
+// the canonical nav fields regardless of the active-registry state.
 func GetDefaultNavFields(shortName string) []NavigableField {
 	defaultNavFieldMu.RLock()
 	if fields, ok := defaultNavFieldRegistry[shortName]; ok && len(fields) > 0 {

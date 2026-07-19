@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -62,7 +63,11 @@ func TestProjectorCoverageAllTypes(t *testing.T) {
 				r = minimalResource(td.ShortName)
 			}
 
-			proj := projection.Generic
+			// Mirrors the deleted projection.Generic's own fallback chain
+			// (config.Load(), falling back to config.DefaultConfig() when
+			// absent) — DefaultConfig() reproduces that fallback
+			// deterministically in a hermetic test.
+			proj := projection.GenericWithConfig(config.DefaultConfig())
 			if td.Project != nil {
 				proj = td.Project
 			}
@@ -158,7 +163,7 @@ func fetchDemoResourceSample(t *testing.T) map[string][]domain.Resource {
 
 	// Storage
 	s3Res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchS3BucketsPage(ctx, clients.S3, token)
+		return awsclient.FetchS3BucketsPageWithNotifications(ctx, clients.S3, nil, token)
 	})
 	tryAdd("s3", s3Res, err)
 

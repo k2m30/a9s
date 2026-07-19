@@ -81,7 +81,8 @@ type ResourceTypeDef struct {
 	// AllWave2 filter in core/aws/wave2.go.
 	Wave2 any
 	// Project is an optional custom DetailProjector. When nil,
-	// projection.Generic is used as the fallback projector.
+	// projection.GenericWithConfig (or GenericWithConfigAndNavProvider) is
+	// used as the fallback projector.
 	Project domain.DetailProjector
 	// Related defines the right-column related-resource panel for this type.
 	Related []domain.RelatedDef

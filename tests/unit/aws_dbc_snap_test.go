@@ -1,13 +1,16 @@
 package unit
 
-// aws_dbc_snap_test.go — Table-driven unit tests for ComputeDBCSnapStatusAndIssues.
+// aws_dbc_snap_test.go — Table-driven unit tests for the dbc-snap §4 phrase
+// computers.
 //
 // Spec: docs/resources/dbc-snap.md §3.1 + §4
 //
-// ComputeDBCSnapStatusAndIssues is the fetcher-local §4 phrase computer added
-// by the coder's refactor of core/aws/dbc_snap.go. It follows the same
-// contract as ComputeDBISnapStatusAndIssues (dbi-snap) but with the dbc-snap
-// signal set:
+// computeDBCSnapFindings/computeRDSDBClusterSnapshotFindings (core/aws) are
+// unexported, so these tests drive them black-box through the exported
+// per-SDK page fetchers (FetchDocDBClusterSnapshotsPage /
+// FetchRDSDBClusterSnapshotsPage — mirrors dbi-snap's fetchSnap pattern in
+// aws_dbi_snap_test.go), reading the computed phrase/Findings back off the
+// returned Resource:
 //
 //   Broken: failed, incompatible-* (exit early, Issues=[keyword])
 //   Warning: creating (Issues=["creating"])
@@ -20,10 +23,6 @@ package unit
 // DBClusterSnapshot has no PercentProgress-style cause for the "creating" state
 // (spec §4 note: "no per-snapshot failure-reason field on DBClusterSnapshot"),
 // so the Issues slice carries just "creating", not "creating: <pct>%".
-//
-// Import path for the function under test:
-//
-//	awsclient "github.com/k2m30/a9s/v3/core/aws"
 
 import (
 	"context"
@@ -37,8 +36,48 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// dbcSnapDocDBSinglePageMock implements awsclient.DocDBDescribeDBClusterSnapshotsAPI
+// with a single fixed page — used to drive one DBClusterSnapshot through
+// FetchDocDBClusterSnapshotsPage per table-driven case.
+type dbcSnapDocDBSinglePageMock struct {
+	output *docdb.DescribeDBClusterSnapshotsOutput
+}
+
+func (m *dbcSnapDocDBSinglePageMock) DescribeDBClusterSnapshots(
+	_ context.Context,
+	_ *docdb.DescribeDBClusterSnapshotsInput,
+	_ ...func(*docdb.Options),
+) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
+	return m.output, nil
+}
+
+// dbcSnapRDSSinglePageMock implements awsclient.RDSDescribeDBClusterSnapshotsAPI
+// with a single fixed page — used to drive one DBClusterSnapshot through
+// FetchRDSDBClusterSnapshotsPage per table-driven case.
+type dbcSnapRDSSinglePageMock struct {
+	output *rds.DescribeDBClusterSnapshotsOutput
+}
+
+func (m *dbcSnapRDSSinglePageMock) DescribeDBClusterSnapshots(
+	_ context.Context,
+	_ *rds.DescribeDBClusterSnapshotsInput,
+	_ ...func(*rds.Options),
+) (*rds.DescribeDBClusterSnapshotsOutput, error) {
+	return m.output, nil
+}
+
+// findingPhrases extracts the ordered Phrase list from a Findings slice.
+func findingPhrases(findings []domain.Finding) []string {
+	phrases := make([]string, len(findings))
+	for i, f := range findings {
+		phrases[i] = f.Phrase
+	}
+	return phrases
+}
 
 // TestComputeDBCSnapStatusAndIssues pins the §4 phrase output and Issues slice
 // for each signal in docs/resources/dbc-snap.md §3.1.
@@ -156,20 +195,32 @@ func TestComputeDBCSnapStatusAndIssues(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			gotStatus, gotIssues := awsclient.ComputeDBCSnapStatusAndIssues(tc.snap)
+			mock := &dbcSnapDocDBSinglePageMock{
+				output: &docdb.DescribeDBClusterSnapshotsOutput{DBClusterSnapshots: []docdbtypes.DBClusterSnapshot{tc.snap}},
+			}
+			result, err := awsclient.FetchDocDBClusterSnapshotsPage(context.Background(), mock, "")
+			if err != nil {
+				t.Fatalf("FetchDocDBClusterSnapshotsPage: unexpected error: %v", err)
+			}
+			if len(result.Resources) != 1 {
+				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+			}
+			r := result.Resources[0]
+			gotStatus := r.Fields["status"]
+			gotIssues := findingPhrases(r.Findings)
 
 			if gotStatus != tc.wantStatus {
-				t.Errorf("ComputeDBCSnapStatusAndIssues status:\n  got:  %q\n  want: %q", gotStatus, tc.wantStatus)
+				t.Errorf("Fields[status]:\n  got:  %q\n  want: %q", gotStatus, tc.wantStatus)
 			}
 
 			if len(gotIssues) != len(tc.wantIssues) {
-				t.Errorf("ComputeDBCSnapStatusAndIssues issues length:\n  got:  %v (len=%d)\n  want: %v (len=%d)",
+				t.Errorf("Findings phrases:\n  got:  %v (len=%d)\n  want: %v (len=%d)",
 					gotIssues, len(gotIssues), tc.wantIssues, len(tc.wantIssues))
 				return
 			}
 			for i, want := range tc.wantIssues {
 				if gotIssues[i] != want {
-					t.Errorf("ComputeDBCSnapStatusAndIssues issues[%d]:\n  got:  %q\n  want: %q", i, gotIssues[i], want)
+					t.Errorf("Findings[%d].Phrase:\n  got:  %q\n  want: %q", i, gotIssues[i], want)
 				}
 			}
 		})
@@ -300,20 +351,32 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			gotStatus, gotIssues := awsclient.ComputeRDSDBClusterSnapshotStatusAndIssues(tc.snap)
+			mock := &dbcSnapRDSSinglePageMock{
+				output: &rds.DescribeDBClusterSnapshotsOutput{DBClusterSnapshots: []rdstypes.DBClusterSnapshot{tc.snap}},
+			}
+			result, err := awsclient.FetchRDSDBClusterSnapshotsPage(context.Background(), mock, "")
+			if err != nil {
+				t.Fatalf("FetchRDSDBClusterSnapshotsPage: unexpected error: %v", err)
+			}
+			if len(result.Resources) != 1 {
+				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+			}
+			r := result.Resources[0]
+			gotStatus := r.Fields["status"]
+			gotIssues := findingPhrases(r.Findings)
 
 			if gotStatus != tc.wantStatus {
-				t.Errorf("ComputeRDSDBClusterSnapshotStatusAndIssues status:\n  got:  %q\n  want: %q", gotStatus, tc.wantStatus)
+				t.Errorf("Fields[status]:\n  got:  %q\n  want: %q", gotStatus, tc.wantStatus)
 			}
 
 			if len(gotIssues) != len(tc.wantIssues) {
-				t.Errorf("ComputeRDSDBClusterSnapshotStatusAndIssues issues length:\n  got:  %v (len=%d)\n  want: %v (len=%d)",
+				t.Errorf("Findings phrases:\n  got:  %v (len=%d)\n  want: %v (len=%d)",
 					gotIssues, len(gotIssues), tc.wantIssues, len(tc.wantIssues))
 				return
 			}
 			for i, want := range tc.wantIssues {
 				if gotIssues[i] != want {
-					t.Errorf("ComputeRDSDBClusterSnapshotStatusAndIssues issues[%d]:\n  got:  %q\n  want: %q",
+					t.Errorf("Findings[%d].Phrase:\n  got:  %q\n  want: %q",
 						i, gotIssues[i], want)
 				}
 			}

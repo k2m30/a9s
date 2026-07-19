@@ -6,7 +6,6 @@ package projection
 import (
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -18,8 +17,9 @@ import (
 //
 // projection cannot import core/resource (no import cycle from
 // core/semantics back to core/resource). The callbacks
-// below are set by core/resource at init time so Generic can access
-// per-type metadata without creating that cycle.
+// below are set by core/resource at init time so GenericWithConfig and
+// GenericWithConfigAndNavProvider can access per-type metadata without
+// creating that cycle.
 //
 // Callers that don't wire these (e.g. isolated unit tests that never import
 // core/resource) get graceful fallback: nil callbacks → no navigability,
@@ -27,8 +27,8 @@ import (
 // Fields-only flat rendering).
 
 // NavFieldsProvider returns the navigable field definitions for a resource
-// type, enabling Generic to mark matching detail items as navigable.
-// Set by core/resource.init().
+// type, enabling GenericWithConfig to mark matching detail items as
+// navigable. Set by core/resource.init().
 var NavFieldsProvider func(shortName string) []domain.NavigableField
 
 // NavIDProvider resolves an ARN/value to a bare resource ID for navigation.
@@ -43,70 +43,14 @@ var FieldAliasProvider func(shortName string, fields map[string]string) map[stri
 // Set by core/resource.init().
 var FieldKeysProvider func(shortName string) []string
 
-// ─── View-config cache ────────────────────────────────────────────────────
+// ─── Generic projectors ───────────────────────────────────────────────────
 
-var (
-	viewConfigOnce sync.Once
-	viewConfig     *config.ViewsConfig
-)
-
-// loadConfig returns the cached view config, loading it on first call.
-//
-// Lookup order:
-//  1. config.Load() — discovers per-resource YAML in $A9S_CONFIG_DIR/views/,
-//     ~/.a9s/views/, and .a9s/views/ in CWD.
-//  2. config.DefaultConfig() — built-in defaults compiled into the binary.
-//
-// The defaults fallback is what makes Generic deterministic across
-// environments: a CI runner with no ~/.a9s/views/ produces the same projection
-// shape as an operator's machine with a populated config. Without the
-// fallback, Generic would silently degrade to flat alphabetical Fields-only
-// rendering — losing per-type ordering, headers, navigability, tag flattening,
-// and JSON expansion.
-func loadConfig() *config.ViewsConfig {
-	viewConfigOnce.Do(func() {
-		cfg, _ := config.Load()
-		if cfg == nil {
-			cfg = config.DefaultConfig()
-		}
-		viewConfig = cfg
-	})
-	return viewConfig
-}
-
-// ─── Generic projector ────────────────────────────────────────────────────
-
-// Generic is the default DetailProjector.  It ports the non-ct-events
-// buildFieldList logic from internal/tui/views/detail_fields.go and returns
-// the result as []domain.Section.
-//
-// Behaviour when r.Type == "":
-//   - No per-type view config, navigable-field annotations, or alias
-//     normalisation are applied.
-//   - All entries in r.Fields are sorted alphabetically and returned as a
-//     single section.  This covers synthetic test resources and types that
-//     do not yet set r.Type in their fetcher.
-//
-// Behaviour when r.Type != "":
-//   - Per-type detail paths from ~/.a9s/views/<type>.yaml drive the order.
-//   - Navigable fields are annotated (Navigable=true + TargetType).
-//   - JSON-valued fields are expanded into header + sub-item lines.
-//   - Tag sections are flattened into individual key/value rows.
-func Generic(r domain.Resource) []domain.Section {
-	items := buildItems(r, loadConfig(), NavFieldsProvider)
-	if len(items) == 0 {
-		return nil
-	}
-	return groupIntoSections(items)
-}
-
-// GenericWithConfig returns a DetailProjector equivalent to Generic but using
-// the provided view config instead of loading from disk. Pass nil to suppress
-// view-config-driven detail paths entirely (produces flat alphabetical Fields
-// rendering identical to the legacy nil-viewConfig path).
+// GenericWithConfig returns a DetailProjector using the provided view
+// config. Pass nil to suppress view-config-driven detail paths entirely
+// (produces flat alphabetical Fields rendering).
 //
 // Intended for callers (e.g. DetailModel) that already hold a loaded config
-// and want to avoid a second disk read, or that want nil-config semantics.
+// and want to avoid a disk read, or that want nil-config semantics.
 func GenericWithConfig(cfg *config.ViewsConfig) domain.DetailProjector {
 	return func(r domain.Resource) []domain.Section {
 		items := buildItems(r, cfg, NavFieldsProvider)
@@ -121,7 +65,7 @@ func GenericWithConfig(cfg *config.ViewsConfig) domain.DetailProjector {
 // GenericWithConfig but uses an explicit nav fields provider instead of the
 // global NavFieldsProvider. This allows callers to scope navigability to a
 // specific registry (e.g. the ACTIVE-only registry for DetailModel) without
-// affecting the global provider used by projection.Generic.
+// affecting the global NavFieldsProvider.
 //
 // Pass nil for navProvider to suppress navigable-field annotations entirely.
 func GenericWithConfigAndNavProvider(cfg *config.ViewsConfig, navProvider func(string) []domain.NavigableField) domain.DetailProjector {

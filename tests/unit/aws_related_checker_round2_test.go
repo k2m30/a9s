@@ -36,6 +36,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
+	"github.com/aws/smithy-go"
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -195,6 +196,35 @@ func (f *fakeECSDescribeTasksWithImage) DescribeTasks(_ context.Context, _ *ecs.
 	return &ecs.DescribeTasksOutput{Tasks: f.tasks}, nil
 }
 
+// ecsTaskRound2FullFake composes the three narrow ECS mocks above into one
+// awsclient.ECSAPI value — the registered "ecs-task" paginated fetcher reads
+// ListClusters/ListTasks/DescribeTasks off a single *ServiceClients.ECS
+// field. DescribeClusters/ListServices/DescribeServices are stubbed since
+// this test never touches them. DescribeTaskDefinition returns a
+// ClientException ("does not exist"), matching the pre-refactor 4-arg
+// FetchECSTasksPage contract, so Fields["task_def_join_error"] stays unset.
+type ecsTaskRound2FullFake struct {
+	*fakeECSListClustersOnly
+	*fakeECSListTasksOnly
+	*fakeECSDescribeTasksWithImage
+}
+
+func (f *ecsTaskRound2FullFake) DescribeClusters(_ context.Context, _ *ecs.DescribeClustersInput, _ ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error) {
+	return &ecs.DescribeClustersOutput{}, nil
+}
+
+func (f *ecsTaskRound2FullFake) ListServices(_ context.Context, _ *ecs.ListServicesInput, _ ...func(*ecs.Options)) (*ecs.ListServicesOutput, error) {
+	return &ecs.ListServicesOutput{}, nil
+}
+
+func (f *ecsTaskRound2FullFake) DescribeServices(_ context.Context, _ *ecs.DescribeServicesInput, _ ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error) {
+	return &ecs.DescribeServicesOutput{}, nil
+}
+
+func (f *ecsTaskRound2FullFake) DescribeTaskDefinition(_ context.Context, _ *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
+	return nil, &smithy.GenericAPIError{Code: "ClientException", Message: "task definition does not exist"}
+}
+
 func TestECR_Related_ECSTask_ResolvesViaRealFetcherOutput(t *testing.T) {
 	imageURI := "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme-repo:latest"
 	task := ecstypes.Task{
@@ -211,8 +241,10 @@ func TestECR_Related_ECSTask_ResolvesViaRealFetcherOutput(t *testing.T) {
 	listTasksAPI := &fakeECSListTasksOnly{taskArns: []string{*task.TaskArn}}
 	describeTasksAPI := &fakeECSDescribeTasksWithImage{tasks: []ecstypes.Task{task}}
 
+	fetcher := resource.GetPaginatedFetcher("ecs-task")
+	ecsFull := &ecsTaskRound2FullFake{listClustersAPI, listTasksAPI, describeTasksAPI}
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchECSTasksPage(context.Background(), listClustersAPI, listTasksAPI, describeTasksAPI, token)
+		return fetcher(context.Background(), &awsclient.ServiceClients{ECS: ecsFull}, token)
 	})
 	if err != nil {
 		t.Fatalf("FetchECSTasks returned error: %v", err)

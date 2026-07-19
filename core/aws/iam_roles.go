@@ -157,11 +157,11 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 // itself only ever takes the bare RoleName, so no path-stripping is needed
 // here.
 //
-// Mirrors the resilience contract of FetchIAMPoliciesByIDsFull /
-// FetchIAMPoliciesByIDs: per-id failures (e.g. NoSuchEntity) are collected
-// and returned as a composite error via AggregateFailures, while the
-// resources that did resolve are still returned so the caller gets partial
-// success rather than an all-or-nothing failure.
+// Mirrors the resilience contract of FetchIAMPoliciesByIDsFull: per-id
+// failures (e.g. NoSuchEntity) are collected and returned as a composite
+// error via AggregateFailures, while the resources that did resolve are
+// still returned so the caller gets partial success rather than an
+// all-or-nothing failure.
 func FetchRolesByIDs(ctx context.Context, api IAMGetRoleAPI, ids []string) ([]resource.Resource, error) {
 	if len(ids) == 0 {
 		return nil, nil

@@ -61,6 +61,7 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	ekssvc "github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -104,10 +105,11 @@ func TestPR03c_NGFetcher_ActiveEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
+	ngResult, err := pr03cFetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
 	if err != nil {
-		t.Fatalf("FetchNodeGroups: unexpected error: %v", err)
+		t.Fatalf("ng paginated fetcher: unexpected error: %v", err)
 	}
+	resources := ngResult.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -137,10 +139,11 @@ func TestPR03c_NGFetcher_BrokenEmitsFinding(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
+	ngResult, err := pr03cFetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
 	if err != nil {
-		t.Fatalf("FetchNodeGroups: unexpected error: %v", err)
+		t.Fatalf("ng paginated fetcher: unexpected error: %v", err)
 	}
+	resources := ngResult.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -183,10 +186,11 @@ func TestPR03c_NGFetcher_TransitionalEmitsWarn(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
+	ngResult, err := pr03cFetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
 	if err != nil {
-		t.Fatalf("FetchNodeGroups: unexpected error: %v", err)
+		t.Fatalf("ng paginated fetcher: unexpected error: %v", err)
 	}
+	resources := ngResult.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -254,6 +258,29 @@ func (m *pr03cEKSDescribeNodegroupMock) DescribeNodegroup(
 		key = *input.ClusterName + "/" + *input.NodegroupName
 	}
 	return &ekssvc.DescribeNodegroupOutput{Nodegroup: m.nodegroups[key]}, nil
+}
+
+// pr03cEKSFake composes the three narrow EKS mocks above into one
+// awsclient.EKSAPI value — the registered "ng" paginated fetcher reads
+// ListClusters/ListNodegroups/DescribeNodegroup off a single
+// *ServiceClients.EKS field. DescribeCluster is stubbed since the ng fetcher
+// never calls it.
+type pr03cEKSFake struct {
+	*pr03cEKSListMock
+	*pr03cEKSListNodegroupsMock
+	*pr03cEKSDescribeNodegroupMock
+}
+
+func (f *pr03cEKSFake) DescribeCluster(
+	_ context.Context, _ *ekssvc.DescribeClusterInput, _ ...func(*ekssvc.Options),
+) (*ekssvc.DescribeClusterOutput, error) {
+	return &ekssvc.DescribeClusterOutput{}, nil
+}
+
+func pr03cFetchNodeGroups(ctx context.Context, listClusters *pr03cEKSListMock, listNG *pr03cEKSListNodegroupsMock, describeNG *pr03cEKSDescribeNodegroupMock) (resource.FetchResult, error) {
+	fetcher := resource.GetPaginatedFetcher("ng")
+	clients := &awsclient.ServiceClients{EKS: &pr03cEKSFake{listClusters, listNG, describeNG}}
+	return fetcher(ctx, clients, "")
 }
 
 // =============================================================================
@@ -618,9 +645,9 @@ func TestPR03c_ECSTaskFetcher_RunningEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchECSTasksPage(context.Background(), listClustersMock, listTasksMock, describeTasksMock, "")
+	result, err := pr03cFetchECSTasks(context.Background(), listClustersMock, listTasksMock, describeTasksMock)
 	if err != nil {
-		t.Fatalf("FetchECSTasksPage: unexpected error: %v", err)
+		t.Fatalf("ecs-task paginated fetcher: unexpected error: %v", err)
 	}
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
@@ -667,9 +694,9 @@ func TestPR03c_ECSTaskFetcher_StoppedUserInitiatedEmitsDimFinding(t *testing.T) 
 		},
 	}
 
-	result, err := awsclient.FetchECSTasksPage(context.Background(), listClustersMock, listTasksMock, describeTasksMock, "")
+	result, err := pr03cFetchECSTasks(context.Background(), listClustersMock, listTasksMock, describeTasksMock)
 	if err != nil {
-		t.Fatalf("FetchECSTasksPage: unexpected error: %v", err)
+		t.Fatalf("ecs-task paginated fetcher: unexpected error: %v", err)
 	}
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
@@ -710,9 +737,9 @@ func TestPR03c_ECSTaskFetcher_TransitionalEmitsWarn(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchECSTasksPage(context.Background(), listClustersMock, listTasksMock, describeTasksMock, "")
+	result, err := pr03cFetchECSTasks(context.Background(), listClustersMock, listTasksMock, describeTasksMock)
 	if err != nil {
-		t.Fatalf("FetchECSTasksPage: unexpected error: %v", err)
+		t.Fatalf("ecs-task paginated fetcher: unexpected error: %v", err)
 	}
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
@@ -764,6 +791,42 @@ func (m *pr03cECSDescribeTasksMock) DescribeTasks(
 	_ ...func(*ecssvc.Options),
 ) (*ecssvc.DescribeTasksOutput, error) {
 	return &ecssvc.DescribeTasksOutput{Tasks: m.tasks}, nil
+}
+
+// pr03cECSFake composes the three narrow ECS mocks above into one
+// awsclient.ECSAPI value — the registered "ecs-task" paginated fetcher reads
+// ListClusters/ListTasks/DescribeTasks off a single *ServiceClients.ECS
+// field. DescribeClusters/ListServices/DescribeServices are stubbed since
+// these ecs-task tests never touch them. DescribeTaskDefinition returns a
+// ClientException ("does not exist"), matching the pre-refactor 4-arg
+// FetchECSTasksPage contract (which never queried task definitions), so
+// Fields["task_def_join_error"] stays unset.
+type pr03cECSFake struct {
+	*pr03cECSListClustersMock
+	*pr03cECSListTasksMock
+	*pr03cECSDescribeTasksMock
+}
+
+func (f *pr03cECSFake) DescribeClusters(_ context.Context, _ *ecssvc.DescribeClustersInput, _ ...func(*ecssvc.Options)) (*ecssvc.DescribeClustersOutput, error) {
+	return &ecssvc.DescribeClustersOutput{}, nil
+}
+
+func (f *pr03cECSFake) ListServices(_ context.Context, _ *ecssvc.ListServicesInput, _ ...func(*ecssvc.Options)) (*ecssvc.ListServicesOutput, error) {
+	return &ecssvc.ListServicesOutput{}, nil
+}
+
+func (f *pr03cECSFake) DescribeServices(_ context.Context, _ *ecssvc.DescribeServicesInput, _ ...func(*ecssvc.Options)) (*ecssvc.DescribeServicesOutput, error) {
+	return &ecssvc.DescribeServicesOutput{}, nil
+}
+
+func (f *pr03cECSFake) DescribeTaskDefinition(_ context.Context, _ *ecssvc.DescribeTaskDefinitionInput, _ ...func(*ecssvc.Options)) (*ecssvc.DescribeTaskDefinitionOutput, error) {
+	return nil, &smithy.GenericAPIError{Code: "ClientException", Message: "task definition does not exist"}
+}
+
+func pr03cFetchECSTasks(ctx context.Context, listClusters *pr03cECSListClustersMock, listTasks *pr03cECSListTasksMock, describeTasks *pr03cECSDescribeTasksMock) (resource.FetchResult, error) {
+	fetcher := resource.GetPaginatedFetcher("ecs-task")
+	clients := &awsclient.ServiceClients{ECS: &pr03cECSFake{listClusters, listTasks, describeTasks}}
+	return fetcher(ctx, clients, "")
 }
 
 // =============================================================================

@@ -262,41 +262,9 @@ func FetchCostAndUsageWithResources(ctx context.Context, api CostsGetCostAndUsag
 	})
 }
 
-// FetchDimensionValues paginates GetDimensionValues to exhaustion, mapping
-// dimension value -> its "description" attribute (e.g. linked-account id ->
-// account name).
-func FetchDimensionValues(ctx context.Context, api CostsGetDimensionValuesAPI, dim costs.Dimension, window costs.Period) (map[string]string, error) {
-	attrs := make(map[string]string)
-	input := &costexplorer.GetDimensionValuesInput{
-		Dimension:  cetypes.Dimension(dim),
-		TimePeriod: &cetypes.DateInterval{Start: aws.String(window.Start), End: aws.String(window.End)},
-	}
-
-	for {
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*costexplorer.GetDimensionValuesOutput, error) {
-			return api.GetDimensionValues(ctx, input)
-		})
-		if err != nil {
-			return nil, classifyCostsError(err)
-		}
-		mapAttrs(attrs, out.DimensionValues)
-		if out.NextPageToken == nil {
-			break
-		}
-		input.NextPageToken = out.NextPageToken
-	}
-	return attrs, nil
-}
-
-// FetchCostAnomalies paginates GetAnomalies to exhaustion, mapping each
-// anomaly's first root cause into a preformatted RootCause string and a
-// Dimension map for per-cell matching (FR-014).
-func FetchCostAnomalies(ctx context.Context, api CostsGetAnomaliesAPI, window costs.Period) ([]costs.AnomalyMark, error) {
-	marks, _, err := FetchCostAnomaliesCounted(ctx, api, window)
-	return marks, err
-}
-
-// FetchCostAnomaliesCounted is FetchCostAnomalies plus the number of
+// FetchCostAnomaliesCounted paginates GetAnomalies to exhaustion, mapping
+// each anomaly's first root cause into a preformatted RootCause string and a
+// Dimension map for per-cell matching (FR-014), plus the number of
 // GetAnomalies pages actually requested — CostsLoaded.Requests must fold
 // this in alongside the main cost-and-usage fetch's own count, since the
 // anomaly overlay is a separate billed CE call riding alongside it.

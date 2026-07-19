@@ -37,7 +37,7 @@ import (
 func TestS3_FetcherResourceIssues_AlwaysEmpty(t *testing.T) {
 	fake := fakes.NewS3()
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchS3BucketsPage(context.Background(), fake, token)
+		return awsclient.FetchS3BucketsPageWithNotifications(context.Background(), fake, nil, token)
 	})
 	if err != nil {
 		t.Fatalf("FetchS3Buckets: %v", err)
@@ -62,7 +62,7 @@ func TestS3_FetcherResourceIssues_AlwaysEmpty(t *testing.T) {
 func TestS3_FetcherIdentityFields_HealthyBucket(t *testing.T) {
 	fake := fakes.NewS3()
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchS3BucketsPage(context.Background(), fake, token)
+		return awsclient.FetchS3BucketsPageWithNotifications(context.Background(), fake, nil, token)
 	})
 	if err != nil {
 		t.Fatalf("FetchS3Buckets: %v", err)
@@ -278,9 +278,9 @@ func TestS3_FetcherPage_EmptyBucketList(t *testing.T) {
 	mock := &mockS3ListBucketsClient{
 		output: &s3.ListBucketsOutput{Buckets: nil},
 	}
-	result, err := awsclient.FetchS3BucketsPage(context.Background(), mock, "")
+	result, err := awsclient.FetchS3BucketsPageWithNotifications(context.Background(), mock, nil, "")
 	if err != nil {
-		t.Fatalf("FetchS3BucketsPage: %v", err)
+		t.Fatalf("FetchS3BucketsPageWithNotifications: %v", err)
 	}
 	if len(result.Resources) != 0 {
 		t.Errorf("expected 0 resources for empty bucket list, got %d", len(result.Resources))

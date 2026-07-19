@@ -8,101 +8,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// FetchNodeGroups performs a four-step fetch:
-// 1. ListClusters to get cluster names (paginated)
-// 2. ListNodegroups per cluster to get node group names (paginated)
-// 3. DescribeNodegroup per node group to get full details
-// 4. DescribeLaunchTemplateVersions for nodegroups with custom LaunchTemplates to resolve image_id
-//
-// The ltVersionsAPI parameter is optional (variadic). When omitted or nil, image_id is left empty.
-func FetchNodeGroups(
-	ctx context.Context,
-	listClustersAPI EKSListClustersAPI,
-	listNodegroupsAPI EKSListNodegroupsAPI,
-	describeNodegroupAPI EKSDescribeNodegroupAPI,
-	ltVersionsAPIs ...EC2DescribeLaunchTemplateVersionsAPI,
-) ([]resource.Resource, error) {
-	var ltVersionsAPI EC2DescribeLaunchTemplateVersionsAPI
-	if len(ltVersionsAPIs) > 0 {
-		ltVersionsAPI = ltVersionsAPIs[0]
-	}
-	// Step 1: List all clusters (paginated)
-	var allClusters []string
-	var clusterNextToken *string
-
-	for {
-		listOutput, err := listClustersAPI.ListClusters(ctx, &eks.ListClustersInput{
-			NextToken: clusterNextToken,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("listing EKS clusters: %w", err)
-		}
-
-		allClusters = append(allClusters, listOutput.Clusters...)
-
-		if listOutput.NextToken == nil {
-			break
-		}
-		clusterNextToken = listOutput.NextToken
-	}
-
-	var resources []resource.Resource
-
-	// Step 2: For each cluster, list its node groups (paginated)
-	for _, clusterName := range allClusters {
-		var allNodegroups []string
-		var ngNextToken *string
-
-		for {
-			ngListOutput, err := listNodegroupsAPI.ListNodegroups(ctx, &eks.ListNodegroupsInput{
-				ClusterName: aws.String(clusterName),
-				NextToken:   ngNextToken,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("listing node groups for cluster %s: %w", clusterName, err)
-			}
-
-			allNodegroups = append(allNodegroups, ngListOutput.Nodegroups...)
-
-			if ngListOutput.NextToken == nil {
-				break
-			}
-			ngNextToken = ngListOutput.NextToken
-		}
-
-		// Step 3: For each node group, describe it
-		for _, ngName := range allNodegroups {
-			descOutput, err := describeNodegroupAPI.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
-				ClusterName:   aws.String(clusterName),
-				NodegroupName: aws.String(ngName),
-			})
-			if err != nil {
-				return nil, fmt.Errorf("describing node group %s: %w", ngName, err)
-			}
-			if descOutput.Nodegroup == nil {
-				continue
-			}
-			res := buildNodeGroupResource(clusterName, ngName, descOutput.Nodegroup)
-			// Step 4: Resolve image_id from custom LaunchTemplate (non-fatal on error)
-			if descOutput.Nodegroup.LaunchTemplate != nil && descOutput.Nodegroup.LaunchTemplate.Id != nil {
-				imageID := resolveNGImageID(ctx, ltVersionsAPI, descOutput.Nodegroup.LaunchTemplate)
-				res.Fields["image_id"] = imageID
-			}
-			resources = append(resources, res)
-		}
-	}
-
-	return resources, nil
-}
 
 // resolveNGImageID calls DescribeLaunchTemplateVersions for the given LaunchTemplateSpecification
 // and returns the ImageId from the first version found. Returns "" on any error or missing data.

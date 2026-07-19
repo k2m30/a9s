@@ -3,6 +3,7 @@ package unit
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -76,7 +77,8 @@ func TestFetchKMSKeys_ParsesCustomerManagedKeys(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchKMSKeys(context.Background(), listKeysMock, describeKeyMock, listAliasesMock)
+	result, err := awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, "")
+	resources := result.Resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -131,7 +133,8 @@ func TestFetchKMSKeys_ListKeysError(t *testing.T) {
 	describeKeyMock := &mockKMSDescribeKeyClient{}
 	listAliasesMock := &mockKMSListAliasesClient{}
 
-	resources, err := awsclient.FetchKMSKeys(context.Background(), listKeysMock, describeKeyMock, listAliasesMock)
+	result, err := awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, "")
+	resources := result.Resources
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
@@ -149,7 +152,8 @@ func TestFetchKMSKeys_EmptyResponse(t *testing.T) {
 	describeKeyMock := &mockKMSDescribeKeyClient{}
 	listAliasesMock := &mockKMSListAliasesClient{}
 
-	resources, err := awsclient.FetchKMSKeys(context.Background(), listKeysMock, describeKeyMock, listAliasesMock)
+	result, err := awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, "")
+	resources := result.Resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -188,7 +192,8 @@ func TestFetchKMSKeys_NoAliasForKey(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchKMSKeys(context.Background(), listKeysMock, describeKeyMock, listAliasesMock)
+	result, err := awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, "")
+	resources := result.Resources
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -307,9 +312,16 @@ func TestFetchKMSKeys_DescribeKeyPartialFailure(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchKMSKeys(context.Background(), listKeysMock, describeKeyMock, listAliasesMock)
-	if err != nil {
-		t.Fatalf("expected no error (skip undescribable keys), got %v", err)
+	result, err := awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, "")
+	resources := result.Resources
+	// FetchKMSKeysPage (successor to the deleted FetchKMSKeys) folds a
+	// per-key DescribeKey failure into a composite error via
+	// AggregateFailures — same never-silent-skip contract as the
+	// EKS/NG/ECS fetchers — rather than swallowing it silently. The key
+	// still gets skipped from the results; the failure is just no longer
+	// invisible.
+	if err == nil || !strings.Contains(err.Error(), "key-denied") {
+		t.Fatalf("expected composite error naming the undescribable key %q, got %v", "key-denied", err)
 	}
 
 	if len(resources) != 2 {
@@ -344,9 +356,13 @@ func TestFetchKMSKeys_DescribeKeyAllFail(t *testing.T) {
 		output: &kms.ListAliasesOutput{Aliases: []kmstypes.AliasListEntry{}},
 	}
 
-	resources, err := awsclient.FetchKMSKeys(context.Background(), listKeysMock, describeKeyMock, listAliasesMock)
-	if err != nil {
-		t.Fatalf("expected no error (all keys skipped gracefully), got %v", err)
+	result, err := awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, "")
+	resources := result.Resources
+	// FetchKMSKeysPage folds every DescribeKey failure into a composite
+	// error (AggregateFailures) rather than swallowing it — matching the
+	// never-silent-skip contract used elsewhere in this codebase.
+	if err == nil || !strings.Contains(err.Error(), "key-fail-1") || !strings.Contains(err.Error(), "key-fail-2") {
+		t.Fatalf("expected composite error naming both undescribable keys, got %v", err)
 	}
 
 	if len(resources) != 0 {

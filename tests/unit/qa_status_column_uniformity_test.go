@@ -168,6 +168,8 @@ func statusColumnCensus(columns []app.ColumnDef, lifecycleKey string) (statusIdx
 // "<shortName>:<ruleKey>" — see that map's doc comment for the ratchet
 // semantics.
 func TestStatusColumnUniformityGate_ExactlyOneStatusColumnTitledStatus(t *testing.T) {
+	_, ctrl := newSeededTestController(t)
+
 	types := resource.AllResourceTypes()
 	sort.Slice(types, func(i, j int) bool { return types[i].ShortName < types[j].ShortName })
 
@@ -208,7 +210,7 @@ func TestStatusColumnUniformityGate_ExactlyOneStatusColumnTitledStatus(t *testin
 
 	for _, td := range types {
 		td := td
-		columns := app.ResolveListColumns(td.ShortName)
+		columns := ctrl.ResolveColumnsForType(td.ShortName)
 		if len(columns) == 0 {
 			continue
 		}

@@ -58,16 +58,6 @@ func isSnapUnencrypted(snap rdstypes.DBSnapshot) bool {
 	return snap.Encrypted != nil && !*snap.Encrypted
 }
 
-// buildStatusFromIssues returns the top phrase, or empty string when there
-// are no issues. Multi-finding (+N) stacking is now computed at render time
-// by phraseFromFindings(r.Findings) — not by string-suffix algebra here.
-func buildStatusFromIssues(issues []string) string {
-	if len(issues) == 0 {
-		return ""
-	}
-	return issues[0]
-}
-
 // FetchDBISnapshotsPage fetches a single page of RDS snapshots.
 func FetchDBISnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &rds.DescribeDBSnapshotsInput{

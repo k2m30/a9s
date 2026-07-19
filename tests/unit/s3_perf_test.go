@@ -16,7 +16,7 @@ func TestFetchS3Buckets_NoGetBucketLocation(t *testing.T) {
 
 	start := time.Now()
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchS3BucketsPage(context.Background(), listClient, token)
+		return awsclient.FetchS3BucketsPageWithNotifications(context.Background(), listClient, nil, token)
 	})
 	elapsed := time.Since(start)
 

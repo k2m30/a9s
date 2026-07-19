@@ -39,9 +39,9 @@ func FetchAMIsByIDs(ctx context.Context, api EC2DescribeImagesAPI, ids []string)
 	if len(filtered) == 0 {
 		return nil, nil
 	}
-	// IncludeDeprecated mirrors the single-ID FetchAMIByID path — batch drill
-	// from a related-panel pivot (ec2→ami, asg→ami, etc.) may reference a
-	// deprecated AMI; without this flag those IDs silently vanish from results.
+	// IncludeDeprecated: a batch drill from a related-panel pivot (ec2→ami,
+	// asg→ami, etc.) may reference a deprecated AMI; without this flag those
+	// IDs silently vanish from results.
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeImagesOutput, error) {
 		return api.DescribeImages(ctx, &ec2.DescribeImagesInput{
 			ImageIds:          filtered,
@@ -114,23 +114,6 @@ func FetchAMIsPage(ctx context.Context, api EC2DescribeImagesAPI, continuationTo
 			TotalHint:   totalHint,
 		},
 	}, nil
-}
-
-// FetchAMIByID fetches one AMI by exact image ID. Unlike the generic AMI list
-// fetcher, this path does not restrict Owners so public and third-party images
-// referenced by EC2 instances can still open real detail views.
-func FetchAMIByID(ctx context.Context, api EC2DescribeImagesAPI, imageID string) (resource.Resource, error) {
-	output, err := api.DescribeImages(ctx, &ec2.DescribeImagesInput{
-		ImageIds:          []string{imageID},
-		IncludeDeprecated: aws.Bool(true),
-	})
-	if err != nil {
-		return resource.Resource{}, fmt.Errorf("fetching AMI %s: %w", imageID, err)
-	}
-	if len(output.Images) == 0 {
-		return resource.Resource{}, fmt.Errorf("AMI %s not found", imageID)
-	}
-	return imageResource(output.Images[0]), nil
 }
 
 func imageResource(img ec2types.Image) resource.Resource {

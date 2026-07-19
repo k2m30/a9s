@@ -17,49 +17,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ComputeRDSDBClusterSnapshotStatusAndIssues computes the §4 status phrase and
-// ordered issues slice for an Aurora / Multi-AZ DB cluster snapshot fetched via
-// the RDS SDK. Returns ("", nil) for a healthy (available) snapshot.
-//
-// Algorithm mirrors ComputeDBCSnapStatusAndIssues — same §4 precedence ladder:
-//  1. Broken: Status == "failed" → phrase "failed"
-//  2. Broken: strings.HasPrefix(Status, "incompatible-") → phrase verbatim
-//  3. Warning: Status == "creating" → phrase "creating"
-//  4. Warning: manual snapshot older than 365d → "manual, unused <N>d"
-func ComputeRDSDBClusterSnapshotStatusAndIssues(snap rdstypes.DBClusterSnapshot) (string, []string) {
-	rawStatus := ""
-	if snap.Status != nil {
-		rawStatus = *snap.Status
-	}
-
-	var issues []string
-
-	// Broken checks first (severity wins).
-	if rawStatus == "failed" {
-		issues = append(issues, "failed")
-		return buildStatusFromIssues(issues), issues
-	}
-	if strings.HasPrefix(rawStatus, "incompatible-") {
-		issues = append(issues, rawStatus)
-		return buildStatusFromIssues(issues), issues
-	}
-
-	// Warning: creating (transitional). DBClusterSnapshot has no PercentProgress.
-	if rawStatus == "creating" {
-		issues = append(issues, "creating")
-	}
-
-	// Warning: manual snapshot unused for > 365 days.
-	if snap.SnapshotType != nil && *snap.SnapshotType == "manual" && snap.SnapshotCreateTime != nil {
-		ageD := int(time.Since(*snap.SnapshotCreateTime).Hours() / 24)
-		if ageD > 365 {
-			issues = append(issues, fmt.Sprintf("manual, unused %dd", ageD))
-		}
-	}
-
-	return buildStatusFromIssues(issues), issues
-}
-
 // computeRDSDBClusterSnapshotFindings returns []domain.Finding for an RDS cluster snapshot.
 func computeRDSDBClusterSnapshotFindings(snap rdstypes.DBClusterSnapshot) []domain.Finding {
 	rawStatus := aws.ToString(snap.Status)

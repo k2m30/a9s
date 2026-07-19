@@ -15,25 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// FetchEC2Instances calls the EC2 DescribeInstances API and returns all pages
-// of instances. Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchEC2Instances(ctx context.Context, api EC2FetchInstancesAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchEC2InstancesPage(ctx, api, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
 // FetchEC2InstancesPage calls the EC2 DescribeInstances API and returns
 // a single page of instances. Pass an empty continuationToken for the first page.
 func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, continuationToken string) (resource.FetchResult, error) {

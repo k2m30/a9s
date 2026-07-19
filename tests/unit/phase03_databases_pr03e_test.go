@@ -582,9 +582,9 @@ func TestPR03e_S3Fetcher_HealthyEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchS3BucketsPage(context.Background(), mock, "")
+	result, err := awsclient.FetchS3BucketsPageWithNotifications(context.Background(), mock, nil, "")
 	if err != nil {
-		t.Fatalf("FetchS3BucketsPage: unexpected error: %v", err)
+		t.Fatalf("FetchS3BucketsPageWithNotifications: unexpected error: %v", err)
 	}
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))

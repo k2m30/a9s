@@ -253,6 +253,43 @@ func (m *mockEKSDescribeClusterClient) DescribeCluster(
 	return nil, fmt.Errorf("cluster %q not found", *params.Name)
 }
 
+// mockEKSFullClient composes independently-configurable EKS mocks
+// (mockEKSListClustersClient/mockEKSDescribeClusterClient here,
+// mockEKSListNodegroupsClient/mockEKSDescribeNodegroupClient in
+// aws_nodegroups_test.go) into one awsclient.EKSAPI value — required because
+// FetchEKSClustersPage and the registered "ng" paginated fetcher each read
+// every EKS operation off a single *ServiceClients.EKS field, unlike the
+// removed signatures that took each operation as a separate parameter.
+// newMockEKSFull defaults any nil argument to a zero-value mock (safe empty
+// response) so callers only need to specify the parts they care about.
+type mockEKSFullClient struct {
+	*mockEKSListClustersClient
+	*mockEKSDescribeClusterClient
+	*mockEKSListNodegroupsClient
+	*mockEKSDescribeNodegroupClient
+}
+
+func newMockEKSFull(
+	list *mockEKSListClustersClient,
+	describe *mockEKSDescribeClusterClient,
+	listNG *mockEKSListNodegroupsClient,
+	describeNG *mockEKSDescribeNodegroupClient,
+) *mockEKSFullClient {
+	if list == nil {
+		list = &mockEKSListClustersClient{}
+	}
+	if describe == nil {
+		describe = &mockEKSDescribeClusterClient{}
+	}
+	if listNG == nil {
+		listNG = &mockEKSListNodegroupsClient{}
+	}
+	if describeNG == nil {
+		describeNG = &mockEKSDescribeNodegroupClient{}
+	}
+	return &mockEKSFullClient{list, describe, listNG, describeNG}
+}
+
 // ---------------------------------------------------------------------------
 // Secrets Manager mocks
 // ---------------------------------------------------------------------------

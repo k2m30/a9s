@@ -55,10 +55,10 @@ func ec2VpcResource() domain.Resource {
 // domain.Item.Path ends up empty or synthesized.
 func TestProjectionPath_FieldItemToDomainItem_PreservesPath(t *testing.T) {
 	r := ec2VpcResource()
-	sections := projection.Generic(r)
+	sections := projection.GenericWithConfig(nil)(r)
 
 	if len(sections) == 0 {
-		t.Fatal("projection.Generic returned zero sections for VpcId resource — cannot test Path")
+		t.Fatal("projection.GenericWithConfig(nil) returned zero sections for VpcId resource — cannot test Path")
 	}
 
 	// Find the VpcId item and assert its Path.
@@ -87,6 +87,6 @@ func TestProjectionPath_FieldItemToDomainItem_PreservesPath(t *testing.T) {
 	}
 
 	if !found {
-		t.Error("VpcId item not found in projection.Generic output — fixture or projector broken")
+		t.Error("VpcId item not found in projection.GenericWithConfig(nil) output — fixture or projector broken")
 	}
 }

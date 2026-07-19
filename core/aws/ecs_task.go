@@ -17,24 +17,13 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// FetchECSTasksPage fetches one page of ECS clusters using the continuationToken,
-// then for each cluster in that page fetches all tasks via ListTasks+DescribeTasks.
-// IsTruncated reflects whether ListClusters has more pages beyond this one.
-// Fields["efs_file_system_ids"] is always "" (no task-definition join).
-// Use the SetPaginatedForTest path for the full join via DescribeTaskDefinition.
-func FetchECSTasksPage(
-	ctx context.Context,
-	listClustersAPI ECSListClustersAPI,
-	listTasksAPI ECSListTasksAPI,
-	describeTasksAPI ECSDescribeTasksAPI,
-	continuationToken string,
-) (resource.FetchResult, error) {
-	return fetchECSTasksPageWithJoin(ctx, listClustersAPI, listTasksAPI, describeTasksAPI, nil, continuationToken)
-}
-
-// fetchECSTasksPageWithJoin is the full implementation used by the SetPaginatedForTest
-// closure in init(). describeTaskDefAPI may be nil; in that case the EFS volume
-// join is skipped and Fields["efs_file_system_ids"] is always "".
+// fetchECSTasksPageWithJoin fetches one page of ECS clusters using the
+// continuationToken, then for each cluster in that page fetches all tasks via
+// ListTasks+DescribeTasks. IsTruncated reflects whether ListClusters has more
+// pages beyond this one. describeTaskDefAPI may be nil; in that case the EFS
+// volume join is skipped and Fields["efs_file_system_ids"] is always "". This
+// is the full implementation registered as the ecs-task catalog Fetcher (see
+// catalog_compute.go) and used by the SetPaginatedForTest closure in init().
 func fetchECSTasksPageWithJoin(
 	ctx context.Context,
 	listClustersAPI ECSListClustersAPI,

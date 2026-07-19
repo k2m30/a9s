@@ -21,9 +21,13 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// countingListPoliciesAPI is a minimal IAMListPoliciesAPI mock that returns
-// a single policy and counts how many times ListPolicies is called.
+// countingListPoliciesAPI is an IAMAPI mock that returns a single policy from
+// ListPolicies (counting calls) and stubs ListGroups empty — FetchIAMPoliciesByIDsFull
+// (successor to the removed FetchIAMPoliciesByIDs) always runs the inline
+// group-policy sweep too, so a bare ListPolicies-only mock would panic through
+// the embedded nil IAMAPI on the first ListGroups call.
 type countingListPoliciesAPI struct {
+	awsclient.IAMAPI
 	calls      atomic.Int64
 	policyName string
 }
@@ -44,8 +48,12 @@ func (f *countingListPoliciesAPI) ListPolicies(_ context.Context, _ *iam.ListPol
 	}, nil
 }
 
-// Compile-time: countingListPoliciesAPI satisfies IAMListPoliciesAPI.
-var _ awsclient.IAMListPoliciesAPI = (*countingListPoliciesAPI)(nil)
+func (f *countingListPoliciesAPI) ListGroups(_ context.Context, _ *iam.ListGroupsInput, _ ...func(*iam.Options)) (*iam.ListGroupsOutput, error) {
+	return &iam.ListGroupsOutput{}, nil
+}
+
+// Compile-time: countingListPoliciesAPI satisfies IAMAPI.
+var _ awsclient.IAMAPI = (*countingListPoliciesAPI)(nil)
 
 // TestPolicyStore_ClearForcesRebuild verifies that after store.Clear() is
 // called, the next FetchIAMPoliciesByIDs call rebuilds the cache from the
@@ -65,7 +73,7 @@ func TestPolicyStore_ClearForcesRebuild(t *testing.T) {
 	mock1 := &countingListPoliciesAPI{policyName: "policy-A"}
 
 	// Step 2: First call — must build the cache (ListPolicies called once).
-	res1, err := awsclient.FetchIAMPoliciesByIDs(context.Background(), mock1, []string{"policy-A"}, store)
+	res1, err := awsclient.FetchIAMPoliciesByIDsFull(context.Background(), mock1, []string{"policy-A"}, store)
 	if err != nil {
 		t.Fatalf("FetchIAMPoliciesByIDs (mock1, first call): unexpected error: %v", err)
 	}
@@ -77,7 +85,7 @@ func TestPolicyStore_ClearForcesRebuild(t *testing.T) {
 	}
 
 	// Step 3: Second call with same mock — must be a cache hit (no extra API call).
-	res2, err := awsclient.FetchIAMPoliciesByIDs(context.Background(), mock1, []string{"policy-A"}, store)
+	res2, err := awsclient.FetchIAMPoliciesByIDsFull(context.Background(), mock1, []string{"policy-A"}, store)
 	if err != nil {
 		t.Fatalf("FetchIAMPoliciesByIDs (mock1, second call): unexpected error: %v", err)
 	}
@@ -93,7 +101,7 @@ func TestPolicyStore_ClearForcesRebuild(t *testing.T) {
 
 	// Step 5: Call with mock2 — must rebuild from mock2 (returns "policy-B").
 	mock2 := &countingListPoliciesAPI{policyName: "policy-B"}
-	res3, err := awsclient.FetchIAMPoliciesByIDs(context.Background(), mock2, []string{"policy-B"}, store)
+	res3, err := awsclient.FetchIAMPoliciesByIDsFull(context.Background(), mock2, []string{"policy-B"}, store)
 	if err != nil {
 		t.Fatalf("FetchIAMPoliciesByIDs (mock2, post-clear): unexpected error: %v", err)
 	}

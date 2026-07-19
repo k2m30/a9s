@@ -1075,10 +1075,18 @@ func (m *mockKMSListKeysPaginatedClient) ListKeys(
 	return out, nil
 }
 
+// mockKMSListAliasesPaginatedClient selects its response page by the
+// request's Marker (nil -> page 0, non-nil -> page 1) rather than a
+// monotonic call counter: FetchKMSKeysPage fully re-drains ListAliases from
+// scratch (Marker starting at nil again) on every single key page it
+// fetches, so a counter-based mock would silently exhaust itself after the
+// first key page and starve every later page's alias resolution. calls still
+// counts every invocation for the "how many ListAliases calls total"
+// assertions.
 type mockKMSListAliasesPaginatedClient struct {
 	outputs []*kms.ListAliasesOutput
 	err     error
-	callIdx int
+	calls   int
 }
 
 func (m *mockKMSListAliasesPaginatedClient) ListAliases(
@@ -1086,15 +1094,47 @@ func (m *mockKMSListAliasesPaginatedClient) ListAliases(
 	params *kms.ListAliasesInput,
 	optFns ...func(*kms.Options),
 ) (*kms.ListAliasesOutput, error) {
+	m.calls++
 	if m.err != nil {
 		return nil, m.err
 	}
-	if m.callIdx >= len(m.outputs) {
+	idx := 0
+	if params.Marker != nil {
+		idx = 1
+	}
+	if idx >= len(m.outputs) {
 		return &kms.ListAliasesOutput{}, nil
 	}
-	out := m.outputs[m.callIdx]
-	m.callIdx++
-	return out, nil
+	return m.outputs[idx], nil
+}
+
+// kmsFullPaginatedFake composes the paginated ListKeys/ListAliases mocks
+// above with the plain mockKMSDescribeKeyClient into one awsclient.KMSAPI
+// value — FetchKMSKeysPage reads all three off a single *ServiceClients.KMS
+// field. GetKeyRotationStatus/ListGrants/GetKeyPolicy are stubbed empty since
+// the paginated fetcher never calls them.
+type kmsFullPaginatedFake struct {
+	*mockKMSListKeysPaginatedClient
+	*mockKMSDescribeKeyClient
+	*mockKMSListAliasesPaginatedClient
+}
+
+func (f *kmsFullPaginatedFake) GetKeyRotationStatus(
+	_ context.Context, _ *kms.GetKeyRotationStatusInput, _ ...func(*kms.Options),
+) (*kms.GetKeyRotationStatusOutput, error) {
+	return &kms.GetKeyRotationStatusOutput{KeyRotationEnabled: true}, nil
+}
+
+func (f *kmsFullPaginatedFake) ListGrants(
+	_ context.Context, _ *kms.ListGrantsInput, _ ...func(*kms.Options),
+) (*kms.ListGrantsOutput, error) {
+	return &kms.ListGrantsOutput{}, nil
+}
+
+func (f *kmsFullPaginatedFake) GetKeyPolicy(
+	_ context.Context, _ *kms.GetKeyPolicyInput, _ ...func(*kms.Options),
+) (*kms.GetKeyPolicyOutput, error) {
+	return &kms.GetKeyPolicyOutput{}, nil
 }
 
 func TestFetchKMSKeys_Pagination(t *testing.T) {
@@ -1153,7 +1193,10 @@ func TestFetchKMSKeys_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchKMSKeys(context.Background(), listKeysMock, describeKeyMock, listAliasesMock)
+	kmsFull := &kmsFullPaginatedFake{listKeysMock, describeKeyMock, listAliasesMock}
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: kmsFull}, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1188,9 +1231,13 @@ func TestFetchKMSKeys_Pagination(t *testing.T) {
 		}
 	})
 
-	t.Run("list_aliases_called_twice", func(t *testing.T) {
-		if listAliasesMock.callIdx != 2 {
-			t.Errorf("expected 2 ListAliases API calls, got %d", listAliasesMock.callIdx)
+	t.Run("list_aliases_called_four_times", func(t *testing.T) {
+		// FetchKMSKeysPage fully re-drains ListAliases (2 pages) from scratch
+		// on every single key page it fetches — 2 key pages x 2 alias pages
+		// each = 4 total calls, not 2 (the old FetchKMSKeys wrapper drained
+		// aliases exactly once for the whole multi-page fetch).
+		if listAliasesMock.calls != 4 {
+			t.Errorf("expected 4 ListAliases API calls, got %d", listAliasesMock.calls)
 		}
 	})
 

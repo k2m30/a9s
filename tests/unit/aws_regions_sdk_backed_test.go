@@ -13,22 +13,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// TestAllRegions_EveryCodeMatchesSDKRegex verifies that every region code
-// returned by AllRegions() satisfies the SDK's commercial-partition region
-// regex. The SDK regex lives in the same partitions.json blob we embed, so
-// any future region code the SDK recognises is automatically accepted.
-func TestAllRegions_EveryCodeMatchesSDKRegex(t *testing.T) {
-	regions := awsclient.AllRegions()
-	if len(regions) == 0 {
-		t.Fatal("AllRegions() returned empty — embedded partitions.json likely unloaded")
-	}
-	for _, r := range regions {
-		if !awsclient.ValidateRegionCode(r.Code) {
-			t.Errorf("region %q does not match SDK commercial-partition regex", r.Code)
-		}
-	}
-}
-
 // TestAllRegions_StableAlphabeticalOrder pins the selector ordering. The
 // region selector relies on AllRegions() returning a deterministic order so
 // cursor-position tests remain stable as new regions are added.
@@ -66,31 +50,6 @@ func TestAllRegions_DisplayNamesPreserved(t *testing.T) {
 	for code, displayName := range want {
 		if got[code] != displayName {
 			t.Errorf("DisplayName[%q] = %q, want %q", code, got[code], displayName)
-		}
-	}
-}
-
-// TestValidateRegionCode_EdgeCases pins the regex entry point. Callers can
-// use ValidateRegionCode to gate user-entered region strings before wiring
-// them into NewAWSSessionContext.
-func TestValidateRegionCode_EdgeCases(t *testing.T) {
-	cases := []struct {
-		code string
-		want bool
-	}{
-		{"us-east-1", true},
-		{"eu-central-1", true},
-		{"ap-northeast-3", true},
-		{"", false},
-		{"USA", false},
-		{"us-east", false},    // incomplete
-		{"us-east-1a", false}, // AZ, not a region
-		{"not-a-region-1", false},
-	}
-	for _, c := range cases {
-		got := awsclient.ValidateRegionCode(c.code)
-		if got != c.want {
-			t.Errorf("ValidateRegionCode(%q) = %v, want %v", c.code, got, c.want)
 		}
 	}
 }

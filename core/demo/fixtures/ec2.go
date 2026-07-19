@@ -3265,7 +3265,7 @@ func buildImages() []ec2types.Image {
 		// ami-0eks111111111111a — pinned by the EC2 fake's
 		// DescribeLaunchTemplateVersions(lt-0eks111111111111a) response (see
 		// core/demo/fakes/ec2.go), which the EKS general-pool nodegroup's
-		// LaunchTemplate resolves to via FetchNodeGroups. Required so the AMI
+		// LaunchTemplate resolves to via resolveNGImageID. Required so the AMI
 		// this nodegroup actually launches from exists as a real fixture,
 		// closing the ami→ng and eks→ami related-panel pivots.
 		{

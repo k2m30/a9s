@@ -21,6 +21,7 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/demo/fakes"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -30,8 +31,12 @@ import (
 
 // fakeEC2DescribeLaunchTemplateVersions implements awsclient.EC2DescribeLaunchTemplateVersionsAPI
 // for unit tests. Keyed by "launchTemplateId:version" (e.g. "lt-001:3").
-// When the err field is non-nil, every call returns that error.
+// When the err field is non-nil, every call returns that error. It embeds
+// *fakes.EC2Fake (full EC2API) since the registered "ng" fetcher reads
+// DescribeLaunchTemplateVersions off the same *ServiceClients.EC2 field every
+// other EC2 operation lives on.
 type fakeEC2DescribeLaunchTemplateVersions struct {
+	*fakes.EC2Fake
 	// outputs keyed by "<launchTemplateId>:<version>" — e.g. "lt-001:3" or "lt-002:$Default"
 	outputs map[string]*ec2.DescribeLaunchTemplateVersionsOutput
 	err     error
@@ -67,11 +72,7 @@ func (f *fakeEC2DescribeLaunchTemplateVersions) DescribeLaunchTemplateVersions(
 // Helper: build a minimal three-step EKS mock set for a single nodegroup
 // ---------------------------------------------------------------------------
 
-func eksMinimalMocksForNG(clusterName, ngName string, ng *ekstypes.Nodegroup) (
-	*mockEKSListClustersClient,
-	*mockEKSListNodegroupsClient,
-	*mockEKSDescribeNodegroupClient,
-) {
+func eksMinimalMocksForNG(clusterName, ngName string, ng *ekstypes.Nodegroup) *mockEKSFullClient {
 	listClusters := &mockEKSListClustersClient{
 		output: &eks.ListClustersOutput{Clusters: []string{clusterName}},
 	}
@@ -85,7 +86,7 @@ func eksMinimalMocksForNG(clusterName, ngName string, ng *ekstypes.Nodegroup) (
 			clusterName + "/" + ngName: {Nodegroup: ng},
 		},
 	}
-	return listClusters, listNGs, describeNG
+	return newMockEKSFull(listClusters, nil, listNGs, describeNG)
 }
 
 // ---------------------------------------------------------------------------
@@ -109,9 +110,10 @@ func TestFetchNodeGroups_ResolvesImageIDFromCustomLaunchTemplate(t *testing.T) {
 		},
 	}
 
-	listClusters, listNGs, describeNG := eksMinimalMocksForNG("prod-cluster", "ng-custom", ng)
+	eksFull := eksMinimalMocksForNG("prod-cluster", "ng-custom", ng)
 
 	ltFake := &fakeEC2DescribeLaunchTemplateVersions{
+		EC2Fake: fakes.NewEC2(),
 		outputs: map[string]*ec2.DescribeLaunchTemplateVersionsOutput{
 			"lt-001:3": {
 				LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{
@@ -125,10 +127,12 @@ func TestFetchNodeGroups_ResolvesImageIDFromCustomLaunchTemplate(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClusters, listNGs, describeNG, ltFake)
+	pf := resource.GetPaginatedFetcher("ng")
+	result, err := pf(context.Background(), &awsclient.ServiceClients{EKS: eksFull, EC2: ltFake}, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -157,15 +161,17 @@ func TestFetchNodeGroups_ImageIDEmptyWhenNoLaunchTemplate(t *testing.T) {
 		LaunchTemplate: nil, // EKS-managed, no custom launch template
 	}
 
-	listClusters, listNGs, describeNG := eksMinimalMocksForNG("dev-cluster", "ng-managed", ng)
+	eksFull := eksMinimalMocksForNG("dev-cluster", "ng-managed", ng)
 
 	// Use a safe no-op fake that returns empty output without error.
-	noopLTFake := &fakeEC2DescribeLaunchTemplateVersions{}
+	noopLTFake := &fakeEC2DescribeLaunchTemplateVersions{EC2Fake: fakes.NewEC2()}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClusters, listNGs, describeNG, noopLTFake)
+	pf := resource.GetPaginatedFetcher("ng")
+	result, err := pf(context.Background(), &awsclient.ServiceClients{EKS: eksFull, EC2: noopLTFake}, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -197,17 +203,20 @@ func TestFetchNodeGroups_ImageIDEmptyWhenLaunchTemplateResolveFails(t *testing.T
 		},
 	}
 
-	listClusters, listNGs, describeNG := eksMinimalMocksForNG("staging-cluster", "ng-lt-error", ng)
+	eksFull := eksMinimalMocksForNG("staging-cluster", "ng-lt-error", ng)
 
 	ltFake := &fakeEC2DescribeLaunchTemplateVersions{
-		err: fmt.Errorf("AWS API error: launch template not found"),
+		EC2Fake: fakes.NewEC2(),
+		err:     fmt.Errorf("AWS API error: launch template not found"),
 	}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClusters, listNGs, describeNG, ltFake)
+	pf := resource.GetPaginatedFetcher("ng")
+	result, err := pf(context.Background(), &awsclient.ServiceClients{EKS: eksFull, EC2: ltFake}, "")
 	// The fetch should succeed (error from DescribeLaunchTemplateVersions is non-fatal)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource (nodegroup still emitted despite LT error), got %d", len(resources))
 	}
@@ -249,9 +258,10 @@ func TestFetchNodeGroups_UsesDefaultVersionWhenVersionIsEmpty(t *testing.T) {
 		},
 	}
 
-	listClusters, listNGs, describeNG := eksMinimalMocksForNG("prod-cluster", "ng-default-lt", ng)
+	eksFull := eksMinimalMocksForNG("prod-cluster", "ng-default-lt", ng)
 
 	ltFake := &fakeEC2DescribeLaunchTemplateVersions{
+		EC2Fake: fakes.NewEC2(),
 		outputs: map[string]*ec2.DescribeLaunchTemplateVersionsOutput{
 			// The coder must call with Versions=["$Default"] when Version is nil
 			"lt-002:$Default": {
@@ -266,10 +276,12 @@ func TestFetchNodeGroups_UsesDefaultVersionWhenVersionIsEmpty(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClusters, listNGs, describeNG, ltFake)
+	pf := resource.GetPaginatedFetcher("ng")
+	result, err := pf(context.Background(), &awsclient.ServiceClients{EKS: eksFull, EC2: ltFake}, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}

@@ -297,7 +297,7 @@ func TestFetchAMIByID_UsesExactImageIDWithoutOwnersFilter(t *testing.T) {
 		},
 	}
 
-	res, err := awsclient.FetchAMIByID(context.Background(), mock, "ami-public-exact")
+	res, err := awsclient.FetchAMIsByIDs(context.Background(), mock, []string{"ami-public-exact"})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -306,13 +306,13 @@ func TestFetchAMIByID_UsesExactImageIDWithoutOwnersFilter(t *testing.T) {
 	}
 	in := mock.inputs[0]
 	if len(in.ImageIds) != 1 || in.ImageIds[0] != "ami-public-exact" {
-		t.Fatalf("FetchAMIByID should query the exact AMI id, got ImageIds=%v", in.ImageIds)
+		t.Fatalf("FetchAMIsByIDs should query the exact AMI id, got ImageIds=%v", in.ImageIds)
 	}
 	if len(in.Owners) != 0 {
-		t.Fatalf("FetchAMIByID must not set Owners filtering for exact-ID lookups, got %v", in.Owners)
+		t.Fatalf("FetchAMIsByIDs must not set Owners filtering for exact-ID lookups, got %v", in.Owners)
 	}
-	if res.ID != "ami-public-exact" {
-		t.Fatalf("expected fetched resource ID %q, got %q", "ami-public-exact", res.ID)
+	if len(res) != 1 || res[0].ID != "ami-public-exact" {
+		t.Fatalf("expected fetched resource ID %q, got %v", "ami-public-exact", res)
 	}
 }
 
@@ -321,7 +321,7 @@ func TestFetchAMIByID_NotFound(t *testing.T) {
 		output: &ec2.DescribeImagesOutput{Images: nil},
 	}
 
-	_, err := awsclient.FetchAMIByID(context.Background(), mock, "ami-missing")
+	_, err := awsclient.FetchAMIsByIDs(context.Background(), mock, []string{"ami-missing"})
 	if err == nil {
 		t.Fatal("expected not-found error, got nil")
 	}

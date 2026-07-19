@@ -38,7 +38,7 @@ func TestFetchWAFWebACLs_ParsesMultipleACLs(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchWAFWebACLsPage(context.Background(), mock, token)
+		return awsclient.FetchWAFWebACLsPageWithCloudFront(context.Background(), mock, nil, token)
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -81,7 +81,7 @@ func TestFetchWAFWebACLs_ScopeRegional(t *testing.T) {
 	}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchWAFWebACLsPage(context.Background(), mock, token)
+		return awsclient.FetchWAFWebACLsPageWithCloudFront(context.Background(), mock, nil, token)
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -104,7 +104,7 @@ func TestFetchWAFWebACLs_EmptyResponse(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchWAFWebACLsPage(context.Background(), mock, token)
+		return awsclient.FetchWAFWebACLsPageWithCloudFront(context.Background(), mock, nil, token)
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -121,7 +121,7 @@ func TestFetchWAFWebACLs_APIError(t *testing.T) {
 	}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchWAFWebACLsPage(context.Background(), mock, token)
+		return awsclient.FetchWAFWebACLsPageWithCloudFront(context.Background(), mock, nil, token)
 	})
 	if err == nil {
 		t.Fatal("expected error, got nil")

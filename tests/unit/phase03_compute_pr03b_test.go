@@ -207,10 +207,11 @@ func TestPR03b_EKSFetcher_ActiveEmitsNoFinding(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEKSClusters(context.Background(), listMock, describeMock)
+	result, err := awsclient.FetchEKSClustersPage(context.Background(), &awsclient.ServiceClients{EKS: &pr03bEKSFake{listMock, describeMock}}, "")
 	if err != nil {
-		t.Fatalf("FetchEKSClusters: unexpected error: %v", err)
+		t.Fatalf("FetchEKSClustersPage: unexpected error: %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -235,10 +236,11 @@ func TestPR03b_EKSFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEKSClusters(context.Background(), listMock, describeMock)
+	result, err := awsclient.FetchEKSClustersPage(context.Background(), &awsclient.ServiceClients{EKS: &pr03bEKSFake{listMock, describeMock}}, "")
 	if err != nil {
-		t.Fatalf("FetchEKSClusters: unexpected error: %v", err)
+		t.Fatalf("FetchEKSClustersPage: unexpected error: %v", err)
 	}
+	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
@@ -289,6 +291,27 @@ func (m *pr03bEKSDescribeMock) DescribeCluster(
 		name = *input.Name
 	}
 	return &ekssvc.DescribeClusterOutput{Cluster: m.clusters[name]}, nil
+}
+
+// pr03bEKSFake composes pr03bEKSListMock and pr03bEKSDescribeMock into one
+// awsclient.EKSAPI value — FetchEKSClustersPage reads both operations off a
+// single *ServiceClients.EKS field. ListNodegroups/DescribeNodegroup are
+// stubbed empty since these EKS-cluster tests never touch node groups.
+type pr03bEKSFake struct {
+	*pr03bEKSListMock
+	*pr03bEKSDescribeMock
+}
+
+func (f *pr03bEKSFake) ListNodegroups(
+	_ context.Context, _ *ekssvc.ListNodegroupsInput, _ ...func(*ekssvc.Options),
+) (*ekssvc.ListNodegroupsOutput, error) {
+	return &ekssvc.ListNodegroupsOutput{}, nil
+}
+
+func (f *pr03bEKSFake) DescribeNodegroup(
+	_ context.Context, _ *ekssvc.DescribeNodegroupInput, _ ...func(*ekssvc.Options),
+) (*ekssvc.DescribeNodegroupOutput, error) {
+	return &ekssvc.DescribeNodegroupOutput{}, nil
 }
 
 // =============================================================================

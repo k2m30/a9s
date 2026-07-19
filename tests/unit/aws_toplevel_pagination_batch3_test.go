@@ -554,6 +554,18 @@ func (m *mockCodePipelinePaginatedClient) ListPipelines(
 	return out, nil
 }
 
+// GetPipelineState/GetPipeline satisfy awsclient.CodePipelineAPI (the type of
+// *ServiceClients.CodePipeline) — FetchCodePipelinesPageWithClients only
+// calls ListPipelines, but the field's static type requires the full
+// interface.
+func (m *mockCodePipelinePaginatedClient) GetPipelineState(ctx context.Context, params *codepipeline.GetPipelineStateInput, optFns ...func(*codepipeline.Options)) (*codepipeline.GetPipelineStateOutput, error) {
+	return &codepipeline.GetPipelineStateOutput{}, nil
+}
+
+func (m *mockCodePipelinePaginatedClient) GetPipeline(ctx context.Context, params *codepipeline.GetPipelineInput, optFns ...func(*codepipeline.Options)) (*codepipeline.GetPipelineOutput, error) {
+	return &codepipeline.GetPipelineOutput{}, nil
+}
+
 func TestFetchCodePipelines_Pagination(t *testing.T) {
 	mock := &mockCodePipelinePaginatedClient{
 		outputs: []*codepipeline.ListPipelinesOutput{
@@ -573,7 +585,7 @@ func TestFetchCodePipelines_Pagination(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchCodePipelinesPage(context.Background(), mock, token)
+		return awsclient.FetchCodePipelinesPageWithClients(context.Background(), &awsclient.ServiceClients{CodePipeline: mock}, token)
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -933,6 +945,28 @@ func (m *mockEKSDescribeClusterPaginatedClient) DescribeCluster(
 	return nil, fmt.Errorf("cluster %s not found", *params.Name)
 }
 
+// eksPaginatedFullFake composes the paginated ListClusters/DescribeCluster
+// mocks below into one awsclient.EKSAPI value — FetchEKSClustersPage reads
+// both off a single *ServiceClients.EKS field. ListNodegroups/
+// DescribeNodegroup are stubbed since this EKS-cluster test never touches
+// node groups.
+type eksPaginatedFullFake struct {
+	*mockEKSListClustersPaginatedClient
+	*mockEKSDescribeClusterPaginatedClient
+}
+
+func (f *eksPaginatedFullFake) ListNodegroups(
+	_ context.Context, _ *eks.ListNodegroupsInput, _ ...func(*eks.Options),
+) (*eks.ListNodegroupsOutput, error) {
+	return &eks.ListNodegroupsOutput{}, nil
+}
+
+func (f *eksPaginatedFullFake) DescribeNodegroup(
+	_ context.Context, _ *eks.DescribeNodegroupInput, _ ...func(*eks.Options),
+) (*eks.DescribeNodegroupOutput, error) {
+	return &eks.DescribeNodegroupOutput{}, nil
+}
+
 func TestFetchEKSClusters_Pagination(t *testing.T) {
 	listMock := &mockEKSListClustersPaginatedClient{
 		outputs: []*eks.ListClustersOutput{
@@ -954,7 +988,10 @@ func TestFetchEKSClusters_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEKSClusters(context.Background(), listMock, describeMock)
+	eksFull := &eksPaginatedFullFake{listMock, describeMock}
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return awsclient.FetchEKSClustersPage(context.Background(), &awsclient.ServiceClients{EKS: eksFull}, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1313,7 +1350,7 @@ func TestFetchWAFWebACLs_Pagination(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchWAFWebACLsPage(context.Background(), mock, token)
+		return awsclient.FetchWAFWebACLsPageWithCloudFront(context.Background(), mock, nil, token)
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -1408,6 +1445,23 @@ func (m *mockEKSDescribeNodegroupPaginatedClient) DescribeNodegroup(
 	return nil, fmt.Errorf("nodegroup %s not found", key)
 }
 
+// ngPaginatedFullFake composes the three paginated mocks above into one
+// awsclient.EKSAPI value — the registered "ng" paginated fetcher reads
+// ListClusters/ListNodegroups/DescribeNodegroup off a single
+// *ServiceClients.EKS field. DescribeCluster is stubbed since the ng fetcher
+// never calls it.
+type ngPaginatedFullFake struct {
+	*mockEKSListClustersPaginatedClient
+	*mockEKSListNodegroupsPaginatedClient
+	*mockEKSDescribeNodegroupPaginatedClient
+}
+
+func (f *ngPaginatedFullFake) DescribeCluster(
+	_ context.Context, _ *eks.DescribeClusterInput, _ ...func(*eks.Options),
+) (*eks.DescribeClusterOutput, error) {
+	return &eks.DescribeClusterOutput{}, nil
+}
+
 func TestFetchNodeGroups_Pagination(t *testing.T) {
 	// ListClusters returns 2 pages with 1 cluster each
 	listClustersMock := &mockEKSListClustersPaginatedClient{
@@ -1422,16 +1476,22 @@ func TestFetchNodeGroups_Pagination(t *testing.T) {
 		},
 	}
 
-	// ListNodegroups for cluster-A returns 2 pages; cluster-B returns 1 page
+	// ListNodegroups returns one page per cluster (the registered "ng"
+	// fetcher calls ListNodegroups exactly once per cluster within a single
+	// ListClusters page — a cluster's OWN nodegroup list is not internally
+	// re-paginated within one fetch call, so this fixture exercises the
+	// cluster-level (ListClusters) pagination this test targets without
+	// tripping the separate, real within-cluster-nodegroup-page-2
+	// truncation gap: a cluster whose nodegroups span 2+ ListNodegroups
+	// pages will only ever surface page 1 within the ListClusters page it
+	// was returned on (Pagination.IsTruncated reports it, but a caller
+	// re-driving purely off the ListClusters continuation token moves on to
+	// the next cluster rather than revisiting this one's remaining page).
 	listNGMock := &mockEKSListNodegroupsPaginatedClient{
 		outputs: map[string][]*eks.ListNodegroupsOutput{
 			"cluster-A": {
 				{
-					NextToken:  aws.String("ng-page2"),
-					Nodegroups: []string{"ng-a1"},
-				},
-				{
-					Nodegroups: []string{"ng-a2"},
+					Nodegroups: []string{"ng-a1", "ng-a2"},
 				},
 			},
 			"cluster-B": {
@@ -1450,7 +1510,11 @@ func TestFetchNodeGroups_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchNodeGroups(context.Background(), listClustersMock, listNGMock, describeNGMock)
+	ngFull := &ngPaginatedFullFake{listClustersMock, listNGMock, describeNGMock}
+	pf := resource.GetPaginatedFetcher("ng")
+	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
+		return pf(context.Background(), &awsclient.ServiceClients{EKS: ngFull}, token)
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

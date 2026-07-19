@@ -48,10 +48,12 @@ func TestFetchEKSClusters_ParsesMultipleClusters(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchEKSClusters(context.Background(), listMock, describeMock)
+	clients := &awsclient.ServiceClients{EKS: newMockEKSFull(listMock, describeMock, nil, nil)}
+	result, err := awsclient.FetchEKSClustersPage(context.Background(), clients, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+	resources := result.Resources
 
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
@@ -116,12 +118,13 @@ func TestFetchEKSClusters_ListClustersError(t *testing.T) {
 	}
 	describeMock := &mockEKSDescribeClusterClient{}
 
-	resources, err := awsclient.FetchEKSClusters(context.Background(), listMock, describeMock)
+	clients := &awsclient.ServiceClients{EKS: newMockEKSFull(listMock, describeMock, nil, nil)}
+	result, err := awsclient.FetchEKSClustersPage(context.Background(), clients, "")
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d resources", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected no resources on error, got %d resources", len(result.Resources))
 	}
 }
 
@@ -133,12 +136,13 @@ func TestFetchEKSClusters_EmptyResponse(t *testing.T) {
 	}
 	describeMock := &mockEKSDescribeClusterClient{}
 
-	resources, err := awsclient.FetchEKSClusters(context.Background(), listMock, describeMock)
+	clients := &awsclient.ServiceClients{EKS: newMockEKSFull(listMock, describeMock, nil, nil)}
+	result, err := awsclient.FetchEKSClustersPage(context.Background(), clients, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
 	}
 }
 

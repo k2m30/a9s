@@ -552,6 +552,18 @@ func (m *mockCodePipelineClient) ListPipelines(ctx context.Context, params *code
 	return m.output, m.err
 }
 
+// GetPipelineState/GetPipeline satisfy awsclient.CodePipelineAPI (the type of
+// *ServiceClients.CodePipeline) — FetchCodePipelinesPageWithClients only
+// calls ListPipelines, but the field's static type requires the full
+// interface regardless of what a given caller actually exercises.
+func (m *mockCodePipelineClient) GetPipelineState(ctx context.Context, params *codepipeline.GetPipelineStateInput, optFns ...func(*codepipeline.Options)) (*codepipeline.GetPipelineStateOutput, error) {
+	return &codepipeline.GetPipelineStateOutput{}, nil
+}
+
+func (m *mockCodePipelineClient) GetPipeline(ctx context.Context, params *codepipeline.GetPipelineInput, optFns ...func(*codepipeline.Options)) (*codepipeline.GetPipelineOutput, error) {
+	return &codepipeline.GetPipelineOutput{}, nil
+}
+
 // ---------------------------------------------------------------------------
 // Kinesis mocks
 // ---------------------------------------------------------------------------
@@ -799,6 +811,55 @@ type mockKMSListAliasesClient struct {
 
 func (m *mockKMSListAliasesClient) ListAliases(ctx context.Context, params *kms.ListAliasesInput, optFns ...func(*kms.Options)) (*kms.ListAliasesOutput, error) {
 	return m.output, m.err
+}
+
+// mockKMSFullClient composes the three narrow KMS mocks above into one
+// awsclient.KMSAPI value — FetchKMSKeysPage reads ListKeys/DescribeKey/
+// ListAliases off a single *ServiceClients.KMS field, unlike the removed
+// FetchKMSKeys signature that took each as a separate parameter.
+// GetKeyRotationStatus/ListGrants/GetKeyPolicy are stubbed empty since the
+// paginated fetcher never calls them. newMockKMSFull defaults any nil
+// argument to a zero-value mock so callers only need to specify the parts
+// they care about.
+type mockKMSFullClient struct {
+	*mockKMSListKeysClient
+	*mockKMSDescribeKeyClient
+	*mockKMSListAliasesClient
+}
+
+func newMockKMSFull(
+	list *mockKMSListKeysClient,
+	describe *mockKMSDescribeKeyClient,
+	aliases *mockKMSListAliasesClient,
+) *mockKMSFullClient {
+	if list == nil {
+		list = &mockKMSListKeysClient{}
+	}
+	if describe == nil {
+		describe = &mockKMSDescribeKeyClient{}
+	}
+	if aliases == nil {
+		aliases = &mockKMSListAliasesClient{}
+	}
+	return &mockKMSFullClient{list, describe, aliases}
+}
+
+func (m *mockKMSFullClient) GetKeyRotationStatus(
+	_ context.Context, _ *kms.GetKeyRotationStatusInput, _ ...func(*kms.Options),
+) (*kms.GetKeyRotationStatusOutput, error) {
+	return &kms.GetKeyRotationStatusOutput{KeyRotationEnabled: true}, nil
+}
+
+func (m *mockKMSFullClient) ListGrants(
+	_ context.Context, _ *kms.ListGrantsInput, _ ...func(*kms.Options),
+) (*kms.ListGrantsOutput, error) {
+	return &kms.ListGrantsOutput{}, nil
+}
+
+func (m *mockKMSFullClient) GetKeyPolicy(
+	_ context.Context, _ *kms.GetKeyPolicyInput, _ ...func(*kms.Options),
+) (*kms.GetKeyPolicyOutput, error) {
+	return &kms.GetKeyPolicyOutput{}, nil
 }
 
 // ---------------------------------------------------------------------------

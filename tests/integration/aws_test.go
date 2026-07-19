@@ -52,7 +52,7 @@ func TestQA_171_RegionNoServiceSupport(t *testing.T) {
 
 	// Attempt to fetch EKS clusters -- may return an error for unsupported regions,
 	// but should not panic.
-	_, err = awsclient.FetchEKSClusters(ctx, clients.EKS, clients.EKS)
+	_, err = awsclient.FetchEKSClustersPage(ctx, clients, "")
 	if err != nil {
 		t.Logf("FetchEKSClusters in af-south-1 returned error (may be expected): %v", err)
 	} else {
@@ -102,11 +102,11 @@ func TestQA_074_SSOExpiredToken(t *testing.T) {
 
 	// Try to fetch EC2 instances -- if SSO token is expired, this should return
 	// an error containing "ExpiredToken" or similar.
-	_, err = awsclient.FetchEC2Instances(ctx, clients.EC2)
+	_, err = awsclient.FetchEC2InstancesPage(ctx, clients.EC2, "")
 	if err != nil {
-		t.Logf("FetchEC2Instances with SSO profile returned error: %v", err)
+		t.Logf("FetchEC2InstancesPage with SSO profile returned error: %v", err)
 	} else {
-		t.Log("FetchEC2Instances with SSO profile succeeded (token may be valid)")
+		t.Log("FetchEC2InstancesPage with SSO profile succeeded (token may be valid)")
 	}
 }
 
@@ -131,15 +131,17 @@ func TestQA_200_S3ListingGlobalRegardlessOfRegion(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	buckets1, err := awsclient.FetchS3Buckets(ctx, clients1.S3)
+	result1, err := awsclient.FetchS3BucketsPageWithNotifications(ctx, clients1.S3, nil, "")
 	if err != nil {
 		t.Skipf("could not fetch S3 buckets from us-east-1: %v", err)
 	}
+	buckets1 := result1.Resources
 
-	buckets2, err := awsclient.FetchS3Buckets(ctx, clients2.S3)
+	result2, err := awsclient.FetchS3BucketsPageWithNotifications(ctx, clients2.S3, nil, "")
 	if err != nil {
 		t.Skipf("could not fetch S3 buckets from eu-west-1: %v", err)
 	}
+	buckets2 := result2.Resources
 
 	// Both regions should return the same number of buckets
 	if len(buckets1) != len(buckets2) {
@@ -202,12 +204,12 @@ func TestIntegration_FetchEC2Instances(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	resources, err := awsclient.FetchEC2Instances(ctx, clients.EC2)
+	result, err := awsclient.FetchEC2InstancesPage(ctx, clients.EC2, "")
 	if err != nil {
-		t.Logf("FetchEC2Instances returned error (may be auth): %v", err)
+		t.Logf("FetchEC2InstancesPage returned error (may be auth): %v", err)
 		return
 	}
-	t.Logf("FetchEC2Instances returned %d instances", len(resources))
+	t.Logf("FetchEC2InstancesPage returned %d instances", len(result.Resources))
 }
 
 // Test: FetchS3Buckets with real client
@@ -223,10 +225,10 @@ func TestIntegration_FetchS3Buckets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	resources, err := awsclient.FetchS3Buckets(ctx, clients.S3)
+	result, err := awsclient.FetchS3BucketsPageWithNotifications(ctx, clients.S3, nil, "")
 	if err != nil {
-		t.Logf("FetchS3Buckets returned error (may be auth): %v", err)
+		t.Logf("FetchS3BucketsPageWithNotifications returned error (may be auth): %v", err)
 		return
 	}
-	t.Logf("FetchS3Buckets returned %d buckets", len(resources))
+	t.Logf("FetchS3BucketsPageWithNotifications returned %d buckets", len(result.Resources))
 }

@@ -44,7 +44,7 @@ func TestFetchCodePipelines_ParsesMultiple(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchCodePipelinesPage(context.Background(), mock, token)
+		return awsclient.FetchCodePipelinesPageWithClients(context.Background(), &awsclient.ServiceClients{CodePipeline: mock}, token)
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -103,7 +103,7 @@ func TestFetchCodePipelines_RawStructPopulated(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchCodePipelinesPage(context.Background(), mock, token)
+		return awsclient.FetchCodePipelinesPageWithClients(context.Background(), &awsclient.ServiceClients{CodePipeline: mock}, token)
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -128,7 +128,7 @@ func TestFetchCodePipelines_ErrorResponse(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchCodePipelinesPage(context.Background(), mock, token)
+		return awsclient.FetchCodePipelinesPageWithClients(context.Background(), &awsclient.ServiceClients{CodePipeline: mock}, token)
 	})
 	if err == nil {
 		t.Fatal("expected an error, got nil")
@@ -146,7 +146,7 @@ func TestFetchCodePipelines_EmptyResponse(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchCodePipelinesPage(context.Background(), mock, token)
+		return awsclient.FetchCodePipelinesPageWithClients(context.Background(), &awsclient.ServiceClients{CodePipeline: mock}, token)
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)

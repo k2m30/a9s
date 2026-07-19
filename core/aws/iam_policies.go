@@ -285,45 +285,6 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 	return resources, AggregateFailures("policy FetchByIDs", failures, len(ids))
 }
 
-// FetchIAMPoliciesByIDs is the narrower test-friendly variant: resolves
-// names from ListPolicies(Scope=All) only, no inlines. Useful when the
-// caller only has an IAMListPoliciesAPI (unit tests with a minimal mock).
-// Production code goes through FetchIAMPoliciesByIDsFull.
-//
-// Per-ID failures (IDs not present in the all-policies map) are collected into
-// a composite error returned alongside the partial success list.
-func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []string, store iamPolicyStore) ([]resource.Resource, error) {
-	if len(ids) == 0 {
-		return nil, nil
-	}
-
-	if !store.ManagedBuilt() {
-		if err := buildLocalPolicies(ctx, api, store); err != nil {
-			return nil, err
-		}
-		store.MarkManagedBuilt()
-	}
-
-	var failures []string
-	resources := make([]resource.Resource, 0, len(ids))
-	seen := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		if id == "" {
-			continue
-		}
-		if _, dup := seen[id]; dup {
-			continue
-		}
-		seen[id] = struct{}{}
-		if r, hit := store.Lookup(id); hit {
-			resources = append(resources, r)
-		} else {
-			failures = append(failures, fmt.Sprintf("%s: not found", id))
-		}
-	}
-	return resources, AggregateFailures("policy FetchByIDs", failures, len(ids))
-}
-
 // buildLocalPolicies paginates ListPolicies(Scope=Local) and populates the
 // store with the account's CUSTOMER-managed policies only. It deliberately does
 // NOT list Scope=All: the ~1000+ AWS-managed policy catalog is account-

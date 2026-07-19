@@ -120,16 +120,17 @@ func TestMaterializeListFields_CachedRowRendersIdenticallyToLive(t *testing.T) {
 		RawStruct: raw,
 		Fields:    map[string]string{},
 	}
+	// Render the live row (RawStruct present, Fields not yet materialized).
+	_, liveCtrl := newSeededTestController(t)
+
 	// Use the SAME column set list_body.go's buildListBody resolves for "ec2"
 	// (the real 9-column catalog from core/config/defaults_compute.go),
 	// not a 2-column subset — otherwise Path-based columns outside the subset
 	// (e.g. Instance ID) are never materialized and the parity check is
 	// vacuous (both sides render "" for that cell instead of pinning a real
 	// value match).
-	columns := app.ResolveListColumns("ec2")
+	columns := liveCtrl.ResolveColumnsForType("ec2")
 
-	// Render the live row (RawStruct present, Fields not yet materialized).
-	_, liveCtrl := newSeededTestController(t)
 	liveCtrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	liveCtrl.ApplyResourcesLoaded("ec2", []resource.Resource{live}, nil, false)
 	liveRows := liveCtrl.Snapshot().Body.List.Rows

@@ -12,31 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// FetchS3Buckets calls the S3 ListBuckets API and returns all pages of buckets.
-// Used by tests; the production path uses the per-page fetcher for pagination.
-func FetchS3Buckets(ctx context.Context, listAPI S3ListBucketsAPI) ([]resource.Resource, error) {
-	var all []resource.Resource
-	token := ""
-	for {
-		result, err := FetchS3BucketsPage(ctx, listAPI, token)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, result.Resources...)
-		if result.Pagination == nil || !result.Pagination.IsTruncated {
-			break
-		}
-		token = result.Pagination.NextToken
-	}
-	return all, nil
-}
-
-// FetchS3BucketsPage calls the S3 ListBuckets API and returns a single page
-// of buckets. Pass an empty continuationToken for the first page.
-func FetchS3BucketsPage(ctx context.Context, listAPI S3ListBucketsAPI, continuationToken string) (resource.FetchResult, error) {
-	return FetchS3BucketsPageWithNotifications(ctx, listAPI, nil, continuationToken)
-}
-
 // FetchS3BucketsPageWithNotifications returns one page of buckets and, when
 // available, enriches each bucket with notification targets.
 func FetchS3BucketsPageWithNotifications(

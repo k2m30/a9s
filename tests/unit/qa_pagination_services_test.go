@@ -1702,6 +1702,18 @@ func (m *mockCodePipelineListPipelinesAPIPaginated) ListPipelines(_ context.Cont
 	return m.PageFunc(m.Calls)
 }
 
+// GetPipelineState/GetPipeline satisfy awsclient.CodePipelineAPI (the type of
+// *ServiceClients.CodePipeline) — FetchCodePipelinesPageWithClients only
+// calls ListPipelines, but the field's static type requires the full
+// interface.
+func (m *mockCodePipelineListPipelinesAPIPaginated) GetPipelineState(_ context.Context, _ *codepipeline.GetPipelineStateInput, _ ...func(*codepipeline.Options)) (*codepipeline.GetPipelineStateOutput, error) {
+	return &codepipeline.GetPipelineStateOutput{}, nil
+}
+
+func (m *mockCodePipelineListPipelinesAPIPaginated) GetPipeline(_ context.Context, _ *codepipeline.GetPipelineInput, _ ...func(*codepipeline.Options)) (*codepipeline.GetPipelineOutput, error) {
+	return &codepipeline.GetPipelineOutput{}, nil
+}
+
 // ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchCodePipelinesPage
 // ---------------------------------------------------------------------------
@@ -1723,7 +1735,7 @@ func TestQA_Pagination_FetchCodePipelinesPage_FirstPage(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchCodePipelinesPage(context.Background(), mock, "")
+	result, err := awsclient.FetchCodePipelinesPageWithClients(context.Background(), &awsclient.ServiceClients{CodePipeline: mock}, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1763,7 +1775,7 @@ func TestQA_Pagination_FetchCodePipelinesPage_Continuation(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchCodePipelinesPage(context.Background(), mock, "token-page-2")
+	result, err := awsclient.FetchCodePipelinesPageWithClients(context.Background(), &awsclient.ServiceClients{CodePipeline: mock}, "token-page-2")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1791,7 +1803,7 @@ func TestQA_Pagination_FetchCodePipelinesPage_Empty(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchCodePipelinesPage(context.Background(), mock, "")
+	result, err := awsclient.FetchCodePipelinesPageWithClients(context.Background(), &awsclient.ServiceClients{CodePipeline: mock}, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1810,7 +1822,7 @@ func TestQA_Pagination_FetchCodePipelinesPage_Error(t *testing.T) {
 		},
 	}
 
-	_, err := awsclient.FetchCodePipelinesPage(context.Background(), mock, "")
+	_, err := awsclient.FetchCodePipelinesPageWithClients(context.Background(), &awsclient.ServiceClients{CodePipeline: mock}, "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

@@ -6,10 +6,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/semantics/projection"
 )
 
-// WireProjection wires the resource-registry callbacks into the generic projector
-// so that projection.Generic can access navigable-field definitions, ID
-// resolvers, and field-alias normalisers without importing core/resource
-// (which would create an import cycle).
+// WireProjection wires the resource-registry callbacks into the generic
+// projectors so that projection.GenericWithConfig and
+// projection.GenericWithConfigAndNavProvider can access navigable-field
+// definitions, ID resolvers, and field-alias normalisers without importing
+// core/resource (which would create an import cycle).
 //
 // `core/resource/` deliberately contains zero `func init()`.
 // WireProjection replaces the former package init() and is

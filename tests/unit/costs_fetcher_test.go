@@ -19,8 +19,7 @@ import (
 //
 //	func FetchCostAndUsage(ctx, api CostsGetCostAndUsageAPI, q costs.Query) (a9saws.CostFetchResult, error)
 //	func FetchCostAndUsageWithResources(ctx, api CostsGetCostAndUsageWithResourcesAPI, q costs.Query) (a9saws.CostFetchResult, error)
-//	func FetchDimensionValues(ctx, api CostsGetDimensionValuesAPI, dim costs.Dimension, window costs.Period) (map[string]string, error)
-//	func FetchCostAnomalies(ctx, api CostsGetAnomaliesAPI, window costs.Period) ([]costs.AnomalyMark, error)
+//	func FetchCostAnomaliesCounted(ctx, api CostsGetAnomaliesAPI, window costs.Period) ([]costs.AnomalyMark, int, error)
 //
 // CostFetchResult{Records []costs.Record, Attrs map[string]string, RequestCount int}
 // and the three typed sentinel errors (ErrCostsAccessDenied, ErrCostsDataUnavailable,
@@ -82,18 +81,6 @@ func (m *mockCostsGetAnomaliesClient) GetAnomalies(
 	params *costexplorer.GetAnomaliesInput,
 	optFns ...func(*costexplorer.Options),
 ) (*costexplorer.GetAnomaliesOutput, error) {
-	return m.output, nil
-}
-
-type mockCostsGetDimensionValuesClient struct {
-	output *costexplorer.GetDimensionValuesOutput
-}
-
-func (m *mockCostsGetDimensionValuesClient) GetDimensionValues(
-	ctx context.Context,
-	params *costexplorer.GetDimensionValuesInput,
-	optFns ...func(*costexplorer.Options),
-) (*costexplorer.GetDimensionValuesOutput, error) {
 	return m.output, nil
 }
 
@@ -378,29 +365,6 @@ func TestFetchCostAndUsageWithResources_MapsRecordsAndCountsRequests(t *testing.
 }
 
 // ---------------------------------------------------------------------------
-// GetDimensionValues
-// ---------------------------------------------------------------------------
-
-func TestFetchDimensionValues_MapsValuesToAttrs(t *testing.T) {
-	mock := &mockCostsGetDimensionValuesClient{
-		output: &costexplorer.GetDimensionValuesOutput{
-			DimensionValues: []cetypes.DimensionValuesWithAttributes{
-				{Value: strPtr("123456789012"), Attributes: map[string]string{"description": "prod-account"}},
-			},
-		},
-	}
-
-	got, err := a9saws.FetchDimensionValues(context.Background(), mock, costs.Dimension("LINKED_ACCOUNT"), costs.Period{Start: "2026-06-01", End: "2026-07-01"})
-	if err != nil {
-		t.Fatalf("FetchDimensionValues() error = %v", err)
-	}
-	want := map[string]string{"123456789012": "prod-account"}
-	if len(got) != len(want) || got["123456789012"] != "prod-account" {
-		t.Errorf("FetchDimensionValues() = %v, want %v", got, want)
-	}
-}
-
-// ---------------------------------------------------------------------------
 // GetAnomalies
 // ---------------------------------------------------------------------------
 
@@ -436,9 +400,9 @@ func TestFetchCostAnomalies_MapsDimension(t *testing.T) {
 		},
 	}
 
-	marks, err := a9saws.FetchCostAnomalies(context.Background(), mock, costs.Period{Start: "2026-07-01", End: "2026-07-08"})
+	marks, _, err := a9saws.FetchCostAnomaliesCounted(context.Background(), mock, costs.Period{Start: "2026-07-01", End: "2026-07-08"})
 	if err != nil {
-		t.Fatalf("FetchCostAnomalies() error = %v", err)
+		t.Fatalf("FetchCostAnomaliesCounted() error = %v", err)
 	}
 	if len(marks) != 1 {
 		t.Fatalf("len(marks) = %d, want 1", len(marks))

@@ -1509,7 +1509,7 @@ func TestQA_Pagination_FetchWAFWebACLsPage_FirstPage(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchWAFWebACLsPage(context.Background(), mock, "")
+	result, err := awsclient.FetchWAFWebACLsPageWithCloudFront(context.Background(), mock, nil, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1548,7 +1548,7 @@ func TestQA_Pagination_FetchWAFWebACLsPage_Continuation(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchWAFWebACLsPage(context.Background(), mock, "marker-waf-page-2")
+	result, err := awsclient.FetchWAFWebACLsPageWithCloudFront(context.Background(), mock, nil, "marker-waf-page-2")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1585,7 +1585,7 @@ func TestQA_Pagination_FetchWAFWebACLsPage_Empty(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchWAFWebACLsPage(context.Background(), mock, "")
+	result, err := awsclient.FetchWAFWebACLsPageWithCloudFront(context.Background(), mock, nil, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1610,7 +1610,7 @@ func TestQA_Pagination_FetchWAFWebACLsPage_Error(t *testing.T) {
 		},
 	}
 
-	_, err := awsclient.FetchWAFWebACLsPage(context.Background(), mock, "")
+	_, err := awsclient.FetchWAFWebACLsPageWithCloudFront(context.Background(), mock, nil, "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

@@ -215,7 +215,8 @@ func TestPersistedRows_CarryEveryRenderableColumn(t *testing.T) {
 
 	for _, td := range types {
 		t.Run(td.ShortName, func(t *testing.T) {
-			// app.ResolveListColumns mirrors the EXACT resolution
+			// (*app.Controller).ResolveColumnsForType, driven with a nil
+			// viewConfig below, mirrors the EXACT resolution
 			// materializeListFieldsForType itself uses
 			// (resolveListColumnsForBuild): when td.Columns is already as
 			// large as the built-in default view's column count, the
@@ -228,7 +229,9 @@ func TestPersistedRows_CarryEveryRenderableColumn(t *testing.T) {
 			// any type whose td.Columns is not strictly smaller than the
 			// default view's column count (e.g. lambda: 6 Columns vs 6
 			// default List entries).
-			cols := app.ResolveListColumns(td.ShortName)
+			t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+			colsCtrl := fieldCompletenessPair(t, "fieldcomplete-defaultcols-"+td.ShortName, "us-east-1")
+			cols := colsCtrl.ResolveColumnsForType(td.ShortName)
 			targets := pathBackedKeylessColumns(cols, td.LifecycleKey)
 			if len(targets) == 0 {
 				t.Skip("no Path-backed, Key-less column in the default view — nothing for MaterializeListFields to persist for this type")

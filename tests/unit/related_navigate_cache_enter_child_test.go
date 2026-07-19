@@ -53,7 +53,7 @@ func setupS3ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 
 	s3Client := fakes.NewS3()
 	s3Res, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchS3BucketsPage(context.Background(), s3Client, token)
+		return awsclient.FetchS3BucketsPageWithNotifications(context.Background(), s3Client, nil, token)
 	})
 	if err != nil || len(s3Res) == 0 {
 		t.Fatalf("demo s3 fixtures missing (err=%v, len=%d)", err, len(s3Res))

@@ -36,7 +36,7 @@ func TestFetchS3Buckets_Paginated(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchS3BucketsPage(context.Background(), mock, token)
+		return awsclient.FetchS3BucketsPageWithNotifications(context.Background(), mock, nil, token)
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

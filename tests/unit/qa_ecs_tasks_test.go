@@ -8,11 +8,51 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// qaECSTaskFake composes the three narrow ECS mocks below into one
+// awsclient.ECSAPI value — the registered "ecs-task" paginated fetcher reads
+// ListClusters/ListTasks/DescribeTasks off a single *ServiceClients.ECS
+// field. ListServices/DescribeServices/DescribeClusters/DescribeTaskDefinition
+// are stubbed since these ecs-task tests never touch them (nil
+// describeTaskDefAPI equivalent — the join is skipped when it errors/returns
+// nothing, matching the pre-refactor 3-arg FetchECSTasksPage contract).
+type qaECSTaskFake struct {
+	*mockECSListClustersClient
+	*mockECSListTasksClient
+	*mockECSDescribeTasksClient
+}
+
+func (f *qaECSTaskFake) DescribeClusters(_ context.Context, _ *ecs.DescribeClustersInput, _ ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error) {
+	return &ecs.DescribeClustersOutput{}, nil
+}
+
+func (f *qaECSTaskFake) ListServices(_ context.Context, _ *ecs.ListServicesInput, _ ...func(*ecs.Options)) (*ecs.ListServicesOutput, error) {
+	return &ecs.ListServicesOutput{}, nil
+}
+
+func (f *qaECSTaskFake) DescribeServices(_ context.Context, _ *ecs.DescribeServicesInput, _ ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error) {
+	return &ecs.DescribeServicesOutput{}, nil
+}
+
+// DescribeTaskDefinition returns a ClientException ("does not exist"), the
+// production join's own signal for "no such task definition" — this keeps
+// Fields["task_def_join_error"] unset, matching the pre-refactor 3-arg
+// FetchECSTasksPage contract (which never queried task definitions at all).
+func (f *qaECSTaskFake) DescribeTaskDefinition(_ context.Context, _ *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
+	return nil, &smithy.GenericAPIError{Code: "ClientException", Message: "task definition does not exist"}
+}
+
+func qaECSTaskFetch(ctx context.Context, listClusters *mockECSListClustersClient, listTasks *mockECSListTasksClient, describeTasks *mockECSDescribeTasksClient, token string) (resource.FetchResult, error) {
+	fetcher := resource.GetPaginatedFetcher("ecs-task")
+	clients := &awsclient.ServiceClients{ECS: &qaECSTaskFake{listClusters, listTasks, describeTasks}}
+	return fetcher(ctx, clients, token)
+}
 
 func TestQA_ECSTasks_FetchSuccess(t *testing.T) {
 	listClusters := &mockECSListClustersClient{
@@ -60,7 +100,7 @@ func TestQA_ECSTasks_FetchSuccess(t *testing.T) {
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchECSTasksPage(context.Background(), listClusters, listTasks, describeTasks, token)
+		return qaECSTaskFetch(context.Background(), listClusters, listTasks, describeTasks, token)
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -137,7 +177,7 @@ func TestQA_ECSTasks_FetchNoClusters(t *testing.T) {
 	describeTasks := &mockECSDescribeTasksClient{}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchECSTasksPage(context.Background(), listClusters, listTasks, describeTasks, token)
+		return qaECSTaskFetch(context.Background(), listClusters, listTasks, describeTasks, token)
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -161,7 +201,7 @@ func TestQA_ECSTasks_FetchNoTasksInCluster(t *testing.T) {
 	describeTasks := &mockECSDescribeTasksClient{}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchECSTasksPage(context.Background(), listClusters, listTasks, describeTasks, token)
+		return qaECSTaskFetch(context.Background(), listClusters, listTasks, describeTasks, token)
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -179,7 +219,7 @@ func TestQA_ECSTasks_FetchListClustersError(t *testing.T) {
 	describeTasks := &mockECSDescribeTasksClient{}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-		return awsclient.FetchECSTasksPage(context.Background(), listClusters, listTasks, describeTasks, token)
+		return qaECSTaskFetch(context.Background(), listClusters, listTasks, describeTasks, token)
 	})
 	if err == nil {
 		t.Fatal("expected error, got nil")

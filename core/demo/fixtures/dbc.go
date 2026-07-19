@@ -91,7 +91,7 @@ const (
 	// WarnDBCSnapManualUnusedID — available + manual + age > 365d. Pins
 	// CodeDBCSnapManualUnused firing on its own (unlike
 	// WarnDBCSnapFailedAndManualOldID, whose Status=failed early-return
-	// suppresses the manual-age check per ComputeDBCSnapStatusAndIssues §0.1).
+	// suppresses the manual-age check per computeDBCSnapFindings §0.1).
 	WarnDBCSnapManualUnusedID  = "manual-forgotten-dbc-snap"
 	WarnDBCSnapManualUnusedARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:manual-forgotten-dbc-snap"
 
@@ -336,7 +336,7 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			VpcId:                       aws.String(dbcVPCID),
 		},
 		// failed + manual + 400d age + parent missing — three Wave-1 phrases.
-		// Status=failed (Broken) early-returns from ComputeDBCSnapStatusAndIssues,
+		// Status=failed (Broken) early-returns from computeDBCSnapFindings,
 		// so only the "failed" phrase is in Issues (Broken wins). Orphan signal
 		// from the cross-ref enricher arrives as a separate Wave-2 finding; the
 		// merged "<top> (+N)" display is composed at render time by

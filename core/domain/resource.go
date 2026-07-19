@@ -16,9 +16,9 @@ type Resource struct {
 	Name string
 	// Type is the resource short name (e.g. "ec2", "rds", "s3"). Set by
 	// fetchers and by the detail view before calling a DetailProjector.
-	// Used by projection.Generic to look up per-type view config, navigable
-	// fields, and field aliases. Empty string = unknown type (falls back to
-	// Fields-only rendering with no navigability).
+	// Used by projection.GenericWithConfig to look up per-type view config,
+	// navigable fields, and field aliases. Empty string = unknown type
+	// (falls back to Fields-only rendering with no navigability).
 	Type string
 	// Fields holds all visible column values by key.
 	Fields map[string]string

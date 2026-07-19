@@ -48,9 +48,3 @@ func FormatTruncated(n int) string {
 	return strconv.Itoa(n) + "+"
 }
 
-// FormatUnknown returns the em-dash marker used for cells whose value the
-// enricher could not determine at all (e.g., the API call failed before any
-// data was observed).
-func FormatUnknown() string {
-	return CellUnknownText
-}

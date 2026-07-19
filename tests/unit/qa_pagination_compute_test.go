@@ -339,7 +339,7 @@ func TestQA_Pagination_FetchS3BucketsPage_FirstPage(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchS3BucketsPage(context.Background(), mock, "")
+	result, err := awsclient.FetchS3BucketsPageWithNotifications(context.Background(), mock, nil, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -375,7 +375,7 @@ func TestQA_Pagination_FetchS3BucketsPage_Continuation(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchS3BucketsPage(context.Background(), mock, "cont-token-2")
+	result, err := awsclient.FetchS3BucketsPageWithNotifications(context.Background(), mock, nil, "cont-token-2")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -406,7 +406,7 @@ func TestQA_Pagination_FetchS3BucketsPage_Empty(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchS3BucketsPage(context.Background(), mock, "")
+	result, err := awsclient.FetchS3BucketsPageWithNotifications(context.Background(), mock, nil, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -425,7 +425,7 @@ func TestQA_Pagination_FetchS3BucketsPage_Error(t *testing.T) {
 		},
 	}
 
-	_, err := awsclient.FetchS3BucketsPage(context.Background(), mock, "")
+	_, err := awsclient.FetchS3BucketsPageWithNotifications(context.Background(), mock, nil, "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
