@@ -33,8 +33,9 @@ import (
 // AmendRows' copy-on-write mutation (task #17 wave 1 stage 3 — the former
 // ResourceCache/LazyResourceCache in-place-mutation legs are gone; a type's
 // rows live in exactly one RowStore entry, so this is the only per-type-row
-// destination left). DEF-7's mutate-in-place bug class is exactly what
-// Amend exists to remove — see RowStore.Amend's doc comment.
+// destination left). The mutate-in-place bug class the dispatch-time payload
+// freeze guards against is exactly what Amend exists to remove — see
+// RowStore.Amend's doc comment.
 func (c *Core) applyEnrichment(
 	resourceType string,
 	findings map[string][]domain.Finding,

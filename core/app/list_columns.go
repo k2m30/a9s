@@ -308,7 +308,7 @@ func hasWave2Finding(findings []domain.Finding) bool {
 // ("healthy", "warning", "broken", "dim", "") so RenderList can reproduce
 // the exact lipgloss.Style that View() derives from td.ResolveColor(r).
 //
-// DEF-3/C6: a row's OWN persisted findings (r.Findings — what a cold-boot
+// Per cache contract C6: a row's OWN persisted findings (r.Findings — what a cold-boot
 // reseed from cache.Row.Findings populates, and what the demo/live fold
 // layer mutates directly) are consulted FIRST, before falling back to the
 // findings map (the session-scoped Wave-2 enrichment store, which is empty

@@ -1,7 +1,8 @@
 // app_cache_first_seeding_test.go — RED tests for the CACHE-FIRST LIST UX epic,
-// Contract A (in-session seeding) and Contract C (menu Refreshing signal).
+// the cache-first seeding contract (in-session seeding) and the
+// menu-refreshing contract (menu Refreshing signal).
 //
-// Contract A: when a list screen opens and the session already holds rows for
+// Cache-first seeding: when a list screen opens and the session already holds rows for
 // that type (RowStore — first-page rows retained by availability probes, task
 // #17 wave 1 stage 2's replacement for the removed session.ProbeResources/
 // ProbeTruncated maps), the list must render those rows IMMEDIATELY:
@@ -10,7 +11,7 @@
 // Refreshing=false. When no rows are known, today's behavior (Loading=true, no
 // Refreshing) stays unchanged.
 //
-// Contract C: MenuBody gains Refreshing=true while a background availability
+// Menu-refreshing: MenuBody gains Refreshing=true while a background availability
 // sweep is running after a cache-seeded startup. It flips false when the sweep
 // completes.
 //
@@ -52,7 +53,7 @@ import (
 // file has no cross-file coupling to another test file's helper lifetime.
 //
 // A9S_CONFIG_FOLDER is redirected to t.TempDir() so the disk-store fallback
-// HandleNavigate now consults (DEF-15) reads/writes an isolated per-test
+// HandleNavigate now consults reads/writes an isolated per-test
 // directory instead of the developer's real ~/.a9s/cache — a leftover
 // ec2.yaml from a prior manual run (or another test package sharing the same
 // "demo"/"us-east-1" pair) would otherwise leak rows into
@@ -71,10 +72,10 @@ func newSeededTestController(t *testing.T) (*runtime.Core, *app.Controller) {
 }
 
 // -----------------------------------------------------------------------
-// Contract A — in-session seeding from ProbeResources
+// Cache-first seeding — in-session seeding from ProbeResources
 // -----------------------------------------------------------------------
 
-// TestListOpen_SeedsFromProbeResources_EC2 pins Contract A for "ec2": when
+// TestListOpen_SeedsFromProbeResources_EC2 pins cache-first seeding for "ec2": when
 // the session already holds ProbeResources for ec2, opening the ec2 list
 // must render those rows immediately with Loading=false and Refreshing=true.
 func TestListOpen_SeedsFromProbeResources_EC2(t *testing.T) {
@@ -113,7 +114,7 @@ func TestListOpen_SeedsFromProbeResources_EC2(t *testing.T) {
 	}
 }
 
-// TestListOpen_SeedsFromProbeResources_S3 pins Contract A for a second,
+// TestListOpen_SeedsFromProbeResources_S3 pins cache-first seeding for a second,
 // differently-shaped resource type (s3, Key-based columns vs ec2's
 // Path-based columns) to guard against a seeding path that only works for
 // one column-resolution style.
@@ -146,10 +147,10 @@ func TestListOpen_SeedsFromProbeResources_S3(t *testing.T) {
 // TestListOpen_NoProbeResourcesNoDiskStore_KeepsTodaysLoadingBehavior
 // verifies the "genuinely nothing known" branch is unchanged: Loading=true,
 // Refreshing not set, no rows. This is the regression guard that stops
-// Contract A from firing unconditionally.
+// cache-first seeding from firing unconditionally.
 //
 // Renamed from TestListOpen_NoProbeResources_KeepsTodaysLoadingBehavior
-// (DEF-15): once HandleNavigate grew a disk-store fallback for warm
+// once HandleNavigate grew a disk-store fallback for warm
 // list-opens, "no ProbeResources" alone no longer implies Loading=true — a
 // populated on-disk per-type cache for this pair now seeds the list too (see
 // TestListOpen_NoProbeResourcesButDiskStoreHasRows_SeedsFromDiskStore below).
@@ -181,7 +182,7 @@ func TestListOpen_NoProbeResourcesNoDiskStore_KeepsTodaysLoadingBehavior(t *test
 }
 
 // TestListOpen_NoProbeResourcesButDiskStoreHasRows_SeedsFromDiskStore pins
-// the DEF-15 disk-store fallback contract at the Controller/list-open layer
+// the post-sweep disk-store fallback contract at the Controller/list-open layer
 // (a layer above the runtime.HandleNavigate-level and TUI-Update-level pins
 // in tests/unit/tui_post_sweep_seed_test.go): when RowStore holds nothing for
 // the type but the on-disk per-type cache for the current profile/region pair
@@ -231,7 +232,7 @@ func TestListOpen_NoProbeResourcesButDiskStoreHasRows_SeedsFromDiskStore(t *test
 }
 
 // TestListOpen_SeedsFromResourceCache_PreviousVisit pins the second half of
-// Contract A's seeding source: "or a previous visit's ResourceCache" — not
+// the cache-first seeding contract's second seeding source: "or a previous visit's ResourceCache" — not
 // just the availability-probe ProbeResources map. Simulates a user who
 // already opened the ec2 list once this session (populating session
 // ResourceCache), popped back to the menu, then re-opens the list — the
@@ -264,7 +265,7 @@ func TestListOpen_SeedsFromResourceCache_PreviousVisit(t *testing.T) {
 
 // TestListOpen_ResourcesLoaded_ClearsRefreshingAndSwapsRows pins the
 // "on ResourcesLoaded the rows swap in place and Refreshing=false" half of
-// Contract A.
+// the cache-first seeding contract.
 func TestListOpen_ResourcesLoaded_ClearsRefreshingAndSwapsRows(t *testing.T) {
 	core, c := newSeededTestController(t)
 

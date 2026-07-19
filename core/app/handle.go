@@ -139,7 +139,8 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 
 	// messages.APIError: routed entirely through runtime.Core.HandleEvent
 	// (the case added there mirrors this same ConnectGen stand-in + intent
-	// application) — DEF-5's orchestrator gap fix. Handling it a second time
+	// application) — the C4 fetch-failure handling lives in the Core, not
+	// here. Handling it a second time
 	// here would double-apply the ClearActiveListLoadingIntent/FlashIntent
 	// the Core already returns via the intents/tasks captured above.
 

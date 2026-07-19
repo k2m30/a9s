@@ -441,7 +441,7 @@ func (c *Controller) ClearListLoading() {
 
 // SetListFetchError records a failed fetch's error text on the top list
 // screen, mirroring the headless ClearActiveListLoadingIntent application in
-// intents.go (DEF-5/C4): a fetch failure over cached content stops the
+// intents.go (cache contract C4): a fetch failure over cached content stops the
 // refreshing marker and swaps in an error marker instead of leaving the list
 // with no error surfaced. No-op when err is empty.
 func (c *Controller) SetListFetchError(err string) {
@@ -460,7 +460,7 @@ func (c *Controller) SetListFetchError(err string) {
 
 // SetListRefreshing sets the Refreshing flag on the top list screen. Mirrors
 // SetListFetchError's locking/topListState pattern. Used by cache-first
-// seeding callers (DEF-12, C3: docs/design/cache-requirements.md) to mark a
+// seeding callers (C3: docs/design/cache-requirements.md) to mark a
 // seeded-but-unverified list surface so the renderer's refreshing marker
 // (⟳ / "── refreshing... ──") distinguishes it from verified-fresh content —
 // renderers read this flag, they never compute it.
@@ -476,7 +476,7 @@ func (c *Controller) SetListRefreshing(v bool) {
 
 // SetListTotalCount sets the TotalCount override on the top list screen.
 // Mirrors SetListRefreshing's locking/topListState pattern. Used by
-// cache-first seeding callers (item B, #17 wave 2, DEF-21) AFTER
+// cache-first seeding callers (the seed-time provisional total, #17 wave 2) AFTER
 // applyResourcesLoaded so the seed-time value survives the unconditional
 // clear inside it — same set-after-seed ordering SetListRefreshing already
 // requires. n <= 0 is a no-op: TotalCount's zero value already means

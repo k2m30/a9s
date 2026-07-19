@@ -37,7 +37,7 @@ func IsBackgroundTaskKind(kind runtime.TaskKind) bool {
 // result the response doesn't need to already show SOMETHING. A genuinely
 // cold fetch (nothing renderable yet, screenAlreadyRenderable=false) stays
 // blocking, since the synchronous half of the partition is what produces the
-// `Loading…` shell in the same response (DEF-1/C4, pilot step 2).
+// `Loading…` shell in the same response (cache contract C4, S3 pilot step 2).
 //
 // Every other TaskKind's classification is delegated unchanged to
 // IsBackgroundTaskKind — this function only changes behavior for

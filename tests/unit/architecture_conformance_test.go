@@ -310,7 +310,7 @@ func stripGoComments(src []byte) []byte {
 // wraps the mutation inside an Amend/AmendRows copy-on-write callback,
 // operating on that callback's freshly-copied slice — never a bare
 // RowStore.Snapshot/SnapshotAll result. A file added to this set in the
-// future without satisfying (a) or (b) is exactly the DEF-7 mutate-in-place
+// future without satisfying (a) or (b) is exactly the mutate-in-place
 // regression this pin exists to catch.
 var rowStoreMutationSeamFiles = map[string]struct{}{
 	"app/list_columns.go":              {}, // read-only Findings[0] access, not a mutation call site

@@ -155,10 +155,10 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		return NavigateResult{Kind: NavigateKindPopAll}, nil
 
 	case NavigateTargetResourceList:
-		// DEF-19: disarm the deferred one-shot -c navigation the instant any
+		// One-shot command disarm (D15): disarm the deferred one-shot -c navigation the instant any
 		// resource-list navigation actually happens. CommandArmed/PendingCommand
 		// (session.go) latch a REPLAY of this exact navigation, deferred until
-		// handleAvailabilityCacheLoaded's seed lands (DEF-14/D11) — but nothing
+		// handleAvailabilityCacheLoaded's seed lands (deferred -c navigation, D11) — but nothing
 		// previously re-checked "has the user already navigated since arming"
 		// at consumption time. A manually-typed navigation to the SAME or a
 		// DIFFERENT resource type in the race window between arming (connect
@@ -220,7 +220,7 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		}
 		// The seed rides the miss branch, not a NavigateKindPushResourceListCached
 		// promotion: this check above (c.ResourceCache(canon)) only hits a FULL
-		// (non-Partial, OriginFetch) RowStore entry (DEF-12 C1 + Goal 4) — an
+		// (non-Partial, OriginFetch) RowStore entry (warm-open seeding, C1 + Goal 4) — an
 		// OriginProbe/OriginDisk entry retained below is knowledge the probe
 		// gathered, not a verified live fetch, so the fetch must still run to
 		// confirm/replace what the probe retained; Kind and the
@@ -232,7 +232,7 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		// session.ProbeResources map no longer exists; the store is read
 		// directly instead.
 		//
-		// DEF-15/P2: the disk fallback fires only when this session never
+		// Observed-empty guard on the disk-store fallback: it fires only when this session never
 		// observed canon at all. Gen (domain.Gen, zero value 0) is the
 		// observed-at-all discriminator here, NOT Origin — TypeRows{}'s zero
 		// value has Origin==OriginDisk (iota 0), so testing Origin alone cannot
@@ -266,7 +266,7 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 						Pagination: &resource.PaginationMeta{
 							IsTruncated: !tf.Exact,
 						},
-						// Item B/DEF-21: tf.Count is the authoritative total for the
+						// Seed-time provisional total: tf.Count is the authoritative total for the
 						// C6a reconstructable pair (Count may exceed len(tf.Rows) — a
 						// counts-only write never touches Rows). Carry it through so
 						// the seeded list's title shows the real total, not the

@@ -1,5 +1,5 @@
-// app_preconnect_replay_test.go — RED regression pins for DEF-10
-// (docs/design/cache-requirements.md C10): a navigation issued BEFORE the
+// app_preconnect_replay_test.go — RED regression pins for the pre-connect
+// replay (docs/design/cache-requirements.md C10): a navigation issued BEFORE the
 // AWS connect completes renders the cached list correctly (C1), but its
 // fetch task fails with "AWS clients not initialized" and is never replayed
 // once the connect lands — the list is stuck on cached rows plus a
@@ -35,7 +35,7 @@
 //     handled outside HandleEvent) — so today a ClientsReady fed
 //     through Controller.Handle hits the default nil,nil branch and is
 //     silently dropped for headless/web callers. Wiring this seam is
-//     therefore part of the DEF-10 fix, not a pre-existing green path;
+//     therefore part of the pre-connect replay fix, not a pre-existing green path;
 //     test 1 below drives this exact path and pins the TARGET (fixed)
 //     behavior.
 //
@@ -110,7 +110,7 @@ func TestSessionNew_PendingRefreshTrue(t *testing.T) {
 	}
 }
 
-// TestPreConnectNavigate_ReplaysFetchOnClientsReady pins DEF-10 end-to-end
+// TestPreConnectNavigate_ReplaysFetchOnClientsReady pins the pre-connect replay end-to-end
 // at the seam the web lane actually uses.
 //
 // Setup: a live controller (no clients) whose disk cache already has s3
@@ -184,7 +184,7 @@ func TestPreConnectNavigate_ReplaysFetchOnClientsReady(t *testing.T) {
 	}
 }
 
-// TestMenuOnlyStartup_NoRefreshTask pins the non-regression half of DEF-10:
+// TestMenuOnlyStartup_NoRefreshTask pins the non-regression half of the pre-connect replay:
 // a session that never navigated away from the main menu before connecting
 // must NOT get a spurious replay fetch — there is no "last navigation" to
 // replay. It also pins that PendingRefresh is consumed (one-shot): a SECOND
@@ -231,7 +231,7 @@ func TestMenuOnlyStartup_NoRefreshTask(t *testing.T) {
 }
 
 // TestPreConnectNavigate_ReplayDrain_ClearsLastFetchError is the optional
-// DEF-5/C4 companion (item 4): after the replay fetch task returned by
+// C4 error-marker companion: after the replay fetch task returned by
 // ClientsReady is actually drained (fed through Controller.Handle as a
 // messages.ResourcesLoaded result, the same lane DrainSync uses), the list's
 // LastFetchError marker must be cleared and fresh rows must be showing —
@@ -239,9 +239,9 @@ func TestMenuOnlyStartup_NoRefreshTask(t *testing.T) {
 // actually reaches the screen.
 //
 // This seeds LastFetchError directly via a prior messages.APIError landing
-// on the s3 list (mirrors DEF-5's "keeps the content, swaps the marker for
+// on the s3 list (mirrors C4's "keeps the content, swaps the marker for
 // an error marker" contract already pinned elsewhere) to model the exact
-// failure state DEF-10 describes: "AWS clients not initialized" left a
+// failure state the pre-connect replay describes: "AWS clients not initialized" left a
 // permanent error marker on the pre-connect fetch attempt.
 func TestPreConnectNavigate_ReplayDrain_ClearsLastFetchError(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -310,7 +310,7 @@ func TestPreConnectNavigate_ReplayDrain_ClearsLastFetchError(t *testing.T) {
 }
 
 // errPreConnectClientsNotInitialized is a minimal error type standing in
-// for the real "AWS clients not initialized" error DEF-10 names, kept local
+// for the real "AWS clients not initialized" error the pre-connect replay names, kept local
 // to this file so the test has no dependency on the production error
 // value's exact type or message.
 type errPreConnectClientsNotInitialized struct{}

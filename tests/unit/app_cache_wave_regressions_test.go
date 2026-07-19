@@ -9,7 +9,7 @@
 //  2. Truncated disk seed shows N+ (C1/C5): a warm list open seeded from a
 //     disk cache TypeFile whose Count is a truncated lower bound must render
 //     the "N+" title / HasPagination=true BEFORE any refetch lands.
-//  3. Badge fallback (S1/DEF-8 regression): a row whose td.ResolveColor is
+//  3. Badge fallback (S1 regression): a row whose td.ResolveColor is
 //     an issue color but whose ONLY finding is a non-badge Wave-2 "~"
 //     (SevWarn) finding must still count in listIssueCount/GetListIssueCount
 //     — gating the color check on len(r.Findings)==0 undercounts any row
@@ -190,7 +190,7 @@ func TestWarmListOpen_TruncatedDiskSeed_ShowsNPlus_BeforeRefetch(t *testing.T) {
 // issue count: per docs/attention-signals.md S1 "~ findings do not bump", and
 // colorEC2 is colorFromAnyFinding-only (it does not read Fields["state"]), so
 // once runtime.Wave1Only strips the lone Wave-2 warn no issue signal remains.
-// This is the reversal of the former DEF-8 behavior — the list frame title now
+// This is the reversal of the former any-finding-counts behavior — the list frame title now
 // matches the menu badge's unifiedIssueCount exactly.
 func TestGetListIssueCount_LoneWave2Warn_NotCounted(t *testing.T) {
 	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")

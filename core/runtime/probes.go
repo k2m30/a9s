@@ -119,7 +119,7 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 // exact-stick/mismatch-drop guards that lived independently in each caller
 // and could disagree about which write lane's Rows should survive.
 //
-// Persisted-pair invariant (supersedes the old DEF-4b/D14 comments): a
+// Persisted-pair invariant: a
 // pair may only ever show Count > len(Rows) in the COUNTS-ONLY shape (rule
 // 2 below) — and it never loses rows it already had. A write never reduces
 // row richness merely to make Count and len(Rows) match; C1/goal 3 (a
@@ -144,13 +144,13 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 //
 // Rules, applied in order:
 //
-//  0. Contradiction (DEF-18/DEF-9 self-heal): existing.Exact is stored true,
+//  0. Contradiction (false-exact self-heal, D14/D7): existing.Exact is stored true,
 //     but the CURRENT observation is itself truncated (rawTruncated) AND its
 //     own accumulated depth already reaches or exceeds the stored exact
 //     count (rawCount >= existing.Count). A truncated fetch cannot, by
 //     construction, have exhausted a list that is genuinely done at
 //     existing.Count — either a continuation token still exists past that
-//     depth, or the DEF-9 verify-depth walk reached the stored-exact depth
+//     depth, or the verify-depth walk (D7) reached the stored-exact depth
 //     and AWS still reports more. The stored Exact was therefore never true
 //     for the CURRENT population (a shrink/growth since it was set, or it
 //     was poisoned by an old build's false-exact bug) — live contradiction
@@ -273,7 +273,7 @@ func rowIDsAreSubset(candidate, superset []cache.Row) bool {
 // type file per resource type (C7: per-type files, no merge logic). Returns
 // nil immediately when entries is nil or caching is disabled (NoCache). The
 // entire per-type read-modify-write-to-disk sequence runs inside
-// WithCacheStore (DEF-17) so it can never interleave with a concurrent
+// WithCacheStore (the store-lock serialization, D13) so it can never interleave with a concurrent
 // SaveResourceListCache/SaveAvailabilityCache call for the same type file
 // dispatched from another tea.Cmd goroutine (e.g. a background availability
 // sweep's save racing a list screen's own fetch-completion save) — that race
@@ -370,7 +370,7 @@ func (c *Core) SaveAvailabilityCache(
 // defaults-only cascade in resolveSaveColumns) and, for every Path-backed
 // column whose Fields entry is still empty, extracts the scalar from
 // RawStruct and writes it into Fields under the column's resolved key (Key
-// when set, else the lowercased Title). Owner decision, item A: "для всех
+// when set, else the lowercased Title). Owner decision: "для всех
 // ресурсов должны быть закешированы все колонки, которые могут меняться" —
 // every renderable list column must be cached, driven by the column CONFIG,
 // no hardcode. Shared by both save lanes via SaveTypeRows (task #17 wave 1
@@ -475,7 +475,7 @@ func materializeResourceFields(r resource.Resource, columns []config.ListColumn,
 // never a child/related/filtered view).
 //
 // The entire read-modify-write-to-disk sequence runs inside WithCacheStore
-// (DEF-17) — see SaveAvailabilityCache's doc comment for why obtaining the
+// (the store-lock serialization, D13) — see SaveAvailabilityCache's doc comment for why obtaining the
 // store via EnsureCacheStore and mutating it afterward is not sufficient:
 // that shape only serializes the pointer lookup, not the store.Type/Put/
 // SaveType sequence, letting two concurrent saves for the same type file
@@ -562,7 +562,7 @@ func (c *Core) saveResourceListCache(shortName string, rows []cache.Row, count i
 			// never downgrades an already-exact stored total. reconcileTypeFile's
 			// rule 0 overrides this stickiness when the raw (exact, count)
 			// observation itself contradicts the stored exactness — e.g. the
-			// DEF-9 verify-depth walk reaching the stored-exact depth while
+			// verify-depth walk (D7) reaching the stored-exact depth while
 			// AWS still reports truncation (a self-heal for a poisoned pair).
 			incoming.Exact = true
 			incoming.Count = existing.Count

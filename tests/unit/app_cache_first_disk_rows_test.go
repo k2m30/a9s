@@ -277,7 +277,7 @@ func TestCacheTypeFile_RowFindingsRoundTripThroughSaveLoad(t *testing.T) {
 // controller-level outcome of Contract B: on a cold start (empty session,
 // RowStore never observed) with a valid disk cache file present, opening a
 // list before probes complete must seed rows+findings from disk with
-// Refreshing=true — mirroring Contract A's in-session seeding outcome, but
+// Refreshing=true — mirroring the cache-first seeding contract's in-session outcome, but
 // sourced from disk instead of session state.
 //
 // Ambiguity resolution: "seeds from disk" is modeled at the controller

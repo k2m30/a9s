@@ -5,7 +5,7 @@
 // doc (docs/design/cache-requirements.md) is authoritative; comments below
 // cite the specific rule (C3/C4/C5/C6/C7) each pin locks in.
 //
-// Investigation note (DEF-3): a static trace of the current committed
+// Investigation note (persisted-findings round-trip, C6): a static trace of the current committed
 // production wiring (core/app/handle.go's maybeSaveResourceListCache,
 // core/runtime/probes.go's SaveResourceListCache, and
 // core/runtime/handlers_availability.go's rowsFromCacheRows) shows
@@ -36,7 +36,7 @@ import (
 )
 
 // -----------------------------------------------------------------------
-// DEF-1 (C4) — a cold list open with a connected client must not block the
+// C4 — a cold list open with a connected client must not block the
 // transport when the target screen is already renderable (cached rows
 // seeded, or the Loading shell already present).
 //
@@ -112,8 +112,8 @@ func TestIsBackgroundFetchTask_NonFetchKind_UnaffectedByRenderability(t *testing
 	}
 }
 
-// TestWebBoot_WarmListOpen_FetchTaskDeferredAsBackground pins DEF-1
-// end-to-end at the seam a web request handler would actually use: a
+// TestWebBoot_WarmListOpen_FetchTaskDeferredAsBackground pins the C4
+// background-fetch classification end-to-end at the seam a web request handler would actually use: a
 // controller seeded with cache-first rows for s3 (mirroring pilot step 7 —
 // "cached rows... render < 100ms... ⟟ marker") opens the s3 list, and the
 // resulting KindFetchResources task — run through the real
@@ -184,7 +184,7 @@ func TestWebBoot_WarmListOpen_FetchTaskDeferredAsBackground(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
-// DEF-2 (C5) — the availability sweep's truncated probe result must never
+// C5 — the availability sweep's truncated probe result must never
 // downgrade an already-exact stored total in the LIVE menu view-state
 // (session.MenuState via PatchMenuAvailability), mirroring the guard that
 // already exists on the disk-persist path (SaveAvailabilityCache /
@@ -201,7 +201,7 @@ func TestWebBoot_WarmListOpen_FetchTaskDeferredAsBackground(t *testing.T) {
 // -----------------------------------------------------------------------
 
 // TestAvailabilityChecked_TruncatedProbe_NeverDowngradesExactMenuTotal pins
-// DEF-2 directly: a menu holding an exact 55 for s3 (Truncated=false) that
+// the C5 no-downgrade guard directly: a menu holding an exact 55 for s3 (Truncated=false) that
 // then receives an AvailabilityChecked{Count:50, Truncated:true} for s3 (the
 // availability sweep's truncated first-page result) must retain
 // Availability["s3"]==55 and Truncated["s3"]==false — not regress to 50/true.
@@ -264,7 +264,7 @@ func findMenuEntryPilot(t *testing.T, vs app.ViewState, shortName string) app.Me
 }
 
 // -----------------------------------------------------------------------
-// DEF-3 (C6) — per-row Findings must survive the production save+reload+
+// C6 — per-row Findings must survive the production save+reload+
 // reseed round trip (not just the cache package's own manually-constructed
 // Row round-trip tests), and cold-boot seeding must render glyphs/status
 // derived from them.
@@ -279,7 +279,7 @@ func findMenuEntryPilot(t *testing.T, vs app.ViewState, shortName string) app.Me
 // -----------------------------------------------------------------------
 
 // TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed pins
-// DEF-3 against the production wiring: a list screen holding a
+// the persisted-findings round-trip against the production wiring: a list screen holding a
 // resource.Resource row with a Wave-2 Finding, saved via the SAME call path
 // production code uses (Controller.applyResourcesLoaded -> syncExactTotalToMenu
 // -> maybeSaveResourceListCache -> Core.SaveResourceListCache — driven here
@@ -363,7 +363,7 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 }
 
 // -----------------------------------------------------------------------
-// DEF-4 (C7) — (a) a refresh of one type must leave sibling per-type files
+// C7 — (a) a refresh of one type must leave sibling per-type files
 // byte-identical when driven through the PRODUCTION refresh path end-to-end
 // (not just Store.SaveType directly, which TestPerTypeSave_TouchingOneType_
 // LeavesSiblingFilesByteExact in app_web_live_cold_boot_test.go already
@@ -385,8 +385,8 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 // FindingsSurviveWiredSaveAndColdBootReseed above does, mirroring a Ctrl+R
 // refresh's data flow) and asserts a SIBLING type's on-disk file
 // (pre-populated directly via cache.LoadDir/SaveType, mirroring an earlier
-// session's save) is byte-identical before and after — pinning DEF-4a
-// end-to-end through the production wiring rather than only through
+// session's save) is byte-identical before and after — pinning sibling-file
+// isolation (C7) end-to-end through the production wiring rather than only through
 // Store.SaveType directly.
 func TestProductionRefresh_OneType_LeavesSiblingTypeFilesByteIdentical(t *testing.T) {
 	tmp := t.TempDir()
@@ -432,7 +432,7 @@ func TestProductionRefresh_OneType_LeavesSiblingTypeFilesByteIdentical(t *testin
 }
 
 // TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStaysConsistent
-// pins DEF-4b: a type whose disk file already holds an EXACT 55 rows (a
+// pins the persisted-pair invariant: a type whose disk file already holds an EXACT 55 rows (a
 // prior full-depth session), refreshed via the production list-open path
 // with a TRUNCATED 50-row result (e.g. a first-page-only refetch), must
 // leave the persisted file's Count/Rows/Exact mutually consistent — per the
@@ -490,7 +490,7 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 }
 
 // -----------------------------------------------------------------------
-// DEF-5 (C4) — after a fetch failure over cached content, Refreshing must
+// C4 — after a fetch failure over cached content, Refreshing must
 // stop, and an error marker must replace it (nothing goes blank, per C4:
 // "keeps the content, swaps the marker for an error marker, and logs once").
 //
@@ -514,8 +514,8 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 // halves are pinned below.
 // -----------------------------------------------------------------------
 
-// TestAPIError_OverCachedList_ClearsRefreshing_SetsErrorMarker pins DEF-5's
-// full behavioral contract at the Controller.Handle seam a web/headless
+// TestAPIError_OverCachedList_ClearsRefreshing_SetsErrorMarker pins the C4
+// fetch-failure error marker's full behavioral contract at the Controller.Handle seam a web/headless
 // caller actually uses: a list screen seeded from cache (Refreshing=true,
 // rows on screen) that then receives the real messages.APIError event a
 // failed KindFetchResources execution produces must end with
@@ -587,7 +587,7 @@ func TestAPIError_OverCachedList_ClearsRefreshing_SetsErrorMarker(t *testing.T) 
 	}
 }
 
-// errPilotFetchFailed is a fixed sentinel error for DEF-5's APIError pin,
+// errPilotFetchFailed is a fixed sentinel error for the C4 APIError pin,
 // avoiding a dependency on any specific AWS SDK error type.
 var errPilotFetchFailed = &pilotFetchError{}
 
@@ -596,14 +596,14 @@ type pilotFetchError struct{}
 func (*pilotFetchError) Error() string { return "pilot: simulated fetch failure" }
 
 // -----------------------------------------------------------------------
-// DEF-6 (C3) — MenuEntry has no per-entry origin field distinguishing
+// C3 — MenuEntry has no per-entry origin field distinguishing
 // "cache" (seeded, not yet re-verified) from "verified" (confirmed this
 // session by a live AvailabilityChecked landing). Compile-red field-
 // existence pin, mirroring StatusCol's introduction.
 // -----------------------------------------------------------------------
 
 // TestMenuEntry_Origin_CacheBeforeVerification_FlipsOnAvailabilityChecked
-// pins DEF-6 end-to-end: a menu entry seeded purely from
+// pins the count-origin tracking end-to-end: a menu entry seeded purely from
 // AvailabilityCacheLoaded (disk cache, not yet re-verified this session)
 // must report Origin=="cache"; once the matching AvailabilityChecked result
 // lands for that type, Origin must flip to "verified".
@@ -631,7 +631,7 @@ func TestMenuEntry_Origin_CacheBeforeVerification_FlipsOnAvailabilityChecked(t *
 }
 
 // -----------------------------------------------------------------------
-// DEF-7 (C7/C8) — a background availability sweep's probe + Wave-2
+// C7/C8 — a background availability sweep's probe + Wave-2
 // enrichment completion must persist that type's per-row rows/findings to
 // disk WITHOUT any list screen ever having been opened. Today only
 // SaveAvailabilityCache (counts-only, no rows) runs from the
@@ -652,7 +652,7 @@ func TestMenuEntry_Origin_CacheBeforeVerification_FlipsOnAvailabilityChecked(t *
 // -----------------------------------------------------------------------
 
 // TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen
-// pins DEF-7: driving a full availability-sweep-and-enrichment completion
+// pins the sweep-completion row persistence: driving a full availability-sweep-and-enrichment completion
 // for s3 through Controller.Handle — WITHOUT ever calling
 // Apply(ActionCommand, "s3") or otherwise opening the s3 list screen — must
 // still leave a readable per-type file on disk carrying the rows the sweep
@@ -678,7 +678,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 	// already drained (so handleAvailabilityChecked's "all checks done" path
 	// fires TaskKindSaveCache) — no list screen is opened anywhere in this
 	// test. Gen must match the session's live AvailabilityGen (seeded at 1 by
-	// session.New — see the DEF-2 test above for the same gotcha), or the
+	// session.New — see the C5 no-downgrade test above for the same gotcha), or the
 	// event is silently dropped as stale.
 	_, tasks := ctrl.Handle(messages.AvailabilityChecked{
 		ResourceType: "s3",
@@ -737,7 +737,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 }
 
 // -----------------------------------------------------------------------
-// DEF-8 (C6) — Wave-2 findings applied to an OPEN live list must reach the
+// Open-list findings persistence (C6) — Wave-2 findings applied to an OPEN live list must reach the
 // persisted per-type cache. Verified live (last gap before the S3-pilot
 // rerun): applyEnrichment (core/runtime/helpers.go, driven from
 // Core.handleEnrichmentChecked via the real messages.EnrichmentChecked
@@ -751,12 +751,13 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 // maybeSaveResourceListCache (core/app/handle.go) reads when persisting
 // (Findings: r.Findings, copied straight from ls.Rows). Net effect on a real
 // account: s3.yaml carries issues:5 in the header and every row with ZERO
-// findings — a cold-boot reseed then has nothing for the already-green DEF-3
+// findings — a cold-boot reseed then has nothing for the already-green
 // render-time classification to classify, so no glyphs render.
 //
-// This differs from DEF-3 above: DEF-3 pins findings that arrive ALREADY
+// This differs from the persisted-findings round-trip pin above, which covers
+// findings that arrive ALREADY
 // baked onto the Resource passed to ApplyResourcesLoaded (the Wave-1 initial
-// load). DEF-8 pins the Wave-2 path: rows land with NO findings, enrichment
+// load). This section pins the Wave-2 path: rows land with NO findings, enrichment
 // is applied afterward through the production EnrichmentChecked seam, and
 // only THEN is the list-open save re-triggered — exactly the sequence a live
 // account produces (fetch, then a later enrichment probe).
@@ -772,7 +773,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 // -----------------------------------------------------------------------
 
 // TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph
-// pins DEF-8 end-to-end through the production seams a live app actually
+// pins the open-list findings persistence end-to-end through the production seams a live app actually
 // uses: open the s3 list, land its Wave-1 rows with NO findings (mirrors a
 // real fetch, findings are not known yet), apply Wave-2 enrichment through
 // the real Controller.Handle(messages.EnrichmentChecked{...}) seam the live
@@ -781,7 +782,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 // then assert the persisted TypeFile's Rows carry the finding for the
 // flagged row. A second assertion cold-boots a fresh controller from that
 // same on-disk pair and asserts the seeded row renders with a non-empty
-// Severity — the already-green DEF-3 machinery, closing the loop end to end.
+// Severity — the already-green render-time classification machinery, closing the loop end to end.
 func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -851,7 +852,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 
 	// Cold-boot half: a brand-new controller for the SAME pair must seed the
 	// list-open with the persisted row's Findings intact, closing the loop to
-	// the already-green DEF-3 render-time classification.
+	// the already-green render-time classification.
 	s2 := session.New()
 	s2.Profile = "pilot-def8-prof"
 	s2.Region = "us-east-1"

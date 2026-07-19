@@ -160,7 +160,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 // isScreenRenderable reports whether vs's active body already has SOMETHING
 // to show a caller besides an empty screen: a list or costs body with rows
-// already on it, or an explicit Loading shell. Used to bind DEF-1/C4's
+// already on it, or an explicit Loading shell. Used to bind C4's
 // IsBackgroundFetchTask classifier to the post-Apply snapshot so a renderable
 // fetch screen defers its fetch task to the background, while a genuinely cold
 // open keeps it blocking so the response carries the shell itself.
@@ -211,7 +211,7 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 
 	// Drain blocking tasks (the response body's own content) synchronously
 	// under entry.mu; partition off background tasks (related-check fan-out,
-	// detail enrichment, save-cache, and — per DEF-1/C4 — a KindFetchResources
+	// detail enrichment, save-cache, and — per cache contract C4 — a KindFetchResources
 	// task whose target screen is already renderable) so the response is not
 	// held hostage to them — they run in their own goroutine after the
 	// response is written.

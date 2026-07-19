@@ -260,7 +260,7 @@ func (SaveThemeConfigPayload) isTaskPayload() {}
 // SaveCachePayload carries a snapshot of the per-type rows the sweep/
 // enrichment completion just retained, captured at TASK-DISPATCH time (inside
 // handleAvailabilityChecked / handleEnrichmentChecked's "all done" branch) —
-// DEF-7/C7/C8. This matters because c.session.ProbeResources can still be
+// the dispatch-time payload freeze (C7/C8). This matters because c.session.ProbeResources can still be
 // mutated in-place after dispatch but before the task executes (e.g. a LATER
 // handleEnrichmentChecked call's applyEnrichment/FieldUpdates merge touching a
 // type already captured in this snapshot); a save that read

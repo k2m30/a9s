@@ -84,7 +84,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// such as "rds" for ShortName "dbi"). buildMenuBody resolves the
 				// active key per item using menuActiveKey().
 				//
-				// DEF-2/C5: a truncated probe result must never downgrade an
+				// Per cache contract C5: a truncated probe result must never downgrade an
 				// already-exact stored total — mirrors the guard
 				// SaveResourceListCache/SaveAvailabilityCache already apply on the
 				// disk-persist path (core/runtime/probes.go). Exactness only
@@ -102,7 +102,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 					ms.Availability[v.ResourceType] = v.Count
 					ms.Truncated[v.ResourceType] = v.Truncated
 				}
-				// DEF-6/C3: track cache-seeded vs live-verified origin
+				// Per cache contract C3: track cache-seeded vs live-verified origin
 				// independently of the exactness guard above — a truncated
 				// sweep result that loses the count/truncated race still
 				// means the type WAS live-checked this session, so its
@@ -221,7 +221,8 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// ...and the findings themselves must land on the controller's own
 				// rows (ls.Rows / the RowStore-backed type cache) — the list-open
 				// save path persists from them, so without this the on-disk cache
-				// rows carry no findings and reseed glyphless (DEF-8). A
+				// rows carry no findings and reseed glyphless (violating
+				// C6's persisted-findings round-trip). A
 				// multi-condition resource keeps every Finding — and every
 				// finding's own AttentionDetail — on the row.
 				c.applyRowFindings(v.ResourceType, v.Enrichment.Findings, v.Enrichment.AttentionDetails)
@@ -251,7 +252,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			// than leaving it stuck Loading=true (emitted by HandleAPIError).
 			if ls := c.topListState(); ls != nil {
 				ls.Loading = false
-				// DEF-5/C4: a fetch failure over cached content stops the
+				// Per cache contract C4: a fetch failure over cached content stops the
 				// refreshing marker and swaps in an error marker instead —
 				// nothing goes blank, rows stay on screen.
 				if v.Err != "" {

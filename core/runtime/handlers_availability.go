@@ -62,7 +62,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 	var intents []UIIntent
 
 	// Emit one PatchMenuAvailability intent per resource type with cached data.
-	// DEF-6/C3: Origin="cache" — seeded from disk, not yet re-verified this
+	// Per cache contract C3: Origin="cache" — seeded from disk, not yet re-verified this
 	// session (handleAvailabilityChecked flips it to "verified" once the
 	// matching live probe result lands).
 	for shortName, count := range entries {
@@ -74,7 +74,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		})
 	}
 
-	// Contract D / C1: seed RowStore with the disk-cached rows for every
+	// Per C1: seed RowStore with the disk-cached rows for every
 	// known type so a cold list-open renders real cells instantly
 	// (Loading=false, Refreshing=true) instead of the empty Loading shell —
 	// mirrors Count/Truncated already being applied to the menu above.
@@ -187,7 +187,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		}
 	}
 
-	// DEF-14/D11: consume the one-shot -c navigation armed by
+	// Deferred -c navigation (D11): consume the one-shot -c navigation armed by
 	// handleClientsReadySuccess on the live path, now that the
 	// session.ProbeResources seed above has landed — dispatching it any
 	// earlier (e.g. alongside TaskKindLoadAvailCache) would race the seed,
@@ -229,7 +229,7 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 			ResourceType: shortName,
 			Count:        count,
 			Truncated:    msg.Truncated[shortName],
-			// DEF-6/C3: a prefetch is a synchronous LIVE count (demo /
+			// Per cache contract C3: a prefetch is a synchronous LIVE count (demo /
 			// no-cache mode), not a disk-cache seed — origin is "verified"
 			// from the moment it lands, no separate probe confirms it.
 			Origin: OriginVerified,
@@ -303,7 +303,7 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 			ResourceType: msg.ResourceType,
 			Count:        msg.Count,
 			Truncated:    msg.Truncated,
-			// DEF-6/C3: a live AvailabilityChecked result confirms this type
+			// Per cache contract C3: a live AvailabilityChecked result confirms this type
 			// this session — origin flips from "cache" (or unset) to
 			// "verified" regardless of whether the exactness guard in
 			// applyIntents' PatchMenuAvailability case ends up keeping the
@@ -401,7 +401,7 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		c.session.MarkPairSwept()
 	}
 
-	// DEF-7 (restated on RowStore): snapshot RowStore NOW, before a later
+	// Dispatch-time payload freeze (restated on RowStore): snapshot RowStore NOW, before a later
 	// mutation (e.g. a subsequent handleEnrichmentChecked's
 	// applyEnrichment/FieldUpdates AmendRows fold for a type already in this
 	// snapshot) could change it out from under an already-dispatched save —
@@ -673,7 +673,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	// branch used to perform, there is nothing to nil out here.
 	if c.session.EnrichChecked >= c.session.EnrichTotal {
 		intents = append(intents, PatchMenuEnrichProgress{Checked: 0, Total: 0})
-		// DEF-7 (restated on RowStore): SnapshotAll captures a defensive,
+		// Dispatch-time payload freeze (restated on RowStore): SnapshotAll captures a defensive,
 		// by-construction-isolated copy (see RowStore.SnapshotAll's doc
 		// comment) at THIS dispatch instant, immune to any later Amend the
 		// live store still accepts for this type. This is the completion path
@@ -705,7 +705,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 //
 // SnapshotAll's own defensive-copy guarantee (fresh slice + fresh Fields map
 // per row, see RowStore.Snapshot's doc comment) is what gives this payload
-// the DEF-7 dispatch-time-freeze property the deleted function's
+// the dispatch-time-freeze property the deleted function's
 // element-by-element copy used to provide by hand.
 //
 // wave2Complete is stamped onto the returned payload's Wave2Complete field
@@ -734,7 +734,8 @@ func (c *Core) snapshotRowStoreForSave(wave2Complete bool) *SaveCachePayload {
 // nil-Pagination entry (the exact shape HandleResourcesLoaded's
 // PatchResourceCache/SetResourceCache carries before any real page-boundary
 // observation) read as exact, so a downstream Exact-count derivation could
-// silently downgrade an already-deeper stored-exact total (DEF-18).
+// silently downgrade an already-deeper stored-exact total (the false-exact
+// shape D14 describes).
 func (c *Core) rowStoreResourcesAndTruncated() (map[string][]resource.Resource, map[string]bool) {
 	all := c.session.RowStore.SnapshotAll(false)
 	resources := make(map[string][]resource.Resource, len(all))
@@ -749,7 +750,7 @@ func (c *Core) rowStoreResourcesAndTruncated() (map[string][]resource.Resource, 
 		// availabilityFromResourceCache's identical guard. A bare `!= nil &&
 		// .IsTruncated` here would let an unobserved (nil-Pagination) entry
 		// read as exact, letting a downstream Exact-count derivation silently
-		// downgrade a genuinely deeper stored-exact total (DEF-18).
+		// downgrade a genuinely deeper stored-exact total (D14).
 		truncated[shortName] = tr.Pagination == nil || tr.Pagination.IsTruncated
 	}
 	return resources, truncated

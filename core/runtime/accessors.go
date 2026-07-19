@@ -100,7 +100,8 @@ func (c *Core) EnsureCacheStore() *cache.Store {
 // WithCacheStore runs fn against the current pair's *cache.Store with
 // session.pairMu held for fn's entire duration, so a caller's own
 // store.Type/Put/SaveType read-modify-write sequence for one type file can
-// never interleave with another such sequence running concurrently (DEF-17),
+// never interleave with another such sequence running concurrently (the
+// store-lock serialization, D13),
 // and so the Profile/Region pair itself cannot be read torn or racing a
 // concurrent profile/region switch. No-op (fn not called) when NoCache is
 // set, mirroring EnsureCacheStore.

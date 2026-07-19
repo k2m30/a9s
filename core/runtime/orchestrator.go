@@ -114,8 +114,8 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		return c.handleEnrichmentChecked(msg)
 	case messages.ResourcesLoaded:
 		// Row-store dual-write, PLUS the list-open Wave-2 probe task — but
-		// NEVER HandleResourcesLoaded's intents (task #17 wave 1 / DEF-20
-		// follow-up). The TUI adapter calls Core.HandleResourcesLoaded
+		// NEVER HandleResourcesLoaded's intents (task #17 wave 1).
+		// The TUI adapter calls Core.HandleResourcesLoaded
 		// directly (bypassing HandleEvent entirely, see
 		// runtime_adapter_resources.go) and Controller.Handle
 		// (core/app/handle.go) already runs its own, separate
@@ -155,7 +155,7 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 	case messages.IdentityError:
 		return c.HandleIdentityError(IdentityErrorEvent{Err: msg.Err})
 	case messages.APIError:
-		// DEF-5/C4: a headless/web caller feeding a failed KindFetchResources
+		// Per cache contract C4: a headless/web caller feeding a failed KindFetchResources
 		// execution's messages.APIError straight through HandleEvent (rather
 		// than the TUI shim's bump-then-call path) must still get the
 		// classification + ClearActiveListLoadingIntent(Err) intent — a web

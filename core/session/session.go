@@ -145,7 +145,7 @@ type Session struct {
 	// (Command was set and StackDepth==1 at ClientsReady time), but must wait
 	// for handleAvailabilityCacheLoaded to seed RowStore's disk-cached rows
 	// first so the navigation never races the availability-cache seed
-	// (DEF-14/D11). Consumed (cleared) by handleAvailabilityCacheLoaded; not
+	// (the deferred -c navigation, D11). Consumed (cleared) by handleAvailabilityCacheLoaded; not
 	// cleared by Rotate for the same reason Command survives it.
 	CommandArmed bool
 
@@ -493,7 +493,7 @@ func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
 // *cache.Store while holding pairMu for the entire call (both the pair read
 // and the store decision, then fn itself), then returns fn's error.
 //
-// DEF-17: SaveResourceListCache and SaveAvailabilityCache each perform their
+// Store-lock serialization (D13): SaveResourceListCache and SaveAvailabilityCache each perform their
 // own store.Type (read) / mutate / store.Put+SaveType (write) sequence for
 // the same on-disk type file. Obtaining the *cache.Store via EnsureCacheStore
 // and then mutating it afterward (the previous shape of both callers) only
@@ -503,7 +503,7 @@ func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
 // racing a background availability-sweep save for the same resource type)
 // can interleave: each reads the other's stale pre-write TypeFile, and
 // whichever's Put+SaveType lands last wins with a Count/Rows pairing that
-// never itself violated the DEF-4b matched-pair rule but does not reflect
+// never itself violated the persisted-pair invariant (runtime/probes.go) but does not reflect
 // either write in full (e.g. one call's Count together with the other
 // call's Rows). cache.Store also has no internal locking of its own — two
 // goroutines writing s.types[shortName] concurrently is a data race on the
@@ -526,8 +526,8 @@ func (s *Session) WithCacheStore(fn func(store *cache.Store) error) error {
 // ReadCacheStore runs fn against the current Profile/Region pair's
 // *cache.Store while holding pairMu, for callers that only read
 // (store.Type/store.Types) and never Put/SaveType. Pairs with WithCacheStore
-// (DEF-17): a reader that bypassed the lock (the shape every read call site
-// had before DEF-17) could observe cache.Store's internal map mid-write from
+// (the store-lock serialization, D13): a reader that bypassed the lock (the
+// shape every read call site once had) could observe cache.Store's internal map mid-write from
 // a concurrent WithCacheStore call — a data race on the map itself,
 // independent of the logical Count/Rows consistency WithCacheStore's callers
 // already guard. Same nil-store-to-fn contract as WithCacheStore.

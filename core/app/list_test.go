@@ -54,7 +54,7 @@ import (
 //
 // A9S_CONFIG_FOLDER is redirected to a fresh t.TempDir() per call (not just
 // per test binary run) so the disk-store fallback HandleNavigate now
-// consults (DEF-15) cannot leak rows between tests that share the same
+// consults (the post-sweep disk-store fallback) cannot leak rows between tests that share the same
 // "demo"/"us-east-1" profile/region pair — a per-package-run shared temp dir
 // was tried and rejected: every newListController(t, "ec2") call in the package
 // would still read/write the SAME demo--us-east-1/ec2.yaml file, so an

@@ -42,7 +42,7 @@ import (
 func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool, topLevelCanonical bool) {
 	resources = c.materializeListFieldsForType(typeName, resources)
 
-	// Item C: a silent swap (a non-append replace — the common cold-boot shape
+	// Silent-swap findings carry: a silent swap (a non-append replace — the common cold-boot shape
 	// where a seeded/cached list is replaced by its own verify-refetch) must
 	// never let a row's glyph flash off. The fresh resources argument arrives
 	// findings-less on a brand-new session (the Wave-2 enrichment store is
@@ -56,7 +56,7 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// survives the swap.
 	priorFindings, priorDetails := outgoingRowFindingsByID(ls, c.cachedResources(typeName))
 
-	// DEF-18 mechanism A: a background verify-refetch (e.g. cold-open's
+	// Stale verify-refetch discard (D14): a background verify-refetch (e.g. cold-open's
 	// KindFetchResources, bounded by a CachedListDepth snapshot taken at
 	// dispatch time) can complete AFTER a foreground load-more (m) has
 	// already appended deeper rows onto this same screen. No per-list
@@ -85,7 +85,7 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// if ls.Rows itself were protected.
 	stale := !appendPage && ls != nil && !ls.HasPagination && isStaleReplace(ls.Rows, resources, pagination)
 
-	// Item C (continued): a silent swap is exactly the !appendPage && !stale
+	// Silent-swap findings carry (continued): a silent swap is exactly the !appendPage && !stale
 	// replace path below. Fold the captured prior findings onto the incoming
 	// resources for any surviving ID BEFORE they land on ls.Rows/RowStore —
 	// only when the session enrichment store has nothing for this type yet
@@ -124,12 +124,12 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		}
 	}
 
-	// --- Per-screen storage (Bug 1 fix) -----------------------------------
+	// --- Per-screen storage ------------------------------------------------
 	// Writing to ls.Rows ensures that two stacked list screens of the same
 	// resource type never share a row slice. Each screen's fetch result lands
 	// exclusively on that screen's ListState.
 	//
-	// DEF-17 backstop: an append must never introduce a row whose ID already
+	// Append-dedup backstop (D13): an append must never introduce a row whose ID already
 	// exists on the screen. This is a backstop, not the fix for the root
 	// cause below — it only prevents a duplicate that already reached this
 	// call from becoming visible; the empty-cursor guard is what stops the
@@ -153,7 +153,7 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 			ls.Rows = append(ls.Rows, dedupAgainstExisting(ls.Rows, resources)...)
 			ls.rowsVersion++
 		case stale:
-			// Discard: see the DEF-18 mechanism A comment above. ls.Rows is
+			// Discard: see the stale verify-refetch discard comment above. ls.Rows is
 			// unchanged, so the buildListBody memo (list_body.go) must not be
 			// invalidated either — no rowsVersion bump.
 		default:
@@ -165,24 +165,24 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	if ls != nil {
 		ls.Loading = false
 		ls.LoadingMore = false
-		// Contract A: a fetch result landing clears Refreshing — the seeded
+		// Cache-first seeding contract: a fetch result landing clears Refreshing — the seeded
 		// (or now-replaced) rows are confirmed. Callers that seed rows from a
 		// cache-first source set Refreshing=true themselves AFTER calling this
 		// method, so this unconditional clear only ever fires for a genuine
 		// fetch-result swap, never undoing the seed-time flag.
 		ls.Refreshing = false
-		// Item B/DEF-21: a genuine fetch result also retires the seed-time
+		// Seed-time provisional total (#17 wave 2): a genuine fetch result also retires the seed-time
 		// TotalCount override — len(ls.Rows) is authoritative again once a real
 		// fetch has confirmed/replaced the seeded page. Mirrors Refreshing's
 		// clear-then-caller-rearms-after-seed ordering above.
 		ls.TotalCount = 0
-		// DEF-5/C4: a successful fetch result clears any outstanding error
+		// Per cache contract C4: a successful fetch result clears any outstanding error
 		// marker from a previous failed attempt.
 		ls.LastFetchError = ""
 		switch {
 		case stale:
 			// Keep the richer on-screen pagination state (HasPagination/
-			// PaginationCursor) — see the DEF-18 mechanism A comment above.
+			// PaginationCursor) — see the stale verify-refetch discard comment above.
 		case pagination != nil:
 			ls.HasPagination = pagination.IsTruncated
 			ls.PaginationCursor = pagination.NextToken
@@ -194,7 +194,8 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 
 	// Fresh rows arrive without Wave-2 findings; re-apply the latest known
 	// findings from the enrichment store so a silent-swap refetch never leaves
-	// the controller rows (and therefore the list-open save path, DEF-8)
+	// the controller rows (and therefore the list-open save path, which
+	// persists row findings per C6)
 	// glyph-blind until the next EnrichmentChecked. Mirrors the session-side
 	// fold, which re-applies onto Core stores after every result lands. Uses
 	// listEnrichmentFindings (every independently-evaluated Wave-2 Finding
@@ -207,7 +208,8 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 
 // outgoingRowFindingsByID captures the findings (and their companion
 // AttentionDetail rows) currently attached to the row set about to be
-// replaced by a silent swap (item C), keyed by resource ID. Prefers ls.Rows
+// replaced by a silent swap (the silent-swap findings carry above), keyed by
+// resource ID. Prefers ls.Rows
 // (the per-screen store applyResourcesLoaded is about to overwrite) since it
 // is the richer, currently-displayed source; falls back to the
 // RowStore-backed type cache when ls is nil or carries no rows yet (e.g. the
@@ -244,7 +246,7 @@ func outgoingRowFindingsByID(ls *ListState, cachedRows []resource.Resource) (map
 
 // isStaleReplace reports whether a non-append ResourcesLoaded result looks
 // like a stale background verify-refetch that raced a later foreground
-// append on the same screen (DEF-18 mechanism A), evaluating only the
+// append on the same screen (the stale verify-refetch discard), evaluating only the
 // content shape. The caller additionally gates this on ls.HasPagination ==
 // false (the screen already reached a confirmed exact total) before
 // treating the result as stale — see the call site's comment for why that
@@ -564,7 +566,7 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 
 	allResources := c.listScreenResources(ls, typeName)
 	total := len(allResources)
-	// Item B/DEF-21: a seeded-but-unverified list (C6a reconstructable disk
+	// Seed-time provisional total: a seeded-but-unverified list (C6a reconstructable disk
 	// pair) may know a larger authoritative total than its last-known Rows —
 	// prefer it for display until the next real fetch result clears it
 	// (applyResourcesLoaded). Only the displayed total is overridden; filtered
@@ -915,7 +917,7 @@ func (c *Controller) clearRowFindings(typeName string) {
 // list reaches only the session-owned stores (Core.applyEnrichment) and the
 // controller's enrichmentStore glyph map, so the list-open save path (which
 // persists from ls.Rows) writes rows with no findings — cached rows then
-// reseed glyphless (S3-pilot DEF-8). Callers must hold c.mu (write); the
+// reseed glyphless (violating C6's persisted-findings round-trip). Callers must hold c.mu (write); the
 // PatchResourceList intent case is the production entry point. A nil
 // findings map clears Wave-2 entries, matching runtime.ApplyWave2ToRow's
 // contract. findings carries every independently-evaluated Wave-2 Finding

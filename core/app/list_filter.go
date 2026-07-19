@@ -321,7 +321,7 @@ func (c *Controller) applyEnrichmentState(typeName string, issueCount int, trunc
 	c.enrichmentTruncated[typeName] = truncated
 	c.enrichmentGen++
 
-	// DEF-20-follow-up: the in-list Wave-2 enrichment lane is the ONLY
+	// Menu issue-badge sync: the in-list Wave-2 enrichment lane is the ONLY
 	// in-session source of the menu issue badge for renderers that run no
 	// background availability sweep (the web/headless lane) — syncing here
 	// mirrors syncExactTotalToMenu's issue-count half via the shared
@@ -338,8 +338,8 @@ func (c *Controller) applyEnrichmentState(typeName string, issueCount int, trunc
 		// "unknown" forever.
 		c.syncMenuIssueCount(ms, canon, issueCount, truncated, authoritative)
 
-		// Persist, mirroring syncExactTotalToMenu's disk-write half (Contract
-		// D: the badge must survive a restart). Best-effort, same as the
+		// Persist, mirroring syncExactTotalToMenu's disk-write half (the
+		// badge must survive a restart). Best-effort, same as the
 		// sweep lane — AmendRows (called by applyRowFindings right after this
 		// in the PatchResourceList intent path) only mutates the in-memory
 		// RowStore and never reaches store.SaveType, so without this call the

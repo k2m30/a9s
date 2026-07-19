@@ -266,7 +266,7 @@ func (c *Core) handleClientsReadyFailure(ev ClientsReadyEvent) ([]UIIntent, []Ta
 // intent when PendingRefresh is set and the active view is a
 // ResourceListModel).
 //
-// -c navigation ordering (DEF-14/D11): on the NoCache/demo path the counts
+// -c navigation ordering (deferred -c navigation, D11): on the NoCache/demo path the counts
 // are seeded synchronously below (DemoPrefetchCounts), so it is safe to emit
 // TaskKindEmitNavigate immediately. On the live path the availability cache
 // seed (session.ProbeResources) is populated asynchronously by

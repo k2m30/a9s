@@ -620,7 +620,7 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 		sb.WriteString(styles.DimText.Render(hint))
 	}
 
-	// Cache-first seeding (Contract A): the list opened with rows already
+	// Cache-first seeding: the list opened with rows already
 	// visible while a fresh fetch confirms/replaces them. Additive-only — this
 	// line never renders when Refreshing is false (the default), so it does
 	// not affect the byte-parity gate against the legacy View() path.
@@ -629,7 +629,7 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 		sb.WriteString(styles.DimText.Render("── refreshing... ──"))
 	}
 
-	// DEF-5/C4: a fetch failure over cached content swaps the refreshing
+	// Per cache contract C4: a fetch failure over cached content swaps the refreshing
 	// marker for an error marker — cached rows stay on screen, nothing goes
 	// blank. LastFetchError is consumed verbatim (already-classified text
 	// from HandleAPIError); this view performs no further formatting.

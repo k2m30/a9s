@@ -658,8 +658,8 @@ func TestHandleClientsReady_Success_LivePath(t *testing.T) {
 }
 
 // TestHandleClientsReady_Success_Command_StackDepth1: Command set + StackDepth==1
-// → the live path does NOT emit TaskKindEmitNavigate directly (DEF-14/D11
-// Cause B). Emitting it here would race handleAvailabilityCacheLoaded's
+// → the live path does NOT emit TaskKindEmitNavigate directly (the
+// navigation-race half of D11). Emitting it here would race handleAvailabilityCacheLoaded's
 // session.ProbeResources seed (tea.Batch runs task cmds concurrently),
 // landing on a bare "Loading..." list with no title count. Instead
 // HandleClientsReady arms the deferred navigation — session.CommandArmed

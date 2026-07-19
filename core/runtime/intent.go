@@ -152,7 +152,7 @@ func (ReplaceScreen) isIntent() {}
 
 // OriginCache and OriginVerified are the two valid values for
 // PatchMenuAvailability.Origin — a cross-layer contract shared by every
-// Core handler that sets Origin and every adapter that reads it (DEF-6/C3).
+// Core handler that sets Origin and every adapter that reads it (C3).
 // Defined as constants (rather than inline string literals) so a typo in
 // either producer or consumer fails to compile instead of silently landing
 // on the "leave origin unchanged" empty-string branch.
@@ -169,7 +169,7 @@ type PatchMenuAvailability struct {
 	Truncated    bool
 	// Origin distinguishes a disk-cache-seeded entry ("cache", not yet
 	// re-verified this session) from one confirmed by a live probe this
-	// session ("verified") — DEF-6/C3. Empty means "leave the stored origin
+	// session ("verified") — C3. Empty means "leave the stored origin
 	// unchanged" (used by callers that only ever touch Count/Truncated).
 	Origin string
 }
@@ -242,7 +242,7 @@ func (AppendErrorHistoryIntent) isIntent() {}
 // HandleAPIError so a failed AWS call removes the spinner immediately rather
 // than waiting for the next render.
 //
-// Err carries the error-marker text (DEF-5/C4): when non-empty, the adapter
+// Err carries the error-marker text (C4): when non-empty, the adapter
 // must also clear the active list's Refreshing flag and set its
 // LastFetchError to Err, so cached content stays on screen with the marker
 // swapped from "refreshing" to "error" instead of going blank. Empty when

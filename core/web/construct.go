@@ -67,7 +67,7 @@ func newSession(profile, region, command string, demoMode, noCache bool, viewCfg
 			// arms session.CommandArmed/PendingCommand, and
 			// handleAvailabilityCacheLoaded dispatches the deferred
 			// TaskKindEmitNavigate once its ProbeResources seed has landed
-			// (DEF-14/D11) — the same ordering the TUI's -c flag relies on.
+			// (deferred -c navigation, D11) — the same ordering the TUI's -c flag relies on.
 			core.SetCommand(command)
 		}
 	}

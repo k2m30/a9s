@@ -148,7 +148,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			return nil, nil
 		}
 		var flashErr error
-		// DEF-7/C7/C8: an availability-sweep + Wave-2 enrichment completion
+		// Per C7/C8: an availability-sweep + Wave-2 enrichment completion
 		// must persist that type's per-row rows/findings (SaveResourceListCache)
 		// WITHOUT requiring any list screen to have been opened — mirrors the
 		// list-open persistence path (app.Controller.maybeSaveResourceListCache)
@@ -571,9 +571,9 @@ func (c *Core) availabilityFromResourceCache() (
 		// which must NOT be conflated with a genuine "not truncated"
 		// observation. Unknown truncation is conservatively truncated so a
 		// downstream Exact-count derivation (SaveAvailabilityCache) never
-		// promotes an unobserved page-1-shaped count to Exact (DEF-18
-		// mechanism B: a false Exact=true silently downgraded a real exact
-		// 55 to a false exact 50 and then dropped the stored Rows).
+		// promotes an unobserved page-1-shaped count to Exact (the
+		// false-exact half of D14: a false Exact=true silently downgraded a
+		// real exact 55 to a false exact 50 and then dropped the stored Rows).
 		isTrunc := tr.Pagination == nil || tr.Pagination.IsTruncated
 		if isTrunc {
 			truncated[rt] = true
@@ -599,7 +599,7 @@ func (c *Core) availabilityFromResourceCache() (
 // saveProbeResourcesToTypeFiles persists probeResources — a snapshot (or, for
 // a nil-Payload dispatch, a live read) of the availability sweep's (and
 // Wave-2 enrichment's) retained per-type rows, findings included — to each
-// type's on-disk file via SaveResourceListCache. DEF-7/C7/C8: this is the
+// type's on-disk file via SaveResourceListCache. Per C7/C8: this is the
 // sweep-completion counterpart to app.Controller.maybeSaveResourceListCache,
 // which only runs when a list screen has been opened; this path lets that
 // same per-type persistence happen from a background sweep alone, so a

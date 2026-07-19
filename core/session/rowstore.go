@@ -198,7 +198,8 @@ func cloneRows(rows []resource.Resource) []resource.Resource {
 // non-append replace is treated as a stale, out-of-order straggler only when
 // incoming is BOTH smaller than existing AND still truncated AND a strict ID
 // subset of existing — the same conservative, false-negative-biased shape
-// the per-screen ListState guard uses (DEF-18 mechanism A).
+// the per-screen ListState guard uses (the stale verify-refetch discard,
+// list_body.go).
 func isStaleReplaceRows(existing, incoming []resource.Resource, pagination *resource.PaginationMeta) bool {
 	if len(incoming) == 0 || len(incoming) >= len(existing) {
 		return false
@@ -237,7 +238,7 @@ func isStaleReplaceRows(existing, incoming []resource.Resource, pagination *reso
 //     rows wholesale.
 //  5. TotalCount shrink guard (applies to both append and replace): a
 //     non-exact incoming pagination (IsTruncated=true, or nil — nil is never
-//     exact per DEF-18) only ever RAISES TotalCount to at least len(newRows);
+//     exact per C5/D14) only ever RAISES TotalCount to at least len(newRows);
 //     it never shrinks a wider TotalCount already known (e.g. seeded by an
 //     earlier ObserveCount or a wider prior Observe), since a truncated page
 //     explicitly does not claim to be the whole list. Only an EXACT
@@ -262,7 +263,7 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 		return existing.Rows, existing.Gen
 	}
 
-	// C5/DEF-18 mechanism A: the stale-shaped-replace rejection below only
+	// C5 + the stale verify-refetch discard: the stale-shaped-replace rejection below only
 	// applies while the EXISTING entry has not yet reached a confirmed exact
 	// total (mirrors core/app/list_body.go's applyResourcesLoaded, which
 	// gates its own isStaleReplace call on !ls.HasPagination). A Ctrl+R full
@@ -285,7 +286,7 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 		newRows = rows
 	}
 
-	// TotalCount shrink guard: nil pagination is never exact (DEF-18), and an
+	// TotalCount shrink guard: nil pagination is never exact (C5/D14), and an
 	// IsTruncated=true page explicitly does not claim to be the whole list —
 	// neither is authoritative proof the total shrank, so both only ever
 	// raise TotalCount to at least len(newRows), never below the existing
@@ -379,8 +380,8 @@ func (s *RowStore) ObservePartial(canon string, rows []resource.Resource) ([]res
 // Amend applies fn to canon's currently retained row slice via copy-on-write:
 // fn receives the existing []resource.Resource and returns its replacement,
 // so no caller ever observes a torn or partially mutated row and no
-// previously-returned Snapshot is invalidated by this call (DEF-7:
-// mutate-in-place is exactly the bug class this method exists to remove —
+// previously-returned Snapshot is invalidated by this call (the dispatch-time
+// payload freeze: mutate-in-place is exactly the bug class this method exists to remove —
 // the two enrich-fold implementations in runtime/helpers.go and
 // tui/app_enrich_fold.go both mutate resource.Resource fields in place on a
 // shared backing array; Amend is their eventual dual-write / replacement

@@ -161,7 +161,7 @@ func TestGetDefaultRegion_UnknownProfile(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// DEF-14/D11 Cause A — GetDefaultRegion static resolution chain:
+// The region-resolution half of D11 — GetDefaultRegion static resolution chain:
 // AWS_REGION env > AWS_DEFAULT_REGION env > profile region >
 // source_profile chain (recursive, cycle-guarded) > [default] region >
 // "us-east-1" fallback.

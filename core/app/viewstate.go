@@ -193,7 +193,7 @@ type ListBody struct {
 	Refreshing bool `json:"refreshing,omitempty"`
 	// LastFetchError is the error marker text for the most recent failed
 	// fetch over this list, or "" when no error is outstanding. Set by a
-	// messages.APIError landing while cached content is on screen (DEF-5/C4:
+	// messages.APIError landing while cached content is on screen (C4:
 	// "keeps the content, swaps the marker for an error marker") — Refreshing
 	// is cleared in the same event so the two markers never show together.
 	// Renderers (web list.html, TUI RenderList) consume this field verbatim.
@@ -356,7 +356,7 @@ type MenuEntry struct {
 	AvailTruncated bool `json:"avail_truncated,omitempty"`
 	// Origin is "cache" (disk-cache-seeded, not yet re-verified this session)
 	// or "verified" (confirmed by a live AvailabilityChecked probe this
-	// session), or "" when no availability data has landed at all — DEF-6/C3.
+	// session), or "" when no availability data has landed at all — C3.
 	// Drives the dimmed stale style; renderers read it, never compute it.
 	Origin string `json:"origin,omitempty"`
 }

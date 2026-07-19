@@ -85,12 +85,12 @@ type ListState struct {
 	// no-rows-known spinner path.
 	Refreshing bool `json:"refreshing,omitempty"`
 	// LastFetchError is the error marker text for the most recent failed
-	// fetch over this screen, or "" when no error is outstanding (DEF-5/C4).
+	// fetch over this screen, or "" when no error is outstanding (C4).
 	// Set by a messages.APIError landing while this screen is active; cleared
 	// on the next successful ResourcesLoaded for this screen.
 	LastFetchError string `json:"last_fetch_error,omitempty"`
 	// TotalCount is the authoritative total for a seeded-but-unverified list
-	// (item B, #17 wave 2, DEF-21), set by cache-first seeding callers AFTER
+	// (the seed-time provisional total, #17 wave 2), set by cache-first seeding callers AFTER
 	// applyResourcesLoaded — mirroring Refreshing's set-after-seed ordering —
 	// when the seed source's known total exceeds len(Rows) (the C6a
 	// reconstructable disk pair: Count may outrun the last-known Rows).
@@ -234,7 +234,7 @@ type MenuState struct {
 	IssueTruncAuthoritative map[string]bool `json:"issue_trunc_authoritative,omitempty"`
 	// Origin tracks, per resource type, whether the stored availability count
 	// is disk-cache-seeded ("cache") or confirmed by a live probe this
-	// session ("verified") — DEF-6/C3.
+	// session ("verified") — C3.
 	Origin map[string]string `json:"origin,omitempty"`
 
 	// Progress fields for FrameTitle indicator (DERIVED at Snapshot, stored here

@@ -127,12 +127,12 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		// entry), populate rows immediately from the cache entry so headless/web
 		// callers see data without waiting for a fetch round-trip — then mark
 		// Refreshing and dispatch a fresh fetch task so the seeded rows are
-		// confirmed/replaced (Contract A: cache-first seeding never skips the
+		// confirmed/replaced (cache-first seeding never skips the
 		// live fetch, it only removes the visible wait for it).
 		if res.Kind == runtime.NavigateKindPushResourceListCached && res.CachedEntry != nil {
 			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false, isTopLevelCanonicalList(intent.ID, top.State.List))
 			top.State.List.Refreshing = true
-			// Item B/DEF-21: set AFTER applyResourcesLoaded, same ordering as
+			// Seed-time provisional total (#17 wave 2): set AFTER applyResourcesLoaded, same ordering as
 			// Refreshing above — applyResourcesLoaded unconditionally clears
 			// TotalCount as part of every fetch-result landing (including this
 			// seed call itself).
@@ -156,7 +156,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false, isTopLevelCanonicalList(intent.ID, top.State.List))
 			top.State.List.Loading = false
 			top.State.List.Refreshing = true
-			// Item B/DEF-21: same set-after-seed ordering as the cache-hit branch
+			// Seed-time provisional total: same set-after-seed ordering as the cache-hit branch
 			// above.
 			if res.CachedEntry.TotalCount > 0 {
 				top.State.List.TotalCount = res.CachedEntry.TotalCount
@@ -260,7 +260,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 // Core.ExecuteTask's perspective (ErrAdapterOnlyTask) — DrainSync* calls
 // this method for that one kind instead of executing it, so the one-shot
 // -c/ActionCommand navigation armed by HandleClientsReady and dispatched by
-// handleAvailabilityCacheLoaded (DEF-14/D11) actually lands on the headless
+// handleAvailabilityCacheLoaded (deferred -c navigation, D11) actually lands on the headless
 // stack the same way it lands on the TUI's view stack.
 func (c *Controller) ApplyEmitNavigate(p runtime.EmitNavigatePayload) []runtime.TaskRequest {
 	c.mu.Lock()

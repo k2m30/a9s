@@ -219,7 +219,7 @@ func (s *Server) getOrCreateSession(sessionID string) *sessionEntry {
 // call below arms session.CommandArmed/PendingCommand itself, and the drain's
 // per-task interception of TaskKindEmitNavigate (see drainsync.go) applies
 // the deferred navigation the moment handleAvailabilityCacheLoaded emits it —
-// the same one lane the TUI's -c flag drives (DEF-14/D11), instead of a
+// the same one lane the TUI's -c flag drives (deferred -c navigation, D11), instead of a
 // second server-side apply racing or duplicating it.
 //
 // It runs in its own goroutine and relies on the controller's internal
