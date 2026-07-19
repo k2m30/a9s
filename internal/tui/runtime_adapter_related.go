@@ -401,6 +401,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 						DefDisplayName:   def.DisplayName,
 						Result:           resource.UnknownRelated(def.TargetType),
 						Generation:       gen,
+						LazyAddError:     fmt.Errorf("related checker for %s panicked: %v", def.TargetType, r),
 					}
 				}
 			}()

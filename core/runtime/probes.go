@@ -311,7 +311,7 @@ func (c *Core) SaveAvailabilityCache(
 			if truncated != nil {
 				trunc = truncated[rawName]
 			}
-			existing, _ := store.Type(name)
+			existing, hadExisting := store.Type(name)
 			incoming := cache.TypeFile{
 				Count: count,
 				// C5: a truncated first-page probe never downgrades a stored
@@ -343,6 +343,19 @@ func (c *Core) SaveAvailabilityCache(
 				tf.Issues = existing.Issues
 				tf.IssuesKnown = existing.IssuesKnown
 				tf.IssuesTruncated = existing.IssuesTruncated
+			}
+			// Rule 2 (counts-only write) never touches Rows, so scalar
+			// equality against the prior on-disk entry means the file
+			// content is logically identical — skip the write rather than
+			// allocating a fresh inode for no observable change.
+			if hadExisting &&
+				tf.Count == existing.Count &&
+				tf.Exact == existing.Exact &&
+				tf.HasResources == existing.HasResources &&
+				tf.Issues == existing.Issues &&
+				tf.IssuesKnown == existing.IssuesKnown &&
+				tf.IssuesTruncated == existing.IssuesTruncated {
+				continue
 			}
 			store.Put(name, tf)
 			if err := store.SaveType(name); err != nil && firstErr == nil {

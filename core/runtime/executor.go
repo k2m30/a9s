@@ -64,7 +64,7 @@ func (c *Core) CaptureDispatch() DispatchSnapshot {
 		AvailabilityGen:   c.session.AvailabilityGen,
 		EnrichmentGen:     c.session.EnrichmentGen,
 		ConnectGen:        c.session.ConnectGen,
-		EnrichmentTypeGen: c.session.EnrichmentTypeGen,
+		EnrichmentTypeGen: c.session.EnrichmentTypeGenSnapshot(),
 		Profile:           c.session.Profile,
 		Region:            c.session.Region,
 		NoCache:           c.session.NoCache,

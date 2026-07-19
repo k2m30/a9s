@@ -116,7 +116,7 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 	}
 
 	var tasks []TaskRequest
-	if ev.TypeGen != 0 && ev.TypeGen == c.session.EnrichmentTypeGen[resType] {
+	if ev.TypeGen != 0 && ev.TypeGen == c.session.EnrichmentTypeGenGet(resType) {
 		// task #17 wave 1 stage 2: the removed session.ProbeResources/
 		// ProbeTruncated reseed is now store-only — ObserveRows below is this
 		// reseed's only destination. The enrichment-rerun reseed is a genuine

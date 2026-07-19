@@ -456,7 +456,7 @@ func (c *Core) startEnrichment() ([]UIIntent, []TaskRequest) {
 		// strips-then-reapplies Wave-2 findings from the fresh map, which
 		// naturally clears a genuinely-healed row and replaces a still-broken
 		// one — no separate eager clear is needed to reach that end state.
-		c.session.EnrichmentTypeGen[name]++
+		c.session.EnrichmentTypeGenBump(name)
 		delete(c.session.EnrichmentRan, name)
 
 		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: name}})
@@ -472,7 +472,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	}
 
 	// Per-type generation guard.
-	if msg.TypeGen != 0 && msg.TypeGen != c.session.EnrichmentTypeGen[msg.ResourceType] {
+	if msg.TypeGen != 0 && msg.TypeGen != c.session.EnrichmentTypeGenGet(msg.ResourceType) {
 		return nil, nil
 	}
 
@@ -643,7 +643,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		next := c.session.EnrichQueue[0]
 		c.session.EnrichQueue = c.session.EnrichQueue[1:]
 
-		c.session.EnrichmentTypeGen[next]++
+		c.session.EnrichmentTypeGenBump(next)
 		delete(c.session.EnrichmentRan, next)
 
 		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: next}})

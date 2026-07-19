@@ -34,6 +34,7 @@ package unit_test
 import (
 	"context"
 	"os"
+	"syscall"
 	"testing"
 	"time"
 
@@ -532,5 +533,103 @@ func TestExecuteTask_SaveCache_ExactIssueCount_SurvivesRowDerivedRecomputation(t
 	}
 	if tf.Issues != 5 {
 		t.Errorf("TypeFile.Issues = %d, want 5 — the exact issue count from availabilityFromResourceCache must survive saveProbeResourcesToTypeFiles's row-derived recomputation when the swept rows carry no findings", tf.Issues)
+	}
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Test 7 — counts-only save must skip an unchanged type file (no rewrite)
+// ────────────────────────────────────────────────────────────────────────────
+
+// statIno stats path and returns its inode (Unix). SaveType always writes
+// via a temp file + rename (cache.go SaveType), so a physical rewrite always
+// allocates a fresh inode — this is a deterministic, sleep-free way to detect
+// "was this file rewritten" independent of on-disk byte content. A byte
+// comparison alone cannot do this: TypeFile.SavedAt is stamped fresh on
+// every Store.Put, so even a save that changes nothing else still produces
+// different bytes.
+func statIno(t *testing.T, path string) uint64 {
+	t.Helper()
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("os.Stat(%s): %v", path, err)
+	}
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	if !ok {
+		t.Fatalf("os.Stat(%s): Sys() is not *syscall.Stat_t on this platform", path)
+	}
+	return st.Ino
+}
+
+// TestSaveAvailabilityCache_UnchangedEntries_DoesNotRewriteTypeFiles pins the
+// upcoming fix: a second SaveAvailabilityCache call carrying IDENTICAL
+// entries/truncated data for a type must not physically rewrite that type's
+// on-disk file. Today (core/runtime/probes.go SaveAvailabilityCache,
+// ~L308-351) every type present in the entries map is unconditionally
+// Put+SaveType'd on every call, so each type file's inode changes even when
+// nothing about that type's availability state changed since the prior save.
+func TestSaveAvailabilityCache_UnchangedEntries_DoesNotRewriteTypeFiles(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	c := newSaveCacheRegressionCore(t, false)
+
+	entries := map[string]int{"ec2": 10, "s3": 20}
+	trunc := map[string]bool{"ec2": false, "s3": false}
+	if err := c.SaveAvailabilityCache(entries, trunc, nil, nil, nil); err != nil {
+		t.Fatalf("SaveAvailabilityCache (initial save): %v", err)
+	}
+
+	dir := cache.Dir(saveRegProfile, saveRegRegion)
+	ec2Path := dir + "/ec2.yaml"
+	s3Path := dir + "/s3.yaml"
+	ec2InoBefore := statIno(t, ec2Path)
+	s3InoBefore := statIno(t, s3Path)
+
+	if err := c.SaveAvailabilityCache(entries, trunc, nil, nil, nil); err != nil {
+		t.Fatalf("SaveAvailabilityCache (identical re-save): %v", err)
+	}
+
+	ec2InoAfter := statIno(t, ec2Path)
+	s3InoAfter := statIno(t, s3Path)
+
+	if ec2InoAfter != ec2InoBefore {
+		t.Errorf("ec2.yaml inode changed (%d -> %d) after re-saving IDENTICAL availability data — SaveAvailabilityCache must skip an unchanged type file rather than rewrite it", ec2InoBefore, ec2InoAfter)
+	}
+	if s3InoAfter != s3InoBefore {
+		t.Errorf("s3.yaml inode changed (%d -> %d) after re-saving IDENTICAL availability data — SaveAvailabilityCache must skip an unchanged type file rather than rewrite it", s3InoBefore, s3InoAfter)
+	}
+}
+
+// TestSaveAvailabilityCache_OneTypeChanged_OnlyThatTypeFileIsRewritten is the
+// positive counterpart: when ONE type's Count actually changes between two
+// SaveAvailabilityCache calls, that type's file MUST still be rewritten —
+// the untouched sibling type's file must keep its original inode. Guards
+// against an over-eager "never rewrite" fix.
+func TestSaveAvailabilityCache_OneTypeChanged_OnlyThatTypeFileIsRewritten(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	c := newSaveCacheRegressionCore(t, false)
+
+	trunc := map[string]bool{"ec2": false, "s3": false}
+	if err := c.SaveAvailabilityCache(map[string]int{"ec2": 10, "s3": 20}, trunc, nil, nil, nil); err != nil {
+		t.Fatalf("SaveAvailabilityCache (initial save): %v", err)
+	}
+
+	dir := cache.Dir(saveRegProfile, saveRegRegion)
+	ec2Path := dir + "/ec2.yaml"
+	s3Path := dir + "/s3.yaml"
+	ec2InoBefore := statIno(t, ec2Path)
+	s3InoBefore := statIno(t, s3Path)
+
+	// Only ec2's count changes; s3 is resubmitted with its identical value.
+	if err := c.SaveAvailabilityCache(map[string]int{"ec2": 11, "s3": 20}, trunc, nil, nil, nil); err != nil {
+		t.Fatalf("SaveAvailabilityCache (ec2 changed): %v", err)
+	}
+
+	ec2InoAfter := statIno(t, ec2Path)
+	s3InoAfter := statIno(t, s3Path)
+
+	if ec2InoAfter == ec2InoBefore {
+		t.Errorf("ec2.yaml inode unchanged (%d) after its Count actually changed from 10 to 11 — a genuinely changed type file MUST still be rewritten", ec2InoBefore)
+	}
+	if s3InoAfter != s3InoBefore {
+		t.Errorf("s3.yaml inode changed (%d -> %d) even though s3's availability data was resubmitted unchanged — only the type whose data actually changed should be rewritten", s3InoBefore, s3InoAfter)
 	}
 }

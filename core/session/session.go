@@ -257,8 +257,19 @@ type Session struct {
 	// / control maps below remain here because they are session-scoped and are
 	// cleared on Session.Rotate() — they are not the authority for finding data.
 	EnrichmentRan          map[string]bool
-	EnrichmentTypeGen      map[string]domain.Gen
 	EnrichmentTruncatedIDs map[string]map[string]bool
+
+	// EnrichmentTypeGen is the per-type Wave-2 enrichment counter, guarded by
+	// enrichmentTypeGenMu — like ProbeStatus above, a dispatch-time snapshot
+	// (Core.CaptureDispatch, read by a tea.Cmd/executor goroutine) and the
+	// handler-loop writer (BumpEnrichmentTypeGen et al.) run on different
+	// goroutines under web/headless hosts, so a bare map clone or index would
+	// race the concurrent increment. Access only through
+	// EnrichmentTypeGenGet/EnrichmentTypeGenBump/EnrichmentTypeGenSnapshot/
+	// EnrichmentTypeGenReset — never read/write this field directly outside
+	// enrichmentTypeGenMu.
+	EnrichmentTypeGen   map[string]domain.Gen
+	enrichmentTypeGenMu sync.Mutex
 
 	// RowStore is the session-scoped, per-type row store (task #17 wave 1/3 —
 	// row-store unification). The single source of truth for every cached
@@ -573,6 +584,40 @@ func (s *Session) AllProbeStatus() map[string]ProbeStatusRecord {
 	return out
 }
 
+// EnrichmentTypeGenGet returns shortName's per-type Wave-2 enrichment
+// counter. Zero when no enrichment has run yet for the type.
+func (s *Session) EnrichmentTypeGenGet(shortName string) domain.Gen {
+	s.enrichmentTypeGenMu.Lock()
+	defer s.enrichmentTypeGenMu.Unlock()
+	return s.EnrichmentTypeGen[shortName]
+}
+
+// EnrichmentTypeGenBump increments shortName's per-type Wave-2 counter and
+// returns the new value.
+func (s *Session) EnrichmentTypeGenBump(shortName string) domain.Gen {
+	s.enrichmentTypeGenMu.Lock()
+	defer s.enrichmentTypeGenMu.Unlock()
+	s.EnrichmentTypeGen[shortName]++
+	return s.EnrichmentTypeGen[shortName]
+}
+
+// EnrichmentTypeGenSnapshot returns a defensive copy of every per-type
+// Wave-2 counter, safe for a dispatch-time snapshot (Core.CaptureDispatch)
+// to carry into an async goroutine without aliasing the live map.
+func (s *Session) EnrichmentTypeGenSnapshot() map[string]domain.Gen {
+	s.enrichmentTypeGenMu.Lock()
+	defer s.enrichmentTypeGenMu.Unlock()
+	return maps.Clone(s.EnrichmentTypeGen)
+}
+
+// EnrichmentTypeGenReset replaces the per-type Wave-2 counter map wholesale
+// with a fresh, empty one (global refresh / Rotate).
+func (s *Session) EnrichmentTypeGenReset() {
+	s.enrichmentTypeGenMu.Lock()
+	defer s.enrichmentTypeGenMu.Unlock()
+	s.EnrichmentTypeGen = make(map[string]domain.Gen)
+}
+
 // SetNewFindingPairs replaces shortName's new-finding-pair counts wholesale
 // with counts (#463) — used by a non-authoritative save (each one is a fresh
 // one-step scan baseline, so REPLACE is correct there). A wave2Authoritative
@@ -691,7 +736,7 @@ func (s *Session) Rotate() {
 	s.EnrichTotal = 0
 	s.RowStore.Clear()
 	s.EnrichmentRan = make(map[string]bool)
-	s.EnrichmentTypeGen = make(map[string]domain.Gen)
+	s.EnrichmentTypeGenReset()
 	s.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
 
 	// ProbeStatus: a prior profile/region's scan-status records must not

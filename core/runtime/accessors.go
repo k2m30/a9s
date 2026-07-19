@@ -186,14 +186,13 @@ func (c *Core) ClearEnrichResKey() { c.session.EnrichResKey = "" }
 // EnrichmentTypeGen returns the per-type Wave-2 enrichment counter for the
 // given resource short name. Zero when no enrichment has run yet for the
 // type.
-func (c *Core) EnrichmentTypeGen(rt string) domain.Gen { return c.session.EnrichmentTypeGen[rt] }
+func (c *Core) EnrichmentTypeGen(rt string) domain.Gen { return c.session.EnrichmentTypeGenGet(rt) }
 
 // BumpEnrichmentTypeGen increments the per-type Wave-2 counter and returns
 // the new value. Used by the refresh path to invalidate the prior batch's
 // per-type findings before re-dispatching.
 func (c *Core) BumpEnrichmentTypeGen(rt string) domain.Gen {
-	c.session.EnrichmentTypeGen[rt]++
-	return c.session.EnrichmentTypeGen[rt]
+	return c.session.EnrichmentTypeGenBump(rt)
 }
 
 // DeleteEnrichmentRan clears the per-type enrichment-ran latch so the next
@@ -217,7 +216,7 @@ func (c *Core) DeleteEnrichmentTruncatedIDs(rt string) {
 // where every type must re-enrich from scratch.
 func (c *Core) ResetEnrichmentMaps() {
 	c.session.EnrichmentRan = make(map[string]bool)
-	c.session.EnrichmentTypeGen = make(map[string]domain.Gen)
+	c.session.EnrichmentTypeGenReset()
 	c.session.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
 }
 
