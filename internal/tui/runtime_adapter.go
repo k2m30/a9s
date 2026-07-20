@@ -36,6 +36,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // handleEnrichDetail invokes m.core.HandleEnrichDetail (Core builds the payload's
@@ -125,6 +126,29 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
 	case runtime.ClearIdentityIntent:
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.ClearIdentityIntent{}})
+		// The controller forward above clears ctrl.identityResult, but the
+		// identity overlay's DISPLAYED state lives on the renderer's own
+		// rendererState (identityData/identityLoading/identityErr — see
+		// newIdentityRS's doc comment), populated by the 'i' key handler and
+		// by SetIdentityIntent's loop over m.stack (app_dispatch.go). Without
+		// this, a rotation that reveals an already-pushed identity rs (e.g.
+		// selector-on-top popped by PopSelectorIntent) would keep showing the
+		// previous pair's ARN. Reset every identity rs to a truthful
+		// "re-fetching" state and re-dispatch the same fetch the 'i' key
+		// uses, so the screen actually clears instead of going stale.
+		identityReset := false
+		for _, s := range m.stack {
+			if s.kind == rsKindIdentity {
+				s.identityData = views.IdentityData{}
+				s.identityErr = ""
+				s.identityLoading = true
+				identityReset = true
+			}
+		}
+		if identityReset {
+			m.core.SetIdentityFetching(true)
+			return m.fetchIdentity(m.core.ConnectGen())
+		}
 	case runtime.PopSelectorIntent:
 		// Controller-first (goal 4): forward so the controller applies its own
 		// type-checked gate (pop only when top.ID is a selector screen —
