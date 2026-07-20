@@ -134,20 +134,17 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 		// this, a rotation that reveals an already-pushed identity rs (e.g.
 		// selector-on-top popped by PopSelectorIntent) would keep showing the
 		// previous pair's ARN. Reset every identity rs to a truthful
-		// "re-fetching" state and re-dispatch the same fetch the 'i' key
-		// uses, so the screen actually clears instead of going stale.
-		identityReset := false
+		// "re-fetching" state; loading=true is truthful without dispatching a
+		// fetch here because the reconnect task already in this batch
+		// (HandleClientsReady success, core/runtime/handlers.go) dispatches
+		// TaskKindFetchIdentity itself against the NEW clients — dispatching
+		// our own fetch here would race it using the still-old clients.
 		for _, s := range m.stack {
 			if s.kind == rsKindIdentity {
 				s.identityData = views.IdentityData{}
 				s.identityErr = ""
 				s.identityLoading = true
-				identityReset = true
 			}
-		}
-		if identityReset {
-			m.core.SetIdentityFetching(true)
-			return m.fetchIdentity(m.core.ConnectGen())
 		}
 	case runtime.PopSelectorIntent:
 		// Controller-first (goal 4): forward so the controller applies its own
