@@ -35,7 +35,6 @@ import (
 	"context"
 	"os"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -541,24 +540,22 @@ func TestExecuteTask_SaveCache_ExactIssueCount_SurvivesRowDerivedRecomputation(t
 // Test 7 — counts-only save must skip an unchanged type file (no rewrite)
 // ────────────────────────────────────────────────────────────────────────────
 
-// statIno stats path and returns its inode (Unix). SaveType always writes
-// via a temp file + rename (cache.go SaveType), so a physical rewrite always
-// allocates a fresh inode — this is a deterministic, sleep-free way to detect
-// "was this file rewritten" independent of on-disk byte content. A byte
-// comparison alone cannot do this: TypeFile.SavedAt is stamped fresh on
-// every Store.Put, so even a save that changes nothing else still produces
-// different bytes.
-func statIno(t *testing.T, path string) uint64 {
+// statFile stats path and returns its os.FileInfo, for a later os.SameFile
+// comparison. SaveType always writes via a temp file + rename (cache.go
+// SaveType), so a physical rewrite always produces a distinct underlying
+// file — this is a deterministic, sleep-free way to detect "was this file
+// rewritten" independent of on-disk byte content. A byte comparison alone
+// cannot do this: TypeFile.SavedAt is stamped fresh on every Store.Put, so
+// even a save that changes nothing else still produces different bytes.
+// os.SameFile does the comparison portably (inode on Unix, volume+file-index
+// on Windows).
+func statFile(t *testing.T, path string) os.FileInfo {
 	t.Helper()
 	fi, err := os.Stat(path)
 	if err != nil {
 		t.Fatalf("os.Stat(%s): %v", path, err)
 	}
-	st, ok := fi.Sys().(*syscall.Stat_t)
-	if !ok {
-		t.Fatalf("os.Stat(%s): Sys() is not *syscall.Stat_t on this platform", path)
-	}
-	return st.Ino
+	return fi
 }
 
 // TestSaveAvailabilityCache_UnchangedEntries_DoesNotRewriteTypeFiles pins the
@@ -581,21 +578,21 @@ func TestSaveAvailabilityCache_UnchangedEntries_DoesNotRewriteTypeFiles(t *testi
 	dir := cache.DirForTest(saveRegProfile, saveRegRegion)
 	ec2Path := dir + "/ec2.yaml"
 	s3Path := dir + "/s3.yaml"
-	ec2InoBefore := statIno(t, ec2Path)
-	s3InoBefore := statIno(t, s3Path)
+	ec2Before := statFile(t, ec2Path)
+	s3Before := statFile(t, s3Path)
 
 	if err := c.SaveAvailabilityCache(entries, trunc, nil, nil, nil); err != nil {
 		t.Fatalf("SaveAvailabilityCache (identical re-save): %v", err)
 	}
 
-	ec2InoAfter := statIno(t, ec2Path)
-	s3InoAfter := statIno(t, s3Path)
+	ec2After := statFile(t, ec2Path)
+	s3After := statFile(t, s3Path)
 
-	if ec2InoAfter != ec2InoBefore {
-		t.Errorf("ec2.yaml inode changed (%d -> %d) after re-saving IDENTICAL availability data — SaveAvailabilityCache must skip an unchanged type file rather than rewrite it", ec2InoBefore, ec2InoAfter)
+	if !os.SameFile(ec2Before, ec2After) {
+		t.Errorf("ec2.yaml was rewritten after re-saving IDENTICAL availability data — SaveAvailabilityCache must skip an unchanged type file rather than rewrite it")
 	}
-	if s3InoAfter != s3InoBefore {
-		t.Errorf("s3.yaml inode changed (%d -> %d) after re-saving IDENTICAL availability data — SaveAvailabilityCache must skip an unchanged type file rather than rewrite it", s3InoBefore, s3InoAfter)
+	if !os.SameFile(s3Before, s3After) {
+		t.Errorf("s3.yaml was rewritten after re-saving IDENTICAL availability data — SaveAvailabilityCache must skip an unchanged type file rather than rewrite it")
 	}
 }
 
@@ -616,22 +613,22 @@ func TestSaveAvailabilityCache_OneTypeChanged_OnlyThatTypeFileIsRewritten(t *tes
 	dir := cache.DirForTest(saveRegProfile, saveRegRegion)
 	ec2Path := dir + "/ec2.yaml"
 	s3Path := dir + "/s3.yaml"
-	ec2InoBefore := statIno(t, ec2Path)
-	s3InoBefore := statIno(t, s3Path)
+	ec2Before := statFile(t, ec2Path)
+	s3Before := statFile(t, s3Path)
 
 	// Only ec2's count changes; s3 is resubmitted with its identical value.
 	if err := c.SaveAvailabilityCache(map[string]int{"ec2": 11, "s3": 20}, trunc, nil, nil, nil); err != nil {
 		t.Fatalf("SaveAvailabilityCache (ec2 changed): %v", err)
 	}
 
-	ec2InoAfter := statIno(t, ec2Path)
-	s3InoAfter := statIno(t, s3Path)
+	ec2After := statFile(t, ec2Path)
+	s3After := statFile(t, s3Path)
 
-	if ec2InoAfter == ec2InoBefore {
-		t.Errorf("ec2.yaml inode unchanged (%d) after its Count actually changed from 10 to 11 — a genuinely changed type file MUST still be rewritten", ec2InoBefore)
+	if os.SameFile(ec2Before, ec2After) {
+		t.Errorf("ec2.yaml was not rewritten after its Count actually changed from 10 to 11 — a genuinely changed type file MUST still be rewritten")
 	}
-	if s3InoAfter != s3InoBefore {
-		t.Errorf("s3.yaml inode changed (%d -> %d) even though s3's availability data was resubmitted unchanged — only the type whose data actually changed should be rewritten", s3InoBefore, s3InoAfter)
+	if !os.SameFile(s3Before, s3After) {
+		t.Errorf("s3.yaml was rewritten even though s3's availability data was resubmitted unchanged — only the type whose data actually changed should be rewritten")
 	}
 }
 

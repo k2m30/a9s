@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -272,23 +271,20 @@ func TestSaveTheme_ValidConfigWithExtraKeys_PreservesExtraKeys(t *testing.T) {
 // Atomicity: SaveTheme must not truncate-write config.yaml in place
 // ===========================================================================
 
-// inodeOf stats path and returns its inode (Unix). A write that goes through
-// the standard atomic-replace pattern (write to a temp file, then rename over
-// the target) always allocates a fresh inode for the destination path; an
-// in-place os.WriteFile (open O_TRUNC, write, close) always keeps the same
-// inode. This is a deterministic, content-independent way to detect whether
-// a write was atomic, without any production-side test hooks.
-func inodeOf(t *testing.T, path string) uint64 {
+// statFile stats path and returns its os.FileInfo, for a later os.SameFile
+// comparison. A write that goes through the standard atomic-replace pattern
+// (write to a temp file, then rename over the target) always produces a
+// distinct underlying file from the caller's perspective; an in-place
+// os.WriteFile (open O_TRUNC, write, close) always keeps the same one.
+// os.SameFile does this comparison portably (inode on Unix, volume+file-index
+// on Windows), without any production-side test hooks.
+func statFile(t *testing.T, path string) os.FileInfo {
 	t.Helper()
 	fi, err := os.Stat(path)
 	if err != nil {
 		t.Fatalf("os.Stat(%s): %v", path, err)
 	}
-	st, ok := fi.Sys().(*syscall.Stat_t)
-	if !ok {
-		t.Fatalf("os.Stat(%s): Sys() is not *syscall.Stat_t on this platform", path)
-	}
-	return st.Ino
+	return fi
 }
 
 // TestSaveTheme_ExistingFile_WriteIsAtomicByRename pins the fix for
@@ -307,14 +303,14 @@ func TestSaveTheme_ExistingFile_WriteIsAtomicByRename(t *testing.T) {
 	if err := os.WriteFile(path, []byte("theme: dracula.yaml\n"), 0600); err != nil {
 		t.Fatalf("writing initial config.yaml: %v", err)
 	}
-	inoBefore := inodeOf(t, path)
+	before := statFile(t, path)
 
 	if err := config.SaveTheme("nord.yaml"); err != nil {
 		t.Fatalf("SaveTheme(\"nord.yaml\"): unexpected error: %v", err)
 	}
-	inoAfter := inodeOf(t, path)
+	after := statFile(t, path)
 
-	if inoAfter == inoBefore {
-		t.Errorf("config.yaml inode unchanged (%d) after SaveTheme — the write is not atomic (in-place truncate+write instead of temp-file+rename), so a crash mid-write can corrupt config.yaml", inoBefore)
+	if os.SameFile(before, after) {
+		t.Errorf("config.yaml is still the same underlying file after SaveTheme — the write is not atomic (in-place truncate+write instead of temp-file+rename), so a crash mid-write can corrupt config.yaml")
 	}
 }
