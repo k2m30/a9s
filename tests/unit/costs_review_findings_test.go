@@ -653,10 +653,19 @@ func TestCostsReview_ResourceRowEnter_TUI_NavigatesToEC2Detail_NotStuckOnCostsSc
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 
-	// SERVICE root: one EC2 row, no metric switch/pivot needed.
+	// SERVICE root: one EC2 row, no metric switch/pivot needed. The record's
+	// Period is anchored to the CURRENT calendar month (never a fixed date)
+	// so it always lands in the root frame's default rightmost column —
+	// costsOpenAtNewestDrillLevel — regardless of which month the suite runs
+	// in, both for the drill's cell.Period (what the first Enter below
+	// drills into) and for staying inside whatever trailing window the grid
+	// actually renders.
+	nowUTC := time.Now().UTC()
+	nowMonthStart := time.Date(nowUTC.Year(), nowUTC.Month(), 1, 0, 0, 0, 0, time.UTC)
+	currentMonth := costs.Period{Start: nowMonthStart.Format("2006-01-02"), End: nowMonthStart.AddDate(0, 1, 0).Format("2006-01-02")}
 	m, _ = rootApplyMsg(m, messages.CostsLoaded{
 		Query:    reviewBaseServiceQuery(),
-		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{reviewFullMetricRecord(costs.Period{Start: "2026-06-01", End: "2026-07-01"}, "Amazon Elastic Compute Cloud - Compute", 1200.0)}},
+		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{reviewFullMetricRecord(currentMonth, "Amazon Elastic Compute Cloud - Compute", 1200.0)}},
 		Requests: 1,
 	})
 
@@ -672,18 +681,13 @@ func TestCostsReview_ResourceRowEnter_TUI_NavigatesToEC2Detail_NotStuckOnCostsSc
 	// SOME period lands inside whatever window the drill actually built.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 
-	// The pushed USAGE_TYPE frame now opens with the cursor already on its
-	// own newest column (FR-002, applyCostsSelect's PushDrill case) — the
-	// last, often not-yet-elapsed week of the current month. Scroll it back
-	// to the oldest (first) week, guaranteed fully in the past, so the
-	// 60-day-ending-today record spans built below (usageTypeRecords,
-	// resourceIDRecords) actually cover whatever day-level window the next
-	// drill selects. ScrollLeft clamps at column 0, so over-scrolling is safe.
-	const overScrollWeeks = 8
-	for range overScrollWeeks {
-		m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyLeft))
-	}
-
+	// The pushed USAGE_TYPE frame opens with its cursor on costsCurrentCol's
+	// pick (applyCostsSelect's PushDrill case) — the newest window column
+	// whose Start has already begun, i.e. the week containing today, never
+	// the raw last (possibly not-yet-elapsed) column and never the oldest
+	// column. That week's Start is at most 6 days before today, so it is
+	// always inside the RESOURCE_ID 14-day retention window regardless of
+	// today's day-of-month or month boundary — no manual scrolling needed.
 	usageTypeQuery := costs.Query{
 		Granularity: costs.GranularityDay.APIGranularity(),
 		GroupBy:     []costs.Dimension{costs.DimensionUsageType},
