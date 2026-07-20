@@ -138,7 +138,7 @@ tmux capture-pane -t "$SESSION" -p > "$CAPDIR/ec2_detail.txt"
 
 expect() {
 	# $1 = capture file, $2 = required substring, $3 = human label
-	if grep -qF "$2" "$CAPDIR/$1"; then
+	if grep -qF -- "$2" "$CAPDIR/$1"; then
 		echo "PASS  $3"
 	else
 		echo "FAIL  $3 — missing \"$2\" in $CAPDIR/$1"
@@ -148,7 +148,7 @@ expect() {
 
 expect_re() {
 	# $1 = capture file, $2 = required ERE, $3 = human label
-	if grep -qE "$2" "$CAPDIR/$1"; then
+	if grep -qE -- "$2" "$CAPDIR/$1"; then
 		echo "PASS  $3"
 	else
 		echo "FAIL  $3 — no match for /$2/ in $CAPDIR/$1"
@@ -158,7 +158,7 @@ expect_re() {
 
 forbid() {
 	# $1 = capture file, $2 = forbidden substring, $3 = human label
-	if grep -qF "$2" "$CAPDIR/$1"; then
+	if grep -qF -- "$2" "$CAPDIR/$1"; then
 		echo "FAIL  $3 — forbidden \"$2\" present in $CAPDIR/$1"
 		FAILURES=$((FAILURES + 1))
 	else
@@ -168,7 +168,7 @@ forbid() {
 
 forbid_re() {
 	# $1 = capture file, $2 = forbidden ERE, $3 = human label
-	if grep -qE "$2" "$CAPDIR/$1"; then
+	if grep -qE -- "$2" "$CAPDIR/$1"; then
 		echo "FAIL  $3 — forbidden /$2/ present in $CAPDIR/$1"
 		FAILURES=$((FAILURES + 1))
 	else
