@@ -5,6 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.55.0] - 2026-07-20
+
+### Added
+
+- Opt-in diagnostics: `--log-file` / `A9S_LOG_FILE` install a JSON file
+  logger (off by default); cache skip reports route through it, probe
+  failures/timeouts appear in the `!` error log (one entry per type per
+  sweep), and web mode logs requests and render errors when enabled.
+- New pre-push gates: `verify-renderer-free` (core/ compiles with zero
+  renderer or internal/ deps), `verify-hooks` (git hooks installed),
+  `check-catalogen` (generated doc blocks match catalog declarations);
+  `verify-readonly` reimplemented as an AST checker (`cmd/readonlycheck`)
+  immune to comment/string/formatting bypasses; a dead-export baseline in
+  arch-review; drift-guard tests pinning the process doc's gate list to
+  the Makefile and attention-signals prose to its generated tables.
+
+### Changed
+
+- List rendering memoized: 7.3 ms → 72 µs per frame on a 3,000-row list
+  (105.7k → 16 allocs); invalidation covers filter, sort, attention,
+  row-store generations, and enrichment state.
+- Cache saves skip byte-identical type files and perform disk I/O outside
+  the session-wide pair lock (prepare-under-lock, commit-outside split).
+- Wave-2 enrichment dispatches through a bounded 4-probe window with live
+  refills instead of ~50 concurrent probes per sweep.
+- ACM expiry/orphan findings compute in wave 1 from the list call —
+  the per-certificate wave-2 sweep and its >50-cert blind spot are gone.
+- Severities aligned with the attention-signals contract: tg graduated
+  (partial-unhealthy warns, all-unhealthy breaks; initial/draining/unused
+  don't count), s3 public-access-block findings warn, acm graduated
+  30d/7d, ec2's four instance-status conditions split into four codes.
+- **BREAKING (`core/`)**: `IssueEnricherResult.IssueCount` and
+  `messages.EnrichmentChecked.Issues` deleted; 24 dead exports removed
+  (superseded whole-page fetchers, `projection.Generic` — use
+  `GenericWithConfig` — and others); 17 test-only exports renamed to
+  `*ForTest`; `scripts/verify-readonly.sh` removed in favor of
+  `cmd/readonlycheck`.
+
+### Fixed
+
+- Fatal `concurrent map read and map write` crash when opening a list
+  during the wave-2 enrichment sweep.
+- Eternal spinner on stalled networks: all interactive fetch lanes,
+  including server-side filtered drills, carry a 30s deadline; profile or
+  region switches cancel in-flight background tasks.
+- EKS node-group pagination lost every page after the first for clusters
+  spanning multiple `ListNodegroups` pages, and a result-capped fetch
+  returned an unresumable empty continuation token — both fixed.
+- Related-checker panics surfaced nowhere (permanent `?`); they now reach
+  the error flash and log. Four related checkers (dbc, dbi, ddb, redis)
+  reported a false proven-zero on an unloaded alarm cache; they now
+  report unknown per the engine contract.
+- RELATED panel filter mode: Up/Down moved a dead widget cursor and Enter
+  never navigated; movement now drives the real cursor (arrow keys only —
+  `j`/`k` still type into the filter), Enter confirms the filter and
+  stays, and the next Enter navigates, with the cursor surviving the
+  confirm.
+- `SaveTheme` silently destroyed `config.yaml` on a corrupt parse and
+  wrote non-atomically; child-view fetches dropped partial results on
+  composite errors in both live paths.
+- Enrichment dispatcher races: stale completions starved the queue,
+  list-open probes stole refills or triggered duplicate dispatches, and a
+  rerun-invalidated final completion stranded the progress badge.
+- Stale list rows when a background availability update replaced the
+  row store under a screen that had not adopted its own rows yet.
+
 ## [3.54.1] - 2026-07-19
 
 ### Changed
