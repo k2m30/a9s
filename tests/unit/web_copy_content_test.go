@@ -291,19 +291,16 @@ func TestCopyContent_Detail_FallbackToRawYAML_WhenNoUsableField(t *testing.T) {
 // 5. Text screen (YAML/JSON) — ANSI-stripped, newline-joined content.
 // ===========================================================================
 
-func TestCopyContent_Text_StripsANSI_JoinsLines(t *testing.T) {
-	res := resource.Resource{
-		ID:   "i-0copytext001",
-		Name: "copy-text-server",
-		Fields: map[string]string{
-			"state":         "running",
-			"instance_type": "t3.medium",
-		},
-	}
-	m := views.NewYAMLWithCtrl(res, "ec2", keys.Default(), nil)
-	m.SetSize(120, 40)
-	lines := m.ContentLines()
-
+// wave4AssertTextScreenCopy pushes screenID with lines via the blessed
+// newTestController helper (see qa_controller_construction_discipline_test.go
+// — a direct app.New here isn't callable from this package's
+// newTextScreenController equivalent, which lives in package unit) and
+// asserts CopyContent()'s content is the ANSI-stripped, newline-joined body
+// with the screen-exact label (BodyKindText covers ScreenYAML, ScreenJSON,
+// and ScreenErrorLog — copyContentText, core/app/copy.go — so the label must
+// vary by id, not stay hardcoded to "YAML").
+func wave4AssertTextScreenCopy(t *testing.T, screenID runtime.ScreenID, lines []string, wantLabel string) {
+	t.Helper()
 	hasANSI := false
 	for _, l := range lines {
 		if strings.Contains(l, "\x1b[") {
@@ -312,17 +309,11 @@ func TestCopyContent_Text_StripsANSI_JoinsLines(t *testing.T) {
 		}
 	}
 	if !hasANSI {
-		t.Fatal("precondition: YAML ContentLines() must contain ANSI color codes for this test to be meaningful")
+		t.Fatal("precondition: ContentLines() must contain ANSI color codes for this test to be meaningful")
 	}
 
-	// Route construction through the blessed newTestController helper (see
-	// qa_controller_construction_discipline_test.go) instead of a direct
-	// app.New — it already pairs t.TempDir()/t.Cleanup(c.Close) correctly;
-	// text_ports_test.go's newTextScreenController does the same
-	// PushScreen+EnsureTextState arrangement but lives in package unit, not
-	// unit_test, so it isn't callable from here.
 	c := newTestController(t)
-	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenYAML}})
+	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: screenID}})
 	c.EnsureTextState(lines)
 
 	content, label := wave4AssertCopyContent(t, c)
@@ -333,9 +324,32 @@ func TestCopyContent_Text_StripsANSI_JoinsLines(t *testing.T) {
 	if content != wantPlain {
 		t.Errorf("CopyContent() content mismatch:\ngot:\n%q\nwant:\n%q", content, wantPlain)
 	}
-	if label != "Copied YAML to clipboard" {
-		t.Errorf("CopyContent() label = %q, want %q", label, "Copied YAML to clipboard")
+	if label != wantLabel {
+		t.Errorf("CopyContent() label = %q, want %q", label, wantLabel)
 	}
+}
+
+func wave4CopyTextResource() resource.Resource {
+	return resource.Resource{
+		ID:   "i-0copytext001",
+		Name: "copy-text-server",
+		Fields: map[string]string{
+			"state":         "running",
+			"instance_type": "t3.medium",
+		},
+	}
+}
+
+func TestCopyContent_Text_StripsANSI_JoinsLines(t *testing.T) {
+	m := views.NewYAMLWithCtrl(wave4CopyTextResource(), "ec2", keys.Default(), nil)
+	m.SetSize(120, 40)
+	wave4AssertTextScreenCopy(t, runtime.ScreenYAML, m.ContentLines(), "Copied YAML to clipboard")
+}
+
+func TestCopyContent_JSON_StripsANSI_JoinsLines(t *testing.T) {
+	m := views.NewJSONWithCtrl(wave4CopyTextResource(), "ec2", keys.Default(), nil)
+	m.SetSize(120, 40)
+	wave4AssertTextScreenCopy(t, runtime.ScreenJSON, m.ContentLines(), "Copied JSON to clipboard")
 }
 
 // ===========================================================================

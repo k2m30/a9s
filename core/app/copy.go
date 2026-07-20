@@ -11,6 +11,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
 // CopyContent resolves the (content, label) pair for the copy action ('c' in
@@ -38,7 +39,7 @@ func (c *Controller) copyContent() (content, label string) {
 	case BodyKindDetail:
 		return c.copyContentDetail()
 	case BodyKindText:
-		return copyContentText(c.topTextState())
+		return copyContentText(c.stack[len(c.stack)-1].ID, c.topTextState())
 	case BodyKindIdentity:
 		return copyContentIdentity(c.buildIdentityBody())
 	default:
@@ -124,9 +125,11 @@ func detailResourceRawYAML(res resource.Resource) string {
 	return string(data)
 }
 
-// copyContentText resolves copy content for a YAML/JSON text screen: every
-// line joined with newlines, ANSI escape codes stripped.
-func copyContentText(ts *TextState) (string, string) {
+// copyContentText resolves copy content for a text screen (YAML, JSON, or
+// error log): every line joined with newlines, ANSI escape codes stripped.
+// The label is screen-exact — BodyKindText covers all three screen IDs
+// (bodyKindForScreen), so a bare "YAML" label was wrong for JSON/error-log.
+func copyContentText(id runtime.ScreenID, ts *TextState) (string, string) {
 	if ts == nil || len(ts.Lines) == 0 {
 		return "", ""
 	}
@@ -137,7 +140,14 @@ func copyContentText(ts *TextState) (string, string) {
 		}
 		sb.WriteString(ansi.Strip(line))
 	}
-	return sb.String(), "Copied YAML to clipboard"
+	label := "Copied text to clipboard"
+	switch id {
+	case runtime.ScreenYAML:
+		label = "Copied YAML to clipboard"
+	case runtime.ScreenJSON:
+		label = "Copied JSON to clipboard"
+	}
+	return sb.String(), label
 }
 
 // copyContentIdentity resolves copy content for the identity screen: the
