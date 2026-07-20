@@ -529,11 +529,12 @@ type ThemeFileReadEvent struct {
 // the selector can render the "(current)" indicator. No tasks fire — the
 // adapter's builder closure constructs the SelectorModel synchronously.
 func (c *Core) HandleProfilesLoaded(ev ProfilesLoadedEvent) ([]UIIntent, []TaskRequest) {
+	current, _ := c.session.CurrentPair()
 	intents := []UIIntent{PushScreen{
 		ID: ScreenProfileSelector,
 		Payload: ProfileSelectorPayload{
 			Profiles: ev.Profiles,
-			Current:  c.session.Profile,
+			Current:  current,
 		},
 	}}
 	return intents, nil

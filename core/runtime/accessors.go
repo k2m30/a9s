@@ -46,21 +46,33 @@ func (c *Core) CurrentGenFor(a messages.Aspect) domain.Gen {
 }
 
 // Profile returns the active session profile.
-func (c *Core) Profile() string { return c.session.Profile }
+func (c *Core) Profile() string {
+	p, _ := c.session.CurrentPair()
+	return p
+}
 
 // SetProfile sets the active session profile. Used by the WithProfile
 // constructor option only, before any goroutine other than the caller's own
 // can observe the session — goes through SetProfileRegion regardless, so a
 // later WithProfile/WithRegion combination (both constructor options run
 // during the same single-threaded construction) never risks a torn pair.
-func (c *Core) SetProfile(p string) { c.session.SetProfileRegion(p, c.session.Region) }
+func (c *Core) SetProfile(p string) {
+	_, r := c.session.CurrentPair()
+	c.session.SetProfileRegion(p, r)
+}
 
 // Region returns the active session region.
-func (c *Core) Region() string { return c.session.Region }
+func (c *Core) Region() string {
+	_, r := c.session.CurrentPair()
+	return r
+}
 
 // SetRegion sets the active session region. Used by the WithRegion
 // constructor option only. See SetProfile's doc comment.
-func (c *Core) SetRegion(r string) { c.session.SetProfileRegion(c.session.Profile, r) }
+func (c *Core) SetRegion(r string) {
+	p, _ := c.session.CurrentPair()
+	c.session.SetProfileRegion(p, r)
+}
 
 // NoCache reports whether the --no-cache / --demo CLI flags disabled
 // on-disk availability caching and background probes.

@@ -59,14 +59,15 @@ type DispatchSnapshot struct {
 // CaptureDispatch snapshots the session generations and clients. Call it
 // synchronously at task-dispatch time (NOT inside a goroutine).
 func (c *Core) CaptureDispatch() DispatchSnapshot {
+	profile, region := c.session.CurrentPair()
 	return DispatchSnapshot{
 		Clients:           c.session.Clients,
 		AvailabilityGen:   c.session.AvailabilityGen,
 		EnrichmentGen:     c.session.EnrichmentGen,
 		ConnectGen:        c.session.ConnectGen,
 		EnrichmentTypeGen: c.session.EnrichmentTypeGenSnapshot(),
-		Profile:           c.session.Profile,
-		Region:            c.session.Region,
+		Profile:           profile,
+		Region:            region,
 		NoCache:           c.session.NoCache,
 	}
 }
