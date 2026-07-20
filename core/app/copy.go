@@ -21,14 +21,17 @@ import (
 // once instead of drifting between a TUI-local implementation and a web
 // no-op.
 func (c *Controller) CopyContent() (content, label string) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.copyContent()
 }
 
 // copyContent is the lock-free core of CopyContent, also called by
 // snapshot() to populate ViewState.CopyText/CopyLabel from the identical
-// resolution. Callers must already hold c.mu (read or write).
+// resolution. Callers must already hold c.mu for WRITE — copyContentDetail
+// reaches buildDetailBody, which may maps.Copy into the shared resource's
+// AttentionDetails map (detail_body.go), the same mutation-on-read hazard
+// Snapshot() documents on its own write-lock choice.
 func (c *Controller) copyContent() (content, label string) {
 	if len(c.stack) == 0 {
 		return "", ""

@@ -10,6 +10,7 @@ package unit_test
 
 import (
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/app"
@@ -469,4 +470,77 @@ func TestCopyContent_NoOpScreens_ReturnEmpty(t *testing.T) {
 			t.Errorf("CopyContent() on the costs screen = (%q, %q), want (\"\", \"\")", content, label)
 		}
 	})
+}
+
+// ===========================================================================
+// 8. Concurrency — CopyContent() must be safe to call from multiple
+// goroutines. Codex P2 finding (core/app/copy.go): CopyContent() takes only
+// c.mu.RLock(), but its detail branch calls buildDetailBody ->
+// buildDetailFieldItems, which — whenever ds.Resource.AttentionDetails is
+// already a non-nil map — merges ds.AttentionDetails into it in place via
+// maps.Copy (detail_body.go). That merge MUTATES a map shared across every
+// call, the same class of builder-mutation snapshot.go's own doc comment
+// says requires the WRITE lock ("buildListBody ... may populate
+// ListState.bodyMemo on a cache miss"). Concurrent CopyContent() calls on a
+// detail screen with pre-populated AttentionDetails therefore race on that
+// shared map.
+// ===========================================================================
+
+// wave4ConcurrentCopyResource carries a non-nil, non-empty AttentionDetails
+// map (set on the resource itself, not just delivered later via
+// ApplyDetailFinding) so ensureDetailState seeds ds.Resource.AttentionDetails
+// as a non-nil map AND ds.AttentionDetails (a clone) as non-empty — the exact
+// precondition that makes buildDetailFieldItems's "if r.AttentionDetails ==
+// nil { r.AttentionDetails = make(...) }" guard skip allocating a fresh map,
+// so every call's maps.Copy writes into the SAME shared map instead.
+func wave4ConcurrentCopyResource() resource.Resource {
+	code := domain.FindingCode("concurrent.test.finding")
+	return resource.Resource{
+		ID:   "res-detail-004",
+		Name: "detail-concurrent-test",
+		AttentionDetails: map[domain.FindingCode]domain.AttentionDetail{
+			code: {Rows: []domain.DetailRow{{Label: "Action", Value: "reboot"}}},
+		},
+	}
+}
+
+// TestCopyContent_ConcurrentCallsAreSerialized hammers CopyContent() from
+// several goroutines on the same detail screen. Each goroutine writes only
+// to its own disjoint slice range (no race in the harness itself) so any
+// race reported by `go test -race` is exclusively inside CopyContent()'s own
+// locking. Asserts nothing beyond "no panic and every call agrees" — the
+// race detector, not this assertion, is the oracle for the locking bug.
+func TestCopyContent_ConcurrentCallsAreSerialized(t *testing.T) {
+	c := newDetailController(t, wave4ConcurrentCopyResource(), "copytest-detail-concurrent")
+
+	const goroutines = 8
+	const iterations = 50
+
+	type copyResult struct{ content, label string }
+	results := make([][]copyResult, goroutines)
+	for g := range results {
+		results[g] = make([]copyResult, iterations)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for g := range goroutines {
+		go func(g int) {
+			defer wg.Done()
+			for i := range iterations {
+				content, label := c.CopyContent()
+				results[g][i] = copyResult{content, label}
+			}
+		}(g)
+	}
+	wg.Wait()
+
+	want := results[0][0]
+	for g := range results {
+		for i, got := range results[g] {
+			if got != want {
+				t.Errorf("CopyContent() result diverged across concurrent calls: goroutine %d iter %d = %+v, want %+v", g, i, got, want)
+			}
+		}
+	}
 }
