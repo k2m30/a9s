@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.55.1] - 2026-07-20
+
+### Fixed
+
+- Deleted-resource 404s no longer surface in the `!` error log as
+  enrichment failures (#456): a resource deleted between the list call
+  and a per-ID describe (`NoSuchBucket`, bare `NotFound`,
+  `NoSuchHostedZone`) is classified as an operational race — the row is
+  marked data-incomplete (`?`), no finding is emitted, and the failure
+  aggregate stays clean. The S3 public-access-block and Route 53
+  enrichers adopt the shared classifier; the four S3 related-panel
+  checkers switch from message-substring to error-code matching and
+  render a deleted bucket as an honest zero instead of an error cell.
+- Stale disk-cache rows can no longer outlive a deletion indefinitely
+  (#457): an exact observation is now authoritative at the per-type disk
+  reconcile chokepoint and shrinks stored rows to the live population
+  (truncated first pages still never lose deeper rows), and a type whose
+  population went to zero persists its emptiness. This ends the
+  startup-loop where a deleted resource's cached row re-seeded every
+  session and fed Wave-2 describes against a deleted ID. Wave-2 finding
+  carry and `FindingFirstSeen` survive the shrink
+  (`docs/design/cache-requirements.md` C6a amended, defect D18).
+- S3 throttling (`SlowDown`, 503) is retried like every other throttle
+  code instead of failing the call on the first attempt.
+
+### Added
+
+- `core/aws.IsNotFoundErr` — the canonical deleted-between-list-and-describe
+  classifier for fetchers, checkers, and enrichers (`core/` importers).
+
 ## [3.55.0] - 2026-07-20
 
 ### Added
