@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -185,6 +186,13 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"elb", "alb", "nlb", "loadbalancers", "load-balancers"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "ec2/home?region="+region+"#LoadBalancer:loadBalancerArn="+arn)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 32, Sortable: true},
 			{Key: "dns_name", Title: "DNS Name", Width: 48, Sortable: false},
@@ -204,7 +212,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return FetchLoadBalancersPage(ctx, c.ELBv2, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichELBAttributes, Priority: 100},
-		FieldKeys: []string{"name", "dns_name", "type", "scheme", "state", "vpc_id", "load_balancer_arn"},
+		FieldKeys: []string{"name", "dns_name", "type", "scheme", "state", "vpc_id", "load_balancer_arn", "arn"},
 		Related: []domain.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: checkELBTargetGroups, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkELBAlarms, NeedsTargetCache: true, Truncated: true},
@@ -237,6 +245,13 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"tg", "targetgroups", "target-groups"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["target_group_arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "ec2/home?region="+region+"#TargetGroup:targetGroupArn="+arn)
+		},
 		Columns: []domain.Column{
 			{Key: "target_group_name", Title: "Target Group", Width: 32, Sortable: true},
 			{Key: "port", Title: "Port", Width: 8, Sortable: true},
@@ -287,6 +302,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"sg", "securitygroups", "security-groups"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "vpc/home?region="+region+"#SecurityGroup:groupId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "group_name", Title: "Group Name", Width: 28, Sortable: true},
 			{Key: "group_id", Title: "Group ID", Width: 24, Sortable: true},
@@ -323,6 +341,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"vpc", "vpcs"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "vpc/home?region="+region+"#VpcDetails:VpcId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24, Sortable: true},
 			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
@@ -362,6 +383,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"subnet", "subnets"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "vpc/home?region="+region+"#SubnetDetails:subnetId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28, Sortable: true},
 			{Key: "subnet_id", Title: "Subnet ID", Width: 26, Sortable: true},
@@ -406,6 +430,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"rtb", "routetables", "route-tables"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "vpc/home?region="+region+"#RouteTableDetails:RouteTableId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28, Sortable: true},
 			{Key: "route_table_id", Title: "Route Table ID", Width: 26, Sortable: true},
@@ -449,6 +476,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"nat", "natgateways", "nat-gateways"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "vpc/home?region="+region+"#NatGatewayDetails:natGatewayId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24, Sortable: true},
 			{Key: "nat_gateway_id", Title: "NAT Gateway ID", Width: 26, Sortable: true},
@@ -489,6 +519,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"igw", "internetgateways", "internet-gateways"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "vpc/home?region="+region+"#InternetGateway:internetGatewayId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28, Sortable: true},
 			{Key: "igw_id", Title: "IGW ID", Width: 26, Sortable: true},
@@ -520,6 +553,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"eip", "elastic-ips", "elasticips"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "vpc/home?region="+region+"#ElasticIpDetails:AllocationId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24, Sortable: true},
 			{Key: "allocation_id", Title: "Allocation ID", Width: 26, Sortable: true},
@@ -566,6 +602,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"vpce", "vpc-endpoints", "vpcendpoints"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "vpc/home?region="+region+"#EndpointDetails:vpcEndpointId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "service_name", Title: "Service Name", Width: 40, Sortable: true},
 			{Key: "vpce_id", Title: "Endpoint ID", Width: 26, Sortable: true},
@@ -613,6 +652,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"tgw", "transit-gateways", "transitgateways"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "vpc/home?region="+region+"#TransitGateways:filter="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28, Sortable: true},
 			{Key: "tgw_id", Title: "TGW ID", Width: 26, Sortable: true},
@@ -651,6 +693,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "ec2/home?region="+region+"#NetworkInterface:networkInterfaceId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24, Sortable: true},
 			{Key: "eni_id", Title: "ENI ID", Width: 26, Sortable: true},
@@ -696,6 +741,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "transfer/home#/servers/"+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "server_id", Title: "Server Id", Width: 32, Sortable: true},
 			{Key: "status", Title: "Status", Width: 32, Sortable: true},
@@ -755,6 +803,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "vpc/home?region="+region+"#PeeringConnectionDetails:VpcPeeringConnectionId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "pcx_id", Title: "Pcx Id", Width: 24, Sortable: true},
 			{Key: "status", Title: "Status", Width: 34, Sortable: true},

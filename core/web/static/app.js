@@ -465,6 +465,34 @@
       return;
     }
 
+    // Open/copy console link: reads the console URL + demo flag the
+    // controller resolved for the current screen (mirrored onto #body's
+    // data-console-url/data-is-demo by ViewState.ConsoleURL/IsDemo). Both
+    // "o" and "O" act synchronously in this handler — window.open and the
+    // Clipboard API both require a user-activation call stack, so neither
+    // can be deferred into the async /action round-trip. The server never
+    // execs anything for this feature; only the client opens/copies.
+    if ((e.key === "o" || e.key === "O") && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      var bodyEl = document.getElementById("body");
+      var consoleURL = bodyEl ? (bodyEl.getAttribute("data-console-url") || "") : "";
+      var isDemo = bodyEl ? bodyEl.getAttribute("data-is-demo") === "true" : false;
+      if (!consoleURL) return;
+      if (e.key === "O") {
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+          showClientFlash("Clipboard unavailable", true);
+          return;
+        }
+        navigator.clipboard.writeText(consoleURL)
+          .then(function () { showClientFlash("Copied console URL", false); })
+          .catch(function () { showClientFlash("Copy failed", true); });
+        return;
+      }
+      if (isDemo) return;
+      window.open(consoleURL, "_blank");
+      return;
+    }
+
     // Look up in key map.
     for (var i = 0; i < keyMap.length; i++) {
       var entry = keyMap[i];

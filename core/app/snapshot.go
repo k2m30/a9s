@@ -3,7 +3,9 @@
 package app
 
 import (
+	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
@@ -81,7 +83,61 @@ func (c *Controller) snapshot() ViewState {
 		vs.Footer = CostsFooterHintsFor(c.uiMode)
 	}
 	vs.CopyText, vs.CopyLabel = c.copyContent()
+	vs.ConsoleURL, _ = c.consoleURL()
+	vs.IsDemo = c.core.IsDemo()
 	return vs
+}
+
+// consoleURL resolves the AWS console link for the current screen's target
+// resource: the list's selected row, or the detail screen's resource. Type
+// lookup mirrors copyContentList/copyContentDetail's fallback (top-level
+// catalog, then child-type registry, since a child list's Ctx.ResourceType
+// is the child type's own ShortName). Any other screen kind — or a screen
+// with no resolvable target — returns ("", false). The TUI's richer
+// resolution (including the related-panel-focused case) lives in
+// internal/tui/console_open.go; this is the web-only, minimal counterpart.
+func (c *Controller) consoleURL() (string, bool) {
+	if len(c.stack) == 0 {
+		return "", false
+	}
+	top := c.stack[len(c.stack)-1]
+
+	var td *resource.ResourceTypeDef
+	var res resource.Resource
+	switch bodyKindForScreen(top) {
+	case BodyKindList:
+		r, ok := c.listSelected()
+		if !ok {
+			return "", false
+		}
+		typeName := top.Ctx.ResourceType
+		td = resource.FindResourceType(typeName)
+		if td == nil {
+			td = resource.GetChildType(typeName)
+		}
+		res = r
+	case BodyKindDetail:
+		ds := c.topDetailState()
+		if ds == nil {
+			return "", false
+		}
+		td = resource.FindResourceType(ds.ResourceType)
+		if td == nil {
+			td = resource.GetChildType(ds.ResourceType)
+		}
+		res = ds.Resource
+	default:
+		return "", false
+	}
+	if td == nil {
+		return "", false
+	}
+
+	accountID := ""
+	if c.identityResult != nil {
+		accountID = c.identityResult.AccountID
+	}
+	return consolelink.Resolve(*td, res, c.core.Region(), accountID)
 }
 
 // ScreenIDs returns the ScreenID of every entry on the controller's screen

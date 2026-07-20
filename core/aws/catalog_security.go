@@ -5,10 +5,12 @@ package aws
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -74,6 +76,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		Aliases:       []string{"role", "roles", "iam-roles", "iam_roles"},
 		Category:      "SECURITY & IAM",
 		CloudTrailKey: "_localfield.role_name:Fields.role_name",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Global(region, "iam/home#/roles/details/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "role_name", Title: "Role Name", Width: 36, Sortable: true},
 			{Key: "role_id", Title: "Role ID", Width: 22, Sortable: true},
@@ -126,6 +131,13 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		Aliases:       []string{"policy", "policies", "iam-policies", "iam_policies"},
 		Category:      "SECURITY & IAM",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Global(region, "iam/home#/policies/details/"+url.QueryEscape(arn))
+		},
 		Columns: []domain.Column{
 			{Key: "policy_name", Title: "Policy Name", Width: 36, Sortable: true},
 			{Key: "policy_type", Title: "Type", Width: 10, Sortable: true},
@@ -188,7 +200,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		Wave2: IssueEnricher{Fn: EnrichIAMPolicy, Priority: 100},
 		FieldKeys: []string{
 			"policy_name", "policy_type", "attachment_count", "is_attachable",
-			"path", "create_date",
+			"path", "create_date", "arn",
 		},
 		IssueEnricherFieldKeys: []string{"risk"},
 		FetchByIDs: fetchByIDsWithClients(func(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
@@ -215,6 +227,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		Aliases:       []string{"iam-user", "iam-users", "users", "iam_users"},
 		Category:      "SECURITY & IAM",
 		CloudTrailKey: "Username:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Global(region, "iam/home#/users/details/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "user_name", Title: "User Name", Width: 32, Sortable: true},
 			{Key: "mfa", Title: "MFA", Width: 5, Sortable: true},
@@ -250,6 +265,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		Aliases:       []string{"iam-group", "iam-groups", "groups", "iam_groups"},
 		Category:      "SECURITY & IAM",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Global(region, "iam/home#/groups/details/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "group_name", Title: "Group Name", Width: 32, Sortable: true},
 			{Key: "group_id", Title: "Group ID", Width: 22, Sortable: true},
@@ -285,6 +303,13 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		Aliases:       []string{"waf", "webacl", "web-acl"},
 		Category:      "SECURITY & IAM",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			tail := "wafv2-pro/protections/" + url.PathEscape(r.Name) + "/" + r.ID + "?panel=protectionPackHome"
+			if r.Fields["scope"] == "CLOUDFRONT" {
+				return consolelink.Regional("us-east-1", tail+"&region=us-east-1&scope=global")
+			}
+			return consolelink.Regional(region, tail+"&region="+region+"&scope=regional")
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28, Sortable: true},
 			{Key: "id", Title: "ID", Width: 38, Sortable: true},

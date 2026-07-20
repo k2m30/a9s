@@ -190,6 +190,15 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleToggleRelated()
 	}
 
+	// OpenConsole (o) / CopyConsoleURL (O) — resolve the active resource's AWS
+	// console link and either open it in a browser or copy it to clipboard.
+	if key.Matches(msg, m.keys.OpenConsole) {
+		return m.handleOpenConsole(false)
+	}
+	if key.Matches(msg, m.keys.CopyConsoleURL) {
+		return m.handleOpenConsole(true)
+	}
+
 	return m.updateActiveRS(msg)
 }
 

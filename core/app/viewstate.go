@@ -23,6 +23,16 @@ type ViewState struct {
 	// CopyContent() a second time.
 	CopyText  string `json:"copy_text,omitempty"`
 	CopyLabel string `json:"copy_label,omitempty"`
+	// ConsoleURL is the AWS console link for the current screen's target
+	// resource (the list's selected row, or the detail screen's resource) —
+	// "" when the type has no console page or the screen carries no target.
+	// The TUI resolves its own richer version (including the related-panel-
+	// focused case) via internal/tui/console_open.go; this field only backs
+	// the web client's o/O keys.
+	ConsoleURL string `json:"console_url,omitempty"`
+	// IsDemo mirrors core.IsDemo() so the web client can disable the "o" open
+	// action in demo mode while still allowing "O" to copy the URL.
+	IsDemo bool `json:"is_demo,omitempty"`
 }
 
 // Header mirrors the top bar rendered by internal/tui/layout.

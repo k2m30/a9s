@@ -79,6 +79,7 @@ func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersA
 				"state":             state,
 				"vpc_id":            vpcID,
 				"load_balancer_arn": lbArn,
+				"arn":               lbArn,
 			},
 			Findings:  findings,
 			RawStruct: lb,

@@ -22,6 +22,8 @@
 | `J` | JSON view |
 | `x` | Reveal (expand) |
 | `c` | Copy resource ID to clipboard |
+| `o` | Open the selected resource in the AWS console (browser) |
+| `O` | Copy the AWS console URL to clipboard |
 | `i` | IAM identity view |
 | `/` | Filter |
 | `Ctrl+Z` | Show only attention-worthy rows (resource lists) / filter to types with issues (main menu) |

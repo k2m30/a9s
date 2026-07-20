@@ -27,13 +27,15 @@ type Map struct {
 	Tab    key.Binding
 
 	// Resource list actions
-	Describe    key.Binding
-	YAML        key.Binding
-	JSON        key.Binding
-	Reveal      key.Binding
-	Copy        key.Binding
-	ScrollLeft  key.Binding
-	ScrollRight key.Binding
+	Describe       key.Binding
+	YAML           key.Binding
+	JSON           key.Binding
+	Reveal         key.Binding
+	Copy           key.Binding
+	OpenConsole    key.Binding
+	CopyConsoleURL key.Binding
+	ScrollLeft     key.Binding
+	ScrollRight    key.Binding
 
 	// Child-view triggers
 	Events    key.Binding
@@ -98,13 +100,15 @@ func Default() Map {
 		Filter: key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 		Tab:    key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "complete")),
 
-		Describe:    key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "detail")),
-		YAML:        key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "yaml")),
-		JSON:        key.NewBinding(key.WithKeys("J"), key.WithHelp("J", "json")),
-		Reveal:      key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "reveal")),
-		Copy:        key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy id")),
-		ScrollLeft:  key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("h/←", "scroll left")),
-		ScrollRight: key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l/→", "scroll right")),
+		Describe:       key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "detail")),
+		YAML:           key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "yaml")),
+		JSON:           key.NewBinding(key.WithKeys("J"), key.WithHelp("J", "json")),
+		Reveal:         key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "reveal")),
+		Copy:           key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy id")),
+		OpenConsole:    key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open console")),
+		CopyConsoleURL: key.NewBinding(key.WithKeys("O"), key.WithHelp("O", "copy console url")),
+		ScrollLeft:     key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("h/←", "scroll left")),
+		ScrollRight:    key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l/→", "scroll right")),
 
 		Events:    key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "events")),
 		Logs:      key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "logs")),

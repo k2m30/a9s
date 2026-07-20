@@ -14,6 +14,7 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -82,6 +83,9 @@ var containersTypes = []catalog.ResourceTypeDef{
 		Category:      "CONTAINERS",
 		CloudTrailKey: "ResourceName:Fields.arn",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "eks/home?region="+region+"#/clusters/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "cluster_name", Title: "Cluster Name", Width: 28, Sortable: true},
 			{Key: "version", Title: "Version", Width: 10, Sortable: true},
@@ -139,6 +143,13 @@ var containersTypes = []catalog.ResourceTypeDef{
 		Category:      "CONTAINERS",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			cluster := r.Fields["cluster_name"]
+			if cluster == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "eks/home?region="+region+"#/clusters/"+url.PathEscape(cluster)+"/nodegroups/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "nodegroup_name", Title: "Node Group", Width: 28, Sortable: true},
 			{Key: "cluster_name", Title: "Cluster", Width: 24, Sortable: true},

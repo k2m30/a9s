@@ -4,11 +4,13 @@ package aws
 
 import (
 	"context"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -334,6 +336,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Category:                "COMPUTE",
 		CloudTrailKey:           "ResourceName:ID",
 		CostExplorerServiceName: CostExplorerServiceNameEC2,
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "ec2/home?region="+region+"#InstanceDetails:instanceId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28, Sortable: true},
 			{Key: "state", Title: "Status", Width: 12, Sortable: true},
@@ -440,6 +445,13 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "ecs/v2/redirect?arn="+url.QueryEscape(arn)+"&region="+region)
+		},
 		Columns: []domain.Column{
 			{Key: "service_name", Title: "Service Name", Width: 32, Sortable: true},
 			{Key: "cluster", Title: "Cluster", Width: 24, Sortable: true},
@@ -475,7 +487,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Wave2: IssueEnricher{Fn: EnrichECSServices, Priority: 100},
 		FieldKeys: []string{
 			"service_name", "cluster", "status", "desired_count",
-			"running_count", "launch_type", "task_definition",
+			"running_count", "launch_type", "task_definition", "arn",
 		},
 		Related: []domain.RelatedDef{
 			{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSSvcCluster},
@@ -515,6 +527,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "ecs/v2/clusters/"+url.PathEscape(r.ID)+"?region="+region)
+		},
 		Columns: []domain.Column{
 			{Key: "cluster_name", Title: "Cluster Name", Width: 32, Sortable: true},
 			{Key: "status", Title: "Status", Width: 12, Sortable: true},
@@ -557,6 +572,13 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "ecs/v2/redirect?arn="+url.QueryEscape(arn)+"&region="+region)
+		},
 		Columns: []domain.Column{
 			{Key: "task_id", Title: "Task ID", Width: 38, Sortable: true},
 			{Key: "cluster", Title: "Cluster", Width: 24, Sortable: true},
@@ -574,7 +596,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		// task_role/execution_role/secret_arns/ssm_param_names — emitted by
 		// ecsJoinTaskDefinition's DescribeTaskDefinition join; required by
 		// the ecs-task:role, ecs-task:secrets, and ecs-task:ssm pivots.
-		FieldKeys: []string{"task_id", "cluster", "last_status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "status", "efs_file_system_ids", "task_role", "execution_role", "secret_arns", "ssm_param_names", "container_images"},
+		FieldKeys: []string{"task_id", "cluster", "last_status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "status", "efs_file_system_ids", "task_role", "execution_role", "secret_arns", "ssm_param_names", "container_images", "arn"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSTaskService},
 			{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSTaskCluster},
@@ -613,6 +635,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Aliases:       []string{"lambda", "functions"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:Fields.arn",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "lambda/home?region="+region+"#/functions/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "function_name", Title: "Function Name", Width: 36, Sortable: true},
 			{Key: "runtime", Title: "Runtime", Width: 16, Sortable: true},
@@ -689,6 +714,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "ec2/home?region="+region+"#AutoScalingGroupDetails:id="+url.PathEscape(r.ID)+";view=details")
+		},
 		Columns: []domain.Column{
 			{Key: "asg_name", Title: "ASG Name", Width: 36, Sortable: true},
 			{Key: "min_size", Title: "Min", Width: 6, Sortable: true},
@@ -742,6 +770,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Aliases:       []string{"ebs", "volumes", "ebs-vol"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "ec2/home?region="+region+"#VolumeDetails:volumeId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24, Sortable: true},
 			{Key: "volume_id", Title: "Volume ID", Width: 22, Sortable: true},
@@ -787,6 +818,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Aliases:       []string{"ebs-snap", "snapshots", "snap"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "ec2/home?region="+region+"#Snapshots:snapshotId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24, Sortable: true},
 			{Key: "snapshot_id", Title: "Snapshot ID", Width: 24, Sortable: true},
@@ -833,6 +867,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Aliases:       []string{"ami", "amis", "images"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "ec2/home?region="+region+"#ImageDetails:imageId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 32, Sortable: true},
 			{Key: "image_id", Title: "Image ID", Width: 22, Sortable: true},
@@ -892,6 +929,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "ec2/home?region="+region+"#LaunchTemplateDetails:launchTemplateId="+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 32, Sortable: true},
 			{Key: "status", Title: "Status", Width: 32, Sortable: true},

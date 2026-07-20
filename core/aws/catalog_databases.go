@@ -5,9 +5,11 @@ package aws
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -289,6 +291,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:Fields.arn",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "rds/home?region="+region+"#database:id="+url.PathEscape(r.ID)+";is-cluster=false")
+		},
 		Columns: []domain.Column{
 			{Key: "db_identifier", Title: "DB Identifier", Width: 28, Sortable: true},
 			{Key: "engine", Title: "Engine", Width: 12, Sortable: true},
@@ -358,6 +363,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Aliases:       []string{"s3", "buckets"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Global(region, "s3/buckets/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Bucket Name", Width: 40, Sortable: true},
 			{Key: "creation_date", Title: "Creation Date", Width: 22, Sortable: true},
@@ -417,6 +425,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "elasticache/home?region="+region+"#/redis/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
 			{Key: "node_type", Title: "Node Type", Width: 18, Sortable: true},
@@ -461,6 +472,20 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:Fields.arn",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			engine := strings.ToLower(r.Fields["engine"])
+			switch {
+			case strings.HasPrefix(engine, "docdb"):
+				return consolelink.Regional(region, "docdb/home?region="+region+"#cluster-details/"+url.PathEscape(r.ID))
+			case strings.HasPrefix(engine, "neptune"):
+				if arn := r.Fields["arn"]; arn != "" {
+					return consolelink.GoView(region, arn)
+				}
+				return ""
+			default:
+				return consolelink.Regional(region, "rds/home?region="+region+"#database:id="+url.PathEscape(r.ID)+";is-cluster=true")
+			}
+		},
 		Columns: []domain.Column{
 			{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
 			{Key: "engine_version", Title: "Version", Width: 10, Sortable: true},
@@ -524,7 +549,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		}),
 		Wave2: IssueEnricher{Fn: EnrichDBCMaintenance, Priority: 100},
 		FieldKeys: []string{
-			"cluster_id", "engine_version", "status", "instances", "endpoint", "arn",
+			"cluster_id", "engine", "engine_version", "status", "instances", "endpoint", "arn",
 			"has_writer", "writer_count", "deletion_protection", "storage_encrypted",
 			"backup_retention_period",
 		},
@@ -563,6 +588,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "dynamodbv2/home?region="+region+"#table?name="+url.QueryEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "table_name", Title: "Table Name", Width: 36, Sortable: true},
 			{Key: "status", Title: "Status", Width: 12, Sortable: true},
@@ -607,6 +635,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Aliases:       []string{"opensearch", "os", "elasticsearch"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "aos/home?region="+region+"#opensearch/domains/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "domain_name", Title: "Domain Name", Width: 28, Sortable: true},
 			{Key: "engine_version", Title: "Engine Version", Width: 16, Sortable: true},
@@ -669,6 +700,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "redshiftv2/home?region="+region+"#cluster-details:cluster="+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "cluster_id", Title: "Cluster ID", Width: 36, Sortable: true},
 			{Key: "status", Title: "Status", Width: 34, Sortable: true},
@@ -732,6 +766,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "efs/home?region="+region+"#/file-systems/"+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28, Sortable: true},
 			{Key: "file_system_id", Title: "File System ID", Width: 22, Sortable: true},
@@ -784,6 +821,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "rds/home?region="+region+"#db-snapshot:id="+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "snapshot_id", Title: "Snapshot ID", Width: 36, Sortable: true},
 			{Key: "db_instance", Title: "DB Instance", Width: 28, Sortable: true},
@@ -824,6 +864,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "rds/home?region="+region+"#db-snapshot:id="+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "snapshot_id", Title: "Snapshot ID", Width: 36, Sortable: true},
 			{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},

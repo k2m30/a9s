@@ -50,6 +50,11 @@ func FetchCloudFormationStacksPage(ctx context.Context, api CFNDescribeStacksAPI
 			description = *stack.Description
 		}
 
+		arn := ""
+		if stack.StackId != nil {
+			arn = *stack.StackId
+		}
+
 		r := resource.Resource{
 			ID:       stackName,
 			Name:     stackName,
@@ -60,6 +65,7 @@ func FetchCloudFormationStacksPage(ctx context.Context, api CFNDescribeStacksAPI
 				"creation_time": creationTime,
 				"last_updated":  lastUpdated,
 				"description":   description,
+				"arn":           arn,
 			},
 			RawStruct: stack,
 		}

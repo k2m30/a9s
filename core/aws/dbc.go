@@ -44,6 +44,11 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 			engineVersion = *cluster.EngineVersion
 		}
 
+		engine := ""
+		if cluster.Engine != nil {
+			engine = *cluster.Engine
+		}
+
 		instances := fmt.Sprintf("%d", len(cluster.DBClusterMembers))
 
 		endpoint := ""
@@ -86,6 +91,7 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 			Findings: findings,
 			Fields: map[string]string{
 				"cluster_id":              clusterID,
+				"engine":                  engine,
 				"engine_version":          engineVersion,
 				"status":                  statusPhrase,
 				"instances":               instances,

@@ -86,6 +86,11 @@ func FetchECSServicesPage(
 				taskDefinition = *svc.TaskDefinition
 			}
 
+			arn := ""
+			if svc.ServiceArn != nil {
+				arn = *svc.ServiceArn
+			}
+
 			// emit wave1 Findings for non-healthy lifecycle states.
 			// ACTIVE → no Finding (healthy). Fields["status"] is still populated
 			// so the existing structural Color path works as fallback.
@@ -108,6 +113,7 @@ func FetchECSServicesPage(
 					"running_count":   runningCount,
 					"launch_type":     launchType,
 					"task_definition": taskDefinition,
+					"arn":             arn,
 				},
 				Findings:  findings,
 				RawStruct: svc,

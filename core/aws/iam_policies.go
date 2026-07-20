@@ -122,6 +122,10 @@ func managedPolicyToResource(policy iamtypes.Policy) resource.Resource {
 	if policy.Arn != nil && !IsCustomerManagedIAMPolicyARN(*policy.Arn) {
 		policyType = "aws-managed"
 	}
+	arn := ""
+	if policy.Arn != nil {
+		arn = *policy.Arn
+	}
 	return resource.Resource{
 		ID:   policyName,
 		Name: policyName,
@@ -132,6 +136,7 @@ func managedPolicyToResource(policy iamtypes.Policy) resource.Resource {
 			"is_attachable":    isAttachable,
 			"path":             path,
 			"create_date":      createDate,
+			"arn":              arn,
 		},
 		Findings:  orphanUnattachedPolicyFinding(attachmentCount, policy.IsAttachable),
 		RawStruct: policy,
@@ -332,6 +337,10 @@ func buildLocalPolicies(ctx context.Context, api IAMListPoliciesAPI, store iamPo
 			if p.Arn != nil && !IsCustomerManagedIAMPolicyARN(*p.Arn) {
 				policyType = "aws-managed"
 			}
+			arn := ""
+			if p.Arn != nil {
+				arn = *p.Arn
+			}
 			r := resource.Resource{
 				ID:   policyName,
 				Name: policyName,
@@ -342,6 +351,7 @@ func buildLocalPolicies(ctx context.Context, api IAMListPoliciesAPI, store iamPo
 					"is_attachable":    isAttachable,
 					"path":             path,
 					"create_date":      createDate,
+					"arn":              arn,
 				},
 				Findings:  orphanUnattachedPolicyFinding(attachmentCount, p.IsAttachable),
 				RawStruct: p,

@@ -4,10 +4,12 @@ package aws
 
 import (
 	"context"
+	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
@@ -84,6 +86,9 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"alarm", "alarms", "cloudwatch", "cw_alarms"},
 		Category:      "MONITORING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "cloudwatch/home?region="+region+"#alarmsV2:alarm/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "alarm_name", Title: "Alarm Name", Width: 36, Sortable: true},
 			{Key: "state", Title: "State", Width: 12, Sortable: true},
@@ -131,6 +136,9 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"logs", "loggroups", "log-groups", "cwlogs", "log_groups"},
 		Category:      "MONITORING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "cloudwatch/home?region="+region+"#logsV2:log-groups/log-group/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "log_group_name", Title: "Log Group Name", Width: 48, Sortable: true},
 			{Key: "stored_bytes", Title: "Size", Width: 14, Sortable: true},
@@ -175,6 +183,13 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Aliases:       []string{"trail", "cloudtrail", "trails"},
 		Category:      "MONITORING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["trail_arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "cloudtrailv2/home?region="+region+"#/trails/"+arn)
+		},
 		Columns: []domain.Column{
 			{Key: "trail_name", Title: "Trail Name", Width: 28, Sortable: true},
 			{Key: "s3_bucket", Title: "S3 Bucket", Width: 28, Sortable: true},
@@ -201,7 +216,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		// records the in-fetcher contract itself; see its doc comment in
 		// issue_enrichment.go for what does (and does not) guard that wiring.
 		Wave2:     IssueEnricher{Fn: InFetcherWave2Sentinel, Priority: 100},
-		FieldKeys: []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled"},
+		FieldKeys: []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled", "trail_arn"},
 		Related: []domain.RelatedDef{
 			{TargetType: "s3", DisplayName: "S3 Bucket", Checker: checkTrailS3, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTrailLogs, NeedsTargetCache: true, Truncated: true},

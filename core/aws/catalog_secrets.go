@@ -4,10 +4,12 @@ package aws
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -83,6 +85,9 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Aliases:       []string{"secrets", "secretsmanager", "sm"},
 		Category:      "SECRETS & CONFIG",
 		CloudTrailKey: "ResourceName:Fields.arn",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "secretsmanager/secret?region="+region+"&name="+url.QueryEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "secret_name", Title: "Secret Name", Width: 36, Sortable: true},
 			{Key: "description", Title: "Description", Width: 30, Sortable: false},
@@ -130,6 +135,10 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Aliases:       []string{"ssm", "parameters", "parameter-store"},
 		Category:      "SECRETS & CONFIG",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			name := strings.TrimPrefix(r.ID, "/")
+			return consolelink.Regional(region, "systems-manager/parameters/"+name+"/description?region="+region)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 40, Sortable: true},
 			{Key: "type", Title: "Type", Width: 14, Sortable: true},
@@ -165,6 +174,9 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Category:      "SECRETS & CONFIG",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "kms/home?region="+region+"#/kms/keys/"+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "alias", Title: "Alias", Width: 32, Sortable: true},
 			{Key: "key_id", Title: "Key ID", Width: 38, Sortable: true},

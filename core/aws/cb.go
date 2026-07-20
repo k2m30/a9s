@@ -78,6 +78,11 @@ func FetchCodeBuildProjectsPage(
 			lastModified = project.LastModified.Format("2006-01-02 15:04")
 		}
 
+		arn := ""
+		if project.Arn != nil {
+			arn = *project.Arn
+		}
+
 		r := resource.Resource{
 			ID:   name,
 			Name: name,
@@ -86,6 +91,7 @@ func FetchCodeBuildProjectsPage(
 				"source_type":   sourceType,
 				"description":   description,
 				"last_modified": lastModified,
+				"arn":           arn,
 			},
 			RawStruct: project,
 		}

@@ -174,6 +174,7 @@ func FetchRDSDBClustersPage(ctx context.Context, api RDSDescribeDBClustersAPI, c
 			Findings: findings,
 			Fields: map[string]string{
 				"cluster_id":              clusterID,
+				"engine":                  engine,
 				"engine_version":          engineVersion,
 				"status":                  statusPhrase,
 				"instances":               instances,

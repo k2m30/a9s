@@ -5,9 +5,11 @@ package aws
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -208,6 +210,13 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Aliases:       []string{"sqs", "queues"},
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:Fields.arn",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "sqs/v3/home?region="+region+"#/queues/"+arn)
+		},
 		Columns: []domain.Column{
 			{Key: "queue_name", Title: "Queue Name", Width: 36, Sortable: true},
 			{Key: "approx_messages", Title: "Messages", Width: 10, Sortable: true},
@@ -246,6 +255,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Aliases:       []string{"sns", "topics"},
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "sns/v3/home?region="+region+"#/topic/"+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "display_name", Title: "Topic Name", Width: 40, Sortable: true},
 			{Key: "topic_arn", Title: "Topic ARN", Width: 60, Sortable: true},
@@ -285,6 +297,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Aliases:       []string{"sns-sub", "sns-subscriptions", "subscriptions"},
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "sns/v3/home?region="+region+"#/subscription/"+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "topic_arn", Title: "Topic ARN", Width: 48, Sortable: true},
 			{Key: "protocol", Title: "Protocol", Width: 10, Sortable: true},
@@ -324,6 +339,20 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			// environment_arn shape: arn:aws:elasticbeanstalk:region:account:environment/{app}/{env}
+			_, rest, ok := strings.Cut(r.Fields["environment_arn"], ":environment/")
+			if !ok {
+				return ""
+			}
+			appEnv := strings.SplitN(rest, "/", 2)
+			if len(appEnv) != 2 || appEnv[0] == "" || appEnv[1] == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "elasticbeanstalk/home?region="+region+
+				"#/environment/dashboard?applicationName="+url.QueryEscape(appEnv[0])+
+				"&environmentName="+url.QueryEscape(appEnv[1]))
+		},
 		Columns: []domain.Column{
 			{Key: "environment_name", Title: "Environment", Width: 28, Sortable: true},
 			{Key: "application_name", Title: "Application", Width: 24, Sortable: true},
@@ -336,7 +365,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return FetchEBEnvironmentsPage(ctx, c.ElasticBeanstalk, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichEBEnvironmentHealth, Priority: 100},
-		FieldKeys: []string{"environment_name", "application_name", "status", "health", "version_label"},
+		FieldKeys: []string{"environment_name", "application_name", "status", "health", "version_label", "environment_arn"},
 		Related: []domain.RelatedDef{
 			{TargetType: "cfn", DisplayName: "CloudFormation Stack", Checker: checkEbCFN, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEbLogs, NeedsTargetCache: true, Truncated: true},
@@ -366,6 +395,13 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Aliases:       []string{"eb-rule", "eventbridge"},
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			bus := r.Fields["event_bus"]
+			if bus == "" {
+				bus = "default"
+			}
+			return consolelink.Regional(region, "events/home?region="+region+"#/eventbus/"+url.PathEscape(bus)+"/rules/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Rule Name", Width: 28, Sortable: true},
 			{Key: "state", Title: "State", Width: 10, Sortable: true},
@@ -411,6 +447,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "kinesis/home?region="+region+"#/streams/details/"+url.PathEscape(r.ID)+"/monitoring")
+		},
 		Columns: []domain.Column{
 			{Key: "stream_name", Title: "Stream Name", Width: 36, Sortable: true},
 			{Key: "status", Title: "Status", Width: 12, Sortable: true},
@@ -442,6 +481,13 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Aliases:       []string{"msk", "kafka"},
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["cluster_arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "msk/home?region="+region+"#/cluster/"+url.QueryEscape(arn)+"/view?tabId=details")
+		},
 		Columns: []domain.Column{
 			{Key: "cluster_name", Title: "Cluster Name", Width: 28, Sortable: true},
 			{Key: "cluster_type", Title: "Type", Width: 14, Sortable: true},
@@ -453,7 +499,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return FetchMSKClustersPage(ctx, c.MSK, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichMSKCluster, Priority: 100},
-		FieldKeys: []string{"cluster_name", "cluster_type", "state", "version"},
+		FieldKeys: []string{"cluster_name", "cluster_type", "state", "version", "cluster_arn"},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkMSKAlarms, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkMSKSG, NeedsTargetCache: false},
@@ -488,6 +534,13 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Aliases:       []string{"sfn", "stepfunctions", "state-machines"},
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "states/home?region="+region+"#/statemachines/view/"+arn)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 36, Sortable: true},
 			{Key: "type", Title: "Type", Width: 10, Sortable: true},
@@ -538,6 +591,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "ses/home?region="+region+"#/identities/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "identity_name", Title: "Identity", Width: 36, Sortable: true},
 			{Key: "identity_type", Title: "Type", Width: 16, Sortable: true},

@@ -62,7 +62,16 @@ type fullIntegrationFindResourceOptions struct {
 func fullIntegrationNewDemoScenario(t *testing.T) *fullIntegrationScenario {
 	t.Helper()
 	clients := demo.NewServiceClients()
-	m := fullIntegrationNewReadyModelWithClients(t, demo.DemoProfile, demo.DemoRegion, clients)
+	// Builds the model directly (rather than via
+	// fullIntegrationNewReadyModelWithClients, which fullIntegrationNewLiveScenarioFromClients
+	// also shares and must NOT mark demo) so tui.WithIsDemo(true) is set here.
+	// Without it, m.isDemo stays false despite the demo fixture clients, so any
+	// app logic branching on real demo-mode state (Wave 2 skip, the console-open
+	// feature's browser-exec guard, etc.) silently exercises the live-mode path
+	// instead against a "demo" scenario.
+	m := tui.New(demo.DemoProfile, demo.DemoRegion, tui.WithClients(clients), tui.WithIsDemo(true), tui.WithNoCache(true))
+	m, _ = fullIntegrationApplyMsg(m, tea.WindowSizeMsg{Width: 240, Height: 220})
+	m, _ = fullIntegrationApplyMsg(m, messages.ClientsReady{Clients: clients, Region: demo.DemoRegion})
 	return &fullIntegrationScenario{
 		t:                 t,
 		model:             m,

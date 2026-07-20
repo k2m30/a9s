@@ -4,8 +4,10 @@ package aws
 
 import (
 	"context"
+	"strings"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -49,6 +51,10 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Aliases:       []string{"r53", "route53", "dns", "hosted-zones"},
 		Category:      "DNS & CDN",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			zone := strings.TrimPrefix(r.ID, "/hostedzone/")
+			return consolelink.Global(region, "route53/v2/hostedzones#ListRecordSets/"+zone)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 36, Sortable: true},
 			{Key: "zone_id", Title: "Zone ID", Width: 30, Sortable: true},
@@ -90,6 +96,9 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Category:      "DNS & CDN",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Global(region, "cloudfront/v4/home#/distributions/"+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "domain_name", Title: "Domain Name", Width: 40, Sortable: true},
 			{Key: "distribution_id", Title: "Distribution ID", Width: 16, Sortable: true},
@@ -132,6 +141,13 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Category:      "DNS & CDN",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			uuid := r.ID
+			if idx := strings.LastIndex(r.ID, "/"); idx >= 0 {
+				uuid = r.ID[idx+1:]
+			}
+			return consolelink.Regional(region, "acm/home?region="+region+"#/certificates/"+uuid)
+		},
 		Columns: []domain.Column{
 			{Key: "domain_name", Title: "Domain Name", Width: 40, Sortable: true},
 			{Key: "status", Title: "Status", Width: 14, Sortable: true},
@@ -164,6 +180,12 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Aliases:       []string{"apigw", "apigateway", "api-gateway"},
 		Category:      "DNS & CDN",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			if r.Fields["protocol"] == "REST" {
+				return consolelink.Regional(region, "apigateway/home?region="+region+"#/apis/"+r.ID)
+			}
+			return consolelink.Regional(region, "apigateway/main/api-detail?api="+r.ID+"&region="+region)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28, Sortable: true},
 			{Key: "api_id", Title: "API ID", Width: 14, Sortable: true},

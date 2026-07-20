@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -27,6 +28,9 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Aliases:       []string{"backup", "backup-plans"},
 		Category:      "BACKUP",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "backup/home?region="+region+"#/backupplan/details/"+r.ID)
+		},
 		Columns: []domain.Column{
 			{Key: "plan_name", Title: "Plan Name", Width: 32, Sortable: true},
 			{Key: "plan_id", Title: "Plan ID", Width: 38, Sortable: true},

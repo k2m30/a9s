@@ -4,9 +4,11 @@ package aws
 
 import (
 	"context"
+	"net/url"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -47,6 +49,9 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Aliases:       []string{"glue", "glue-jobs"},
 		Category:      "DATA & ANALYTICS",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "gluestudio/home?region="+region+"#/editor/job/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "job_name", Title: "Job Name", Width: 32, Sortable: true},
 			{Key: "glue_version", Title: "Version", Width: 10, Sortable: true},
@@ -91,6 +96,9 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Aliases:       []string{"athena", "workgroups"},
 		Category:      "DATA & ANALYTICS",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "athena/home?region="+region+"#/workgroups/details/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "workgroup_name", Title: "Workgroup", Width: 28, Sortable: true},
 			{Key: "state", Title: "State", Width: 12, Sortable: true},
@@ -122,6 +130,9 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Category:      "DATA & ANALYTICS",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "mwaa/home?region="+region+"#environments/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 32, Sortable: true},
 			{Key: "status", Title: "Status", Width: 32, Sortable: true},

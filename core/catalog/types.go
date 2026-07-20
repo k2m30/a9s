@@ -42,6 +42,10 @@ type ResourceTypeDef struct {
 	// cost grid has no RESOURCE_ID drill-down mapped to this type — its rows
 	// get an "unsupported" note instead of a detail-view jump.
 	CostExplorerServiceName string
+	// ConsoleURL returns the AWS console page for r, or "" when the type has
+	// no console page or required inputs are missing. region is the active
+	// session region; accountID may be "" before the identity fetch lands.
+	ConsoleURL func(r domain.Resource, region, accountID string) string
 
 	// ─── Display ───────────────────────────────────────────────────────────
 

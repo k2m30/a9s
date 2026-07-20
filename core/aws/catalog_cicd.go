@@ -4,8 +4,10 @@ package aws
 
 import (
 	"context"
+	"net/url"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -53,6 +55,13 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Category:      "CI/CD",
 		CloudTrailKey: "ResourceName:ID",
 		LifecycleKey:  "status",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "cloudformation/home?region="+region+"#/stacks/stackinfo?stackId="+arn)
+		},
 		Columns: []domain.Column{
 			{Key: "stack_name", Title: "Stack Name", Width: 36, Sortable: true},
 			{Key: "status", Title: "Status", Width: 24, Sortable: true},
@@ -69,7 +78,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return FetchCloudFormationStacksPage(ctx, c.CloudFormation, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichCFNCombined, Priority: 100},
-		FieldKeys: []string{"stack_name", "status", "creation_time", "last_updated", "description"},
+		FieldKeys: []string{"stack_name", "status", "creation_time", "last_updated", "description", "arn"},
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCfnRole},
 			{TargetType: "cfn", DisplayName: "Related Stacks", Checker: checkCFNCFN, NeedsTargetCache: true, Truncated: true},
@@ -98,6 +107,9 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Aliases:       []string{"pipeline", "codepipeline", "pipelines"},
 		Category:      "CI/CD",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "codesuite/codepipeline/pipelines/"+url.PathEscape(r.ID)+"/view?region="+region)
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Pipeline Name", Width: 30, Sortable: true},
 			{Key: "pipeline_type", Title: "Type", Width: 6, Sortable: true},
@@ -141,6 +153,16 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Aliases:       []string{"cb", "codebuild"},
 		Category:      "CI/CD",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, accountID string) string {
+			acct := consolelink.AccountFromARN(r.Fields["arn"])
+			if acct == "" {
+				acct = accountID
+			}
+			if acct == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "codesuite/codebuild/"+acct+"/projects/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Project Name", Width: 32, Sortable: true},
 			{Key: "source_type", Title: "Source Type", Width: 14, Sortable: true},
@@ -159,7 +181,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return FetchCodeBuildProjectsPage(ctx, c.CodeBuild, c.CodeBuild, continuationToken)
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichCodeBuildStatus, Priority: 10},
-		FieldKeys:              []string{"name", "source_type", "description", "last_modified"},
+		FieldKeys:              []string{"name", "source_type", "description", "last_modified", "arn"},
 		IssueEnricherFieldKeys: []string{"last_build"},
 		Related: []domain.RelatedDef{
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkCbLogs, NeedsTargetCache: true, Truncated: true},
@@ -193,6 +215,9 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Aliases:       []string{"ecr", "container-registry"},
 		Category:      "CI/CD",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return consolelink.Regional(region, "ecr/repositories/"+url.PathEscape(r.ID)+"/?region="+region)
+		},
 		Columns: []domain.Column{
 			{Key: "repository_name", Title: "Repository", Width: 36, Sortable: true},
 			{Key: "uri", Title: "URI", Width: 60, Sortable: false},
@@ -239,6 +264,19 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		Aliases:       []string{"codeartifact", "artifact", "ca"},
 		Category:      "CI/CD",
 		CloudTrailKey: "ResourceName:ID",
+		ConsoleURL: func(r domain.Resource, region, accountID string) string {
+			acct := r.Fields["domain_owner"]
+			if acct == "" {
+				acct = consolelink.AccountFromARN(r.Fields["arn"])
+			}
+			if acct == "" {
+				acct = accountID
+			}
+			if acct == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "codesuite/codeartifact/d/"+acct+"/"+url.PathEscape(r.Fields["domain_name"])+"/r/"+url.PathEscape(r.ID))
+		},
 		Columns: []domain.Column{
 			{Key: "repo_name", Title: "Repository", Width: 28, Sortable: true},
 			{Key: "domain_name", Title: "Domain", Width: 24, Sortable: true},
@@ -250,7 +288,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return FetchCodeArtifactReposPage(ctx, c.CodeArtifact, continuationToken)
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichCodeArtifactRepository, Priority: 100},
-		FieldKeys:              []string{"repo_name", "domain_name", "description", "domain_owner"},
+		FieldKeys:              []string{"repo_name", "domain_name", "description", "domain_owner", "arn"},
 		IssueEnricherFieldKeys: []string{"package_count"},
 		Related: []domain.RelatedDef{
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkCodeartifactKMS, NeedsTargetCache: false},

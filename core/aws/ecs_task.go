@@ -70,8 +70,10 @@ func fetchECSTasksPageWithJoin(
 		for _, task := range descOutput.Tasks {
 			// Extract task UUID from ARN (last segment after /)
 			taskID := ""
+			taskArn := ""
 			if task.TaskArn != nil {
-				parts := strings.Split(*task.TaskArn, "/")
+				taskArn = *task.TaskArn
+				parts := strings.Split(taskArn, "/")
 				taskID = parts[len(parts)-1]
 			}
 
@@ -140,6 +142,7 @@ func fetchECSTasksPageWithJoin(
 				"secret_arns":         taskDefJoin.secretARNs,
 				"ssm_param_names":     taskDefJoin.ssmParamNames,
 				"container_images":    containerImages,
+				"arn":                 taskArn,
 			}
 			if joinErr != nil {
 				fields["task_def_join_error"] = "true"
