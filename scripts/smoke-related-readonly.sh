@@ -53,7 +53,7 @@ open_and_capture() {
 }
 
 expect() {
-	if grep -qE "$2" "$CAPDIR/$1"; then
+	if grep -qE -- "$2" "$CAPDIR/$1"; then
 		echo "PASS  $3"
 	else
 		echo "FAIL  $3 — no match for /$2/ in $CAPDIR/$1"
@@ -62,7 +62,7 @@ expect() {
 }
 
 forbid() {
-	if grep -qE "$2" "$CAPDIR/$1"; then
+	if grep -qE -- "$2" "$CAPDIR/$1"; then
 		echo "FAIL  $3 — forbidden /$2/ present in $CAPDIR/$1"
 		FAILURES=$((FAILURES + 1))
 	else
@@ -76,7 +76,7 @@ forbid() {
 # resource carries findings. Only that exact header token is masked, so a
 # vacuous word anywhere else on the same line still fails.
 forbid_status() {
-	if sed -E 's/Attention \([0-9]+\)/attention-block-header/' "$CAPDIR/$1" | grep -qE "$2"; then
+	if sed -E 's/Attention \([0-9]+\)/attention-block-header/' "$CAPDIR/$1" | grep -qE -- "$2"; then
 		echo "FAIL  $3 — forbidden /$2/ present in $CAPDIR/$1"
 		FAILURES=$((FAILURES + 1))
 	else
