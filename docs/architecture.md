@@ -474,27 +474,15 @@ All in `internal/tui/views/`:
 | **SelectorModel** | `selector.go` | Generic list picker (profile, region, theme selection) |
 | **IdentityModel** | `identity.go` | Shows `sts:GetCallerIdentity` result |
 
-Views implement the `View` interface (`views/view.go`):
+Views are concrete models with no shared interface: each returns its own concrete type from its update method, and the root model's dispatch (`updateActiveRS`) type-switches on the active renderer state to route and write back.
 
-```go
-type View interface {
-    View() string
-    SetSize(w, h int)
-    FrameTitle() string
-    CopyContent() (string, string)
-    GetHelpContext() HelpContext
-}
-```
+Cross-view behaviors that older revisions expressed as per-view capability interfaces now live in the renderer-agnostic snapshot, so the TUI and web renderers consume one truth:
 
-`Update` is deliberately excluded from the interface because each view returns its own concrete type. The root model's `updateActiveView()` type-switches on each concrete type to dispatch and write back.
-
-**Optional capability interfaces** (`views/view.go`): views implement these only when the capability applies. The root model type-asserts against each interface and calls only the implementations present, so older views without the capability keep working.
-
-| Interface | Methods | Implemented by |
-|-----------|---------|----------------|
-| `Filterable` | `SetFilter(text string)`, `GetFilter() string` | Navigable list views (main menu, resource list, selector). Static views (detail, YAML, JSON, help, reveal) do NOT implement it. |
-| `Searchable` | `IsSearchActive() bool`, `IsSearchInputMode() bool`, `SearchInfo() string` | Text-content views (detail, YAML, JSON). Drives the search status line in the frame footer. |
-| `Hintable` | `BottomHints() []layout.KeyHint` | Views that render context-specific key hints along the bottom border. Views that omit it get a plain bottom border — the absence is backward-compatible. |
+| Behavior | Source of truth |
+|----------|-----------------|
+| Filter / search state | `ViewState` body fields (`ListBody.Filter`, `DetailBody.Search`, `TextBody.Search`, …) populated by the controller |
+| Footer key hints | `core/app` footer builders (`buildListFooterHints`, `MenuFooterHintsFor`, `CostsFooterHintsFor`) via `ViewState.Footer` |
+| Copy content (`c`) | `Controller.CopyContent()` (`core/app/copy.go`) — one resolution for list/detail/text/identity, exposed as `ViewState.CopyText`/`CopyLabel`; the TUI's `handleCopy` delegates to it, the web client reads the rendered `data-copy-*` attributes. Only the reveal screen's copy stays adapter-local (the controller has no reveal screen). |
 
 ### Issue Counting & Attention Filter
 

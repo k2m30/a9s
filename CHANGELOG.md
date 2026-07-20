@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.55.2] - 2026-07-20
+
+### Fixed
+
+- Web mode's `c` copy key works (#478): it was a silent no-op — the
+  client POSTed the action to a server that treats copy as
+  renderer-only, and the browser half was never implemented. Copy
+  resolution now lives once in the controller
+  (`Controller.CopyContent`), exposed through
+  `ViewState.CopyText/CopyLabel` and rendered as `data-copy-*`
+  attributes; the web client writes the clipboard in the keydown
+  handler and shows a client-side flash. The TUI's `handleCopy`
+  delegates to the same resolution, deleting its duplicated logic.
+- `CopyField` actually resolves (#478): every `CopyField` in the
+  catalog is registered on a child type, but the copy path consulted
+  only the top-level registry — so copy always fell back to the row ID.
+  The shared lookup consults both registries; on an
+  `sns_subscriptions` child list, `c` now copies the endpoint.
+- `Controller.CopyContent` takes the write lock: the detail branch
+  reaches the mutating detail-body builder, and the read lock allowed
+  concurrent map writes (crash) under concurrent web requests.
+- Identity no longer survives a profile/region rotation stale: a new
+  `ClearIdentityIntent` (emitted by `HandleProfileSelected` /
+  `HandleRegionSelected`) clears the controller's cached identity and
+  the TUI identity screen's renderer state, so neither renderer shows
+  or copies the previous pair's ARN. Repopulation is owned exclusively
+  by the post-connect identity fetch — rotation itself never fetches
+  (the retained pre-rotation clients would re-land the old identity
+  stamped with the new generation). On `--no-cache` rotations (demo
+  included), where no post-connect refetch exists, the identity screen
+  resets to blank instead of a never-resolving loading state.
+
+### Added
+
+- `core/` exports: `app.Controller.CopyContent`,
+  `app.ViewState.CopyText/CopyLabel`, `runtime.ClearIdentityIntent`.
+
 ## [3.55.1] - 2026-07-20
 
 ### Fixed
