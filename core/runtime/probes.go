@@ -157,16 +157,21 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 //
 // Rules, applied in order:
 //
-//  0. Contradiction (false-exact self-heal, D14/D7): existing.Exact is stored true,
-//     but the CURRENT observation is itself truncated (rawTruncated) AND its
-//     own accumulated depth already reaches or exceeds the stored exact
-//     count (rawCount >= existing.Count). A truncated fetch cannot, by
-//     construction, have exhausted a list that is genuinely done at
-//     existing.Count — either a continuation token still exists past that
-//     depth, or the verify-depth walk (D7) reached the stored-exact depth
-//     and AWS still reports more. The stored Exact was therefore never true
-//     for the CURRENT population (a shrink/growth since it was set, or it
-//     was poisoned by an old build's false-exact bug) — live contradiction
+//  0. Contradiction (false-exact self-heal, D14/D7): existing.Exact is stored
+//     true, but the CURRENT observation is itself truncated (rawTruncated)
+//     AND its own accumulated depth already reaches or exceeds the stored
+//     exact count (rawCount >= existing.Count), AND that depth is itself
+//     proof of a live population — existing.Count > 0 (the general case), or,
+//     for a stored exact-ZERO pair, rawCount > 0 (the type's population came
+//     back). A truncated observation reporting rawCount == 0 over a stored
+//     exact-zero is NOT a contradiction — a genuinely empty type legitimately
+//     stays exact-zero — so rule 0 does not fire for that shape. A truncated
+//     fetch cannot, by construction, have exhausted a list that is genuinely
+//     done at existing.Count — either a continuation token still exists past
+//     that depth, or the verify-depth walk (D7) reached the stored-exact
+//     depth and AWS still reports more. The stored Exact was therefore never
+//     true for the CURRENT population (a shrink/growth since it was set, or
+//     it was poisoned by an old build's false-exact bug) — live contradiction
 //     beats a stored claim, so Exact is dropped and the deeper truncated
 //     observation's own count/rows become the new (lower-bound) truth. This
 //     is the one case where a truncated observation is allowed to REGRESS a
@@ -221,9 +226,13 @@ type reconcileInput struct {
 
 func reconcileTypeFile(existing cache.TypeFile, in reconcileInput) cache.TypeFile {
 	incoming := in.Incoming
-	if existing.Exact && in.RawTruncated && in.RawCount >= existing.Count && existing.Count > 0 {
+	if existing.Exact && in.RawTruncated && in.RawCount >= existing.Count && (existing.Count > 0 || in.RawCount > 0) {
 		// Rule 0: the stored Exact is provably false — accept the poisoned
 		// pair's self-healing observation instead of letting it re-stick.
+		// The (existing.Count > 0 || in.RawCount > 0) clause covers a stored
+		// exact-ZERO pair too: rawCount > 0 is proof the population came
+		// back, while rawCount == 0 over an exact-zero stays exact-zero (no
+		// contradiction to heal).
 		incoming.Exact = false
 		if in.RawCount > incoming.Count {
 			incoming.Count = in.RawCount

@@ -43,7 +43,7 @@ func IsEndpointNotFound(err error) bool {
 // per-ID describe call landed is an operational race, not a failure —
 // callers mark the ID truncated (data incomplete), emit no finding, and keep
 // it out of the failure aggregate. It is never surfaced as a hard error or a
-// false-negative finding (e.g. "no encryption configured" on a bucket that
+// false-positive finding (e.g. "no encryption configured" on a bucket that
 // no longer exists).
 //
 // Unwraps via errors.As to smithy.APIError, so both a typed SDK error (e.g.

@@ -36,11 +36,27 @@
 //     same seam TestSnapshotProbeResourcesForSave_FieldsIsolatedFromLaterMutation
 //     in runtime_savecache_regressions_test.go exercises.
 //
-// The rule-1 non-exact (truncated) subset case and rule-0 false-exact
-// self-heal case are intentionally NOT re-pinned here: existing coverage in
-// runtime_reconciletypefile_test.go (TestSaveResourceListCache_SubsetRowsWrite_KeepsFullerRows,
-// exact=false) and runtime_savecache_regressions_test.go/review_wave_cache_defects_test.go
-// already covers them and is unaffected by this new exact-only rule.
+// The rule-1 non-exact (truncated) subset case is intentionally NOT
+// re-pinned here: existing coverage in runtime_reconciletypefile_test.go
+// (TestSaveResourceListCache_SubsetRowsWrite_KeepsFullerRows, exact=false)
+// already covers it and is unaffected by this new exact-only rule.
+//
+// CodeRabbit Major follow-up on PR #476 — rule 0's self-heal gap for a
+// stored exact-zero pair (the observed-empty-exact contract above makes
+// {Count:0, Exact:true, Rows:[]} a normal, reachable steady state):
+//
+//  6. TestReconcileTypeFile_ExactZeroSelfHeal_TruncatedNonZeroObservationHeals —
+//     rule 0 (core/runtime/probes.go) additionally requires existing.Count >
+//     0, so a stored exact-zero pair can never self-heal even when a later
+//     TRUNCATED rows-carrying observation proves the population came back
+//     (RawCount > 0 >= existing.Count is already true, but the guard still
+//     blocks). Currently produces the poisoned pair {Count:0, Exact:true,
+//     Rows:N} forever. Rows-carrying lane, via SaveResourceListCache.
+//  7. TestSaveAvailabilityCache_ExactZeroSelfHeal_CountsOnlyTruncatedObservationDropsExact —
+//     the same rule-0 gap from the counts-only lane (SaveAvailabilityCache):
+//     Exact incorrectly stays true; Count already advances correctly today
+//     (a pre-existing, unrelated code path in that lane), Rows stays
+//     untouched either way (rule 2).
 //
 // All tests are hermetic: A9S_CONFIG_FOLDER redirected to t.TempDir(), no AWS
 // credentials, no network. Fake profile/region/resource IDs only. Reuses
@@ -388,5 +404,106 @@ func TestObservedEmptyExact_SweepZeroPopulationPersistsEmptiness(t *testing.T) {
 	}
 	if tf.Count != 0 {
 		t.Errorf("TypeFile.Count = %d, want 0", tf.Count)
+	}
+}
+
+// TestReconcileTypeFile_ExactZeroSelfHeal_TruncatedNonZeroObservationHeals
+// pins the rule-0 self-heal gap CodeRabbit flagged on PR #476: rule 0
+// (core/runtime/probes.go) requires existing.Count > 0, so a stored
+// exact-zero pair — a normal, reachable steady state now that
+// TestObservedEmptyExact_SweepZeroPopulationPersistsEmptiness above pins
+// observed-empty-exact persistence — can never self-heal. A later
+// TRUNCATED rows-carrying save whose raw count is nonzero (the type's
+// population came back, e.g. a 50-row first page) is proof the stored
+// {Count:0, Exact:true} is stale: RawCount(50) >= existing.Count(0) already
+// holds, but existing.Count>0 blocks rule 0 regardless. The caller-side C5
+// stickiness in saveResourceListCache then re-forces Exact=true and Count=0
+// onto the incoming observation, and the 50 rows win under rules 3/4 (their
+// own len is not < existing's 0), producing a permanently poisoned pair —
+// {Count:0, Exact:true, Rows:50} — that no future truncated observation can
+// ever repair.
+func TestReconcileTypeFile_ExactZeroSelfHeal_TruncatedNonZeroObservationHeals(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	const shortName = "exactzeroselfheal"
+
+	store := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
+	store.Put(shortName, cache.TypeFile{HasResources: false, Count: 0, Exact: true, Rows: []cache.Row{}})
+	if err := store.SaveType(shortName); err != nil {
+		t.Fatalf("seed SaveType(%s): %v", shortName, err)
+	}
+
+	c := newSaveCacheRegressionCore(t, false)
+	// The population came back: a truncated (first-page) rows-carrying
+	// observation of 50 rows — proof the stored exact-zero total is stale.
+	revivedRows := reconcileRows("revived", 50)
+	if err := c.SaveResourceListCache(shortName, revivedRows, 50, false /* truncated */, 0, false, false); err != nil {
+		t.Fatalf("SaveResourceListCache: %v", err)
+	}
+
+	reloaded := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
+	tf, ok := reloaded.Type(shortName)
+	if !ok {
+		t.Fatal("TypeFile missing after truncated self-heal save")
+	}
+	if tf.Exact {
+		t.Errorf("TypeFile.Exact = true, want false — rule 0 must self-heal a stored exact-zero pair once a truncated observation proves a nonzero population, not let the stale exact-zero claim stick forever")
+	}
+	if tf.Count != 50 {
+		t.Errorf("TypeFile.Count = %d, want 50 (the raw observed count) — a self-healed pair must report the truncated observation's own count, not remain stuck at the stale exact-zero total", tf.Count)
+	}
+	if len(tf.Rows) != 50 {
+		t.Fatalf("TypeFile.Rows has %d entries, want 50", len(tf.Rows))
+	}
+	for i, want := range revivedRows {
+		if tf.Rows[i].ID != want.ID {
+			t.Errorf("tf.Rows[%d].ID = %q, want %q", i, tf.Rows[i].ID, want.ID)
+		}
+	}
+	if tf.Exact && tf.Count == 0 && len(tf.Rows) > 0 {
+		t.Error("TypeFile is the poisoned pair shape {Exact:true, Count:0} with non-empty Rows — precisely the bug rule 0's guard must prevent")
+	}
+}
+
+// TestSaveAvailabilityCache_ExactZeroSelfHeal_CountsOnlyTruncatedObservationDropsExact
+// pins the same rule-0 gap from the counts-only lane (SaveAvailabilityCache):
+// a truncated counts-only observation with a nonzero count must drop the
+// stored exact-zero pair's Exact flag. Count already advances correctly
+// today in this lane (SaveAvailabilityCache's own stickiness sub-block only
+// preserves existing.Count when existing.Count > count, which is never true
+// against a stored Count of 0) — Exact is the only field this lane's rule-0
+// gap leaves wrong. Rows stays untouched either way: rule 2 never inspects
+// Rows regardless of rule 0's outcome.
+func TestSaveAvailabilityCache_ExactZeroSelfHeal_CountsOnlyTruncatedObservationDropsExact(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	const shortName = "exactzeroselfhealcounts"
+
+	store := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
+	store.Put(shortName, cache.TypeFile{HasResources: false, Count: 0, Exact: true, Rows: []cache.Row{}})
+	if err := store.SaveType(shortName); err != nil {
+		t.Fatalf("seed SaveType(%s): %v", shortName, err)
+	}
+
+	c := newSaveCacheRegressionCore(t, false)
+	if err := c.SaveAvailabilityCache(
+		map[string]int{shortName: 50},
+		map[string]bool{shortName: true}, // truncated: a first-page-only probe
+		nil, nil, nil,
+	); err != nil {
+		t.Fatalf("SaveAvailabilityCache: %v", err)
+	}
+
+	reloaded := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
+	tf, ok := reloaded.Type(shortName)
+	if !ok {
+		t.Fatal("TypeFile missing after counts-only self-heal observation")
+	}
+	if tf.Exact {
+		t.Errorf("TypeFile.Exact = true, want false — a truncated counts-only observation with a nonzero count must self-heal a stored exact-zero pair, same rule 0 gap as the rows-carrying lane")
+	}
+	if tf.Count != 50 {
+		t.Errorf("TypeFile.Count = %d, want 50", tf.Count)
+	}
+	if len(tf.Rows) != 0 {
+		t.Errorf("TypeFile.Rows has %d entries, want 0 UNTOUCHED — the counts-only lane never inspects Rows regardless of rule 0's outcome", len(tf.Rows))
 	}
 }
