@@ -304,8 +304,12 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		Category:      "SECURITY & IAM",
 		CloudTrailKey: "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			scope := r.Fields["scope"]
+			if r.Name == "" || scope == "" {
+				return ""
+			}
 			tail := "wafv2-pro/protections/" + url.PathEscape(r.Name) + "/" + r.ID + "?panel=protectionPackHome"
-			if r.Fields["scope"] == "CLOUDFRONT" {
+			if scope == "CLOUDFRONT" {
 				return consolelink.Regional("us-east-1", tail+"&region=us-east-1&scope=global")
 			}
 			return consolelink.Regional(region, tail+"&region="+region+"&scope=regional")

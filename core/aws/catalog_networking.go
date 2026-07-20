@@ -187,7 +187,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
-			arn := r.Fields["arn"]
+			arn := r.Fields["load_balancer_arn"]
 			if arn == "" {
 				return ""
 			}
@@ -212,7 +212,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return FetchLoadBalancersPage(ctx, c.ELBv2, continuationToken)
 		}),
 		Wave2:     IssueEnricher{Fn: EnrichELBAttributes, Priority: 100},
-		FieldKeys: []string{"name", "dns_name", "type", "scheme", "state", "vpc_id", "load_balancer_arn", "arn"},
+		FieldKeys: []string{"name", "dns_name", "type", "scheme", "state", "vpc_id", "load_balancer_arn"},
 		Related: []domain.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: checkELBTargetGroups, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkELBAlarms, NeedsTargetCache: true, Truncated: true},

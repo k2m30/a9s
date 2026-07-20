@@ -272,10 +272,11 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			if acct == "" {
 				acct = accountID
 			}
-			if acct == "" {
+			domainName := r.Fields["domain_name"]
+			if acct == "" || domainName == "" {
 				return ""
 			}
-			return consolelink.Regional(region, "codesuite/codeartifact/d/"+acct+"/"+url.PathEscape(r.Fields["domain_name"])+"/r/"+url.PathEscape(r.ID))
+			return consolelink.Regional(region, "codesuite/codeartifact/d/"+acct+"/"+url.PathEscape(domainName)+"/r/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
 			{Key: "repo_name", Title: "Repository", Width: 28, Sortable: true},

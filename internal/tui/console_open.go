@@ -124,9 +124,11 @@ func openBrowserCmd(consoleURL string) tea.Cmd {
 		if !consolelink.Valid(consoleURL) {
 			return messages.Flash{Text: "invalid console URL", IsError: true}
 		}
-		if err := browserOpenCommand(consoleURL).Start(); err != nil {
+		cmd := browserOpenCommand(consoleURL)
+		if err := cmd.Start(); err != nil {
 			return messages.Flash{Text: fmt.Sprintf("open failed: %v", err), IsError: true}
 		}
+		go func() { _ = cmd.Wait() }()
 		return messages.Flash{Text: "opened in AWS console", IsError: false}
 	}
 }

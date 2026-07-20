@@ -474,6 +474,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		LifecycleKey:  "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			engine := strings.ToLower(r.Fields["engine"])
+			if engine == "" {
+				return ""
+			}
 			switch {
 			case strings.HasPrefix(engine, "docdb"):
 				return consolelink.Regional(region, "docdb/home?region="+region+"#cluster-details/"+url.PathEscape(r.ID))

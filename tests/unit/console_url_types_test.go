@@ -20,6 +20,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -715,9 +716,16 @@ func TestConsoleURL_NilSafety_PopulatedFieldsResolvesWithNilRawStruct(t *testing
 				url.QueryEscape("arn:aws:ecs:us-east-1:123456789012:service/my-cluster/my-svc") + "&region=us-east-1",
 		},
 		{
+			// elb reads Fields["load_balancer_arn"], not "arn" — that
+			// duplicate key was deliberately removed for a single truth
+			// source (core/aws/elb.go / catalog_networking.go). This is
+			// also the exact shape an old cached row carries: it was
+			// written before "arn" ever existed, so a resolver that
+			// depended on "arn" would silently break every pre-existing
+			// cache file.
 			shortName: "elb",
 			resource: domain.Resource{ID: "elb-cached", RawStruct: nil, Fields: map[string]string{
-				"arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/abc123",
+				"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/abc123",
 			}},
 			want: "https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#LoadBalancer:loadBalancerArn=" +
 				"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/abc123",
@@ -778,5 +786,114 @@ func TestConsoleURL_HostileInput_SecretsNameEncoding(t *testing.T) {
 	want := "https://us-east-1.console.aws.amazon.com/secretsmanager/secret?region=us-east-1&name=" + url.QueryEscape(row.ID)
 	if got != want {
 		t.Errorf("secrets hostile-input ConsoleURL = %q, want %q", got, want)
+	}
+}
+
+// ─── Incomplete-row hardening (Codex review) ────────────────────────────────
+//
+// A related-panel stub/ID-only resource (no StubCreator registered for its
+// type) carries just ID+Type — Name and Fields are zero-valued. Before the
+// Codex-driven fix, waf/codeartifact/dbc's builders would either panic-free
+// but WRONG-guess a URL (dbc defaulting to the RDS console for an empty
+// engine) or build a structurally-empty-but-non-empty path segment
+// (waf/codeartifact with an empty Name/domain_name). All three now guard
+// explicitly and return "" instead.
+
+func TestConsoleURL_IncompleteRow_Waf_EmptyNameOrScopeReturnsEmpty(t *testing.T) {
+	td := consoleURLTypeDef(t, "waf")
+	cases := []struct {
+		name string
+		row  domain.Resource
+	}{
+		{"empty Name", domain.Resource{ID: "acl-uuid-1", Name: "", Fields: map[string]string{"scope": "REGIONAL"}}},
+		{"empty scope", domain.Resource{ID: "acl-uuid-2", Name: "some-acl", Fields: map[string]string{"scope": ""}}},
+		{"both empty (bare ID-only stub)", domain.Resource{ID: "acl-uuid-3"}},
+	}
+	for _, c := range cases {
+		if got := td.ConsoleURL(c.row, "us-east-1", consoleTestAccountID); got != "" {
+			t.Errorf("waf %s: ConsoleURL = %q, want \"\"", c.name, got)
+		}
+	}
+}
+
+func TestConsoleURL_IncompleteRow_Codeartifact_EmptyDomainNameReturnsEmpty(t *testing.T) {
+	td := consoleURLTypeDef(t, "codeartifact")
+	// domain_owner and arn are present (account resolves fine) — only
+	// domain_name is missing, which used to still build a URL with an empty
+	// path segment ("d/123456789012//r/my-repo").
+	row := domain.Resource{ID: "my-repo", Fields: map[string]string{
+		"domain_owner": "123456789012",
+		"domain_name":  "",
+	}}
+	if got := td.ConsoleURL(row, "us-east-1", consoleTestAccountID); got != "" {
+		t.Errorf("codeartifact empty domain_name: ConsoleURL = %q, want \"\"", got)
+	}
+}
+
+func TestConsoleURL_IncompleteRow_Dbc_EmptyEngineNeverGuessesRDS(t *testing.T) {
+	td := consoleURLTypeDef(t, "dbc")
+	// Before the guard, an empty engine fell through the switch's default
+	// case and produced an RDS-console URL for a resource that might not
+	// even be an RDS cluster (docdb/neptune both prefix-match "engine").
+	row := domain.Resource{ID: "acme-docdb-prod", Fields: map[string]string{"engine": ""}}
+	if got := td.ConsoleURL(row, "us-east-1", consoleTestAccountID); got != "" {
+		t.Errorf("dbc empty engine: ConsoleURL = %q, want \"\" (must never guess the RDS console)", got)
+	}
+}
+
+// ─── elb cache-restored shape (Codex review) ────────────────────────────────
+
+// TestConsoleURL_Elb_CacheRestoredShape_LoadBalancerArnOnlyResolves proves
+// the exact row shape an on-disk cache file written before this feature
+// carries: Fields["load_balancer_arn"] only, no "arn" key (that duplicate
+// was deliberately deleted for a single truth source — see
+// core/aws/elb.go). A resolver that regressed to reading Fields["arn"]
+// would silently break ConsoleURL for every already-cached elb row.
+func TestConsoleURL_Elb_CacheRestoredShape_LoadBalancerArnOnlyResolves(t *testing.T) {
+	td := consoleURLTypeDef(t, "elb")
+	arn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cached-lb/9876543210"
+	row := domain.Resource{
+		ID:        "cached-lb",
+		RawStruct: nil,
+		Fields:    map[string]string{"load_balancer_arn": arn},
+	}
+	got := td.ConsoleURL(row, "us-east-1", consoleTestAccountID)
+	want := "https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#LoadBalancer:loadBalancerArn=" + arn
+	if got != want {
+		t.Errorf("elb cache-restored shape: ConsoleURL = %q, want %q", got, want)
+	}
+}
+
+// ─── Related-panel wiring: stub rows never yield a malformed URL ───────────
+
+// TestConsoleURL_RelatedPanelStub_FieldHungryTypeYieldsNoLink is the lighter-
+// weight equivalent of driving full related-panel focus state through the
+// TUI (build a detail view, run related checks, focus the right column,
+// press "o") to reach handleOpenConsole's consoleTargetFromRelatedRow path.
+// Chose this over the full TUI drive: neither waf nor dbc registers a
+// StubCreator (confirmed via core/aws/catalog_security.go /
+// catalog_databases.go), so consoleTargetFromRelatedRow's fallback for a
+// single-ID related row is exactly domain.Resource{ID: id, Type: targetType}
+// — a bare stub with no Name and no Fields. Driving consolelink.Resolve
+// directly on that exact shape exercises the identical call
+// handleOpenConsole makes (ConsoleURL, then the Fields["arn"]/GoView
+// fallback) without needing related-checker fakes, right-column focus
+// state, or a live detail screen — the TUI scaffolding would only add
+// indirection around this same call, not additional coverage.
+func TestConsoleURL_RelatedPanelStub_FieldHungryTypeYieldsNoLink(t *testing.T) {
+	cases := []struct {
+		shortName string
+		id        string
+	}{
+		{"waf", "a1b2c3d4-5678-90ab-cdef-111111111111"},
+		{"dbc", "acme-docdb-prod"},
+	}
+	for _, c := range cases {
+		td := consoleURLTypeDef(t, c.shortName)
+		stub := domain.Resource{ID: c.id, Type: c.shortName} // no Name, no Fields — the no-StubCreator fallback shape
+		got, ok := consolelink.Resolve(td, stub, "us-east-1", consoleTestAccountID)
+		if ok || got != "" {
+			t.Errorf("%s: Resolve() on a related-panel stub (ID-only, no Fields) = (%q, %v), want (\"\", false)", c.shortName, got, ok)
+		}
 	}
 }
