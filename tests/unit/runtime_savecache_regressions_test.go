@@ -555,6 +555,11 @@ func statFile(t *testing.T, path string) os.FileInfo {
 	if err != nil {
 		t.Fatalf("os.Stat(%s): %v", path, err)
 	}
+	// os.Stat on Windows defers the volume/file-index load until os.SameFile,
+	// which would re-resolve the PATH at comparison time and always match.
+	// A self-comparison forces the identity to be captured now, pinning the
+	// file object the path points to at stat time.
+	os.SameFile(fi, fi)
 	return fi
 }
 
