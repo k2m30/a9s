@@ -123,6 +123,8 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 		}
 	case runtime.MenuClearAvailabilityIntent:
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
+	case runtime.ClearIdentityIntent:
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.ClearIdentityIntent{}})
 	case runtime.PopSelectorIntent:
 		// Controller-first (goal 4): forward so the controller applies its own
 		// type-checked gate (pop only when top.ID is a selector screen —

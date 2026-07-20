@@ -419,6 +419,53 @@ func TestCopyContent_Identity_NoOp(t *testing.T) {
 	})
 }
 
+// TestCopyContent_Identity_ClearedAfterRotation is a Codex P2 finding: the
+// controller caches the resolved identity in c.identityResult (set via
+// SetIdentityIntent, core/app/intents.go, from a messages.IdentityLoaded
+// delivery) and clears it ONLY in handleActionOpenIdentity
+// (core/app/actions_view.go). handleActionSelectProfile/
+// handleActionSelectRegion rotate the session (which clears
+// Session.Identity) but never touch identityLoading/identityResult/
+// identityErrMsg — so CopyContent() on an already-open identity screen keeps
+// serving the PREVIOUS profile's ARN across a profile/region switch, until
+// the refetch eventually lands.
+//
+// HandleProfileSelected's own intents are MenuClearAvailabilityIntent,
+// PopSelectorIntent, and a FlashIntent — PopSelectorIntent (core/app/
+// intents.go) only pops the top screen when it is a profile/region/theme
+// SELECTOR, never ScreenIdentity, so the identity screen legitimately stays
+// on top of the stack across ActionSelectProfile (confirmed by the
+// Body.Kind precondition below) — no re-open/re-navigate is needed to
+// reproduce this on the real seam.
+func TestCopyContent_Identity_ClearedAfterRotation(t *testing.T) {
+	c := newTestController(t)
+	c.Apply(app.Action{Kind: app.ActionOpenIdentity})
+
+	wantARN := "arn:aws:iam::123456789012:user/copy-test-preswitch-operator"
+	c.Handle(messages.IdentityLoaded{
+		Identity: &awsclient.CallerIdentity{
+			AccountID: "123456789012",
+			Arn:       wantARN,
+			UserName:  "copy-test-preswitch-operator",
+		},
+		Gen: 0,
+	})
+	if content, _ := c.CopyContent(); content != wantARN {
+		t.Fatalf("precondition: CopyContent() before rotation = %q, want the loaded ARN %q", content, wantARN)
+	}
+
+	c.Apply(app.Action{Kind: app.ActionSelectProfile, Arg: "other-profile"})
+
+	if kind := c.Snapshot().Body.Kind; kind != app.BodyKindIdentity {
+		t.Fatalf("precondition: identity screen must still be on top after ActionSelectProfile (PopSelectorIntent only pops a selector screen), got Body.Kind = %q", kind)
+	}
+
+	content, label := wave4AssertCopyContent(t, c)
+	if content != "" || label != "" {
+		t.Errorf("CopyContent() after a profile rotation must not serve the stale pre-switch ARN: got (%q, %q), want (\"\", \"\") until the refetch lands", content, label)
+	}
+}
+
 // ===========================================================================
 // 7. Menu / selector / help / costs screens — always a no-op.
 // ===========================================================================

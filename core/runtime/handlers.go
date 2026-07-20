@@ -451,6 +451,7 @@ func (c *Core) HandleProfileSelected(ev ProfileSelectedEvent) ([]UIIntent, []Tas
 
 	intents := []UIIntent{
 		MenuClearAvailabilityIntent{},
+		ClearIdentityIntent{},
 		PopSelectorIntent{},
 		FlashIntent{Text: "Switching to " + ev.Profile + "..."},
 	}
@@ -674,6 +675,7 @@ func (c *Core) HandleRegionSelected(ev RegionSelectedEvent) ([]UIIntent, []TaskR
 
 	intents := []UIIntent{
 		MenuClearAvailabilityIntent{},
+		ClearIdentityIntent{},
 		PopSelectorIntent{},
 		FlashIntent{Text: "Switching to " + ev.Region + "..."},
 	}

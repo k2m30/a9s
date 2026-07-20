@@ -332,6 +332,16 @@ type SetIdentityIntent struct {
 
 func (SetIdentityIntent) isIntent() {}
 
+// ClearIdentityIntent tells the adapter to discard any resolved identity for
+// the outgoing profile/region pair. Emitted unconditionally by
+// HandleProfileSelected / HandleRegionSelected (never by a same-pair refresh,
+// e.g. menu Ctrl+R's MenuClearAvailabilityIntent) so a stale ARN from the
+// previous pair can never be copied or displayed before the new pair's
+// identity fetch (if any) lands.
+type ClearIdentityIntent struct{}
+
+func (ClearIdentityIntent) isIntent() {}
+
 // HeaderInvalidateIntent asks the adapter to bust the cached header so
 // the next View() pass recomputes the badge / role / right-side string.
 // Emitted alongside SetIdentityIntent on successful identity resolution

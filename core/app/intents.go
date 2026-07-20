@@ -239,6 +239,16 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				c.identityErrMsg = ""
 			}
 
+		case runtime.ClearIdentityIntent:
+			// Emitted unconditionally by HandleProfileSelected/HandleRegionSelected
+			// (never by a same-pair refresh) so the previous pair's ARN is never
+			// served — via CopyContent or the identity screen — after a rotation,
+			// before the new pair's identity fetch (if any) lands. identityLoading
+			// is deliberately left alone: it is owned by handleActionOpenIdentity's
+			// fetch-start/fetch-end lifecycle, not this rotation chokepoint.
+			c.identityResult = nil
+			c.identityErrMsg = ""
+
 		case runtime.FlashIntent:
 			// Surface the transient notification (e.g. the API-error flash from
 			// HandleAPIError) as Header.Flash; cleared at the start of the next Apply.
