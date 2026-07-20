@@ -70,6 +70,20 @@ forbid() {
 	fi
 }
 
+# forbid_status: like forbid, but first neutralizes the detail view's designed
+# "Attention (N)" section header — the vacuous-word ban targets status TEXT,
+# not the attention block's title, which legitimately renders whenever the
+# resource carries findings. Only that exact header token is masked, so a
+# vacuous word anywhere else on the same line still fails.
+forbid_status() {
+	if sed -E 's/Attention \([0-9]+\)/attention-block-header/' "$CAPDIR/$1" | grep -qE "$2"; then
+		echo "FAIL  $3 — forbidden /$2/ present in $CAPDIR/$1"
+		FAILURES=$((FAILURES + 1))
+	else
+		echo "PASS  $3"
+	fi
+}
+
 # --- 1. Open the first non-empty candidate type with registered pivots, open
 # its detail, wait for related settle, expect at least one counted badge. ---
 CANDIDATES="ec2 lambda s3 sg"
@@ -177,7 +191,7 @@ fi
 for cap in "$DETAIL_CAP" drill1.txt drill1_esc.txt; do
 	[ -f "$CAPDIR/$cap" ] || continue
 	forbid "$cap" ' [A-Z][A-Z0-9]*(_[A-Z0-9]+)+ ' "no raw UPPER_SNAKE cell in $cap"
-	forbid "$cap" ' (Attention|Danger|Warning|Issue|Problem) ' "no vacuous whole-word status in $cap"
+	forbid_status "$cap" ' (Attention|Danger|Warning|Issue|Problem) ' "no vacuous whole-word status in $cap"
 done
 
 if [ "$FAILURES" -gt 0 ]; then
