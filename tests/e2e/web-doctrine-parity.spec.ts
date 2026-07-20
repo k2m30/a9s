@@ -129,8 +129,8 @@ test.describe("presentation doctrine — web parity (demo fixtures)", () => {
       ).toHaveText("public access block incomplete");
       await expect(
         row,
-        `${bucket} row must carry the findings-derived issue color class (row-broken — SevBroken finding)`,
-      ).toHaveClass(/row-broken/);
+        `${bucket} row must carry the findings-derived issue color class (row-warning — incomplete PAB is SevWarning per the attention-signals contract)`,
+      ).toHaveClass(/row-warning/);
     }
 
     // Doctrine contrast: a healthy bucket keeps the default color and a blank
@@ -190,7 +190,9 @@ test.describe("presentation doctrine — web parity (demo fixtures)", () => {
     const statusCol = await statusColIndex(page);
     const tgRow = page.locator(".list-table tbody tr", { hasText: "acme-web-tg" });
     await expect(tgRow.locator("td").nth(statusCol)).toHaveText("unhealthy targets: 1/3");
-    await expect(tgRow).toHaveClass(/row-broken/);
+    // Partially unhealthy (a rolling deploy shape) is SevWarning per the
+    // attention-signals contract; row-broken is reserved for zero healthy.
+    await expect(tgRow).toHaveClass(/row-warning/);
 
     await openTargetHealthChildView(page);
 
