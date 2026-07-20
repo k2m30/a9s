@@ -1032,8 +1032,8 @@ func TestQA_YAML_ResourceID_AllTypes(t *testing.T) {
 // IsTextViewer/NewTextViewer/CopyContent-rawText-branch retired: all DEAD per
 // specs/022-codebase-cleanup/wave3-map-text.md (line 13) — the live error-log
 // path is ctrl-backed via newErrorLogRS+EnsureTextState, not IsTextViewer;
-// raw-text copy is pinned live in wave3_text_ports_test.go's
-// TestWave3Port_ErrorLogCopy_UncoloredContent (handleCopy on rsKindText).
+// raw-text copy is pinned live in text_ports_test.go's
+// TestPort_ErrorLogCopy_UncoloredContent (handleCopy on rsKindText).
 
 // ════════════════════════════════════════════════════════════════════════════
 // colorizeYAML list-item path — lines starting with "- " (scalar list items)

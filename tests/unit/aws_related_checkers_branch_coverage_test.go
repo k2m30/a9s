@@ -1,6 +1,6 @@
 package unit_test
 
-// aws_wave5_related_test.go — Wave 5 coverage fill for zero-hit branches in:
+// aws_related_checkers_branch_coverage_test.go — branch coverage fill for zero-hit branches in:
 //   - kms_related.go:      kmsRoleNamesFromPolicyJSON
 //   - opensearch_related.go: checkOpenSearchCFN, checkOpenSearchACM
 //   - dbc_related.go:    checkDbcSubnet

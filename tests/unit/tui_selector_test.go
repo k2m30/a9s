@@ -13,8 +13,8 @@
 //     built on NewTransientSelector + app.SelectorBody.
 //   - the real '/' filter mode end-to-end: qa_filtering_test.go's
 //     TestQA_Filter_11_15/11_16_*SelectorFilterWorks.
-//   - copy is a no-op on a selector screen: wave3_text_ports_test.go's
-//     TestWave3Port_SelectorCopy_IsNoOp.
+//   - copy is a no-op on a selector screen: text_ports_test.go's
+//     TestPort_SelectorCopy_IsNoOp.
 //
 // Update() itself IS live (app_stack.go's rsKindSelector case calls
 // NewSelectorWithCtrl(m.ctrl, ...).Update(msg)), and it drives real

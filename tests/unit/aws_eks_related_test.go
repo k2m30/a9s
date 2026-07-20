@@ -385,7 +385,7 @@ func TestRelated_EKS_AMI_Match(t *testing.T) {
 
 	// DescribeLaunchTemplateVersions returns a different AMI per call (matched by version).
 	callCount := 0
-	fakeEC2 := &fakeEC2Batch2{
+	fakeEC2 := &fakeEC2ForASG{
 		describeLaunchTemplateVersionsFn: func(input *ec2.DescribeLaunchTemplateVersionsInput) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
 			callCount++
 			amiID := ami1
@@ -437,7 +437,7 @@ func TestRelated_EKS_AMI_Empty(t *testing.T) {
 		},
 	}
 	fakeEKS := newFakeEKSWithNodegroups([]string{"ng-managed"}, eksNodegroups)
-	fakeEC2 := &fakeEC2Batch2{}
+	fakeEC2 := &fakeEC2ForASG{}
 	clients := &awsclient.ServiceClients{EKS: fakeEKS, EC2: fakeEC2}
 	res := eksClusterSrcResource()
 
@@ -493,7 +493,7 @@ func TestRelated_EKS_AMI_SoftSkipsDeletedLaunchTemplate(t *testing.T) {
 	}
 	fakeEKS := newFakeEKSWithNodegroups([]string{"ng-valid", "ng-deleted"}, eksNodegroups)
 
-	fakeEC2 := &fakeEC2Batch2{
+	fakeEC2 := &fakeEC2ForASG{
 		describeLaunchTemplateVersionsFn: func(input *ec2.DescribeLaunchTemplateVersionsInput) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
 			if input.LaunchTemplateId != nil && *input.LaunchTemplateId == ltDeleted {
 				return nil, &smithy.GenericAPIError{

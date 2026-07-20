@@ -1,5 +1,6 @@
-// fakes_us1_batch4_test.go contains lightweight fake implementations of AWS
-// service client interfaces used by the US1 batch-4 checker tests.
+// fakes_cb_ecr_ecs_kinesis_related_test.go contains lightweight fake implementations of AWS
+// service client interfaces used by the cb, ecr, ecs-svc, and kinesis
+// related-panel checker tests.
 // Covered: CodePipelineAPI (cb→pipeline, ecr→pipeline), ECRAPI (ecr→role),
 // ECSAPI (ecs-svc→ecr, ecs-svc→secrets), DynamoDBAPI (kinesis→ddb).
 // All types are in package unit_test (external test package).
@@ -22,25 +23,25 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// fakeCodePipelineBatch4 — implements CodePipelineAPI
+// fakeCodePipelineForCBECR — implements CodePipelineAPI
 // (CodePipelineListPipelinesAPI + CodePipelineGetPipelineStateAPI +
 //  CodePipelineGetPipelineAPI)
 // Controllable method: GetPipeline — keyed by pipeline name.
 // ---------------------------------------------------------------------------
 
-type fakeCodePipelineBatch4 struct {
+type fakeCodePipelineForCBECR struct {
 	declarationsByName map[string]*cptypes.PipelineDeclaration
 }
 
-func (f *fakeCodePipelineBatch4) ListPipelines(_ context.Context, _ *codepipeline.ListPipelinesInput, _ ...func(*codepipeline.Options)) (*codepipeline.ListPipelinesOutput, error) {
+func (f *fakeCodePipelineForCBECR) ListPipelines(_ context.Context, _ *codepipeline.ListPipelinesInput, _ ...func(*codepipeline.Options)) (*codepipeline.ListPipelinesOutput, error) {
 	return &codepipeline.ListPipelinesOutput{}, nil
 }
 
-func (f *fakeCodePipelineBatch4) GetPipelineState(_ context.Context, _ *codepipeline.GetPipelineStateInput, _ ...func(*codepipeline.Options)) (*codepipeline.GetPipelineStateOutput, error) {
+func (f *fakeCodePipelineForCBECR) GetPipelineState(_ context.Context, _ *codepipeline.GetPipelineStateInput, _ ...func(*codepipeline.Options)) (*codepipeline.GetPipelineStateOutput, error) {
 	return &codepipeline.GetPipelineStateOutput{}, nil
 }
 
-func (f *fakeCodePipelineBatch4) GetPipeline(_ context.Context, input *codepipeline.GetPipelineInput, _ ...func(*codepipeline.Options)) (*codepipeline.GetPipelineOutput, error) {
+func (f *fakeCodePipelineForCBECR) GetPipeline(_ context.Context, input *codepipeline.GetPipelineInput, _ ...func(*codepipeline.Options)) (*codepipeline.GetPipelineOutput, error) {
 	if input.Name == nil {
 		return &codepipeline.GetPipelineOutput{}, nil
 	}
@@ -53,13 +54,13 @@ func (f *fakeCodePipelineBatch4) GetPipeline(_ context.Context, input *codepipel
 	return &codepipeline.GetPipelineOutput{}, nil
 }
 
-// Compile-time check: fakeCodePipelineBatch4 satisfies CodePipelineAPI.
-var _ awsclient.CodePipelineAPI = (*fakeCodePipelineBatch4)(nil)
+// Compile-time check: fakeCodePipelineForCBECR satisfies CodePipelineAPI.
+var _ awsclient.CodePipelineAPI = (*fakeCodePipelineForCBECR)(nil)
 
-// newFakeCodePipelineWithDeclarations returns a fakeCodePipelineBatch4 whose
+// newFakeCodePipelineWithDeclarations returns a fakeCodePipelineForCBECR whose
 // GetPipeline returns the declaration keyed by pipeline name.
-func newFakeCodePipelineWithDeclarations(declarations map[string]*cptypes.PipelineDeclaration) *fakeCodePipelineBatch4 {
-	return &fakeCodePipelineBatch4{declarationsByName: declarations}
+func newFakeCodePipelineWithDeclarations(declarations map[string]*cptypes.PipelineDeclaration) *fakeCodePipelineForCBECR {
+	return &fakeCodePipelineForCBECR{declarationsByName: declarations}
 }
 
 // pipelineDeclarationWithCodeBuildAction builds a minimal PipelineDeclaration
@@ -334,30 +335,30 @@ func pipelineDeclarationWithSNSApprovalAction(pipelineName, topicARN string) *cp
 }
 
 // ---------------------------------------------------------------------------
-// fakeECRBatch4 — implements ECRAPI
+// fakeECRForRole — implements ECRAPI
 // (ECRDescribeRepositoriesAPI + ECRDescribeImagesAPI +
 //  ECRDescribeImageScanFindingsAPI + ECRGetRepositoryPolicyAPI)
 // Controllable method: GetRepositoryPolicy.
 // ---------------------------------------------------------------------------
 
-type fakeECRBatch4 struct {
+type fakeECRForRole struct {
 	getPolicyOutput *ecr.GetRepositoryPolicyOutput
 	getPolicyErr    error
 }
 
-func (f *fakeECRBatch4) DescribeRepositories(_ context.Context, _ *ecr.DescribeRepositoriesInput, _ ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error) {
+func (f *fakeECRForRole) DescribeRepositories(_ context.Context, _ *ecr.DescribeRepositoriesInput, _ ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error) {
 	return &ecr.DescribeRepositoriesOutput{}, nil
 }
 
-func (f *fakeECRBatch4) DescribeImages(_ context.Context, _ *ecr.DescribeImagesInput, _ ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error) {
+func (f *fakeECRForRole) DescribeImages(_ context.Context, _ *ecr.DescribeImagesInput, _ ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error) {
 	return &ecr.DescribeImagesOutput{}, nil
 }
 
-func (f *fakeECRBatch4) DescribeImageScanFindings(_ context.Context, _ *ecr.DescribeImageScanFindingsInput, _ ...func(*ecr.Options)) (*ecr.DescribeImageScanFindingsOutput, error) {
+func (f *fakeECRForRole) DescribeImageScanFindings(_ context.Context, _ *ecr.DescribeImageScanFindingsInput, _ ...func(*ecr.Options)) (*ecr.DescribeImageScanFindingsOutput, error) {
 	return &ecr.DescribeImageScanFindingsOutput{}, nil
 }
 
-func (f *fakeECRBatch4) GetRepositoryPolicy(_ context.Context, _ *ecr.GetRepositoryPolicyInput, _ ...func(*ecr.Options)) (*ecr.GetRepositoryPolicyOutput, error) {
+func (f *fakeECRForRole) GetRepositoryPolicy(_ context.Context, _ *ecr.GetRepositoryPolicyInput, _ ...func(*ecr.Options)) (*ecr.GetRepositoryPolicyOutput, error) {
 	if f.getPolicyErr != nil {
 		return nil, f.getPolicyErr
 	}
@@ -367,27 +368,27 @@ func (f *fakeECRBatch4) GetRepositoryPolicy(_ context.Context, _ *ecr.GetReposit
 	return &ecr.GetRepositoryPolicyOutput{}, nil
 }
 
-func (f *fakeECRBatch4) ListTagsForResource(_ context.Context, _ *ecr.ListTagsForResourceInput, _ ...func(*ecr.Options)) (*ecr.ListTagsForResourceOutput, error) {
+func (f *fakeECRForRole) ListTagsForResource(_ context.Context, _ *ecr.ListTagsForResourceInput, _ ...func(*ecr.Options)) (*ecr.ListTagsForResourceOutput, error) {
 	return &ecr.ListTagsForResourceOutput{}, nil
 }
 
-// Compile-time check: fakeECRBatch4 satisfies ECRAPI.
-var _ awsclient.ECRAPI = (*fakeECRBatch4)(nil)
+// Compile-time check: fakeECRForRole satisfies ECRAPI.
+var _ awsclient.ECRAPI = (*fakeECRForRole)(nil)
 
-// newFakeECRWithRepositoryPolicy returns a fakeECRBatch4 whose GetRepositoryPolicy
+// newFakeECRWithRepositoryPolicy returns a fakeECRForRole whose GetRepositoryPolicy
 // returns the given IAM policy JSON text.
-func newFakeECRWithRepositoryPolicy(policyText string) *fakeECRBatch4 {
-	return &fakeECRBatch4{
+func newFakeECRWithRepositoryPolicy(policyText string) *fakeECRForRole {
+	return &fakeECRForRole{
 		getPolicyOutput: &ecr.GetRepositoryPolicyOutput{
 			PolicyText: aws.String(policyText),
 		},
 	}
 }
 
-// newFakeECRWithNoPolicyError returns a fakeECRBatch4 whose GetRepositoryPolicy
+// newFakeECRWithNoPolicyError returns a fakeECRForRole whose GetRepositoryPolicy
 // returns a RepositoryPolicyNotFoundException error.
-func newFakeECRWithNoPolicyError() *fakeECRBatch4 {
-	return &fakeECRBatch4{
+func newFakeECRWithNoPolicyError() *fakeECRForRole {
+	return &fakeECRForRole{
 		getPolicyErr: &ecrtypes.RepositoryPolicyNotFoundException{
 			Message: aws.String("Repository policy not found"),
 		},
@@ -395,55 +396,55 @@ func newFakeECRWithNoPolicyError() *fakeECRBatch4 {
 }
 
 // ---------------------------------------------------------------------------
-// fakeECSBatch4 — implements ECSAPI
+// fakeECSForSvcPivots — implements ECSAPI
 // (ECSListClustersAPI + ECSDescribeClustersAPI + ECSListServicesAPI +
 //  ECSDescribeServicesAPI + ECSListTasksAPI + ECSDescribeTasksAPI +
 //  ECSDescribeTaskDefinitionAPI)
 // Controllable method: DescribeTaskDefinition.
 // ---------------------------------------------------------------------------
 
-type fakeECSBatch4 struct {
+type fakeECSForSvcPivots struct {
 	describeTaskDefFn func(*ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error)
 }
 
-func (f *fakeECSBatch4) ListClusters(_ context.Context, _ *ecs.ListClustersInput, _ ...func(*ecs.Options)) (*ecs.ListClustersOutput, error) {
+func (f *fakeECSForSvcPivots) ListClusters(_ context.Context, _ *ecs.ListClustersInput, _ ...func(*ecs.Options)) (*ecs.ListClustersOutput, error) {
 	return &ecs.ListClustersOutput{}, nil
 }
 
-func (f *fakeECSBatch4) DescribeClusters(_ context.Context, _ *ecs.DescribeClustersInput, _ ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error) {
+func (f *fakeECSForSvcPivots) DescribeClusters(_ context.Context, _ *ecs.DescribeClustersInput, _ ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error) {
 	return &ecs.DescribeClustersOutput{}, nil
 }
 
-func (f *fakeECSBatch4) ListServices(_ context.Context, _ *ecs.ListServicesInput, _ ...func(*ecs.Options)) (*ecs.ListServicesOutput, error) {
+func (f *fakeECSForSvcPivots) ListServices(_ context.Context, _ *ecs.ListServicesInput, _ ...func(*ecs.Options)) (*ecs.ListServicesOutput, error) {
 	return &ecs.ListServicesOutput{}, nil
 }
 
-func (f *fakeECSBatch4) DescribeServices(_ context.Context, _ *ecs.DescribeServicesInput, _ ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error) {
+func (f *fakeECSForSvcPivots) DescribeServices(_ context.Context, _ *ecs.DescribeServicesInput, _ ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error) {
 	return &ecs.DescribeServicesOutput{}, nil
 }
 
-func (f *fakeECSBatch4) ListTasks(_ context.Context, _ *ecs.ListTasksInput, _ ...func(*ecs.Options)) (*ecs.ListTasksOutput, error) {
+func (f *fakeECSForSvcPivots) ListTasks(_ context.Context, _ *ecs.ListTasksInput, _ ...func(*ecs.Options)) (*ecs.ListTasksOutput, error) {
 	return &ecs.ListTasksOutput{}, nil
 }
 
-func (f *fakeECSBatch4) DescribeTasks(_ context.Context, _ *ecs.DescribeTasksInput, _ ...func(*ecs.Options)) (*ecs.DescribeTasksOutput, error) {
+func (f *fakeECSForSvcPivots) DescribeTasks(_ context.Context, _ *ecs.DescribeTasksInput, _ ...func(*ecs.Options)) (*ecs.DescribeTasksOutput, error) {
 	return &ecs.DescribeTasksOutput{}, nil
 }
 
-func (f *fakeECSBatch4) DescribeTaskDefinition(_ context.Context, input *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
+func (f *fakeECSForSvcPivots) DescribeTaskDefinition(_ context.Context, input *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
 	if f.describeTaskDefFn != nil {
 		return f.describeTaskDefFn(input)
 	}
 	return &ecs.DescribeTaskDefinitionOutput{}, nil
 }
 
-// Compile-time check: fakeECSBatch4 satisfies ECSAPI.
-var _ awsclient.ECSAPI = (*fakeECSBatch4)(nil)
+// Compile-time check: fakeECSForSvcPivots satisfies ECSAPI.
+var _ awsclient.ECSAPI = (*fakeECSForSvcPivots)(nil)
 
-// newFakeECSWithTaskDefinition returns a fakeECSBatch4 whose DescribeTaskDefinition
+// newFakeECSWithTaskDefinition returns a fakeECSForSvcPivots whose DescribeTaskDefinition
 // always returns the given task definition.
-func newFakeECSWithTaskDefinition(td *ecstypes.TaskDefinition) *fakeECSBatch4 {
-	return &fakeECSBatch4{
+func newFakeECSWithTaskDefinition(td *ecstypes.TaskDefinition) *fakeECSForSvcPivots {
+	return &fakeECSForSvcPivots{
 		describeTaskDefFn: func(_ *ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error) {
 			return &ecs.DescribeTaskDefinitionOutput{TaskDefinition: td}, nil
 		},
@@ -451,30 +452,30 @@ func newFakeECSWithTaskDefinition(td *ecstypes.TaskDefinition) *fakeECSBatch4 {
 }
 
 // ---------------------------------------------------------------------------
-// fakeDynamoDBBatch4 — implements DynamoDBAPI
+// fakeDynamoDBForKinesis — implements DynamoDBAPI
 // (DDBListTablesAPI + DDBDescribeTableAPI +
 //  DynamoDBDescribeContinuousBackupsAPI +
 //  DynamoDBDescribeKinesisStreamingDestinationAPI)
 // Controllable method: DescribeKinesisStreamingDestination — keyed by table name.
 // ---------------------------------------------------------------------------
 
-type fakeDynamoDBBatch4 struct {
+type fakeDynamoDBForKinesis struct {
 	kinesisDestByTable map[string][]ddbtypes.KinesisDataStreamDestination
 }
 
-func (f *fakeDynamoDBBatch4) ListTables(_ context.Context, _ *dynamodb.ListTablesInput, _ ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error) {
+func (f *fakeDynamoDBForKinesis) ListTables(_ context.Context, _ *dynamodb.ListTablesInput, _ ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error) {
 	return &dynamodb.ListTablesOutput{}, nil
 }
 
-func (f *fakeDynamoDBBatch4) DescribeTable(_ context.Context, _ *dynamodb.DescribeTableInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+func (f *fakeDynamoDBForKinesis) DescribeTable(_ context.Context, _ *dynamodb.DescribeTableInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
 	return &dynamodb.DescribeTableOutput{}, nil
 }
 
-func (f *fakeDynamoDBBatch4) DescribeContinuousBackups(_ context.Context, _ *dynamodb.DescribeContinuousBackupsInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeContinuousBackupsOutput, error) {
+func (f *fakeDynamoDBForKinesis) DescribeContinuousBackups(_ context.Context, _ *dynamodb.DescribeContinuousBackupsInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeContinuousBackupsOutput, error) {
 	return &dynamodb.DescribeContinuousBackupsOutput{}, nil
 }
 
-func (f *fakeDynamoDBBatch4) DescribeKinesisStreamingDestination(_ context.Context, input *dynamodb.DescribeKinesisStreamingDestinationInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
+func (f *fakeDynamoDBForKinesis) DescribeKinesisStreamingDestination(_ context.Context, input *dynamodb.DescribeKinesisStreamingDestinationInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
 	if input.TableName == nil {
 		return &dynamodb.DescribeKinesisStreamingDestinationOutput{}, nil
 	}
@@ -493,14 +494,14 @@ func (f *fakeDynamoDBBatch4) DescribeKinesisStreamingDestination(_ context.Conte
 	}, nil
 }
 
-// Compile-time check: fakeDynamoDBBatch4 satisfies DynamoDBAPI.
-var _ awsclient.DynamoDBAPI = (*fakeDynamoDBBatch4)(nil)
+// Compile-time check: fakeDynamoDBForKinesis satisfies DynamoDBAPI.
+var _ awsclient.DynamoDBAPI = (*fakeDynamoDBForKinesis)(nil)
 
-// newFakeDynamoDBWithKinesisDestination returns a fakeDynamoDBBatch4 whose
+// newFakeDynamoDBWithKinesisDestination returns a fakeDynamoDBForKinesis whose
 // DescribeKinesisStreamingDestination returns the given stream ARN as an
 // ACTIVE destination for the given table name.
-func newFakeDynamoDBWithKinesisDestination(tableName, streamARN string) *fakeDynamoDBBatch4 {
-	return &fakeDynamoDBBatch4{
+func newFakeDynamoDBWithKinesisDestination(tableName, streamARN string) *fakeDynamoDBForKinesis {
+	return &fakeDynamoDBForKinesis{
 		kinesisDestByTable: map[string][]ddbtypes.KinesisDataStreamDestination{
 			tableName: {
 				{

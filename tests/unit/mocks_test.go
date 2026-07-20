@@ -397,16 +397,21 @@ func (m *mockEKSDescribeNodegroupClient) DescribeNodegroup(
 // AWS error mocks
 // ---------------------------------------------------------------------------
 
-type mockAPIError struct {
-	code    string
-	message string
-	fault   smithy.ErrorFault
+// MockAPIError implements smithy.APIError with a caller-supplied code,
+// message, and fault. Exported so tests/unit_test package files (which
+// cannot share unexported identifiers with this package) can reuse it
+// instead of defining their own copy — see fakes_boundary_test.go's
+// boundaryAPIError and costs_selfreview_test.go's selfReviewAPIError aliases.
+type MockAPIError struct {
+	Code    string
+	Message string
+	Fault   smithy.ErrorFault
 }
 
-func (e *mockAPIError) Error() string                 { return e.message }
-func (e *mockAPIError) ErrorCode() string             { return e.code }
-func (e *mockAPIError) ErrorMessage() string          { return e.message }
-func (e *mockAPIError) ErrorFault() smithy.ErrorFault { return e.fault }
+func (e *MockAPIError) Error() string                 { return e.Message }
+func (e *MockAPIError) ErrorCode() string             { return e.Code }
+func (e *MockAPIError) ErrorMessage() string          { return e.Message }
+func (e *MockAPIError) ErrorFault() smithy.ErrorFault { return e.Fault }
 
 // ---------------------------------------------------------------------------
 // Subnet mocks

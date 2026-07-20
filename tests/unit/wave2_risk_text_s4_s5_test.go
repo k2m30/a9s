@@ -78,16 +78,16 @@ import (
 // 1 (S4 in list: a flagged row's Status column shows the concrete Phrase) was
 // TestWave2_ListStatusColumn_ShowsConcretePhrase_ForIssueFinding, a legacy
 // views.ResourceListModel.SetEnrichmentState()/.View()-driven pin. Ported to
-// wave3_list_ports_test.go's TestWave3ListStatusColumn_
+// list_ports_test.go's TestWave3ListStatusColumn_
 // EnrichmentMapOnlyFinding_OverridesRawState, which drives the same
 // enrichment-map-only status-cell-override branch (list_body.go) through the
 // live Controller.ApplyEnrichmentState seam.
 //
 // 2 and 3 (S5-in-detail full sentence, and Detail=="" fallback) were legacy
 // views.DetailModel.PlainContent()-driven pins for the same claim
-// TestWave3_DetailAttention_RendersFullDetailSentence_AlongsidePhrase /
-// TestWave3_DetailAttention_FallsBackToPhrase_WhenDetailEmpty
-// (tests/unit/wave3_detail_ports_test.go) now pin on the live
+// Test_DetailAttention_RendersFullDetailSentence_AlongsidePhrase /
+// Test_DetailAttention_FallsBackToPhrase_WhenDetailEmpty
+// (tests/unit/detail_ports_test.go) now pin on the live
 // injectAttentionSectionDetail path — removed here, wave3 detail-family
 // cleanup (specs/022-codebase-cleanup).
 // ---------------------------------------------------------------------------

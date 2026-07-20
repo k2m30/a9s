@@ -1,11 +1,11 @@
-// wave3_pagination_frametitle_ports_test.go — Wave 3 (022-codebase-cleanup)
-// PORT for the F/G-section pins in qa_pagination_stories_test.go
+// pagination_frametitle_ports_test.go — live-seam port for the F/G-section
+// pins in qa_pagination_stories_test.go
 // (TestStoryF1/F2/F3/G1/G3): the "(N+)" truncated-count vs "(N)" exact-count
 // FrameTitle transition across Ctrl+R-reset, top-level re-fetch, empty-list
 // re-fetch, and cross-resource-type switch. These drive the legacy
 // views.ResourceListModel path (dead code — production never calls its
 // Update()/FrameTitle() directly; the controller/ViewState render path is
-// the only live consumer, per this file's Wave 3 siblings).
+// the only live consumer, per this file's list/detail/text sibling port files).
 //
 // The existing controller-oracle coverage (core/app/list_test.go's
 // TestListFrameTitle_LoadingState_NonEmpty / ShowsCountAfterLoad) only
@@ -45,8 +45,8 @@ func wave3PagResourcesFrom(start, n int) []resource.Resource {
 	return out
 }
 
-func TestWave3PaginationFrameTitle_CtrlR_ResetsPagination(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "ec2", configForType("ec2"))
+func TestPaginationFrameTitle_CtrlR_ResetsPagination(t *testing.T) {
+	c := openListControllerWithConfig(t, "ec2", configForType("ec2"))
 
 	// Initial truncated page.
 	c.ApplyResourcesLoaded("ec2", wave3PagResources(200), &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-p2"}, false)
@@ -68,8 +68,8 @@ func TestWave3PaginationFrameTitle_CtrlR_ResetsPagination(t *testing.T) {
 	}
 }
 
-func TestWave3PaginationFrameTitle_CtrlR_TopLevel_ReFetchesAllPages(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "ec2", configForType("ec2"))
+func TestPaginationFrameTitle_CtrlR_TopLevel_ReFetchesAllPages(t *testing.T) {
+	c := openListControllerWithConfig(t, "ec2", configForType("ec2"))
 
 	c.ApplyResourcesLoaded("ec2", wave3PagResources(150), nil, false)
 	if title := c.ListFrameTitle(); title != "ec2(150)" {
@@ -84,8 +84,8 @@ func TestWave3PaginationFrameTitle_CtrlR_TopLevel_ReFetchesAllPages(t *testing.T
 	}
 }
 
-func TestWave3PaginationFrameTitle_CtrlR_EmptyList_ReFetches(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "ec2", configForType("ec2"))
+func TestPaginationFrameTitle_CtrlR_EmptyList_ReFetches(t *testing.T) {
+	c := openListControllerWithConfig(t, "ec2", configForType("ec2"))
 
 	c.ApplyResourcesLoaded("ec2", []resource.Resource{}, nil, false)
 	if title := c.ListFrameTitle(); title != "ec2(0)" {
@@ -98,8 +98,8 @@ func TestWave3PaginationFrameTitle_CtrlR_EmptyList_ReFetches(t *testing.T) {
 	}
 }
 
-func TestWave3PaginationFrameTitle_DetailAndBack_PreservesLoadedData(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "ec2", configForType("ec2"))
+func TestPaginationFrameTitle_DetailAndBack_PreservesLoadedData(t *testing.T) {
+	c := openListControllerWithConfig(t, "ec2", configForType("ec2"))
 
 	// 200 + 200 + 200 = 600 total across three pages.
 	c.ApplyResourcesLoaded("ec2", wave3PagResources(200), &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-p2"}, false)
@@ -133,8 +133,8 @@ func TestWave3PaginationFrameTitle_DetailAndBack_PreservesLoadedData(t *testing.
 	}
 }
 
-func TestWave3PaginationFrameTitle_SwitchingResourceType_ResetsPagination(t *testing.T) {
-	c1 := wave3ListControllerWithConfig(t, "ec2", configForType("ec2"))
+func TestPaginationFrameTitle_SwitchingResourceType_ResetsPagination(t *testing.T) {
+	c1 := openListControllerWithConfig(t, "ec2", configForType("ec2"))
 	c1.ApplyResourcesLoaded("ec2", wave3PagResources(200), &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"}, false)
 	if title := c1.ListFrameTitle(); title != "ec2(200+)" {
 		t.Fatalf("precondition: ec2 %q", title)
@@ -143,7 +143,7 @@ func TestWave3PaginationFrameTitle_SwitchingResourceType_ResetsPagination(t *tes
 	// Switching resource type in production pushes a fresh list screen —
 	// modeled here as an independent controller for "dbi", starting in
 	// loading state (no rows yet).
-	c2 := wave3ListControllerWithConfig(t, "dbi", configForType("dbi"))
+	c2 := openListControllerWithConfig(t, "dbi", configForType("dbi"))
 	if title := c2.ListFrameTitle(); title != "dbi" {
 		t.Errorf("new list screen should show loading title %q, got %q", "dbi", title)
 	}
@@ -159,12 +159,12 @@ func TestWave3PaginationFrameTitle_SwitchingResourceType_ResetsPagination(t *tes
 	}
 }
 
-// TestWave3PaginationFrameTitle_RapidRefresh_ReplaceClean ports
+// TestPaginationFrameTitle_RapidRefresh_ReplaceClean ports
 // TestStoryI3_RapidRefresh_ReplaceClean: several rapid Ctrl+R replace results
 // arriving in sequence must leave the model reflecting only the last one,
 // with no stale "+" truncation marker once the final page is exact.
-func TestWave3PaginationFrameTitle_RapidRefresh_ReplaceClean(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "ec2", configForType("ec2"))
+func TestPaginationFrameTitle_RapidRefresh_ReplaceClean(t *testing.T) {
+	c := openListControllerWithConfig(t, "ec2", configForType("ec2"))
 	c.ApplyResourcesLoaded("ec2", wave3PagResources(200), &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-p2"}, false)
 
 	for attempt := range 3 {
@@ -192,13 +192,13 @@ func TestWave3PaginationFrameTitle_RapidRefresh_ReplaceClean(t *testing.T) {
 // seam.
 // ===========================================================================
 
-// TestWave3PaginationFrameTitle_LoadingMore_ShowsAndClears ports
+// TestPaginationFrameTitle_LoadingMore_ShowsAndClears ports
 // TestResourceList_FrameTitle_LoadingMore + TestResourceList_LoadMore_
 // SetsAndClearsLoadingMore: the "(N+ loading...)" inline suffix appears
 // while ActionLoadMore is in flight and disappears (replaced by the plain
 // count) once the appended page lands.
-func TestWave3PaginationFrameTitle_LoadingMore_ShowsAndClears(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "ec2", configForType("ec2"))
+func TestPaginationFrameTitle_LoadingMore_ShowsAndClears(t *testing.T) {
+	c := openListControllerWithConfig(t, "ec2", configForType("ec2"))
 	c.ApplyResourcesLoaded("ec2", wave3PagResources(200), &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-p2"}, false)
 
 	c.Apply(app.Action{Kind: app.ActionLoadMore})
@@ -216,11 +216,11 @@ func TestWave3PaginationFrameTitle_LoadingMore_ShowsAndClears(t *testing.T) {
 	}
 }
 
-// TestWave3PaginationFrameTitle_TruncatedWithFilter ports
+// TestPaginationFrameTitle_TruncatedWithFilter ports
 // TestResourceList_FrameTitle_TruncatedWithFilter: an active text filter on a
 // still-truncated list shows "(filtered/total+)".
-func TestWave3PaginationFrameTitle_TruncatedWithFilter(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "ec2", configForType("ec2"))
+func TestPaginationFrameTitle_TruncatedWithFilter(t *testing.T) {
+	c := openListControllerWithConfig(t, "ec2", configForType("ec2"))
 	c.ApplyResourcesLoaded("ec2", wave3PagResources(200), &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-p2"}, false)
 
 	// "i-0000" matches i-00000..i-00009 = 10 of the 200 loaded rows.
@@ -231,12 +231,12 @@ func TestWave3PaginationFrameTitle_TruncatedWithFilter(t *testing.T) {
 	}
 }
 
-// TestWave3PaginationFrameTitle_AllLoadedWithFilter ports
+// TestPaginationFrameTitle_AllLoadedWithFilter ports
 // TestResourceList_FrameTitle_AllLoadedWithFilter: an active text filter on a
 // fully-loaded (non-truncated) list shows the exact "(filtered/total)" pair,
 // with no trailing "+".
-func TestWave3PaginationFrameTitle_AllLoadedWithFilter(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "ec2", configForType("ec2"))
+func TestPaginationFrameTitle_AllLoadedWithFilter(t *testing.T) {
+	c := openListControllerWithConfig(t, "ec2", configForType("ec2"))
 	c.ApplyResourcesLoaded("ec2", wave3PagResources(523), &resource.PaginationMeta{IsTruncated: false}, false)
 
 	// "i-0000" matches i-00000..i-00009 = 10 of the 523 loaded rows.

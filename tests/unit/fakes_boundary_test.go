@@ -16,33 +16,30 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/smithy-go"
+
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // ---------------------------------------------------------------------------
 // boundaryAPIError — implements smithy.APIError for access-denied / throttle
-// testing.
+// testing. Alias for the package-unit canonical fake (mocks_test.go's
+// MockAPIError) — package unit_test cannot share unexported identifiers with
+// package unit, so this file reuses the exported type instead of keeping its
+// own parallel copy.
 // ---------------------------------------------------------------------------
 
-type boundaryAPIError struct {
-	code    string
-	message string
-}
-
-func (e *boundaryAPIError) Error() string                 { return e.message }
-func (e *boundaryAPIError) ErrorCode() string             { return e.code }
-func (e *boundaryAPIError) ErrorMessage() string          { return e.message }
-func (e *boundaryAPIError) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
+type boundaryAPIError = unit.MockAPIError
 
 // newAccessDeniedError returns an error that ClassifyAWSError maps to
 // retryable=false with code "AccessDeniedException".
 func newAccessDeniedError() error {
-	return &boundaryAPIError{code: "AccessDeniedException", message: "access denied by IAM policy"}
+	return &boundaryAPIError{Code: "AccessDeniedException", Message: "access denied by IAM policy", Fault: smithy.FaultClient}
 }
 
 // newThrottleError returns an error that ClassifyAWSError maps to
 // retryable=true with code "Throttling".
 func newThrottleError() error {
-	return &boundaryAPIError{code: "Throttling", message: "rate exceeded"}
+	return &boundaryAPIError{Code: "Throttling", Message: "rate exceeded", Fault: smithy.FaultClient}
 }
 
 // ---------------------------------------------------------------------------

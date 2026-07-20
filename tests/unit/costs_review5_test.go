@@ -55,10 +55,12 @@ func costsReview5DrillToStrandedByIDPlaceholder(t *testing.T, profile string) (t
 	})
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter)) // -> USAGE_TYPE child
 
-	// Newest week, not usageWindow[0]: a freshly-pushed drill child opens on
-	// the OLDEST column, which late in the month is outside the 14-day
-	// resource-drill clamp and would refuse the drill — so plant the record
-	// on the newest week and scroll the cursor there before drilling.
+	// Newest week, not usageWindow[0]: the CostsLoaded record below is
+	// planted on exactly one week, and Enter only dispatches a by-ID fetch
+	// from a cursor sitting on that non-empty cell — every other week in the
+	// window is still zero-valued, so drilling from wherever the cursor
+	// happens to be left would dispatch nothing. Plant the record on the
+	// newest week and scroll the cursor there before drilling.
 	usageWindow := costs.WindowWithin(period, costs.GranularityWeek, now)
 	usagePeriod := usageWindow[len(usageWindow)-1]
 	usageQuery := costs.Query{

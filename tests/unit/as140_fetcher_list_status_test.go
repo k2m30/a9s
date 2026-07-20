@@ -110,7 +110,7 @@ func TestAS140_FetcherListPath_NonFindingStatusVisible(t *testing.T) {
 				},
 			}
 
-			c := wave3ListControllerWithConfig(t, tc.shortName, configForType(tc.shortName))
+			c := openListControllerWithConfig(t, tc.shortName, configForType(tc.shortName))
 			joined := wave3RowCellsJoined(t, c, tc.shortName, []resource.Resource{res})
 			wantPhrase := domain.HumanizeStatusPhrase(tc.statusPhrase)
 			if !strings.Contains(joined, wantPhrase) {
@@ -152,7 +152,7 @@ func TestAS140_FetcherListPath_FindingsBeatLifecycle(t *testing.T) {
 		},
 	}
 
-	c := wave3ListControllerWithConfig(t, "dbi", configForType("dbi"))
+	c := openListControllerWithConfig(t, "dbi", configForType("dbi"))
 	joined := wave3RowCellsJoined(t, c, "dbi", []resource.Resource{res})
 	if !strings.Contains(joined, "stopped (+1)") {
 		t.Errorf("AS-140: list row should compose Wave-1+Wave-2 stack as %q via phraseFromFindings; got: %q",

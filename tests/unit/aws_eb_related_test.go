@@ -236,7 +236,7 @@ func TestRelated_Eb_Role_NoRoleSettings(t *testing.T) {
 			Value:      aws.String("LoadBalanced"),
 		},
 	})
-	fakeIAM := &fakeIAMBatch2{}
+	fakeIAM := &fakeIAMForASG{}
 	clients := &awsclient.ServiceClients{
 		ElasticBeanstalk: fakeEB,
 		IAM:              fakeIAM,
@@ -565,7 +565,7 @@ func TestRelated_Eb_TG_NoLoadBalancers(t *testing.T) {
 	})
 	clients := &awsclient.ServiceClients{
 		ElasticBeanstalk: fakeEB,
-		ELBv2:            &fakeELBv2Batch2{},
+		ELBv2:            &fakeELBv2ForEB{},
 	}
 
 	res := resource.Resource{

@@ -140,14 +140,14 @@ func runCmdTree(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 // persists whatever Findings the row already carries at snapshot time — not
 // that any particular enricher produced them.
 func TestTUISaveCache_PersistsRowsToTypeFile(t *testing.T) {
-	const profile, region = "def11-tui-prof", "us-east-1"
+	const profile, region = "savecache-tui-prof", "us-east-1"
 	m := newSaveCacheApp(t, profile, region)
 
 	finding := domain.Finding{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave1:s3"}
 	sweepResources := []resource.Resource{
 		{
-			ID:       "bucket-def11-1",
-			Name:     "def11-bucket",
+			ID:       "bucket-savecache-1",
+			Name:     "savecache-bucket",
 			Type:     "s3",
 			Fields:   map[string]string{"region": region},
 			Findings: []domain.Finding{finding},
@@ -168,7 +168,7 @@ func TestTUISaveCache_PersistsRowsToTypeFile(t *testing.T) {
 	}
 	found := false
 	for _, r := range tf.Rows {
-		if r.ID == "bucket-def11-1" {
+		if r.ID == "bucket-savecache-1" {
 			found = true
 			if len(r.Findings) != 1 || r.Findings[0].Code != "s3-public-read" {
 				t.Errorf("persisted TUI-swept row Findings = %+v, want 1 finding with Code=%q", r.Findings, "s3-public-read")
@@ -176,7 +176,7 @@ func TestTUISaveCache_PersistsRowsToTypeFile(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("persisted s3 TypeFile.Rows missing bucket-def11-1 — the TUI-swept row was not persisted at all")
+		t.Error("persisted s3 TypeFile.Rows missing bucket-savecache-1 — the TUI-swept row was not persisted at all")
 	}
 }
 
@@ -186,11 +186,11 @@ func TestTUISaveCache_PersistsRowsToTypeFile(t *testing.T) {
 // regress the one thing the intercepted TUI path got right. Green both before
 // and after the fix.
 func TestTUISaveCache_AvailabilityCountsStillPersist(t *testing.T) {
-	const profile, region = "def11-tui-counts-prof", "us-east-1"
+	const profile, region = "savecache-tui-counts-prof", "us-east-1"
 	m := newSaveCacheApp(t, profile, region)
 
 	sweepResources := []resource.Resource{
-		{ID: "bucket-def11-2", Name: "def11-bucket-2", Type: "s3", Fields: map[string]string{"region": region}},
+		{ID: "bucket-savecache-2", Name: "savecache-bucket-2", Type: "s3", Fields: map[string]string{"region": region}},
 	}
 
 	m, cmd := driveSweepCompletion(m, sweepResources)

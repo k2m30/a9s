@@ -1,5 +1,5 @@
-// wave3_list_loadmore_ports_test.go — Wave 3 (022-codebase-cleanup) PORT pins
-// for the ActionLoadMore no-op/debounce/error-recovery mechanism and the
+// list_loadmore_ports_test.go — live-seam port pins for the ActionLoadMore
+// no-op/debounce/error-recovery mechanism and the
 // sort/cursor stability of a plain (non-checker) load-more append, ported
 // from the doomed legacy qa_pagination_stories_test.go funcs onto the LIVE
 // Controller seam (core/app/actions_list.go handleActionLoadMore,
@@ -16,7 +16,7 @@
 //     or "already LoadingMore -> nil tasks (debounce)" guard branches.
 //   - TestStoryI4_LoadMoreAfterSort_PreservesSortOrder: core/app/list_test.go's
 //     TestListSort_* never combines an active sort with an append; the only
-//     append+sort coverage anywhere (wave3_list_ports_test.go's
+//     append+sort coverage anywhere (list_ports_test.go's
 //     RelatedCheckerCarry_PreservesSortAfterMerge) drives the reapplyCheckerAgainst
 //     merge path, not a plain non-checker ActionLoadMore append.
 //   - TestStoryI5_LoadMoreAtBottom_CursorStays: nothing pins that ls.SelectedRow
@@ -70,8 +70,8 @@ func wave3LoadMoreResources(n int, idOffset int) []resource.Resource {
 // ActionLoadMore no-op / debounce guard branches
 // ===========================================================================
 
-func TestWave3ActionLoadMore_NotTruncated_Noop(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestActionLoadMore_NotTruncated_Noop(t *testing.T) {
+	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(3, 0), &resource.PaginationMeta{IsTruncated: false}, false)
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionLoadMore})
@@ -80,8 +80,8 @@ func TestWave3ActionLoadMore_NotTruncated_Noop(t *testing.T) {
 	}
 }
 
-func TestWave3ActionLoadMore_AlreadyLoading_Debounced(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestActionLoadMore_AlreadyLoading_Debounced(t *testing.T) {
+	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(200, 0), &resource.PaginationMeta{
 		IsTruncated: true, NextToken: "tok",
 	}, false)
@@ -106,8 +106,8 @@ func TestWave3ActionLoadMore_AlreadyLoading_Debounced(t *testing.T) {
 // re-arms ActionLoadMore.
 // ===========================================================================
 
-func TestWave3ActionLoadMore_ErrorClearsLoading_PreservesRowsAndAllowsRetry(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestActionLoadMore_ErrorClearsLoading_PreservesRowsAndAllowsRetry(t *testing.T) {
+	c := openListController(t, "ec2")
 	seed := wave3LoadMoreResources(200, 0)
 	c.ApplyResourcesLoaded("ec2", seed, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-p2"}, false)
 
@@ -142,8 +142,8 @@ func TestWave3ActionLoadMore_ErrorClearsLoading_PreservesRowsAndAllowsRetry(t *t
 // Sort and cursor stability across a plain (non-checker) load-more append.
 // ===========================================================================
 
-func TestWave3ListSort_PreservedAfterLoadMoreAppend(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestListSort_PreservedAfterLoadMoreAppend(t *testing.T) {
+	c := openListController(t, "ec2")
 
 	// Page 1: 200 items named in reverse-alpha order.
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(200, 0), &resource.PaginationMeta{
@@ -187,8 +187,8 @@ func TestWave3ListSort_PreservedAfterLoadMoreAppend(t *testing.T) {
 	}
 }
 
-func TestWave3ListCursor_StableAfterLoadMoreAppend(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestListCursor_StableAfterLoadMoreAppend(t *testing.T) {
+	c := openListController(t, "ec2")
 
 	seed := wave3LoadMoreResources(200, 0)
 	c.ApplyResourcesLoaded("ec2", seed, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-p2"}, false)
@@ -262,8 +262,8 @@ func wave3RenderListBody(t *testing.T, c *app.Controller, shortName string) stri
 	return m.RenderList(*lb)
 }
 
-func TestWave3RenderList_LoadMoreHint_ShownWhenTruncated(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestRenderList_LoadMoreHint_ShownWhenTruncated(t *testing.T) {
+	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(5, 0), &resource.PaginationMeta{
 		IsTruncated: true, NextToken: "tok",
 	}, false)
@@ -274,8 +274,8 @@ func TestWave3RenderList_LoadMoreHint_ShownWhenTruncated(t *testing.T) {
 	}
 }
 
-func TestWave3RenderList_LoadMoreHint_FilterAwareVariant(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestRenderList_LoadMoreHint_FilterAwareVariant(t *testing.T) {
+	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(5, 0), &resource.PaginationMeta{
 		IsTruncated: true, NextToken: "tok",
 	}, false)
@@ -287,8 +287,8 @@ func TestWave3RenderList_LoadMoreHint_FilterAwareVariant(t *testing.T) {
 	}
 }
 
-func TestWave3RenderList_LoadMoreHint_HiddenWhenNotTruncated(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestRenderList_LoadMoreHint_HiddenWhenNotTruncated(t *testing.T) {
+	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(5, 0), &resource.PaginationMeta{
 		IsTruncated: false,
 	}, false)
@@ -299,8 +299,8 @@ func TestWave3RenderList_LoadMoreHint_HiddenWhenNotTruncated(t *testing.T) {
 	}
 }
 
-func TestWave3RenderList_LoadMoreHint_ShowsLoadingWhileInFlight(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestRenderList_LoadMoreHint_ShowsLoadingWhileInFlight(t *testing.T) {
+	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(5, 0), &resource.PaginationMeta{
 		IsTruncated: true, NextToken: "tok",
 	}, false)
@@ -315,8 +315,8 @@ func TestWave3RenderList_LoadMoreHint_ShowsLoadingWhileInFlight(t *testing.T) {
 	}
 }
 
-func TestWave3RenderList_LoadMoreHint_HiddenAfterAllPagesLoaded(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestRenderList_LoadMoreHint_HiddenAfterAllPagesLoaded(t *testing.T) {
+	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(5, 0), &resource.PaginationMeta{
 		IsTruncated: true, NextToken: "tok",
 	}, false)

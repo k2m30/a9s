@@ -114,10 +114,10 @@ func TestIdentityView_ErrorState(t *testing.T) {
 
 // CopyContent()/FrameTitle() are DEAD on IdentityModel per
 // specs/022-codebase-cleanup/wave3-map-text.md. Live equivalents:
-//   - loaded → copies exact ARN: wave3_text_ports_test.go's
-//     TestWave3Port_IdentityCopy_CopiesExactARN (handleCopy/rsKindIdentity).
-//   - loading → copy is a no-op: wave3_text_ports_test.go's
-//     TestWave3Port_IdentityCopy_NoOpWhileLoading.
+//   - loaded → copies exact ARN: text_ports_test.go's
+//     TestPort_IdentityCopy_CopiesExactARN (handleCopy/rsKindIdentity).
+//   - loading → copy is a no-op: text_ports_test.go's
+//     TestPort_IdentityCopy_NoOpWhileLoading.
 //   - FrameTitle: no live branch reads IdentityModel.FrameTitle() at all —
 //     the identity screen has no rs.helpContext/frame-title dependency on it.
 

@@ -1,6 +1,6 @@
 package unit
 
-// aws_enrichment_wave4_test.go — Deep-branch coverage for Wave-2 enrichers.
+// aws_enrichment_waf_logs_ebs_test.go — Deep-branch coverage for Wave-2 enrichers.
 //
 // Enrichers covered:
 //   - EnrichWAFLogging

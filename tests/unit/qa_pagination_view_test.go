@@ -5,8 +5,8 @@ package unit
 // These tests exercise 'M' key (LoadMore) Update() behavior when truncated,
 // non-truncated, or already loading. The FrameTitle()/Append format and
 // cursor-stability pins this file used to carry have been ported onto the
-// live Controller seam (see wave3_pagination_frametitle_ports_test.go and
-// wave3_list_loadmore_ports_test.go) since ResourceListModel.FrameTitle() is
+// live Controller seam (see pagination_frametitle_ports_test.go and
+// list_loadmore_ports_test.go) since ResourceListModel.FrameTitle() is
 // dead code.
 //
 // Phase 0+1 prerequisites (must be merged before these compile):

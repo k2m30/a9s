@@ -5,8 +5,8 @@ package unit
 //
 // Sections A, B (basic), and E (retry) are already covered elsewhere.
 // Sections F/G/H/I's ResourceListModel-driven pins have been ported onto the
-// live Controller seam — see wave3_pagination_frametitle_ports_test.go and
-// wave3_list_loadmore_ports_test.go — since ResourceListModel.FrameTitle()
+// live Controller seam — see pagination_frametitle_ports_test.go and
+// list_loadmore_ports_test.go — since ResourceListModel.FrameTitle()
 // is dead code.
 // This file tests:
 //   - D: Top-Level Pagination Correctness (large-count multi-page fetchers)

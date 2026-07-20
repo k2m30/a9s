@@ -142,7 +142,7 @@ func def17Page2Resources(offset, n int) []resource.Resource {
 func TestLoadMore_TUI_ColdOpen_NoDuplicates(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	registerDef17S3Fetcher(t)
-	const profile, region = "def17-tui-profile", "us-east-1"
+	const profile, region = "tui-profile", "us-east-1"
 
 	m := tui.New(profile, region,
 		tui.WithClients(demo.NewServiceClients()),
@@ -295,7 +295,7 @@ func TestLoadMore_TokenPresent_AfterColdOpen(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
 	s := session.New()
-	s.Profile = "def17-cursor-profile"
+	s.Profile = "cursor-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
@@ -339,7 +339,7 @@ func TestLoadMore_AppendDedup_Backstop(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
 	s := session.New()
-	s.Profile = "def17-dedup-profile"
+	s.Profile = "dedup-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
@@ -406,7 +406,7 @@ func TestLoadMore_AppendDedup_Backstop(t *testing.T) {
 func TestLoadMore_PersistedPair_NeverMismatched(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
-	const profile, region = "def17-pair-profile", "us-east-1"
+	const profile, region = "pair-profile", "us-east-1"
 
 	s := session.New()
 	s.Profile = profile

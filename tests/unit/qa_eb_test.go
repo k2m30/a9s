@@ -131,7 +131,7 @@ func TestFetchEBEnvironments_EmptyResponse(t *testing.T) {
 
 func TestFetchEBEnvironments_APIError(t *testing.T) {
 	mock := &mockEBClient{
-		err: &mockAPIError{code: "InvalidParameterValue", message: "invalid"},
+		err: &MockAPIError{Code: "InvalidParameterValue", Message: "invalid"},
 	}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {

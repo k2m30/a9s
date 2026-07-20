@@ -70,8 +70,8 @@
 // TestQA_EC2_A13_1_LoadingState, TestQA_EC2_A14_1_TerminalTooNarrow,
 // TestQA_EC2_A14_5_TerminalTooShort, TestQA_EC2_D1_FullNavigationStack;
 // qa_load_more_dedup_test.go: TestLoadMore_TUI_ColdOpen_NoDuplicates;
-// wave3_detail_ports_test.go:
-// TestWave3_Detail_EnterOnNavigableField_TUIKeyRoute_NavigatesToTarget) all
+// detail_ports_test.go:
+// Test_Detail_EnterOnNavigableField_TUIKeyRoute_NavigatesToTarget) all
 // already carry a t.Cleanup(func() { m.CloseController() }) placed
 // immediately after construction, after their existing t.TempDir()/t.Setenv
 // line, so LIFO cleanup order closes the controller before testing.T's own

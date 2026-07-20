@@ -1,4 +1,4 @@
-// fakes_coverage_restore_test.go contains fake AWS service client implementations
+// fakes_related_checkers_misc_test.go contains fake AWS service client implementations
 // used by the coverage-restoration tests across athena, eventbridge_rule, backup,
 // redshift, tg, and pipeline related checkers.
 package unit_test

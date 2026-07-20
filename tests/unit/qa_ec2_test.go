@@ -1287,8 +1287,8 @@ func TestQA_EC2_D8_DetailToYAMLAndBackToDetail(t *testing.T) {
 // no-match / empty-query branches are now pinned on the live
 // app.Controller+ActionSetFilter seam: see
 // TestWave3ListFilter_MatchesFieldsValue_{PrivateIP,PublicIP,InstanceType},
-// TestWave3ListFilter_MatchesFindingsPhrase_CaseInsensitive
-// (tests/unit/wave3_list_ports_test.go), and TestListFilter_MatchingRowsOnly,
+// TestListFilter_MatchesFindingsPhrase_CaseInsensitive
+// (tests/unit/list_ports_test.go), and TestListFilter_MatchingRowsOnly,
 // TestListFilter_NoMatchProducesZeroRows, TestListFilter_EmptyFilterShowsAll,
 // TestListFilter_S3_MatchesBucketName (core/app/list_test.go).
 // ===========================================================================
@@ -1336,7 +1336,7 @@ func TestQA_EC2_LifecycleColumnData(t *testing.T) {
 
 // TestQA_EC2_FilterByLifecycle (views.FilterResources("spot", ...)) removed —
 // same Fields-value substring-match branch already pinned generically by
-// TestWave3ListFilter_MatchesFieldsValue_InstanceType (wave3_list_ports_test.go)
+// TestListFilter_MatchesFieldsValue_InstanceType (list_ports_test.go)
 // on the live app.Controller+ActionSetFilter seam.
 
 func TestQA_EC2_DetailShowsLifecycle(t *testing.T) {

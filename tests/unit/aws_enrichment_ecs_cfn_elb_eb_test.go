@@ -1,6 +1,7 @@
 package unit
 
-// aws_enrichment_wave3_test.go — Behavioral tests for Wave-3 enrichers.
+// aws_enrichment_ecs_cfn_elb_eb_test.go — Behavioral tests for the ECS, CFN,
+// ELB, and EB enrichers.
 //
 // Enrichers covered:
 //   - EnrichECSServices      (line 1715)
@@ -42,9 +43,9 @@ import (
 // ECS fakes — shared by ECSServices, ECSClusters, ECSTasks
 // =============================================================================
 
-// ecsWave3Fake embeds ECSAPI and overrides DescribeServices, DescribeClusters,
+// fakeECSEnricher embeds ECSAPI and overrides DescribeServices, DescribeClusters,
 // and DescribeTasks for Wave-3 tests.
-type ecsWave3Fake struct {
+type fakeECSEnricher struct {
 	awsclient.ECSAPI
 
 	// DescribeServices
@@ -60,7 +61,7 @@ type ecsWave3Fake struct {
 	descTasksErr error
 }
 
-func (f *ecsWave3Fake) DescribeServices(
+func (f *fakeECSEnricher) DescribeServices(
 	_ context.Context,
 	_ *ecs.DescribeServicesInput,
 	_ ...func(*ecs.Options),
@@ -74,7 +75,7 @@ func (f *ecsWave3Fake) DescribeServices(
 	return &ecs.DescribeServicesOutput{}, nil
 }
 
-func (f *ecsWave3Fake) DescribeClusters(
+func (f *fakeECSEnricher) DescribeClusters(
 	_ context.Context,
 	_ *ecs.DescribeClustersInput,
 	_ ...func(*ecs.Options),
@@ -88,7 +89,7 @@ func (f *ecsWave3Fake) DescribeClusters(
 	return &ecs.DescribeClustersOutput{}, nil
 }
 
-func (f *ecsWave3Fake) DescribeTasks(
+func (f *fakeECSEnricher) DescribeTasks(
 	_ context.Context,
 	_ *ecs.DescribeTasksInput,
 	_ ...func(*ecs.Options),
@@ -102,8 +103,8 @@ func (f *ecsWave3Fake) DescribeTasks(
 	return &ecs.DescribeTasksOutput{}, nil
 }
 
-// Compile-time check: ecsWave3Fake satisfies ECSAPI.
-var _ awsclient.ECSAPI = (*ecsWave3Fake)(nil)
+// Compile-time check: fakeECSEnricher satisfies ECSAPI.
+var _ awsclient.ECSAPI = (*fakeECSEnricher)(nil)
 
 // =============================================================================
 // EnrichECSServices
@@ -114,7 +115,7 @@ var _ awsclient.ECSAPI = (*ecsWave3Fake)(nil)
 // with summary containing "running" and "desired".
 func TestEnrichECSServices_StuckServiceEmitsBangFinding(t *testing.T) {
 	svcName := "my-service"
-	fake := &ecsWave3Fake{
+	fake := &fakeECSEnricher{
 		descSvcOut: &ecs.DescribeServicesOutput{
 			Services: []ecstypes.Service{
 				{
@@ -164,7 +165,7 @@ func TestEnrichECSServices_StuckServiceEmitsBangFinding(t *testing.T) {
 // rollout FAILED" in the summary.
 func TestEnrichECSServices_DeploymentRolloutFailedEmitsFinding(t *testing.T) {
 	svcName := "failing-svc"
-	fake := &ecsWave3Fake{
+	fake := &fakeECSEnricher{
 		descSvcOut: &ecs.DescribeServicesOutput{
 			Services: []ecstypes.Service{
 				{
@@ -214,7 +215,7 @@ func TestEnrichECSServices_DeploymentRolloutFailedEmitsFinding(t *testing.T) {
 // DescribeServices marks Truncated=true (no finding) and surfaces a composite error
 // containing the enricher prefix and the failing resource ID.
 func TestEnrichECSServices_APIErrorSetsTruncated(t *testing.T) {
-	fake := &ecsWave3Fake{
+	fake := &fakeECSEnricher{
 		descSvcErr: errors.New("simulated DescribeServices error"),
 	}
 	clients := &awsclient.ServiceClients{ECS: fake}
@@ -251,7 +252,7 @@ func TestEnrichECSServices_APIErrorSetsTruncated(t *testing.T) {
 // desired == running and no deployment failures produces no finding.
 func TestEnrichECSServices_HealthyServiceNoFinding(t *testing.T) {
 	svcName := "healthy-svc"
-	fake := &ecsWave3Fake{
+	fake := &fakeECSEnricher{
 		descSvcOut: &ecs.DescribeServicesOutput{
 			Services: []ecstypes.Service{
 				{
@@ -291,7 +292,7 @@ func TestEnrichECSServices_HealthyServiceNoFinding(t *testing.T) {
 func TestEnrichECSServices_RecentEventUnableToPlaceEmitsFinding(t *testing.T) {
 	svcName := "placement-svc"
 	recentTime := time.Now().Add(-1 * time.Minute)
-	fake := &ecsWave3Fake{
+	fake := &fakeECSEnricher{
 		descSvcOut: &ecs.DescribeServicesOutput{
 			Services: []ecstypes.Service{
 				{
@@ -337,7 +338,7 @@ func TestEnrichECSServices_RecentEventUnableToPlaceEmitsFinding(t *testing.T) {
 // pendingTasksCount > 0 produces a "~" finding.
 func TestEnrichECSClusters_PendingTasksEmitsFinding(t *testing.T) {
 	clusterName := "prod-cluster"
-	fake := &ecsWave3Fake{
+	fake := &fakeECSEnricher{
 		descClustersOut: &ecs.DescribeClustersOutput{
 			Clusters: []ecstypes.Cluster{
 				{
@@ -381,7 +382,7 @@ func TestEnrichECSClusters_PendingTasksEmitsFinding(t *testing.T) {
 // running==0 but registered>0 produces a "~" finding.
 func TestEnrichECSClusters_NoRunningTasksWithInstancesEmitsFinding(t *testing.T) {
 	clusterName := "idle-cluster"
-	fake := &ecsWave3Fake{
+	fake := &fakeECSEnricher{
 		descClustersOut: &ecs.DescribeClustersOutput{
 			Clusters: []ecstypes.Cluster{
 				{
@@ -421,7 +422,7 @@ func TestEnrichECSClusters_NoRunningTasksWithInstancesEmitsFinding(t *testing.T)
 // aggregate issue badge (Truncated stays false) — the per-row "?" is the
 // correct signal, and it keeps a batch failure from becoming invisible.
 func TestEnrichECSClusters_BatchErrorMarksRowsTruncatedIDsNotBadge(t *testing.T) {
-	fake := &ecsWave3Fake{
+	fake := &fakeECSEnricher{
 		descClustersErr: errors.New("simulated DescribeClusters error"),
 	}
 	clients := &awsclient.ServiceClients{ECS: fake}
@@ -457,7 +458,7 @@ func TestEnrichECSClusters_BatchErrorMarksRowsTruncatedIDsNotBadge(t *testing.T)
 // running > 0 and no pending tasks produces no finding.
 func TestEnrichECSClusters_HealthyClusterNoFinding(t *testing.T) {
 	clusterName := "healthy-cluster"
-	fake := &ecsWave3Fake{
+	fake := &fakeECSEnricher{
 		descClustersOut: &ecs.DescribeClustersOutput{
 			Clusters: []ecstypes.Cluster{
 				{
@@ -498,7 +499,7 @@ func TestEnrichECSClusters_HealthyClusterNoFinding(t *testing.T) {
 func TestEnrichECSTasks_TaskFailedToStartEmitsFinding(t *testing.T) {
 	taskID := "abc12345678901234567890123456789012"
 	taskARN := "arn:aws:ecs:us-east-1:123456789012:task/my-cluster/" + taskID
-	fake := &ecsWave3Fake{
+	fake := &fakeECSEnricher{
 		descTasksOut: &ecs.DescribeTasksOutput{
 			Tasks: []ecstypes.Task{
 				{
@@ -543,7 +544,7 @@ func TestEnrichECSTasks_ContainerNonZeroExitEmitsFinding(t *testing.T) {
 	taskID := "def12345678901234567890123456789012"
 	taskARN := "arn:aws:ecs:us-east-1:123456789012:task/my-cluster/" + taskID
 	exitCode := int32(137)
-	fake := &ecsWave3Fake{
+	fake := &fakeECSEnricher{
 		descTasksOut: &ecs.DescribeTasksOutput{
 			Tasks: []ecstypes.Task{
 				{
@@ -584,7 +585,7 @@ func TestEnrichECSTasks_ContainerNonZeroExitEmitsFinding(t *testing.T) {
 // and surface a composite error — matching the ecs-svc/ecs-clusters convention
 // for "!" bang-severity enrichers.
 func TestEnrichECSTasks_APIErrorSetsTruncated(t *testing.T) {
-	fake := &ecsWave3Fake{
+	fake := &fakeECSEnricher{
 		descTasksErr: errors.New("simulated DescribeTasks error"),
 	}
 	clients := &awsclient.ServiceClients{ECS: fake}
@@ -614,7 +615,7 @@ func TestEnrichECSTasks_APIErrorSetsTruncated(t *testing.T) {
 // matching the ecs-svc enricher's shape (both are "!" bang-severity enrichers,
 // unlike the "~"-only ecs-clusters enricher which intentionally keeps err nil).
 func TestEnrichECSTasks_BatchErrorMarksRowsTruncatedIDsNotBadgeAndReturnsErr(t *testing.T) {
-	fake := &ecsWave3Fake{
+	fake := &fakeECSEnricher{
 		descTasksErr: errors.New("simulated DescribeTasks error"),
 	}
 	clients := &awsclient.ServiceClients{ECS: fake}
@@ -655,7 +656,7 @@ func TestEnrichECSTasks_HealthyTaskNoFinding(t *testing.T) {
 	taskID := "ghi12345678901234567890123456789012"
 	taskARN := "arn:aws:ecs:us-east-1:123456789012:task/my-cluster/" + taskID
 	exitCode := int32(0)
-	fake := &ecsWave3Fake{
+	fake := &fakeECSEnricher{
 		descTasksOut: &ecs.DescribeTasksOutput{
 			Tasks: []ecstypes.Task{
 				{
@@ -695,9 +696,9 @@ func TestEnrichECSTasks_HealthyTaskNoFinding(t *testing.T) {
 // CFN fake
 // =============================================================================
 
-// cfnWave3Fake embeds CFNAPI and overrides DescribeStackEvents and
+// fakeCFNEnricher embeds CFNAPI and overrides DescribeStackEvents and
 // DescribeStacks for EnrichCFNStackEvents and EnrichCFNCombined.
-type cfnWave3Fake struct {
+type fakeCFNEnricher struct {
 	awsclient.CFNAPI
 
 	// DescribeStackEvents
@@ -709,7 +710,7 @@ type cfnWave3Fake struct {
 	stacksErr error
 }
 
-func (f *cfnWave3Fake) DescribeStackEvents(
+func (f *fakeCFNEnricher) DescribeStackEvents(
 	_ context.Context,
 	_ *cfnsvc.DescribeStackEventsInput,
 	_ ...func(*cfnsvc.Options),
@@ -720,7 +721,7 @@ func (f *cfnWave3Fake) DescribeStackEvents(
 	return &cfnsvc.DescribeStackEventsOutput{StackEvents: f.stackEvents}, nil
 }
 
-func (f *cfnWave3Fake) DescribeStacks(
+func (f *fakeCFNEnricher) DescribeStacks(
 	_ context.Context,
 	_ *cfnsvc.DescribeStacksInput,
 	_ ...func(*cfnsvc.Options),
@@ -735,7 +736,7 @@ func (f *cfnWave3Fake) DescribeStacks(
 }
 
 // Compile-time check.
-var _ awsclient.CFNAPI = (*cfnWave3Fake)(nil)
+var _ awsclient.CFNAPI = (*fakeCFNEnricher)(nil)
 
 // =============================================================================
 // EnrichCFNStackEvents
@@ -745,7 +746,7 @@ var _ awsclient.CFNAPI = (*cfnWave3Fake)(nil)
 // event with a _FAILED status produces a "!" finding.
 func TestEnrichCFNStackEvents_FailedEventEmitsBangFinding(t *testing.T) {
 	stackID := "arn:aws:cloudformation:us-east-1:123456789012:stack/my-stack/abc"
-	fake := &cfnWave3Fake{
+	fake := &fakeCFNEnricher{
 		stackEvents: []cfntypes.StackEvent{
 			{
 				ResourceStatus:       cfntypes.ResourceStatusCreateFailed,
@@ -788,7 +789,7 @@ func TestEnrichCFNStackEvents_FailedEventEmitsBangFinding(t *testing.T) {
 // surfaces a composite error containing the enricher prefix and the failing stack ID.
 func TestEnrichCFNStackEvents_APIErrorSetsPerResourceTruncation(t *testing.T) {
 	stackID := "arn:aws:cloudformation:us-east-1:123456789012:stack/err-stack/xyz"
-	fake := &cfnWave3Fake{
+	fake := &fakeCFNEnricher{
 		stackEventsErr: errors.New("simulated DescribeStackEvents error"),
 	}
 	clients := &awsclient.ServiceClients{CloudFormation: fake}
@@ -824,7 +825,7 @@ func TestEnrichCFNStackEvents_APIErrorSetsPerResourceTruncation(t *testing.T) {
 // only successful events produces no finding.
 func TestEnrichCFNStackEvents_NoFailedEventsNoFinding(t *testing.T) {
 	stackID := "arn:aws:cloudformation:us-east-1:123456789012:stack/ok-stack/ok1"
-	fake := &cfnWave3Fake{
+	fake := &fakeCFNEnricher{
 		stackEvents: []cfntypes.StackEvent{
 			{
 				ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
@@ -857,8 +858,8 @@ func TestEnrichCFNStackEvents_NoFailedEventsNoFinding(t *testing.T) {
 // ELB fake
 // =============================================================================
 
-// elbWave3Fake embeds ELBv2API and overrides DescribeLoadBalancerAttributes.
-type elbWave3Fake struct {
+// fakeELBEnricher embeds ELBv2API and overrides DescribeLoadBalancerAttributes.
+type fakeELBEnricher struct {
 	awsclient.ELBv2API
 
 	// perLBAttrs maps LB ARN → attributes list returned
@@ -866,7 +867,7 @@ type elbWave3Fake struct {
 	errOnLBARN string // ARN that triggers an error
 }
 
-func (f *elbWave3Fake) DescribeLoadBalancerAttributes(
+func (f *fakeELBEnricher) DescribeLoadBalancerAttributes(
 	_ context.Context,
 	in *elbv2svc.DescribeLoadBalancerAttributesInput,
 	_ ...func(*elbv2svc.Options),
@@ -880,7 +881,7 @@ func (f *elbWave3Fake) DescribeLoadBalancerAttributes(
 }
 
 // Compile-time check.
-var _ awsclient.ELBv2API = (*elbWave3Fake)(nil)
+var _ awsclient.ELBv2API = (*fakeELBEnricher)(nil)
 
 // =============================================================================
 // EnrichELBAttributes
@@ -901,7 +902,7 @@ var _ awsclient.ELBv2API = (*elbWave3Fake)(nil)
 // this test was simply never updated to match.
 func TestEnrichELBAttributes_BothMisconfigurations_TildeFinding(t *testing.T) {
 	lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/abc"
-	fake := &elbWave3Fake{
+	fake := &fakeELBEnricher{
 		perLBAttrs: map[string][]elbtypes.LoadBalancerAttribute{
 			lbARN: {
 				{Key: aws.String("deletion_protection.enabled"), Value: aws.String("false")},
@@ -931,7 +932,7 @@ func TestEnrichELBAttributes_BothMisconfigurations_TildeFinding(t *testing.T) {
 // that only deletion protection missing produces a "~" finding (not promoted).
 func TestEnrichELBAttributes_OnlyDeletionProtectionMissing_TildeFinding(t *testing.T) {
 	lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/partial-lb/def"
-	fake := &elbWave3Fake{
+	fake := &fakeELBEnricher{
 		perLBAttrs: map[string][]elbtypes.LoadBalancerAttribute{
 			lbARN: {
 				{Key: aws.String("deletion_protection.enabled"), Value: aws.String("false")},
@@ -963,7 +964,7 @@ func TestEnrichELBAttributes_OnlyDeletionProtectionMissing_TildeFinding(t *testi
 // findings, so a coverage gap must never lower-bound the issue badge.
 func TestEnrichELBAttributes_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/err-lb/ghi"
-	fake := &elbWave3Fake{
+	fake := &fakeELBEnricher{
 		errOnLBARN: lbARN,
 		perLBAttrs: map[string][]elbtypes.LoadBalancerAttribute{},
 	}
@@ -987,7 +988,7 @@ func TestEnrichELBAttributes_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 // both deletion protection and access logs enabled produces no finding.
 func TestEnrichELBAttributes_WellConfiguredLB_NoFinding(t *testing.T) {
 	lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/secure-lb/jkl"
-	fake := &elbWave3Fake{
+	fake := &fakeELBEnricher{
 		perLBAttrs: map[string][]elbtypes.LoadBalancerAttribute{
 			lbARN: {
 				{Key: aws.String("deletion_protection.enabled"), Value: aws.String("true")},
@@ -1011,9 +1012,9 @@ func TestEnrichELBAttributes_WellConfiguredLB_NoFinding(t *testing.T) {
 // EnrichEBEnvironmentHealth
 // =============================================================================
 
-// ebHealthWave3Fake embeds ElasticBeanstalkAPI and overrides
+// fakeEBHealthEnricher embeds ElasticBeanstalkAPI and overrides
 // DescribeEnvironmentHealth.
-type ebHealthWave3Fake struct {
+type fakeEBHealthEnricher struct {
 	awsclient.ElasticBeanstalkAPI
 
 	// perEnvCauses maps environment name → causes list
@@ -1021,7 +1022,7 @@ type ebHealthWave3Fake struct {
 	errOnEnvName string
 }
 
-func (f *ebHealthWave3Fake) DescribeEnvironmentHealth(
+func (f *fakeEBHealthEnricher) DescribeEnvironmentHealth(
 	_ context.Context,
 	in *elasticbeanstalk.DescribeEnvironmentHealthInput,
 	_ ...func(*elasticbeanstalk.Options),
@@ -1038,14 +1039,14 @@ func (f *ebHealthWave3Fake) DescribeEnvironmentHealth(
 }
 
 // Compile-time check.
-var _ awsclient.ElasticBeanstalkAPI = (*ebHealthWave3Fake)(nil)
+var _ awsclient.ElasticBeanstalkAPI = (*fakeEBHealthEnricher)(nil)
 
 // TestEnrichEBEnvironmentHealth_CausesEmitsTildeFinding verifies that a non-empty
 // Causes slice produces a "~" finding with "EB causes:" in the summary.
 func TestEnrichEBEnvironmentHealth_CausesEmitsTildeFinding(t *testing.T) {
 	envName := "prod-env"
 	envID := "e-abcdef1234"
-	fake := &ebHealthWave3Fake{
+	fake := &fakeEBHealthEnricher{
 		perEnvCauses: map[string][]string{
 			envName: {"No data available for some instances"},
 		},
@@ -1086,7 +1087,7 @@ func TestEnrichEBEnvironmentHealth_CausesEmitsTildeFinding(t *testing.T) {
 func TestEnrichEBEnvironmentHealth_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	envName := "err-env"
 	envID := "e-errenv1234"
-	fake := &ebHealthWave3Fake{
+	fake := &fakeEBHealthEnricher{
 		perEnvCauses: map[string][]string{},
 		errOnEnvName: envName,
 	}
@@ -1118,7 +1119,7 @@ func TestEnrichEBEnvironmentHealth_APIErrorMarksRowTruncatedIDNotBadge(t *testin
 func TestEnrichEBEnvironmentHealth_NoCauses_NoFinding(t *testing.T) {
 	envName := "healthy-env"
 	envID := "e-healthy1234"
-	fake := &ebHealthWave3Fake{
+	fake := &fakeEBHealthEnricher{
 		perEnvCauses: map[string][]string{
 			envName: {}, // empty causes
 		},
@@ -1152,7 +1153,7 @@ func TestEnrichEBEnvironmentHealth_NoCauses_NoFinding(t *testing.T) {
 // finding from events (events win over drift on conflict) and IssueCount > 0.
 func TestEnrichCFNCombined_EventsAndDriftMerged(t *testing.T) {
 	stackID := "arn:aws:cloudformation:us-east-1:123456789012:stack/combined-stack/c01"
-	fake := &cfnWave3Fake{
+	fake := &fakeCFNEnricher{
 		stackEvents: []cfntypes.StackEvent{
 			{
 				ResourceStatus:    cfntypes.ResourceStatusUpdateFailed,
@@ -1206,7 +1207,7 @@ func TestEnrichCFNCombined_EventsAndDriftMerged(t *testing.T) {
 // "~" finding and IssueCount == 0.
 func TestEnrichCFNCombined_DriftOnlyNoEventFailure_TildeFinding(t *testing.T) {
 	stackID := "arn:aws:cloudformation:us-east-1:123456789012:stack/drift-only-stack/d01"
-	fake := &cfnWave3Fake{
+	fake := &fakeCFNEnricher{
 		stackEvents: []cfntypes.StackEvent{
 			{
 				ResourceStatus:    cfntypes.ResourceStatusCreateComplete,

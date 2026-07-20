@@ -236,7 +236,7 @@ func TestS3_FetcherWithNotifications_AbsentBucket_EmptyFields(t *testing.T) {
 	result, err := awsclient.FetchS3BucketsPageWithNotifications(
 		context.Background(),
 		listMock,
-		&s3EmptyNotificationFake{},
+		&S3BucketNotificationFake{Output: &s3.GetBucketNotificationConfigurationOutput{}},
 		"",
 	)
 	if err != nil {
@@ -257,15 +257,22 @@ func TestS3_FetcherWithNotifications_AbsentBucket_EmptyFields(t *testing.T) {
 	}
 }
 
-// s3EmptyNotificationFake returns an empty notification config for every bucket.
-type s3EmptyNotificationFake struct{}
+// S3BucketNotificationFake implements S3GetBucketNotificationConfigurationAPI
+// with a caller-supplied result. Exported so tests/unit_test package files
+// (which cannot share unexported identifiers with this package) can reuse it
+// instead of defining their own copy — see helpers_uncovered_test.go's
+// mockS3GetBucketNotificationClient alias.
+type S3BucketNotificationFake struct {
+	Output *s3.GetBucketNotificationConfigurationOutput
+	Err    error
+}
 
-func (f *s3EmptyNotificationFake) GetBucketNotificationConfiguration(
+func (f *S3BucketNotificationFake) GetBucketNotificationConfiguration(
 	_ context.Context,
 	_ *s3.GetBucketNotificationConfigurationInput,
 	_ ...func(*s3.Options),
 ) (*s3.GetBucketNotificationConfigurationOutput, error) {
-	return &s3.GetBucketNotificationConfigurationOutput{}, nil
+	return f.Output, f.Err
 }
 
 // ---------------------------------------------------------------------------

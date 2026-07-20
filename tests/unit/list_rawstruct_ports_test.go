@@ -1,4 +1,4 @@
-// wave3_list_rawstruct_ports_test.go — Wave 3 (022-codebase-cleanup) PORT for
+// list_rawstruct_ports_test.go — live-seam port for
 // qa_list_rawstruct_test.go + qa_list_rawstruct_child_views_test.go
 // (specs/022-codebase-cleanup/wave3-status.md: "RawStruct-over-Fields
 // precedence + Humanize column flag pins — UNIQUE, exist nowhere else; port
@@ -7,7 +7,7 @@
 // Both legacy files drive views.NewResourceList(...).Update(...).View() —
 // dead code in production (the controller/ViewState render path is the only
 // live consumer of core/app/list_columns.go's listExtractCellValue,
-// exactly as wave3_list_ports_test.go's header already documents for the
+// exactly as list_ports_test.go's header already documents for the
 // filter/checker-carry/marker-col pins). This file re-pins every RawStruct/
 // Humanize assertion the two legacy files made, driven instead through the
 // live seam: Controller.ApplyResourcesLoaded -> buildListBody ->
@@ -52,8 +52,8 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Helpers (distinctly named — wave3ListController already exists in
-// wave3_list_ports_test.go and is reused directly for top-level types).
+// Helpers (distinctly named — openListController already exists in
+// list_ports_test.go and is reused directly for top-level types).
 // ---------------------------------------------------------------------------
 
 // wave3RowCellsJoined applies resources to c under typeName and returns the
@@ -74,7 +74,7 @@ func wave3RowCellsJoined(t *testing.T, c *app.Controller, typeName string, resou
 // wave3ChildListController builds a Controller pre-navigated to a
 // ScreenChildList for a resource.GetChildType-registered shortName —
 // child types (log_streams, tg_health, ecs_svc_events, ...) never appear in
-// the main catalog/menu, so they cannot go through wave3ListController's
+// the main catalog/menu, so they cannot go through openListController's
 // ActionCommand navigation. Mirrors PushChildListScreen's own doc: "used by
 // NewChildResourceList to ensure topListState() is non-nil before Patch*
 // calls" — the same construction the live child-list code path uses.
@@ -103,7 +103,7 @@ func wave3ChildListController(t *testing.T, shortName string) *app.Controller {
 	return c
 }
 
-// wave3ListControllerWithConfig mirrors wave3ListController but injects a
+// openListControllerWithConfig mirrors openListController but injects a
 // caller-supplied *config.ViewsConfig via SetViewConfig before navigating —
 // SetViewConfig's own doc requires it be called "before the first
 // Snapshot()", so it must run before Apply(ActionCommand), which is the
@@ -112,7 +112,7 @@ func wave3ChildListController(t *testing.T, shortName string) *app.Controller {
 // (never nil) to exactly replicate the legacy harness's `cfg :=
 // configForType(shortName)` — see wave3ChildListController's doc for why a
 // nil vc silently swaps some types onto the wrong column layout.
-func wave3ListControllerWithConfig(t *testing.T, shortName string, cfg *config.ViewsConfig) *app.Controller {
+func openListControllerWithConfig(t *testing.T, shortName string, cfg *config.ViewsConfig) *app.Controller {
 	t.Helper()
 	c := newTestController(t)
 	c.SetViewConfig(cfg)
@@ -121,13 +121,13 @@ func wave3ListControllerWithConfig(t *testing.T, shortName string, cfg *config.V
 }
 
 // ===========================================================================
-// 1. TestWave3ListRawStruct_AllTypes — port of TestQA_ListRawStruct_AllTypes.
+// 1. TestListRawStruct_AllTypes — port of TestQA_ListRawStruct_AllTypes.
 // Subsumes the legacy file's 7 individual per-type tests (EC2/RDS/Redis/
 // DocDB/EKS/Secrets/S3), which that file's own table comment says are
 // "already covered individually above, included for completeness".
 // ===========================================================================
 
-func TestWave3ListRawStruct_AllTypes(t *testing.T) {
+func TestListRawStruct_AllTypes(t *testing.T) {
 	tests := []struct {
 		shortName   string
 		rawStruct   any
@@ -196,7 +196,7 @@ func TestWave3ListRawStruct_AllTypes(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.shortName, func(t *testing.T) {
-			c := wave3ListControllerWithConfig(t, tc.shortName, configForType(tc.shortName))
+			c := openListControllerWithConfig(t, tc.shortName, configForType(tc.shortName))
 			res := resource.Resource{ID: "test-id", Name: "test-name", RawStruct: tc.rawStruct}
 			joined := wave3RowCellsJoined(t, c, tc.shortName, []resource.Resource{res})
 			for _, expected := range tc.expectInRow {
@@ -209,12 +209,12 @@ func TestWave3ListRawStruct_AllTypes(t *testing.T) {
 }
 
 // ===========================================================================
-// 2. TestWave3ListRawStruct_AllTypes_OverridesFields — port of
+// 2. TestListRawStruct_AllTypes_OverridesFields — port of
 // TestQA_ListRawStruct_AllTypes_OverridesFields (RawStruct-over-Fields
 // precedence, plus the documented status-column exception where Fields wins).
 // ===========================================================================
 
-func TestWave3ListRawStruct_AllTypes_OverridesFields(t *testing.T) {
+func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 	tests := []struct {
 		shortName   string
 		rawStruct   any
@@ -313,7 +313,7 @@ func TestWave3ListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.shortName, func(t *testing.T) {
-			c := wave3ListControllerWithConfig(t, tc.shortName, configForType(tc.shortName))
+			c := openListControllerWithConfig(t, tc.shortName, configForType(tc.shortName))
 			res := resource.Resource{ID: "test-id", Name: "test-name", Fields: tc.wrongFields, RawStruct: tc.rawStruct}
 			joined := wave3RowCellsJoined(t, c, tc.shortName, []resource.Resource{res})
 
@@ -332,7 +332,7 @@ func TestWave3ListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 }
 
 // ===========================================================================
-// 3. TestWave3ListRawStruct_WithProductionViewsYAML — port of
+// 3. TestListRawStruct_WithProductionViewsYAML — port of
 // TestQA_ListRawStruct_WithProductionViewsYAML: validates against the real
 // on-disk .a9s/views/ config (config.LoadFromDirs), not the built-in
 // config.DefaultConfig() every other test in this file uses — a genuine
@@ -340,7 +340,7 @@ func TestWave3ListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 // from (go run ./cmd/viewsgen/).
 // ===========================================================================
 
-func TestWave3ListRawStruct_WithProductionViewsYAML(t *testing.T) {
+func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 	cfg, err := config.LoadFromDirs([]string{filepath.Join("..", "..", ".a9s", "views")})
 	if err != nil {
 		t.Fatalf("failed to load production views dir: %v", err)
@@ -356,7 +356,7 @@ func TestWave3ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			PrivateIpAddress: new("172.16.0.100"),
 			State:            &ec2types.InstanceState{Name: ec2types.InstanceStateNameStopped},
 		}
-		c := wave3ListControllerWithConfig(t, "ec2", cfg)
+		c := openListControllerWithConfig(t, "ec2", cfg)
 		res := resource.Resource{ID: "i-prod-config-test", Name: "prod-test", Fields: map[string]string{"state": "WRONG"}, RawStruct: inst}
 		joined := wave3RowCellsJoined(t, c, "ec2", []resource.Resource{res})
 		if !strings.Contains(joined, "wrong") {
@@ -380,7 +380,7 @@ func TestWave3ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			MultiAZ:              new(true),
 			Endpoint:             &rdstypes.Endpoint{Address: new("prod-rds-test.cluster-xyz.us-west-2.rds.amazonaws.com")},
 		}
-		c := wave3ListControllerWithConfig(t, "dbi", cfg)
+		c := openListControllerWithConfig(t, "dbi", cfg)
 		res := resource.Resource{ID: "prod-rds-test", Name: "prod-rds-test", Fields: map[string]string{"endpoint": "WRONG-EP"}, RawStruct: db}
 		joined := wave3RowCellsJoined(t, c, "dbi", []resource.Resource{res})
 		if !strings.Contains(joined, "prod-rds-test.cluster-xyz") {
@@ -399,7 +399,7 @@ func TestWave3ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			MemberClusters:        []string{"prod-redis-test-001", "prod-redis-test-002"},
 			ConfigurationEndpoint: &elasticachetypes.Endpoint{Address: new("prod-redis-test.clustercfg.usw2.cache.amazonaws.com")},
 		}
-		c := wave3ListControllerWithConfig(t, "redis", cfg)
+		c := openListControllerWithConfig(t, "redis", cfg)
 		res := resource.Resource{ID: "prod-redis-test", Name: "prod-redis-test", Fields: map[string]string{"endpoint": "WRONG-EP"}, RawStruct: rg}
 		joined := wave3RowCellsJoined(t, c, "redis", []resource.Resource{res})
 		if !strings.Contains(joined, "prod-redis-test.clustercfg") {
@@ -417,7 +417,7 @@ func TestWave3ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			Status:              new("available"),
 			Endpoint:            new("prod-docdb-test.cluster-abc.us-west-2.docdb.amazonaws.com"),
 		}
-		c := wave3ListControllerWithConfig(t, "dbc", cfg)
+		c := openListControllerWithConfig(t, "dbc", cfg)
 		res := resource.Resource{ID: "prod-docdb-test", Name: "prod-docdb-test", Fields: map[string]string{"endpoint": "WRONG-EP"}, RawStruct: cluster}
 		joined := wave3RowCellsJoined(t, c, "dbc", []resource.Resource{res})
 		if !strings.Contains(joined, "prod-docdb-test.cluster-abc") {
@@ -433,7 +433,7 @@ func TestWave3ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			Endpoint:        new("https://prod-eks-test.gr7.us-west-2.eks.amazonaws.com"),
 			PlatformVersion: new("eks.9"),
 		}
-		c := wave3ListControllerWithConfig(t, "eks", cfg)
+		c := openListControllerWithConfig(t, "eks", cfg)
 		res := resource.Resource{ID: "prod-eks-test", Name: "prod-eks-test", Fields: map[string]string{"endpoint": "WRONG-EP"}, RawStruct: cluster}
 		joined := wave3RowCellsJoined(t, c, "eks", []resource.Resource{res})
 		if !strings.Contains(joined, "prod-eks-test.gr7") {
@@ -443,7 +443,7 @@ func TestWave3ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 
 	t.Run("Secrets", func(t *testing.T) {
 		secret := smtypes.SecretListEntry{Name: new("prod/test/secret"), Description: new("Production test secret")}
-		c := wave3ListControllerWithConfig(t, "secrets", cfg)
+		c := openListControllerWithConfig(t, "secrets", cfg)
 		res := resource.Resource{ID: "prod/test/secret", Name: "prod/test/secret", Fields: map[string]string{"description": "WRONG-DESC"}, RawStruct: secret}
 		joined := wave3RowCellsJoined(t, c, "secrets", []resource.Resource{res})
 		if !strings.Contains(joined, "Production test secret") {
@@ -456,7 +456,7 @@ func TestWave3ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 
 	t.Run("S3", func(t *testing.T) {
 		bucket := s3types.Bucket{Name: new("prod-config-bucket"), CreationDate: new(testTime)}
-		c := wave3ListControllerWithConfig(t, "s3", cfg)
+		c := openListControllerWithConfig(t, "s3", cfg)
 		res := resource.Resource{ID: "prod-config-bucket", Name: "prod-config-bucket", Fields: map[string]string{"creation_date": "WRONG-DATE"}, RawStruct: bucket}
 		joined := wave3RowCellsJoined(t, c, "s3", []resource.Resource{res})
 		if !strings.Contains(joined, "2025-06-15") {
@@ -469,12 +469,12 @@ func TestWave3ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 }
 
 // ===========================================================================
-// 4. TestWave3ListRawStruct_FieldsFallbackWhenNoRawStruct — port of
+// 4. TestListRawStruct_FieldsFallbackWhenNoRawStruct — port of
 // TestQA_ListRawStruct_FieldsFallbackWhenNoRawStruct.
 // ===========================================================================
 
-func TestWave3ListRawStruct_FieldsFallbackWhenNoRawStruct(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "ec2", configForType("ec2"))
+func TestListRawStruct_FieldsFallbackWhenNoRawStruct(t *testing.T) {
+	c := openListControllerWithConfig(t, "ec2", configForType("ec2"))
 	res := resource.Resource{
 		ID:   "i-fallback",
 		Name: "fallback-instance",
@@ -492,7 +492,7 @@ func TestWave3ListRawStruct_FieldsFallbackWhenNoRawStruct(t *testing.T) {
 }
 
 // ===========================================================================
-// 4a. TestWave3ListRawStruct_HumanizeColumn_FieldsFallbackWhenNoRawStruct —
+// 4a. TestListRawStruct_HumanizeColumn_FieldsFallbackWhenNoRawStruct —
 // a Humanize:true, Path-only (Key-less) column must still route through
 // domain.HumanizeStatusPhrase when RawStruct is nil and the raw AWS enum is
 // only reachable via the title-match Fields fallback (a cache-warm row:
@@ -509,8 +509,8 @@ func TestWave3ListRawStruct_FieldsFallbackWhenNoRawStruct(t *testing.T) {
 // column, only the ones explicitly flagged.
 // ===========================================================================
 
-func TestWave3ListRawStruct_HumanizeColumn_FieldsFallbackWhenNoRawStruct(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "transfer", configForType("transfer"))
+func TestListRawStruct_HumanizeColumn_FieldsFallbackWhenNoRawStruct(t *testing.T) {
+	c := openListControllerWithConfig(t, "transfer", configForType("transfer"))
 	res := resource.Resource{
 		ID:   "s-0abc1234def56789a",
 		Name: "s-0abc1234def56789a",
@@ -546,8 +546,8 @@ func TestWave3ListRawStruct_HumanizeColumn_FieldsFallbackWhenNoRawStruct(t *test
 // (string RawStruct), EBS volume/snapshot, AMI, CloudTrail events.
 // ===========================================================================
 
-func TestWave3ListRawStruct_SQS_StringRawStruct(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "sqs", configForType("sqs"))
+func TestListRawStruct_SQS_StringRawStruct(t *testing.T) {
+	c := openListControllerWithConfig(t, "sqs", configForType("sqs"))
 	res := resource.Resource{
 		ID:   "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue",
 		Name: "my-queue",
@@ -569,8 +569,8 @@ func TestWave3ListRawStruct_SQS_StringRawStruct(t *testing.T) {
 	}
 }
 
-func TestWave3ListRawStruct_EBSVolume(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "ebs", configForType("ebs"))
+func TestListRawStruct_EBSVolume(t *testing.T) {
+	c := openListControllerWithConfig(t, "ebs", configForType("ebs"))
 	res := resource.Resource{
 		ID:   "vol-111aabbcc",
 		Name: "prod-data-vol",
@@ -593,8 +593,8 @@ func TestWave3ListRawStruct_EBSVolume(t *testing.T) {
 	}
 }
 
-func TestWave3ListRawStruct_EBSSnapshot(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "ebs-snap", configForType("ebs-snap"))
+func TestListRawStruct_EBSSnapshot(t *testing.T) {
+	c := openListControllerWithConfig(t, "ebs-snap", configForType("ebs-snap"))
 	res := resource.Resource{
 		ID:   "snap-0aabb11cc",
 		Name: "prod-snap-daily",
@@ -617,8 +617,8 @@ func TestWave3ListRawStruct_EBSSnapshot(t *testing.T) {
 	}
 }
 
-func TestWave3ListRawStruct_AMI(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "ami", configForType("ami"))
+func TestListRawStruct_AMI(t *testing.T) {
+	c := openListControllerWithConfig(t, "ami", configForType("ami"))
 	res := resource.Resource{
 		ID:   "ami-0abc111222333444a",
 		Name: "my-web-server-ami",
@@ -641,8 +641,8 @@ func TestWave3ListRawStruct_AMI(t *testing.T) {
 	}
 }
 
-func TestWave3ListRawStruct_CloudTrailEvent(t *testing.T) {
-	c := wave3ListControllerWithConfig(t, "ct-events", configForType("ct-events"))
+func TestListRawStruct_CloudTrailEvent(t *testing.T) {
+	c := openListControllerWithConfig(t, "ct-events", configForType("ct-events"))
 	res := resource.Resource{
 		ID:   "evt-0001-abcd-1234-5678-abcdef012345",
 		Name: "RunInstances",
@@ -664,12 +664,12 @@ func TestWave3ListRawStruct_CloudTrailEvent(t *testing.T) {
 }
 
 // ===========================================================================
-// 6. TestWave3ListRawStruct_ChildViews — table-driven port of the 22 child
+// 6. TestListRawStruct_ChildViews — table-driven port of the 22 child
 // list-view tests in qa_list_rawstruct_child_views_test.go. None of these
 // shortNames appear in the AllTypes table above — every one is unique.
 // ===========================================================================
 
-func TestWave3ListRawStruct_ChildViews(t *testing.T) {
+func TestListRawStruct_ChildViews(t *testing.T) {
 	ts := testTime
 
 	tests := []struct {
@@ -995,7 +995,7 @@ func TestWave3ListRawStruct_ChildViews(t *testing.T) {
 }
 
 // ===========================================================================
-// 2. TestWave3ListRawStruct_S3ObjectSort_UsesNumericByteOrder — port of
+// 2. TestListRawStruct_S3ObjectSort_UsesNumericByteOrder — port of
 // qa_s3_test.go's TestQA_S3_B10_3_ObjectList_SortBySize_UsesNumericByteOrder.
 // s3_objects's default view config sets {Key:"size", SortPath:"Size"} on the
 // Size column (core/config/defaults_databases.go), routing sort through
@@ -1007,7 +1007,7 @@ func TestWave3ListRawStruct_ChildViews(t *testing.T) {
 // controller level.
 // ===========================================================================
 
-func TestWave3ListRawStruct_S3ObjectSort_UsesNumericByteOrder(t *testing.T) {
+func TestListRawStruct_S3ObjectSort_UsesNumericByteOrder(t *testing.T) {
 	objects := []resource.Resource{
 		{
 			ID: "medium.bin", Name: "medium.bin",

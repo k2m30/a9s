@@ -117,7 +117,7 @@ func TestFetchWAFWebACLs_EmptyResponse(t *testing.T) {
 
 func TestFetchWAFWebACLs_APIError(t *testing.T) {
 	mock := &mockWAFv2Client{
-		err: &mockAPIError{code: "WAFInternalErrorException", message: "internal error"},
+		err: &MockAPIError{Code: "WAFInternalErrorException", Message: "internal error"},
 	}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {

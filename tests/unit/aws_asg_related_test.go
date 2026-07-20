@@ -637,7 +637,7 @@ func TestRelated_ASG_AMI_MatchByLaunchTemplate(t *testing.T) {
 	})
 	clients := &awsclient.ServiceClients{
 		EC2:         fakeEC2,
-		AutoScaling: &fakeASGBatch2{},
+		AutoScaling: &fakeASGChecker{},
 	}
 
 	res := resource.Resource{
@@ -670,8 +670,8 @@ func TestRelated_ASG_AMI_MatchByLaunchTemplate(t *testing.T) {
 // Count=0 when the ASG has no LaunchConfigurationName and no LaunchTemplate.
 func TestRelated_ASG_AMI_NoLaunchConfigOrTemplate(t *testing.T) {
 	clients := &awsclient.ServiceClients{
-		EC2:         &fakeEC2Batch2{},
-		AutoScaling: &fakeASGBatch2{},
+		EC2:         &fakeEC2ForASG{},
+		AutoScaling: &fakeASGChecker{},
 	}
 
 	res := resource.Resource{
@@ -786,8 +786,8 @@ func TestRelated_ASG_ELB_WrongRawStruct(t *testing.T) {
 func TestRelated_ASG_Role_MatchByServiceLinkedRole(t *testing.T) {
 	roleARN := "arn:aws:iam::123456789012:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling"
 
-	fakeASG := &fakeASGBatch2{}
-	fakeIAM := &fakeIAMBatch2{}
+	fakeASG := &fakeASGChecker{}
+	fakeIAM := &fakeIAMForASG{}
 	clients := &awsclient.ServiceClients{
 		AutoScaling: fakeASG,
 		IAM:         fakeIAM,
@@ -878,8 +878,8 @@ func TestRelated_ASG_Role_MatchByLaunchConfigInstanceProfile(t *testing.T) {
 // when the ASG has no ServiceLinkedRoleARN and no launch config or template.
 func TestRelated_ASG_Role_NoRoles(t *testing.T) {
 	clients := &awsclient.ServiceClients{
-		AutoScaling: &fakeASGBatch2{},
-		IAM:         &fakeIAMBatch2{},
+		AutoScaling: &fakeASGChecker{},
+		IAM:         &fakeIAMForASG{},
 	}
 
 	res := resource.Resource{
@@ -929,7 +929,7 @@ func TestRelated_ASG_SG_MatchByLaunchConfig(t *testing.T) {
 	fakeASG := newFakeASGWithLaunchConfig(lcName, "", []string{sgID})
 	clients := &awsclient.ServiceClients{
 		AutoScaling: fakeASG,
-		EC2:         &fakeEC2Batch2{},
+		EC2:         &fakeEC2ForASG{},
 	}
 
 	res := resource.Resource{
@@ -959,8 +959,8 @@ func TestRelated_ASG_SG_MatchByLaunchConfig(t *testing.T) {
 // Count=0 when the ASG has no launch config and no launch template.
 func TestRelated_ASG_SG_NoLaunchConfigOrTemplate(t *testing.T) {
 	clients := &awsclient.ServiceClients{
-		AutoScaling: &fakeASGBatch2{},
-		EC2:         &fakeEC2Batch2{},
+		AutoScaling: &fakeASGChecker{},
+		EC2:         &fakeEC2ForASG{},
 	}
 
 	res := resource.Resource{
@@ -1045,7 +1045,7 @@ func TestRelated_ASG_SNS_MatchByNotificationConfig(t *testing.T) {
 // when the ASG has no notification configurations and no lifecycle hooks.
 func TestRelated_ASG_SNS_NoNotifications(t *testing.T) {
 	clients := &awsclient.ServiceClients{
-		AutoScaling: &fakeASGBatch2{},
+		AutoScaling: &fakeASGChecker{},
 	}
 
 	res := resource.Resource{
@@ -1128,7 +1128,7 @@ func TestRelated_ASG_VPC_MatchBySubnets(t *testing.T) {
 // when VPCZoneIdentifier is empty.
 func TestRelated_ASG_VPC_NoSubnets(t *testing.T) {
 	clients := &awsclient.ServiceClients{
-		EC2: &fakeEC2Batch2{},
+		EC2: &fakeEC2ForASG{},
 	}
 
 	res := resource.Resource{
@@ -1172,7 +1172,7 @@ func TestRelated_ASG_VPC_WrongRawStruct(t *testing.T) {
 // fakeELBv2WithTargetGroups implements ELBv2API and returns configurable TG output
 // from DescribeTargetGroups, used to test the ALB/NLB path in checkASGELB.
 type fakeELBv2WithTargetGroups struct {
-	fakeELBv2Batch2
+	fakeELBv2ForEB
 	describeTargetGroupsFn func(*elbv2.DescribeTargetGroupsInput) (*elbv2.DescribeTargetGroupsOutput, error)
 }
 
@@ -1286,7 +1286,7 @@ func TestRelated_ASG_Role_MatchByLaunchTemplateInstanceProfile(t *testing.T) {
 	ltID := "lt-0abc1234567890def"
 	profileARN := "arn:aws:iam::123456789012:instance-profile/ec2-instance-profile"
 
-	fakeEC2 := &fakeEC2Batch2{
+	fakeEC2 := &fakeEC2ForASG{
 		describeLaunchTemplateVersionsFn: func(_ *ec2.DescribeLaunchTemplateVersionsInput) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
 			return &ec2.DescribeLaunchTemplateVersionsOutput{
 				LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{
@@ -1307,7 +1307,7 @@ func TestRelated_ASG_Role_MatchByLaunchTemplateInstanceProfile(t *testing.T) {
 	clients := &awsclient.ServiceClients{
 		EC2:         fakeEC2,
 		IAM:         fakeIAM,
-		AutoScaling: &fakeASGBatch2{},
+		AutoScaling: &fakeASGChecker{},
 	}
 
 	res := resource.Resource{

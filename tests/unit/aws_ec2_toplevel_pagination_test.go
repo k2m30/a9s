@@ -1528,14 +1528,14 @@ func TestFetchRedshiftClusters_Pagination(t *testing.T) {
 // EIP — EC2 DescribeAddresses (no pagination — single call, skip test)
 // Note: DescribeAddresses does NOT support pagination in the AWS API.
 // The output has no NextToken. This is intentional — EIP is excluded from
-// the pagination batch.
+// this file's fetchers.
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// Error propagation tests for Batch 2 paginated fetchers
+// Error propagation tests for this file's paginated fetchers
 // ---------------------------------------------------------------------------
 
-func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
+func TestNetworkingPagination_ErrorPropagation(t *testing.T) {
 	testErr := fmt.Errorf("test API error")
 
 	t.Run("sg_error", func(t *testing.T) {

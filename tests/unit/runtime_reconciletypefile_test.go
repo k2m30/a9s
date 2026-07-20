@@ -274,7 +274,7 @@ func TestSaveResourceListCache_NonSubsetSameDepth_RefreshWins(t *testing.T) {
 // at HEAD 9244f1b4 (Rows nuked to 0).
 // ────────────────────────────────────────────────────────────────────────────
 
-func TestDEF20_ListPageSweepMenuSync_RowsSurviveAllThreeSaveLanes(t *testing.T) {
+func TestListPageSweepMenuSync_RowsSurviveAllThreeSaveLanes(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "ec2"
 

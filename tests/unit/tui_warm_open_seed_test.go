@@ -83,8 +83,8 @@ import (
 func TestHandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask(t *testing.T) {
 	sess := session.New()
 	probeRows := []resource.Resource{
-		{ID: "arn:aws:s3:::def12-warm-bucket-1", Name: "def12-warm-bucket-1", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
-		{ID: "arn:aws:s3:::def12-warm-bucket-2", Name: "def12-warm-bucket-2", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
+		{ID: "arn:aws:s3:::warm-bucket-1", Name: "warm-bucket-1", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
+		{ID: "arn:aws:s3:::warm-bucket-2", Name: "warm-bucket-2", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
 	}
 	sess.RowStore.Observe("s3", probeRows, &resource.PaginationMeta{IsTruncated: true}, session.OriginProbe, false)
 
@@ -117,11 +117,11 @@ func TestHandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask(t *testing.T)
 	if len(result.CachedEntry.Resources) != 2 {
 		t.Fatalf("len(result.CachedEntry.Resources) = %d, want 2 (the retained probe rows)", len(result.CachedEntry.Resources))
 	}
-	if result.CachedEntry.Resources[0].ID != "arn:aws:s3:::def12-warm-bucket-1" {
-		t.Errorf("result.CachedEntry.Resources[0].ID = %q, want %q", result.CachedEntry.Resources[0].ID, "arn:aws:s3:::def12-warm-bucket-1")
+	if result.CachedEntry.Resources[0].ID != "arn:aws:s3:::warm-bucket-1" {
+		t.Errorf("result.CachedEntry.Resources[0].ID = %q, want %q", result.CachedEntry.Resources[0].ID, "arn:aws:s3:::warm-bucket-1")
 	}
-	if result.CachedEntry.Resources[1].ID != "arn:aws:s3:::def12-warm-bucket-2" {
-		t.Errorf("result.CachedEntry.Resources[1].ID = %q, want %q", result.CachedEntry.Resources[1].ID, "arn:aws:s3:::def12-warm-bucket-2")
+	if result.CachedEntry.Resources[1].ID != "arn:aws:s3:::warm-bucket-2" {
+		t.Errorf("result.CachedEntry.Resources[1].ID = %q, want %q", result.CachedEntry.Resources[1].ID, "arn:aws:s3:::warm-bucket-2")
 	}
 	if result.CachedEntry.Pagination == nil || !result.CachedEntry.Pagination.IsTruncated {
 		t.Errorf("result.CachedEntry.Pagination = %+v, want non-nil with IsTruncated=true (mirrors RowStore.Snapshot(s3).Pagination.IsTruncated)", result.CachedEntry.Pagination)
@@ -174,11 +174,11 @@ func TestHandleNavigate_MissWithoutProbeRows_NoCachedEntry(t *testing.T) {
 // package.
 func newWarmOpenApp(t *testing.T) tui.Model {
 	t.Helper()
-	m := tui.New("def12-warmopen-demo", "us-east-1",
+	m := tui.New("warmopen-demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfileForTest("def12-warmopen-demo"),
+		tui.WithProfileForTest("warmopen-demo"),
 		tui.WithRegionForTest("us-east-1"))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	return m
@@ -209,8 +209,8 @@ func TestTUI_WarmOpen_RendersSeededRows_NotLoading(t *testing.T) {
 	m := newWarmOpenApp(t)
 
 	sweepRows := []resource.Resource{
-		{ID: "arn:aws:s3:::def12-tui-warm-bucket-1", Name: "def12-tui-warm-bucket-1", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
-		{ID: "arn:aws:s3:::def12-tui-warm-bucket-2", Name: "def12-tui-warm-bucket-2", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
+		{ID: "arn:aws:s3:::tui-warm-bucket-1", Name: "tui-warm-bucket-1", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
+		{ID: "arn:aws:s3:::tui-warm-bucket-2", Name: "tui-warm-bucket-2", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
 	}
 	m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "s3",
@@ -231,11 +231,11 @@ func TestTUI_WarmOpen_RendersSeededRows_NotLoading(t *testing.T) {
 	if strings.Contains(content, "Loading...") {
 		t.Errorf("rendered view after warm-opening s3 (with probe rows already retained) still shows the bare Loading shell — D9: known rows must render instantly:\n%s", content)
 	}
-	if !strings.Contains(content, "def12-tui-warm-bucket-1") {
-		t.Errorf("rendered view after warm-opening s3 does not contain the seeded row %q:\n%s", "def12-tui-warm-bucket-1", content)
+	if !strings.Contains(content, "tui-warm-bucket-1") {
+		t.Errorf("rendered view after warm-opening s3 does not contain the seeded row %q:\n%s", "tui-warm-bucket-1", content)
 	}
-	if !strings.Contains(content, "def12-tui-warm-bucket-2") {
-		t.Errorf("rendered view after warm-opening s3 does not contain the seeded row %q:\n%s", "def12-tui-warm-bucket-2", content)
+	if !strings.Contains(content, "tui-warm-bucket-2") {
+		t.Errorf("rendered view after warm-opening s3 does not contain the seeded row %q:\n%s", "tui-warm-bucket-2", content)
 	}
 	if !strings.Contains(content, "2+") {
 		t.Errorf("rendered view after warm-opening a truncated probe seed does not contain the %q lower-bound title marker:\n%s", "2+", content)

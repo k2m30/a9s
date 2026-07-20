@@ -25,6 +25,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // ---------------------------------------------------------------------------
@@ -469,18 +470,11 @@ func TestFetchLambdaFunctionsPageWithEventSources_EmptyMappings(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // mockS3GetBucketNotificationClient implements S3GetBucketNotificationConfigurationAPI.
-type mockS3GetBucketNotificationClient struct {
-	output *s3.GetBucketNotificationConfigurationOutput
-	err    error
-}
-
-func (m *mockS3GetBucketNotificationClient) GetBucketNotificationConfiguration(
-	ctx context.Context,
-	params *s3.GetBucketNotificationConfigurationInput,
-	optFns ...func(*s3.Options),
-) (*s3.GetBucketNotificationConfigurationOutput, error) {
-	return m.output, m.err
-}
+// It is an alias for the package-unit canonical fake (aws_s3_test.go's
+// S3BucketNotificationFake) — package unit_test cannot share unexported
+// identifiers with package unit, so this file reuses the exported type
+// instead of keeping its own parallel copy.
+type mockS3GetBucketNotificationClient = unit.S3BucketNotificationFake
 
 // mockS3ListBucketsForNotification implements S3ListBucketsAPI for notification tests.
 type mockS3ListBucketsForNotification struct {
@@ -509,7 +503,7 @@ func TestFetchS3BucketsPageWithNotifications_PopulatesLambdaNotification(t *test
 	}
 
 	notifMock := &mockS3GetBucketNotificationClient{
-		output: &s3.GetBucketNotificationConfigurationOutput{
+		Output: &s3.GetBucketNotificationConfigurationOutput{
 			LambdaFunctionConfigurations: []s3types.LambdaFunctionConfiguration{
 				{LambdaFunctionArn: aws.String(lambdaARN)},
 			},
@@ -548,7 +542,7 @@ func TestFetchS3BucketsPageWithNotifications_PopulatesSQSNotification(t *testing
 	}
 
 	notifMock := &mockS3GetBucketNotificationClient{
-		output: &s3.GetBucketNotificationConfigurationOutput{
+		Output: &s3.GetBucketNotificationConfigurationOutput{
 			QueueConfigurations: []s3types.QueueConfiguration{
 				{QueueArn: aws.String(sqsARN)},
 			},
@@ -587,7 +581,7 @@ func TestFetchS3BucketsPageWithNotifications_PopulatesSNSNotification(t *testing
 	}
 
 	notifMock := &mockS3GetBucketNotificationClient{
-		output: &s3.GetBucketNotificationConfigurationOutput{
+		Output: &s3.GetBucketNotificationConfigurationOutput{
 			TopicConfigurations: []s3types.TopicConfiguration{
 				{TopicArn: aws.String(snsARN)},
 			},
@@ -657,7 +651,7 @@ func TestFetchS3BucketsPageWithNotifications_NotificationAPIError(t *testing.T) 
 	// The notification API returns an error (e.g., permission denied).
 	// The bucket should still be returned with empty notification fields.
 	notifMock := &mockS3GetBucketNotificationClient{
-		err: &mockAWSError{code: "AccessDenied", message: "Access Denied"},
+		Err: &mockAWSError{code: "AccessDenied", message: "Access Denied"},
 	}
 
 	result, err := awsclient.FetchS3BucketsPageWithNotifications(

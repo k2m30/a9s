@@ -56,7 +56,7 @@ func collectAllPages(fetch func(token string) (resource.FetchResult, error)) ([]
 // newDetailControllerUnit builds a Controller (via the blessed newTestController
 // helper — see qa_controller_construction_discipline_test.go) with a ScreenDetail
 // on the stack for res, ready to call Snapshot().Body.Detail. Package-unit
-// equivalent of wave3_detail_ports_test.go's newDetailController (package
+// equivalent of detail_ports_test.go's newDetailController (package
 // unit_test symbols aren't visible from here).
 func newDetailControllerUnit(t *testing.T, res resource.Resource, resourceType string) *app.Controller {
 	t.Helper()

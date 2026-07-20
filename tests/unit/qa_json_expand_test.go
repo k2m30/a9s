@@ -206,7 +206,7 @@ func TestQA_JSONExpand_JSONView_NotAffected(t *testing.T) {
 // Retargeted (wave3 detail-family cleanup round 4, specs/022-codebase-cleanup)
 // off views.NewDetail(...).View() onto the live Controller.EnsureDetailState +
 // NewTransientDetail.RenderDetail seam. Not a duplicate of wave3_detail_ports_
-// test.go's TestWave3_CTEvents_LiveProjector_SectionHeadersPresentInOrder: that
+// test.go's Test_CTEvents_LiveProjector_SectionHeadersPresentInOrder: that
 // test pins section ORDER via a minimal fixture with no embedded JSON: this one
 // pins the distinct "requestParameters.policy embedded JSON string is not
 // exploded into sub-fields by expandJSONItems" no-crash contract.

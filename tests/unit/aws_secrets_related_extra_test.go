@@ -1,4 +1,4 @@
-// aws_secrets_related_batch5_test.go contains TDD Red tests for the Secrets
+// aws_secrets_related_extra_test.go contains TDD Red tests for the Secrets
 // Manager related-panel checkers: secrets→codeartifact, secrets→eb,
 // secrets→ecs-task, secrets→logs, secrets→role, secrets→sns.
 // Tests are written before the coder replaces the stubs in stubs_related.go
@@ -157,7 +157,7 @@ func TestRelated_Secrets_EB_MatchByResolveReference(t *testing.T) {
 	}
 
 	// EB fake: DescribeConfigurationSettings returns option with secret reference for matching-env only
-	fakeEB := &fakeEBBatch2{
+	fakeEB := &fakeEBChecker{
 		describeConfigSettingsFn: func(input *elasticbeanstalk.DescribeConfigurationSettingsInput) (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
 			envName := ""
 			if input.EnvironmentName != nil {
@@ -303,7 +303,7 @@ func TestRelated_Secrets_ECSTask_MatchBySecretsValueFrom(t *testing.T) {
 	}
 
 	// ECS fake: DescribeTaskDefinition returns a task def with secret reference for matching task
-	fakeECS := &fakeECSBatch4{
+	fakeECS := &fakeECSForSvcPivots{
 		describeTaskDefFn: func(input *ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error) {
 			if input.TaskDefinition != nil && *input.TaskDefinition == taskDefARN {
 				return &ecs.DescribeTaskDefinitionOutput{

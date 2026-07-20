@@ -8,7 +8,7 @@
 // efsCheckerByTarget is the shared helper consumed by:
 //   - aws_efs_related_extra_test.go (checkEFSAlarm, checkEFSEC2, checkEFSENI, checkEFSVPC)
 //   - aws_efs_related_wave2_test.go (checkEFSSG, checkEFSSubnet)
-//   - aws_wave5_related_test.go    (checkEFSLambda)
+//   - aws_related_checkers_branch_coverage_test.go    (checkEFSLambda)
 package unit_test
 
 import (
@@ -33,7 +33,7 @@ import (
 // Shared helper: efsCheckerByTarget
 //
 // Used by this file AND sibling files aws_efs_related_extra_test.go,
-// aws_efs_related_wave2_test.go, and aws_wave5_related_test.go.
+// aws_efs_related_wave2_test.go, and aws_related_checkers_branch_coverage_test.go.
 // MUST NOT be removed or renamed.
 // ---------------------------------------------------------------------------
 

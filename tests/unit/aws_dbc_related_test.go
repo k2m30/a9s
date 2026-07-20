@@ -19,7 +19,7 @@ import (
 // dbcCheckerByTarget returns the RelatedChecker for the given target type
 // registered under "dbc". It fails the test immediately if the checker is
 // not found or is nil — providing clear diagnostics when registrations drift.
-// This helper MUST live at package scope because aws_wave5_related_test.go
+// This helper MUST live at package scope because aws_related_checkers_branch_coverage_test.go
 // calls it from TestRelated_DBC_Subnet_* tests.
 func dbcCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
@@ -604,7 +604,7 @@ func TestRelated_DBC_KMS_WrongRawStruct(t *testing.T) {
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestRelated_DBC_Subnet_NilDocDB verifies Count=-1 when DocDB client is nil.
-// (aws_wave5_related_test.go covers TestRelated_DBC_Subnet_NilClientsW5, this
+// (aws_related_checkers_branch_coverage_test.go covers TestRelated_DBC_Subnet_NilClientsW5, this
 // test covers the ServiceClients != nil but DocDB == nil path.)
 func TestRelated_DBC_Subnet_NilDocDB(t *testing.T) {
 	src := resource.Resource{

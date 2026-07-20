@@ -104,7 +104,7 @@ func TestFetchCodeArtifactRepos_EmptyResponse(t *testing.T) {
 
 func TestFetchCodeArtifactRepos_APIError(t *testing.T) {
 	mock := &mockCodeArtifactClient{
-		err: &mockAPIError{code: "AccessDeniedException", message: "access denied"},
+		err: &MockAPIError{Code: "AccessDeniedException", Message: "access denied"},
 	}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {

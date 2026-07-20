@@ -26,7 +26,6 @@ import (
 	cetypes "github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	smithy "github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/app"
 	a9saws "github.com/k2m30/a9s/v3/core/aws"
@@ -35,6 +34,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/core/session"
+	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
 // ===========================================================================
@@ -556,7 +556,7 @@ func TestCostsSelfReview_C9_DataThrough_DerivesFromWarmStore_NoFetchNeeded(t *te
 // ===========================================================================
 
 func TestCostsSelfReview_C10a_ClassifyCostsError_MatchesBareAccessDeniedCode(t *testing.T) {
-	bare := &selfReviewAPIError{code: "AccessDenied", message: "not authorized"}
+	bare := &selfReviewAPIError{Code: "AccessDenied", Message: "not authorized"}
 
 	_, err := a9saws.FetchCostAndUsage(context.Background(), &selfReviewErroringCostsAPI{err: bare}, costs.Query{Granularity: "MONTHLY", GroupBy: []costs.Dimension{costs.DimensionService}})
 	if err == nil {
@@ -567,15 +567,12 @@ func TestCostsSelfReview_C10a_ClassifyCostsError_MatchesBareAccessDeniedCode(t *
 	}
 }
 
-type selfReviewAPIError struct {
-	code    string
-	message string
-}
-
-func (e *selfReviewAPIError) Error() string                 { return e.code + ": " + e.message }
-func (e *selfReviewAPIError) ErrorCode() string             { return e.code }
-func (e *selfReviewAPIError) ErrorMessage() string          { return e.message }
-func (e *selfReviewAPIError) ErrorFault() smithy.ErrorFault { return smithy.FaultUnknown }
+// selfReviewAPIError is an alias for the package-unit canonical fake
+// (mocks_test.go's MockAPIError) — package unit_test cannot share unexported
+// identifiers with package unit, so this file reuses the exported type
+// instead of keeping its own parallel copy. Fault is left at its zero value
+// (smithy.FaultUnknown), matching this file's original hardcoded fault.
+type selfReviewAPIError = unit.MockAPIError
 
 type selfReviewErroringCostsAPI struct {
 	err error
@@ -587,7 +584,7 @@ func (s *selfReviewErroringCostsAPI) GetCostAndUsage(_ context.Context, _ *coste
 
 func TestCostsSelfReview_C10b_GetCostAndUsage_RetriesOnThrottle_ThenSucceeds(t *testing.T) {
 	stub := &selfReviewFlakyThrottleCostsAPI{
-		throttleErr: &selfReviewAPIError{code: "Throttling", message: "rate exceeded"},
+		throttleErr: &selfReviewAPIError{Code: "Throttling", Message: "rate exceeded"},
 		successOut: &costexplorer.GetCostAndUsageOutput{
 			ResultsByTime: []cetypes.ResultByTime{
 				{
@@ -708,8 +705,8 @@ func (s *selfReviewEC2BatchAPI) DescribeInstances(_ context.Context, in *ec2.Des
 	for _, id := range in.InstanceIds {
 		if id == s.badID {
 			return nil, &selfReviewAPIError{
-				code:    "InvalidInstanceID.NotFound",
-				message: fmt.Sprintf("The instance ID '%s' does not exist", s.badID),
+				Code:    "InvalidInstanceID.NotFound",
+				Message: fmt.Sprintf("The instance ID '%s' does not exist", s.badID),
 			}
 		}
 	}

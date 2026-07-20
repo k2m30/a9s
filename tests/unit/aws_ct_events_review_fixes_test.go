@@ -6,8 +6,8 @@ package unit
 //
 // Bug 1 (sort uses display-formatted time string, breaking month boundaries;
 // sortColKey="time" → lexicographic compare, fix: sort by event_time
-// RFC3339 instead) is ported onto the live seam in wave3_list_ports_test.go's
-// TestWave3CTEventsSort_RFC3339_AcrossMonthBoundary — this file's
+// RFC3339 instead) is ported onto the live seam in list_ports_test.go's
+// TestCTEventsSort_RFC3339_AcrossMonthBoundary — this file's
 // ResourceListModel.SelectedResource() harness is dead code.
 //
 // Bug 2 (TestCTVerb_BatchDeleteAttributes_IsDestructive):

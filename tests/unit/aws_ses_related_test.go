@@ -78,11 +78,11 @@ func sesFixtureClients() *awsclient.ServiceClients {
 	}
 }
 
-// newFakeSESv2FromFixture builds a fakeSESv2Batch5 that mirrors the fixture data:
+// newFakeSESv2FromFixture builds a fakeSESv2Checker that mirrors the fixture data:
 //   - GetEmailIdentity for SESGraphRootIdentity → ConfigurationSetName = SESConfigSetName
 //   - GetConfigurationSetEventDestinations for SESConfigSetName → fixture destinations
 //   - All other identities return empty config set name
-func newFakeSESv2FromFixture(f *fixtures.SESFixtures) *fakeSESv2Batch5 {
+func newFakeSESv2FromFixture(f *fixtures.SESFixtures) *fakeSESv2Checker {
 	return newFakeSESv2WithEventDestinations(
 		fixtures.SESGraphRootIdentity,
 		fixtures.SESConfigSetName,

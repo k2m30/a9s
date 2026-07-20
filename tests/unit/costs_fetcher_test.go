@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	cetypes "github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
+	smithy "github.com/aws/smithy-go"
 
 	a9saws "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/costs"
@@ -286,7 +287,7 @@ func TestFetchCostAndUsage_ClassifiesErrors(t *testing.T) {
 	q := costs.Query{Granularity: "MONTHLY", GroupBy: []costs.Dimension{costs.Dimension("SERVICE")}, Range: costs.Period{Start: "2026-06-01", End: "2026-07-01"}}
 
 	t.Run("AccessDeniedException maps to ErrCostsAccessDenied", func(t *testing.T) {
-		mock := &mockCostsGetCostAndUsageClient{err: &boundaryAPIError{code: "AccessDeniedException", message: "User is not authorized to perform: ce:GetCostAndUsage"}}
+		mock := &mockCostsGetCostAndUsageClient{err: &boundaryAPIError{Code: "AccessDeniedException", Message: "User is not authorized to perform: ce:GetCostAndUsage", Fault: smithy.FaultClient}}
 		_, err := a9saws.FetchCostAndUsage(context.Background(), mock, q)
 		if !errors.Is(err, a9saws.ErrCostsAccessDenied) {
 			t.Errorf("FetchCostAndUsage() error = %v, want errors.Is(err, ErrCostsAccessDenied)", err)
@@ -302,7 +303,7 @@ func TestFetchCostAndUsage_ClassifiesErrors(t *testing.T) {
 	})
 
 	t.Run("ThrottlingException maps to ErrCostsThrottled", func(t *testing.T) {
-		mock := &mockCostsGetCostAndUsageClient{err: &boundaryAPIError{code: "ThrottlingException", message: "Rate exceeded"}}
+		mock := &mockCostsGetCostAndUsageClient{err: &boundaryAPIError{Code: "ThrottlingException", Message: "Rate exceeded", Fault: smithy.FaultClient}}
 		_, err := a9saws.FetchCostAndUsage(context.Background(), mock, q)
 		if !errors.Is(err, a9saws.ErrCostsThrottled) {
 			t.Errorf("FetchCostAndUsage() error = %v, want errors.Is(err, ErrCostsThrottled)", err)

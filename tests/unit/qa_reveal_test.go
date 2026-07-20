@@ -46,8 +46,8 @@ func TestQA_Reveal_ViewBeforeSetSize(t *testing.T) {
 // RevealModel per specs/022-codebase-cleanup/wave3-map-text.md (reveal.go:
 // "DEAD: ... FrameTitle, CopyContent, SecretValue (copy uses rs.revealValue),
 // GetHelpContext, HeaderWarning"). The live equivalents:
-//   - copy label + exact revealed value: wave3_text_ports_test.go's
-//     TestWave3Port_RevealCopy_CopiesExactValue (drives the real
+//   - copy label + exact revealed value: text_ports_test.go's
+//     TestPort_RevealCopy_CopiesExactValue (drives the real
 //     handleCopy/rsKindReveal seam via rs.revealValue, not m.CopyContent()).
 //   - GetHelpContext / rs.helpContext for reveal: newRevealRS wires
 //     helpContext: views.HelpFromReveal unconditionally (renderer.go); no
@@ -190,8 +190,8 @@ func TestQA_Reveal_EmptyValue(t *testing.T) {
 // FrameTitle() is DEAD (no live caller, not resource-type-specific — see
 // qa_docdb_test.go's identical retirement note). The empty-value copy-label
 // edge case (m.CopyContent() above) is ported onto the live
-// handleCopy/rsKindReveal seam as TestWave3Port_RevealCopy_EmptyValue in
-// wave3_text_ports_test.go — handleCopy's rsKindReveal branch has no
+// handleCopy/rsKindReveal seam as TestPort_RevealCopy_EmptyValue in
+// text_ports_test.go — handleCopy's rsKindReveal branch has no
 // empty-guard, so an empty secret still copies with the normal label.
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -212,8 +212,8 @@ func TestQA_Reveal_LongValue(t *testing.T) {
 
 // SecretValue()/CopyContent() are DEAD (copy uses rs.revealValue directly —
 // see reveal.go's DEAD list). The exact-value copy round-trip they checked is
-// already covered length-agnostically by wave3_text_ports_test.go's
-// TestWave3Port_RevealCopy_CopiesExactValue on the live handleCopy seam; no
+// already covered length-agnostically by text_ports_test.go's
+// TestPort_RevealCopy_CopiesExactValue on the live handleCopy seam; no
 // length-specific behavior branch exists to justify a second pin.
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -290,7 +290,7 @@ func TestQA_Reveal_JSONValue_ColonInKeys_StaysQuoted(t *testing.T) {
 
 // TestQA_Reveal_JSONValue_CopyReturnsRaw's m.CopyContent() pin (dead per
 // wave3-map-text.md) is ported onto the live handleCopy/rsKindReveal seam as
-// wave3_text_ports_test.go's TestWave3Port_RevealCopy_JSONValueStaysRaw.
+// text_ports_test.go's TestPort_RevealCopy_JSONValueStaysRaw.
 
 func TestQA_Reveal_NonJSON_RenderedAsIs(t *testing.T) {
 	plainSecret := "my-plain-password-123"

@@ -122,7 +122,7 @@ func TestIsBackgroundFetchTask_NonFetchKind_UnaffectedByRenderability(t *testing
 // must land in the DEFERRED slice, never executed synchronously.
 func TestWebBoot_WarmListOpen_FetchTaskDeferredAsBackground(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	core, ctrl := newLiveWebStyleController(t, "pilot-def1-prof", "us-east-1")
+	core, ctrl := newLiveWebStyleController(t, "pilot-warmboot-prof", "us-east-1")
 
 	// Seed a REAL on-disk per-type file for s3 so the cache-first list-open
 	// path (NavigateKindPushResourceList's RowStore/OriginDisk seed) has
@@ -141,9 +141,9 @@ func TestWebBoot_WarmListOpen_FetchTaskDeferredAsBackground(t *testing.T) {
 		Count:        3,
 		Exact:        true,
 		Rows: []cache.Row{
-			{ID: "bucket-pilot-def1-1", Name: "bucket-pilot-def1-1"},
-			{ID: "bucket-pilot-def1-2", Name: "bucket-pilot-def1-2"},
-			{ID: "bucket-pilot-def1-3", Name: "bucket-pilot-def1-3"},
+			{ID: "bucket-pilot-warmboot-1", Name: "bucket-pilot-warmboot-1"},
+			{ID: "bucket-pilot-warmboot-2", Name: "bucket-pilot-warmboot-2"},
+			{ID: "bucket-pilot-warmboot-3", Name: "bucket-pilot-warmboot-3"},
 		},
 	})
 	if err := store.SaveType("s3"); err != nil {
@@ -295,7 +295,7 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
 	s := session.New()
-	s.Profile = "pilot-def3-prof"
+	s.Profile = "pilot-coldreseed-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
@@ -310,10 +310,10 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{
-		{ID: "bucket-def3-1", Name: "def3-bucket", Type: "s3", Fields: map[string]string{"region": "us-east-1"}, Findings: []domain.Finding{finding}},
+		{ID: "bucket-coldreseed-1", Name: "coldreseed-bucket", Type: "s3", Fields: map[string]string{"region": "us-east-1"}, Findings: []domain.Finding{finding}},
 	}, nil, false)
 
-	store := cache.LoadDirForTest("pilot-def3-prof", "us-east-1")
+	store := cache.LoadDirForTest("pilot-coldreseed-prof", "us-east-1")
 	tf, ok := store.Type("s3")
 	if !ok {
 		t.Fatal(`store.Type("s3") missing after a production-path list-open + ApplyResourcesLoaded save`)
@@ -330,7 +330,7 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 	// classification (buildListBody -> td.ResolveColor) produces the correct
 	// glyph/severity before any live fetch lands.
 	s2 := session.New()
-	s2.Profile = "pilot-def3-prof"
+	s2.Profile = "pilot-coldreseed-prof"
 	s2.Region = "us-east-1"
 	core2 := runtime.New(s2, resource.AllResourceTypes())
 	ctrl2 := app.New(core2)
@@ -350,15 +350,15 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 	}
 	found := false
 	for i := range lb.Rows {
-		if lb.Rows[i].ResourceID == "bucket-def3-1" {
+		if lb.Rows[i].ResourceID == "bucket-coldreseed-1" {
 			found = true
 			if lb.Rows[i].Severity == "" {
-				t.Error("cold-boot seeded row for bucket-def3-1 has empty Severity — C6: the seeded row's persisted Findings must drive render-time severity classification, not just the raw Fields")
+				t.Error("cold-boot seeded row for bucket-coldreseed-1 has empty Severity — C6: the seeded row's persisted Findings must drive render-time severity classification, not just the raw Fields")
 			}
 		}
 	}
 	if !found {
-		t.Error("cold-boot seeded rows missing bucket-def3-1 — the persisted row was not seeded back at all")
+		t.Error("cold-boot seeded rows missing bucket-coldreseed-1 — the persisted row was not seeded back at all")
 	}
 }
 
@@ -392,26 +392,26 @@ func TestProductionRefresh_OneType_LeavesSiblingTypeFilesByteIdentical(t *testin
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	seed := cache.LoadDirForTest("pilot-def4a-prof", "us-east-1")
+	seed := cache.LoadDirForTest("pilot-siblingrefresh-prof", "us-east-1")
 	seed.Put("ec2", cache.TypeFile{
 		HasResources: true,
 		Count:        12,
 		Exact:        true,
 		Rows: []cache.Row{
-			{ID: "i-0def4apreexist01", Name: "pre-existing-instance", Fields: map[string]string{"state": "running"}},
+			{ID: "i-0siblingrefreshpre01", Name: "pre-existing-instance", Fields: map[string]string{"state": "running"}},
 		},
 	})
 	if err := seed.SaveType("ec2"); err != nil {
 		t.Fatalf("SaveType (ec2 fixture): %v", err)
 	}
-	ec2Path := cache.DirForTest("pilot-def4a-prof", "us-east-1") + "/ec2.yaml"
+	ec2Path := cache.DirForTest("pilot-siblingrefresh-prof", "us-east-1") + "/ec2.yaml"
 	before, err := readFileForAuditPilot(t, ec2Path)
 	if err != nil {
 		t.Fatalf("reading ec2 fixture file before the s3-only production refresh: %v", err)
 	}
 
 	s := session.New()
-	s.Profile = "pilot-def4a-prof"
+	s.Profile = "pilot-siblingrefresh-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
@@ -419,7 +419,7 @@ func TestProductionRefresh_OneType_LeavesSiblingTypeFilesByteIdentical(t *testin
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{
-		{ID: "bucket-def4a-1", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
+		{ID: "bucket-siblingrefresh-1", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
 	}, nil, false)
 
 	after, err := readFileForAuditPilot(t, ec2Path)
@@ -444,17 +444,17 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 
 	rows55 := make([]cache.Row, 55)
 	for i := range rows55 {
-		id := "bucket-def4b-" + itoaPilot(i)
+		id := "bucket-truncrefetch-" + itoaPilot(i)
 		rows55[i] = cache.Row{ID: id, Name: id, Fields: map[string]string{"region": "us-east-1"}}
 	}
-	seed := cache.LoadDirForTest("pilot-def4b-prof", "us-east-1")
+	seed := cache.LoadDirForTest("pilot-truncrefetch-prof", "us-east-1")
 	seed.Put("s3", cache.TypeFile{HasResources: true, Count: 55, Exact: true, Rows: rows55})
 	if err := seed.SaveType("s3"); err != nil {
 		t.Fatalf("SaveType (s3 exact-55 fixture): %v", err)
 	}
 
 	s := session.New()
-	s.Profile = "pilot-def4b-prof"
+	s.Profile = "pilot-truncrefetch-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
@@ -464,13 +464,13 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 	// pilot's observed "truncated refetch save SHRANK rows 55->50" defect.
 	rows50 := make([]resource.Resource, 50)
 	for i := range rows50 {
-		id := "bucket-def4b-" + itoaPilot(i)
+		id := "bucket-truncrefetch-" + itoaPilot(i)
 		rows50[i] = resource.Resource{ID: id, Name: id, Type: "s3", Fields: map[string]string{"region": "us-east-1"}}
 	}
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
-	ctrl.ApplyResourcesLoaded("s3", rows50, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-def4b"}, false)
+	ctrl.ApplyResourcesLoaded("s3", rows50, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-truncrefetch"}, false)
 
-	reloaded := cache.LoadDirForTest("pilot-def4b-prof", "us-east-1")
+	reloaded := cache.LoadDirForTest("pilot-truncrefetch-prof", "us-east-1")
 	tf, ok := reloaded.Type("s3")
 	if !ok {
 		t.Fatal(`reloaded.Type("s3") missing after the truncated refetch`)
@@ -523,7 +523,7 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 // on screen (nothing blanks).
 func TestAPIError_OverCachedList_ClearsRefreshing_SetsErrorMarker(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	core, ctrl := newLiveWebStyleController(t, "pilot-def5-prof", "us-east-1")
+	core, ctrl := newLiveWebStyleController(t, "pilot-apierror-prof", "us-east-1")
 
 	// Seed a REAL on-disk per-type file for s3 so the cache-first list-open
 	// has genuine row data to seed from (C6a: a counts-only
@@ -540,8 +540,8 @@ func TestAPIError_OverCachedList_ClearsRefreshing_SetsErrorMarker(t *testing.T) 
 		Count:        2,
 		Exact:        true,
 		Rows: []cache.Row{
-			{ID: "bucket-pilot-def5-1", Name: "bucket-pilot-def5-1"},
-			{ID: "bucket-pilot-def5-2", Name: "bucket-pilot-def5-2"},
+			{ID: "bucket-pilot-apierror-1", Name: "bucket-pilot-apierror-1"},
+			{ID: "bucket-pilot-apierror-2", Name: "bucket-pilot-apierror-2"},
 		},
 	})
 	if err := store.SaveType("s3"); err != nil {
@@ -663,7 +663,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
 	s := session.New()
-	s.Profile = "pilot-def7-prof"
+	s.Profile = "pilot-sweepenrich-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
@@ -671,7 +671,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 
 	finding := domain.Finding{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave2:s3"}
 	sweepResources := []resource.Resource{
-		{ID: "bucket-def7-1", Name: "def7-bucket", Type: "s3", Fields: map[string]string{"region": "us-east-1"}, Findings: []domain.Finding{finding}},
+		{ID: "bucket-sweepenrich-1", Name: "sweepenrich-bucket", Type: "s3", Fields: map[string]string{"region": "us-east-1"}, Findings: []domain.Finding{finding}},
 	}
 
 	// Drive exactly one AvailabilityChecked landing for s3, with the queue
@@ -714,7 +714,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 		}
 	}
 
-	store := cache.LoadDirForTest("pilot-def7-prof", "us-east-1")
+	store := cache.LoadDirForTest("pilot-sweepenrich-prof", "us-east-1")
 	tf, ok := store.Type("s3")
 	if !ok {
 		t.Fatal(`store.Type("s3") missing after a sweep+enrichment completion — C7: per-type persistence must not require a list screen to have been opened`)
@@ -724,7 +724,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 	}
 	found := false
 	for _, r := range tf.Rows {
-		if r.ID == "bucket-def7-1" {
+		if r.ID == "bucket-sweepenrich-1" {
 			found = true
 			if len(r.Findings) != 1 || r.Findings[0].Code != "s3-public-read" {
 				t.Errorf("persisted sweep-only row Findings = %+v, want 1 finding with Code=%q", r.Findings, "s3-public-read")
@@ -732,7 +732,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 		}
 	}
 	if !found {
-		t.Error("persisted s3 TypeFile.Rows missing bucket-def7-1 — the sweep-fetched row was not persisted at all")
+		t.Error("persisted s3 TypeFile.Rows missing bucket-sweepenrich-1 — the sweep-fetched row was not persisted at all")
 	}
 }
 
@@ -788,7 +788,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
 	s := session.New()
-	s.Profile = "pilot-def8-prof"
+	s.Profile = "pilot-enrichchecked-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	ctrl := app.New(core)
@@ -805,13 +805,13 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	// real fetch landing before any enrichment probe has run.
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 	baseRows := []resource.Resource{
-		{ID: "bucket-def8-1", Name: "def8-bucket", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
+		{ID: "bucket-enrichchecked-1", Name: "enrichchecked-bucket", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
 	}
 	ctrl.ApplyResourcesLoaded("s3", baseRows, nil, false)
 
 	// Sanity: the pre-enrichment save must NOT carry the finding yet (setup
 	// assumption, not the defect under test).
-	preStore := cache.LoadDirForTest("pilot-def8-prof", "us-east-1")
+	preStore := cache.LoadDirForTest("pilot-enrichchecked-prof", "us-east-1")
 	preTF, ok := preStore.Type("s3")
 	if !ok || len(preTF.Rows) != 1 {
 		t.Fatalf("test setup: pre-enrichment s3 TypeFile missing or wrong row count: ok=%v rows=%+v", ok, preTF.Rows)
@@ -827,7 +827,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	// per-type gen guard only fires when msg.TypeGen != 0.
 	ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "s3",
-		Findings:     map[string][]domain.Finding{"bucket-def8-1": {finding}},
+		Findings:     map[string][]domain.Finding{"bucket-enrichchecked-1": {finding}},
 	})
 
 	// Re-trigger the list-open save path — the same seam
@@ -838,7 +838,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	// rows maybeSaveResourceListCache always reads from ls.Rows.
 	ctrl.ApplyResourcesLoaded("s3", baseRows, nil, false)
 
-	store := cache.LoadDirForTest("pilot-def8-prof", "us-east-1")
+	store := cache.LoadDirForTest("pilot-enrichchecked-prof", "us-east-1")
 	tf, ok := store.Type("s3")
 	if !ok {
 		t.Fatal(`store.Type("s3") missing after enrichment + list-open save`)
@@ -854,7 +854,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	// list-open with the persisted row's Findings intact, closing the loop to
 	// the already-green render-time classification.
 	s2 := session.New()
-	s2.Profile = "pilot-def8-prof"
+	s2.Profile = "pilot-enrichchecked-prof"
 	s2.Region = "us-east-1"
 	core2 := runtime.New(s2, resource.AllResourceTypes())
 	ctrl2 := app.New(core2)
@@ -874,15 +874,15 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	}
 	found := false
 	for i := range lb.Rows {
-		if lb.Rows[i].ResourceID == "bucket-def8-1" {
+		if lb.Rows[i].ResourceID == "bucket-enrichchecked-1" {
 			found = true
 			if lb.Rows[i].Severity == "" {
-				t.Error("cold-boot seeded row for bucket-def8-1 has empty Severity — C6: the seeded row's persisted Findings must drive render-time severity classification, closing the loop back to render-time glyph classification")
+				t.Error("cold-boot seeded row for bucket-enrichchecked-1 has empty Severity — C6: the seeded row's persisted Findings must drive render-time severity classification, closing the loop back to render-time glyph classification")
 			}
 		}
 	}
 	if !found {
-		t.Error("cold-boot seeded rows missing bucket-def8-1 — the persisted row was not seeded back at all")
+		t.Error("cold-boot seeded rows missing bucket-enrichchecked-1 — the persisted row was not seeded back at all")
 	}
 }
 

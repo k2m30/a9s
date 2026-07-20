@@ -44,7 +44,7 @@ import (
 // memo key that tracks only "filter active" as a bool rather than the
 // filter's own text would incorrectly reuse the first filter's cached rows.
 func TestListBodyMemoSeq_FilterSetChangedCleared_RowsAndCountUpdate(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+	c := openListController(t, "ec2")
 	resources := wave3FilterEC2Resources()
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 
@@ -100,7 +100,7 @@ func TestListBodyMemoSeq_FilterSetChangedCleared_RowsAndCountUpdate(t *testing.T
 // Col but not Dir, or vice-versa, would return the previous render's row
 // order here.
 func TestListBodyMemoSeq_SortToggle_RowOrderUpdatesAcrossRenders(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+	c := openListController(t, "ec2")
 	resources := wave3FilterEC2Resources()
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 
@@ -170,7 +170,7 @@ func idsEqual(a, b []string) bool {
 // one-shot cache-bust already consumed by the ON render) would leak the
 // filtered row set into this render.
 func TestListBodyMemoSeq_AttentionToggle_BothDirectionsAcrossRenders(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+	c := openListController(t, "ec2")
 	resources := wave3FilterEC2Resources() // cache-node carries a SevWarn Finding
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 
@@ -211,7 +211,7 @@ func TestListBodyMemoSeq_AttentionToggle_BothDirectionsAcrossRenders(t *testing.
 // append lands to prove the append is what changed the second render's
 // content, rather than the append call itself doing so out of band.
 func TestListBodyMemoSeq_LoadMoreAppend_NewRowsAppearOnNextRender(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+	c := openListController(t, "ec2")
 	page1 := []resource.Resource{
 		{ID: "i-page1-a", Name: "alpha", Type: "ec2", Fields: map[string]string{"instance_id": "i-page1-a", "name": "alpha", "state": "running"}},
 		{ID: "i-page1-b", Name: "beta", Type: "ec2", Fields: map[string]string{"instance_id": "i-page1-b", "name": "beta", "state": "running"}},
@@ -253,7 +253,7 @@ func TestListBodyMemoSeq_LoadMoreAppend_NewRowsAppearOnNextRender(t *testing.T) 
 // renders a healthy row, applies a Wave-2 finding via ApplyEnrichmentState
 // (the same seam production code's Wave-2 sweep uses), then renders again.
 // TestEnrichment_BrokenRowHasDecoratorError (core/app/list_test.go) and
-// TestWave3ListStatusColumn_EnrichmentMapOnlyFinding_OverridesRawState
+// TestListStatusColumn_EnrichmentMapOnlyFinding_OverridesRawState
 // (this file) both apply the finding BEFORE ever rendering, so neither
 // proves a SECOND render — as opposed to the first-ever render of that
 // screen — picks up the change.
@@ -267,7 +267,7 @@ func TestListBodyMemoSeq_LoadMoreAppend_NewRowsAppearOnNextRender(t *testing.T) 
 // cell; the key must also incorporate the enrichment store's own state (or
 // enrichment must be given its own generation bump) to invalidate here.
 func TestListBodyMemoSeq_EnrichmentLandsAfterFirstRender_DecoratorFlipsOnNextRender(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+	c := openListController(t, "ec2")
 	resources := []resource.Resource{
 		{ID: "i-0aaa111111111111a", Name: "web-server", Type: "ec2",
 			Fields: map[string]string{"instance_id": "i-0aaa111111111111a", "name": "web-server", "state": "running"}},
@@ -306,7 +306,7 @@ func TestListBodyMemoSeq_EnrichmentLandsAfterFirstRender_DecoratorFlipsOnNextRen
 //     fallback branch (list_state.go:152-157)
 // ===========================================================================
 //
-// wave3ListController pushes a resource-list screen via ActionCommand but
+// openListController pushes a resource-list screen via ActionCommand but
 // never calls ApplyResourcesLoaded, so the pushed ListState's Rows field
 // stays nil (core/app/navigate.go's NavigateKindPushResourceList only seeds
 // ls.Rows when HandleNavigate attaches a CachedEntry, which a fresh
@@ -330,11 +330,11 @@ func TestListBodyMemoSeq_EnrichmentLandsAfterFirstRender_DecoratorFlipsOnNextRen
 // once (populating/validating listBodyMemo), deliver an AvailabilityChecked
 // purely through Controller.Handle, then render again and assert the
 // RowStore's new rows are visible. Gen: domain.Gen(1) is session.New()'s
-// AvailabilityGen seed (session.go:395) — wave3ListController never bumps
+// AvailabilityGen seed (session.go:395) — openListController never bumps
 // it, so the same literal satisfies messages.IsStale's exact-match guard on
 // both deliveries in a test.
 func TestListBodyMemoSeq_BackgroundAvailabilityReplace_FallbackRowsStaleAcrossRenders(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+	c := openListController(t, "ec2")
 
 	r1 := []resource.Resource{
 		{ID: "i-r1-aaaa", Name: "batch-1-alpha", Type: "ec2",
@@ -378,7 +378,7 @@ func TestListBodyMemoSeq_BackgroundAvailabilityReplace_FallbackRowsStaleAcrossRe
 }
 
 func TestListBodyMemoSeq_BackgroundAvailabilityFirstWrite_EmptyFallbackStaysStaleAfterPopulate(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+	c := openListController(t, "ec2")
 
 	render1 := *c.Snapshot().Body.List
 	if len(render1.Rows) != 0 {

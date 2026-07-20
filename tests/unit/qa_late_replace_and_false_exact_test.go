@@ -223,7 +223,7 @@ func TestNilPaginationEntry_IsNotExact(t *testing.T) {
 func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
-	const profile, region = "def18-late-replace-profile", "us-east-1"
+	const profile, region = "late-replace-profile", "us-east-1"
 
 	s := session.New()
 	s.Profile = profile
@@ -329,7 +329,7 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 func TestFreshReplace_StillWins(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
-	const profile, region = "def18-fresh-replace-profile", "us-east-1"
+	const profile, region = "fresh-replace-profile", "us-east-1"
 
 	s := session.New()
 	s.Profile = profile

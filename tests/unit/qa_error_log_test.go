@@ -11,7 +11,7 @@ package unit
 //   - "!" key opens error log viewer (YAMLModel in text mode)
 //   - "!" key with empty history shows flash instead of opening viewer
 //   - Copy-label pin for the error-log text screen lives in
-//     wave3_text_ports_test.go (TestWave3Port_ErrorLogCopy_UncoloredContent) —
+//     text_ports_test.go (TestPort_ErrorLogCopy_UncoloredContent) —
 //     the live handleCopy seam, not the dead NewTextViewer constructor.
 // ══════════════════════════════════════════════════════════════════════════════
 

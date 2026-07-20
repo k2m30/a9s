@@ -192,8 +192,8 @@ func TestTKey_WorksFromAllViews(t *testing.T) {
 
 	// Detail_LeftCol / Detail_RightColFocused subtests (dead views.DetailModel
 	// Update/View, 022-codebase-cleanup wave 3) removed — no port needed:
-	// TestWave3_ActionCloudTrail_Detail_DispatchesCtEventsFetchFiltered
-	// (wave3_detail_ports_test.go) already pins the same contract (ActionCloudTrail
+	// Test_ActionCloudTrail_Detail_DispatchesCtEventsFetchFiltered
+	// (detail_ports_test.go) already pins the same contract (ActionCloudTrail
 	// on a detail screen dispatches a KindFetchFiltered task scoped to
 	// "ct-events") more precisely, against the live controller Apply path,
 	// independent of left/right-column focus (a renderer-only concern the
@@ -202,13 +202,13 @@ func TestTKey_WorksFromAllViews(t *testing.T) {
 	// The YAML case (views.NewYAML+Update, both DEAD per
 	// specs/022-codebase-cleanup/wave3-map-text.md) is retired here: it's
 	// ported onto the live text-screen seam as
-	// wave3_text_ports_test.go's TestWave3Port_YAML_TKey_LiveCTEventsNavigate.
+	// text_ports_test.go's TestPort_YAML_TKey_LiveCTEventsNavigate.
 }
 
 // TestResourceList_TKey_SuppressedOnChildList verifies that on a child
 // resource list (parentContext != nil), pressing "t" is a no-op. The
 // corresponding footer-hint suppression is pinned separately by
-// wave3_list_ports_test.go's TestWave3ListFooterHints_CloudTrailTKey_
+// list_ports_test.go's TestWave3ListFooterHints_CloudTrailTKey_
 // GatedByParentContext (dead ResourceListModel.BottomHints() removed here).
 func TestResourceList_TKey_SuppressedOnChildList(t *testing.T) {
 	td := resource.GetChildType("s3_objects")

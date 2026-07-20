@@ -1,16 +1,16 @@
-// tui_stack_sync_test.go — parity pins for wave 3 of the rendererState /
-// controller stack-sync convergence (#20 wave 3).
+// tui_stack_sync_test.go — parity pins for the rendererState / controller
+// stack-sync convergence.
 //
 // The TUI keeps its own rendererState stack (m.stack, unexported) alongside
-// the headless app.Controller's own screen stack (m.ctrl, unexported). Wave 3
-// hardens the invariant that the two never diverge in DEPTH or SCREEN
+// the headless app.Controller's own screen stack (m.ctrl, unexported). This
+// file hardens the invariant that the two never diverge in DEPTH or SCREEN
 // IDENTITY across every push/pop site (pushScreen, popRS/popRSOnly/
 // popRSWithCtrlPop, and the applyIntents/applyIntent PushScreen/PopScreen/
 // PopSelectorIntent cases).
 //
 // Oracle: internal/tui/app_stack_invariant.go's exported Model.StackInSync()
 // (backed by core/app/snapshot.go's Controller.ScreenIDs()) is the
-// wave-3 debug-buildable invariant check — asserted after EVERY step below.
+// debug-buildable invariant check — asserted after EVERY step below.
 // StackInSync groups some ScreenIDs under one rsKind (list: ScreenResourceList
 // or ScreenChildList; text: ScreenYAML or ScreenJSON; selector: any of the
 // three selector flavors), so a kind-swap within one of those groups (e.g.

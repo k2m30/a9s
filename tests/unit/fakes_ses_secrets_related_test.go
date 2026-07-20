@@ -1,5 +1,6 @@
-// fakes_us1_batch5_test.go contains lightweight fake implementations of AWS
-// service client interfaces used by the US1 batch-5 checker tests.
+// fakes_ses_secrets_related_test.go contains lightweight fake implementations of AWS
+// service client interfaces used by the ses and secrets related-panel
+// checker tests.
 // Covered: SESv2API (ses→eb-rule, ses→kinesis, ses→sns via GetConfigurationSetEventDestinations),
 // SecretsManagerAPI (secrets→role via GetResourcePolicy),
 // LambdaAPI (secrets→logs, secrets→role, secrets→sns via GetFunction).
@@ -20,47 +21,47 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// fakeSESv2Batch5 — implements SESv2API
+// fakeSESv2Checker — implements SESv2API
 // Controllable method: GetConfigurationSetEventDestinations — keyed by config set name.
 // GetEmailIdentity is also controllable to return the ConfigurationSetName.
 // All other methods return safe empty stubs.
 // ---------------------------------------------------------------------------
 
-type fakeSESv2Batch5 struct {
+type fakeSESv2Checker struct {
 	getConfigSetEventDestsFn func(*sesv2.GetConfigurationSetEventDestinationsInput) (*sesv2.GetConfigurationSetEventDestinationsOutput, error)
 	getEmailIdentityFn       func(*sesv2.GetEmailIdentityInput) (*sesv2.GetEmailIdentityOutput, error)
 }
 
-func (f *fakeSESv2Batch5) ListEmailIdentities(_ context.Context, _ *sesv2.ListEmailIdentitiesInput, _ ...func(*sesv2.Options)) (*sesv2.ListEmailIdentitiesOutput, error) {
+func (f *fakeSESv2Checker) ListEmailIdentities(_ context.Context, _ *sesv2.ListEmailIdentitiesInput, _ ...func(*sesv2.Options)) (*sesv2.ListEmailIdentitiesOutput, error) {
 	return &sesv2.ListEmailIdentitiesOutput{}, nil
 }
 
-func (f *fakeSESv2Batch5) GetAccount(_ context.Context, _ *sesv2.GetAccountInput, _ ...func(*sesv2.Options)) (*sesv2.GetAccountOutput, error) {
+func (f *fakeSESv2Checker) GetAccount(_ context.Context, _ *sesv2.GetAccountInput, _ ...func(*sesv2.Options)) (*sesv2.GetAccountOutput, error) {
 	return &sesv2.GetAccountOutput{}, nil
 }
 
-func (f *fakeSESv2Batch5) GetConfigurationSetEventDestinations(_ context.Context, input *sesv2.GetConfigurationSetEventDestinationsInput, _ ...func(*sesv2.Options)) (*sesv2.GetConfigurationSetEventDestinationsOutput, error) {
+func (f *fakeSESv2Checker) GetConfigurationSetEventDestinations(_ context.Context, input *sesv2.GetConfigurationSetEventDestinationsInput, _ ...func(*sesv2.Options)) (*sesv2.GetConfigurationSetEventDestinationsOutput, error) {
 	if f.getConfigSetEventDestsFn != nil {
 		return f.getConfigSetEventDestsFn(input)
 	}
 	return &sesv2.GetConfigurationSetEventDestinationsOutput{}, nil
 }
 
-func (f *fakeSESv2Batch5) GetEmailIdentity(_ context.Context, input *sesv2.GetEmailIdentityInput, _ ...func(*sesv2.Options)) (*sesv2.GetEmailIdentityOutput, error) {
+func (f *fakeSESv2Checker) GetEmailIdentity(_ context.Context, input *sesv2.GetEmailIdentityInput, _ ...func(*sesv2.Options)) (*sesv2.GetEmailIdentityOutput, error) {
 	if f.getEmailIdentityFn != nil {
 		return f.getEmailIdentityFn(input)
 	}
 	return &sesv2.GetEmailIdentityOutput{}, nil
 }
 
-// Compile-time check: fakeSESv2Batch5 satisfies SESv2API.
-var _ awsclient.SESv2API = (*fakeSESv2Batch5)(nil)
+// Compile-time check: fakeSESv2Checker satisfies SESv2API.
+var _ awsclient.SESv2API = (*fakeSESv2Checker)(nil)
 
-// newFakeSESv2WithEventDestinations returns a fakeSESv2Batch5 whose
+// newFakeSESv2WithEventDestinations returns a fakeSESv2Checker whose
 // GetEmailIdentity returns configSetName for identityName, and whose
 // GetConfigurationSetEventDestinations returns the given event destinations.
-func newFakeSESv2WithEventDestinations(identityName, configSetName string, dests []sesv2types.EventDestination) *fakeSESv2Batch5 {
-	return &fakeSESv2Batch5{
+func newFakeSESv2WithEventDestinations(identityName, configSetName string, dests []sesv2types.EventDestination) *fakeSESv2Checker {
+	return &fakeSESv2Checker{
 		getEmailIdentityFn: func(input *sesv2.GetEmailIdentityInput) (*sesv2.GetEmailIdentityOutput, error) {
 			name := ""
 			if input.EmailIdentity != nil {
@@ -82,24 +83,24 @@ func newFakeSESv2WithEventDestinations(identityName, configSetName string, dests
 }
 
 // ---------------------------------------------------------------------------
-// fakeSecretsManagerBatch5 — implements SecretsManagerAPI
+// fakeSecretsManagerChecker — implements SecretsManagerAPI
 // Controllable method: GetResourcePolicy.
 // ---------------------------------------------------------------------------
 
-type fakeSecretsManagerBatch5 struct {
+type fakeSecretsManagerChecker struct {
 	getResourcePolicyOutput *secretsmanager.GetResourcePolicyOutput
 	getResourcePolicyErr    error
 }
 
-func (f *fakeSecretsManagerBatch5) ListSecrets(_ context.Context, _ *secretsmanager.ListSecretsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
+func (f *fakeSecretsManagerChecker) ListSecrets(_ context.Context, _ *secretsmanager.ListSecretsInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.ListSecretsOutput, error) {
 	return &secretsmanager.ListSecretsOutput{}, nil
 }
 
-func (f *fakeSecretsManagerBatch5) GetSecretValue(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
+func (f *fakeSecretsManagerChecker) GetSecretValue(_ context.Context, _ *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 	return &secretsmanager.GetSecretValueOutput{}, nil
 }
 
-func (f *fakeSecretsManagerBatch5) GetResourcePolicy(_ context.Context, _ *secretsmanager.GetResourcePolicyInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetResourcePolicyOutput, error) {
+func (f *fakeSecretsManagerChecker) GetResourcePolicy(_ context.Context, _ *secretsmanager.GetResourcePolicyInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetResourcePolicyOutput, error) {
 	if f.getResourcePolicyErr != nil {
 		return nil, f.getResourcePolicyErr
 	}
@@ -109,23 +110,23 @@ func (f *fakeSecretsManagerBatch5) GetResourcePolicy(_ context.Context, _ *secre
 	return &secretsmanager.GetResourcePolicyOutput{}, nil
 }
 
-// Compile-time check: fakeSecretsManagerBatch5 satisfies SecretsManagerAPI.
-var _ awsclient.SecretsManagerAPI = (*fakeSecretsManagerBatch5)(nil)
+// Compile-time check: fakeSecretsManagerChecker satisfies SecretsManagerAPI.
+var _ awsclient.SecretsManagerAPI = (*fakeSecretsManagerChecker)(nil)
 
-// newFakeSecretsManagerWithResourcePolicy returns a fakeSecretsManagerBatch5
+// newFakeSecretsManagerWithResourcePolicy returns a fakeSecretsManagerChecker
 // whose GetResourcePolicy returns the given IAM policy JSON.
-func newFakeSecretsManagerWithResourcePolicy(policyJSON string) *fakeSecretsManagerBatch5 {
-	return &fakeSecretsManagerBatch5{
+func newFakeSecretsManagerWithResourcePolicy(policyJSON string) *fakeSecretsManagerChecker {
+	return &fakeSecretsManagerChecker{
 		getResourcePolicyOutput: &secretsmanager.GetResourcePolicyOutput{
 			ResourcePolicy: aws.String(policyJSON),
 		},
 	}
 }
 
-// newFakeSecretsManagerNoPolicy returns a fakeSecretsManagerBatch5 whose
+// newFakeSecretsManagerNoPolicy returns a fakeSecretsManagerChecker whose
 // GetResourcePolicy returns nil (no policy attached to secret).
-func newFakeSecretsManagerNoPolicy() *fakeSecretsManagerBatch5 {
-	return &fakeSecretsManagerBatch5{
+func newFakeSecretsManagerNoPolicy() *fakeSecretsManagerChecker {
+	return &fakeSecretsManagerChecker{
 		getResourcePolicyOutput: &secretsmanager.GetResourcePolicyOutput{
 			ResourcePolicy: nil,
 		},
@@ -133,50 +134,50 @@ func newFakeSecretsManagerNoPolicy() *fakeSecretsManagerBatch5 {
 }
 
 // ---------------------------------------------------------------------------
-// fakeLambdaBatch5 — implements LambdaAPI
+// fakeLambdaForSecrets — implements LambdaAPI
 // Controllable method: GetFunction — returns FunctionConfiguration per invocation.
 // ---------------------------------------------------------------------------
 
-type fakeLambdaBatch5 struct {
+type fakeLambdaForSecrets struct {
 	getFunctionFn func(*lambdapkg.GetFunctionInput) (*lambdapkg.GetFunctionOutput, error)
 }
 
-func (f *fakeLambdaBatch5) ListFunctions(_ context.Context, _ *lambdapkg.ListFunctionsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListFunctionsOutput, error) {
+func (f *fakeLambdaForSecrets) ListFunctions(_ context.Context, _ *lambdapkg.ListFunctionsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListFunctionsOutput, error) {
 	return &lambdapkg.ListFunctionsOutput{}, nil
 }
 
-func (f *fakeLambdaBatch5) ListEventSourceMappings(_ context.Context, _ *lambdapkg.ListEventSourceMappingsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListEventSourceMappingsOutput, error) {
+func (f *fakeLambdaForSecrets) ListEventSourceMappings(_ context.Context, _ *lambdapkg.ListEventSourceMappingsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListEventSourceMappingsOutput, error) {
 	return &lambdapkg.ListEventSourceMappingsOutput{}, nil
 }
 
-func (f *fakeLambdaBatch5) GetFunction(_ context.Context, input *lambdapkg.GetFunctionInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.GetFunctionOutput, error) {
+func (f *fakeLambdaForSecrets) GetFunction(_ context.Context, input *lambdapkg.GetFunctionInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.GetFunctionOutput, error) {
 	if f.getFunctionFn != nil {
 		return f.getFunctionFn(input)
 	}
 	return &lambdapkg.GetFunctionOutput{}, nil
 }
 
-func (f *fakeLambdaBatch5) ListTags(_ context.Context, _ *lambdapkg.ListTagsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListTagsOutput, error) {
+func (f *fakeLambdaForSecrets) ListTags(_ context.Context, _ *lambdapkg.ListTagsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListTagsOutput, error) {
 	return &lambdapkg.ListTagsOutput{}, nil
 }
 
-// Compile-time check: fakeLambdaBatch5 satisfies LambdaAPI.
-var _ awsclient.LambdaAPI = (*fakeLambdaBatch5)(nil)
+// Compile-time check: fakeLambdaForSecrets satisfies LambdaAPI.
+var _ awsclient.LambdaAPI = (*fakeLambdaForSecrets)(nil)
 
-// newFakeLambdaWithFunctionConfig returns a fakeLambdaBatch5 whose GetFunction
+// newFakeLambdaWithFunctionConfig returns a fakeLambdaForSecrets whose GetFunction
 // returns the given FunctionConfiguration regardless of which function is requested.
-func newFakeLambdaWithFunctionConfig(cfg *lambdatypes.FunctionConfiguration) *fakeLambdaBatch5 {
-	return &fakeLambdaBatch5{
+func newFakeLambdaWithFunctionConfig(cfg *lambdatypes.FunctionConfiguration) *fakeLambdaForSecrets {
+	return &fakeLambdaForSecrets{
 		getFunctionFn: func(_ *lambdapkg.GetFunctionInput) (*lambdapkg.GetFunctionOutput, error) {
 			return &lambdapkg.GetFunctionOutput{Configuration: cfg}, nil
 		},
 	}
 }
 
-// newFakeLambdaWithDLQ returns a fakeLambdaBatch5 whose GetFunction
+// newFakeLambdaWithDLQ returns a fakeLambdaForSecrets whose GetFunction
 // returns a FunctionConfiguration with the given DeadLetterConfig.TargetArn.
-func newFakeLambdaWithDLQ(functionName, dlqArn string) *fakeLambdaBatch5 {
-	return &fakeLambdaBatch5{
+func newFakeLambdaWithDLQ(functionName, dlqArn string) *fakeLambdaForSecrets {
+	return &fakeLambdaForSecrets{
 		getFunctionFn: func(_ *lambdapkg.GetFunctionInput) (*lambdapkg.GetFunctionOutput, error) {
 			return &lambdapkg.GetFunctionOutput{
 				Configuration: &lambdatypes.FunctionConfiguration{

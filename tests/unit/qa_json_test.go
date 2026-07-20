@@ -4,9 +4,9 @@
 // BottomHints/ResourceID/SearchInfo/SetSize-resize are DEAD per
 // specs/022-codebase-cleanup/wave3-map-text.md (json.go). Most of that
 // surface was accessor-level and is already covered elsewhere on the live
-// path (colorize golden + uncolored-copy: wave3_text_ports_test.go's
-// TestWave3Port_JSONCopy_UncoloredContent /
-// TestWave3Port_JSON_ColorizeGolden_LiveContentLines). What survives here —
+// path (colorize golden + uncolored-copy: text_ports_test.go's
+// TestPort_JSONCopy_UncoloredContent /
+// TestPort_JSON_ColorizeGolden_LiveContentLines). What survives here —
 // retargeted onto NewJSONWithCtrl + ContentLines() — is JSON-specific
 // marshal-correctness behavior with no YAML equivalent: json.MarshalIndent
 // (unlike YAML's fieldpath.ToSafeValue) does NOT omit zero/false values, and

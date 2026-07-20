@@ -184,7 +184,7 @@ func TestStage2Pin_D12_PostSweepListOpen_SeedsTitleRowsAndEnrichedField(t *testi
 // Amend lands before the executor runs.
 // -----------------------------------------------------------------------
 
-// TestStage2Pin_DEF7_SavePayloadFrozenAtDispatch_SurvivesLaterAmend drives an
+// TestStage2Pin_SavePayloadFrozenAtDispatch_SurvivesLaterAmend drives an
 // enrichment-completion sweep to termination (producing a TaskKindSaveCache
 // dispatch carrying a SaveCachePayload), then applies a LATER Amend (a
 // second, distinct enrichment landing for the same type with different
@@ -206,11 +206,11 @@ func TestStage2Pin_D12_PostSweepListOpen_SeedsTitleRowsAndEnrichedField(t *testi
 // RED if a Stage-2 re-implementation ever snapshotted lazily (e.g. captured
 // a reference into the live store instead of calling SnapshotAll) instead of
 // eagerly at dispatch time.
-func TestStage2Pin_DEF7_SavePayloadFrozenAtDispatch_SurvivesLaterAmend(t *testing.T) {
+func TestStage2Pin_SavePayloadFrozenAtDispatch_SurvivesLaterAmend(t *testing.T) {
 	s, core, c := newStage2PinTestController(t)
 
 	seed := []resource.Resource{
-		{ID: "i-0def7seed0001", Name: "def7-seed-1", Type: stage2PinType, Fields: map[string]string{"state": "running"}},
+		{ID: "i-0frozenseed0001", Name: "frozen-seed-1", Type: stage2PinType, Fields: map[string]string{"state": "running"}},
 	}
 	_, _ = c.Handle(messages.AvailabilityChecked{
 		ResourceType: stage2PinType,
@@ -228,7 +228,7 @@ func TestStage2Pin_DEF7_SavePayloadFrozenAtDispatch_SurvivesLaterAmend(t *testin
 		Gen:          s.EnrichmentGen,
 		TypeGen:      s.EnrichmentTypeGen[stage2PinType],
 		FieldUpdates: map[string]map[string]string{
-			"i-0def7seed0001": {"cost_estimate": "10.00"},
+			"i-0frozenseed0001": {"cost_estimate": "10.00"},
 		},
 	})
 
@@ -282,7 +282,7 @@ func TestStage2Pin_DEF7_SavePayloadFrozenAtDispatch_SurvivesLaterAmend(t *testin
 // would save. No SyncProbeResourcesForType caller left in production.
 // -----------------------------------------------------------------------
 
-// TestStage2Pin_DEF21_D16_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft pins
+// TestStage2Pin_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft pins
 // the byte-equivalence contract: after a list-open + one load-more append
 // (accumulated depth 2), an independent sweep-completion save (a SEPARATE,
 // smaller probe result for the same type landing via EnrichmentChecked's
@@ -310,7 +310,7 @@ func TestStage2Pin_DEF7_SavePayloadFrozenAtDispatch_SurvivesLaterAmend(t *testin
 // AmendRows today, must carry the depth-2 accumulation without that specific
 // function existing) AND must flip from RED to GREEN on the "no caller left"
 // sub-assertion.
-func TestStage2Pin_DEF21_D16_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *testing.T) {
+func TestStage2Pin_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *testing.T) {
 	t.Run("no_production_caller_of_SyncProbeResourcesForType_remains", func(t *testing.T) {
 		out, err := caseInsensitiveGrepSyncProbeResourcesForTypeCallers(t)
 		if err != nil {
@@ -467,7 +467,7 @@ func caseInsensitiveGrepSyncProbeResourcesForTypeCallers(t *testing.T) (string, 
 // rows; no stale disk rows resurrect.
 // -----------------------------------------------------------------------
 
-// TestStage2Pin_DEF15_ObservedEmptyProbe_BeatsStaleDiskRows pins the
+// TestStage2Pin_ObservedEmptyProbe_BeatsStaleDiskRows pins the
 // "observed-empty is fresher than any disk row" rule the handlers_navigate.go
 // doc comment states explicitly: a live Wave-1 probe confirming
 // a type is genuinely empty this session (map key present, zero-length
@@ -487,7 +487,7 @@ func caseInsensitiveGrepSyncProbeResourcesForTypeCallers(t *testing.T) (string, 
 // wrongly fall through to a stale disk seed; RowStore.Observe's own
 // Origin field (OriginProbe vs OriginDisk) and the Disk-never-overwrites-
 // Fetch/Probe rule are exactly what must carry this precedence forward.
-func TestStage2Pin_DEF15_ObservedEmptyProbe_BeatsStaleDiskRows(t *testing.T) {
+func TestStage2Pin_ObservedEmptyProbe_BeatsStaleDiskRows(t *testing.T) {
 	s, core, c := newStage2PinTestController(t)
 
 	store := core.EnsureCacheStore()

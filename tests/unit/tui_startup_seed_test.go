@@ -100,7 +100,7 @@ func TestTUIInit_SeedsMenuFromDisk_BeforeClientsReady(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	const profile, region = "def13-cold-prof", "us-east-1"
+	const profile, region = "coldseed-prof", "us-east-1"
 	seedTypeFile(t, profile, region, "s3", 7)
 
 	m := tui.New(profile, region,
@@ -200,7 +200,7 @@ func TestTUIInit_EmptyRegion_ResolvesConfigDefaultForSeed(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	const profile, configDefaultRegion = "def13-emptyregion-prof", "eu-west-1"
+	const profile, configDefaultRegion = "coldseed-emptyregion-prof", "eu-west-1"
 	cfgDir := t.TempDir()
 	cfgPath := cfgDir + "/config"
 	awsConfig := "[profile " + profile + "]\nregion = " + configDefaultRegion + "\n"
@@ -257,7 +257,7 @@ func TestCoreLoadAvailabilityCache_EmptyRegion_ResolvesConfigDefault(t *testing.
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	const profile, configDefaultRegion = "def13-web-emptyregion-prof", "ap-southeast-2"
+	const profile, configDefaultRegion = "coldseed-web-emptyregion-prof", "ap-southeast-2"
 	cfgDir := t.TempDir()
 	cfgPath := cfgDir + "/config"
 	awsConfig := "[profile " + profile + "]\nregion = " + configDefaultRegion + "\n"

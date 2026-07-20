@@ -45,17 +45,17 @@ func ec2RoleCheckerByTarget(t *testing.T) resource.RelatedChecker {
 }
 
 // recordingRoleIAM implements awsclient.IAMAPI's superset by embedding
-// fakeIAMBatch2 (defined in fakes_us1_batch2_test.go, same package) and adds
+// fakeIAMForASG (defined in fakes_asg_eb_related_test.go, same package) and adds
 // a call counter for GetInstanceProfile so tests can assert zero-call fast
 // paths and exactly-one-call resolution paths.
 type recordingRoleIAM struct {
-	fakeIAMBatch2
+	fakeIAMForASG
 	calls int
 }
 
 func (f *recordingRoleIAM) GetInstanceProfile(ctx context.Context, input *iam.GetInstanceProfileInput, optFns ...func(*iam.Options)) (*iam.GetInstanceProfileOutput, error) {
 	f.calls++
-	return f.fakeIAMBatch2.GetInstanceProfile(ctx, input, optFns...)
+	return f.fakeIAMForASG.GetInstanceProfile(ctx, input, optFns...)
 }
 
 func ec2InstanceWithProfileARN(arn string) resource.Resource {

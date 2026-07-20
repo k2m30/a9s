@@ -73,7 +73,7 @@ func TestCheckEKSAMI_SkipsDeletedLaunchTemplate(t *testing.T) {
 	}
 	fakeEKS := newFakeEKSWithNodegroups([]string{"ng-good", "ng-deleted-lt"}, eksNodegroups)
 
-	fakeEC2 := &fakeEC2Batch2{
+	fakeEC2 := &fakeEC2ForASG{
 		describeLaunchTemplateVersionsFn: func(input *ec2.DescribeLaunchTemplateVersionsInput) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
 			ltID := ""
 			if input.LaunchTemplateId != nil {
@@ -137,7 +137,7 @@ func TestCheckEKSAMI_HardFailsOnOtherErrors(t *testing.T) {
 	}
 	fakeEKS := newFakeEKSWithNodegroups([]string{"ng-throttled"}, eksNodegroups)
 
-	fakeEC2 := &fakeEC2Batch2{
+	fakeEC2 := &fakeEC2ForASG{
 		describeLaunchTemplateVersionsFn: func(_ *ec2.DescribeLaunchTemplateVersionsInput) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
 			return nil, fmt.Errorf("unexpected 5xx from EC2 DescribeLaunchTemplateVersions")
 		},
@@ -170,7 +170,7 @@ func TestCheckEKSAMI_HardFailsOnOtherErrors(t *testing.T) {
 func TestCheckNGAMI_SkipsDeletedLaunchTemplate(t *testing.T) {
 	const ltDeleted = "lt-deleted999"
 
-	fakeEC2 := &fakeEC2Batch2{
+	fakeEC2 := &fakeEC2ForASG{
 		describeLaunchTemplateVersionsFn: func(_ *ec2.DescribeLaunchTemplateVersionsInput) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
 			return nil, &smithy.GenericAPIError{
 				Code:    "InvalidLaunchTemplateId.NotFound",

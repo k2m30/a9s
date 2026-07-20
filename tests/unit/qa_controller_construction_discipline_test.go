@@ -102,8 +102,8 @@ var knownConstructionDebt = map[string]bool{
 	"app_detail_attention_cursor_test.go:newAttentionCursorController#1":                                                 true,
 	"app_drainsync_partition_test.go:TestDrainSyncPartition_BlockingFollowUp_IsBackground_ReturnedNotExecuted#1":         true,
 	"app_enrichment_menu_badge_test.go:newEnrichmentMenuBadgeController#1":                                               true,
-	"app_fetchers_wave5_test.go:TestLoadAvailabilityCache_IssueFieldsMapped#1":                                           true,
-	"app_fetchers_wave5_test.go:TestLoadAvailabilityCache_PopulatedCacheReturnsEntries#1":                                true,
+	"app_fetchers_branch_coverage_test.go:TestLoadAvailabilityCache_IssueFieldsMapped#1":                                           true,
+	"app_fetchers_branch_coverage_test.go:TestLoadAvailabilityCache_PopulatedCacheReturnsEntries#1":                                true,
 	"app_handlers_theme_profile_test.go:TestHandleProfilesLoaded_PushesProfileSelectorView#1":                            true,
 	"app_live_shaped_badge_repro_test.go:newLiveShapedBadgeReproController#1":                                            true,
 	"app_menu_test.go:newMenuController#1":                                                                               true,
@@ -390,18 +390,18 @@ var knownConstructionDebt = map[string]bool{
 	"tui_wiring_test.go:TestWiring_ClientsReady_DemoMode_TriggersAvailabilityProbes#1":               true,
 	"tui_wiring_test.go:TestWiring_EmptyProfileShowsDefaultInHeader#1":                               true,
 	"tui_wiring_test.go:TestWiring_RefreshOnMainMenu_DemoMode_TriggersProbes#1":                      true,
-	// wave3_detail_ports_test.go:newDetailController#1 — renamed from
+	// detail_ports_test.go:newDetailController#1 — renamed from
 	// detail_render_parity_test.go:newDetailController#1 (specs/022-codebase-cleanup
 	// Scope C: detail_render_parity_test.go deleted, newDetailController relocated
 	// alongside its other same-package callers). Same pre-existing debt, not new.
-	"wave3_detail_ports_test.go:newDetailController#1": true,
-	// wave3_text_ports_test.go:wave3NewTextController#1 — renamed from
-	// text_ctrl_interaction_test.go:newTextController#1 (Wave 3 round 4:
-	// text_ctrl_interaction_test.go's dead-Update()-driven pins replaced by
-	// real key-path ports, its live ctrl.Apply-direct precision pins moved
-	// here). Same pre-existing debt, not new: no ResourcesLoaded/
+	"detail_ports_test.go:newDetailController#1": true,
+	// text_ports_test.go:newTextScreenController#1 — renamed from
+	// text_ctrl_interaction_test.go:newTextController#1 (that file's
+	// dead-Update()-driven pins were replaced by real key-path ports, and its
+	// live ctrl.Apply-direct precision pins moved here). Same pre-existing
+	// debt, not new: no ResourcesLoaded/
 	// EnrichmentChecked/AvailabilityChecked event is ever driven through it.
-	"wave3_text_ports_test.go:wave3NewTextController#1": true,
+	"text_ports_test.go:newTextScreenController#1": true,
 }
 
 // ccdSite is one direct tui.New/app.New call site the scanner found.

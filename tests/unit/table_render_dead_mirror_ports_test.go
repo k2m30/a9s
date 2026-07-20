@@ -1,5 +1,5 @@
-// wave3_table_render_dead_mirror_ports_test.go — Wave 3 (022-codebase-cleanup
-// re-audit) PORT for the internal/tui/views/table_render.go dead-mirror
+// table_render_dead_mirror_ports_test.go — live-seam port, from the
+// 022-codebase-cleanup re-audit, for the internal/tui/views/table_render.go dead-mirror
 // foursome (phraseFromFindings, resolveIdentityColumn, lifecycleColumnKey,
 // widenLifecycleColumn): specs/022-codebase-cleanup/reaudit.md "port+delete:
 // table_render.go foursome ... Pinned only by two in-package test files
@@ -90,7 +90,7 @@ func wave3MarkerColOf(t *testing.T, c *app.Controller) int {
 // the guard itself is a trivial zero-iteration loop with no branch to lose.
 // ===========================================================================
 
-func TestWave3ResolveListMarkerCol_MatchesIdentityKey(t *testing.T) {
+func TestResolveListMarkerCol_MatchesIdentityKey(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "EC2 Instances", IdentityKey: "foo"}
 	cols := []config.ListColumn{
 		{Key: "status", Title: "Status", Width: 10},
@@ -104,7 +104,7 @@ func TestWave3ResolveListMarkerCol_MatchesIdentityKey(t *testing.T) {
 	}
 }
 
-func TestWave3ResolveListMarkerCol_FallsThroughToNameKey(t *testing.T) {
+func TestResolveListMarkerCol_FallsThroughToNameKey(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "RDS Instances"}
 	cols := []config.ListColumn{
 		{Key: "id", Title: "ID", Width: 10},
@@ -117,7 +117,7 @@ func TestWave3ResolveListMarkerCol_FallsThroughToNameKey(t *testing.T) {
 	}
 }
 
-func TestWave3ResolveListMarkerCol_FallsThroughToPath_Identifier(t *testing.T) {
+func TestResolveListMarkerCol_FallsThroughToPath_Identifier(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "RDS Instances"}
 	cols := []config.ListColumn{
 		{Key: "id", Title: "ID", Width: 10},
@@ -131,7 +131,7 @@ func TestWave3ResolveListMarkerCol_FallsThroughToPath_Identifier(t *testing.T) {
 	}
 }
 
-func TestWave3ResolveListMarkerCol_FallsThroughToPath_NameInPath(t *testing.T) {
+func TestResolveListMarkerCol_FallsThroughToPath_NameInPath(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "Lambda Functions"}
 	cols := []config.ListColumn{
 		{Title: "Arn", Width: 10},
@@ -143,7 +143,7 @@ func TestWave3ResolveListMarkerCol_FallsThroughToPath_NameInPath(t *testing.T) {
 	}
 }
 
-func TestWave3ResolveListMarkerCol_FallsThroughToTitle(t *testing.T) {
+func TestResolveListMarkerCol_FallsThroughToTitle(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "ACM Certificates"}
 	cols := []config.ListColumn{
 		{Title: "ARN", Width: 10},
@@ -157,7 +157,7 @@ func TestWave3ResolveListMarkerCol_FallsThroughToTitle(t *testing.T) {
 	}
 }
 
-func TestWave3ResolveListMarkerCol_CaseInsensitiveTitleMatch(t *testing.T) {
+func TestResolveListMarkerCol_CaseInsensitiveTitleMatch(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "ACM Certificates"}
 	cols := []config.ListColumn{
 		{Title: "ARN", Width: 10},
@@ -171,7 +171,7 @@ func TestWave3ResolveListMarkerCol_CaseInsensitiveTitleMatch(t *testing.T) {
 	}
 }
 
-func TestWave3ResolveListMarkerCol_TitleMatchesTypeName(t *testing.T) {
+func TestResolveListMarkerCol_TitleMatchesTypeName(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "S3 Buckets"}
 	cols := []config.ListColumn{
 		{Title: "ARN", Width: 10},
@@ -184,7 +184,7 @@ func TestWave3ResolveListMarkerCol_TitleMatchesTypeName(t *testing.T) {
 	}
 }
 
-func TestWave3ResolveListMarkerCol_FallsBackToZero(t *testing.T) {
+func TestResolveListMarkerCol_FallsBackToZero(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "ECR Repositories"}
 	cols := []config.ListColumn{
 		{Key: "arn", Title: "ARN", Width: 10},
@@ -197,7 +197,7 @@ func TestWave3ResolveListMarkerCol_FallsBackToZero(t *testing.T) {
 	}
 }
 
-func TestWave3ResolveListMarkerCol_IdentityKeyBeatsNameKey(t *testing.T) {
+func TestResolveListMarkerCol_IdentityKeyBeatsNameKey(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "DB Instances", IdentityKey: "db_id"}
 	cols := []config.ListColumn{
 		{Key: "name", Title: "Name", Width: 10},
@@ -209,7 +209,7 @@ func TestWave3ResolveListMarkerCol_IdentityKeyBeatsNameKey(t *testing.T) {
 	}
 }
 
-func TestWave3ResolveListMarkerCol_IdentityKeyNotFound_FallsToNameKey(t *testing.T) {
+func TestResolveListMarkerCol_IdentityKeyNotFound_FallsToNameKey(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "EC2 Instances", IdentityKey: "nonexistent_key"}
 	cols := []config.ListColumn{
 		{Key: "name", Title: "Name", Width: 10},
@@ -229,7 +229,7 @@ func TestWave3ResolveListMarkerCol_IdentityKeyNotFound_FallsToNameKey(t *testing
 // TestWidenLifecycleColumn_StackedFindingsSizedToMergedPhrase.
 // ===========================================================================
 
-func TestWave3RenderListWidenLifecycleColumn_StackedFindingsNotTruncated(t *testing.T) {
+func TestRenderListWidenLifecycleColumn_StackedFindingsNotTruncated(t *testing.T) {
 	td := resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"}
 	cfg := &config.ViewsConfig{Views: map[string]config.ViewDef{
 		"ec2": {List: []config.ListColumn{

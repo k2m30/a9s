@@ -1,6 +1,6 @@
 package unit
 
-// aws_enrichment_wave4b_test.go — Targets the 1-4 uncovered branches in each
+// aws_enrichment_iam_asg_codepipeline_test.go — Targets the 1-4 uncovered branches in each
 // Wave 2 enricher: EnrichIAMRoleLastUsed, EnrichIAMPolicy, EnrichIAMGroup,
 // EnrichASGScalingActivities, EnrichCodePipelineStatus, plus full coverage of
 // the pure helpers isMSKVersionOutdated and parseVersionPart.

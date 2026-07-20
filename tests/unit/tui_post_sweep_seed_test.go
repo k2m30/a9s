@@ -73,8 +73,8 @@ func seedDiskStoreWithS3Rows(t *testing.T, profile, region string) *cache.Store 
 		Count:        2,
 		Exact:        true,
 		Rows: []cache.Row{
-			{ID: "arn:aws:s3:::def15-store-bucket-1", Name: "def15-store-bucket-1", Fields: map[string]string{"region": region}},
-			{ID: "arn:aws:s3:::def15-store-bucket-2", Name: "def15-store-bucket-2", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::sweep-bucket-1", Name: "sweep-bucket-1", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::sweep-bucket-2", Name: "sweep-bucket-2", Fields: map[string]string{"region": region}},
 		},
 	})
 	if err := store.SaveType("s3"); err != nil {
@@ -115,7 +115,7 @@ func seedDiskStoreWithS3Rows(t *testing.T, profile, region string) *cache.Store 
 // the same row IDs to both).
 func TestPostSweepWarmOpen_SeedsFromStore(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	profile, region := "def15-store-profile", "us-east-1"
+	profile, region := "sweep-store-profile", "us-east-1"
 	seedDiskStoreWithS3Rows(t, profile, region)
 
 	sess := session.New()
@@ -147,8 +147,8 @@ func TestPostSweepWarmOpen_SeedsFromStore(t *testing.T) {
 		Count:        2,
 		Gen:          1,
 		Resources: []resource.Resource{
-			{ID: "arn:aws:s3:::def15-store-bucket-1", Name: "def15-store-bucket-1", Type: "s3", Fields: map[string]string{"region": region}},
-			{ID: "arn:aws:s3:::def15-store-bucket-2", Name: "def15-store-bucket-2", Type: "s3", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::sweep-bucket-1", Name: "sweep-bucket-1", Type: "s3", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::sweep-bucket-2", Name: "sweep-bucket-2", Type: "s3", Fields: map[string]string{"region": region}},
 		},
 	})
 
@@ -194,7 +194,7 @@ func TestPostSweepWarmOpen_SeedsFromStore(t *testing.T) {
 	for _, r := range result.CachedEntry.Resources {
 		gotIDs[r.ID] = true
 	}
-	for _, want := range []string{"arn:aws:s3:::def15-store-bucket-1", "arn:aws:s3:::def15-store-bucket-2"} {
+	for _, want := range []string{"arn:aws:s3:::sweep-bucket-1", "arn:aws:s3:::sweep-bucket-2"} {
 		if !gotIDs[want] {
 			t.Errorf("result.CachedEntry.Resources missing disk-store row %q, got IDs %v", want, gotIDs)
 		}
@@ -243,8 +243,8 @@ func driveToPostSweepState(m tui.Model, region string) tui.Model {
 		Count:        2,
 		Gen:          1,
 		Resources: []resource.Resource{
-			{ID: "arn:aws:s3:::def15-tui-bucket-1", Name: "def15-tui-bucket-1", Type: "s3", Fields: map[string]string{"region": region}},
-			{ID: "arn:aws:s3:::def15-tui-bucket-2", Name: "def15-tui-bucket-2", Type: "s3", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::sweep-tui-bucket-1", Name: "sweep-tui-bucket-1", Type: "s3", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::sweep-tui-bucket-2", Name: "sweep-tui-bucket-2", Type: "s3", Fields: map[string]string{"region": region}},
 		},
 	})
 	for i := 0; i < 5; i++ {
@@ -272,7 +272,7 @@ func driveToPostSweepState(m tui.Model, region string) tui.Model {
 // (reachable only when RowStore was never observed this session).
 func TestPostSweepWarmOpen_TUI_RendersRows(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	const profile, region = "def15-tui-profile", "us-east-1"
+	const profile, region = "sweep-tui-profile", "us-east-1"
 	seedDiskStoreWithS3Rows(t, profile, region)
 
 	m := newPostSweepApp(t, profile, region)
@@ -287,11 +287,11 @@ func TestPostSweepWarmOpen_TUI_RendersRows(t *testing.T) {
 	if strings.Contains(content, "Loading...") {
 		t.Errorf("rendered view after post-sweep opening s3 (RowStore fully seeded) still shows the bare Loading shell — D12:\n%s", content)
 	}
-	if !strings.Contains(content, "def15-tui-bucket-1") {
-		t.Errorf("rendered view after post-sweep opening s3 does not contain the RowStore-seeded row %q:\n%s", "def15-tui-bucket-1", content)
+	if !strings.Contains(content, "sweep-tui-bucket-1") {
+		t.Errorf("rendered view after post-sweep opening s3 does not contain the RowStore-seeded row %q:\n%s", "sweep-tui-bucket-1", content)
 	}
-	if !strings.Contains(content, "def15-tui-bucket-2") {
-		t.Errorf("rendered view after post-sweep opening s3 does not contain the RowStore-seeded row %q:\n%s", "def15-tui-bucket-2", content)
+	if !strings.Contains(content, "sweep-tui-bucket-2") {
+		t.Errorf("rendered view after post-sweep opening s3 does not contain the RowStore-seeded row %q:\n%s", "sweep-tui-bucket-2", content)
 	}
 }
 
@@ -318,7 +318,7 @@ func TestPostSweepWarmOpen_TUI_RendersRows(t *testing.T) {
 // false mechanism — see the test body's diagnostic branch.
 func TestColonCommand_WarmOpen_RendersRows(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	const profile, region = "def15-colon-profile", "us-east-1"
+	const profile, region = "sweep-colon-profile", "us-east-1"
 	seedDiskStoreWithS3Rows(t, profile, region)
 
 	m := newPostSweepApp(t, profile, region)
@@ -336,8 +336,8 @@ func TestColonCommand_WarmOpen_RendersRows(t *testing.T) {
 		Count:        2,
 		Gen:          1,
 		Resources: []resource.Resource{
-			{ID: "arn:aws:s3:::def15-tui-bucket-1", Name: "def15-tui-bucket-1", Type: "s3", Fields: map[string]string{"region": region}},
-			{ID: "arn:aws:s3:::def15-tui-bucket-2", Name: "def15-tui-bucket-2", Type: "s3", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::sweep-tui-bucket-1", Name: "sweep-tui-bucket-1", Type: "s3", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::sweep-tui-bucket-2", Name: "sweep-tui-bucket-2", Type: "s3", Fields: map[string]string{"region": region}},
 		},
 	})
 
@@ -361,8 +361,8 @@ func TestColonCommand_WarmOpen_RendersRows(t *testing.T) {
 		t.Logf("FINDING: :s3 mid-sweep (ProbeResources populated) renders the bare Loading shell through the colon-command lane. Since Test 2 proves the messages.Navigate path renders seeded rows once ProbeResources is populated, this divergence is specific to the colon-command key-mode input path (rootKeyPress(':') + chars + KeyEnter) versus a directly-injected messages.Navigate — the command-mode submit handler is not reaching the same HandleNavigate call, or is racing/dropping the seed. Needs deeper tracing in the TUI command-mode submit handler, not HandleNavigate itself.")
 		t.Errorf("rendered view after :s3 mid-sweep still shows the bare Loading shell — the D12 live-tmux symptom:\n%s", content)
 	}
-	if !strings.Contains(content, "def15-tui-bucket-1") && !strings.Contains(content, "def15-store-bucket-1") {
-		t.Errorf("rendered view after :s3 mid-sweep does not contain a seeded row (neither ProbeResources' def15-tui-bucket-1 nor a disk-store fallback row):\n%s", content)
+	if !strings.Contains(content, "sweep-tui-bucket-1") && !strings.Contains(content, "sweep-bucket-1") {
+		t.Errorf("rendered view after :s3 mid-sweep does not contain a seeded row (neither ProbeResources' sweep-tui-bucket-1 nor a disk-store fallback row):\n%s", content)
 	}
 }
 
@@ -377,7 +377,7 @@ func TestColonCommand_WarmOpen_RendersRows(t *testing.T) {
 // rendered view shows the disk-seeded rows rather than Loading.
 func TestMenuEnter_PostSweep_RendersRows(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	const profile, region = "def15-menu-profile", "us-east-1"
+	const profile, region = "sweep-menu-profile", "us-east-1"
 
 	store := cache.LoadDirForTest(profile, region)
 	store.Put("ec2", cache.TypeFile{
@@ -385,8 +385,8 @@ func TestMenuEnter_PostSweep_RendersRows(t *testing.T) {
 		Count:        2,
 		Exact:        true,
 		Rows: []cache.Row{
-			{ID: "i-def15menu1", Name: "def15-menu-instance-1", Fields: map[string]string{"region": region}},
-			{ID: "i-def15menu2", Name: "def15-menu-instance-2", Fields: map[string]string{"region": region}},
+			{ID: "i-sweepmenu1", Name: "sweep-menu-instance-1", Fields: map[string]string{"region": region}},
+			{ID: "i-sweepmenu2", Name: "sweep-menu-instance-2", Fields: map[string]string{"region": region}},
 		},
 	})
 	if err := store.SaveType("ec2"); err != nil {
@@ -404,8 +404,8 @@ func TestMenuEnter_PostSweep_RendersRows(t *testing.T) {
 		Count:        2,
 		Gen:          1,
 		Resources: []resource.Resource{
-			{ID: "i-def15menu1", Name: "def15-menu-instance-1", Type: "ec2", Fields: map[string]string{"region": region}},
-			{ID: "i-def15menu2", Name: "def15-menu-instance-2", Type: "ec2", Fields: map[string]string{"region": region}},
+			{ID: "i-sweepmenu1", Name: "sweep-menu-instance-1", Type: "ec2", Fields: map[string]string{"region": region}},
+			{ID: "i-sweepmenu2", Name: "sweep-menu-instance-2", Type: "ec2", Fields: map[string]string{"region": region}},
 		},
 	})
 	for i := 0; i < 5; i++ {
@@ -431,11 +431,11 @@ func TestMenuEnter_PostSweep_RendersRows(t *testing.T) {
 	if strings.Contains(content, "Loading...") {
 		t.Errorf("rendered view after menu-Enter on ec2 post-sweep still shows the bare Loading shell — D12:\n%s", content)
 	}
-	if !strings.Contains(content, "def15-menu-instance-1") {
-		t.Errorf("rendered view after menu-Enter on ec2 post-sweep does not contain the disk-seeded row %q:\n%s", "def15-menu-instance-1", content)
+	if !strings.Contains(content, "sweep-menu-instance-1") {
+		t.Errorf("rendered view after menu-Enter on ec2 post-sweep does not contain the disk-seeded row %q:\n%s", "sweep-menu-instance-1", content)
 	}
-	if !strings.Contains(content, "def15-menu-instance-2") {
-		t.Errorf("rendered view after menu-Enter on ec2 post-sweep does not contain the disk-seeded row %q:\n%s", "def15-menu-instance-2", content)
+	if !strings.Contains(content, "sweep-menu-instance-2") {
+		t.Errorf("rendered view after menu-Enter on ec2 post-sweep does not contain the disk-seeded row %q:\n%s", "sweep-menu-instance-2", content)
 	}
 }
 
@@ -456,7 +456,7 @@ func TestMenuEnter_PostSweep_RendersRows(t *testing.T) {
 // fix does not introduce a stale cross-pair leak.
 func TestPairSwitch_PostSweep_NoStaleSeed(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	profileA, profileB, region := "def15-pairswitch-a", "def15-pairswitch-b", "us-east-1"
+	profileA, profileB, region := "sweep-pairswitch-a", "sweep-pairswitch-b", "us-east-1"
 	seedDiskStoreWithS3Rows(t, profileA, region)
 	// profileB's pair intentionally has no on-disk s3 data at all.
 
@@ -521,7 +521,7 @@ func TestPairSwitch_PostSweep_NoStaleSeed(t *testing.T) {
 // current-session observed-empty result is fresher than any disk row (C2).
 func TestObservedEmpty_DoesNotSeedStaleDiskRows(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	profile, region := "def15p2-store-profile", "us-east-1"
+	profile, region := "stale-store-profile", "us-east-1"
 
 	store := cache.LoadDirForTest(profile, region)
 	store.Put("s3", cache.TypeFile{
@@ -529,9 +529,9 @@ func TestObservedEmpty_DoesNotSeedStaleDiskRows(t *testing.T) {
 		Count:        3,
 		Exact:        true,
 		Rows: []cache.Row{
-			{ID: "arn:aws:s3:::def15p2-stale-bucket-1", Name: "def15p2-stale-bucket-1", Fields: map[string]string{"region": region}},
-			{ID: "arn:aws:s3:::def15p2-stale-bucket-2", Name: "def15p2-stale-bucket-2", Fields: map[string]string{"region": region}},
-			{ID: "arn:aws:s3:::def15p2-stale-bucket-3", Name: "def15p2-stale-bucket-3", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::stale-bucket-1", Name: "stale-bucket-1", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::stale-bucket-2", Name: "stale-bucket-2", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::stale-bucket-3", Name: "stale-bucket-3", Fields: map[string]string{"region": region}},
 		},
 	})
 	if err := store.SaveType("s3"); err != nil {
@@ -600,7 +600,7 @@ func TestObservedEmpty_DoesNotSeedStaleDiskRows(t *testing.T) {
 // this pair is fully populated with 3 rows from a prior session.
 func TestObservedEmpty_TUI_DoesNotRenderStaleRows(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	const profile, region = "def15p2-tui-profile", "us-east-1"
+	const profile, region = "stale-tui-profile", "us-east-1"
 
 	store := cache.LoadDirForTest(profile, region)
 	store.Put("s3", cache.TypeFile{
@@ -608,9 +608,9 @@ func TestObservedEmpty_TUI_DoesNotRenderStaleRows(t *testing.T) {
 		Count:        3,
 		Exact:        true,
 		Rows: []cache.Row{
-			{ID: "arn:aws:s3:::def15p2-tui-stale-1", Name: "def15p2-tui-stale-1", Fields: map[string]string{"region": region}},
-			{ID: "arn:aws:s3:::def15p2-tui-stale-2", Name: "def15p2-tui-stale-2", Fields: map[string]string{"region": region}},
-			{ID: "arn:aws:s3:::def15p2-tui-stale-3", Name: "def15p2-tui-stale-3", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::stale-tui-1", Name: "stale-tui-1", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::stale-tui-2", Name: "stale-tui-2", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::stale-tui-3", Name: "stale-tui-3", Fields: map[string]string{"region": region}},
 		},
 	})
 	if err := store.SaveType("s3"); err != nil {
@@ -634,7 +634,7 @@ func TestObservedEmpty_TUI_DoesNotRenderStaleRows(t *testing.T) {
 	})
 
 	content := stripANSI(rootViewContent(m))
-	for _, stale := range []string{"def15p2-tui-stale-1", "def15p2-tui-stale-2", "def15p2-tui-stale-3"} {
+	for _, stale := range []string{"stale-tui-1", "stale-tui-2", "stale-tui-3"} {
 		if strings.Contains(content, stale) {
 			t.Errorf("rendered view after opening s3 (observed empty this session via live probe) contains stale disk-store row %q — the observed-empty guard on the disk-store fallback:\n%s", stale, content)
 		}
@@ -650,7 +650,7 @@ func TestObservedEmpty_TUI_DoesNotRenderStaleRows(t *testing.T) {
 // must not regress.
 func TestUnobserved_StillSeedsFromStore(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	profile, region := "def15p2-unobserved-profile", "us-east-1"
+	profile, region := "stale-unobserved-profile", "us-east-1"
 	seedDiskStoreWithS3Rows(t, profile, region)
 
 	sess := session.New()
@@ -681,7 +681,7 @@ func TestUnobserved_StillSeedsFromStore(t *testing.T) {
 	for _, r := range result.CachedEntry.Resources {
 		gotIDs[r.ID] = true
 	}
-	for _, want := range []string{"arn:aws:s3:::def15-store-bucket-1", "arn:aws:s3:::def15-store-bucket-2"} {
+	for _, want := range []string{"arn:aws:s3:::sweep-bucket-1", "arn:aws:s3:::sweep-bucket-2"} {
 		if !gotIDs[want] {
 			t.Errorf("result.CachedEntry.Resources missing disk-store row %q, got IDs %v", want, gotIDs)
 		}

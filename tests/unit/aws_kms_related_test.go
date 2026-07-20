@@ -390,7 +390,7 @@ func TestRelated_KMS_Role_AccessDenied_ReturnsMinusOne(t *testing.T) {
 	}
 	// GetKeyPolicy returns AccessDenied; ListGrants returns empty (never reached).
 	clients := &awsclient.ServiceClients{
-		KMS: &fakeKMSUS1{
+		KMS: &fakeKMSChecker{
 			getKeyPolicyErr: newAccessDeniedError(),
 		},
 	}
@@ -419,7 +419,7 @@ func TestRelated_KMS_Role_ListGrantsAccessDenied_ReturnsMinusOne(t *testing.T) {
 	// so the policy parse finds no role principals.
 	// ListGrants then returns AccessDenied.
 	clients := &awsclient.ServiceClients{
-		KMS: &fakeKMSUS1{
+		KMS: &fakeKMSChecker{
 			getKeyPolicyOut: &kmssvc.GetKeyPolicyOutput{},
 			listGrantsErr:   newAccessDeniedError(),
 		},

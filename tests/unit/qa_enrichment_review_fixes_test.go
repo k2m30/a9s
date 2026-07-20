@@ -12,7 +12,7 @@ package unit
 // A second review finding this file used to pin (resolveIdentityColumn
 // running on the full pre-hscroll column list, so the marker doesn't jump to
 // a different semantic column when scrolled) is now covered by
-// wave3_list_ports_test.go's TestWave3MarkerColParity_
+// list_ports_test.go's TestWave3MarkerColParity_
 // EnrichmentFindingsWithHScroll_AllResourceTypes, which pins the live
 // RenderList seam (this file's ResourceListModel.View() harness is dead
 // code).

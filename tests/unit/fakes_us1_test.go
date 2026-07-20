@@ -31,36 +31,36 @@ import (
 // Backup fake — implements BackupAPI
 // ---------------------------------------------------------------------------
 
-type fakeBackupUS1 struct {
+type fakeBackupChecker struct {
 	recoveryPointsOutput *backup.ListRecoveryPointsByResourceOutput
 	recoveryPointsErr    error
 }
 
-func (f *fakeBackupUS1) ListBackupPlans(_ context.Context, _ *backup.ListBackupPlansInput, _ ...func(*backup.Options)) (*backup.ListBackupPlansOutput, error) {
+func (f *fakeBackupChecker) ListBackupPlans(_ context.Context, _ *backup.ListBackupPlansInput, _ ...func(*backup.Options)) (*backup.ListBackupPlansOutput, error) {
 	return &backup.ListBackupPlansOutput{}, nil
 }
 
-func (f *fakeBackupUS1) ListBackupJobs(_ context.Context, _ *backup.ListBackupJobsInput, _ ...func(*backup.Options)) (*backup.ListBackupJobsOutput, error) {
+func (f *fakeBackupChecker) ListBackupJobs(_ context.Context, _ *backup.ListBackupJobsInput, _ ...func(*backup.Options)) (*backup.ListBackupJobsOutput, error) {
 	return &backup.ListBackupJobsOutput{}, nil
 }
 
-func (f *fakeBackupUS1) GetBackupPlan(_ context.Context, _ *backup.GetBackupPlanInput, _ ...func(*backup.Options)) (*backup.GetBackupPlanOutput, error) {
+func (f *fakeBackupChecker) GetBackupPlan(_ context.Context, _ *backup.GetBackupPlanInput, _ ...func(*backup.Options)) (*backup.GetBackupPlanOutput, error) {
 	return &backup.GetBackupPlanOutput{}, nil
 }
 
-func (f *fakeBackupUS1) ListBackupSelections(_ context.Context, _ *backup.ListBackupSelectionsInput, _ ...func(*backup.Options)) (*backup.ListBackupSelectionsOutput, error) {
+func (f *fakeBackupChecker) ListBackupSelections(_ context.Context, _ *backup.ListBackupSelectionsInput, _ ...func(*backup.Options)) (*backup.ListBackupSelectionsOutput, error) {
 	return &backup.ListBackupSelectionsOutput{}, nil
 }
 
-func (f *fakeBackupUS1) DescribeBackupVault(_ context.Context, _ *backup.DescribeBackupVaultInput, _ ...func(*backup.Options)) (*backup.DescribeBackupVaultOutput, error) {
+func (f *fakeBackupChecker) DescribeBackupVault(_ context.Context, _ *backup.DescribeBackupVaultInput, _ ...func(*backup.Options)) (*backup.DescribeBackupVaultOutput, error) {
 	return &backup.DescribeBackupVaultOutput{}, nil
 }
 
-func (f *fakeBackupUS1) GetBackupVaultNotifications(_ context.Context, _ *backup.GetBackupVaultNotificationsInput, _ ...func(*backup.Options)) (*backup.GetBackupVaultNotificationsOutput, error) {
+func (f *fakeBackupChecker) GetBackupVaultNotifications(_ context.Context, _ *backup.GetBackupVaultNotificationsInput, _ ...func(*backup.Options)) (*backup.GetBackupVaultNotificationsOutput, error) {
 	return &backup.GetBackupVaultNotificationsOutput{}, nil
 }
 
-func (f *fakeBackupUS1) ListRecoveryPointsByResource(_ context.Context, _ *backup.ListRecoveryPointsByResourceInput, _ ...func(*backup.Options)) (*backup.ListRecoveryPointsByResourceOutput, error) {
+func (f *fakeBackupChecker) ListRecoveryPointsByResource(_ context.Context, _ *backup.ListRecoveryPointsByResourceInput, _ ...func(*backup.Options)) (*backup.ListRecoveryPointsByResourceOutput, error) {
 	if f.recoveryPointsErr != nil {
 		return nil, f.recoveryPointsErr
 	}
@@ -70,10 +70,10 @@ func (f *fakeBackupUS1) ListRecoveryPointsByResource(_ context.Context, _ *backu
 	return &backup.ListRecoveryPointsByResourceOutput{}, nil
 }
 
-// newFakeBackupWithRecoveryPoints constructs a fakeBackupUS1 with the given
+// newFakeBackupWithRecoveryPoints constructs a fakeBackupChecker with the given
 // recovery point entries for ListRecoveryPointsByResource.
-func newFakeBackupWithRecoveryPoints(entries []backuptypes.RecoveryPointByResource) *fakeBackupUS1 {
-	return &fakeBackupUS1{
+func newFakeBackupWithRecoveryPoints(entries []backuptypes.RecoveryPointByResource) *fakeBackupChecker {
+	return &fakeBackupChecker{
 		recoveryPointsOutput: &backup.ListRecoveryPointsByResourceOutput{
 			RecoveryPoints: entries,
 		},
@@ -84,30 +84,30 @@ func newFakeBackupWithRecoveryPoints(entries []backuptypes.RecoveryPointByResour
 // KMS fake — implements KMSAPI
 // ---------------------------------------------------------------------------
 
-type fakeKMSUS1 struct {
+type fakeKMSChecker struct {
 	listGrantsOutput *kms.ListGrantsOutput
 	listGrantsErr    error
 	getKeyPolicyOut  *kms.GetKeyPolicyOutput
 	getKeyPolicyErr  error
 }
 
-func (f *fakeKMSUS1) ListKeys(_ context.Context, _ *kms.ListKeysInput, _ ...func(*kms.Options)) (*kms.ListKeysOutput, error) {
+func (f *fakeKMSChecker) ListKeys(_ context.Context, _ *kms.ListKeysInput, _ ...func(*kms.Options)) (*kms.ListKeysOutput, error) {
 	return &kms.ListKeysOutput{}, nil
 }
 
-func (f *fakeKMSUS1) DescribeKey(_ context.Context, _ *kms.DescribeKeyInput, _ ...func(*kms.Options)) (*kms.DescribeKeyOutput, error) {
+func (f *fakeKMSChecker) DescribeKey(_ context.Context, _ *kms.DescribeKeyInput, _ ...func(*kms.Options)) (*kms.DescribeKeyOutput, error) {
 	return &kms.DescribeKeyOutput{}, nil
 }
 
-func (f *fakeKMSUS1) ListAliases(_ context.Context, _ *kms.ListAliasesInput, _ ...func(*kms.Options)) (*kms.ListAliasesOutput, error) {
+func (f *fakeKMSChecker) ListAliases(_ context.Context, _ *kms.ListAliasesInput, _ ...func(*kms.Options)) (*kms.ListAliasesOutput, error) {
 	return &kms.ListAliasesOutput{}, nil
 }
 
-func (f *fakeKMSUS1) GetKeyRotationStatus(_ context.Context, _ *kms.GetKeyRotationStatusInput, _ ...func(*kms.Options)) (*kms.GetKeyRotationStatusOutput, error) {
+func (f *fakeKMSChecker) GetKeyRotationStatus(_ context.Context, _ *kms.GetKeyRotationStatusInput, _ ...func(*kms.Options)) (*kms.GetKeyRotationStatusOutput, error) {
 	return &kms.GetKeyRotationStatusOutput{}, nil
 }
 
-func (f *fakeKMSUS1) ListGrants(_ context.Context, _ *kms.ListGrantsInput, _ ...func(*kms.Options)) (*kms.ListGrantsOutput, error) {
+func (f *fakeKMSChecker) ListGrants(_ context.Context, _ *kms.ListGrantsInput, _ ...func(*kms.Options)) (*kms.ListGrantsOutput, error) {
 	if f.listGrantsErr != nil {
 		return nil, f.listGrantsErr
 	}
@@ -117,7 +117,7 @@ func (f *fakeKMSUS1) ListGrants(_ context.Context, _ *kms.ListGrantsInput, _ ...
 	return &kms.ListGrantsOutput{}, nil
 }
 
-func (f *fakeKMSUS1) GetKeyPolicy(_ context.Context, _ *kms.GetKeyPolicyInput, _ ...func(*kms.Options)) (*kms.GetKeyPolicyOutput, error) {
+func (f *fakeKMSChecker) GetKeyPolicy(_ context.Context, _ *kms.GetKeyPolicyInput, _ ...func(*kms.Options)) (*kms.GetKeyPolicyOutput, error) {
 	if f.getKeyPolicyErr != nil {
 		return nil, f.getKeyPolicyErr
 	}
@@ -127,9 +127,9 @@ func (f *fakeKMSUS1) GetKeyPolicy(_ context.Context, _ *kms.GetKeyPolicyInput, _
 	return &kms.GetKeyPolicyOutput{}, nil
 }
 
-// newFakeKMSWithGrants constructs a fakeKMSUS1 returning the supplied grant entries.
-func newFakeKMSWithGrants(entries []kmstypes.GrantListEntry) *fakeKMSUS1 {
-	return &fakeKMSUS1{
+// newFakeKMSWithGrants constructs a fakeKMSChecker returning the supplied grant entries.
+func newFakeKMSWithGrants(entries []kmstypes.GrantListEntry) *fakeKMSChecker {
+	return &fakeKMSChecker{
 		listGrantsOutput: &kms.ListGrantsOutput{Grants: entries},
 	}
 }
@@ -141,24 +141,24 @@ func newFakeKMSWithGrants(entries []kmstypes.GrantListEntry) *fakeKMSUS1 {
 //  DynamoDBDescribeKinesisStreamingDestinationAPI)
 // ---------------------------------------------------------------------------
 
-type fakeDynamoDBUS1 struct {
+type fakeDynamoDBChecker struct {
 	kinesisDestOutput *dynamodb.DescribeKinesisStreamingDestinationOutput
 	kinesisDestErr    error
 }
 
-func (f *fakeDynamoDBUS1) ListTables(_ context.Context, _ *dynamodb.ListTablesInput, _ ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error) {
+func (f *fakeDynamoDBChecker) ListTables(_ context.Context, _ *dynamodb.ListTablesInput, _ ...func(*dynamodb.Options)) (*dynamodb.ListTablesOutput, error) {
 	return &dynamodb.ListTablesOutput{}, nil
 }
 
-func (f *fakeDynamoDBUS1) DescribeTable(_ context.Context, _ *dynamodb.DescribeTableInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+func (f *fakeDynamoDBChecker) DescribeTable(_ context.Context, _ *dynamodb.DescribeTableInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
 	return &dynamodb.DescribeTableOutput{}, nil
 }
 
-func (f *fakeDynamoDBUS1) DescribeContinuousBackups(_ context.Context, _ *dynamodb.DescribeContinuousBackupsInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeContinuousBackupsOutput, error) {
+func (f *fakeDynamoDBChecker) DescribeContinuousBackups(_ context.Context, _ *dynamodb.DescribeContinuousBackupsInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeContinuousBackupsOutput, error) {
 	return &dynamodb.DescribeContinuousBackupsOutput{}, nil
 }
 
-func (f *fakeDynamoDBUS1) DescribeKinesisStreamingDestination(_ context.Context, _ *dynamodb.DescribeKinesisStreamingDestinationInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
+func (f *fakeDynamoDBChecker) DescribeKinesisStreamingDestination(_ context.Context, _ *dynamodb.DescribeKinesisStreamingDestinationInput, _ ...func(*dynamodb.Options)) (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
 	if f.kinesisDestErr != nil {
 		return nil, f.kinesisDestErr
 	}
@@ -174,20 +174,20 @@ func (f *fakeDynamoDBUS1) DescribeKinesisStreamingDestination(_ context.Context,
 //  LambdaGetFunctionAPI + LambdaListTagsAPI)
 // ---------------------------------------------------------------------------
 
-type fakeLambdaUS1 struct {
+type fakeLambdaForKMS struct {
 	getFunctionOutput *lambdapkg.GetFunctionOutput
 	getFunctionErr    error
 }
 
-func (f *fakeLambdaUS1) ListFunctions(_ context.Context, _ *lambdapkg.ListFunctionsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListFunctionsOutput, error) {
+func (f *fakeLambdaForKMS) ListFunctions(_ context.Context, _ *lambdapkg.ListFunctionsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListFunctionsOutput, error) {
 	return &lambdapkg.ListFunctionsOutput{}, nil
 }
 
-func (f *fakeLambdaUS1) ListEventSourceMappings(_ context.Context, _ *lambdapkg.ListEventSourceMappingsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListEventSourceMappingsOutput, error) {
+func (f *fakeLambdaForKMS) ListEventSourceMappings(_ context.Context, _ *lambdapkg.ListEventSourceMappingsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListEventSourceMappingsOutput, error) {
 	return &lambdapkg.ListEventSourceMappingsOutput{}, nil
 }
 
-func (f *fakeLambdaUS1) GetFunction(_ context.Context, _ *lambdapkg.GetFunctionInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.GetFunctionOutput, error) {
+func (f *fakeLambdaForKMS) GetFunction(_ context.Context, _ *lambdapkg.GetFunctionInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.GetFunctionOutput, error) {
 	if f.getFunctionErr != nil {
 		return nil, f.getFunctionErr
 	}
@@ -197,14 +197,14 @@ func (f *fakeLambdaUS1) GetFunction(_ context.Context, _ *lambdapkg.GetFunctionI
 	return &lambdapkg.GetFunctionOutput{}, nil
 }
 
-func (f *fakeLambdaUS1) ListTags(_ context.Context, _ *lambdapkg.ListTagsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListTagsOutput, error) {
+func (f *fakeLambdaForKMS) ListTags(_ context.Context, _ *lambdapkg.ListTagsInput, _ ...func(*lambdapkg.Options)) (*lambdapkg.ListTagsOutput, error) {
 	return &lambdapkg.ListTagsOutput{}, nil
 }
 
-// newFakeLambdaWithKMSKey returns a fakeLambdaUS1 whose GetFunction returns
+// newFakeLambdaWithKMSKey returns a fakeLambdaForKMS whose GetFunction returns
 // a FunctionConfiguration with the specified KMSKeyArn.
-func newFakeLambdaWithKMSKey(kmsKeyARN string) *fakeLambdaUS1 {
-	return &fakeLambdaUS1{
+func newFakeLambdaWithKMSKey(kmsKeyARN string) *fakeLambdaForKMS {
+	return &fakeLambdaForKMS{
 		getFunctionOutput: &lambdapkg.GetFunctionOutput{
 			Configuration: &lambdatypes.FunctionConfiguration{
 				KMSKeyArn: &kmsKeyARN,
@@ -220,28 +220,28 @@ func newFakeLambdaWithKMSKey(kmsKeyARN string) *fakeLambdaUS1 {
 //  CodeArtifactDescribeDomainAPI)
 // ---------------------------------------------------------------------------
 
-type fakeCodeArtifactUS1 struct {
+type fakeCodeArtifactChecker struct {
 	describeDomainOutput *codeartifact.DescribeDomainOutput
 	describeDomainErr    error
 }
 
-func (f *fakeCodeArtifactUS1) ListRepositories(_ context.Context, _ *codeartifact.ListRepositoriesInput, _ ...func(*codeartifact.Options)) (*codeartifact.ListRepositoriesOutput, error) {
+func (f *fakeCodeArtifactChecker) ListRepositories(_ context.Context, _ *codeartifact.ListRepositoriesInput, _ ...func(*codeartifact.Options)) (*codeartifact.ListRepositoriesOutput, error) {
 	return &codeartifact.ListRepositoriesOutput{}, nil
 }
 
-func (f *fakeCodeArtifactUS1) GetRepositoryPermissionsPolicy(_ context.Context, _ *codeartifact.GetRepositoryPermissionsPolicyInput, _ ...func(*codeartifact.Options)) (*codeartifact.GetRepositoryPermissionsPolicyOutput, error) {
+func (f *fakeCodeArtifactChecker) GetRepositoryPermissionsPolicy(_ context.Context, _ *codeartifact.GetRepositoryPermissionsPolicyInput, _ ...func(*codeartifact.Options)) (*codeartifact.GetRepositoryPermissionsPolicyOutput, error) {
 	return &codeartifact.GetRepositoryPermissionsPolicyOutput{}, nil
 }
 
-func (f *fakeCodeArtifactUS1) DescribeRepository(_ context.Context, _ *codeartifact.DescribeRepositoryInput, _ ...func(*codeartifact.Options)) (*codeartifact.DescribeRepositoryOutput, error) {
+func (f *fakeCodeArtifactChecker) DescribeRepository(_ context.Context, _ *codeartifact.DescribeRepositoryInput, _ ...func(*codeartifact.Options)) (*codeartifact.DescribeRepositoryOutput, error) {
 	return &codeartifact.DescribeRepositoryOutput{}, nil
 }
 
-func (f *fakeCodeArtifactUS1) GetDomainPermissionsPolicy(_ context.Context, _ *codeartifact.GetDomainPermissionsPolicyInput, _ ...func(*codeartifact.Options)) (*codeartifact.GetDomainPermissionsPolicyOutput, error) {
+func (f *fakeCodeArtifactChecker) GetDomainPermissionsPolicy(_ context.Context, _ *codeartifact.GetDomainPermissionsPolicyInput, _ ...func(*codeartifact.Options)) (*codeartifact.GetDomainPermissionsPolicyOutput, error) {
 	return &codeartifact.GetDomainPermissionsPolicyOutput{}, nil
 }
 
-func (f *fakeCodeArtifactUS1) DescribeDomain(_ context.Context, _ *codeartifact.DescribeDomainInput, _ ...func(*codeartifact.Options)) (*codeartifact.DescribeDomainOutput, error) {
+func (f *fakeCodeArtifactChecker) DescribeDomain(_ context.Context, _ *codeartifact.DescribeDomainInput, _ ...func(*codeartifact.Options)) (*codeartifact.DescribeDomainOutput, error) {
 	if f.describeDomainErr != nil {
 		return nil, f.describeDomainErr
 	}
@@ -251,10 +251,10 @@ func (f *fakeCodeArtifactUS1) DescribeDomain(_ context.Context, _ *codeartifact.
 	return &codeartifact.DescribeDomainOutput{}, nil
 }
 
-// newFakeCodeArtifactWithKMSKey returns a fakeCodeArtifactUS1 whose DescribeDomain
+// newFakeCodeArtifactWithKMSKey returns a fakeCodeArtifactChecker whose DescribeDomain
 // returns the supplied KMS key ARN in Domain.EncryptionKey.
-func newFakeCodeArtifactWithKMSKey(keyARN string) *fakeCodeArtifactUS1 {
-	return &fakeCodeArtifactUS1{
+func newFakeCodeArtifactWithKMSKey(keyARN string) *fakeCodeArtifactChecker {
+	return &fakeCodeArtifactChecker{
 		describeDomainOutput: &codeartifact.DescribeDomainOutput{
 			Domain: &catypes.DomainDescription{
 				EncryptionKey: &keyARN,
@@ -269,48 +269,48 @@ func newFakeCodeArtifactWithKMSKey(keyARN string) *fakeCodeArtifactUS1 {
 // succeeds.
 // ---------------------------------------------------------------------------
 
-type fakeAPIGWV2US1 struct {
+type fakeAPIGWV2Checker struct {
 	integrations    []apigwv2types.Integration
 	integrationsErr error
 }
 
-func (f *fakeAPIGWV2US1) GetApis(_ context.Context, _ *apigatewayv2.GetApisInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApisOutput, error) {
+func (f *fakeAPIGWV2Checker) GetApis(_ context.Context, _ *apigatewayv2.GetApisInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApisOutput, error) {
 	return &apigatewayv2.GetApisOutput{}, nil
 }
 
-func (f *fakeAPIGWV2US1) GetStages(_ context.Context, _ *apigatewayv2.GetStagesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error) {
+func (f *fakeAPIGWV2Checker) GetStages(_ context.Context, _ *apigatewayv2.GetStagesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetStagesOutput, error) {
 	return &apigatewayv2.GetStagesOutput{}, nil
 }
 
-func (f *fakeAPIGWV2US1) GetIntegrations(_ context.Context, _ *apigatewayv2.GetIntegrationsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetIntegrationsOutput, error) {
+func (f *fakeAPIGWV2Checker) GetIntegrations(_ context.Context, _ *apigatewayv2.GetIntegrationsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetIntegrationsOutput, error) {
 	if f.integrationsErr != nil {
 		return nil, f.integrationsErr
 	}
 	return &apigatewayv2.GetIntegrationsOutput{Items: f.integrations}, nil
 }
 
-func (f *fakeAPIGWV2US1) GetDomainNames(_ context.Context, _ *apigatewayv2.GetDomainNamesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetDomainNamesOutput, error) {
+func (f *fakeAPIGWV2Checker) GetDomainNames(_ context.Context, _ *apigatewayv2.GetDomainNamesInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetDomainNamesOutput, error) {
 	return &apigatewayv2.GetDomainNamesOutput{}, nil
 }
 
-func (f *fakeAPIGWV2US1) GetApiMappings(_ context.Context, _ *apigatewayv2.GetApiMappingsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApiMappingsOutput, error) {
+func (f *fakeAPIGWV2Checker) GetApiMappings(_ context.Context, _ *apigatewayv2.GetApiMappingsInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetApiMappingsOutput, error) {
 	return &apigatewayv2.GetApiMappingsOutput{}, nil
 }
 
-func (f *fakeAPIGWV2US1) GetVpcLinks(_ context.Context, _ *apigatewayv2.GetVpcLinksInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetVpcLinksOutput, error) {
+func (f *fakeAPIGWV2Checker) GetVpcLinks(_ context.Context, _ *apigatewayv2.GetVpcLinksInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetVpcLinksOutput, error) {
 	return &apigatewayv2.GetVpcLinksOutput{}, nil
 }
 
-func (f *fakeAPIGWV2US1) GetAuthorizers(_ context.Context, _ *apigatewayv2.GetAuthorizersInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetAuthorizersOutput, error) {
+func (f *fakeAPIGWV2Checker) GetAuthorizers(_ context.Context, _ *apigatewayv2.GetAuthorizersInput, _ ...func(*apigatewayv2.Options)) (*apigatewayv2.GetAuthorizersOutput, error) {
 	return &apigatewayv2.GetAuthorizersOutput{}, nil
 }
 
-// newFakeAPIGWV2WithLambdaIntegration returns a fakeAPIGWV2US1 whose
+// newFakeAPIGWV2WithLambdaIntegration returns a fakeAPIGWV2Checker whose
 // GetIntegrations returns a single integration pointing at the given Lambda
 // function name.
-func newFakeAPIGWV2WithLambdaIntegration(functionName string) *fakeAPIGWV2US1 {
+func newFakeAPIGWV2WithLambdaIntegration(functionName string) *fakeAPIGWV2Checker {
 	uri := "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:123456789012:function:" + functionName + "/invocations"
-	return &fakeAPIGWV2US1{
+	return &fakeAPIGWV2Checker{
 		integrations: []apigwv2types.Integration{
 			{IntegrationUri: &uri},
 		},

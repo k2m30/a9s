@@ -103,7 +103,7 @@ func TestFetchGlueJobs_EmptyResponse(t *testing.T) {
 
 func TestFetchGlueJobs_APIError(t *testing.T) {
 	mock := &mockGlueClient{
-		err: &mockAPIError{code: "AccessDeniedException", message: "access denied"},
+		err: &MockAPIError{Code: "AccessDeniedException", Message: "access denied"},
 	}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {

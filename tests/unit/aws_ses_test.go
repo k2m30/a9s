@@ -387,7 +387,7 @@ func TestFetchSESIdentitiesPage_NilIdentityNameUsesEmptyString(t *testing.T) {
 // returned without panic and without resources.
 func TestFetchSESIdentitiesPage_APIErrorPropagated(t *testing.T) {
 	mock := &mockSESv2Client{
-		err: &mockAPIError{code: "TooManyRequestsException", message: "rate limit exceeded"},
+		err: &MockAPIError{Code: "TooManyRequestsException", Message: "rate limit exceeded"},
 	}
 
 	_, err := awsclient.FetchSESIdentitiesPage(context.Background(), mock, "")

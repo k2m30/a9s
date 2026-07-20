@@ -480,14 +480,14 @@ func TestRelated_ECSSvc_EbRule_FetchFilter(t *testing.T) {
 // ecs-svc→sfn (Pattern C+reverse: cache["sfn"] scan, sfnDescribe + ASL parse)
 // ---------------------------------------------------------------------------
 
-// fakeSFNBatch4 satisfies awsclient.SFNAPI via embedding. Only DescribeStateMachine
+// fakeSFNForECSSvc satisfies awsclient.SFNAPI via embedding. Only DescribeStateMachine
 // is overridden — it returns the pre-configured output keyed by state machine ARN.
-type fakeSFNBatch4 struct {
+type fakeSFNForECSSvc struct {
 	awsclient.SFNAPI
 	describeOutputByARN map[string]*sfnsvc.DescribeStateMachineOutput
 }
 
-func (f *fakeSFNBatch4) DescribeStateMachine(_ context.Context, input *sfnsvc.DescribeStateMachineInput, _ ...func(*sfnsvc.Options)) (*sfnsvc.DescribeStateMachineOutput, error) {
+func (f *fakeSFNForECSSvc) DescribeStateMachine(_ context.Context, input *sfnsvc.DescribeStateMachineInput, _ ...func(*sfnsvc.Options)) (*sfnsvc.DescribeStateMachineOutput, error) {
 	if input.StateMachineArn == nil {
 		return &sfnsvc.DescribeStateMachineOutput{}, nil
 	}
@@ -524,7 +524,7 @@ func TestRelated_ECSSvc_SFN_Match(t *testing.T) {
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
 	const sfnARN = "arn:aws:states:us-east-1:123456789012:stateMachine:api-pipeline"
 
-	fakeSFN := &fakeSFNBatch4{
+	fakeSFN := &fakeSFNForECSSvc{
 		describeOutputByARN: map[string]*sfnsvc.DescribeStateMachineOutput{
 			sfnARN: {
 				StateMachineArn: aws.String(sfnARN),
@@ -560,7 +560,7 @@ func TestRelated_ECSSvc_SFN_Empty(t *testing.T) {
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
 	const sfnARN = "arn:aws:states:us-east-1:123456789012:stateMachine:other-pipeline"
 
-	fakeSFN := &fakeSFNBatch4{
+	fakeSFN := &fakeSFNForECSSvc{
 		describeOutputByARN: map[string]*sfnsvc.DescribeStateMachineOutput{
 			sfnARN: {
 				Definition: aws.String(sfnASLWithECSFamily("totally-different-task")),

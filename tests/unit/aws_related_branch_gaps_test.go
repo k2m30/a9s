@@ -65,7 +65,7 @@ func TestRelated_ASGSG_NilClients(t *testing.T) {
 func TestRelated_ASGSG_LaunchConfigPath_ReturnsSecurityGroups(t *testing.T) {
 	const lcName = "my-launch-config"
 	fakeASG := newFakeASGWithLaunchConfig(lcName, "instance-profile", []string{"sg-0abc1111", "sg-0abc2222"})
-	clients := &awsclient.ServiceClients{AutoScaling: fakeASG, EC2: &fakeEC2Batch2{}}
+	clients := &awsclient.ServiceClients{AutoScaling: fakeASG, EC2: &fakeEC2ForASG{}}
 	res := resource.Resource{
 		ID: "my-asg",
 		RawStruct: asgtypes.AutoScalingGroup{
@@ -93,12 +93,12 @@ func TestRelated_ASGSG_LaunchConfigPath_ReturnsSecurityGroups(t *testing.T) {
 
 func TestRelated_ASGSG_LaunchConfigPath_DescribeError(t *testing.T) {
 	wantErr := errors.New("boom: describe launch configurations failed")
-	fakeASG := &fakeASGBatch2{
+	fakeASG := &fakeASGChecker{
 		describeLaunchConfigsFn: func(_ *autoscaling.DescribeLaunchConfigurationsInput) (*autoscaling.DescribeLaunchConfigurationsOutput, error) {
 			return nil, wantErr
 		},
 	}
-	clients := &awsclient.ServiceClients{AutoScaling: fakeASG, EC2: &fakeEC2Batch2{}}
+	clients := &awsclient.ServiceClients{AutoScaling: fakeASG, EC2: &fakeEC2ForASG{}}
 	res := resource.Resource{
 		ID: "my-asg",
 		RawStruct: asgtypes.AutoScalingGroup{
@@ -119,8 +119,8 @@ func TestRelated_ASGSG_LaunchConfigPath_DescribeError(t *testing.T) {
 }
 
 func TestRelated_ASGSG_LaunchConfigPath_EmptyResult(t *testing.T) {
-	fakeASG := &fakeASGBatch2{} // DescribeLaunchConfigurations returns empty output by default
-	clients := &awsclient.ServiceClients{AutoScaling: fakeASG, EC2: &fakeEC2Batch2{}}
+	fakeASG := &fakeASGChecker{} // DescribeLaunchConfigurations returns empty output by default
+	clients := &awsclient.ServiceClients{AutoScaling: fakeASG, EC2: &fakeEC2ForASG{}}
 	res := resource.Resource{
 		ID: "my-asg",
 		RawStruct: asgtypes.AutoScalingGroup{
@@ -138,7 +138,7 @@ func TestRelated_ASGSG_LaunchConfigPath_EmptyResult(t *testing.T) {
 }
 
 func TestRelated_ASGSG_NoLCNoLT_ReturnsZero(t *testing.T) {
-	clients := &awsclient.ServiceClients{AutoScaling: &fakeASGBatch2{}, EC2: &fakeEC2Batch2{}}
+	clients := &awsclient.ServiceClients{AutoScaling: &fakeASGChecker{}, EC2: &fakeEC2ForASG{}}
 	res := resource.Resource{
 		ID: "my-asg",
 		RawStruct: asgtypes.AutoScalingGroup{
@@ -165,7 +165,7 @@ func TestRelated_ASGSG_DirectLaunchTemplatePath_ReturnsSecurityGroupIDs(t *testi
 			},
 		},
 	})
-	clients := &awsclient.ServiceClients{EC2: fakeEC2, AutoScaling: &fakeASGBatch2{}}
+	clients := &awsclient.ServiceClients{EC2: fakeEC2, AutoScaling: &fakeASGChecker{}}
 	res := resource.Resource{
 		ID: "my-asg",
 		RawStruct: asgtypes.AutoScalingGroup{
@@ -202,7 +202,7 @@ func TestRelated_ASGSG_MixedInstancesPolicyFallback_ReturnsSecurityGroups(t *tes
 			},
 		},
 	})
-	clients := &awsclient.ServiceClients{EC2: fakeEC2, AutoScaling: &fakeASGBatch2{}}
+	clients := &awsclient.ServiceClients{EC2: fakeEC2, AutoScaling: &fakeASGChecker{}}
 	res := resource.Resource{
 		ID: "my-asg",
 		RawStruct: asgtypes.AutoScalingGroup{
@@ -234,12 +234,12 @@ func TestRelated_ASGSG_MixedInstancesPolicyFallback_ReturnsSecurityGroups(t *tes
 
 func TestRelated_ASGSG_LaunchTemplateVersionsError(t *testing.T) {
 	wantErr := errors.New("boom: describe launch template versions failed")
-	fakeEC2 := &fakeEC2Batch2{
+	fakeEC2 := &fakeEC2ForASG{
 		describeLaunchTemplateVersionsFn: func(_ *ec2.DescribeLaunchTemplateVersionsInput) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
 			return nil, wantErr
 		},
 	}
-	clients := &awsclient.ServiceClients{EC2: fakeEC2, AutoScaling: &fakeASGBatch2{}}
+	clients := &awsclient.ServiceClients{EC2: fakeEC2, AutoScaling: &fakeASGChecker{}}
 	res := resource.Resource{
 		ID: "my-asg",
 		RawStruct: asgtypes.AutoScalingGroup{

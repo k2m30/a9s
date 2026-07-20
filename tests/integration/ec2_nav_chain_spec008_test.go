@@ -12,7 +12,7 @@ package integration
 // detail_livepath_migration_test.go's TestDetailController_MoveDown_
 // SkipsSectionHeadersAndSpacers (ActionMoveDown repeatedly advances
 // Body.Detail.FieldCursor, always landing on a real field row) and
-// wave3_detail_ports_test.go's TestWave3_DetailController_MoveDown_
+// detail_ports_test.go's TestWave3_DetailController_MoveDown_
 // ClampsAtLastField / MoveUp_ClampsAtFirstField (boundary clamp).
 
 import (

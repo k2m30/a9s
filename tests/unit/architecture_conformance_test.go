@@ -39,11 +39,11 @@ func TestConformance_EveryResourceTypeHasPaginatedFetcher(t *testing.T) {
 }
 
 // TestConformance_EveryCatalogWave2ResolvesThroughAccessor pins the Wave 2
-// contract post-AS-731: every catalog entry whose Wave2 field is non-nil must
-// resolve through awsclient.Wave2EnricherFor. The catalog is now the single
-// source of truth — this conformance variant iterates catalog.All() directly
-// instead of parsing docs/attention-signals.md (the markdown-parsing
-// scaffolding was dropped per AS-731 scope item 6).
+// contract: every catalog entry whose Wave2 field is non-nil must resolve
+// through awsclient.Wave2EnricherFor. The catalog is now the single source of
+// truth — this conformance variant iterates catalog.All() directly instead of
+// parsing docs/attention-signals.md (the markdown-parsing scaffolding was
+// dropped once the catalog became that source of truth).
 func TestConformance_EveryCatalogWave2ResolvesThroughAccessor(t *testing.T) {
 	entries := catalog.All()
 	if len(entries) == 0 {

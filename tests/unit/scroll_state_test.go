@@ -6,7 +6,7 @@
 // DEAD: Cursor, Total, Up, Down, Top, Bottom, PageUp, PageDown, SetTotal,
 // Clamp") — cursor movement is controller-owned (app.SelectorState /
 // app.DetailState), not driven through these ScrollState methods anymore.
-// VisibleWindow's centered-window cases moved to wave3_text_ports_test.go
+// VisibleWindow's centered-window cases moved to text_ports_test.go
 // (TestWave3Port_ScrollState_VisibleWindow_*) ahead of this trim, so they
 // survive here without duplication.
 package unit

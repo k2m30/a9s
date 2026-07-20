@@ -402,7 +402,7 @@ func TestRelated_Kinesis_DDB_NoClient(t *testing.T) {
 func TestRelated_Kinesis_DDB_FetchFilter(t *testing.T) {
 	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
 
-	fakeDDB := &fakeDynamoDBBatch4{}
+	fakeDDB := &fakeDynamoDBForKinesis{}
 	clients := &awsclient.ServiceClients{DynamoDB: fakeDDB}
 
 	cache := resource.ResourceCache{

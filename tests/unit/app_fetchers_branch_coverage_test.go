@@ -1,7 +1,7 @@
 package unit
 
-// app_fetchers_wave5_test.go — behavioral tests for zero-hit and near-zero-hit
-// functions reachable via internal/tui (wave 5 coverage fill):
+// app_fetchers_branch_coverage_test.go — behavioral tests for zero-hit and near-zero-hit
+// functions reachable via internal/tui:
 //
 //   - fetchAMIDetail (0.0%)          — nil-client guard (only testable path)
 //   - loadAvailabilityCache (27.3%)  — success path with real disk cache data

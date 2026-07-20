@@ -25,7 +25,7 @@ func TestClassifyAWSError_NilError(t *testing.T) {
 func TestClassifyAWSError_ExpiredToken(t *testing.T) {
 	for _, errCode := range []string{"ExpiredToken", "ExpiredTokenException", "RequestExpired"} {
 		t.Run(errCode, func(t *testing.T) {
-			err := &mockAPIError{code: errCode, message: "token expired", fault: smithy.FaultClient}
+			err := &MockAPIError{Code: errCode, Message: "token expired", Fault: smithy.FaultClient}
 			code, message, retryable := awsclient.ClassifyAWSError(err)
 			if code != errCode {
 				t.Errorf("expected code %q, got %q", errCode, code)
@@ -43,7 +43,7 @@ func TestClassifyAWSError_ExpiredToken(t *testing.T) {
 func TestClassifyAWSError_AccessDenied(t *testing.T) {
 	for _, errCode := range []string{"AccessDenied", "AccessDeniedException"} {
 		t.Run(errCode, func(t *testing.T) {
-			err := &mockAPIError{code: errCode, message: "access denied", fault: smithy.FaultClient}
+			err := &MockAPIError{Code: errCode, Message: "access denied", Fault: smithy.FaultClient}
 			code, message, retryable := awsclient.ClassifyAWSError(err)
 			if code != errCode {
 				t.Errorf("expected code %q, got %q", errCode, code)
@@ -61,7 +61,7 @@ func TestClassifyAWSError_AccessDenied(t *testing.T) {
 func TestClassifyAWSError_Throttling(t *testing.T) {
 	for _, errCode := range []string{"Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded"} {
 		t.Run(errCode, func(t *testing.T) {
-			err := &mockAPIError{code: errCode, message: "rate exceeded", fault: smithy.FaultClient}
+			err := &MockAPIError{Code: errCode, Message: "rate exceeded", Fault: smithy.FaultClient}
 			code, message, retryable := awsclient.ClassifyAWSError(err)
 			if code != errCode {
 				t.Errorf("expected code %q, got %q", errCode, code)
@@ -77,7 +77,7 @@ func TestClassifyAWSError_Throttling(t *testing.T) {
 }
 
 func TestClassifyAWSError_UnknownCode(t *testing.T) {
-	err := &mockAPIError{code: "SomeOtherError", message: "something went wrong", fault: smithy.FaultServer}
+	err := &MockAPIError{Code: "SomeOtherError", Message: "something went wrong", Fault: smithy.FaultServer}
 	code, message, retryable := awsclient.ClassifyAWSError(err)
 	if code != "SomeOtherError" {
 		t.Errorf("expected code %q, got %q", "SomeOtherError", code)

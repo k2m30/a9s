@@ -1,8 +1,8 @@
-// wave3_list_ports_test.go — Wave 3 (022-codebase-cleanup) PORT pins for the
-// ResourceList/MainMenu family. Ports three narrow, verified-missing behavior
-// pins from the doomed legacy view-model tests (specs/022-codebase-cleanup/
-// wave3-map-list-menu.md) onto the LIVE controller seams, so the legacy
-// pins can be deleted in a later round without losing coverage:
+// list_ports_test.go — live-seam port pins for the ResourceList/MainMenu
+// family. Ports three narrow, verified-missing behavior pins from the doomed
+// legacy view-model tests (specs/022-codebase-cleanup/wave3-map-list-menu.md)
+// onto the LIVE controller seams, so the legacy pins can be deleted in a
+// later round without losing coverage:
 //
 //  1. listFilterResources (core/app/list_filter.go) — Fields-value and
 //     Findings-phrase text-filter match branches. core/app/list_test.go's
@@ -46,10 +46,10 @@ import (
 // avoid depending on — the doomed parity/purity test files' own helpers).
 // ---------------------------------------------------------------------------
 
-// wave3ListController builds a Controller (via the blessed newTestController
+// openListController builds a Controller (via the blessed newTestController
 // helper — see qa_controller_construction_discipline_test.go) pre-navigated
 // to a ScreenResourceList for the given resource type ShortName.
-func wave3ListController(t *testing.T, shortName string) *app.Controller {
+func openListController(t *testing.T, shortName string) *app.Controller {
 	t.Helper()
 	c := newTestController(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: shortName})
@@ -58,12 +58,12 @@ func wave3ListController(t *testing.T, shortName string) *app.Controller {
 
 // newListController is a compatibility shim: qa_controller_frame_title_issue_badge_test.go
 // and qa_title_warning_findings_test.go depend on a helper of this exact name
-// that used to live in resourcelist_render_parity_test.go (deleted as part of
-// the Wave 3 parity-bridge retirement, its own construction now routed
-// through wave3ListController/newTestController instead of a raw app.New
-// call). Kept here so those two out-of-scope files keep compiling unchanged.
+// that used to live in resourcelist_render_parity_test.go (deleted after its
+// pins were ported here, construction now routed through
+// openListController/newTestController instead of a raw app.New call). Kept
+// here so those two out-of-scope files keep compiling unchanged.
 func newListController(t *testing.T, shortName string) *app.Controller {
-	return wave3ListController(t, shortName)
+	return openListController(t, shortName)
 }
 
 // ===========================================================================
@@ -115,8 +115,8 @@ func wave3FilterEC2Resources() []resource.Resource {
 	}
 }
 
-func TestWave3ListFilter_MatchesFieldsValue_PrivateIP(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestListFilter_MatchesFieldsValue_PrivateIP(t *testing.T) {
+	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3FilterEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "10.0.48"})
 
@@ -130,8 +130,8 @@ func TestWave3ListFilter_MatchesFieldsValue_PrivateIP(t *testing.T) {
 	}
 }
 
-func TestWave3ListFilter_MatchesFieldsValue_PublicIP(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestListFilter_MatchesFieldsValue_PublicIP(t *testing.T) {
+	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3FilterEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "203.0.113.20"})
 
@@ -144,8 +144,8 @@ func TestWave3ListFilter_MatchesFieldsValue_PublicIP(t *testing.T) {
 	}
 }
 
-func TestWave3ListFilter_MatchesFieldsValue_InstanceType(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestListFilter_MatchesFieldsValue_InstanceType(t *testing.T) {
+	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3FilterEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "g4dn"})
 
@@ -158,14 +158,14 @@ func TestWave3ListFilter_MatchesFieldsValue_InstanceType(t *testing.T) {
 	}
 }
 
-// TestWave3ListFilter_MatchesFindingsPhrase_CaseInsensitive isolates the
+// TestListFilter_MatchesFindingsPhrase_CaseInsensitive isolates the
 // third listFilterResources branch (r.Findings[i].Phrase), which no
 // controller-path test exercised before this file: cache-node has no Name or
 // Fields value containing "degraded" — it can only be found via its finding
 // phrase. Also proves the match is case-insensitive, mirroring the ID/Name/
 // Fields branches.
-func TestWave3ListFilter_MatchesFindingsPhrase_CaseInsensitive(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestListFilter_MatchesFindingsPhrase_CaseInsensitive(t *testing.T) {
+	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3FilterEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "DEGRADED"})
 
@@ -213,13 +213,13 @@ func wave3SG(id, vpcID string) resource.Resource {
 	}
 }
 
-// TestWave3RelatedCheckerCarry_ZeroInitialGrowsOnLoadMore verifies that a
+// TestRelatedCheckerCarry_ZeroInitialGrowsOnLoadMore verifies that a
 // (0+) truncated pivot (empty initial RelatedIDSet, non-nil so it hides
 // everything) both hides unrelated rows immediately AND grows as further
 // LoadMore pages arrive — the merge accumulates across pages, it does not
 // reset.
-func TestWave3RelatedCheckerCarry_ZeroInitialGrowsOnLoadMore(t *testing.T) {
-	c := wave3ListController(t, "sg")
+func TestRelatedCheckerCarry_ZeroInitialGrowsOnLoadMore(t *testing.T) {
+	c := openListController(t, "sg")
 	c.PatchListReapplyChecker(wave3VPCSGChecker, resource.Resource{ID: "vpc-target"})
 
 	// Page 1: two SGs, neither in vpc-target. Zero-initial carry must hide
@@ -257,12 +257,12 @@ func TestWave3RelatedCheckerCarry_ZeroInitialGrowsOnLoadMore(t *testing.T) {
 	}
 }
 
-// TestWave3RelatedCheckerCarry_NonTruncatedStillExtends verifies that even a
+// TestRelatedCheckerCarry_NonTruncatedStillExtends verifies that even a
 // non-truncated pivot (initial RelatedIDSet seeded from an exact match count,
 // not a (0+)/(N+) scan) keeps extending on LoadMore — the carry mechanism is
 // identical regardless of how the initial set was seeded.
-func TestWave3RelatedCheckerCarry_NonTruncatedStillExtends(t *testing.T) {
-	c := wave3ListController(t, "sg")
+func TestRelatedCheckerCarry_NonTruncatedStillExtends(t *testing.T) {
+	c := openListController(t, "sg")
 	c.PatchListRelatedIDSet([]string{"sg-a", "sg-b"})
 	c.PatchListReapplyChecker(wave3VPCSGChecker, resource.Resource{ID: "vpc-target"})
 
@@ -279,12 +279,12 @@ func TestWave3RelatedCheckerCarry_NonTruncatedStillExtends(t *testing.T) {
 	}
 }
 
-// TestWave3RelatedCheckerCarry_PreservesSortAfterMerge verifies that when the
+// TestRelatedCheckerCarry_PreservesSortAfterMerge verifies that when the
 // checker-carry merge grows the RelatedIDSet, the active sort is honored for
 // the newly visible rows — they land in sorted position, not in arrival
 // order.
-func TestWave3RelatedCheckerCarry_PreservesSortAfterMerge(t *testing.T) {
-	c := wave3ListController(t, "sg")
+func TestRelatedCheckerCarry_PreservesSortAfterMerge(t *testing.T) {
+	c := openListController(t, "sg")
 
 	alwaysMatch := func(_ context.Context, _ any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 		entry, ok := cache["sg"]
@@ -321,11 +321,11 @@ func TestWave3RelatedCheckerCarry_PreservesSortAfterMerge(t *testing.T) {
 	}
 }
 
-// TestWave3RelatedCheckerCarry_NoChecker_Inert verifies that a list without a
+// TestRelatedCheckerCarry_NoChecker_Inert verifies that a list without a
 // carried checker is unaffected by the merge machinery — the feature is
 // opt-in and must not regress ordinary (non-related) list loads.
-func TestWave3RelatedCheckerCarry_NoChecker_Inert(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestRelatedCheckerCarry_NoChecker_Inert(t *testing.T) {
+	c := openListController(t, "ec2")
 	c.PatchListRelatedIDSet([]string{"i-1", "i-2"})
 	// No PatchListReapplyChecker call.
 
@@ -529,7 +529,7 @@ func wave3AssertMarkerGlyphPlacement(t wave3AssertT, typeName string, out string
 	}
 }
 
-// TestWave3MarkerColParity_EnrichmentFindings_AllResourceTypes ports the
+// TestMarkerColParity_EnrichmentFindings_AllResourceTypes ports the
 // unique behavior scenario S13 exercised from resourcelist_render_parity_test.go
 // (the "PRIMARY MarkerCol gap detector": enrichment glyphs force the render
 // path to actually consume MarkerCol, unlike a plain unfiltered list where a
@@ -537,7 +537,7 @@ func wave3AssertMarkerGlyphPlacement(t wave3AssertT, typeName string, out string
 // type so a step-3-cascade divergence (column Path contains "Name"/
 // "Identifier" but Key isn't "name") in ANY type is caught, not just one
 // synthetic type.
-func TestWave3MarkerColParity_EnrichmentFindings_AllResourceTypes(t *testing.T) {
+func TestMarkerColParity_EnrichmentFindings_AllResourceTypes(t *testing.T) {
 	allTypes := resource.AllResourceTypes()
 	if len(allTypes) == 0 {
 		t.Fatal("resource.AllResourceTypes() returned empty slice — catalog not registered")
@@ -555,7 +555,7 @@ func TestWave3MarkerColParity_EnrichmentFindings_AllResourceTypes(t *testing.T) 
 			m := views.NewResourceList(td, nil, k)
 			m.SetSize(stdW, stdH)
 
-			c := wave3ListController(t, td.ShortName)
+			c := openListController(t, td.ShortName)
 			c.ApplyResourcesLoaded(td.ShortName, resources, nil, false)
 			c.ApplyEnrichmentState(td.ShortName, len(findings), false, findings, nil)
 			body := *c.Snapshot().Body.List
@@ -565,7 +565,7 @@ func TestWave3MarkerColParity_EnrichmentFindings_AllResourceTypes(t *testing.T) 
 	}
 }
 
-// TestWave3MarkerColParity_EnrichmentFindingsWithHScroll_AllResourceTypes
+// TestMarkerColParity_EnrichmentFindingsWithHScroll_AllResourceTypes
 // ports S15 from resourcelist_render_parity_test.go: MarkerCol is a
 // full-column-space index computed once by resolveListMarkerCol, but the
 // GLYPH is placed at a SEPARATE, hscroll-translated visible column index
@@ -576,7 +576,7 @@ func TestWave3MarkerColParity_EnrichmentFindings_AllResourceTypes(t *testing.T) 
 // Neither the S13 pin above (no hscroll) nor tui_viewstate_purity_list_test.go
 // (single synthetic type, no hscroll) exercises this interaction — this is a
 // second, independent gap from the same parity-bridge precondition check.
-func TestWave3MarkerColParity_EnrichmentFindingsWithHScroll_AllResourceTypes(t *testing.T) {
+func TestMarkerColParity_EnrichmentFindingsWithHScroll_AllResourceTypes(t *testing.T) {
 	allTypes := resource.AllResourceTypes()
 	if len(allTypes) == 0 {
 		t.Fatal("resource.AllResourceTypes() returned empty slice — catalog not registered")
@@ -597,7 +597,7 @@ func TestWave3MarkerColParity_EnrichmentFindingsWithHScroll_AllResourceTypes(t *
 			m := views.NewResourceList(td, nil, k)
 			m.SetSize(stdW, stdH)
 
-			c := wave3ListController(t, td.ShortName)
+			c := openListController(t, td.ShortName)
 			c.ApplyResourcesLoaded(td.ShortName, resources, nil, false)
 			c.ApplyEnrichmentState(td.ShortName, len(findings), false, findings, nil)
 			c.Apply(app.Action{Kind: app.ActionScrollRight})
@@ -608,7 +608,7 @@ func TestWave3MarkerColParity_EnrichmentFindingsWithHScroll_AllResourceTypes(t *
 	}
 }
 
-// TestWave3MarkerColParity_EmptyPrecedingCell_KeylessPathColumn pins
+// TestMarkerColParity_EmptyPrecedingCell_KeylessPathColumn pins
 // wave3AssertMarkerGlyphPlacement's own robustness against a column BEFORE
 // the marker column rendering empty — the "keyless Path column with no
 // RawStruct" case CodeRabbit flagged: naively splitting a data row on
@@ -620,7 +620,7 @@ func TestWave3MarkerColParity_EnrichmentFindingsWithHScroll_AllResourceTypes(t *
 // registration pattern in qa_issue_count_invariant_test.go) with the marker
 // column (Key: "name") at index 1, so an empty index-0 column sits strictly
 // before it.
-func TestWave3MarkerColParity_EmptyPrecedingCell_KeylessPathColumn(t *testing.T) {
+func TestMarkerColParity_EmptyPrecedingCell_KeylessPathColumn(t *testing.T) {
 	td := resource.ResourceTypeDef{
 		ShortName: "wave3synthetic",
 		Name:      "Wave3 Synthetic",
@@ -691,8 +691,8 @@ func TestWave3MarkerColParity_EmptyPrecedingCell_KeylessPathColumn(t *testing.T)
 //    TestAttentionFilter_IncludesResourcesWithFindings.
 // ===========================================================================
 
-func TestWave3AttentionFilter_IncludesResourcesWithWave2OnlyFindings(t *testing.T) {
-	c := wave3ListController(t, "s3")
+func TestAttentionFilter_IncludesResourcesWithWave2OnlyFindings(t *testing.T) {
+	c := openListController(t, "s3")
 
 	// s3's Color always resolves Healthy regardless of Fields, so all three
 	// resources below fail the Wave-1 IsIssue() gate — only the Wave-2
@@ -719,7 +719,7 @@ func TestWave3AttentionFilter_IncludesResourcesWithWave2OnlyFindings(t *testing.
 	}
 }
 
-// TestWave3AttentionFilter_ReappliesOnLateEnrichmentArrival ports
+// TestAttentionFilter_ReappliesOnLateEnrichmentArrival ports
 // qa_attention_filter_enrichment_test.go's TestAttentionFilter_
 // SetEnrichmentState_ReappliesFilter: unlike the sibling test above (which
 // applies enrichment BEFORE toggling attention), this activates the
@@ -729,8 +729,8 @@ func TestWave3AttentionFilter_IncludesResourcesWithWave2OnlyFindings(t *testing.
 // snapshot to go stale), so this ordering is structurally safe by
 // architecture; kept as a regression pin against exactly the historical bug
 // (ResourceListModel.SetEnrichmentState not re-running applySortAndFilter).
-func TestWave3AttentionFilter_ReappliesOnLateEnrichmentArrival(t *testing.T) {
-	c := wave3ListController(t, "s3")
+func TestAttentionFilter_ReappliesOnLateEnrichmentArrival(t *testing.T) {
+	c := openListController(t, "s3")
 
 	resources := []resource.Resource{
 		{ID: "b-0", Name: "bucket-alpha", Fields: map[string]string{"name": "bucket-alpha"}},
@@ -773,7 +773,7 @@ func TestWave3AttentionFilter_ReappliesOnLateEnrichmentArrival(t *testing.T) {
 //    canonicalization intent but had no positive test).
 // ===========================================================================
 
-func TestWave3ResourcesLoaded_DropsMismatchedType(t *testing.T) {
+func TestResourcesLoaded_DropsMismatchedType(t *testing.T) {
 	cases := []struct {
 		name          string
 		listShortName string // active screen's resource type
@@ -789,7 +789,7 @@ func TestWave3ResourcesLoaded_DropsMismatchedType(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c := wave3ListController(t, tc.listShortName)
+			c := openListController(t, tc.listShortName)
 
 			c.Handle(messages.ResourcesLoaded{
 				ResourceType: tc.staleType,
@@ -806,7 +806,7 @@ func TestWave3ResourcesLoaded_DropsMismatchedType(t *testing.T) {
 	}
 }
 
-func TestWave3ResourcesLoaded_AppliesMatchingType(t *testing.T) {
+func TestResourcesLoaded_AppliesMatchingType(t *testing.T) {
 	cases := []struct {
 		name          string
 		listShortName string
@@ -821,7 +821,7 @@ func TestWave3ResourcesLoaded_AppliesMatchingType(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c := wave3ListController(t, tc.listShortName)
+			c := openListController(t, tc.listShortName)
 
 			c.Handle(messages.ResourcesLoaded{
 				ResourceType: tc.msgType,
@@ -853,7 +853,7 @@ func TestWave3ResourcesLoaded_AppliesMatchingType(t *testing.T) {
 // exceed an 80-col terminal, so no synthetic type is needed.
 // ===========================================================================
 
-func TestWave3RenderList_NarrowScreen_ShrinksWideColumnInsteadOfDropping(t *testing.T) {
+func TestRenderList_NarrowScreen_ShrinksWideColumnInsteadOfDropping(t *testing.T) {
 	td := resource.GetChildType("log_events")
 	if td == nil {
 		t.Fatal("log_events child type not registered")
@@ -903,13 +903,13 @@ func TestWave3RenderList_NarrowScreen_ShrinksWideColumnInsteadOfDropping(t *test
 // otherwise completely unpinned at the live seam.
 // ===========================================================================
 
-// TestWave3ChildList_DisplayNameAndParentContext_SetByConstructorPath drives
+// TestChildList_DisplayNameAndParentContext_SetByConstructorPath drives
 // the actual production constructor, views.NewChildResourceList (which itself
 // calls PatchListDisplayName/PatchListParentContext internally,
 // resourcelist.go:120) — a direct c.PatchListDisplayName/PatchListParentContext
 // call from the test bypasses that wiring entirely and would stay green even
 // if the constructor stopped calling either setter.
-func TestWave3ChildList_DisplayNameAndParentContext_SetByConstructorPath(t *testing.T) {
+func TestChildList_DisplayNameAndParentContext_SetByConstructorPath(t *testing.T) {
 	c := wave3ChildListController(t, "s3_objects")
 	td := resource.GetChildType("s3_objects")
 	if td == nil {
@@ -929,11 +929,11 @@ func TestWave3ChildList_DisplayNameAndParentContext_SetByConstructorPath(t *test
 	}
 }
 
-// TestWave3ChildList_DisplayName_CombinesWithRowCount verifies the
+// TestChildList_DisplayName_CombinesWithRowCount verifies the
 // DisplayName+count FrameTitle format ("b1(2)") once rows are loaded — the
 // display-name substitutes only the leading name, the count suffix behaves
 // identically to a top-level list.
-func TestWave3ChildList_DisplayName_CombinesWithRowCount(t *testing.T) {
+func TestChildList_DisplayName_CombinesWithRowCount(t *testing.T) {
 	c := wave3ChildListController(t, "s3_objects")
 	c.PatchListDisplayName("b1")
 	c.ApplyResourcesLoaded("s3_objects", []resource.Resource{
@@ -946,8 +946,8 @@ func TestWave3ChildList_DisplayName_CombinesWithRowCount(t *testing.T) {
 	}
 }
 
-func TestWave3ChildList_ParentContext_EmptyForTopLevelList(t *testing.T) {
-	c := wave3ListController(t, "ec2")
+func TestChildList_ParentContext_EmptyForTopLevelList(t *testing.T) {
+	c := openListController(t, "ec2")
 	if got := c.GetListParentContext(); len(got) != 0 {
 		t.Errorf("GetListParentContext() on a top-level (non-child) list: got %v, want empty", got)
 	}
@@ -965,8 +965,8 @@ func TestWave3ChildList_ParentContext_EmptyForTopLevelList(t *testing.T) {
 // ApplyResourcesLoaded seam.
 // ===========================================================================
 
-func TestWave3CTEventsSort_RFC3339_AcrossMonthBoundary(t *testing.T) {
-	c := wave3ListController(t, "ct-events")
+func TestCTEventsSort_RFC3339_AcrossMonthBoundary(t *testing.T) {
+	c := openListController(t, "ct-events")
 	resources := []resource.Resource{
 		{
 			ID: "event-a", Name: "GetObject",
@@ -1013,7 +1013,7 @@ func TestWave3CTEventsSort_RFC3339_AcrossMonthBoundary(t *testing.T) {
 // Reuses loadListController from phase03_view_reads_test.go (same package).
 // ===========================================================================
 
-func TestWave3ListStatusColumn_EnrichmentMapOnlyFinding_OverridesRawState(t *testing.T) {
+func TestListStatusColumn_EnrichmentMapOnlyFinding_OverridesRawState(t *testing.T) {
 	td := resource.ResourceTypeDef{
 		ShortName: "wave3-s4-status-test",
 		Name:      "S4 Status Test",
@@ -1067,7 +1067,7 @@ func hasTKeyHint(hints []app.KeyHint) bool {
 	return false
 }
 
-func TestWave3ListFooterHints_CloudTrailTKey_GatedByParentContext(t *testing.T) {
+func TestListFooterHints_CloudTrailTKey_GatedByParentContext(t *testing.T) {
 	td := resource.ResourceTypeDef{
 		ShortName:     "wave3-ct-hint-test",
 		Name:          "CT Hint Test",

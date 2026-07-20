@@ -36,14 +36,14 @@ import (
 // marshal step itself, independent of the colorizing pass; the colorized
 // path's re-parseability (including colon-bearing quoted keys like
 // "aws:autoscaling:groupName") is pinned separately by
-// TestWave3Port_ColorizeYAML_ColonInQuotedKey_Regression.
+// TestPort_ColorizeYAML_ColonInQuotedKey_Regression.
 //
 // (d) FrameTitle() was dropped: DEAD, no live caller (see qa_docdb_test.go's
 // identical retirement note). (e) "no ANSI codes" was dropped: the marshal
 // step tested here never touches colorizeYAML, so ANSI-free is tautological;
 // the real ANSI-free clipboard-copy contract is already pinned end-to-end via
-// handleCopy in wave3_text_ports_test.go's
-// TestWave3Port_ErrorLogCopy_UncoloredContent and qa_copy_test.go's
+// handleCopy in text_ports_test.go's
+// TestPort_ErrorLogCopy_UncoloredContent and qa_copy_test.go's
 // TestQA_Copy_YAML_CopiesFullYAML.
 func TestQA_YAML_AllTypes(t *testing.T) {
 	forbidden := []string{"<no value>", "<nil>", "%!(EXTRA", "<missing field>"}

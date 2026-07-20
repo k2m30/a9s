@@ -413,27 +413,27 @@ func TestIssue140StoryMapCoversAllStories(t *testing.T) {
 	// wave3 detail-family cleanup, specs/022-codebase-cleanup). Cursor
 	// movement/jump/paging on the live controller path is pinned by
 	// detail_livepath_migration_test.go (skip-over-sections) and
-	// wave3_detail_ports_test.go (boundary clamp at top/bottom). Enter-on-
+	// detail_ports_test.go (boundary clamp at top/bottom). Enter-on-
 	// navigable-field dispatch is a single generic code path
 	// (resource.IsFieldNavigableForTest + actions_nav.go:573) regardless of target
 	// type — VpcId/SubnetId/security-group-ID/ImageId/EBS/ENI are DATA
 	// differences, not separate code paths — pinned generically by
-	// wave3_detail_ports_test.go's TestWave3_Detail_EnterOnNavigableField_
+	// detail_ports_test.go's TestWave3_Detail_EnterOnNavigableField_
 	// TUIKeyRoute_NavigatesToTarget, which presses the real Enter key through
 	// app_stack.go and asserts the navigate lands (the navigable-field
 	// footer-hint test in the same file only proves the hint TEXT, never
 	// presses Enter).
-	addStoryEvidence([]string{"file:tests/unit/detail_livepath_migration_test.go", "file:tests/unit/wave3_detail_ports_test.go"}, "Left-column cursor moves row by row across both plain and navigable fields", "Left-column jump keys go to the first and last detail rows", "Detail paging works on the focused column", "Enter on a plain non-navigable detail row does not leave the view", "Enter on VpcId opens the VPC detail screen", "Enter on SubnetId opens the subnet detail screen", "Enter on a security group ID opens the security group detail screen", "Enter on ImageId opens the AMI detail screen", "Enter on an attached EBS volume ID opens the EBS volume detail screen", "Enter on a network interface ID opens the ENI detail screen")
+	addStoryEvidence([]string{"file:tests/unit/detail_livepath_migration_test.go", "file:tests/unit/detail_ports_test.go"}, "Left-column cursor moves row by row across both plain and navigable fields", "Left-column jump keys go to the first and last detail rows", "Detail paging works on the focused column", "Enter on a plain non-navigable detail row does not leave the view", "Enter on VpcId opens the VPC detail screen", "Enter on SubnetId opens the subnet detail screen", "Enter on a security group ID opens the security group detail screen", "Enter on ImageId opens the AMI detail screen", "Enter on an attached EBS volume ID opens the EBS volume detail screen", "Enter on a network interface ID opens the ENI detail screen")
 	// detail_rendering_spec007_test.go was legacy-DetailModel-only (deleted,
 	// wave3 detail-family cleanup) — navigable-vs-plain rendering distinction
 	// is now pinned on the live RenderDetail(body) seam by
-	// wave3_detail_ports_test.go's IsNavigable-wins-over-ColorTier goldens.
-	addStoryEvidence([]string{"scenario:ec2_017_vpcid_selected", "file:tests/unit/issue140_story_render_contract_test.go", "file:tests/unit/wave3_detail_ports_test.go"}, "Navigable EC2 field values are visibly different from plain values", "Selected navigable fields use row selection instead of underline")
+	// detail_ports_test.go's IsNavigable-wins-over-ColorTier goldens.
+	addStoryEvidence([]string{"scenario:ec2_017_vpcid_selected", "file:tests/unit/issue140_story_render_contract_test.go", "file:tests/unit/detail_ports_test.go"}, "Navigable EC2 field values are visibly different from plain values", "Selected navigable fields use row selection instead of underline")
 	// qa_search_views_test.go was legacy-DetailModel-only (deleted, wave3
 	// detail-family cleanup) — live search coverage moved to
-	// wave3_detail_ports_test.go (real key-path activate/highlight/next/prev/
+	// detail_ports_test.go (real key-path activate/highlight/next/prev/
 	// esc through the live rs.search/ActionSearch seam).
-	addStoryEvidence([]string{"file:tests/unit/wave3_detail_ports_test.go", "file:tests/unit/issue119_scenarios_golden_test.go"}, "Left-column search uses the header and highlights matching detail rows", "Search match indicator is visible in the left detail column", "Search next and previous keys only apply to left-column search", "Search highlighting outranks the navigable underline cue", "Left-column search persists internally when focus moves away", "Escape cancels detail search input before clearing search results or leaving the view", "Escape clears existing search results before popping EC2 detail")
+	addStoryEvidence([]string{"file:tests/unit/detail_ports_test.go", "file:tests/unit/issue119_scenarios_golden_test.go"}, "Left-column search uses the header and highlights matching detail rows", "Search match indicator is visible in the left detail column", "Search next and previous keys only apply to left-column search", "Search highlighting outranks the navigable underline cue", "Left-column search persists internally when focus moves away", "Escape cancels detail search input before clearing search results or leaving the view", "Escape clears existing search results before popping EC2 detail")
 	addStoryEvidence([]string{"file:tests/unit/ec2_stories_rightcol_misc_test.go", "file:tests/unit/qa_copy_test.go"}, "Copy from the left detail column copies the active field value", "YAML shortcut works from EC2 detail regardless of column focus", "Detail help reflects the two-column interaction model")
 
 	addStoryEvidence([]string{"scenario:ec2_019_related_loading", "scenario:ec2_018_right_column_types", "file:tests/unit/ec2_stories_rightcol_misc_test.go"}, "Related types are visible by default when EC2 detail opens", "Related rows start dim and become active as availability is discovered", "Available related rows without a cheap count remain selectable without a number", "Background check failures are silent on screen", "CloudTrail row is always visible and sorted last", "CloudTrail row does not show an inline count")

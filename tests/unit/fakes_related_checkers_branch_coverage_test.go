@@ -1,5 +1,5 @@
-// fakes_wave5_test.go contains lightweight fake implementations of AWS service
-// client interfaces used by the coverage-wave-5 zero-hit branch tests.
+// fakes_related_checkers_branch_coverage_test.go contains lightweight fake implementations of AWS service
+// client interfaces used by the related-checker zero-hit branch tests.
 // Covered: CWLogsAPI+CWLogsDescribeSubscriptionFiltersAPI (logs→kinesis/s3),
 // GlueAPI+GlueGetTagsAPI (glue→cfn), GlueAPI+GlueGetSecurityConfigurationAPI
 // (glue→kms), LambdaAPI with ListEventSourceMappings (ddb→lambda).

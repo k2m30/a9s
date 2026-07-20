@@ -188,7 +188,7 @@ func TestRelated_Secrets_EB_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.T
 // client), not the cache-miss bug this test isolates.
 func TestRelated_Kinesis_DDB_CacheMiss_ReturnsUnknown(t *testing.T) {
 	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
-	fakeDDB := &fakeDynamoDBBatch4{}
+	fakeDDB := &fakeDynamoDBForKinesis{}
 	clients := &awsclient.ServiceClients{DynamoDB: fakeDDB}
 
 	checker := kinesisCheckerByTarget(t, "ddb")
@@ -204,7 +204,7 @@ func TestRelated_Kinesis_DDB_CacheMiss_ReturnsUnknown(t *testing.T) {
 // Count:0.
 func TestRelated_Kinesis_DDB_PresentEmptyCache_ReturnsDefinitiveZero(t *testing.T) {
 	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
-	fakeDDB := &fakeDynamoDBBatch4{}
+	fakeDDB := &fakeDynamoDBForKinesis{}
 	clients := &awsclient.ServiceClients{DynamoDB: fakeDDB}
 	cache := resource.ResourceCache{
 		"ddb": resource.ResourceCacheEntry{
@@ -290,7 +290,7 @@ func TestRelated_Secrets_ECSTask_PresentEmptyCache_ReturnsDefinitiveZero(t *test
 		"arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/db-password",
 		"prod/api/db-password",
 	)
-	clients := &awsclient.ServiceClients{ECS: &fakeECSBatch4{}}
+	clients := &awsclient.ServiceClients{ECS: &fakeECSForSvcPivots{}}
 	cache := resource.ResourceCache{
 		"ecs-task": resource.ResourceCacheEntry{
 			Resources:   []resource.Resource{},

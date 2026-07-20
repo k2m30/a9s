@@ -25,10 +25,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// fakeELBv2Full embeds fakeELBv2Batch2 (satisfies ELBv2API) plus DescribeTags
+// fakeELBv2Full embeds fakeELBv2ForEB (satisfies ELBv2API) plus DescribeTags
 // (ELBv2DescribeTagsAPI) and GetWebACLForResource is on a separate WAF fake.
 type fakeELBv2Full struct {
-	fakeELBv2Batch2
+	fakeELBv2ForEB
 	describeTagsFn         func(*elbv2.DescribeTagsInput) (*elbv2.DescribeTagsOutput, error)
 	describeLBAttributesFn func(*elbv2.DescribeLoadBalancerAttributesInput) (*elbv2.DescribeLoadBalancerAttributesOutput, error)
 }

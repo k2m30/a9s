@@ -102,7 +102,7 @@ func TestFetchSESIdentities_EmptyResponse(t *testing.T) {
 
 func TestFetchSESIdentities_APIError(t *testing.T) {
 	mock := &mockSESv2Client{
-		err: &mockAPIError{code: "TooManyRequestsException", message: "throttled"},
+		err: &MockAPIError{Code: "TooManyRequestsException", Message: "throttled"},
 	}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {

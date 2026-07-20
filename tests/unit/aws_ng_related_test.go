@@ -405,7 +405,7 @@ func TestRelated_NG_AMI_Empty(t *testing.T) {
 			LaunchTemplate: nil, // managed NG — no custom LT
 		},
 	}
-	fakeEC2 := &fakeEC2Batch2{}
+	fakeEC2 := &fakeEC2ForASG{}
 	clients := &awsclient.ServiceClients{EC2: fakeEC2}
 
 	checker := ngCheckerByTarget(t, "ami")

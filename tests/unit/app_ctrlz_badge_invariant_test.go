@@ -47,7 +47,7 @@ func appCtrlZEc2StateFinding(state string) []domain.Finding {
 // resources already loaded.
 func appCtrlZModel(t *testing.T, shortName string, resources []resource.Resource) *app.Controller {
 	t.Helper()
-	c := wave3ListController(t, shortName)
+	c := openListController(t, shortName)
 	c.ApplyResourcesLoaded(shortName, resources, nil, false)
 	return c
 }

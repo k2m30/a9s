@@ -108,7 +108,7 @@ func TestFetchAthenaWorkgroups_EmptyResponse(t *testing.T) {
 
 func TestFetchAthenaWorkgroups_APIError(t *testing.T) {
 	mock := &fakeAthenaListWorkGroups{
-		Err: &mockAPIError{code: "InternalServerException", message: "internal error"},
+		Err: &MockAPIError{Code: "InternalServerException", Message: "internal error"},
 	}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {

@@ -107,7 +107,7 @@ func TestFetchCloudTrailTrails_EmptyResponse(t *testing.T) {
 
 func TestFetchCloudTrailTrails_APIError(t *testing.T) {
 	mock := &mockCloudTrailClient{
-		err: &mockAPIError{code: "UnsupportedOperationException", message: "unsupported"},
+		err: &MockAPIError{Code: "UnsupportedOperationException", Message: "unsupported"},
 	}
 
 	_, err := awsclient.FetchCloudTrailTrails(context.Background(), mock)

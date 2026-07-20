@@ -115,8 +115,8 @@ func (s *costsReview3EC2AllBadAPI) DescribeInstances(_ context.Context, in *ec2.
 		}}, nil
 	}
 	return nil, &selfReviewAPIError{
-		code:    "InvalidInstanceID.NotFound",
-		message: fmt.Sprintf("The instance ID '%s' does not exist. The instance ID '%s' does not exist", s.bad1, s.bad2),
+		Code:    "InvalidInstanceID.NotFound",
+		Message: fmt.Sprintf("The instance ID '%s' does not exist. The instance ID '%s' does not exist", s.bad1, s.bad2),
 	}
 }
 

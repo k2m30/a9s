@@ -102,7 +102,7 @@ func TestFetchKinesisStreams_EmptyResponse(t *testing.T) {
 
 func TestFetchKinesisStreams_APIError(t *testing.T) {
 	mock := &mockKinesisClient{
-		err: &mockAPIError{code: "AccessDeniedException", message: "access denied"},
+		err: &MockAPIError{Code: "AccessDeniedException", Message: "access denied"},
 	}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
