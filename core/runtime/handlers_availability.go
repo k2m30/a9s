@@ -843,9 +843,18 @@ func (c *Core) snapshotRowStoreForSave(wave2Complete bool) *SaveCachePayload {
 // snapshotRowStoreForSave and the TaskKindSaveCache nil-Payload executor
 // fallback both need — the shape TaskKindSaveCache's payload/live-read
 // carried since before the row-store unification (SaveCachePayload.Resources/
-// Truncated). Excludes Partial-only entries and any Rows-empty entry (C6a:
-// a counts-only ObserveCount write must never surface here as a
-// zero-resource, zero-value-Truncated row-carrying entry).
+// Truncated). Excludes Partial-only entries (SnapshotAll(false) already
+// drops those) and every Rows-empty entry EXCEPT a live, exact rows-carrying
+// observation of a genuine zero population (Origin Probe or Fetch, exact
+// pagination) — that IS the type's population going to zero this session,
+// not the absence of an observation, and must still reach the save. A
+// counts-only ObserveCount write (C6a: count known, rows never observed)
+// stays excluded even though it may leave Origin at its OriginDisk zero
+// value or carry forward a prior rows-carrying Origin untouched —
+// discriminated on Pagination (ObserveCount never sets it) together with
+// Origin, not Origin alone, since TypeRows' zero-value Origin IS OriginDisk.
+// A disk-seeded entry (Origin OriginDisk) stays excluded the same way it
+// always has.
 //
 // A nil tr.Pagination reports truncated=true (C5: nil pagination is never
 // exact — mirrors availabilityFromResourceCache's identical guard), never
@@ -861,7 +870,11 @@ func (c *Core) rowStoreResourcesAndTruncated() (map[string][]resource.Resource, 
 	truncated := make(map[string]bool, len(all))
 	for shortName, tr := range all {
 		if len(tr.Rows) == 0 {
-			continue
+			liveExactZeroPopulation := (tr.Origin == session.OriginProbe || tr.Origin == session.OriginFetch) &&
+				tr.Pagination != nil && !tr.Pagination.IsTruncated
+			if !liveExactZeroPopulation {
+				continue
+			}
 		}
 		resources[shortName] = tr.Rows
 		// C5: nil Pagination means this entry's truncation state was never

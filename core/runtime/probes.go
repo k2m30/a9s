@@ -119,13 +119,26 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 // exact-stick/mismatch-drop guards that lived independently in each caller
 // and could disagree about which write lane's Rows should survive.
 //
-// Persisted-pair invariant: a
-// pair may only ever show Count > len(Rows) in the COUNTS-ONLY shape (rule
-// 2 below) — and it never loses rows it already had. A write never reduces
-// row richness merely to make Count and len(Rows) match; C1/goal 3 (a
-// stale-marked answer beats an empty screen) outranks that cosmetic
-// consistency. D14's exact-shrink-drops-rows regression is the shape this
-// chokepoint forbids going forward.
+// Persisted-pair invariant, per rule:
+//   - Rule 0 (contradiction self-heal): a stored Exact that the current raw
+//     observation demonstrably contradicts is dropped; the deeper truncated
+//     observation's own count/rows become the new lower-bound truth.
+//   - Rule 1 (non-exact subset): a rows-carrying write that is itself NOT
+//     exact (a truncated page) never loses rows it already had, even when
+//     its own row set is a shallower subset of the stored rows — Count/Exact
+//     may still advance (C5), but Rows is untouched.
+//   - Rule 2 (counts-only): Rows is never inspected or touched — Count may
+//     exceed len(Rows) indefinitely; this is the only rule allowed to leave
+//     that pair mismatched.
+//   - Rules 3/4, and rule 1's EXACT-subset case: an incoming rows-carrying
+//     observation that is itself exact is authoritative proof of the live
+//     population and replaces stored Rows wholesale, including shrinking
+//     them when the exact incoming row set is a strict subset — a
+//     genuinely deleted resource's row does not outlive its deletion. C6b
+//     Wave-2 carry (carryWave2ForRows) still backfills the SURVIVING rows'
+//     Wave-2 Findings/Fields, and FirstSeen stamping
+//     (stampFindingFirstSeen) applies to survivors exactly as on any other
+//     replace.
 //
 // incoming.Rows == nil (rowsProvided=false) marks a counts-only observation
 // (SaveAvailabilityCache). incoming.Rows != nil, including an empty
@@ -160,12 +173,15 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 //     stored Exact — every other rule below assumes exactness, once true,
 //     only advances (C5), which is the assumption rule 0 exists to correct
 //     when it demonstrably no longer holds.
-//  1. Rows-carrying, incoming shallower than existing AND incoming's IDs are
-//     a subset of existing's (a shallower page of the same list): existing
-//     Rows are kept in full — a shallower observation never regresses a
-//     deeper one. Count/Exact still advance per C5 (a new EXACT count wins
-//     even if its row set is thinner; only a fresh EXACT observation
-//     replaces a stored EXACT).
+//  1. Rows-carrying, incoming NOT itself exact (a truncated page), shallower
+//     than existing AND incoming's IDs are a subset of existing's (a
+//     shallower page of the same list): existing Rows are kept in full — a
+//     truncated observation never regresses a deeper one. Count/Exact still
+//     advance per C5 (a new EXACT count wins even off a thinner row set).
+//     When incoming IS itself exact despite being a shallower subset, it is
+//     authoritative proof of the live population instead (falls to the
+//     default branch below, rules 3/4's shape) — a genuine deletion between
+//     sweeps, not a truncated page.
 //  2. Counts-only (incoming.Rows == nil): Rows are NEVER touched — existing
 //     Rows (if any) are carried forward untouched regardless of whether
 //     Count now disagrees with len(Rows). The pair is reconstructable: the
@@ -227,20 +243,28 @@ func reconcileTypeFile(existing cache.TypeFile, in reconcileInput) cache.TypeFil
 	}
 
 	switch {
-	case len(incoming.Rows) < len(existing.Rows) && rowIDsAreSubset(incoming.Rows, existing.Rows):
-		// Rule 1: shallower page of the same list — keep the deeper rows.
+	case in.RawTruncated && len(incoming.Rows) < len(existing.Rows) && rowIDsAreSubset(incoming.Rows, existing.Rows):
+		// Rule 1: a non-exact (truncated) shallower page of the same list —
+		// keep the deeper rows. Gated on in.RawTruncated (the untouched raw
+		// signal, not incoming.Exact, which a caller's C5 stickiness may
+		// already have forced true) so a genuinely EXACT observation that
+		// happens to be a strict subset falls through to the default branch
+		// instead — an exact subset is authoritative proof of a deletion,
+		// not a shallow page.
 		tf.Rows = existing.Rows
 		if !incoming.Exact && existing.Count > tf.Count {
 			tf.Count = existing.Count
 		}
 		tf.HasResources = tf.Count > 0 || len(tf.Rows) > 0
 	default:
-		// Rules 3 & 4: incoming has more rows, or same/differing depth with
-		// non-subset content (a genuine refresh) — incoming's rows win,
-		// carrying forward any Wave-2 data (C6b) the replaced rows have that
-		// incoming itself lacks, unless this write is itself the
-		// Wave-2-completion save (which must supersede carried data wholesale
-		// so healed/resolved issues clear).
+		// Rules 3 & 4, plus the exact-subset shrink: incoming has more rows,
+		// is itself exact (authoritative proof of the live population, even
+		// when shallower than existing), or is a same/differing-depth
+		// non-subset refresh — incoming's rows win wholesale, carrying
+		// forward any Wave-2 data (C6b) the replaced rows have that incoming
+		// itself lacks, unless this write is itself the Wave-2-completion
+		// save (which must supersede carried data wholesale so
+		// healed/resolved issues clear).
 		if !in.Wave2Authoritative {
 			tf.Rows = carryWave2ForRows(existing.Rows, tf.Rows, issueEnricherFieldKeysFor(in.ShortName))
 		}
