@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/logging"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
@@ -154,6 +155,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := renderPage(w, vs, s.token); err != nil {
+		logging.L().Warn("web render error", "path", r.URL.Path, "err", err)
 		http.Error(w, "render error", http.StatusInternalServerError)
 	}
 }

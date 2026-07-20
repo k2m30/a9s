@@ -150,6 +150,7 @@ a9s -p prod -c events     # open CloudTrail events list in a specific profile
 a9s --version             # print version
 a9s --demo                # run with synthetic demo data (no AWS credentials needed)
 a9s --no-cache            # disable resource availability cache
+a9s --log-file /tmp/a9s.log   # write diagnostics to a file (or set A9S_LOG_FILE); off by default
 a9s --reset-views         # delete view configs and regenerate defaults
 a9s --reset-themes        # delete theme files and regenerate defaults
 ```

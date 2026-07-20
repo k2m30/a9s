@@ -32,6 +32,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/config"
+	"github.com/k2m30/a9s/v3/core/logging"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
@@ -100,7 +101,7 @@ func (s *Server) ListenAndServe(ctx context.Context, readyCh chan<- struct{}) er
 
 	srv := &http.Server{
 		Addr:    s.addr,
-		Handler: mux,
+		Handler: requestLogger(mux),
 		// SSE connections are long-lived; WriteTimeout is intentionally zero.
 		ReadHeaderTimeout: 10 * time.Second,
 	}
@@ -175,6 +176,42 @@ func (s *Server) dnsRebindGuard(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+// statusRecorder wraps http.ResponseWriter to capture the status code a
+// handler wrote, for requestLogger's post-request log line — the standard
+// library gives no other way to observe what a handler sent.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
+
+// requestLogger is outermost middleware (wraps the whole mux, ahead of
+// dnsRebindGuard) that logs one JSON line per handled request when the
+// process-wide logging facility (core/logging) is enabled. logging.Enabled()
+// is checked up front so a disabled facility costs nothing beyond that one
+// call — no ResponseWriter wrapping, no time.Now, no attribute building.
+func requestLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !logging.Enabled() {
+			next.ServeHTTP(w, r)
+			return
+		}
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		logging.L().Info("web request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", rec.status,
+			"duration_ms", time.Since(start).Milliseconds(),
+		)
 	})
 }
 

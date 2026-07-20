@@ -362,6 +362,18 @@ type Session struct {
 	ProbeStatus   map[string]ProbeStatusRecord
 	probeStatusMu sync.Mutex
 
+	// ScanHealthLogged records, per resource short name, whether a failed/
+	// partial Wave-1 probe has already added its scan-health entry to the
+	// `!` error log THIS sweep — handleAvailabilityChecked's dedup guard
+	// (core/runtime/handlers_availability.go): a type's AvailabilityChecked
+	// message can be delivered more than once within one sweep (a
+	// pre-existing double-delivery path elsewhere in dispatch), and without
+	// this guard each delivery independently re-adds the entry. Cleared at
+	// sweep start (handleAvailabilityCacheLoaded, mirrors AvailQueue's own
+	// reset) and by Rotate() — same per-sweep lifetime as EnrichmentRan.
+	// Single-goroutine: written only from the handler loop, no mutex.
+	ScanHealthLogged map[string]bool
+
 	// NewFindingPairs is the per-type count of (row, finding-code) pairs
 	// newly observed on the most recent on-disk cache save for that type
 	// (#463 — new-since-previous-scan deltas for FindingsOverview), keyed by
@@ -389,6 +401,7 @@ func New() *Session {
 		EnrichmentRan:          make(map[string]bool),
 		EnrichmentTypeGen:      make(map[string]domain.Gen),
 		EnrichmentTruncatedIDs: make(map[string]map[string]bool),
+		ScanHealthLogged:       make(map[string]bool),
 		RowStore:               NewRowStore(),
 		RelatedCache:           NewRelatedCacheLRU(MaxRelatedCacheEntries),
 		FilteredRows:           NewFilteredRowsLRU(MaxFilteredRowsEntries),
@@ -822,6 +835,7 @@ func (s *Session) Rotate() {
 	s.EnrichTotal = 0
 	s.RowStore.Clear()
 	s.EnrichmentRan = make(map[string]bool)
+	s.ScanHealthLogged = make(map[string]bool)
 	s.EnrichmentTypeGenReset()
 	s.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
 	// EnrichSweepMembers/EnrichListOpenPending: a prior profile/region's

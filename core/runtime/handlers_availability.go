@@ -25,6 +25,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/logging"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/core/session"
@@ -165,6 +166,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		c.session.AvailQueue = allNames
 		c.session.AvailChecked = 0
 		c.session.AvailTotal = len(allNames)
+		c.session.ScanHealthLogged = make(map[string]bool)
 
 		intents = append(intents, PatchMenuCheckProgress{Checked: 0, Total: c.session.AvailTotal})
 
@@ -349,7 +351,31 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	// DNS does not resolve — the service is not offered in this region)
 	// logs a plain-language one-liner instead of transport jargon. Any
 	// other row-less failure banners as before.
-	if msg.Err != nil {
+	//
+	// #462: exactly one scan-health entry per type per sweep.
+	// c.session.ScanHealthLogged (cleared at sweep start and by Rotate())
+	// guards against a type's AvailabilityChecked message being delivered
+	// more than once within the same sweep — a pre-existing double-delivery
+	// path elsewhere in dispatch — re-adding the entry or re-flashing the
+	// banner on the redundant delivery. The default case's FlashIntent is
+	// the ONLY source of that case's entry (the adapter re-emits it as
+	// messages.Flash, which routes through HandleFlash and appends the
+	// history entry there — see runtime_adapter.go's applyIntents), so
+	// gating that emission on the guard is sufficient to gate the entry too.
+	//
+	// The new "probe <type>: <outcome>: <detail>" shape applies only to the
+	// default (row-less hard failure) case below. The partial-success-with-
+	// rows case keeps msg.Err's own composite per-item text verbatim (e.g.
+	// "partial: throttled on 1 of 3 IDs") — classifyProbeErr's single-code
+	// classification cannot represent a composite E5 error, and the
+	// composite text is the more useful diagnostic for that case.
+	if msg.Err != nil && !c.session.ScanHealthLogged[msg.ResourceType] {
+		if c.session.ScanHealthLogged == nil {
+			c.session.ScanHealthLogged = make(map[string]bool)
+		}
+		c.session.ScanHealthLogged[msg.ResourceType] = true
+		logging.L().Warn("scan probe failed", "type", msg.ResourceType, "outcome", string(outcome), "detail", errClass)
+
 		switch {
 		case len(msg.Resources) > 0:
 			intents = append(intents, AppendErrorHistoryIntent{
@@ -364,7 +390,7 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 			})
 		default:
 			intents = append(intents, FlashIntent{
-				Text:    fmt.Sprintf("availability %s: %v", msg.ResourceType, msg.Err),
+				Text:    fmt.Sprintf("probe %s: %s: %s", msg.ResourceType, outcome, errClass),
 				IsError: true,
 			})
 		}

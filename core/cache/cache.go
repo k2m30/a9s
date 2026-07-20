@@ -15,7 +15,6 @@ package cache
 
 import (
 	"fmt"
-	"log"
 	"maps"
 	"os"
 	"path/filepath"
@@ -26,6 +25,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/logging"
 )
 
 // SchemaVersion is the current on-disk format marker. Every TypeFile's
@@ -260,16 +260,16 @@ func LoadDirIn(root, profile, region string) *Store {
 
 		data, err := os.ReadFile(path)
 		if err != nil {
-			log.Printf("cache: skipping %s: %v", path, err)
+			logging.L().Warn("cache skip", "file", path, "reason", err)
 			continue
 		}
 		if len(data) == 0 {
-			log.Printf("cache: skipping %s: empty file", path)
+			logging.L().Warn("cache skip", "file", path, "reason", "empty file")
 			continue
 		}
 		var tf TypeFile
 		if err := yaml.Unmarshal(data, &tf); err != nil {
-			log.Printf("cache: skipping %s: %v", path, err)
+			logging.L().Warn("cache skip", "file", path, "reason", err)
 			continue
 		}
 		switch tf.Version {
@@ -292,7 +292,7 @@ func LoadDirIn(root, profile, region string) *Store {
 				tf.Rows[i].FindingFirstSeen = stamped
 			}
 		default:
-			log.Printf("cache: skipping %s: unsupported schema version %d (want %d or %d)", path, tf.Version, SchemaVersion, SchemaVersion-1)
+			logging.L().Warn("cache skip", "file", path, "reason", fmt.Sprintf("unsupported schema version %d (want %d or %d)", tf.Version, SchemaVersion, SchemaVersion-1))
 			continue
 		}
 		s.types[shortName] = tf

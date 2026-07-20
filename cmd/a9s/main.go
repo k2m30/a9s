@@ -18,6 +18,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/buildinfo"
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/logging"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/web"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -70,6 +71,7 @@ func main() {
 		webMode        bool
 		webAddr        string
 		webAllowReveal bool
+		logFile        string
 	)
 
 	// A9S_MODE=web activates the web server without requiring --web on the CLI.
@@ -95,6 +97,7 @@ func main() {
 	flag.BoolVar(&webMode, "web", webMode, "Run as HTTP server instead of TUI (also: A9S_MODE=web)")
 	flag.StringVar(&webAddr, "web-addr", "127.0.0.1:7682", "Listen address for web mode (127.0.0.1 only)")
 	flag.BoolVar(&webAllowReveal, "web-allow-reveal", false, "Allow ActionReveal in web mode (off by default)")
+	flag.StringVar(&logFile, "log-file", "", "Write JSON debug logs to this file (also: A9S_LOG_FILE; --log-file wins)")
 
 	flag.Usage = func() {
 		fmt.Println("a9s - Terminal UI AWS Resource Manager")
@@ -110,6 +113,7 @@ func main() {
 		fmt.Println("      --web             Run as HTTP server (also: A9S_MODE=web)")
 		fmt.Println("      --web-addr        Listen address for web mode (default 127.0.0.1:7682)")
 		fmt.Println("      --web-allow-reveal Allow secret reveal in web mode (default off)")
+		fmt.Println("      --log-file        Write JSON debug logs to this file (also: A9S_LOG_FILE)")
 		fmt.Println("  -v, --version         Print version and exit")
 		fmt.Println("  -h, --help            Print this help")
 	}
@@ -151,6 +155,24 @@ func main() {
 			os.Exit(1)
 		}
 		os.Exit(0)
+	}
+
+	// --log-file wins over A9S_LOG_FILE when both are set. Runs before the
+	// TUI takes the terminal / the web server starts accepting connections —
+	// logging.Setup is a process-wide singleton meant to be installed once,
+	// here, at startup (see core/logging's package doc comment). No defer on
+	// the returned close func: main() has several os.Exit calls downstream
+	// (which skip defers), and the log file is opened unbuffered — every
+	// slog write already reaches the OS, so process exit reclaims the fd
+	// with nothing left to flush.
+	effectiveLogFile := logFile
+	if effectiveLogFile == "" {
+		effectiveLogFile = os.Getenv("A9S_LOG_FILE")
+	}
+	if _, logErr := logging.Setup(effectiveLogFile); logErr != nil {
+		// Pre-TUI: stderr is still safe to write to here.
+		fmt.Fprintf(os.Stderr, "Error: --log-file: %v\n", logErr)
+		os.Exit(1)
 	}
 
 	// Validate -c/--command flag: resolve to a canonical resource short name
