@@ -21,7 +21,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/atotto/clipboard"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/config"
@@ -503,76 +502,20 @@ func navigateTasksToCmd(m Model, tasks []runtime.TaskRequest) tea.Cmd {
 	}
 }
 
-// handleCopy performs context-dependent clipboard copy as a tea.Cmd.
-// Dispatches by active rs.kind to produce (content, label) pairs.
+// handleCopy performs context-dependent clipboard copy as a tea.Cmd. The
+// reveal screen stays TUI-local — the controller has no reveal screen — so
+// it is handled directly from the renderer's own rs.revealValue; every other
+// kind delegates to the controller's CopyContent, the single source of truth
+// shared with the web renderer.
 func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 	rs := m.activeRS()
-	snap := m.ctrl.Snapshot()
-	var content, label string
-	switch rs.kind {
-	case rsKindList:
-		r, ok := m.ctrl.ListSelected()
-		if !ok {
+	if rs.kind == rsKindReveal {
+		if rs.revealValue == "" {
 			return m, nil
 		}
-		rt := resource.FindResourceType(rs.resourceType)
-		if rt != nil && rt.CopyField != "" {
-			if val, ok2 := r.Fields[rt.CopyField]; ok2 && val != "" {
-				content, label = val, "Copied: "+val
-				break
-			}
-		}
-		content, label = r.ID, "Copied: "+r.ID
-	case rsKindDetail:
-		if rs.rightCol.IsFocused() {
-			// Copy the focused related row's name from controller state (the
-			// same row the renderer highlights), not the right-column widget.
-			if row, ok := m.ctrl.SelectedRelatedRow(); ok && row.DisplayName != "" {
-				content, label = row.DisplayName, "Copied: "+row.DisplayName
-			}
-			break
-		}
-		if snap.Body.Detail != nil {
-			fc := snap.Body.Detail.FieldCursor
-			if fc >= 0 && fc < len(snap.Body.Detail.Fields) {
-				item := snap.Body.Detail.Fields[fc]
-				val := item.Value
-				if val == "" {
-					val = item.Key
-				}
-				if val != "" {
-					content, label = val, "Copied: "+val
-					break
-				}
-			}
-		}
-		// Fallback: copy raw YAML of the detail resource.
-		if snap.Body.Detail != nil {
-			rawLines := snap.Body.Detail.Fields
-			_ = rawLines
-			// Build raw YAML using the controller resource.
-			res := m.ctrl.GetDetailResource()
-			if res.ID != "" {
-				content = views.RawYAMLFromResource(res)
-				if content != "" {
-					label = "Copied detail to clipboard"
-				}
-			}
-		}
-	case rsKindReveal:
-		content, label = rs.revealValue, "Secret copied to clipboard"
-	case rsKindText:
-		if snap.Body.Text != nil {
-			content = rawContentFromTextBody(snap.Body.Text)
-			if content != "" {
-				label = "Copied YAML to clipboard"
-			}
-		}
-	case rsKindIdentity:
-		if !rs.identityLoading && rs.identityData.ARN != "" {
-			content, label = rs.identityData.ARN, "Copied!"
-		}
+		return m, copyToClipboard(rs.revealValue, "Secret copied to clipboard")
 	}
+	content, label := m.ctrl.CopyContent()
 	if content == "" {
 		return m, nil
 	}
@@ -782,23 +725,6 @@ func (m Model) refreshActiveListWithEnrichmentRerun(tok domain.Gen) tea.Cmd {
 		}
 		return msg
 	}
-}
-
-// rawContentFromTextBody returns the plain-text content from a TextBody for
-// clipboard copy. Joins lines with newlines, stripping any ANSI color codes
-// that the syntax-colorizer may have embedded.
-func rawContentFromTextBody(body *app.TextBody) string {
-	if body == nil {
-		return ""
-	}
-	var sb strings.Builder
-	for i, line := range body.Lines {
-		if i > 0 {
-			sb.WriteByte('\n')
-		}
-		sb.WriteString(ansi.Strip(line))
-	}
-	return sb.String()
 }
 
 // handleReveal fetches a revealed value using the resource type's registered

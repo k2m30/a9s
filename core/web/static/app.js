@@ -133,7 +133,6 @@
     { key: "r",          action: { kind: "toggle-related" } },
     { key: "R",          action: { kind: "refresh" } },
     { key: "m",          action: { kind: "load-more" } },
-    { key: "c",          action: { kind: "copy" } },
     { key: "w",          action: { kind: "toggle-wrap" } },
     { key: "!",          action: { kind: "open-error-log" } },
     { key: "Tab",        action: { kind: "toggle-focus" } },
@@ -226,6 +225,24 @@
   function hideInputBar() {
     var bar = document.getElementById("input-bar");
     if (bar) bar.style.display = "none";
+  }
+
+  // showClientFlash displays a short-lived message in #client-flash, which
+  // lives outside #main (page.html) so it survives the next body swap
+  // instead of being wiped along with the server-rendered #flash. Used for
+  // the copy action's result, since a Clipboard API write only resolves
+  // client-side and has no /action round-trip to carry a server flash.
+  var clientFlashTimer = null;
+  function showClientFlash(text, isError) {
+    var el = document.getElementById("client-flash");
+    if (!el) return;
+    el.textContent = text;
+    el.className = isError ? "hdr-flash-err" : "hdr-flash-ok";
+    el.style.display = "block";
+    if (clientFlashTimer) clearTimeout(clientFlashTimer);
+    clientFlashTimer = setTimeout(function () {
+      el.style.display = "none";
+    }, 2000);
   }
 
   document.addEventListener("keydown", function (e) {
@@ -424,6 +441,28 @@
         e.preventDefault();
         return;
       }
+    }
+
+    // Copy: reads the copy text/label the controller resolved for the
+    // current screen (Controller.CopyContent, mirrored onto #body's
+    // data-copy-text/data-copy-label by ViewState.CopyText/CopyLabel) and
+    // writes it to the clipboard directly in this handler — the Clipboard
+    // API's writeText requires a user-activation call stack, so it cannot be
+    // deferred into the async /action round-trip like every other key.
+    if (e.key === "c" && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      var bodyEl = document.getElementById("body");
+      var copyText = bodyEl ? (bodyEl.getAttribute("data-copy-text") || "") : "";
+      if (!copyText) return;
+      var copyLabel = bodyEl.getAttribute("data-copy-label") || "Copied!";
+      if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        showClientFlash("Clipboard unavailable", true);
+        return;
+      }
+      navigator.clipboard.writeText(copyText)
+        .then(function () { showClientFlash(copyLabel, false); })
+        .catch(function () { showClientFlash("Copy failed", true); });
+      return;
     }
 
     // Look up in key map.

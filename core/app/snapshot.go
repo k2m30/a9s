@@ -80,6 +80,7 @@ func (c *Controller) snapshot() ViewState {
 		vs.FrameTitle = costsFrameTitle(vs.Body.Costs)
 		vs.Footer = CostsFooterHintsFor(c.uiMode)
 	}
+	vs.CopyText, vs.CopyLabel = c.copyContent()
 	return vs
 }
 

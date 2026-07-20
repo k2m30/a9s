@@ -17,6 +17,12 @@ type ViewState struct {
 	Footer      []KeyHint `json:"footer,omitempty"`
 	HelpContext string    `json:"help_context,omitempty"`
 	Body        Body      `json:"body"`
+	// CopyText/CopyLabel are the (content, label) pair CopyContent() resolves
+	// for the current screen, so a renderer (the web copy key handler) can
+	// read the resolution straight off the snapshot instead of calling
+	// CopyContent() a second time.
+	CopyText  string `json:"copy_text,omitempty"`
+	CopyLabel string `json:"copy_label,omitempty"`
 }
 
 // Header mirrors the top bar rendered by internal/tui/layout.
