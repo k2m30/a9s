@@ -64,6 +64,15 @@ const s3PABIncompleteDetail = "Bucket-level public access block is missing or pa
 //	operational, not bugs, and surfacing them in the `!` log produces
 //	noise on multi-region accounts.
 //
+// On NoSuchBucket / bare "NotFound" (IsNotFoundErr):
+//
+//	The bucket was deleted between ListBuckets and this per-bucket call —
+//	an operational race, not a bug, for the same reason as the
+//	PermanentRedirect case above. Mark TruncatedIDs[id]=true (data
+//	incomplete → row "?" marker) but do NOT add to the failure-aggregate
+//	error, and do NOT emit a finding: a deleted bucket has no PAB state
+//	to report.
+//
 // On any other API error: no finding emitted; TruncatedIDs[id] = true and
 // the failure aggregates into the returned composite error.
 func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
@@ -104,6 +113,13 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 					{Label: "Account-level PAB", Value: "may still apply"},
 				}, s3PABIncompleteDetail)
 				result.FieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
+				return
+			}
+			// A bucket deleted between ListBuckets and this per-bucket call is
+			// an operational race, not a failure. See IsNotFoundErr.
+			if IsNotFoundErr(err) {
+				truncated = true
+				result.TruncatedIDs[r.ID] = true
 				return
 			}
 			// Cross-region buckets: ListBuckets returns ALL buckets globally, but

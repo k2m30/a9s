@@ -61,6 +61,12 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
+			// A zone deleted between ListHostedZones and this per-zone call
+			// is an operational race, not a failure. See IsNotFoundErr.
+			if IsNotFoundErr(err) {
+				result.TruncatedIDs[r.ID] = true
+				return
+			}
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			result.TruncatedIDs[r.ID] = true
 			return

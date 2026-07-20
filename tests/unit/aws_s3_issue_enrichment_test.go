@@ -18,6 +18,7 @@ package unit
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -47,6 +48,16 @@ type s3PABFake struct {
 	configs map[string]*s3.GetPublicAccessBlockOutput
 	// errorBuckets is a set of bucket names for which a generic error is returned.
 	errorBuckets map[string]bool
+	// codedErrors maps bucket name → smithy error code (e.g. "NoSuchBucket",
+	// "NotFound", "AccessDenied"); GetPublicAccessBlock returns
+	// &smithy.GenericAPIError{Code: code} for that bucket. Takes priority over
+	// errorBuckets/configs — lets a single fake pin the full 404-taxonomy
+	// (issue #456) alongside the pre-existing hardcoded-AccessDenied path.
+	codedErrors map[string]string
+	// rawErrors maps bucket name → a caller-supplied error returned verbatim,
+	// bypassing smithy.APIError entirely (e.g. a plain network error). Takes
+	// priority over codedErrors/errorBuckets/configs.
+	rawErrors map[string]error
 }
 
 func (f *s3PABFake) GetPublicAccessBlock(
@@ -58,6 +69,12 @@ func (f *s3PABFake) GetPublicAccessBlock(
 		return nil, &smithy.GenericAPIError{Code: "InvalidBucketName", Message: "bucket required"}
 	}
 	bucket := *input.Bucket
+	if err, ok := f.rawErrors[bucket]; ok {
+		return nil, err
+	}
+	if code, ok := f.codedErrors[bucket]; ok {
+		return nil, &smithy.GenericAPIError{Code: code, Message: "synthetic " + code + " for " + bucket}
+	}
 	if f.errorBuckets[bucket] {
 		return nil, &smithy.GenericAPIError{Code: "AccessDenied", Message: "access denied"}
 	}
@@ -587,5 +604,125 @@ func TestS3_Enrich_U11_SummaryStable_NeverContainsRowValues(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Issue #456 — 404 taxonomy: on the pinned SDK (s3 v1.102.1) GetPublicAccessBlock
+// has NO modeled errors, so every failure surfaces as smithy.GenericAPIError
+// with the body's Code verbatim. A bucket deleted between ListBuckets and
+// enrichment yields Code "NoSuchBucket" (confirmed empirically); an
+// empty-body 404 synthesizes Code "NotFound". Both must classify as a
+// silent truncation — same as the existing cross-region branch — never a
+// false "public access block incomplete" finding on a bucket that no longer
+// exists.
+// ---------------------------------------------------------------------------
+
+// TestS3_Enrich_NoSuchBucket_SilentTruncation_NoFinding pins the
+// deleted-bucket case: GetPublicAccessBlock returns Code "NoSuchBucket".
+func TestS3_Enrich_NoSuchBucket_SilentTruncation_NoFinding(t *testing.T) {
+	const deletedBucket = "deleted-bucket"
+	fake := &s3PABFake{
+		codedErrors: map[string]string{deletedBucket: "NoSuchBucket"},
+	}
+	clients := &awsclient.ServiceClients{S3: fake}
+	resources := []resource.Resource{pabResource(deletedBucket)}
+
+	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("composite error must be nil when NoSuchBucket is the only failure; got %v", err)
+	}
+	// This enricher only ever emits the s3.public-access-block-incomplete
+	// finding, so "no finding for this bucket" is equivalent to "no false
+	// public-access-block-incomplete finding for a deleted bucket".
+	if fs, ok := result.Findings[deletedBucket]; ok {
+		t.Errorf("expected no finding for a deleted bucket (NoSuchBucket); got %v", fs)
+	}
+	if _, ok := result.FieldUpdates[deletedBucket]; ok {
+		t.Error("expected no FieldUpdates for a deleted bucket (NoSuchBucket)")
+	}
+	if !result.TruncatedIDs[deletedBucket] {
+		t.Error("TruncatedIDs[deleted-bucket] must be true — data incomplete because the bucket no longer exists")
+	}
+	if !result.Truncated {
+		t.Error("Truncated must be true when a bucket's PAB state cannot be determined (deleted mid-sweep)")
+	}
+}
+
+// TestS3_Enrich_NotFound_SilentTruncation_NoFinding pins the empty-body-404
+// shape: GetPublicAccessBlock returns Code "NotFound" (the code the AWS SDK
+// synthesizes when the HTTP response body is empty on a 404).
+func TestS3_Enrich_NotFound_SilentTruncation_NoFinding(t *testing.T) {
+	const deletedBucket = "gone-empty-body-bucket"
+	fake := &s3PABFake{
+		codedErrors: map[string]string{deletedBucket: "NotFound"},
+	}
+	clients := &awsclient.ServiceClients{S3: fake}
+	resources := []resource.Resource{pabResource(deletedBucket)}
+
+	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("composite error must be nil when NotFound is the only failure; got %v", err)
+	}
+	if fs, ok := result.Findings[deletedBucket]; ok {
+		t.Errorf("expected no finding for a deleted bucket (NotFound); got %v", fs)
+	}
+	if _, ok := result.FieldUpdates[deletedBucket]; ok {
+		t.Error("expected no FieldUpdates for a deleted bucket (NotFound)")
+	}
+	if !result.TruncatedIDs[deletedBucket] {
+		t.Error("TruncatedIDs[gone-empty-body-bucket] must be true — data incomplete because the bucket no longer exists")
+	}
+	if !result.Truncated {
+		t.Error("Truncated must be true when a bucket's PAB state cannot be determined (deleted mid-sweep)")
+	}
+}
+
+// TestS3_Enrich_NonNotFoundErrors_StillAggregate is the negative-space guard
+// for the 404-taxonomy fix: an AccessDenied GenericAPIError and a plain
+// non-smithy error (e.g. a network failure) must NOT be swallowed by the new
+// NoSuchBucket/NotFound silent-truncation branch — both must still surface
+// via the failure aggregate exactly as before.
+func TestS3_Enrich_NonNotFoundErrors_StillAggregate(t *testing.T) {
+	cases := []struct {
+		name   string
+		bucket string
+		fake   func(bucket string) *s3PABFake
+	}{
+		{
+			name:   "AccessDenied",
+			bucket: "locked-bucket",
+			fake: func(bucket string) *s3PABFake {
+				return &s3PABFake{codedErrors: map[string]string{bucket: "AccessDenied"}}
+			},
+		},
+		{
+			name:   "non-APIError/connection-reset",
+			bucket: "flaky-bucket",
+			fake: func(bucket string) *s3PABFake {
+				return &s3PABFake{rawErrors: map[string]error{bucket: fmt.Errorf("connection reset")}}
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			clients := &awsclient.ServiceClients{S3: c.fake(c.bucket)}
+			resources := []resource.Resource{pabResource(c.bucket)}
+
+			result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
+			if err == nil {
+				t.Fatalf("expected non-nil composite error for %s; NoSuchBucket/NotFound silent-truncation must not swallow other errors", c.name)
+			}
+			if !strings.Contains(err.Error(), c.bucket) {
+				t.Errorf("composite error must name the failing bucket %q; got %q", c.bucket, err.Error())
+			}
+			if fs, ok := result.Findings[c.bucket]; ok {
+				t.Errorf("expected no finding for %s; got %v", c.name, fs)
+			}
+			if !result.TruncatedIDs[c.bucket] {
+				t.Errorf("TruncatedIDs[%s] must be true for %s", c.bucket, c.name)
+			}
+		})
 	}
 }

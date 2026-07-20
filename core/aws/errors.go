@@ -28,7 +28,7 @@ func ClassifyAWSError(err error) (code string, message string, retryable bool) {
 		retryable = false
 	case "AccessDenied", "AccessDeniedException":
 		retryable = false
-	case "Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded":
+	case "Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded", "SlowDown":
 		retryable = true
 	default:
 		retryable = false

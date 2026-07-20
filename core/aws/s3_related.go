@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"slices"
 	"strings"
 
@@ -15,9 +16,30 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// s3BenignAbsenceErr reports whether err is a legitimate empty state for a
+// per-bucket S3 sub-resource call, rather than a hard failure: either the
+// specific "not configured" ErrorCode the caller expects (e.g.
+// NoSuchTagSet), or the shared IsNotFoundErr classification for a bucket
+// deleted between ListBuckets and this per-bucket call. Classification is by
+// ErrorCode, not a message substring scan. code is "" for a checker with no
+// per-call benign code of its own (GetBucketLogging, which never errors for
+// "no logging configured" — it returns 200 with LoggingEnabled == nil
+// instead).
+func s3BenignAbsenceErr(err error, code string) bool {
+	if IsNotFoundErr(err) {
+		return true
+	}
+	if code == "" {
+		return false
+	}
+	var apiErr smithy.APIError
+	return errors.As(err, &apiErr) && apiErr.ErrorCode() == code
+}
 
 // checkS3Lambda returns the Lambda function ARNs referenced by this bucket's
 // notification configuration. The bucket fetcher populates Fields["notification_lambda"]
@@ -99,8 +121,9 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 		return tagAPI.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: aws.String(bucket)})
 	})
 	if err != nil {
-		// NoSuchTagSet is a "no tags" response, not a hard failure.
-		if strings.Contains(err.Error(), "NoSuchTagSet") {
+		// NoSuchTagSet is a "no tags" response, and a deleted bucket is a
+		// resolved zero — both are a benign absence, not a hard failure.
+		if s3BenignAbsenceErr(err, "NoSuchTagSet") {
 			return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 		}
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
@@ -161,8 +184,9 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resou
 		return encAPI.GetBucketEncryption(ctx, &s3.GetBucketEncryptionInput{Bucket: aws.String(bucket)})
 	})
 	if err != nil {
-		// ServerSideEncryptionConfigurationNotFoundError means no encryption — honest 0.
-		if strings.Contains(err.Error(), "ServerSideEncryptionConfigurationNotFoundError") {
+		// ServerSideEncryptionConfigurationNotFoundError means no encryption,
+		// and a deleted bucket is a resolved zero — both are honest 0s.
+		if s3BenignAbsenceErr(err, "ServerSideEncryptionConfigurationNotFoundError") {
 			return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 		}
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
@@ -218,6 +242,10 @@ func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ reso
 		return logAPI.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
 	})
 	if err != nil {
+		// A deleted bucket is a resolved zero, not a hard failure.
+		if s3BenignAbsenceErr(err, "") {
+			return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+		}
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
 		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
 		if isS3CrossRegionErr(err) {
@@ -409,8 +437,9 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 	})
 	if err != nil {
 		// NoSuchBucketPolicy is a legitimate "no policy configured"
-		// response — honest 0, not error.
-		if strings.Contains(err.Error(), "NoSuchBucketPolicy") {
+		// response, and a deleted bucket is a resolved zero — both are
+		// honest 0s, not errors.
+		if s3BenignAbsenceErr(err, "NoSuchBucketPolicy") {
 			return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 		}
 		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
