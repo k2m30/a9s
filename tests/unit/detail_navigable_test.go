@@ -1,6 +1,6 @@
 package unit_test
 
-// detail_navigable_test.go — tests for resource.IsFieldNavigable, the
+// detail_navigable_test.go — tests for resource.IsFieldNavigableForTest, the
 // resource-package predicate shared verbatim by both the legacy
 // views.DetailModel field-rendering path (deleted, wave3) and the live
 // buildDetailFieldItems/RenderDetail path — see
@@ -17,13 +17,13 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-func TestIsFieldNavigable_MatchFound(t *testing.T) {
+func TestIsFieldNavigableForTest_MatchFound(t *testing.T) {
 	replaceEC2NavigableFields(t, []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "SubnetId", TargetType: "subnet"},
 	})
 
-	f := resource.IsFieldNavigable("ec2", "VpcId")
+	f := resource.IsFieldNavigableForTest("ec2", "VpcId")
 	if f == nil {
 		t.Fatal("IsFieldNavigable: expected non-nil for registered field VpcId")
 	}
@@ -32,19 +32,19 @@ func TestIsFieldNavigable_MatchFound(t *testing.T) {
 	}
 }
 
-func TestIsFieldNavigable_NoMatch(t *testing.T) {
+func TestIsFieldNavigableForTest_NoMatch(t *testing.T) {
 	replaceEC2NavigableFields(t, []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
 
-	f := resource.IsFieldNavigable("ec2", "SubnetId")
+	f := resource.IsFieldNavigableForTest("ec2", "SubnetId")
 	if f != nil {
 		t.Errorf("IsFieldNavigable: expected nil for unregistered field SubnetId, got %+v", f)
 	}
 }
 
-func TestIsFieldNavigable_UnknownType(t *testing.T) {
-	f := resource.IsFieldNavigable("rds", "VpcId")
+func TestIsFieldNavigableForTest_UnknownType(t *testing.T) {
+	f := resource.IsFieldNavigableForTest("rds", "VpcId")
 	if f != nil {
 		t.Errorf("IsFieldNavigable: expected nil for unregistered type, got %+v", f)
 	}

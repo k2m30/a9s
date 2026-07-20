@@ -8,10 +8,11 @@ import (
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 )
 
-// ExpectedTopLevelCounts returns an independent top-level count oracle for demo
-// integration tests, derived directly from the typed fixture datasets rather
-// than from registered app fetchers.
-func ExpectedTopLevelCounts() map[string]int {
+// ExpectedTopLevelCountsForTest returns an independent top-level count oracle
+// for demo integration tests, derived directly from the typed fixture
+// datasets rather than from registered app fetchers. Test-only: no
+// production caller.
+func ExpectedTopLevelCountsForTest() map[string]int {
 	ec2 := NewEC2Fixtures()
 	mwaaFix := NewMWAAFixtures()
 	transferFix := NewTransferFixtures()

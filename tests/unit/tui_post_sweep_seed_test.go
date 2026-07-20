@@ -67,7 +67,7 @@ import (
 // see on a real read after the sweep's own TaskKindSaveCache wrote it.
 func seedDiskStoreWithS3Rows(t *testing.T, profile, region string) *cache.Store {
 	t.Helper()
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	store.Put("s3", cache.TypeFile{
 		HasResources: true,
 		Count:        2,
@@ -80,7 +80,7 @@ func seedDiskStoreWithS3Rows(t *testing.T, profile, region string) *cache.Store 
 	if err := store.SaveType("s3"); err != nil {
 		t.Fatalf("seed fixture SaveType(s3): %v", err)
 	}
-	return cache.LoadDir(profile, region)
+	return cache.LoadDirForTest(profile, region)
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -223,8 +223,8 @@ func newPostSweepApp(t *testing.T, profile, region string) tui.Model {
 	m := tui.New(profile, region,
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
-		tui.WithProfile(profile),
-		tui.WithRegion(region))
+		tui.WithProfileForTest(profile),
+		tui.WithRegionForTest(region))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	t.Cleanup(m.CloseController)
 	return m
@@ -379,7 +379,7 @@ func TestMenuEnter_PostSweep_RendersRows(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const profile, region = "def15-menu-profile", "us-east-1"
 
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	store.Put("ec2", cache.TypeFile{
 		HasResources: true,
 		Count:        2,
@@ -449,7 +449,7 @@ func TestMenuEnter_PostSweep_RendersRows(t *testing.T) {
 // profile switch to B, whose disk store carries NO s3 data at all),
 // HandleNavigate("s3") must NOT seed CachedEntry from A's now-stale store —
 // EnsureCacheStore is pair-scoped (Session.EnsureCacheStore reloads
-// cache.LoadDir(profile, region) whenever the memoized store's pair differs
+// cache.LoadDirForTest(profile, region) whenever the memoized store's pair differs
 // from session.Profile/Region), so a correct fallback implementation reads
 // B's (empty) store, not A's. This is a non-regression guard, not a RED pin:
 // it must be green both before and after the disk-store fallback fix lands, proving the
@@ -523,7 +523,7 @@ func TestObservedEmpty_DoesNotSeedStaleDiskRows(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	profile, region := "def15p2-store-profile", "us-east-1"
 
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	store.Put("s3", cache.TypeFile{
 		HasResources: true,
 		Count:        3,
@@ -602,7 +602,7 @@ func TestObservedEmpty_TUI_DoesNotRenderStaleRows(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const profile, region = "def15p2-tui-profile", "us-east-1"
 
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	store.Put("s3", cache.TypeFile{
 		HasResources: true,
 		Count:        3,

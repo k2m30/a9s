@@ -36,7 +36,7 @@ import (
 // poisoned later tests that rely on the production BucketPolicies map.
 func s3FakeClientsWithPolicies(policies map[string]string) *awsclient.ServiceClients {
 	fix := &fixtures.S3Fixtures{BucketPolicies: policies}
-	return &awsclient.ServiceClients{S3: fakes.NewS3FromFixtures(fix)}
+	return &awsclient.ServiceClients{S3: fakes.NewS3FromFixturesForTest(fix)}
 }
 
 // TestS3_Role_MalformedPolicyJSON_Count0 pins the error branch in

@@ -401,7 +401,7 @@ func TestNavigableFields_EC2_Registered(t *testing.T) {
 		"SecurityGroups.GroupId":           "sg",
 	}
 	for path, wantTarget := range expected {
-		nav := resource.IsFieldNavigable("ec2", path)
+		nav := resource.IsFieldNavigableForTest("ec2", path)
 		if nav == nil {
 			t.Errorf("expected navigable field %q not registered for ec2", path)
 			continue

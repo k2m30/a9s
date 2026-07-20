@@ -42,7 +42,7 @@ func secretsSource() resource.Resource {
 // --- Navigable Fields ---
 
 func TestNavigableFields_Secrets_KmsKey(t *testing.T) {
-	nav := resource.IsFieldNavigable("secrets", "KmsKeyId")
+	nav := resource.IsFieldNavigableForTest("secrets", "KmsKeyId")
 	if nav == nil {
 		t.Fatal("expected KmsKeyId to be navigable for secrets")
 	}
@@ -52,7 +52,7 @@ func TestNavigableFields_Secrets_KmsKey(t *testing.T) {
 }
 
 func TestNavigableFields_Secrets_RotationLambda(t *testing.T) {
-	nav := resource.IsFieldNavigable("secrets", "RotationLambdaARN")
+	nav := resource.IsFieldNavigableForTest("secrets", "RotationLambdaARN")
 	if nav == nil {
 		t.Fatal("expected RotationLambdaARN to be navigable for secrets")
 	}

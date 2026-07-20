@@ -31,7 +31,7 @@ func kinesisCheckerByTarget(t *testing.T, target string) resource.RelatedChecker
 // --- Navigable Fields ---
 
 func TestNavigableFields_Kinesis_None(t *testing.T) {
-	nav := resource.IsFieldNavigable("kinesis", "StreamName")
+	nav := resource.IsFieldNavigableForTest("kinesis", "StreamName")
 	if nav != nil {
 		t.Errorf("expected no navigable fields for kinesis, but StreamName resolved to %v", nav)
 	}

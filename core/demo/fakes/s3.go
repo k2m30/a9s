@@ -26,11 +26,12 @@ func NewS3() *S3Fake {
 	return &S3Fake{fix: fixtures.NewS3Fixtures()}
 }
 
-// NewS3FromFixtures constructs an S3Fake backed by a caller-supplied
-// fixture set, bypassing the default NewS3Fixtures builder. Intended
-// for tests that need to override specific maps (BucketPolicies,
+// NewS3FromFixturesForTest constructs an S3Fake backed by a caller-supplied
+// fixture set, bypassing the default NewS3Fixtures builder. Test-only: no
+// production caller — demo mode always goes through NewS3. Intended for
+// tests that need to override specific maps (BucketPolicies,
 // EncryptionConfigs, …) without mutating shared demo state.
-func NewS3FromFixtures(f *fixtures.S3Fixtures) *S3Fake {
+func NewS3FromFixturesForTest(f *fixtures.S3Fixtures) *S3Fake {
 	return &S3Fake{fix: f}
 }
 

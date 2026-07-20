@@ -54,7 +54,7 @@ func TestCacheFirstSeen_PersistsAcrossSaves(t *testing.T) {
 
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{row}, nil, false)
 
-	store1 := cache.LoadDir("demo", "us-east-1")
+	store1 := cache.LoadDirForTest("demo", "us-east-1")
 	tf1, ok := store1.Type("s3")
 	if !ok || len(tf1.Rows) != 1 {
 		t.Fatalf("save 1: store.Type(s3) = (%+v, %v), want exactly 1 row", tf1, ok)
@@ -67,7 +67,7 @@ func TestCacheFirstSeen_PersistsAcrossSaves(t *testing.T) {
 	time.Sleep(5 * time.Millisecond)
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{row}, nil, false)
 
-	store2 := cache.LoadDir("demo", "us-east-1")
+	store2 := cache.LoadDirForTest("demo", "us-east-1")
 	tf2, ok := store2.Type("s3")
 	if !ok || len(tf2.Rows) != 1 {
 		t.Fatalf("save 2: store.Type(s3) = (%+v, %v), want exactly 1 row", tf2, ok)
@@ -106,7 +106,7 @@ func TestCacheFirstSeen_ResolvedFindingDropsOut(t *testing.T) {
 		Findings: []domain.Finding{finding},
 	}}, nil, false)
 
-	store1 := cache.LoadDir("demo", "us-east-1")
+	store1 := cache.LoadDirForTest("demo", "us-east-1")
 	tf1, ok := store1.Type("s3")
 	if !ok || len(tf1.Rows) != 1 {
 		t.Fatalf("save 1: store.Type(s3) = (%+v, %v), want exactly 1 row", tf1, ok)
@@ -123,7 +123,7 @@ func TestCacheFirstSeen_ResolvedFindingDropsOut(t *testing.T) {
 		Fields: map[string]string{"region": "us-east-1"},
 	}}, nil, false)
 
-	store2 := cache.LoadDir("demo", "us-east-1")
+	store2 := cache.LoadDirForTest("demo", "us-east-1")
 	tf2, ok := store2.Type("s3")
 	if !ok || len(tf2.Rows) != 1 {
 		t.Fatalf("save 2: store.Type(s3) = (%+v, %v), want exactly 1 row", tf2, ok)
@@ -160,7 +160,7 @@ func TestCacheFirstSeen_ReappearingFindingFreshStamp(t *testing.T) {
 	}
 
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{withFinding}, nil, false)
-	store1 := cache.LoadDir("demo", "us-east-1")
+	store1 := cache.LoadDirForTest("demo", "us-east-1")
 	tf1, ok := store1.Type("s3")
 	if !ok || len(tf1.Rows) != 1 {
 		t.Fatalf("save 1: store.Type(s3) = (%+v, %v), want exactly 1 row", tf1, ok)
@@ -176,7 +176,7 @@ func TestCacheFirstSeen_ReappearingFindingFreshStamp(t *testing.T) {
 	time.Sleep(5 * time.Millisecond)
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{withFinding}, nil, false)
 
-	store3 := cache.LoadDir("demo", "us-east-1")
+	store3 := cache.LoadDirForTest("demo", "us-east-1")
 	tf3, ok := store3.Type("s3")
 	if !ok || len(tf3.Rows) != 1 {
 		t.Fatalf("save 3: store.Type(s3) = (%+v, %v), want exactly 1 row", tf3, ok)
@@ -211,7 +211,7 @@ func TestCacheFirstSeen_V1FileMigratesWithSavedAtFloor(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
-	dir := cache.Dir("migrate-profile", "us-east-1")
+	dir := cache.DirForTest("migrate-profile", "us-east-1")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatalf("creating cache dir: %v", err)
 	}
@@ -245,7 +245,7 @@ func TestCacheFirstSeen_V1FileMigratesWithSavedAtFloor(t *testing.T) {
 	v3File.Version = 3
 	writeTypeFile(t, dir, "lambda", v3File)
 
-	store := cache.LoadDir("migrate-profile", "us-east-1")
+	store := cache.LoadDirForTest("migrate-profile", "us-east-1")
 
 	vpcTF, ok := store.Type("vpc")
 	if !ok {

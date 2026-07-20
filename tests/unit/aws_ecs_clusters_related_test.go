@@ -43,7 +43,7 @@ func TestNavigableFields_ECS_Registered(t *testing.T) {
 		"Configuration.ExecuteCommandConfiguration.KmsKeyId": "kms",
 	}
 	for path, targetType := range expected {
-		nav := resource.IsFieldNavigable("ecs", path)
+		nav := resource.IsFieldNavigableForTest("ecs", path)
 		if nav == nil {
 			t.Errorf("expected navigable field %q not found", path)
 			continue

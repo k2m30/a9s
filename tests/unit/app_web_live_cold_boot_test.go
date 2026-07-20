@@ -36,8 +36,8 @@
 // ROUND-2 REWRITE (this pass) — the old cache.File/cache.Entry/cache.Load/
 // cache.Save/cache.CachedRow/cache.Path/cache.DefaultTTL surface is being
 // DELETED by the coder and replaced with a directory-per-pair,
-// file-per-type surface (cache.Dir, cache.Row, cache.TypeFile, cache.Store,
-// cache.LoadDir, (*Store).Type/Types/Put/SaveType — exact signatures per the
+// file-per-type surface (cache.DirForTest, cache.Row, cache.TypeFile, cache.Store,
+// cache.LoadDirForTest, (*Store).Type/Types/Put/SaveType — exact signatures per the
 // architect's round-2 handoff). Every test in this file that touched the old
 // surface is REWRITTEN below against the new one; none of the old surface
 // is referenced anywhere in this file anymore. This is deliberately a
@@ -88,8 +88,8 @@
 //     pins "--no-cache disables persisted load AND save entirely" at the
 //     controller level using the existing session.NoCache flag.
 //   - C7a chokepoint audit -> UPDATED (not rewritten from scratch): now
-//     scans for cache.Dir(...) references and os.* primitives fed a
-//     cache.Dir(...)-derived path, outside core/cache.
+//     scans for cache.DirForTest(...) references and os.* primitives fed a
+//     cache.DirForTest(...)-derived path, outside core/cache.
 //   - C7a format-marker pin -> UPDATED: TypeFile.Version (not
 //     cache.File.Version) is the pinned first field.
 //
@@ -385,14 +385,14 @@ func TestWebBoot_AvailabilityCacheLoaded_CountsOnlyFallback_KeepsLoadingTrue(t *
 // Round-2 Contract F — per-type-file isolation (structural no-merge, C7)
 // -----------------------------------------------------------------------
 
-// perTypeCacheDir mirrors what cache.Dir(profile, region) will resolve to
+// perTypeCacheDir mirrors what cache.DirForTest(profile, region) will resolve to
 // under an A9S_CONFIG_FOLDER-redirected temp dir, for tests that need to
 // assert directly on directory/file existence without going through
-// cache.LoadDir. Kept minimal and local to this file (no dependency on the
+// cache.LoadDirForTest. Kept minimal and local to this file (no dependency on the
 // coder's eventual Dir() implementation beyond calling it directly).
 func perTypeCacheDir(t *testing.T, profile, region string) string {
 	t.Helper()
-	return cache.Dir(profile, region)
+	return cache.DirForTest(profile, region)
 }
 
 // TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact pins round-2's
@@ -407,9 +407,9 @@ func TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	store := cache.LoadDir("merge-prof", "us-east-1")
+	store := cache.LoadDirForTest("merge-prof", "us-east-1")
 	if store == nil {
-		t.Fatal("cache.LoadDir on an empty directory returned nil — must return an empty (non-nil) Store, never fail, per C7")
+		t.Fatal("cache.LoadDirForTest on an empty directory returned nil — must return an empty (non-nil) Store, never fail, per C7")
 	}
 	store.Put("s3", cache.TypeFile{
 		HasResources: true,
@@ -443,9 +443,9 @@ func TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact(t *testing.T) {
 	}
 
 	// A fresh session for the SAME pair: load, touch ONLY s3, save ONLY s3.
-	store2 := cache.LoadDir("merge-prof", "us-east-1")
+	store2 := cache.LoadDirForTest("merge-prof", "us-east-1")
 	if store2 == nil {
-		t.Fatal("cache.LoadDir returned nil on a populated directory")
+		t.Fatal("cache.LoadDirForTest returned nil on a populated directory")
 	}
 	ec2Before, ok := store2.Type("ec2")
 	if !ok || len(ec2Before.Rows) != 1 {
@@ -471,7 +471,7 @@ func TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact(t *testing.T) {
 		t.Errorf("ec2.yaml bytes changed after an s3-only SaveType call — per-type files must be physically untouched by a save of a different type:\nbefore=%q\nafter=%q", before, after)
 	}
 
-	store3 := cache.LoadDir("merge-prof", "us-east-1")
+	store3 := cache.LoadDirForTest("merge-prof", "us-east-1")
 	s3Loaded, ok := store3.Type("s3")
 	if !ok {
 		t.Fatal(`store3.Type("s3") missing after save+reload`)
@@ -504,13 +504,13 @@ func TestAllLoadedPages_PersistBeyondFirstPage_InTypeFile(t *testing.T) {
 	}
 	rows[0].Findings = []domain.Finding{{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave2:s3"}}
 
-	store := cache.LoadDir("pages-prof", "us-east-1")
+	store := cache.LoadDirForTest("pages-prof", "us-east-1")
 	store.Put("s3", cache.TypeFile{HasResources: true, Count: 55, Exact: true, Rows: rows})
 	if err := store.SaveType("s3"); err != nil {
 		t.Fatalf("SaveType: %v", err)
 	}
 
-	reloaded := cache.LoadDir("pages-prof", "us-east-1")
+	reloaded := cache.LoadDirForTest("pages-prof", "us-east-1")
 	tf, ok := reloaded.Type("s3")
 	if !ok {
 		t.Fatal(`reloaded.Type("s3") missing`)
@@ -539,7 +539,7 @@ func TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBeforeFetchCompl
 	}
 	rows[10].Findings = []domain.Finding{{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave2:s3"}}
 
-	store := cache.LoadDir("coldboot-prof", "us-east-1")
+	store := cache.LoadDirForTest("coldboot-prof", "us-east-1")
 	store.Put("s3", cache.TypeFile{HasResources: true, Count: 55, Exact: true, Rows: rows})
 	if err := store.SaveType("s3"); err != nil {
 		t.Fatalf("SaveType: %v", err)
@@ -552,7 +552,7 @@ func TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBeforeFetchCompl
 	ctrl := app.New(core)
 	t.Cleanup(ctrl.Close)
 
-	reloaded := cache.LoadDir("coldboot-prof", "us-east-1")
+	reloaded := cache.LoadDirForTest("coldboot-prof", "us-east-1")
 	tf, ok := reloaded.Type("s3")
 	if !ok || len(tf.Rows) != 55 {
 		t.Fatalf("fixture sanity: reloaded.Type(s3) = %+v (ok=%v), want 55 rows", tf, ok)
@@ -758,7 +758,7 @@ func TestLoadBeforeSave_PairSwitch_NeverSavesBeforeLoad(t *testing.T) {
 	t.Cleanup(ctrl.Close)
 
 	// Establish pair A's directory via a real load+save round trip.
-	storeA := cache.LoadDir("pair-a", "us-east-1")
+	storeA := cache.LoadDirForTest("pair-a", "us-east-1")
 	storeA.Put("ec2", cache.TypeFile{HasResources: true, Count: 1})
 	if err := storeA.SaveType("ec2"); err != nil {
 		t.Fatalf("SaveType (pair A fixture): %v", err)
@@ -794,7 +794,7 @@ func TestNoCache_NeverLoadsPopulatedDir_NeverWritesFiles(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	store := cache.LoadDir("nocache-prof", "us-east-1")
+	store := cache.LoadDirForTest("nocache-prof", "us-east-1")
 	store.Put("s3", cache.TypeFile{HasResources: true, Count: 999, Exact: true})
 	if err := store.SaveType("s3"); err != nil {
 		t.Fatalf("SaveType fixture: %v", err)
@@ -853,7 +853,7 @@ func TestAncientTypeFile_SeedsNormally_NoAgeDiscard(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	store := cache.LoadDir("ancient-prof", "us-east-1")
+	store := cache.LoadDirForTest("ancient-prof", "us-east-1")
 	store.Put("s3", cache.TypeFile{
 		HasResources: true,
 		Count:        12,
@@ -879,7 +879,7 @@ func TestAncientTypeFile_SeedsNormally_NoAgeDiscard(t *testing.T) {
 		t.Fatalf("SaveType (backdate): %v", err)
 	}
 
-	reloaded := cache.LoadDir("ancient-prof", "us-east-1")
+	reloaded := cache.LoadDirForTest("ancient-prof", "us-east-1")
 	ancientTF, ok := reloaded.Type("s3")
 	if !ok {
 		t.Fatal(`reloaded.Type("s3") missing`)
@@ -924,13 +924,13 @@ func TestAncientTypeFile_SeedsNormally_NoAgeDiscard(t *testing.T) {
 
 // -----------------------------------------------------------------------
 // Contract C7a — at-rest security seam: single chokepoint + format marker
-// (round-2: scans for cache.Dir(...) instead of the deleted cache.Path/Dir)
+// (round-2: scans for cache.DirForTest(...) instead of the deleted cache.Path/Dir)
 // -----------------------------------------------------------------------
 
 // cacheDiskAccessAllowlist lists "<repo-relative-path>:<os.*-func-name>" keys
 // that are legitimately allowed to reference a raw cache-path-derived disk
 // primitive outside the cache package (currently empty — every production
-// caller today goes through cache.LoadDir/(*Store).SaveType). Mirrors
+// caller today goes through cache.LoadDirForTest/(*Store).SaveType). Mirrors
 // nonPaginatedAPIs's allowlist pattern in enrichment_pagination_audit_test.go:
 // additions require a justification comment at the call site, not silent
 // broadening.
@@ -953,11 +953,11 @@ var cacheDiskPrimitives = map[string]bool{
 // TestNoSingleCallListAPIEnrichers) over every internal/ .go file
 // (excluding core/cache and _test.go files) for:
 //  1. any os.<primitive>(...) call whose argument expression textually
-//     references "cache." (catches os.ReadFile(cache.Dir(...)+...) and
+//     references "cache." (catches os.ReadFile(cache.DirForTest(...)+...) and
 //     similar path-construction-then-raw-I/O patterns), and
-//  2. any direct reference to cache.Dir at all outside core/cache —
+//  2. any direct reference to cache.DirForTest at all outside core/cache —
 //     resolving the per-pair directory path is itself the seam violation
-//     C7a rules out; only cache.LoadDir/(*Store).SaveType may do it.
+//     C7a rules out; only cache.LoadDirForTest/(*Store).SaveType may do it.
 func TestCacheFileIO_OnlyThroughCachePackage_NoDirectDiskAccessElsewhere(t *testing.T) {
 	_, thisFile, _, ok := goruntime.Caller(0)
 	if !ok {
@@ -1014,20 +1014,20 @@ func TestCacheFileIO_OnlyThroughCachePackage_NoDirectDiskAccessElsewhere(t *test
 			if !ok {
 				return true
 			}
-			// Case 2: any selector cache.Dir, anywhere in the file — even
+			// Case 2: any selector cache.DirForTest, anywhere in the file — even
 			// outside an os.* call — is itself the seam violation.
-			if pkgIdent, isIdent := sel.X.(*ast.Ident); isIdent && pkgIdent.Name == "cache" && sel.Sel.Name == "Dir" {
-				key := baseName + ":cache.Dir"
+			if pkgIdent, isIdent := sel.X.(*ast.Ident); isIdent && pkgIdent.Name == "cache" && sel.Sel.Name == "DirForTest" {
+				key := baseName + ":cache.DirForTest"
 				if !cacheDiskAccessAllowlist[key] {
 					line := fset.Position(call.Pos()).Line
 					violations = append(violations, baseName+":"+itoaColdBoot(line)+
-						": calls cache.Dir() outside core/cache — only cache.LoadDir/(*Store).SaveType may resolve a cache directory path (C7a single chokepoint)")
+						": calls cache.DirForTest() outside core/cache — only cache.LoadDirForTest/(*Store).SaveType may resolve a cache directory path (C7a single chokepoint)")
 				}
 				return true
 			}
 
 			// Case 1: os.<primitive>(...) whose args textually reference
-			// "cache." — catches os.ReadFile(cache.Dir(...)+...) etc.
+			// "cache." — catches os.ReadFile(cache.DirForTest(...)+...) etc.
 			pkgIdent, ok := sel.X.(*ast.Ident)
 			if !ok || pkgIdent.Name != "os" || !cacheDiskPrimitives[sel.Sel.Name] {
 				return true
@@ -1048,14 +1048,14 @@ func TestCacheFileIO_OnlyThroughCachePackage_NoDirectDiskAccessElsewhere(t *test
 			if flagged {
 				line := fset.Position(call.Pos()).Line
 				violations = append(violations, baseName+":"+itoaColdBoot(line)+
-					": os."+sel.Sel.Name+"() called with a cache-path-derived argument outside core/cache — C7a requires all cache-file disk I/O to flow through cache.LoadDir/(*Store).SaveType")
+					": os."+sel.Sel.Name+"() called with a cache-path-derived argument outside core/cache — C7a requires all cache-file disk I/O to flow through cache.LoadDirForTest/(*Store).SaveType")
 			}
 			return true
 		})
 	}
 
 	if len(violations) > 0 {
-		t.Errorf("found %d cache-file disk-access violation(s) outside core/cache:\n\n  %s\n\nAll cache-file reads/writes must flow through cache.LoadDir/(*Store).SaveType (C7a).",
+		t.Errorf("found %d cache-file disk-access violation(s) outside core/cache:\n\n  %s\n\nAll cache-file reads/writes must flow through cache.LoadDirForTest/(*Store).SaveType (C7a).",
 			len(violations), strings.Join(violations, "\n  "))
 	}
 }

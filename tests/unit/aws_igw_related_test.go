@@ -33,7 +33,7 @@ func TestNavigableFields_IGW_Registered(t *testing.T) {
 		"Attachments.VpcId": "vpc",
 	}
 	for path, wantTarget := range expected {
-		nav := resource.IsFieldNavigable("igw", path)
+		nav := resource.IsFieldNavigableForTest("igw", path)
 		if nav == nil {
 			t.Errorf("expected navigable field %q not found for igw", path)
 			continue

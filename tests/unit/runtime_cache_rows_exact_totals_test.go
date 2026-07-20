@@ -233,10 +233,10 @@ func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {
 // availability to an exact count, SaveAvailabilityCache (the existing
 // probes.go seam) must be able to write that exact/untruncated state to
 // disk when invoked with the controller's updated menu availability maps —
-// and cache.LoadDir must read back the same exact, untruncated per-type
+// and cache.LoadDirForTest must read back the same exact, untruncated per-type
 // entry, modeling "survives an app restart". Round-2 migration: repinned at
 // the same controller seam (core.SaveAvailabilityCache/LoadAvailabilityCache)
-// but the on-disk assertion now goes through cache.LoadDir/Store.Type
+// but the on-disk assertion now goes through cache.LoadDirForTest/Store.Type
 // directly, since the exact-total persistence flows through
 // (*cache.Store).SaveType's per-type file, not the deleted single-file
 // cache.File/cache.Entry shape.
@@ -271,13 +271,13 @@ func TestLoadMoreExhausted_PersistsToDiskCache(t *testing.T) {
 		t.Fatalf("SaveAvailabilityCache: %v", err)
 	}
 
-	store := cache.LoadDir("demo", "us-east-1")
+	store := cache.LoadDirForTest("demo", "us-east-1")
 	if store == nil {
-		t.Fatal("cache.LoadDir returned nil after SaveAvailabilityCache")
+		t.Fatal("cache.LoadDirForTest returned nil after SaveAvailabilityCache")
 	}
 	tf, ok := store.Type("ec2")
 	if !ok {
-		t.Fatal(`cache.LoadDir(...).Type("ec2") missing after SaveAvailabilityCache`)
+		t.Fatal(`cache.LoadDirForTest(...).Type("ec2") missing after SaveAvailabilityCache`)
 	}
 	if tf.Count != 102 {
 		t.Errorf("persisted ec2 Count = %d, want 102 (exact total after load-more exhaustion)", tf.Count)

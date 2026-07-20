@@ -278,8 +278,8 @@ func issue140DemoModel(t *testing.T, w, h int) tui.Model {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: w, Height: h})
 	return m2.(tui.Model)
 }
@@ -415,7 +415,7 @@ func TestIssue140StoryMapCoversAllStories(t *testing.T) {
 	// detail_livepath_migration_test.go (skip-over-sections) and
 	// wave3_detail_ports_test.go (boundary clamp at top/bottom). Enter-on-
 	// navigable-field dispatch is a single generic code path
-	// (resource.IsFieldNavigable + actions_nav.go:573) regardless of target
+	// (resource.IsFieldNavigableForTest + actions_nav.go:573) regardless of target
 	// type — VpcId/SubnetId/security-group-ID/ImageId/EBS/ENI are DATA
 	// differences, not separate code paths — pinned generically by
 	// wave3_detail_ports_test.go's TestWave3_Detail_EnterOnNavigableField_

@@ -42,7 +42,7 @@
 //     handleActionCloudTrail's own "t"-key path was untested until now.
 //  7. isFieldNavigable predicate table. COVERED, not re-ported:
 //     detail_navigable_test.go's TestIsFieldNavigable_MatchFound/NoMatch/
-//     UnknownType (lines 184-215) call resource.IsFieldNavigable directly —
+//     UnknownType (lines 184-215) call resource.IsFieldNavigableForTest directly —
 //     a resource-package predicate shared verbatim by both the legacy
 //     views.DetailModel and the live buildDetailFieldItems path (not a
 //     views-package duplicate), so there is no separate port target.

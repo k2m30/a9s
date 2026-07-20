@@ -8,7 +8,7 @@
 // call Close BEFORE its t.TempDir() cleanup runs, or the async writer
 // goroutine (runAvailabilitySaveLoop, started by queueAvailabilitySave)
 // can still be calling cache.Store.SaveType (os.MkdirAll + os.CreateTemp +
-// os.Rename, all rooted at cache.Dir(profile, region)) while
+// os.Rename, all rooted at cache.DirForTest(profile, region)) while
 // RemoveAll(t.TempDir()) concurrently walks/removes that same tree.
 // cache.cacheRoot() reads os.Getenv("A9S_CONFIG_FOLDER") LIVE at SaveType
 // call time, not at goroutine-launch time, and os.Setenv/os.Unsetenv are

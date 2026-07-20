@@ -116,8 +116,11 @@ func init() {
 	initStyles()
 }
 
-// Reinit re-initializes all composed styles. Useful for tests that toggle NO_COLOR.
-func Reinit() {
+// ReinitForTest re-initializes all composed styles. Test-only: no production
+// caller — production styles are set once at package init() and via
+// ApplyTheme; this exists for tests that toggle NO_COLOR or swap themes
+// between cases and need the composed vars rebuilt.
+func ReinitForTest() {
 	applyPalette(ActiveTheme())
 	initStyles()
 }
@@ -160,7 +163,7 @@ func initStyles() {
 	SearchOtherStyle = lipgloss.Style{}
 
 	// These 13 styles were previously package-level vars in view files,
-	// initialized once at load time and unaffected by NO_COLOR / Reinit().
+	// initialized once at load time and unaffected by NO_COLOR / ReinitForTest().
 	// They are always initialized regardless of NO_COLOR to preserve that behavior.
 	HelpCatStyle = lipgloss.NewStyle().Foreground(ColHelpCat).Bold(true)
 	HelpKeyStyle = lipgloss.NewStyle().Foreground(ColHelpKey).Bold(true)

@@ -26,7 +26,7 @@ func TestScenario_S3ReferenceSurfaces(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)
 
-	expectedS3 := demofixtures.ExpectedTopLevelCounts()["s3"]
+	expectedS3 := demofixtures.ExpectedTopLevelCountsForTest()["s3"]
 
 	t.Run("main_view", func(t *testing.T) {
 		scenario.ExpectViewContains("S3 Buckets (" + strconv.Itoa(expectedS3) + ")")

@@ -265,7 +265,7 @@ func TestReconcileTypeFile_Wave2Carry_MultiFindingRowSurvivesRefresh(t *testing.
 	// newSaveCacheRegressionCore bootstraps its Core against
 	// saveRegProfile/saveRegRegion (runtime_savecache_regressions_test.go) —
 	// the seed must land in the same pair the Core under test reads/writes.
-	store := cache.LoadDir(saveRegProfile, saveRegRegion)
+	store := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	existingRows := []cache.Row{
 		{
 			ID:   wave2CarryMultiResourceID,
@@ -293,7 +293,7 @@ func TestReconcileTypeFile_Wave2Carry_MultiFindingRowSurvivesRefresh(t *testing.
 		t.Fatalf("SaveResourceListCache: %v", err)
 	}
 
-	reloaded := cache.LoadDir(saveRegProfile, saveRegRegion)
+	reloaded := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	tf, ok := reloaded.Type(wave2CarryMultiShortName)
 	if !ok {
 		t.Fatal("TypeFile missing after multi-finding Wave-2-carry refresh")
@@ -316,7 +316,7 @@ func TestRestartSeed_MultiFinding_BothFindingsVisibleOnFirstRender(t *testing.T)
 	// this test used before (Bootstrap is a thin New(sessionWithPairSet, ...)
 	// wrapper — core/runtime/accessors.go). Neither touches disk at
 	// construction time; EnsureCacheStore's first call is what triggers
-	// cache.LoadDir, and that first call happens below, AFTER the helper's
+	// cache.LoadDirForTest, and that first call happens below, AFTER the helper's
 	// t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) has already pinned this
 	// test's own isolated config root — so seeding after construction (but
 	// before ctrl.Apply's cache read) is equivalent to seeding before it.

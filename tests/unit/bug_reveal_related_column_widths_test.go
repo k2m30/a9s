@@ -26,8 +26,8 @@ func TestBugReveal_EC2Detail_RelatedVisibleAcrossWidths(t *testing.T) {
 				tui.WithClients(demo.NewServiceClients()),
 				tui.WithIsDemo(true),
 				tui.WithNoCache(true),
-				tui.WithProfile(demo.DemoProfile),
-				tui.WithRegion(demo.DemoRegion))
+				tui.WithProfileForTest(demo.DemoProfile),
+				tui.WithRegionForTest(demo.DemoRegion))
 			m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: w, Height: 36})
 			m, _ = rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetDetail,

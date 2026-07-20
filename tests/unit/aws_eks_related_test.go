@@ -41,7 +41,7 @@ func TestNavigableFields_EKS(t *testing.T) {
 		"ResourcesVpcConfig.ClusterSecurityGroupId": "sg",
 	}
 	for path, wantTarget := range expected {
-		nav := resource.IsFieldNavigable("eks", path)
+		nav := resource.IsFieldNavigableForTest("eks", path)
 		if nav == nil {
 			t.Errorf("expected navigable field %q not found for eks", path)
 			continue

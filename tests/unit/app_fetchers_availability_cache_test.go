@@ -2,12 +2,12 @@ package unit
 
 // Tests for the disk-cache load path feeding internal/tui/probe_adapter.go's
 // loadAvailabilityCache (Round-2 migration: repinned from the deleted
-// single-file cache.Load/cache.File onto the per-type-file cache.LoadDir/
+// single-file cache.Load/cache.File onto the per-type-file cache.LoadDirForTest/
 // cache.Store/cache.TypeFile per docs/design/cache-requirements.md C7).
 //
 // loadAvailabilityCache delegates to Core.LoadAvailabilityCache, which in
-// turn reads the per-pair Store via cache.LoadDir and maps each type's
-// TypeFile into AvailabilityCacheLoadedMsg. Testing cache.LoadDir/Store.Type
+// turn reads the per-pair Store via cache.LoadDirForTest and maps each type's
+// TypeFile into AvailabilityCacheLoadedMsg. Testing cache.LoadDirForTest/Store.Type
 // directly covers the same logic branches at the data-transformation level:
 //
 //   (a) missing directory  → empty Store, no types
@@ -21,7 +21,7 @@ package unit
 // DELIBERATE product decision" — so the old cache.File.IsExpired coverage
 // has no successor here; those cases are deleted, not repinned.
 //
-// We also test profile/region isolation of cache.Dir to verify the loading
+// We also test profile/region isolation of cache.DirForTest to verify the loading
 // key correctly selects the right per-pair directory.
 
 import (
@@ -36,7 +36,7 @@ import (
 // corrupt-YAML tests) without going through the Store API.
 func writeTypeFileRaw(t *testing.T, profile, region, shortName, content string) {
 	t.Helper()
-	dir := cache.Dir(profile, region)
+	dir := cache.DirForTest(profile, region)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
@@ -47,7 +47,7 @@ func writeTypeFileRaw(t *testing.T, profile, region, shortName, content string) 
 }
 
 // -------------------------------------------------------------------------
-// cache.LoadDir — branch coverage
+// cache.LoadDirForTest — branch coverage
 // -------------------------------------------------------------------------
 
 // TestCacheLoadDir_MissingDirectory verifies a non-nil, empty Store when the
@@ -56,7 +56,7 @@ func TestCacheLoadDir_MissingDirectory(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	store := cache.LoadDir("no-profile", "us-east-1")
+	store := cache.LoadDirForTest("no-profile", "us-east-1")
 	if store == nil {
 		t.Fatal("LoadDir on a missing directory must return a non-nil Store (C7: never fails)")
 	}
@@ -71,7 +71,7 @@ func TestCacheLoadDir_ValidTypeFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	store := cache.LoadDir("test-profile", "us-east-1")
+	store := cache.LoadDirForTest("test-profile", "us-east-1")
 	store.Put("ec2", cache.TypeFile{HasResources: true, Count: 5})
 	store.Put("dbi", cache.TypeFile{HasResources: false, Count: 0})
 	if err := store.SaveType("ec2"); err != nil {
@@ -81,7 +81,7 @@ func TestCacheLoadDir_ValidTypeFile(t *testing.T) {
 		t.Fatalf("SaveType(dbi): %v", err)
 	}
 
-	reloaded := cache.LoadDir("test-profile", "us-east-1")
+	reloaded := cache.LoadDirForTest("test-profile", "us-east-1")
 	if reloaded == nil {
 		t.Fatal("LoadDir returned nil for a populated directory")
 	}
@@ -102,7 +102,7 @@ func TestCacheLoadDir_CorruptTypeFile(t *testing.T) {
 
 	writeTypeFileRaw(t, "test-profile", "eu-west-1", "ec2", ":::not valid yaml:::[[[{{{")
 
-	store := cache.LoadDir("test-profile", "eu-west-1")
+	store := cache.LoadDirForTest("test-profile", "eu-west-1")
 	if store == nil {
 		t.Fatal("LoadDir must return a non-nil Store even when a per-type file is corrupt")
 	}
@@ -113,12 +113,12 @@ func TestCacheLoadDir_CorruptTypeFile(t *testing.T) {
 
 // TestCacheLoadDir_ErrorEntryRetained verifies error entries are present in
 // the raw Store (the exclusion into AvailabilityCacheLoadedMsg.Entries
-// happens in the adapter, not in cache.LoadDir).
+// happens in the adapter, not in cache.LoadDirForTest).
 func TestCacheLoadDir_ErrorEntryRetained(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	store := cache.LoadDir("test-profile", "us-east-1")
+	store := cache.LoadDirForTest("test-profile", "us-east-1")
 	store.Put("ec2", cache.TypeFile{HasResources: true, Count: 7})
 	store.Put("kms", cache.TypeFile{})
 	if err := store.SaveType("ec2"); err != nil {
@@ -128,7 +128,7 @@ func TestCacheLoadDir_ErrorEntryRetained(t *testing.T) {
 		t.Fatalf("SaveType(kms): %v", err)
 	}
 
-	reloaded := cache.LoadDir("test-profile", "us-east-1")
+	reloaded := cache.LoadDirForTest("test-profile", "us-east-1")
 	if _, ok := reloaded.Type("kms"); !ok {
 		t.Error("kms entry should be retained by LoadDir even when empty/errored upstream")
 	}
@@ -143,7 +143,7 @@ func TestCacheLoadDir_IssueFields(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	store := cache.LoadDir("test-profile", "us-east-1")
+	store := cache.LoadDirForTest("test-profile", "us-east-1")
 	store.Put("ec2", cache.TypeFile{
 		HasResources:    true,
 		Count:           10,
@@ -156,7 +156,7 @@ func TestCacheLoadDir_IssueFields(t *testing.T) {
 		t.Fatalf("SaveType: %v", err)
 	}
 
-	reloaded := cache.LoadDir("test-profile", "us-east-1")
+	reloaded := cache.LoadDirForTest("test-profile", "us-east-1")
 	e, ok := reloaded.Type("ec2")
 	if !ok {
 		t.Fatal(`Type("ec2") missing`)
@@ -185,14 +185,14 @@ func TestCacheLoadDir_ProfileRegionIsolation(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	storeA := cache.LoadDir("profile-a", "us-west-2")
+	storeA := cache.LoadDirForTest("profile-a", "us-west-2")
 	storeA.Put("ec2", cache.TypeFile{HasResources: true, Count: 99})
 	if err := storeA.SaveType("ec2"); err != nil {
 		t.Fatalf("SaveType: %v", err)
 	}
 
 	// Load for profile-b / eu-west-1 — directory does not exist.
-	storeB := cache.LoadDir("profile-b", "eu-west-1")
+	storeB := cache.LoadDirForTest("profile-b", "eu-west-1")
 	if storeB == nil {
 		t.Fatal("LoadDir for missing profile must return a non-nil empty Store")
 	}
@@ -201,7 +201,7 @@ func TestCacheLoadDir_ProfileRegionIsolation(t *testing.T) {
 	}
 
 	// Load for profile-a / us-west-2 — should succeed.
-	reloadedA := cache.LoadDir("profile-a", "us-west-2")
+	reloadedA := cache.LoadDirForTest("profile-a", "us-west-2")
 	if e, ok := reloadedA.Type("ec2"); !ok || e.Count != 99 {
 		t.Errorf("ec2 entry: got %+v (ok=%v), want Count=99", e, ok)
 	}
@@ -210,7 +210,7 @@ func TestCacheLoadDir_ProfileRegionIsolation(t *testing.T) {
 // TestCacheLoadDir_StaleTypeFileDoesNotCorrupt_SiblingIsolation verifies
 // that an unrecognized per-type file (from an old a9s version or renamed
 // type) loads under its own name without corrupting or shadowing a sibling
-// recognized type's file — cache.LoadDir performs no registry cross-check
+// recognized type's file — cache.LoadDirForTest performs no registry cross-check
 // itself (registry filtering, if any, is a caller concern), so the
 // unrecognized type's TypeFile DOES surface via Store.Type/Types like any
 // other loaded file; this test only pins that its presence leaves ec2's
@@ -219,20 +219,20 @@ func TestCacheLoadDir_StaleTypeFileDoesNotCorrupt_SiblingIsolation(t *testing.T)
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	store := cache.LoadDir("test-profile", "us-east-1")
+	store := cache.LoadDirForTest("test-profile", "us-east-1")
 	store.Put("ec2", cache.TypeFile{HasResources: true, Count: 2})
 	if err := store.SaveType("ec2"); err != nil {
 		t.Fatalf("SaveType(ec2): %v", err)
 	}
 	writeTypeFileRaw(t, "test-profile", "us-east-1", "old_deprecated_type", "version: 1\nhas_resources: false\ncount: 0\n")
 
-	reloaded := cache.LoadDir("test-profile", "us-east-1")
+	reloaded := cache.LoadDirForTest("test-profile", "us-east-1")
 	// Known key must survive.
 	if _, ok := reloaded.Type("ec2"); !ok {
 		t.Error("ec2 (registered type) should still load from its own per-type file")
 	}
 	// The deprecated type's file loads under its own name in this
-	// per-type-file world (no registry cross-check inside cache.LoadDir
+	// per-type-file world (no registry cross-check inside cache.LoadDirForTest
 	// itself — registry filtering, if any, is a caller concern) but must
 	// not corrupt or shadow ec2's entry.
 	if e, ok := reloaded.Type("ec2"); ok && e.Count != 2 {

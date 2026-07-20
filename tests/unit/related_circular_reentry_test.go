@@ -50,8 +50,8 @@ func circularReentrySetup(t *testing.T) (tui.Model, resource.Resource, resource.
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ec2Client := fakes.NewEC2()

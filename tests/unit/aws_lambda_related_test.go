@@ -31,7 +31,7 @@ func lambdaCheckerByTarget(t *testing.T, target string) resource.RelatedChecker 
 // --- Navigable Field Registration ---
 
 func TestNavigableFields_Lambda_Registered(t *testing.T) {
-	nav := resource.IsFieldNavigable("lambda", "Role")
+	nav := resource.IsFieldNavigableForTest("lambda", "Role")
 	if nav == nil {
 		t.Fatal("expected navigable field Role not found for lambda")
 	}

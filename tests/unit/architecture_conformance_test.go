@@ -70,7 +70,7 @@ func TestConformance_RelatedValidatorsExposed(t *testing.T) {
 	// Shape-only validator.
 	_ = resource.ValidateRelatedResult
 	// Cross-check against cache validator.
-	_ = resource.ValidateRelatedResultAgainstCache
+	_ = resource.ValidateRelatedResultAgainstCacheForTest
 }
 
 // ---------------------------------------------------------------------------

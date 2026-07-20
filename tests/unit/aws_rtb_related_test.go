@@ -35,7 +35,7 @@ func TestNavigableFields_RTB_Registered(t *testing.T) {
 		"Routes.NatGatewayId":   "nat",
 	}
 	for path, wantTarget := range expected {
-		nav := resource.IsFieldNavigable("rtb", path)
+		nav := resource.IsFieldNavigableForTest("rtb", path)
 		if nav == nil {
 			t.Errorf("expected navigable field %q not found for rtb", path)
 			continue

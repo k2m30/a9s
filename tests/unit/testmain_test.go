@@ -26,13 +26,13 @@ func TestMain(m *testing.M) {
 		MaxDelay:    10 * time.Millisecond,
 		Jitter:      false,
 	})
-	// styles holds package-level vars rebuilt by styles.Reinit(), which reads
+	// styles holds package-level vars rebuilt by styles.ReinitForTest(), which reads
 	// NO_COLOR at call time. The invoking shell's NO_COLOR must not change
 	// which SGR assertions pass in this binary, so the baseline is normalized
 	// to "colors on" before any test runs.
 	if _, noColorSet := os.LookupEnv("NO_COLOR"); noColorSet {
 		os.Unsetenv("NO_COLOR") //nolint:errcheck // best-effort hermetic default, not test-critical
-		styles.Reinit()
+		styles.ReinitForTest()
 	}
 	// Package-wide hermetic default: any test constructor in this binary
 	// (package unit AND package unit_test share this one TestMain) that

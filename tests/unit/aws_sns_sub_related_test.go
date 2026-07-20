@@ -241,7 +241,7 @@ func TestNavigableFields_SNSSub(t *testing.T) {
 		"TopicArn": "sns",
 	}
 	for path, wantTarget := range expected {
-		nav := resource.IsFieldNavigable("sns-sub", path)
+		nav := resource.IsFieldNavigableForTest("sns-sub", path)
 		if nav == nil {
 			t.Errorf("expected navigable field %q not found for sns-sub", path)
 			continue

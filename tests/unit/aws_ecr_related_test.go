@@ -64,7 +64,7 @@ func TestNavigableFields_ECR_Registered(t *testing.T) {
 		"EncryptionConfiguration.KmsKey": "kms",
 	}
 	for path, targetType := range expected {
-		nav := resource.IsFieldNavigable("ecr", path)
+		nav := resource.IsFieldNavigableForTest("ecr", path)
 		if nav == nil {
 			t.Errorf("expected navigable field %q not found", path)
 			continue

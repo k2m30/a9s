@@ -313,7 +313,7 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 		{ID: "bucket-def3-1", Name: "def3-bucket", Type: "s3", Fields: map[string]string{"region": "us-east-1"}, Findings: []domain.Finding{finding}},
 	}, nil, false)
 
-	store := cache.LoadDir("pilot-def3-prof", "us-east-1")
+	store := cache.LoadDirForTest("pilot-def3-prof", "us-east-1")
 	tf, ok := store.Type("s3")
 	if !ok {
 		t.Fatal(`store.Type("s3") missing after a production-path list-open + ApplyResourcesLoaded save`)
@@ -384,7 +384,7 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 // ApplyResourcesLoaded, exactly as TestSaveResourceListCache_
 // FindingsSurviveWiredSaveAndColdBootReseed above does, mirroring a Ctrl+R
 // refresh's data flow) and asserts a SIBLING type's on-disk file
-// (pre-populated directly via cache.LoadDir/SaveType, mirroring an earlier
+// (pre-populated directly via cache.LoadDirForTest/SaveType, mirroring an earlier
 // session's save) is byte-identical before and after — pinning sibling-file
 // isolation (C7) end-to-end through the production wiring rather than only through
 // Store.SaveType directly.
@@ -392,7 +392,7 @@ func TestProductionRefresh_OneType_LeavesSiblingTypeFilesByteIdentical(t *testin
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	seed := cache.LoadDir("pilot-def4a-prof", "us-east-1")
+	seed := cache.LoadDirForTest("pilot-def4a-prof", "us-east-1")
 	seed.Put("ec2", cache.TypeFile{
 		HasResources: true,
 		Count:        12,
@@ -404,7 +404,7 @@ func TestProductionRefresh_OneType_LeavesSiblingTypeFilesByteIdentical(t *testin
 	if err := seed.SaveType("ec2"); err != nil {
 		t.Fatalf("SaveType (ec2 fixture): %v", err)
 	}
-	ec2Path := cache.Dir("pilot-def4a-prof", "us-east-1") + "/ec2.yaml"
+	ec2Path := cache.DirForTest("pilot-def4a-prof", "us-east-1") + "/ec2.yaml"
 	before, err := readFileForAuditPilot(t, ec2Path)
 	if err != nil {
 		t.Fatalf("reading ec2 fixture file before the s3-only production refresh: %v", err)
@@ -447,7 +447,7 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 		id := "bucket-def4b-" + itoaPilot(i)
 		rows55[i] = cache.Row{ID: id, Name: id, Fields: map[string]string{"region": "us-east-1"}}
 	}
-	seed := cache.LoadDir("pilot-def4b-prof", "us-east-1")
+	seed := cache.LoadDirForTest("pilot-def4b-prof", "us-east-1")
 	seed.Put("s3", cache.TypeFile{HasResources: true, Count: 55, Exact: true, Rows: rows55})
 	if err := seed.SaveType("s3"); err != nil {
 		t.Fatalf("SaveType (s3 exact-55 fixture): %v", err)
@@ -470,7 +470,7 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 	ctrl.ApplyResourcesLoaded("s3", rows50, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-def4b"}, false)
 
-	reloaded := cache.LoadDir("pilot-def4b-prof", "us-east-1")
+	reloaded := cache.LoadDirForTest("pilot-def4b-prof", "us-east-1")
 	tf, ok := reloaded.Type("s3")
 	if !ok {
 		t.Fatal(`reloaded.Type("s3") missing after the truncated refetch`)
@@ -714,7 +714,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 		}
 	}
 
-	store := cache.LoadDir("pilot-def7-prof", "us-east-1")
+	store := cache.LoadDirForTest("pilot-def7-prof", "us-east-1")
 	tf, ok := store.Type("s3")
 	if !ok {
 		t.Fatal(`store.Type("s3") missing after a sweep+enrichment completion — C7: per-type persistence must not require a list screen to have been opened`)
@@ -811,7 +811,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 
 	// Sanity: the pre-enrichment save must NOT carry the finding yet (setup
 	// assumption, not the defect under test).
-	preStore := cache.LoadDir("pilot-def8-prof", "us-east-1")
+	preStore := cache.LoadDirForTest("pilot-def8-prof", "us-east-1")
 	preTF, ok := preStore.Type("s3")
 	if !ok || len(preTF.Rows) != 1 {
 		t.Fatalf("test setup: pre-enrichment s3 TypeFile missing or wrong row count: ok=%v rows=%+v", ok, preTF.Rows)
@@ -838,7 +838,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	// rows maybeSaveResourceListCache always reads from ls.Rows.
 	ctrl.ApplyResourcesLoaded("s3", baseRows, nil, false)
 
-	store := cache.LoadDir("pilot-def8-prof", "us-east-1")
+	store := cache.LoadDirForTest("pilot-def8-prof", "us-east-1")
 	tf, ok := store.Type("s3")
 	if !ok {
 		t.Fatal(`store.Type("s3") missing after enrichment + list-open save`)

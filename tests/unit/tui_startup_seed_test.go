@@ -60,9 +60,9 @@ import (
 // runtime.cacheStoreToEvent's zero-value TypeFile guard drops the entry.
 func seedTypeFile(t *testing.T, profile, region, shortName string, count int) {
 	t.Helper()
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	if store == nil {
-		t.Fatalf("cache.LoadDir(%q, %q) returned nil", profile, region)
+		t.Fatalf("cache.LoadDirForTest(%q, %q) returned nil", profile, region)
 	}
 	store.Put(shortName, cache.TypeFile{
 		HasResources: true,
@@ -104,8 +104,8 @@ func TestTUIInit_SeedsMenuFromDisk_BeforeClientsReady(t *testing.T) {
 	seedTypeFile(t, profile, region, "s3", 7)
 
 	m := tui.New(profile, region,
-		tui.WithProfile(profile),
-		tui.WithRegion(region))
+		tui.WithProfileForTest(profile),
+		tui.WithRegionForTest(region))
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
@@ -215,7 +215,7 @@ func TestTUIInit_EmptyRegion_ResolvesConfigDefaultForSeed(t *testing.T) {
 
 	seedTypeFile(t, profile, configDefaultRegion, "ec2", 3)
 
-	m := tui.New(profile, "", tui.WithProfile(profile), tui.WithRegion(""))
+	m := tui.New(profile, "", tui.WithProfileForTest(profile), tui.WithRegionForTest(""))
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 

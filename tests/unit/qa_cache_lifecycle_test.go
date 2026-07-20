@@ -50,7 +50,7 @@
 //     ResourceListModel calls after running its own enrichment probe drive
 //     (internal/tui/views/resourcelist.go) — the correct headless/web
 //     equivalent.
-//   - Persistence is asserted by re-reading cache.LoadDir(profile, region)
+//   - Persistence is asserted by re-reading cache.LoadDirForTest(profile, region)
 //     after each Handle call — saves happen synchronously inside the
 //     production handlers, no task execution required.
 //
@@ -118,7 +118,7 @@ func newLifecycleController(t *testing.T, profile, region string) (*runtime.Core
 // seeds session.ProbeResources with the on-disk rows (handleAvailabilityCacheLoaded),
 // which is what makes a subsequent list-open render instantly from cache.
 func bootSeedFromDisk(ctrl *app.Controller, profile, region string) app.ViewState {
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	ev := runtime.CacheStoreToEvent(store)
 	vs, _ := ctrl.Handle(ev)
 	return vs
@@ -221,10 +221,10 @@ func deliverEnrichment(ctrl *app.Controller, issues int, findings map[string][]d
 // (profile, region), failing the test if it is missing.
 func readTypeFile(t *testing.T, profile, region string) cache.TypeFile {
 	t.Helper()
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	tf, ok := store.Type(lifecycleShortName)
 	if !ok {
-		t.Fatalf("cache.LoadDir(%q, %q).Type(%q) missing — expected a persisted TypeFile", profile, region, lifecycleShortName)
+		t.Fatalf("cache.LoadDirForTest(%q, %q).Type(%q) missing — expected a persisted TypeFile", profile, region, lifecycleShortName)
 	}
 	return tf
 }

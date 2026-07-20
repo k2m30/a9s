@@ -41,7 +41,7 @@
 //
 // All tests are hermetic: A9S_CONFIG_FOLDER redirected to t.TempDir(), no
 // AWS credentials, no network. Cache seeding uses the real
-// cache.LoadDir/Put/SaveType per-type-file surface (mirrors
+// cache.LoadDirForTest/Put/SaveType per-type-file surface (mirrors
 // TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact in
 // app_web_live_cold_boot_test.go). Fake profile/region names only
 // ("pilot-prof"/"us-east-1"); realistic resource IDs.
@@ -66,9 +66,9 @@ import (
 // no-pre-supplied-clients path.
 func seedS3TypeFile(t *testing.T, profile, region string) {
 	t.Helper()
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	if store == nil {
-		t.Fatal("cache.LoadDir on an empty directory returned nil — must return an empty (non-nil) Store")
+		t.Fatal("cache.LoadDirForTest on an empty directory returned nil — must return an empty (non-nil) Store")
 	}
 	store.Put("s3", cache.TypeFile{
 		HasResources: true,

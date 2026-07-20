@@ -34,7 +34,7 @@ func TestNavigableFields_EIP(t *testing.T) {
 		"NetworkInterfaceId": "eni",
 	}
 	for path, targetType := range expected {
-		nav := resource.IsFieldNavigable("eip", path)
+		nav := resource.IsFieldNavigableForTest("eip", path)
 		if nav == nil {
 			t.Errorf("expected navigable field %q not found for eip", path)
 			continue

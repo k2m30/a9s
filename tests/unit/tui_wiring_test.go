@@ -292,8 +292,8 @@ func TestWiring_ClientsReady_DemoMode_TriggersAvailabilityProbes(t *testing.T) {
 	m := tui.New("demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Send ClientsReadyMsg — demo mode should still fire availability probes
@@ -318,8 +318,8 @@ func TestWiring_ClientsReady_DemoMode_NoCache_SkipsAvailability(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Send ClientsReadyMsg — with --no-cache, should only produce identity, NOT availability
@@ -434,8 +434,8 @@ func TestWiring_RefreshOnMainMenu_DemoMode_TriggersProbes(t *testing.T) {
 	m := tui.New("demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// First send ClientsReadyMsg so probes can run
@@ -474,8 +474,8 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: demo.NewServiceClients()})
 

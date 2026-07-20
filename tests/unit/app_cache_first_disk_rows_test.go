@@ -13,7 +13,7 @@
 // RawStruct.
 //
 // Round-2 migration note: the disk-cache surface below is repinned onto
-// cache.TypeFile/cache.Row/cache.LoadDir/(*Store).Put/SaveType per
+// cache.TypeFile/cache.Row/cache.LoadDirForTest/(*Store).Put/SaveType per
 // docs/design/cache-requirements.md round 2 (per-type files, C7). Findings
 // live on cache.Row.Findings ([]domain.Finding) — a per-row slice — not a
 // type-level map, since each row carries its own findings now.
@@ -198,7 +198,7 @@ func TestCacheTypeFile_RowsRoundTripThroughSaveLoad(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	store := cache.LoadDir("demo", "us-east-1")
+	store := cache.LoadDirForTest("demo", "us-east-1")
 	store.Put("ec2", cache.TypeFile{
 		HasResources: true,
 		Count:        1,
@@ -210,7 +210,7 @@ func TestCacheTypeFile_RowsRoundTripThroughSaveLoad(t *testing.T) {
 		t.Fatalf("SaveType: %v", err)
 	}
 
-	reloaded := cache.LoadDir("demo", "us-east-1")
+	reloaded := cache.LoadDirForTest("demo", "us-east-1")
 	if reloaded == nil {
 		t.Fatal("LoadDir returned nil after SaveType")
 	}
@@ -234,7 +234,7 @@ func TestCacheTypeFile_RowFindingsRoundTripThroughSaveLoad(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	store := cache.LoadDir("demo", "us-east-1")
+	store := cache.LoadDirForTest("demo", "us-east-1")
 	store.Put("ec2", cache.TypeFile{
 		HasResources: true,
 		Count:        1,
@@ -252,7 +252,7 @@ func TestCacheTypeFile_RowFindingsRoundTripThroughSaveLoad(t *testing.T) {
 		t.Fatalf("SaveType: %v", err)
 	}
 
-	reloaded := cache.LoadDir("demo", "us-east-1")
+	reloaded := cache.LoadDirForTest("demo", "us-east-1")
 	tf, ok := reloaded.Type("ec2")
 	if !ok {
 		t.Fatal(`reloaded.Type("ec2") missing`)
@@ -292,7 +292,7 @@ func TestListOpen_ColdStart_SeedsFromDiskCache_WithRefreshing(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	store := cache.LoadDir("demo", "us-east-1")
+	store := cache.LoadDirForTest("demo", "us-east-1")
 	store.Put("ec2", cache.TypeFile{
 		HasResources: true,
 		Count:        1,
@@ -304,7 +304,7 @@ func TestListOpen_ColdStart_SeedsFromDiskCache_WithRefreshing(t *testing.T) {
 		t.Fatalf("SaveType: %v", err)
 	}
 
-	reloaded := cache.LoadDir("demo", "us-east-1")
+	reloaded := cache.LoadDirForTest("demo", "us-east-1")
 	if reloaded == nil {
 		t.Fatal("LoadDir returned nil")
 	}

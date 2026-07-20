@@ -25,7 +25,7 @@ import (
 // live Controller.Snapshot().Body.Detail + NewTransientDetail.RenderDetail
 // seam — same golden infrastructure as wave3_detail_ports_test.go.
 func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
-	styles.Reinit() // ensure styles are initialized
+	styles.ReinitForTest() // ensure styles are initialized
 
 	cfg, err := config.LoadFromDirs([]string{filepath.Join("..", "..", ".a9s", "views")})
 	if err != nil {

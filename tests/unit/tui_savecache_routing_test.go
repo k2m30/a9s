@@ -50,7 +50,7 @@ import (
 // calls) with on-disk caching ENABLED (unlike newEnrichApp in
 // app_enrich_test.go, which sets WithNoCache(true) — this pin is specifically
 // about what lands on disk, so caching must stay on here). A9S_CONFIG_FOLDER
-// is redirected to t.TempDir() so cache.LoadDir/Store.SaveType write under an
+// is redirected to t.TempDir() so cache.LoadDirForTest/Store.SaveType write under an
 // isolated directory, matching the dispatch-time payload-freeze precedent in
 // app_pilot_defects_test.go.
 func newSaveCacheApp(t *testing.T, profile, region string) tui.Model {
@@ -61,8 +61,8 @@ func newSaveCacheApp(t *testing.T, profile, region string) tui.Model {
 	m := tui.New(profile, region,
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
-		tui.WithProfile(profile),
-		tui.WithRegion(region))
+		tui.WithProfileForTest(profile),
+		tui.WithRegionForTest(region))
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	return m
@@ -158,7 +158,7 @@ func TestTUISaveCache_PersistsRowsToTypeFile(t *testing.T) {
 	m = runCmdTree(t, m, cmd)
 	_ = m
 
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	tf, ok := store.Type("s3")
 	if !ok {
 		t.Fatal(`store.Type("s3") missing after a TUI-driven sweep completion — save-cache routing: the TUI save-cache dispatch must persist a per-type file just like the headless executor path does`)
@@ -197,7 +197,7 @@ func TestTUISaveCache_AvailabilityCountsStillPersist(t *testing.T) {
 	m = runCmdTree(t, m, cmd)
 	_ = m
 
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	tf, ok := store.Type("s3")
 	if !ok {
 		t.Fatal(`store.Type("s3") missing after a TUI-driven sweep completion — availability counts must persist regardless of the rows-persistence regression`)

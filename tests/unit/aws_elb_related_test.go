@@ -36,7 +36,7 @@ func TestNavigableFields_ELB_Registered(t *testing.T) {
 		"AvailabilityZones.SubnetId": "subnet",
 	}
 	for path, wantTarget := range expected {
-		nav := resource.IsFieldNavigable("elb", path)
+		nav := resource.IsFieldNavigableForTest("elb", path)
 		if nav == nil {
 			t.Errorf("expected navigable field %q not found for elb", path)
 			continue

@@ -96,9 +96,10 @@ func GetIssueEnricherFieldKeys(shortName string) []string {
 	return nil
 }
 
-// GetAllFieldKeys returns the union of fetcher-registered field keys and
-// Wave 2 issue-enricher-registered field keys for the given short name.
-func GetAllFieldKeys(shortName string) []string {
+// GetAllFieldKeysForTest returns the union of fetcher-registered field keys
+// and Wave 2 issue-enricher-registered field keys for the given short name.
+// Test-only: no production caller — used by column-key coverage assertions.
+func GetAllFieldKeysForTest(shortName string) []string {
 	fetcher := GetFieldKeys(shortName)
 	enricher := GetIssueEnricherFieldKeys(shortName)
 	if len(enricher) == 0 {
@@ -216,11 +217,13 @@ func GetChildType(shortName string) *ResourceTypeDef {
 	return nil
 }
 
-// AllChildTypes returns all registered child type definitions.
+// AllChildTypesForTest returns all registered child type definitions.
 // The returned slice is in no guaranteed order.
 // Combines legacy registry entries with catalog child entries; legacy wins
-// on name collision so test overrides remain visible.
-func AllChildTypes() []ResourceTypeDef {
+// on name collision so test overrides remain visible. Test-only: no
+// production caller — production code looks up individual child types via
+// GetChildType instead of walking the full set.
+func AllChildTypesForTest() []ResourceTypeDef {
 	result := make([]ResourceTypeDef, 0, len(childTypes))
 	seen := make(map[string]struct{}, len(childTypes))
 	for name, def := range childTypes {
@@ -236,9 +239,10 @@ func AllChildTypes() []ResourceTypeDef {
 	return result
 }
 
-// AllChildShortNames returns the ShortName of every registered child type.
-// Includes both legacy registry entries and catalog child entries.
-func AllChildShortNames() []string {
+// AllChildShortNamesForTest returns the ShortName of every registered child
+// type. Includes both legacy registry entries and catalog child entries.
+// Test-only: no production caller.
+func AllChildShortNamesForTest() []string {
 	seen := make(map[string]struct{}, len(childTypes))
 	for name := range childTypes {
 		seen[name] = struct{}{}

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// app_options.go — tui.Model construction options (WithProfile, WithRegion,
-// WithIsDemo, WithNoCache, WithClients, WithActiveTheme, WithCommand).
+// app_options.go — tui.Model construction options (WithProfileForTest,
+// WithRegionForTest, WithIsDemo, WithNoCache, WithClients, WithActiveTheme,
+// WithCommand).
 //
 // Each option is a small closure that mutates the renderer-side Model or pokes a
 // typed setter on m.core. WithClients takes the runtime-side ServiceClients alias
@@ -11,17 +12,21 @@ package tui
 
 import "github.com/k2m30/a9s/v3/core/runtime"
 
-// WithProfile overrides the profile field on the active session — used in
+// WithProfileForTest overrides the profile field on the active session.
+// Test-only: no production caller — production sets profile via tui.New's
+// positional parameter (see cmd/a9s/main.go); this option exists only for
 // tests that need a specific profile string without going through the live
 // AWS bootstrap path.
-func WithProfile(profile string) Option {
+func WithProfileForTest(profile string) Option {
 	return func(m *Model) { m.core.SetProfile(profile) }
 }
 
-// WithRegion overrides the region field on the active session — used in
+// WithRegionForTest overrides the region field on the active session.
+// Test-only: no production caller — production sets region via tui.New's
+// positional parameter (see cmd/a9s/main.go); this option exists only for
 // tests that need a specific region string without going through the live
 // AWS bootstrap path.
-func WithRegion(region string) Option {
+func WithRegionForTest(region string) Option {
 	return func(m *Model) { m.core.SetRegion(region) }
 }
 

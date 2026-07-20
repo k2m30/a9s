@@ -34,7 +34,7 @@ func kmsCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 // --- Navigable Fields ---
 
 func TestNavigableFields_KMS_None(t *testing.T) {
-	nav := resource.IsFieldNavigable("kms", "KeyId")
+	nav := resource.IsFieldNavigableForTest("kms", "KeyId")
 	if nav != nil {
 		t.Errorf("expected no navigable fields for kms, but KeyId resolved to %v", nav)
 	}

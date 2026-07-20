@@ -99,9 +99,9 @@ func TestTopUp_RenderRelatedPanel_FilterActiveNoRows_ShowsNoMatches(t *testing.T
 func topUpDefs3ResolvedModel(t *testing.T) RightColumnModel {
 	t.Helper()
 	defs := []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
-		{TargetType: "asg", DisplayName: "ASGs", Checker: resource.NoopChecker},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: resource.NoopChecker},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopCheckerForTest},
+		{TargetType: "asg", DisplayName: "ASGs", Checker: resource.NoopCheckerForTest},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: resource.NoopCheckerForTest},
 	}
 	m := newRightColumn(defs, resource.Resource{ID: "i-topup"}, "ec2")
 	m.SetSize(40, 10)
@@ -390,7 +390,7 @@ func TestTopUp_RenderContent_NoViewConfigNoFields_ShowsNoDetailData(t *testing.T
 func TestTopUp_DetailModel_SetSize_WideWithRelatedDefs_AutoShowsRightColumn(t *testing.T) {
 	const rt = "topup-setsize-wide"
 	resource.SetRelatedForTest(rt, []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopCheckerForTest},
 	})
 	defer resource.CleanupRelatedForTest(rt)
 
@@ -420,7 +420,7 @@ func TestTopUp_DetailModel_SetSize_NoRelatedDefs_NeverShowsRightColumn(t *testin
 func TestTopUp_DetailModel_SetSize_NarrowAfterWide_HidesAutoShownRightColumn(t *testing.T) {
 	const rt = "topup-setsize-resize"
 	resource.SetRelatedForTest(rt, []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopCheckerForTest},
 	})
 	defer resource.CleanupRelatedForTest(rt)
 

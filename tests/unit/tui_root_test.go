@@ -64,7 +64,7 @@ var lastAutoIsolatedModel *tui.Model
 // reaches Controller.persistMenuAvailabilityCache) through the returned
 // Model queues an async availability-cache write on that Model's own
 // headless controller. None of these ~575 call sites ever closed it, so the
-// writer goroutine outlived its test — and, because cache.Dir reads
+// writer goroutine outlived its test — and, because cache.DirForTest reads
 // A9S_CONFIG_FOLDER live at write time (not at goroutine-launch time), a
 // still-running writer from an EARLIER call here can land its write inside
 // whatever directory A9S_CONFIG_FOLDER points to by the time the OS
@@ -827,8 +827,8 @@ func TestRoot_EnterChildView_NilParentContext(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Send EnterChildViewMsg with nil ParentContext — must not panic

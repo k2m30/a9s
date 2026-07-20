@@ -161,7 +161,7 @@ type RelatedChecker = domain.RelatedChecker
 // not for production error returns.
 //
 // For cross-checking that returned IDs match the target type's canonical
-// Resource.ID, use ValidateRelatedResultAgainstCache.
+// Resource.ID, use ValidateRelatedResultAgainstCacheForTest.
 func ValidateRelatedResult(r RelatedCheckResult) error {
 	if r.TargetType == "" {
 		return fmt.Errorf("RelatedCheckResult: empty TargetType")
@@ -183,7 +183,7 @@ func ValidateRelatedResult(r RelatedCheckResult) error {
 	return nil
 }
 
-// ValidateRelatedResultAgainstCache enforces the canonical-target-identity
+// ValidateRelatedResultAgainstCacheForTest enforces the canonical-target-identity
 // contract (#279): every ResourceID returned by a checker for a given
 // TargetType MUST match the canonical Resource.ID that the TargetType's
 // fetcher emits. We prove this by cross-checking the returned IDs against the
@@ -199,7 +199,11 @@ func ValidateRelatedResult(r RelatedCheckResult) error {
 // This is the hard contract that catches bugs where a checker returns an ARN,
 // name, or adjacent ID kind instead of the target type's canonical Resource.ID
 // — the class of drill-in regressions called out in the architecture audit.
-func ValidateRelatedResultAgainstCache(r RelatedCheckResult, cache ResourceCache) error {
+//
+// Test-only: no production caller — production relies on the checker
+// contract itself plus ValidateRelatedResult's shape invariants; this cache
+// cross-check runs only from test invariants today.
+func ValidateRelatedResultAgainstCacheForTest(r RelatedCheckResult, cache ResourceCache) error {
 	if err := ValidateRelatedResult(r); err != nil {
 		return err
 	}
@@ -370,13 +374,13 @@ func FormatRelatedCount(state domain.RelatedRowState, count int, truncated bool)
 	return ""
 }
 
-// NoopChecker is a stub RelatedChecker suitable for tests that exercise
+// NoopCheckerForTest is a stub RelatedChecker suitable for tests that exercise
 // registry wiring (SetRelatedForTest / AppendRelated / GetRelated) without
 // exercising real related-resource logic. Production code MUST NOT use it:
 // SetRelatedForTest panics if any RelatedDef is registered with a nil Checker,
 // but production tests using this explicit stub satisfy the guard while
 // remaining free of test-specific behavior.
-func NoopChecker(_ context.Context, _ any, _ Resource, _ ResourceCache) RelatedCheckResult {
+func NoopCheckerForTest(_ context.Context, _ any, _ Resource, _ ResourceCache) RelatedCheckResult {
 	return RelatedCheckResult{}
 }
 
@@ -610,8 +614,11 @@ func GetActiveNavigableFields(shortName string) []NavigableField {
 	return navigableFieldRegistry[shortName]
 }
 
-// IsFieldNavigable returns the NavigableField for the given field path, or nil if not registered.
-func IsFieldNavigable(shortName, fieldPath string) *NavigableField {
+// IsFieldNavigableForTest returns the NavigableField for the given field
+// path, or nil if not registered. Test-only: no production caller —
+// production reads the full set via GetActiveNavigableFields instead of
+// probing one field path at a time.
+func IsFieldNavigableForTest(shortName, fieldPath string) *NavigableField {
 	for _, f := range GetNavigableFields(shortName) {
 		if f.FieldPath == fieldPath {
 			return &f

@@ -38,7 +38,7 @@ func TestNavigableFields_EBSSnap_Registered(t *testing.T) {
 		"KmsKeyId": "kms",
 	}
 	for path, targetType := range expected {
-		nav := resource.IsFieldNavigable("ebs-snap", path)
+		nav := resource.IsFieldNavigableForTest("ebs-snap", path)
 		if nav == nil {
 			t.Errorf("expected navigable field %q not found", path)
 			continue

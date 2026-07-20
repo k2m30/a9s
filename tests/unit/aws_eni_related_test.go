@@ -36,7 +36,7 @@ func TestNavigableFields_ENI_Registered(t *testing.T) {
 		"Association.AllocationId": "eip",
 	}
 	for path, wantTarget := range expected {
-		nav := resource.IsFieldNavigable("eni", path)
+		nav := resource.IsFieldNavigableForTest("eni", path)
 		if nav == nil {
 			t.Errorf("expected navigable field %q not found for eni", path)
 			continue

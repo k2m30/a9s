@@ -34,7 +34,7 @@ func sgCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 // TestNavigableFields_SG_Registered verifies that VpcId -> vpc is registered
 // as a navigable field for the sg resource type.
 func TestNavigableFields_SG_Registered(t *testing.T) {
-	nav := resource.IsFieldNavigable("sg", "VpcId")
+	nav := resource.IsFieldNavigableForTest("sg", "VpcId")
 	if nav == nil {
 		t.Fatal("expected navigable field \"VpcId\" not found for sg")
 	}

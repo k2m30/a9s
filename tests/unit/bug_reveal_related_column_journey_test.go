@@ -21,8 +21,8 @@ func TestBugReveal_MainMenuToEC2Detail_MustShowRelatedColumn(t *testing.T) {
 				tui.WithClients(demo.NewServiceClients()),
 				tui.WithIsDemo(true),
 				tui.WithNoCache(true),
-				tui.WithProfile(profile),
-				tui.WithRegion(demo.DemoRegion))
+				tui.WithProfileForTest(profile),
+				tui.WithRegionForTest(demo.DemoRegion))
 			m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 170, Height: 50})
 			ec2 := mustDemoEC2(t)
 			m, _ = rootApplyMsg(m, messages.Navigate{

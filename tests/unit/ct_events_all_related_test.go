@@ -21,14 +21,14 @@ import (
 // entry to an existing RelatedDef slice without replacing it.
 func TestAppendRelated_AddsToExisting(t *testing.T) {
 	resource.SetRelatedForTest("test_append", []resource.RelatedDef{
-		{TargetType: "vpc", DisplayName: "VPCs", Checker: resource.NoopChecker},
+		{TargetType: "vpc", DisplayName: "VPCs", Checker: resource.NoopCheckerForTest},
 	})
 	t.Cleanup(func() { resource.CleanupRelatedForTest("test_append") })
 
 	resource.AppendRelated("test_append", resource.RelatedDef{
 		TargetType:  "ct-events",
 		DisplayName: "CloudTrail Events",
-		Checker:     resource.NoopChecker,
+		Checker:     resource.NoopCheckerForTest,
 	})
 
 	got := resource.GetRelated("test_append")
@@ -48,7 +48,7 @@ func TestAppendRelated_CreatesNew(t *testing.T) {
 	resource.AppendRelated("test_append_new", resource.RelatedDef{
 		TargetType:  "ct-events",
 		DisplayName: "CloudTrail Events",
-		Checker:     resource.NoopChecker,
+		Checker:     resource.NoopCheckerForTest,
 	})
 
 	got := resource.GetRelated("test_append_new")
@@ -64,14 +64,14 @@ func TestAppendRelated_CreatesNew(t *testing.T) {
 // the same TargetType does not create a duplicate entry.
 func TestAppendRelated_NoDuplicate(t *testing.T) {
 	resource.SetRelatedForTest("test_append_dedup", []resource.RelatedDef{
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: resource.NoopChecker},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: resource.NoopCheckerForTest},
 	})
 	t.Cleanup(func() { resource.CleanupRelatedForTest("test_append_dedup") })
 
 	resource.AppendRelated("test_append_dedup", resource.RelatedDef{
 		TargetType:  "ct-events",
 		DisplayName: "CloudTrail Events",
-		Checker:     resource.NoopChecker,
+		Checker:     resource.NoopCheckerForTest,
 	})
 
 	got := resource.GetRelated("test_append_dedup")

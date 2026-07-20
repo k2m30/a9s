@@ -117,10 +117,12 @@ type TypeFile struct {
 	SavedAt time.Time `yaml:"saved_at"`
 }
 
-// Dir returns the cache directory path for one profile+region pair under the
-// live cache.Root(): <cache root>/<profile>--<region>/. Thin wrapper over
-// DirIn for callers that want the current root rather than a pinned one.
-func Dir(profile, region string) string {
+// DirForTest returns the cache directory path for one profile+region pair
+// under the live cache.Root(): <cache root>/<profile>--<region>/. Thin
+// wrapper over DirIn using the live root rather than a pinned one. Test-only:
+// production always pins its own root (see session.Session.cacheRoot) and
+// calls DirIn directly; only tests need the live-root convenience.
+func DirForTest(profile, region string) string {
 	return DirIn(Root(), profile, region)
 }
 
@@ -174,11 +176,12 @@ func SanitizePathElem(s string) string {
 }
 
 // Store holds the in-memory, loaded state of every resource type's TypeFile
-// for one profile+region pair. Obtained via LoadDir; Put stages a type's new
-// state, SaveType persists exactly that one type's file.
+// for one profile+region pair. Obtained via LoadDirIn (or LoadDirForTest in
+// tests); Put stages a type's new state, SaveType persists exactly that one
+// type's file.
 //
-// dir is captured ONCE, at LoadDir construction time, from Dir(profile,
-// region) — every subsequent SaveType call reuses this captured value instead
+// dir is captured ONCE, at LoadDirIn construction time, from DirIn(root,
+// profile, region) — every subsequent SaveType call reuses this captured value instead
 // of recomputing Dir/cacheRoot (which reads A9S_CONFIG_FOLDER live). Without
 // this, a Store's save path stays bound to whatever the environment variable
 // happens to be at the moment SaveType's goroutine finally runs, not at the
@@ -210,11 +213,12 @@ type Store struct {
 	saveMu sync.Mutex
 }
 
-// LoadDir loads every readable, current-version type file under
-// Dir(profile, region) (i.e. under the live cache.Root()) into memory and
-// returns a Store. Thin wrapper over LoadDirIn for callers that want the
-// current root rather than a pinned one.
-func LoadDir(profile, region string) *Store {
+// LoadDirForTest loads every readable, current-version type file under
+// DirForTest(profile, region) (i.e. under the live cache.Root()) into memory
+// and returns a Store. Thin wrapper over LoadDirIn using the live root rather
+// than a pinned one. Test-only: production always pins its own root (see
+// session.Session.cacheRoot) and calls LoadDirIn directly.
+func LoadDirForTest(profile, region string) *Store {
 	return LoadDirIn(Root(), profile, region)
 }
 
@@ -426,8 +430,8 @@ func (s *Store) PrepareSave(shortName string) (WritePlan, error) {
 	}
 	tf.Rows = deepCopyRows(tf.Rows)
 
-	// dir is s.dir — the root captured once at LoadDir construction time, NOT
-	// a fresh Dir(s.profile, s.region) recompute (see Store's doc comment) —
+	// dir is s.dir — the root captured once at LoadDirIn construction time, NOT
+	// a fresh DirIn(root, s.profile, s.region) recompute (see Store's doc comment) —
 	// so a commit that runs on a goroutine outliving its owning Controller
 	// always targets the directory that existed when the Store was built,
 	// even if A9S_CONFIG_FOLDER has since changed or that directory has

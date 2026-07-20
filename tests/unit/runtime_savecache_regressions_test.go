@@ -142,7 +142,7 @@ func TestExecuteTask_FetchResources_ZeroProgressFollowUp_Terminates(t *testing.T
 	// Seed a cached depth of 55 so the depth loop's bound
 	// (len(Resources) < CachedListDepth) stays true forever if the loop
 	// never detects zero progress.
-	store := cache.LoadDir(saveRegProfile, saveRegRegion)
+	store := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	rows := make([]cache.Row, 55)
 	for i := range rows {
 		rows[i] = cache.Row{ID: saveRegID("zp", i), Name: saveRegID("zp", i)}
@@ -231,7 +231,7 @@ func TestSaveProbeResourcesToTypeFiles_AliasCanonicalizes_OnDiskFileIsCanonical(
 		t.Errorf(`CachedListDepth("dbi") = %d, want 12 — the canonical name must report the same depth as the alias used to save`, got)
 	}
 
-	dir := cache.Dir(saveRegProfile, saveRegRegion)
+	dir := cache.DirForTest(saveRegProfile, saveRegRegion)
 	if _, statErr := os.Stat(dir + "/dbi.yaml"); statErr != nil {
 		t.Errorf("on-disk file dbi.yaml does not exist (%v) — save must canonicalize the alias to the registered ShortName before persisting", statErr)
 	}
@@ -258,7 +258,7 @@ func TestSaveAvailabilityCache_ExactShrink_CountAdvancesRowsUntouched(t *testing
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "exactshrink"
 
-	store := cache.LoadDir(saveRegProfile, saveRegRegion)
+	store := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	rows50 := make([]cache.Row, 50)
 	for i := range rows50 {
 		rows50[i] = cache.Row{ID: saveRegID("es", i), Name: saveRegID("es", i)}
@@ -278,7 +278,7 @@ func TestSaveAvailabilityCache_ExactShrink_CountAdvancesRowsUntouched(t *testing
 		t.Fatalf("SaveAvailabilityCache: %v", err)
 	}
 
-	reloaded := cache.LoadDir(saveRegProfile, saveRegRegion)
+	reloaded := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	tf, ok := reloaded.Type(shortName)
 	if !ok {
 		t.Fatal("TypeFile missing after SaveAvailabilityCache exact-shrink observation")
@@ -364,7 +364,7 @@ func TestSnapshotProbeResourcesForSave_FieldsIsolatedFromLaterMutation(t *testin
 		t.Fatalf("save-cache returned an error flash: %s", flash.Text)
 	}
 
-	store := cache.LoadDir(saveRegProfile, saveRegRegion)
+	store := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	tf, ok := store.Type(shortName)
 	if !ok {
 		t.Fatal("TypeFile missing after save-cache execution")
@@ -398,7 +398,7 @@ func TestAvailabilityCacheLoaded_SeededRowMutation_DoesNotWriteThroughToStore(t 
 	const shortName = "s3"
 
 	seedFindings := []domain.Finding{{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave2:s3"}}
-	store := cache.LoadDir(saveRegProfile, saveRegRegion)
+	store := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	store.Put(shortName, cache.TypeFile{
 		HasResources: true,
 		Count:        1,
@@ -524,7 +524,7 @@ func TestExecuteTask_SaveCache_ExactIssueCount_SurvivesRowDerivedRecomputation(t
 		t.Fatalf("save-cache returned an error flash: %s", flash.Text)
 	}
 
-	store := cache.LoadDir(saveRegProfile, saveRegRegion)
+	store := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	tf, ok := store.Type(shortName)
 	if !ok {
 		t.Fatal("TypeFile missing after TaskKindSaveCache execution")
@@ -578,7 +578,7 @@ func TestSaveAvailabilityCache_UnchangedEntries_DoesNotRewriteTypeFiles(t *testi
 		t.Fatalf("SaveAvailabilityCache (initial save): %v", err)
 	}
 
-	dir := cache.Dir(saveRegProfile, saveRegRegion)
+	dir := cache.DirForTest(saveRegProfile, saveRegRegion)
 	ec2Path := dir + "/ec2.yaml"
 	s3Path := dir + "/s3.yaml"
 	ec2InoBefore := statIno(t, ec2Path)
@@ -613,7 +613,7 @@ func TestSaveAvailabilityCache_OneTypeChanged_OnlyThatTypeFileIsRewritten(t *tes
 		t.Fatalf("SaveAvailabilityCache (initial save): %v", err)
 	}
 
-	dir := cache.Dir(saveRegProfile, saveRegRegion)
+	dir := cache.DirForTest(saveRegProfile, saveRegRegion)
 	ec2Path := dir + "/ec2.yaml"
 	s3Path := dir + "/s3.yaml"
 	ec2InoBefore := statIno(t, ec2Path)
@@ -671,7 +671,7 @@ func TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock(t *tes
 	// the save below performs a genuine per-type read-modify-write (not a
 	// bootstrap from an empty store) — matching the "large account" shape
 	// the review finding describes.
-	seedStore := cache.LoadDir(saveRegProfile, saveRegRegion)
+	seedStore := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	for _, name := range shortNames {
 		rows := make([]cache.Row, rowsPerType)
 		for i := range rows {
@@ -740,7 +740,7 @@ func TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock(t *tes
 		t.Fatalf("SaveAvailabilityCache (concurrent with pairMu readers): %v", saveErr)
 	}
 
-	reloaded := cache.LoadDir(saveRegProfile, saveRegRegion)
+	reloaded := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	for i, name := range shortNames {
 		tf, ok := reloaded.Type(name)
 		if !ok {

@@ -77,7 +77,7 @@ func TestReconcileTypeFile_Wave2Carry_RefreshDropsWave1KeepsWave2(t *testing.T) 
 	// wave2CarryProfile/wave2CarryRegion — the seed must land in the same
 	// pair the Core under test actually reads/writes, or SaveResourceListCache
 	// below sees a fresh empty store and there is nothing to carry from.
-	store := cache.LoadDir(saveRegProfile, saveRegRegion)
+	store := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	existingRows := []cache.Row{
 		{
 			ID:   "s3-bucket-x",
@@ -126,7 +126,7 @@ func TestReconcileTypeFile_Wave2Carry_RefreshDropsWave1KeepsWave2(t *testing.T) 
 		t.Fatalf("SaveResourceListCache: %v", err)
 	}
 
-	reloaded := cache.LoadDir(saveRegProfile, saveRegRegion)
+	reloaded := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	tf, ok := reloaded.Type(shortName)
 	if !ok {
 		t.Fatal("TypeFile missing after Wave-2-carry refresh write")
@@ -189,7 +189,7 @@ func TestReconcileTypeFile_Wave2SourcedObservation_ClearsCarriedData(t *testing.
 	const wave2ClearRegion = "us-east-1"
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
-	store := cache.LoadDir(wave2ClearProfile, wave2ClearRegion)
+	store := cache.LoadDirForTest(wave2ClearProfile, wave2ClearRegion)
 	store.Put("s3", cache.TypeFile{
 		HasResources: true, Count: 1, Exact: true,
 		Rows: []cache.Row{
@@ -265,7 +265,7 @@ func TestReconcileTypeFile_Wave2SourcedObservation_ClearsCarriedData(t *testing.
 		t.Fatal("handleEnrichmentChecked (queue drained) returned no TaskKindSaveCache task — test assumption broken, cannot exercise the Wave-2-completion save path")
 	}
 
-	reloaded := cache.LoadDir(wave2ClearProfile, wave2ClearRegion)
+	reloaded := cache.LoadDirForTest(wave2ClearProfile, wave2ClearRegion)
 	tf, ok := reloaded.Type("s3")
 	if !ok {
 		t.Fatal("TypeFile missing after healed Wave-2-completion write")

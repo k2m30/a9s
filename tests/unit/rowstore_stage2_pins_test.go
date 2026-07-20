@@ -63,10 +63,10 @@ func newStage2PinTestController(t *testing.T) (*session.Session, *runtime.Core, 
 // (qa_cache_lifecycle_test.go:219).
 func stage2PinReadTypeFile(t *testing.T, profile, region, shortName string) cache.TypeFile {
 	t.Helper()
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	tf, ok := store.Type(shortName)
 	if !ok {
-		t.Fatalf("cache.LoadDir(%q, %q).Type(%q) missing — expected a persisted TypeFile", profile, region, shortName)
+		t.Fatalf("cache.LoadDirForTest(%q, %q).Type(%q) missing — expected a persisted TypeFile", profile, region, shortName)
 	}
 	return tf
 }

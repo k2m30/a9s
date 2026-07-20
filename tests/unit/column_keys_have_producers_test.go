@@ -64,7 +64,7 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 	for shortName, view := range cfg.Views {
 		shortName, view := shortName, view
 		t.Run(shortName, func(t *testing.T) {
-			allKeys := resource.GetAllFieldKeys(shortName)
+			allKeys := resource.GetAllFieldKeysForTest(shortName)
 			producerSet := make(map[string]bool, len(allKeys))
 			for _, k := range allKeys {
 				producerSet[k] = true

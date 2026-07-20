@@ -178,8 +178,8 @@ func newWarmOpenApp(t *testing.T) tui.Model {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile("def12-warmopen-demo"),
-		tui.WithRegion("us-east-1"))
+		tui.WithProfileForTest("def12-warmopen-demo"),
+		tui.WithRegionForTest("us-east-1"))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	return m
 }

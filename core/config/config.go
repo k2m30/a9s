@@ -92,9 +92,10 @@ type ViewDef struct {
 	Detail []DetailField `yaml:"-"`
 }
 
-// DetailStrings returns the canonical string identifiers of all DetailFields
-// (Path if set, else Key). Useful for test assertions and debug logging.
-func DetailStrings(fields []DetailField) []string {
+// DetailStringsForTest returns the canonical string identifiers of all
+// DetailFields (Path if set, else Key). Test-only: no production caller —
+// used by test assertions that need the field-identifier list as strings.
+func DetailStringsForTest(fields []DetailField) []string {
 	s := make([]string, len(fields))
 	for i, df := range fields {
 		s[i] = df.String()

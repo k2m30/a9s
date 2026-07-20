@@ -6,7 +6,7 @@
 //
 // Harness precedents:
 //   - tui_post_sweep_seed_test.go: seedDiskStoreWithS3Rows pattern
-//     (cache.LoadDir/Store.Put/Store.SaveType) for pre-seeding a real
+//     (cache.LoadDirForTest/Store.Put/Store.SaveType) for pre-seeding a real
 //     on-disk per-type cache file before a controller ever touches it.
 //   - app_web_live_cold_boot_test.go: newLiveWebStyleController
 //     (runtime.Bootstrap + app.New + SetUIMode("web")), and
@@ -85,7 +85,7 @@ func alltypesSweepPair(t *testing.T, profile, region string) (*runtime.Core, *ap
 // realistic rows, exactly as seedDiskStoreWithS3Rows does for s3.
 func alltypesSeedTwoRows(t *testing.T, profile, region, shortName string) {
 	t.Helper()
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	store.Put(shortName, cache.TypeFile{
 		HasResources: true,
 		Count:        2,
@@ -284,7 +284,7 @@ func TestAllTypes_SaveIsolation(t *testing.T) {
 
 			// Seed every OTHER type plus the type under test, so there are real
 			// sibling files on disk to disturb.
-			store := cache.LoadDir(profile, region)
+			store := cache.LoadDirForTest(profile, region)
 			for _, sibling := range allNames {
 				store.Put(sibling, cache.TypeFile{
 					HasResources: true,
@@ -299,7 +299,7 @@ func TestAllTypes_SaveIsolation(t *testing.T) {
 				}
 			}
 
-			dir := cache.Dir(profile, region)
+			dir := cache.DirForTest(profile, region)
 			before := map[string]string{}
 			for _, sibling := range allNames {
 				if sibling == td.ShortName {
@@ -310,7 +310,7 @@ func TestAllTypes_SaveIsolation(t *testing.T) {
 
 			// Reload (mirrors a fresh session for this pair) and save ONLY the
 			// type under test with different content.
-			store2 := cache.LoadDir(profile, region)
+			store2 := cache.LoadDirForTest(profile, region)
 			store2.Put(td.ShortName, cache.TypeFile{
 				HasResources: true,
 				Count:        9,
@@ -335,7 +335,7 @@ func TestAllTypes_SaveIsolation(t *testing.T) {
 
 			// Sanity: the touched type's own file DID change / now reflects the
 			// new content, proving the save mechanism actually ran.
-			store3 := cache.LoadDir(profile, region)
+			store3 := cache.LoadDirForTest(profile, region)
 			tf, ok := store3.Type(td.ShortName)
 			if !ok || tf.Count != 9 || len(tf.Rows) != 1 || tf.Rows[0].ID != "iso-"+td.ShortName+"-new-1" {
 				t.Errorf("%s: own TypeFile after save+reload = %+v (ok=%v), want the new Count=9/1-row content", td.ShortName, tf, ok)
@@ -371,7 +371,7 @@ func TestAllTypes_StructuralClass_Paginated(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 	profile, region := "alltypes-class-paginated", "us-east-1"
 
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	store.Put(td.ShortName, cache.TypeFile{
 		HasResources: true,
 		Count:        3,
@@ -422,7 +422,7 @@ func TestAllTypes_StructuralClass_ZeroResource(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 	profile, region := "alltypes-class-zero", "us-east-1"
 
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	store.Put(td.ShortName, cache.TypeFile{
 		HasResources: false,
 		Count:        0,
@@ -469,7 +469,7 @@ func TestAllTypes_StructuralClass_IssueBadgeExcluded(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 	profile, region := "alltypes-class-excluded", "us-east-1"
 
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	store.Put(td.ShortName, cache.TypeFile{
 		HasResources: true,
 		Count:        1,
@@ -484,7 +484,7 @@ func TestAllTypes_StructuralClass_IssueBadgeExcluded(t *testing.T) {
 		t.Fatalf("seed fixture SaveType(%s): %v", td.ShortName, err)
 	}
 
-	reloaded := cache.LoadDir(profile, region)
+	reloaded := cache.LoadDirForTest(profile, region)
 	tf, ok := reloaded.Type(td.ShortName)
 	if !ok {
 		t.Fatalf("%s: TypeFile missing after save+reload", td.ShortName)

@@ -58,8 +58,8 @@ func newChainDemoModel(t *testing.T) tui.Model {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = chainApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 	return m
 }

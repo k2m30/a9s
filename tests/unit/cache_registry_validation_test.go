@@ -12,11 +12,11 @@ import (
 
 // TestCache_WrongVersionTypeFile_SkippedButSiblingsSurvive writes a per-type
 // YAML file stamped with a schema version other than cache.SchemaVersion,
-// alongside a well-formed sibling type file, then calls cache.LoadDir and
+// alongside a well-formed sibling type file, then calls cache.LoadDirForTest and
 // verifies the result is safe: it must not crash, the wrong-version type
 // must not surface via Store.Type, and the sibling known-good type must
 // still load normally. This replaces the round-1
-// TestCache_RejectsUnknownResourceKeys concept (per-type-file cache.LoadDir
+// TestCache_RejectsUnknownResourceKeys concept (per-type-file cache.LoadDirForTest
 // has no registry cross-check of its own — an unrecognized-but-well-formed
 // type name loads under its own key just like any other; that filtering
 // concept died with the single-file cache.Load implementation). What
@@ -28,7 +28,7 @@ func TestCache_WrongVersionTypeFile_SkippedButSiblingsSurvive(t *testing.T) {
 
 	const knownType = "ec2"
 
-	dir := cache.Dir("testprofile", "us-east-1")
+	dir := cache.DirForTest("testprofile", "us-east-1")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatalf("creating cache dir: %v", err)
 	}
@@ -38,13 +38,13 @@ func TestCache_WrongVersionTypeFile_SkippedButSiblingsSurvive(t *testing.T) {
 		t.Fatalf("writing wrong-version type file: %v", err)
 	}
 
-	store := cache.LoadDir("testprofile", "us-east-1")
+	store := cache.LoadDirForTest("testprofile", "us-east-1")
 	store.Put(knownType, cache.TypeFile{HasResources: true, Count: 5})
 	if err := store.SaveType(knownType); err != nil {
 		t.Fatalf("SaveType(%s): %v", knownType, err)
 	}
 
-	reloaded := cache.LoadDir("testprofile", "us-east-1")
+	reloaded := cache.LoadDirForTest("testprofile", "us-east-1")
 	if reloaded == nil {
 		t.Fatal("LoadDir returned nil")
 	}
@@ -57,15 +57,15 @@ func TestCache_WrongVersionTypeFile_SkippedButSiblingsSurvive(t *testing.T) {
 	}
 }
 
-// TestCache_LoadDirRoundtrip_AllRegisteredTypes verifies that every
+// TestCache_LoadDirForTestRoundtrip_AllRegisteredTypes verifies that every
 // top-level resource type short name registered via AllShortNames() survives
-// a Put/SaveType/LoadDir round-trip with identical field values, using the
-// live registry so new resource types added in the future are automatically
-// covered.
+// a Put/SaveType/LoadDirForTest round-trip with identical field values, using
+// the live registry so new resource types added in the future are
+// automatically covered.
 // Bug caught: a newly added resource type whose ShortName contains
-// characters that are mis-sanitized by cache.Dir, or a yaml tag omission
+// characters that are mis-sanitized by cache.DirForTest, or a yaml tag omission
 // that silently drops a field on serialize/deserialize.
-func TestCache_LoadDirRoundtrip_AllRegisteredTypes(t *testing.T) {
+func TestCache_LoadDirForTestRoundtrip_AllRegisteredTypes(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
@@ -74,7 +74,7 @@ func TestCache_LoadDirRoundtrip_AllRegisteredTypes(t *testing.T) {
 		t.Fatal("AllShortNames() returned empty — AWS init() may not have run")
 	}
 
-	store := cache.LoadDir("testprofile", "us-east-1")
+	store := cache.LoadDirForTest("testprofile", "us-east-1")
 	entries := make(map[string]cache.TypeFile, len(allNames))
 	for i, name := range allNames {
 		tf := cache.TypeFile{
@@ -91,9 +91,9 @@ func TestCache_LoadDirRoundtrip_AllRegisteredTypes(t *testing.T) {
 		}
 	}
 
-	reloaded := cache.LoadDir("testprofile", "us-east-1")
+	reloaded := cache.LoadDirForTest("testprofile", "us-east-1")
 	if reloaded == nil {
-		t.Fatal("cache.LoadDir returned nil after SaveType")
+		t.Fatal("cache.LoadDirForTest returned nil after SaveType")
 	}
 
 	for _, name := range allNames {

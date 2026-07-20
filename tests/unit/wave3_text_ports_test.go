@@ -351,8 +351,8 @@ func TestWave3Port_ScrollState_VisibleWindow_ViewHeightOne(t *testing.T) {
 	if end-start != 1 {
 		t.Errorf("with viewHeight=1, should show exactly 1 row, got %d", end-start)
 	}
-	if s.Cursor() < start || s.Cursor() >= end {
-		t.Errorf("cursor %d should be within [%d,%d)", s.Cursor(), start, end)
+	if s.CursorForTest() < start || s.CursorForTest() >= end {
+		t.Errorf("cursor %d should be within [%d,%d)", s.CursorForTest(), start, end)
 	}
 }
 

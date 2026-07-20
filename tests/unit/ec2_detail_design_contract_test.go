@@ -21,8 +21,8 @@ func TestEC2Detail_Render_MatchesApprovedDesignContract(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 36})
 	m = m2.(tui.Model)
 

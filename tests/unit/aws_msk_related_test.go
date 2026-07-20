@@ -32,7 +32,7 @@ func mskCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 // --- Navigable Fields ---
 
 func TestNavigableFields_MSK_KmsKey(t *testing.T) {
-	nav := resource.IsFieldNavigable("msk", "Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId")
+	nav := resource.IsFieldNavigableForTest("msk", "Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId")
 	if nav == nil {
 		t.Fatal("expected Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId to be navigable for msk")
 	}

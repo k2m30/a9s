@@ -64,7 +64,7 @@ func newDepthExecutorCore(t *testing.T, noCache bool) *runtime.Core {
 // mirroring the production Put/SaveType seam in core/cache/cache.go.
 func seedCachedRows(t *testing.T, shortName string, count int, exact bool) {
 	t.Helper()
-	store := cache.LoadDir(depthTestProfile, depthTestRegion)
+	store := cache.LoadDirForTest(depthTestProfile, depthTestRegion)
 	rows := make([]cache.Row, count)
 	for i := range rows {
 		rows[i] = cache.Row{ID: bucketID(i), Name: bucketID(i)}

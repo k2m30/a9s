@@ -66,10 +66,10 @@ func Width(s string) int {
 func NoColor(t *testing.T) {
 	t.Helper()
 	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
+	styles.ReinitForTest()
 	t.Cleanup(func() {
 		_ = os.Unsetenv("NO_COLOR")
-		styles.Reinit()
+		styles.ReinitForTest()
 	})
 }
 
@@ -81,13 +81,13 @@ func ForceColor(t *testing.T) {
 	t.Helper()
 	original, wasSet := os.LookupEnv("NO_COLOR")
 	os.Unsetenv("NO_COLOR") //nolint:errcheck
-	styles.Reinit()
+	styles.ReinitForTest()
 	t.Cleanup(func() {
 		if wasSet {
 			os.Setenv("NO_COLOR", original) //nolint:errcheck
 		} else {
 			_ = os.Unsetenv("NO_COLOR")
 		}
-		styles.Reinit()
+		styles.ReinitForTest()
 	})
 }

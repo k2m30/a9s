@@ -202,11 +202,11 @@ type Session struct {
 	pairMu sync.Mutex
 
 	// CacheStore is the loaded per-type disk cache (C7) for the pair recorded
-	// in cacheStoreProfile/cacheStoreRegion. nil until LoadDir has run for a
+	// in cacheStoreProfile/cacheStoreRegion. nil until LoadDirIn has run for a
 	// pair (either at startup via TaskKindLoadAvailCache, or after a pair
 	// switch). The HARD INVARIANT (C7 "load before save") is structural:
 	// Put/SaveType are methods on *cache.Store, and the only way to obtain
-	// one is cache.LoadDir — so no save can happen for a pair before its own
+	// one is cache.LoadDirIn — so no save can happen for a pair before its own
 	// load. Cleared (set to nil) by Rotate so a pair switch never lets writes
 	// for the OLD pair's Store race a save for the NEW pair (C9). Access only
 	// through EnsureCacheStore — never read/write this field directly
@@ -215,7 +215,7 @@ type Session struct {
 
 	// cacheStoreProfile/cacheStoreRegion are the pair CacheStore was loaded
 	// for. EnsureCacheStore compares these against the caller's current pair
-	// and reloads via cache.LoadDir when they disagree, so a task dispatched
+	// and reloads via cache.LoadDirIn when they disagree, so a task dispatched
 	// for pair A that executes after a switch to pair B never writes into
 	// A's directory using a memoized Store (see EnsureCacheStore).
 	cacheStoreProfile string
@@ -483,7 +483,7 @@ func (s *Session) ClearPairSwept() {
 }
 
 // EnsureCacheStore returns the *cache.Store for the current Profile/Region
-// pair, loading (or reloading) it via cache.LoadDir when no store is
+// pair, loading (or reloading) it via cache.LoadDirIn when no store is
 // memoized yet or the memoized store was loaded for a different pair. An
 // unresolved pair ("" profile or region — pre-connect or cold boot before
 // the first ClientsReady/Rotate settles Profile/Region) returns nil without
@@ -811,7 +811,7 @@ func (s *Session) Rotate() {
 	// EnsureCacheStore uses, so a concurrent EnsureCacheStore call cannot
 	// observe a torn state (old Store with a stale/zeroed pair stamp, or
 	// vice versa). The new pair's Store is re-obtained via a fresh
-	// cache.LoadDir call dispatched by the pair-switch handler
+	// cache.LoadDirIn call dispatched by the pair-switch handler
 	// (TaskKindLoadAvailCache), never carried over from the old pair.
 	s.pairMu.Lock()
 	s.CacheStore = nil

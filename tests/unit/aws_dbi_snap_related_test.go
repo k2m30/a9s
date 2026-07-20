@@ -29,7 +29,7 @@ func dbiSnapCheckerByTarget(t *testing.T, target string) resource.RelatedChecker
 // --- Navigable Fields ---
 
 func TestNavigableFields_DBISnap_Registered(t *testing.T) {
-	nav := resource.IsFieldNavigable("dbi-snap", "DBInstanceIdentifier")
+	nav := resource.IsFieldNavigableForTest("dbi-snap", "DBInstanceIdentifier")
 	if nav == nil {
 		t.Error("expected navigable field DBInstanceIdentifier for dbi-snap, got nil")
 	} else if nav.TargetType != "dbi" {

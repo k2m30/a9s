@@ -65,8 +65,8 @@ func livegapModel(t *testing.T) tui.Model {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	t.Cleanup(m.CloseController)
 	m, _ = livegapStep(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 	return m
@@ -100,15 +100,15 @@ func livegapThemesModel(t *testing.T, activeTheme string, themeFiles ...string) 
 			tui.WithIsDemo(true),
 			tui.WithActiveTheme(activeTheme),
 			tui.WithNoCache(true),
-			tui.WithProfile(demo.DemoProfile),
-			tui.WithRegion(demo.DemoRegion))
+			tui.WithProfileForTest(demo.DemoProfile),
+			tui.WithRegionForTest(demo.DemoRegion))
 	} else {
 		m = tui.New(demo.DemoProfile, demo.DemoRegion,
 			tui.WithClients(demo.NewServiceClients()),
 			tui.WithIsDemo(true),
 			tui.WithNoCache(true),
-			tui.WithProfile(demo.DemoProfile),
-			tui.WithRegion(demo.DemoRegion))
+			tui.WithProfileForTest(demo.DemoProfile),
+			tui.WithRegionForTest(demo.DemoRegion))
 	}
 	t.Cleanup(m.CloseController)
 	m, _ = livegapStep(m, tea.WindowSizeMsg{Width: 120, Height: 30})

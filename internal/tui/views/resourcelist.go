@@ -499,7 +499,9 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 // Mapping from body fields to View() state:
 //   - body.Loading            → m.loading
 //   - body.Rows               → m.filteredResources (cells pre-extracted by controller)
-//   - body.Selected           → m.scroll.Cursor()
+//   - body.Selected           → consumed directly (ResourceListModel has no
+//     ScrollState field; VisibleWindow below builds a synthetic ScrollState
+//     from body.Selected instead of storing a cursor)
 //   - body.Columns            → resolved listCol slice (width/title/key from body)
 //   - body.Sort               → m.sortColKey / m.sortAsc
 //   - body.ScrollX            → m.hScrollOffset

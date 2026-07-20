@@ -100,13 +100,13 @@ func TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk(t *testing.T) {
 	})
 	_ = m
 
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	if store == nil {
-		t.Fatal("cache.LoadDir returned nil — expected a persisted s3 type file")
+		t.Fatal("cache.LoadDirForTest returned nil — expected a persisted s3 type file")
 	}
 	tf, ok := store.Type("s3")
 	if !ok {
-		t.Fatalf("cache.LoadDir(%q, %q).Type(\"s3\") missing — top-level TUI list open+append never persisted to disk (HEAD-effdd465 regression: the C6 save gate never fired for a TUI-pushed list)", profile, region)
+		t.Fatalf("cache.LoadDirForTest(%q, %q).Type(\"s3\") missing — top-level TUI list open+append never persisted to disk (HEAD-effdd465 regression: the C6 save gate never fired for a TUI-pushed list)", profile, region)
 	}
 	if len(tf.Rows) != 3 {
 		t.Fatalf("persisted s3 Rows count = %d, want 3 (both loaded pages, not just the first)", len(tf.Rows))
@@ -127,7 +127,7 @@ func TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk(t *testing.T) {
 		t.Errorf("persisted s3 Count = %d, want 3", tf.Count)
 	}
 
-	// Confirm the file that ended up on disk is exactly where cache.Dir says
+	// Confirm the file that ended up on disk is exactly where cache.DirForTest says
 	// it should be, and that it is genuinely readable YAML, not merely an
 	// in-memory Store observation independent of a real file write.
 	wantDir := filepath.Join(tmp, "cache", profile+"--"+region)

@@ -268,8 +268,8 @@ func TestRightColumn_NarrowTerminalIgnoresToggle(t *testing.T) {
 	oldDefs := append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
 	t.Cleanup(func() { resource.SetRelatedForTest("ec2", oldDefs) })
 	resource.SetRelatedForTest("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: resource.NoopChecker},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopCheckerForTest},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: resource.NoopCheckerForTest},
 	})
 
 	m := newPreviewDemoModel(t, 120, 30)

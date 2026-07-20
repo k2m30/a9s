@@ -350,8 +350,8 @@ func issue119RootModel(w, h int, demoMode bool) tui.Model {
 			tui.WithClients(demo.NewServiceClients()),
 			tui.WithIsDemo(true),
 			tui.WithNoCache(true),
-			tui.WithProfile(demo.DemoProfile),
-			tui.WithRegion(demo.DemoRegion))
+			tui.WithProfileForTest(demo.DemoProfile),
+			tui.WithRegionForTest(demo.DemoRegion))
 		return issue119ApplyMsg(m, tea.WindowSizeMsg{Width: w, Height: h})
 	}
 	m := tui.New("testprofile", "us-east-1")

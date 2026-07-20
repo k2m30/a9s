@@ -1087,7 +1087,7 @@ func (s *fullIntegrationScenario) FollowNavigableField(fieldPath string) resourc
 		s.failf("FollowNavigableField(%q): no active detail resource (currentResourceType=%q)", fieldPath, s.currentResourceType)
 	}
 
-	nf := resource.IsFieldNavigable(s.currentResourceType, fieldPath)
+	nf := resource.IsFieldNavigableForTest(s.currentResourceType, fieldPath)
 	if nf == nil {
 		registered := resource.GetNavigableFields(s.currentResourceType)
 		paths := make([]string, len(registered))

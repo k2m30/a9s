@@ -208,7 +208,7 @@ func TestRelated_VPCE_BadRawStruct(t *testing.T) {
 // TestNavigableFields_VPCE verifies that VpcId→vpc is registered as a
 // navigable field.
 func TestNavigableFields_VPCE(t *testing.T) {
-	nav := resource.IsFieldNavigable("vpce", "VpcId")
+	nav := resource.IsFieldNavigableForTest("vpce", "VpcId")
 	if nav == nil {
 		t.Fatal("expected navigable field VpcId not found for vpce")
 	}

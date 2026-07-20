@@ -63,7 +63,7 @@ func emitNavigatePayloadOf(tasks []runtime.TaskRequest) (runtime.EmitNavigatePay
 // EnsureCacheStore/CacheStoreToEvent would see on a real cold start.
 func seedDiskCacheWithS3Rows(t *testing.T, profile, region string) *cache.Store {
 	t.Helper()
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	store.Put("s3", cache.TypeFile{
 		HasResources: true,
 		Count:        2,
@@ -75,7 +75,7 @@ func seedDiskCacheWithS3Rows(t *testing.T, profile, region string) *cache.Store 
 	if err := store.SaveType("s3"); err != nil {
 		t.Fatalf("seed fixture SaveType(s3): %v", err)
 	}
-	return cache.LoadDir(profile, region)
+	return cache.LoadDirForTest(profile, region)
 }
 
 // newLiveCoreForCommandNav builds a live (non-demo, NoCache=false) *runtime.Core
@@ -179,9 +179,9 @@ func TestCommandNavigation_NoCacheDir_StillFires(t *testing.T) {
 		t.Fatal("HandleClientsReady returned TaskKindEmitNavigate immediately on a cold-cache machine — navigation must still be deferred to the post-seed event")
 	}
 
-	// No cache.LoadDir/Put/SaveType ever ran for this pair — mirrors a
+	// No cache.LoadDirForTest/Put/SaveType ever ran for this pair — mirrors a
 	// genuinely cold machine. EnsureCacheStore's LoadDir call returns a
-	// non-nil-but-empty Store (per cache.LoadDir's "never fails" contract),
+	// non-nil-but-empty Store (per cache.LoadDirForTest's "never fails" contract),
 	// so build the event exactly as production does for that case.
 	store := c.CacheStore()
 	event := runtime.CacheStoreToEvent(store)

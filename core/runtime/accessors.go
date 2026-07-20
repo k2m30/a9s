@@ -77,12 +77,12 @@ func (c *Core) SetNoCache(v bool) { c.session.NoCache = v }
 func (c *Core) CacheStore() *cache.Store { return c.EnsureCacheStore() }
 
 // EnsureCacheStore returns the current pair's *cache.Store, reloading via
-// cache.LoadDir(profile, region) whenever the memoized store (if any) was
+// cache.LoadDirIn(root, profile, region) whenever the memoized store (if any) was
 // not loaded for the CURRENT session.Profile/session.Region pair — this
 // covers both the first call since the last Rotate (C9) or process start,
 // and a pair switch that lands between two calls without an intervening
 // Rotate observation. NoCache=true always returns nil without ever calling
-// LoadDir (C7b: --no-cache disables persisted load entirely). An unresolved
+// LoadDirIn (C7b: --no-cache disables persisted load entirely). An unresolved
 // Profile or Region (pair not yet resolved) returns nil WITHOUT memoizing, so
 // a pre-connect call never pins the store to the wrong "<profile>--"
 // directory. Session.EnsureCacheStore reads the pair itself under

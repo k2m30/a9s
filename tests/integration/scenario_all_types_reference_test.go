@@ -32,7 +32,7 @@ import (
 const allTypesSampledRows = 5
 
 func TestScenario_AllTypesReferenceSurfaces(t *testing.T) {
-	counts := demofixtures.ExpectedTopLevelCounts()
+	counts := demofixtures.ExpectedTopLevelCountsForTest()
 
 	// One startup scenario renders the availability-prefetched main menu for
 	// every type at once; per-type walk scenarios skip the startup chain to
@@ -41,7 +41,7 @@ func TestScenario_AllTypesReferenceSurfaces(t *testing.T) {
 	runDemoStartup(t, menuScenario)
 	menuView := menuScenario.currentView()
 
-	childShortNames := resource.AllChildShortNames()
+	childShortNames := resource.AllChildShortNamesForTest()
 	childSet := make(map[string]bool, len(childShortNames))
 	for _, name := range childShortNames {
 		childSet[name] = true

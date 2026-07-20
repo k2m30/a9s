@@ -140,10 +140,10 @@ func issue140SetupRightColumnFocus(t *testing.T, counts map[string]int) (m tui.M
 	oldDefs := append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
 	t.Cleanup(func() { resource.SetRelatedForTest("ec2", oldDefs) })
 	resource.SetRelatedForTest("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopChecker},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: resource.NoopChecker},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopChecker},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: resource.NoopChecker},
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: resource.NoopCheckerForTest},
+		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: resource.NoopCheckerForTest},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopCheckerForTest},
+		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: resource.NoopCheckerForTest},
 	})
 
 	m = newPreviewDemoModel(t, 120, 30)
@@ -278,8 +278,8 @@ func TestIssue140_Story_EC2_029_FilteredAlarmListTitleAndScope(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = m2.(tui.Model)
 

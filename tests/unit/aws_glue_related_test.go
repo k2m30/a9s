@@ -31,7 +31,7 @@ func glueCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 // --- Navigable Field Registration ---
 
 func TestNavigableFields_Glue_Registered(t *testing.T) {
-	nav := resource.IsFieldNavigable("glue", "Role")
+	nav := resource.IsFieldNavigableForTest("glue", "Role")
 	if nav == nil {
 		t.Fatal("expected navigable field Role not found for glue")
 	}

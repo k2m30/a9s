@@ -64,7 +64,7 @@ func newLiveShapedBadgeReproController(t *testing.T, profile, region string) (*r
 // run that only ever completed a Wave-1 availability sweep.
 func seedReadonlyS3DiskCache(t *testing.T, profile, region string) *cache.Store {
 	t.Helper()
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	store.Put("s3", cache.TypeFile{
 		HasResources: true,
 		Count:        50,
@@ -75,7 +75,7 @@ func seedReadonlyS3DiskCache(t *testing.T, profile, region string) *cache.Store 
 	if err := store.SaveType("s3"); err != nil {
 		t.Fatalf("seed fixture SaveType(s3): %v", err)
 	}
-	return cache.LoadDir(profile, region)
+	return cache.LoadDirForTest(profile, region)
 }
 
 // liveShapedBadgeReproS3Resources builds 5 fictional S3 bucket resources,

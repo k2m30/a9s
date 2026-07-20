@@ -127,7 +127,7 @@ func TestWarmListOpen_TruncatedDiskSeed_ShowsNPlus_BeforeRefetch(t *testing.T) {
 		id := "i-0npluswarm" + string(rune('a'+i%26))
 		rows[i] = cache.Row{ID: id, Name: id, Fields: map[string]string{"state": "running"}}
 	}
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	store.Put("ec2", cache.TypeFile{
 		HasResources: true,
 		Count:        50,

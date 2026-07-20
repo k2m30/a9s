@@ -15,13 +15,17 @@ func NewScrollState(total int) ScrollState {
 	return ScrollState{total: total}
 }
 
-// Cursor returns the current cursor position.
-func (s *ScrollState) Cursor() int {
+// CursorForTest returns the current cursor position. Test-only: no
+// production caller — production reads the cursor value it set itself
+// (e.g. body.Selected) rather than reading it back off ScrollState, which is
+// used in production only as a stateless VisibleWindow calculator.
+func (s *ScrollState) CursorForTest() int {
 	return s.cursor
 }
 
-// Total returns the total item count.
-func (s *ScrollState) Total() int {
+// TotalForTest returns the total item count. Test-only: no production
+// caller — see CursorForTest's doc comment.
+func (s *ScrollState) TotalForTest() int {
 	return s.total
 }
 

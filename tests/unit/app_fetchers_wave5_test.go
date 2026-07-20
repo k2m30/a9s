@@ -9,7 +9,7 @@ package unit
 //   - fetchResourcesFiltered (41.7%) — no-fetcher error path with non-nil clients
 //
 // Round-2 migration: the on-disk fixture writer now writes per-type files
-// via cache.LoadDir/(*Store).Put/SaveType instead of the deleted single-file
+// via cache.LoadDirForTest/(*Store).Put/SaveType instead of the deleted single-file
 // cache.File/cache.Save, per docs/design/cache-requirements.md C7. The
 // production consumer (internal/tui/probe_adapter.go's loadAvailabilityCache,
 // via Core.LoadAvailabilityCache) is exercised end-to-end exactly as before.
@@ -59,7 +59,7 @@ import (
 // per-type-file replacement for the deleted single-file writeCacheFileForModel.
 func writeCacheTypesForModel(t *testing.T, profile, region string, entries map[string]cache.TypeFile) {
 	t.Helper()
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	for name, tf := range entries {
 		store.Put(name, tf)
 	}

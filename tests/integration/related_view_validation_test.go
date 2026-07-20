@@ -37,7 +37,7 @@ func TestFullRelatedViewValidation(t *testing.T) {
 	}
 
 	// Build a skip set for child types — they have no top-level list to open.
-	childShortNames := resource.AllChildShortNames()
+	childShortNames := resource.AllChildShortNamesForTest()
 	childSet := make(map[string]bool, len(childShortNames))
 	for _, name := range childShortNames {
 		childSet[name] = true

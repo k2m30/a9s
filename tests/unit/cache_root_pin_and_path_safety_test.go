@@ -86,7 +86,7 @@ func TestSessionCacheRoot_PinnedAtConstruction_EnvChangeAfterNewDoesNotRedirectW
 }
 
 // TestCacheDir_HostileProfileRegion_NeverEscapesCacheRoot is the table-driven
-// half of defect 2: for every hostile profile/region pair, cache.Dir's
+// half of defect 2: for every hostile profile/region pair, cache.DirForTest's
 // result must either stay strictly inside cache.Root() or be "" (the
 // established no-cache sentinel). The "--" glue in Dir already defeats pure
 // "." / ".." traversal at this layer (see file doc comment) — this test
@@ -113,7 +113,7 @@ func TestCacheDir_HostileProfileRegion_NeverEscapesCacheRoot(t *testing.T) {
 			root := t.TempDir()
 			t.Setenv("A9S_CONFIG_FOLDER", root)
 
-			dir := cache.Dir(tc.profile, tc.region)
+			dir := cache.DirForTest(tc.profile, tc.region)
 			if dir == "" {
 				return
 			}
@@ -127,7 +127,7 @@ func TestCacheDir_HostileProfileRegion_NeverEscapesCacheRoot(t *testing.T) {
 
 	root := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", root)
-	got := cache.Dir("prod", "eu-west-1")
+	got := cache.DirForTest("prod", "eu-west-1")
 	want := filepath.Join(root, "cache", "prod--eu-west-1")
 	if got != want {
 		t.Errorf("Dir(prod, eu-west-1) = %q, want %q (benign pair path shape must stay unchanged)", got, want)
@@ -146,13 +146,13 @@ func TestCacheStoreSaveType_HostileShortName_NeverEscapesPairDir(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", root)
 
 	const profile, region = "prod", "eu-west-1"
-	pairDir := filepath.Clean(cache.Dir(profile, region))
+	pairDir := filepath.Clean(cache.DirForTest(profile, region))
 
 	hostileShortNames := []string{"../evil", "../../evil"}
 
 	for _, shortName := range hostileShortNames {
 		t.Run(shortName, func(t *testing.T) {
-			store := cache.LoadDir(profile, region)
+			store := cache.LoadDirForTest(profile, region)
 			store.Put(shortName, cache.TypeFile{HasResources: true, Count: 1})
 			saveErr := store.SaveType(shortName)
 
@@ -186,13 +186,13 @@ func TestCacheStoreSaveType_BenignShortName_WritesExpectedPath(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", root)
 
 	const profile, region, shortName = "prod", "eu-west-1", "ec2"
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	store.Put(shortName, cache.TypeFile{HasResources: true, Count: 1})
 	if err := store.SaveType(shortName); err != nil {
 		t.Fatalf("SaveType(%q): %v", shortName, err)
 	}
 
-	wantPath := filepath.Join(cache.Dir(profile, region), shortName+".yaml")
+	wantPath := filepath.Join(cache.DirForTest(profile, region), shortName+".yaml")
 	if _, err := os.Stat(wantPath); err != nil {
 		t.Errorf("expected %s to exist after SaveType(%q): %v", wantPath, shortName, err)
 	}

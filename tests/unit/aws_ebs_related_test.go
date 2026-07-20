@@ -40,7 +40,7 @@ func TestNavigableFields_EBS_Registered(t *testing.T) {
 		"Attachments.InstanceId": "ec2",
 	}
 	for path, targetType := range expected {
-		nav := resource.IsFieldNavigable("ebs", path)
+		nav := resource.IsFieldNavigableForTest("ebs", path)
 		if nav == nil {
 			t.Errorf("expected navigable field %q not found", path)
 			continue

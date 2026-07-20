@@ -256,10 +256,10 @@ func TestPersistedRows_CarryEveryRenderableColumn(t *testing.T) {
 				}
 				ctrl.ApplyResourcesLoaded(td.ShortName, resources, nil, false)
 
-				store := cache.LoadDir(profile, region)
+				store := cache.LoadDirForTest(profile, region)
 				tf, ok := store.Type(td.ShortName)
 				if !ok {
-					t.Fatalf("%s: cache.LoadDir().Type(%q) missing after ApplyResourcesLoaded — list-open save never persisted", td.ShortName, td.ShortName)
+					t.Fatalf("%s: cache.LoadDirForTest().Type(%q) missing after ApplyResourcesLoaded — list-open save never persisted", td.ShortName, td.ShortName)
 				}
 				if len(tf.Rows) != 1 {
 					t.Fatalf("%s: persisted Rows = %d, want 1", td.ShortName, len(tf.Rows))
@@ -289,7 +289,7 @@ func TestPersistedRows_CarryEveryRenderableColumn(t *testing.T) {
 				// can close is a genuine live re-fetch (steps 3-4).
 				gapKey := strings.ToLower(targets[0].Title)
 				fields := map[string]string{"unrelated-preexisting-field": "kept"}
-				seedStore := cache.LoadDir(profile, region)
+				seedStore := cache.LoadDirForTest(profile, region)
 				seedStore.Put(td.ShortName, cache.TypeFile{
 					HasResources: true,
 					Count:        1,
@@ -341,10 +341,10 @@ func TestPersistedRows_CarryEveryRenderableColumn(t *testing.T) {
 				// Step 4: drive the save (the coder's save-seam
 				// materialization guarantee applies to this fetch-result
 				// save the same way it does for Scenario A).
-				store := cache.LoadDir(profile, region)
+				store := cache.LoadDirForTest(profile, region)
 				tf, ok := store.Type(td.ShortName)
 				if !ok {
-					t.Fatalf("%s: cache.LoadDir().Type(%q) missing after the verify-fetch save", td.ShortName, td.ShortName)
+					t.Fatalf("%s: cache.LoadDirForTest().Type(%q) missing after the verify-fetch save", td.ShortName, td.ShortName)
 				}
 				if len(tf.Rows) != 1 {
 					t.Fatalf("%s: persisted Rows = %d after the verify-fetch save, want 1", td.ShortName, len(tf.Rows))
@@ -443,7 +443,7 @@ func TestPoisonedExact_HealsOnContradiction(t *testing.T) {
 	for i := range rows {
 		rows[i] = cache.Row{ID: "obj-" + strconv.Itoa(i), Name: "obj-" + strconv.Itoa(i)}
 	}
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	store.Put("s3", cache.TypeFile{HasResources: true, Count: 50, Exact: true, Rows: rows})
 	if err := store.SaveType("s3"); err != nil {
 		t.Fatalf("seeding poisoned exact pair: %v", err)
@@ -464,10 +464,10 @@ func TestPoisonedExact_HealsOnContradiction(t *testing.T) {
 	}
 	ctrl.ApplyResourcesLoaded("s3", freshRows, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-heal"}, false)
 
-	reloaded := cache.LoadDir(profile, region)
+	reloaded := cache.LoadDirForTest(profile, region)
 	tf, ok := reloaded.Type("s3")
 	if !ok {
-		t.Fatal("cache.LoadDir().Type(\"s3\") missing after the healing fetch")
+		t.Fatal("cache.LoadDirForTest().Type(\"s3\") missing after the healing fetch")
 	}
 	if tf.Exact {
 		t.Error("persisted s3 TypeFile.Exact = true after a contradicting truncated fetch with 55 known rows, want false — poisoned exact must heal, not stick forever")

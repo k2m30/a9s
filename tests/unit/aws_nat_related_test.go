@@ -35,7 +35,7 @@ func TestNavigableFields_NAT_Registered(t *testing.T) {
 		"NatGatewayAddresses.AllocationId": "eip",
 	}
 	for path, wantTarget := range expected {
-		nav := resource.IsFieldNavigable("nat", path)
+		nav := resource.IsFieldNavigableForTest("nat", path)
 		if nav == nil {
 			t.Errorf("expected navigable field %q not found for nat", path)
 			continue

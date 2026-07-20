@@ -53,8 +53,8 @@ func newEnrichApp() tui.Model {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	return m
 }
@@ -287,8 +287,8 @@ func TestEnrichResult_WrongResourceType_IsIgnored(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/rt-test", "rt-test", "Managed")
@@ -317,8 +317,8 @@ func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/err-test", "err-test", "Managed")
@@ -357,8 +357,8 @@ func TestEnrichResult_StaleGeneration_IsDiscarded(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/gen-test", "gen-test", "Managed")
@@ -388,8 +388,8 @@ func TestYAMLView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/yaml-direct", "yaml-direct", "Managed")
@@ -428,8 +428,8 @@ func TestJSONView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/json-direct", "json-direct", "Managed")
@@ -468,8 +468,8 @@ func TestYAMLView_WrongResourceType_EnrichmentIgnored(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/yaml-guard", "yaml-guard", "Managed")
@@ -562,8 +562,8 @@ func TestRefresh_OnDetailView_DispatchesEnrichment(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/refresh-test", "refresh-test", "Managed")
@@ -593,8 +593,8 @@ func TestHandleEnrichDetail_NoEnricher_ReturnsNilCmd(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// Confirm ec2 has no detail enricher (guard against future registration).
@@ -639,8 +639,8 @@ func TestHandleEnrichDetail_WithEnricher_ReturnsEnrichDetailResultMsg(t *testing
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/enrich-direct", "enrich-direct", "Managed")

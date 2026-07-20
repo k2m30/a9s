@@ -124,10 +124,10 @@ func TestFalseExact_PageOneEntryWithoutPagination_NeverDowngradesExact(t *testin
 		t.Fatalf("ExecuteTask(TaskKindSaveCache): %v", err)
 	}
 
-	store := cache.LoadDir(depthTestProfile, depthTestRegion)
+	store := cache.LoadDirForTest(depthTestProfile, depthTestRegion)
 	tf, ok := store.Type("s3")
 	if !ok {
-		t.Fatal(`cache.LoadDir(...).Type("s3") missing after TaskKindSaveCache`)
+		t.Fatal(`cache.LoadDirForTest(...).Type("s3") missing after TaskKindSaveCache`)
 	}
 	if tf.Count != 55 || !tf.Exact || len(tf.Rows) != 55 {
 		t.Errorf("persisted s3 TypeFile after a page-1-without-Pagination entry raced a save = {Count:%d Exact:%v len(Rows):%d}, want {Count:55 Exact:true len(Rows):55} — D14: a page-1 entry stored without its Pagination must never be treated as an exact observation that downgrades an already-persisted true-exact total", tf.Count, tf.Exact, len(tf.Rows))
@@ -182,10 +182,10 @@ func TestNilPaginationEntry_IsNotExact(t *testing.T) {
 		t.Fatalf("ExecuteTask(TaskKindSaveCache): %v", err)
 	}
 
-	store := cache.LoadDir(depthTestProfile, depthTestRegion)
+	store := cache.LoadDirForTest(depthTestProfile, depthTestRegion)
 	tf, ok := store.Type("s3")
 	if !ok {
-		t.Fatal(`cache.LoadDir(...).Type("s3") missing after TaskKindSaveCache`)
+		t.Fatal(`cache.LoadDirForTest(...).Type("s3") missing after TaskKindSaveCache`)
 	}
 	if tf.Exact && tf.Count == 50 {
 		t.Errorf("persisted s3 TypeFile = {Count:%d Exact:%v}, want the prior exact 55 preserved (Exact=true, Count=55) — D14: a nil-Pagination session.ResourceCache entry must never be treated as an exact observation", tf.Count, tf.Exact)

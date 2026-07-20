@@ -147,8 +147,8 @@ func TestLoadMore_TUI_ColdOpen_NoDuplicates(t *testing.T) {
 	m := tui.New(profile, region,
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
-		tui.WithProfile(profile),
-		tui.WithRegion(region))
+		tui.WithProfileForTest(profile),
+		tui.WithRegionForTest(region))
 	t.Cleanup(func() { m.CloseController() })
 	// Height is tall enough to render all 55 rows without viewport
 	// scrolling — the assertions below check row-ID occurrences and the
@@ -435,7 +435,7 @@ func TestLoadMore_PersistedPair_NeverMismatched(t *testing.T) {
 		PageSize:    50,
 	}, true)
 
-	store := cache.LoadDir(profile, region)
+	store := cache.LoadDirForTest(profile, region)
 	tf, ok := store.Type("s3")
 	if !ok {
 		t.Fatal(`store.Type("s3") missing after the poisoning sequence — cannot validate the persisted-pair invariant`)

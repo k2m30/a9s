@@ -21,8 +21,8 @@ func TestBugReveal_EC2Detail_AutoShowsRelatedAfterResizeToWide(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	if initCmd := m.Init(); initCmd != nil {
 		if initMsg := initCmd(); initMsg != nil {
 			m2, _ := rootApplyMsg(m, initMsg)
@@ -69,8 +69,8 @@ func TestBugReveal_EC2Detail_ResizeDoesNotOverrideExplicitHide(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	if initCmd := m.Init(); initCmd != nil {
 		if initMsg := initCmd(); initMsg != nil {
 			m2, _ := rootApplyMsg(m, initMsg)

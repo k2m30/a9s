@@ -29,8 +29,8 @@ func TestDemoMode_Init_NoAWSConnection(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	cmd := model.Init()
 	if cmd == nil {
 		t.Fatal("Init() returned nil cmd; expected a cmd that produces ClientsReadyMsg")
@@ -58,8 +58,8 @@ func TestDemoMode_FetchResources_EC2(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 
 	// Send ClientsReadyMsg to move past initialization
 	var m tea.Model = model
@@ -99,8 +99,8 @@ func TestDemoMode_FetchResources_Unknown(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 
 	// Send ClientsReadyMsg to move past initialization
 	var m tea.Model = model
@@ -148,8 +148,8 @@ func TestDemoMode_BlockedCommand_Ctx(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())
@@ -182,8 +182,8 @@ func TestDemoMode_BlockedCommand_Region(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())
@@ -216,8 +216,8 @@ func TestDemoMode_RevealWorks(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())
@@ -279,8 +279,8 @@ func TestDemoMode_SSMRevealWorks(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())
@@ -339,8 +339,8 @@ func TestDemoMode_RefreshReturnsSameData(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())

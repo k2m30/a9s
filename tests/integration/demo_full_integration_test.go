@@ -15,7 +15,7 @@ import (
 
 func TestDemoFullIntegration_AllResourcesBaseline(t *testing.T) {
 	clients := demo.NewServiceClients()
-	expectedTopLevel := fullIntegrationCountExpectationsFromCounts(demofixtures.ExpectedTopLevelCounts())
+	expectedTopLevel := fullIntegrationCountExpectationsFromCounts(demofixtures.ExpectedTopLevelCountsForTest())
 
 	m := tui.New(
 		demo.DemoProfile,
@@ -44,7 +44,7 @@ func TestDemoFullIntegration_AllResourcesBaseline(t *testing.T) {
 
 func TestDemoFullIntegration_RelatedHopScenarios(t *testing.T) {
 	clients := demo.NewServiceClients()
-	expectedTopLevel := fullIntegrationCountExpectationsFromCounts(demofixtures.ExpectedTopLevelCounts())
+	expectedTopLevel := fullIntegrationCountExpectationsFromCounts(demofixtures.ExpectedTopLevelCountsForTest())
 
 	scenarios := []fullIntegrationRelatedHopScenario{
 		{

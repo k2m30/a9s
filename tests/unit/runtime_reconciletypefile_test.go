@@ -70,7 +70,7 @@ func TestSaveAvailabilityCache_CountsOnly_NeverDropsRows(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "countsonly"
 
-	store := cache.LoadDir(saveRegProfile, saveRegRegion)
+	store := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	store.Put(shortName, cache.TypeFile{
 		HasResources: true, Count: 50, Exact: true, Rows: reconcileRows("co", 50),
 	})
@@ -88,7 +88,7 @@ func TestSaveAvailabilityCache_CountsOnly_NeverDropsRows(t *testing.T) {
 		t.Fatalf("SaveAvailabilityCache: %v", err)
 	}
 
-	reloaded := cache.LoadDir(saveRegProfile, saveRegRegion)
+	reloaded := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	tf, ok := reloaded.Type(shortName)
 	if !ok {
 		t.Fatal("TypeFile missing after counts-only SaveAvailabilityCache write")
@@ -115,7 +115,7 @@ func TestSaveResourceListCache_SubsetRowsWrite_KeepsFullerRows(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "subsetwrite"
 
-	store := cache.LoadDir(saveRegProfile, saveRegRegion)
+	store := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	existingRows := reconcileRows("sr", 55)
 	store.Put(shortName, cache.TypeFile{
 		HasResources: true, Count: 55, Exact: true, Rows: existingRows,
@@ -133,7 +133,7 @@ func TestSaveResourceListCache_SubsetRowsWrite_KeepsFullerRows(t *testing.T) {
 		t.Fatalf("SaveResourceListCache: %v", err)
 	}
 
-	reloaded := cache.LoadDir(saveRegProfile, saveRegRegion)
+	reloaded := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	tf, ok := reloaded.Type(shortName)
 	if !ok {
 		t.Fatal("TypeFile missing after subset-rows SaveResourceListCache write")
@@ -166,7 +166,7 @@ func TestSaveResourceListCache_DeeperRowsWrite_Wins(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "deeperwrite"
 
-	store := cache.LoadDir(saveRegProfile, saveRegRegion)
+	store := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	store.Put(shortName, cache.TypeFile{
 		HasResources: true, Count: 50, Exact: true, Rows: reconcileRows("dw", 50),
 	})
@@ -181,7 +181,7 @@ func TestSaveResourceListCache_DeeperRowsWrite_Wins(t *testing.T) {
 		t.Fatalf("SaveResourceListCache: %v", err)
 	}
 
-	reloaded := cache.LoadDir(saveRegProfile, saveRegRegion)
+	reloaded := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	tf, ok := reloaded.Type(shortName)
 	if !ok {
 		t.Fatal("TypeFile missing after deeper-rows SaveResourceListCache write")
@@ -208,7 +208,7 @@ func TestSaveResourceListCache_NonSubsetSameDepth_RefreshWins(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "refreshwrite"
 
-	store := cache.LoadDir(saveRegProfile, saveRegRegion)
+	store := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	store.Put(shortName, cache.TypeFile{
 		HasResources: true, Count: 50, Exact: true, Rows: reconcileRows("old", 50),
 	})
@@ -225,7 +225,7 @@ func TestSaveResourceListCache_NonSubsetSameDepth_RefreshWins(t *testing.T) {
 		t.Fatalf("SaveResourceListCache: %v", err)
 	}
 
-	reloaded := cache.LoadDir(saveRegProfile, saveRegRegion)
+	reloaded := cache.LoadDirForTest(saveRegProfile, saveRegRegion)
 	tf, ok := reloaded.Type(shortName)
 	if !ok {
 		t.Fatal("TypeFile missing after non-subset-same-depth SaveResourceListCache write")
@@ -293,7 +293,7 @@ func TestDEF20_ListPageSweepMenuSync_RowsSurviveAllThreeSaveLanes(t *testing.T) 
 	}
 	ctrl.ApplyResourcesLoaded(shortName, page2, &resource.PaginationMeta{IsTruncated: false}, true)
 
-	store := cache.LoadDir(def20Profile, def20Region)
+	store := cache.LoadDirForTest(def20Profile, def20Region)
 	tf, ok := store.Type(shortName)
 	if !ok {
 		t.Fatal("stage 1: TypeFile missing after paged list-open save")
@@ -317,7 +317,7 @@ func TestDEF20_ListPageSweepMenuSync_RowsSurviveAllThreeSaveLanes(t *testing.T) 
 		t.Fatalf("stage 2: SaveResourceListCache: %v", err)
 	}
 
-	store = cache.LoadDir(def20Profile, def20Region)
+	store = cache.LoadDirForTest(def20Profile, def20Region)
 	tf, ok = store.Type(shortName)
 	if !ok {
 		t.Fatal("stage 2: TypeFile missing after sweep-lane subset save")
@@ -337,7 +337,7 @@ func TestDEF20_ListPageSweepMenuSync_RowsSurviveAllThreeSaveLanes(t *testing.T) 
 		t.Fatalf("stage 3: SaveAvailabilityCache: %v", err)
 	}
 
-	store = cache.LoadDir(def20Profile, def20Region)
+	store = cache.LoadDirForTest(def20Profile, def20Region)
 	tf, ok = store.Type(shortName)
 	if !ok {
 		t.Fatal("stage 3: TypeFile missing after counts-only menu-sync save")

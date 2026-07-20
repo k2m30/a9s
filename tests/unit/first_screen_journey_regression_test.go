@@ -33,8 +33,8 @@ func TestFirstScreen_EC2EnterToDetail_ShowsRelatedColumn(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 	m = applyRootAndCmd(t, m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -70,8 +70,8 @@ func TestFirstScreen_DetailEnterRelatedList_EscReturnsToDetail(t *testing.T) {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ec2Client2 := fakes.NewEC2()
@@ -125,8 +125,8 @@ func TestFirstScreen_DetailMissingType_StillShowsRelatedForEC2Shape(t *testing.T
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ec2Client3 := fakes.NewEC2()
@@ -159,8 +159,8 @@ func TestFirstScreen_DetailEnterExternalImageID_DoesNotEndInEmptyAMIList(t *test
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ec2Res := resource.Resource{

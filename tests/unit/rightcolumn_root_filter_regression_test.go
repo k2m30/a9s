@@ -18,8 +18,8 @@ func openFocusedRelatedDetailForRootFilterTest(t *testing.T) tui.Model {
 
 	oldDefs := append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
 	resource.SetRelatedForTest("ec2", []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopChecker},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: resource.NoopChecker},
+		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopCheckerForTest},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: resource.NoopCheckerForTest},
 	})
 	t.Cleanup(func() { resource.SetRelatedForTest("ec2", oldDefs) })
 
@@ -27,8 +27,8 @@ func openFocusedRelatedDetailForRootFilterTest(t *testing.T) tui.Model {
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
-		tui.WithProfile(demo.DemoProfile),
-		tui.WithRegion(demo.DemoRegion))
+		tui.WithProfileForTest(demo.DemoProfile),
+		tui.WithRegionForTest(demo.DemoRegion))
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	res := resource.Resource{

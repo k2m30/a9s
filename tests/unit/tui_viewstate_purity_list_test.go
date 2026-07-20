@@ -88,8 +88,8 @@ func newPurityListModel(td resource.ResourceTypeDef) views.ResourceListModel {
 
 func TestViewStatePurity_List_GlyphFollowsDecoratorNotFindings_Present(t *testing.T) {
 	ensureNoColor(t)
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	styles.ReinitForTest()
+	t.Cleanup(styles.ReinitForTest)
 
 	td := purityTypeDef("purity-glyph-present")
 	m := newPurityListModel(td)
@@ -127,8 +127,8 @@ func TestViewStatePurity_List_GlyphFollowsDecoratorNotFindings_Present(t *testin
 
 func TestViewStatePurity_List_GlyphFollowsDecoratorNotFindings_Absent(t *testing.T) {
 	ensureNoColor(t)
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	styles.ReinitForTest()
+	t.Cleanup(styles.ReinitForTest)
 
 	td := purityTypeDef("purity-glyph-absent")
 	m := newPurityListModel(td)
@@ -176,8 +176,8 @@ func TestViewStatePurity_List_GlyphFollowsDecoratorNotFindings_Absent(t *testing
 
 func TestViewStatePurity_List_StatusCellFollowsCellsNotFindingsPhrase(t *testing.T) {
 	ensureNoColor(t)
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	styles.ReinitForTest()
+	t.Cleanup(styles.ReinitForTest)
 
 	td := purityTypeDef("purity-status-cell")
 	m := newPurityListModel(td)
@@ -231,8 +231,8 @@ func TestViewStatePurity_List_StatusCellFollowsCellsNotFindingsPhrase(t *testing
 
 func TestViewStatePurity_List_MarkerColSelectsPrefixedColumn(t *testing.T) {
 	ensureNoColor(t)
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	styles.ReinitForTest()
+	t.Cleanup(styles.ReinitForTest)
 
 	td := purityTypeDef("purity-markercol")
 	m := newPurityListModel(td)

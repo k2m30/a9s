@@ -38,7 +38,7 @@ func TestNavigableFields_NG_Registered(t *testing.T) {
 		"NodeRole":    "role",
 	}
 	for path, wantTarget := range expected {
-		nav := resource.IsFieldNavigable("ng", path)
+		nav := resource.IsFieldNavigableForTest("ng", path)
 		if nav == nil {
 			t.Errorf("expected navigable field %q not found for ng", path)
 			continue
