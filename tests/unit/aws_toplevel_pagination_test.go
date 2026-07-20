@@ -260,37 +260,9 @@ func TestFetchLambdaFunctions_Pagination(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// Paginated mock: RDS DescribeDBInstances
-// ---------------------------------------------------------------------------
-
-type mockRDSPaginatedClient struct {
-	outputs []*rds.DescribeDBInstancesOutput
-	inputs  []*rds.DescribeDBInstancesInput
-	err     error
-	callIdx int
-}
-
-func (m *mockRDSPaginatedClient) DescribeDBInstances(
-	ctx context.Context,
-	params *rds.DescribeDBInstancesInput,
-	optFns ...func(*rds.Options),
-) (*rds.DescribeDBInstancesOutput, error) {
-	m.inputs = append(m.inputs, params)
-	if m.err != nil {
-		return nil, m.err
-	}
-	if m.callIdx >= len(m.outputs) {
-		return &rds.DescribeDBInstancesOutput{}, nil
-	}
-	out := m.outputs[m.callIdx]
-	m.callIdx++
-	return out, nil
-}
-
 func TestFetchRDSInstances_Pagination(t *testing.T) {
-	mock := &mockRDSPaginatedClient{
-		outputs: []*rds.DescribeDBInstancesOutput{
+	mock := &fakeRDSDescribeDBInstances{
+		Pages: []*rds.DescribeDBInstancesOutput{
 			{
 				Marker: aws.String("page2-marker"),
 				DBInstances: []rdstypes.DBInstance{
@@ -353,17 +325,17 @@ func TestFetchRDSInstances_Pagination(t *testing.T) {
 	})
 
 	t.Run("api_called_twice", func(t *testing.T) {
-		if mock.callIdx != 2 {
-			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
+		if mock.Calls != 2 {
+			t.Errorf("expected 2 API calls, got %d", mock.Calls)
 		}
 	})
 
 	t.Run("page2_received_marker", func(t *testing.T) {
-		if len(mock.inputs) < 2 {
-			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		if len(mock.Inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.Inputs))
 		}
-		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
-			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		if mock.Inputs[1].Marker == nil || *mock.Inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.Inputs[1].Marker, "page2-marker")
 		}
 	})
 }
@@ -841,37 +813,9 @@ func TestFetchDynamoDBTables_Pagination(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// Paginated mock: SQS ListQueues
-// ---------------------------------------------------------------------------
-
-type mockSQSListQueuesPaginatedClient struct {
-	outputs []*sqs.ListQueuesOutput
-	inputs  []*sqs.ListQueuesInput
-	err     error
-	callIdx int
-}
-
-func (m *mockSQSListQueuesPaginatedClient) ListQueues(
-	ctx context.Context,
-	params *sqs.ListQueuesInput,
-	optFns ...func(*sqs.Options),
-) (*sqs.ListQueuesOutput, error) {
-	m.inputs = append(m.inputs, params)
-	if m.err != nil {
-		return nil, m.err
-	}
-	if m.callIdx >= len(m.outputs) {
-		return &sqs.ListQueuesOutput{}, nil
-	}
-	out := m.outputs[m.callIdx]
-	m.callIdx++
-	return out, nil
-}
-
 func TestFetchSQSQueues_Pagination(t *testing.T) {
-	listMock := &mockSQSListQueuesPaginatedClient{
-		outputs: []*sqs.ListQueuesOutput{
+	listMock := &fakeSQSListQueues{
+		Pages: []*sqs.ListQueuesOutput{
 			{
 				NextToken: aws.String("page2-token"),
 				QueueUrls: []string{
@@ -887,8 +831,8 @@ func TestFetchSQSQueues_Pagination(t *testing.T) {
 		},
 	}
 
-	attrMock := &mockSQSGetQueueAttributesClient{
-		outputs: map[string]*sqs.GetQueueAttributesOutput{
+	attrMock := &fakeSQSGetQueueAttributes{
+		ByURL: map[string]*sqs.GetQueueAttributesOutput{
 			"https://sqs.us-east-1.amazonaws.com/111122223333/page1-queue-1": {
 				Attributes: map[string]string{
 					"ApproximateNumberOfMessages":           "10",
@@ -942,17 +886,17 @@ func TestFetchSQSQueues_Pagination(t *testing.T) {
 	})
 
 	t.Run("list_api_called_twice", func(t *testing.T) {
-		if listMock.callIdx != 2 {
-			t.Errorf("expected 2 ListQueues API calls, got %d", listMock.callIdx)
+		if listMock.Calls != 2 {
+			t.Errorf("expected 2 ListQueues API calls, got %d", listMock.Calls)
 		}
 	})
 
 	t.Run("page2_received_token", func(t *testing.T) {
-		if len(listMock.inputs) < 2 {
-			t.Fatalf("expected at least 2 inputs captured, got %d", len(listMock.inputs))
+		if len(listMock.Inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(listMock.Inputs))
 		}
-		if listMock.inputs[1].NextToken == nil || *listMock.inputs[1].NextToken != "page2-token" {
-			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", listMock.inputs[1].NextToken, "page2-token")
+		if listMock.Inputs[1].NextToken == nil || *listMock.Inputs[1].NextToken != "page2-token" {
+			t.Errorf("NextToken not forwarded to page 2: got %v, want %q", listMock.Inputs[1].NextToken, "page2-token")
 		}
 	})
 }

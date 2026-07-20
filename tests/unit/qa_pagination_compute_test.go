@@ -308,27 +308,11 @@ func TestQA_Pagination_FetchLambdaFunctionsPage_Error(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Mock: S3 ListBuckets (paginated)
-// ---------------------------------------------------------------------------
-
-type mockS3ListBucketsAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*s3.ListBucketsOutput, error)
-	lastInput *s3.ListBucketsInput
-}
-
-func (m *mockS3ListBucketsAPIPaginated) ListBuckets(_ context.Context, in *s3.ListBucketsInput, _ ...func(*s3.Options)) (*s3.ListBucketsOutput, error) {
-	m.Calls++
-	m.lastInput = in
-	return m.PageFunc(m.Calls)
-}
-
-// ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchS3BucketsPage
 // ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchS3BucketsPage_FirstPage(t *testing.T) {
-	mock := &mockS3ListBucketsAPIPaginated{
+	mock := &fakeS3ListBuckets{
 		PageFunc: func(_ int) (*s3.ListBucketsOutput, error) {
 			return &s3.ListBucketsOutput{
 				Buckets: []s3types.Bucket{
@@ -364,7 +348,7 @@ func TestQA_Pagination_FetchS3BucketsPage_FirstPage(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchS3BucketsPage_Continuation(t *testing.T) {
-	mock := &mockS3ListBucketsAPIPaginated{
+	mock := &fakeS3ListBuckets{
 		PageFunc: func(_ int) (*s3.ListBucketsOutput, error) {
 			return &s3.ListBucketsOutput{
 				Buckets: []s3types.Bucket{
@@ -388,16 +372,16 @@ func TestQA_Pagination_FetchS3BucketsPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
-	if mock.lastInput == nil {
+	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.lastInput.ContinuationToken == nil || *mock.lastInput.ContinuationToken != "cont-token-2" {
-		t.Errorf("ContinuationToken not forwarded: got %v, want %q", mock.lastInput.ContinuationToken, "cont-token-2")
+	if mock.LastInput.ContinuationToken == nil || *mock.LastInput.ContinuationToken != "cont-token-2" {
+		t.Errorf("ContinuationToken not forwarded: got %v, want %q", mock.LastInput.ContinuationToken, "cont-token-2")
 	}
 }
 
 func TestQA_Pagination_FetchS3BucketsPage_Empty(t *testing.T) {
-	mock := &mockS3ListBucketsAPIPaginated{
+	mock := &fakeS3ListBuckets{
 		PageFunc: func(_ int) (*s3.ListBucketsOutput, error) {
 			return &s3.ListBucketsOutput{
 				Buckets:           []s3types.Bucket{},
@@ -419,7 +403,7 @@ func TestQA_Pagination_FetchS3BucketsPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchS3BucketsPage_Error(t *testing.T) {
-	mock := &mockS3ListBucketsAPIPaginated{
+	mock := &fakeS3ListBuckets{
 		PageFunc: func(_ int) (*s3.ListBucketsOutput, error) {
 			return nil, errors.New("list buckets failed")
 		},

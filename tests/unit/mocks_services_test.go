@@ -6,24 +6,20 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/acm"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
-	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	cloudwatch "github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
-	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
-	"github.com/aws/aws-sdk-go-v2/service/efs"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
@@ -180,19 +176,6 @@ func (m *mockEC2DescribeAddressesClient) DescribeAddresses(ctx context.Context, 
 }
 
 // ---------------------------------------------------------------------------
-// ACM mocks
-// ---------------------------------------------------------------------------
-
-type mockACMListCertificatesClient struct {
-	output *acm.ListCertificatesOutput
-	err    error
-}
-
-func (m *mockACMListCertificatesClient) ListCertificates(ctx context.Context, params *acm.ListCertificatesInput, optFns ...func(*acm.Options)) (*acm.ListCertificatesOutput, error) {
-	return m.output, m.err
-}
-
-// ---------------------------------------------------------------------------
 // Auto Scaling mocks
 // ---------------------------------------------------------------------------
 
@@ -243,19 +226,6 @@ type mockIAMListPoliciesClient struct {
 }
 
 func (m *mockIAMListPoliciesClient) ListPolicies(ctx context.Context, params *iam.ListPoliciesInput, optFns ...func(*iam.Options)) (*iam.ListPoliciesOutput, error) {
-	return m.output, m.err
-}
-
-// ---------------------------------------------------------------------------
-// RDS Snapshots mocks
-// ---------------------------------------------------------------------------
-
-type mockRDSDescribeDBSnapshotsClient struct {
-	output *rds.DescribeDBSnapshotsOutput
-	err    error
-}
-
-func (m *mockRDSDescribeDBSnapshotsClient) DescribeDBSnapshots(ctx context.Context, params *rds.DescribeDBSnapshotsInput, optFns ...func(*rds.Options)) (*rds.DescribeDBSnapshotsOutput, error) {
 	return m.output, m.err
 }
 
@@ -362,32 +332,6 @@ func (m *mockIAMListGroupsClient) ListGroups(ctx context.Context, params *iam.Li
 }
 
 // ---------------------------------------------------------------------------
-// DB Cluster Snapshots mocks
-// ---------------------------------------------------------------------------
-
-type mockDocDBDescribeSnapshotsClient struct {
-	output *docdb.DescribeDBClusterSnapshotsOutput
-	err    error
-}
-
-func (m *mockDocDBDescribeSnapshotsClient) DescribeDBClusterSnapshots(ctx context.Context, params *docdb.DescribeDBClusterSnapshotsInput, optFns ...func(*docdb.Options)) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
-	return m.output, m.err
-}
-
-// ---------------------------------------------------------------------------
-// CloudFront mocks
-// ---------------------------------------------------------------------------
-
-type mockCloudFrontClient struct {
-	output *cloudfront.ListDistributionsOutput
-	err    error
-}
-
-func (m *mockCloudFrontClient) ListDistributions(ctx context.Context, params *cloudfront.ListDistributionsInput, optFns ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsOutput, error) {
-	return m.output, m.err
-}
-
-// ---------------------------------------------------------------------------
 // Route 53 mocks
 // ---------------------------------------------------------------------------
 
@@ -443,32 +387,6 @@ type mockECRClient struct {
 }
 
 func (m *mockECRClient) DescribeRepositories(ctx context.Context, params *ecr.DescribeRepositoriesInput, optFns ...func(*ecr.Options)) (*ecr.DescribeRepositoriesOutput, error) {
-	return m.output, m.err
-}
-
-// ---------------------------------------------------------------------------
-// EFS mocks
-// ---------------------------------------------------------------------------
-
-type mockEFSClient struct {
-	output *efs.DescribeFileSystemsOutput
-	err    error
-}
-
-func (m *mockEFSClient) DescribeFileSystems(ctx context.Context, params *efs.DescribeFileSystemsInput, optFns ...func(*efs.Options)) (*efs.DescribeFileSystemsOutput, error) {
-	return m.output, m.err
-}
-
-// ---------------------------------------------------------------------------
-// EventBridge mocks
-// ---------------------------------------------------------------------------
-
-type mockEventBridgeClient struct {
-	output *eventbridge.ListRulesOutput
-	err    error
-}
-
-func (m *mockEventBridgeClient) ListRules(ctx context.Context, params *eventbridge.ListRulesInput, optFns ...func(*eventbridge.Options)) (*eventbridge.ListRulesOutput, error) {
 	return m.output, m.err
 }
 

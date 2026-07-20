@@ -23,28 +23,12 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Mock: CloudWatch DescribeAlarms (paginated)
-// ---------------------------------------------------------------------------
-
-type mockCloudWatchDescribeAlarmsAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*cloudwatch.DescribeAlarmsOutput, error)
-	lastInput *cloudwatch.DescribeAlarmsInput
-}
-
-func (m *mockCloudWatchDescribeAlarmsAPIPaginated) DescribeAlarms(_ context.Context, in *cloudwatch.DescribeAlarmsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmsOutput, error) {
-	m.Calls++
-	m.lastInput = in
-	return m.PageFunc(m.Calls)
-}
-
-// ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchCloudWatchAlarmsPage
 // ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchCloudWatchAlarmsPage_FirstPage(t *testing.T) {
 	threshold := 90.0
-	mock := &mockCloudWatchDescribeAlarmsAPIPaginated{
+	mock := &fakeCloudWatchDescribeAlarms{
 		PageFunc: func(_ int) (*cloudwatch.DescribeAlarmsOutput, error) {
 			return &cloudwatch.DescribeAlarmsOutput{
 				MetricAlarms: []cwtypes.MetricAlarm{
@@ -87,7 +71,7 @@ func TestQA_Pagination_FetchCloudWatchAlarmsPage_FirstPage(t *testing.T) {
 
 func TestQA_Pagination_FetchCloudWatchAlarmsPage_Continuation(t *testing.T) {
 	threshold := 50.0
-	mock := &mockCloudWatchDescribeAlarmsAPIPaginated{
+	mock := &fakeCloudWatchDescribeAlarms{
 		PageFunc: func(_ int) (*cloudwatch.DescribeAlarmsOutput, error) {
 			return &cloudwatch.DescribeAlarmsOutput{
 				MetricAlarms: []cwtypes.MetricAlarm{
@@ -117,16 +101,16 @@ func TestQA_Pagination_FetchCloudWatchAlarmsPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
-	if mock.lastInput == nil {
+	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
-		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	if mock.LastInput.NextToken == nil || *mock.LastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.LastInput.NextToken, "token-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchCloudWatchAlarmsPage_Empty(t *testing.T) {
-	mock := &mockCloudWatchDescribeAlarmsAPIPaginated{
+	mock := &fakeCloudWatchDescribeAlarms{
 		PageFunc: func(_ int) (*cloudwatch.DescribeAlarmsOutput, error) {
 			return &cloudwatch.DescribeAlarmsOutput{
 				MetricAlarms: []cwtypes.MetricAlarm{},
@@ -148,7 +132,7 @@ func TestQA_Pagination_FetchCloudWatchAlarmsPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchCloudWatchAlarmsPage_Error(t *testing.T) {
-	mock := &mockCloudWatchDescribeAlarmsAPIPaginated{
+	mock := &fakeCloudWatchDescribeAlarms{
 		PageFunc: func(_ int) (*cloudwatch.DescribeAlarmsOutput, error) {
 			return nil, errors.New("describe alarms failed")
 		},
@@ -474,41 +458,11 @@ func TestQA_Pagination_FetchDynamoDBTablesPage_Error(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Mock: SQS ListQueues + GetQueueAttributes (paginated)
-// ---------------------------------------------------------------------------
-
-type mockSQSListQueuesAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*sqs.ListQueuesOutput, error)
-	lastInput *sqs.ListQueuesInput
-}
-
-func (m *mockSQSListQueuesAPIPaginated) ListQueues(_ context.Context, in *sqs.ListQueuesInput, _ ...func(*sqs.Options)) (*sqs.ListQueuesOutput, error) {
-	m.Calls++
-	m.lastInput = in
-	return m.PageFunc(m.Calls)
-}
-
-type mockSQSGetQueueAttributesAPIPaginated struct {
-	Calls    int
-	AttrFunc func(call int, queueURL string) (*sqs.GetQueueAttributesOutput, error)
-}
-
-func (m *mockSQSGetQueueAttributesAPIPaginated) GetQueueAttributes(_ context.Context, input *sqs.GetQueueAttributesInput, _ ...func(*sqs.Options)) (*sqs.GetQueueAttributesOutput, error) {
-	m.Calls++
-	url := ""
-	if input.QueueUrl != nil {
-		url = *input.QueueUrl
-	}
-	return m.AttrFunc(m.Calls, url)
-}
-
-// ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchSQSQueuesPage
 // ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchSQSQueuesPage_FirstPage(t *testing.T) {
-	listMock := &mockSQSListQueuesAPIPaginated{
+	listMock := &fakeSQSListQueues{
 		PageFunc: func(_ int) (*sqs.ListQueuesOutput, error) {
 			return &sqs.ListQueuesOutput{
 				QueueUrls: []string{"https://sqs.us-east-1.amazonaws.com/111111111111/my-queue"},
@@ -516,8 +470,8 @@ func TestQA_Pagination_FetchSQSQueuesPage_FirstPage(t *testing.T) {
 			}, nil
 		},
 	}
-	attrMock := &mockSQSGetQueueAttributesAPIPaginated{
-		AttrFunc: func(_ int, _ string) (*sqs.GetQueueAttributesOutput, error) {
+	attrMock := &fakeSQSGetQueueAttributes{
+		Func: func(_ int, _ string) (*sqs.GetQueueAttributesOutput, error) {
 			return &sqs.GetQueueAttributesOutput{
 				Attributes: map[string]string{
 					"ApproximateNumberOfMessages":           "42",
@@ -553,7 +507,7 @@ func TestQA_Pagination_FetchSQSQueuesPage_FirstPage(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchSQSQueuesPage_Continuation(t *testing.T) {
-	listMock := &mockSQSListQueuesAPIPaginated{
+	listMock := &fakeSQSListQueues{
 		PageFunc: func(_ int) (*sqs.ListQueuesOutput, error) {
 			return &sqs.ListQueuesOutput{
 				QueueUrls: []string{"https://sqs.us-east-1.amazonaws.com/111111111111/another-queue"},
@@ -561,8 +515,8 @@ func TestQA_Pagination_FetchSQSQueuesPage_Continuation(t *testing.T) {
 			}, nil
 		},
 	}
-	attrMock := &mockSQSGetQueueAttributesAPIPaginated{
-		AttrFunc: func(_ int, _ string) (*sqs.GetQueueAttributesOutput, error) {
+	attrMock := &fakeSQSGetQueueAttributes{
+		Func: func(_ int, _ string) (*sqs.GetQueueAttributesOutput, error) {
 			return &sqs.GetQueueAttributesOutput{
 				Attributes: map[string]string{
 					"ApproximateNumberOfMessages":           "0",
@@ -586,16 +540,16 @@ func TestQA_Pagination_FetchSQSQueuesPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
-	if listMock.lastInput == nil {
+	if listMock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if listMock.lastInput.NextToken == nil || *listMock.lastInput.NextToken != "token-page-2" {
-		t.Errorf("NextToken not forwarded: got %v, want %q", listMock.lastInput.NextToken, "token-page-2")
+	if listMock.LastInput.NextToken == nil || *listMock.LastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", listMock.LastInput.NextToken, "token-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchSQSQueuesPage_Empty(t *testing.T) {
-	listMock := &mockSQSListQueuesAPIPaginated{
+	listMock := &fakeSQSListQueues{
 		PageFunc: func(_ int) (*sqs.ListQueuesOutput, error) {
 			return &sqs.ListQueuesOutput{
 				QueueUrls: []string{},
@@ -603,8 +557,8 @@ func TestQA_Pagination_FetchSQSQueuesPage_Empty(t *testing.T) {
 			}, nil
 		},
 	}
-	attrMock := &mockSQSGetQueueAttributesAPIPaginated{
-		AttrFunc: func(_ int, _ string) (*sqs.GetQueueAttributesOutput, error) {
+	attrMock := &fakeSQSGetQueueAttributes{
+		Func: func(_ int, _ string) (*sqs.GetQueueAttributesOutput, error) {
 			return &sqs.GetQueueAttributesOutput{Attributes: map[string]string{}}, nil
 		},
 	}
@@ -622,13 +576,13 @@ func TestQA_Pagination_FetchSQSQueuesPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchSQSQueuesPage_Error(t *testing.T) {
-	listMock := &mockSQSListQueuesAPIPaginated{
+	listMock := &fakeSQSListQueues{
 		PageFunc: func(_ int) (*sqs.ListQueuesOutput, error) {
 			return nil, errors.New("list queues failed")
 		},
 	}
-	attrMock := &mockSQSGetQueueAttributesAPIPaginated{
-		AttrFunc: func(_ int, _ string) (*sqs.GetQueueAttributesOutput, error) {
+	attrMock := &fakeSQSGetQueueAttributes{
+		Func: func(_ int, _ string) (*sqs.GetQueueAttributesOutput, error) {
 			return &sqs.GetQueueAttributesOutput{Attributes: map[string]string{}}, nil
 		},
 	}

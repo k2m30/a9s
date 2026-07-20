@@ -744,33 +744,9 @@ func TestFetchEBEnvironments_Pagination(t *testing.T) {
 // 9. EFS DescribeFileSystems — Marker/NextMarker pagination
 // ---------------------------------------------------------------------------
 
-type mockEFSPaginatedClient struct {
-	outputs []*efs.DescribeFileSystemsOutput
-	inputs  []*efs.DescribeFileSystemsInput
-	err     error
-	callIdx int
-}
-
-func (m *mockEFSPaginatedClient) DescribeFileSystems(
-	ctx context.Context,
-	params *efs.DescribeFileSystemsInput,
-	optFns ...func(*efs.Options),
-) (*efs.DescribeFileSystemsOutput, error) {
-	m.inputs = append(m.inputs, params)
-	if m.err != nil {
-		return nil, m.err
-	}
-	if m.callIdx >= len(m.outputs) {
-		return &efs.DescribeFileSystemsOutput{}, nil
-	}
-	out := m.outputs[m.callIdx]
-	m.callIdx++
-	return out, nil
-}
-
 func TestFetchEFSFileSystems_Pagination(t *testing.T) {
-	mock := &mockEFSPaginatedClient{
-		outputs: []*efs.DescribeFileSystemsOutput{
+	mock := &fakeEFSDescribeFileSystems{
+		Pages: []*efs.DescribeFileSystemsOutput{
 			{
 				NextMarker: aws.String("page2-marker"),
 				FileSystems: []efstypes.FileSystemDescription{
@@ -815,17 +791,17 @@ func TestFetchEFSFileSystems_Pagination(t *testing.T) {
 	})
 
 	t.Run("api_called_twice", func(t *testing.T) {
-		if mock.callIdx != 2 {
-			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
+		if mock.Calls != 2 {
+			t.Errorf("expected 2 API calls, got %d", mock.Calls)
 		}
 	})
 
 	t.Run("page2_received_marker", func(t *testing.T) {
-		if len(mock.inputs) < 2 {
-			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		if len(mock.Inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.Inputs))
 		}
-		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
-			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		if mock.Inputs[1].Marker == nil || *mock.Inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.Inputs[1].Marker, "page2-marker")
 		}
 	})
 }

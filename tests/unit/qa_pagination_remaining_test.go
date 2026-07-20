@@ -36,27 +36,11 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Mock: EventBridge ListRules (paginated, NextToken)
-// ---------------------------------------------------------------------------
-
-type mockEventBridgeListRulesAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*eventbridge.ListRulesOutput, error)
-	lastInput *eventbridge.ListRulesInput
-}
-
-func (m *mockEventBridgeListRulesAPIPaginated) ListRules(_ context.Context, in *eventbridge.ListRulesInput, _ ...func(*eventbridge.Options)) (*eventbridge.ListRulesOutput, error) {
-	m.Calls++
-	m.lastInput = in
-	return m.PageFunc(m.Calls)
-}
-
-// ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchEventBridgeRulesPage
 // ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchEventBridgeRulesPage_FirstPage(t *testing.T) {
-	mock := &mockEventBridgeListRulesAPIPaginated{
+	mock := &fakeEventBridgeListRules{
 		PageFunc: func(_ int) (*eventbridge.ListRulesOutput, error) {
 			return &eventbridge.ListRulesOutput{
 				Rules: []ebtypes.Rule{
@@ -96,7 +80,7 @@ func TestQA_Pagination_FetchEventBridgeRulesPage_FirstPage(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchEventBridgeRulesPage_Continuation(t *testing.T) {
-	mock := &mockEventBridgeListRulesAPIPaginated{
+	mock := &fakeEventBridgeListRules{
 		PageFunc: func(_ int) (*eventbridge.ListRulesOutput, error) {
 			return &eventbridge.ListRulesOutput{
 				Rules: []ebtypes.Rule{
@@ -129,16 +113,16 @@ func TestQA_Pagination_FetchEventBridgeRulesPage_Continuation(t *testing.T) {
 	if result.Resources[0].ID != "last-eb-rule" {
 		t.Errorf("resource ID: expected %q, got %q", "last-eb-rule", result.Resources[0].ID)
 	}
-	if mock.lastInput == nil {
+	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-eb-page-2" {
-		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-eb-page-2")
+	if mock.LastInput.NextToken == nil || *mock.LastInput.NextToken != "token-eb-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.LastInput.NextToken, "token-eb-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchEventBridgeRulesPage_Empty(t *testing.T) {
-	mock := &mockEventBridgeListRulesAPIPaginated{
+	mock := &fakeEventBridgeListRules{
 		PageFunc: func(_ int) (*eventbridge.ListRulesOutput, error) {
 			return &eventbridge.ListRulesOutput{
 				Rules:     []ebtypes.Rule{},
@@ -166,7 +150,7 @@ func TestQA_Pagination_FetchEventBridgeRulesPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchEventBridgeRulesPage_Error(t *testing.T) {
-	mock := &mockEventBridgeListRulesAPIPaginated{
+	mock := &fakeEventBridgeListRules{
 		PageFunc: func(_ int) (*eventbridge.ListRulesOutput, error) {
 			return nil, errors.New("eventbridge: access denied")
 		},

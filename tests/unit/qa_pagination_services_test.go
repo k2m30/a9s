@@ -40,27 +40,11 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Mock: RDS DescribeDBInstances (paginated, uses Marker)
-// ---------------------------------------------------------------------------
-
-type mockRDSDescribeDBInstancesAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*rds.DescribeDBInstancesOutput, error)
-	lastInput *rds.DescribeDBInstancesInput
-}
-
-func (m *mockRDSDescribeDBInstancesAPIPaginated) DescribeDBInstances(_ context.Context, in *rds.DescribeDBInstancesInput, _ ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error) {
-	m.Calls++
-	m.lastInput = in
-	return m.PageFunc(m.Calls)
-}
-
-// ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchRDSInstancesPage
 // ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchRDSInstancesPage_FirstPage(t *testing.T) {
-	mock := &mockRDSDescribeDBInstancesAPIPaginated{
+	mock := &fakeRDSDescribeDBInstances{
 		PageFunc: func(_ int) (*rds.DescribeDBInstancesOutput, error) {
 			return &rds.DescribeDBInstancesOutput{
 				DBInstances: []rdstypes.DBInstance{
@@ -102,7 +86,7 @@ func TestQA_Pagination_FetchRDSInstancesPage_FirstPage(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchRDSInstancesPage_Continuation(t *testing.T) {
-	mock := &mockRDSDescribeDBInstancesAPIPaginated{
+	mock := &fakeRDSDescribeDBInstances{
 		PageFunc: func(_ int) (*rds.DescribeDBInstancesOutput, error) {
 			return &rds.DescribeDBInstancesOutput{
 				DBInstances: []rdstypes.DBInstance{
@@ -131,16 +115,16 @@ func TestQA_Pagination_FetchRDSInstancesPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
-	if mock.lastInput == nil {
+	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.lastInput.Marker == nil || *mock.lastInput.Marker != "marker-page-2" {
-		t.Errorf("Marker not forwarded: got %v, want %q", mock.lastInput.Marker, "marker-page-2")
+	if mock.LastInput.Marker == nil || *mock.LastInput.Marker != "marker-page-2" {
+		t.Errorf("Marker not forwarded: got %v, want %q", mock.LastInput.Marker, "marker-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchRDSInstancesPage_Empty(t *testing.T) {
-	mock := &mockRDSDescribeDBInstancesAPIPaginated{
+	mock := &fakeRDSDescribeDBInstances{
 		PageFunc: func(_ int) (*rds.DescribeDBInstancesOutput, error) {
 			return &rds.DescribeDBInstancesOutput{
 				DBInstances: []rdstypes.DBInstance{},
@@ -162,7 +146,7 @@ func TestQA_Pagination_FetchRDSInstancesPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchRDSInstancesPage_Error(t *testing.T) {
-	mock := &mockRDSDescribeDBInstancesAPIPaginated{
+	mock := &fakeRDSDescribeDBInstances{
 		PageFunc: func(_ int) (*rds.DescribeDBInstancesOutput, error) {
 			return nil, errors.New("describe db instances failed")
 		},
@@ -306,27 +290,11 @@ func TestQA_Pagination_FetchRedisPage_Error(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Mock: DocumentDB DescribeDBClusters (paginated, uses Marker)
-// ---------------------------------------------------------------------------
-
-type mockDocDBDescribeDBClustersAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*docdb.DescribeDBClustersOutput, error)
-	lastInput *docdb.DescribeDBClustersInput
-}
-
-func (m *mockDocDBDescribeDBClustersAPIPaginated) DescribeDBClusters(_ context.Context, in *docdb.DescribeDBClustersInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBClustersOutput, error) {
-	m.Calls++
-	m.lastInput = in
-	return m.PageFunc(m.Calls)
-}
-
-// ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchDocDBClustersPage
 // ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchDocDBClustersPage_FirstPage(t *testing.T) {
-	mock := &mockDocDBDescribeDBClustersAPIPaginated{
+	mock := &fakeDocDBDescribeDBClusters{
 		PageFunc: func(_ int) (*docdb.DescribeDBClustersOutput, error) {
 			return &docdb.DescribeDBClustersOutput{
 				DBClusters: []docdbstypes.DBCluster{
@@ -367,7 +335,7 @@ func TestQA_Pagination_FetchDocDBClustersPage_FirstPage(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchDocDBClustersPage_Continuation(t *testing.T) {
-	mock := &mockDocDBDescribeDBClustersAPIPaginated{
+	mock := &fakeDocDBDescribeDBClusters{
 		PageFunc: func(_ int) (*docdb.DescribeDBClustersOutput, error) {
 			return &docdb.DescribeDBClustersOutput{
 				DBClusters: []docdbstypes.DBCluster{
@@ -392,16 +360,16 @@ func TestQA_Pagination_FetchDocDBClustersPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
-	if mock.lastInput == nil {
+	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.lastInput.Marker == nil || *mock.lastInput.Marker != "marker-page-2" {
-		t.Errorf("Marker not forwarded: got %v, want %q", mock.lastInput.Marker, "marker-page-2")
+	if mock.LastInput.Marker == nil || *mock.LastInput.Marker != "marker-page-2" {
+		t.Errorf("Marker not forwarded: got %v, want %q", mock.LastInput.Marker, "marker-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchDocDBClustersPage_Empty(t *testing.T) {
-	mock := &mockDocDBDescribeDBClustersAPIPaginated{
+	mock := &fakeDocDBDescribeDBClusters{
 		PageFunc: func(_ int) (*docdb.DescribeDBClustersOutput, error) {
 			return &docdb.DescribeDBClustersOutput{
 				DBClusters: []docdbstypes.DBCluster{},
@@ -423,7 +391,7 @@ func TestQA_Pagination_FetchDocDBClustersPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchDocDBClustersPage_Error(t *testing.T) {
-	mock := &mockDocDBDescribeDBClustersAPIPaginated{
+	mock := &fakeDocDBDescribeDBClusters{
 		PageFunc: func(_ int) (*docdb.DescribeDBClustersOutput, error) {
 			return nil, errors.New("describe db clusters failed")
 		},
@@ -436,27 +404,11 @@ func TestQA_Pagination_FetchDocDBClustersPage_Error(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Mock: RDS DescribeDBSnapshots (paginated, uses Marker)
-// ---------------------------------------------------------------------------
-
-type mockRDSDescribeDBSnapshotsAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*rds.DescribeDBSnapshotsOutput, error)
-	lastInput *rds.DescribeDBSnapshotsInput
-}
-
-func (m *mockRDSDescribeDBSnapshotsAPIPaginated) DescribeDBSnapshots(_ context.Context, in *rds.DescribeDBSnapshotsInput, _ ...func(*rds.Options)) (*rds.DescribeDBSnapshotsOutput, error) {
-	m.Calls++
-	m.lastInput = in
-	return m.PageFunc(m.Calls)
-}
-
-// ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchDBISnapshotsPage
 // ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchDBISnapshotsPage_FirstPage(t *testing.T) {
-	mock := &mockRDSDescribeDBSnapshotsAPIPaginated{
+	mock := &fakeRDSDescribeDBSnapshots{
 		PageFunc: func(_ int) (*rds.DescribeDBSnapshotsOutput, error) {
 			return &rds.DescribeDBSnapshotsOutput{
 				DBSnapshots: []rdstypes.DBSnapshot{
@@ -498,7 +450,7 @@ func TestQA_Pagination_FetchDBISnapshotsPage_FirstPage(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchDBISnapshotsPage_Continuation(t *testing.T) {
-	mock := &mockRDSDescribeDBSnapshotsAPIPaginated{
+	mock := &fakeRDSDescribeDBSnapshots{
 		PageFunc: func(_ int) (*rds.DescribeDBSnapshotsOutput, error) {
 			return &rds.DescribeDBSnapshotsOutput{
 				DBSnapshots: []rdstypes.DBSnapshot{
@@ -525,16 +477,16 @@ func TestQA_Pagination_FetchDBISnapshotsPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
-	if mock.lastInput == nil {
+	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.lastInput.Marker == nil || *mock.lastInput.Marker != "marker-page-2" {
-		t.Errorf("Marker not forwarded: got %v, want %q", mock.lastInput.Marker, "marker-page-2")
+	if mock.LastInput.Marker == nil || *mock.LastInput.Marker != "marker-page-2" {
+		t.Errorf("Marker not forwarded: got %v, want %q", mock.LastInput.Marker, "marker-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchDBISnapshotsPage_Empty(t *testing.T) {
-	mock := &mockRDSDescribeDBSnapshotsAPIPaginated{
+	mock := &fakeRDSDescribeDBSnapshots{
 		PageFunc: func(_ int) (*rds.DescribeDBSnapshotsOutput, error) {
 			return &rds.DescribeDBSnapshotsOutput{
 				DBSnapshots: []rdstypes.DBSnapshot{},
@@ -556,7 +508,7 @@ func TestQA_Pagination_FetchDBISnapshotsPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchDBISnapshotsPage_Error(t *testing.T) {
-	mock := &mockRDSDescribeDBSnapshotsAPIPaginated{
+	mock := &fakeRDSDescribeDBSnapshots{
 		PageFunc: func(_ int) (*rds.DescribeDBSnapshotsOutput, error) {
 			return nil, errors.New("describe db snapshots failed")
 		},
@@ -572,24 +524,12 @@ func TestQA_Pagination_FetchDBISnapshotsPage_Error(t *testing.T) {
 // Mock: DocumentDB DescribeDBClusterSnapshots (paginated, uses Marker)
 // ---------------------------------------------------------------------------
 
-type mockDocDBDescribeDBClusterSnapshotsAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*docdb.DescribeDBClusterSnapshotsOutput, error)
-	lastInput *docdb.DescribeDBClusterSnapshotsInput
-}
-
-func (m *mockDocDBDescribeDBClusterSnapshotsAPIPaginated) DescribeDBClusterSnapshots(_ context.Context, in *docdb.DescribeDBClusterSnapshotsInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
-	m.Calls++
-	m.lastInput = in
-	return m.PageFunc(m.Calls)
-}
-
 // ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchDocDBClusterSnapshotsPage
 // ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchDocDBClusterSnapshotsPage_FirstPage(t *testing.T) {
-	mock := &mockDocDBDescribeDBClusterSnapshotsAPIPaginated{
+	mock := &fakeDocDBDescribeDBClusterSnapshots{
 		PageFunc: func(_ int) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
 			return &docdb.DescribeDBClusterSnapshotsOutput{
 				DBClusterSnapshots: []docdbstypes.DBClusterSnapshot{
@@ -631,7 +571,7 @@ func TestQA_Pagination_FetchDocDBClusterSnapshotsPage_FirstPage(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchDocDBClusterSnapshotsPage_Continuation(t *testing.T) {
-	mock := &mockDocDBDescribeDBClusterSnapshotsAPIPaginated{
+	mock := &fakeDocDBDescribeDBClusterSnapshots{
 		PageFunc: func(_ int) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
 			return &docdb.DescribeDBClusterSnapshotsOutput{
 				DBClusterSnapshots: []docdbstypes.DBClusterSnapshot{
@@ -657,16 +597,16 @@ func TestQA_Pagination_FetchDocDBClusterSnapshotsPage_Continuation(t *testing.T)
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
-	if mock.lastInput == nil {
+	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.lastInput.Marker == nil || *mock.lastInput.Marker != "marker-page-2" {
-		t.Errorf("Marker not forwarded: got %v, want %q", mock.lastInput.Marker, "marker-page-2")
+	if mock.LastInput.Marker == nil || *mock.LastInput.Marker != "marker-page-2" {
+		t.Errorf("Marker not forwarded: got %v, want %q", mock.LastInput.Marker, "marker-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchDocDBClusterSnapshotsPage_Empty(t *testing.T) {
-	mock := &mockDocDBDescribeDBClusterSnapshotsAPIPaginated{
+	mock := &fakeDocDBDescribeDBClusterSnapshots{
 		PageFunc: func(_ int) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
 			return &docdb.DescribeDBClusterSnapshotsOutput{
 				DBClusterSnapshots: []docdbstypes.DBClusterSnapshot{},
@@ -688,7 +628,7 @@ func TestQA_Pagination_FetchDocDBClusterSnapshotsPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchDocDBClusterSnapshotsPage_Error(t *testing.T) {
-	mock := &mockDocDBDescribeDBClusterSnapshotsAPIPaginated{
+	mock := &fakeDocDBDescribeDBClusterSnapshots{
 		PageFunc: func(_ int) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
 			return nil, errors.New("describe db cluster snapshots failed")
 		},
@@ -701,29 +641,13 @@ func TestQA_Pagination_FetchDocDBClusterSnapshotsPage_Error(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Mock: EFS DescribeFileSystems (paginated, uses Marker/NextMarker)
-// ---------------------------------------------------------------------------
-
-type mockEFSDescribeFileSystemsAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*efs.DescribeFileSystemsOutput, error)
-	lastInput *efs.DescribeFileSystemsInput
-}
-
-func (m *mockEFSDescribeFileSystemsAPIPaginated) DescribeFileSystems(_ context.Context, in *efs.DescribeFileSystemsInput, _ ...func(*efs.Options)) (*efs.DescribeFileSystemsOutput, error) {
-	m.lastInput = in
-	m.Calls++
-	return m.PageFunc(m.Calls)
-}
-
-// ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchEFSFileSystemsPage
 // ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchEFSFileSystemsPage_FirstPage(t *testing.T) {
 	encrypted := true
 	mountTargets := int32(3)
-	mock := &mockEFSDescribeFileSystemsAPIPaginated{
+	mock := &fakeEFSDescribeFileSystems{
 		PageFunc: func(_ int) (*efs.DescribeFileSystemsOutput, error) {
 			return &efs.DescribeFileSystemsOutput{
 				FileSystems: []efstypes.FileSystemDescription{
@@ -769,7 +693,7 @@ func TestQA_Pagination_FetchEFSFileSystemsPage_FirstPage(t *testing.T) {
 func TestQA_Pagination_FetchEFSFileSystemsPage_Continuation(t *testing.T) {
 	encrypted := false
 	mountTargets := int32(1)
-	mock := &mockEFSDescribeFileSystemsAPIPaginated{
+	mock := &fakeEFSDescribeFileSystems{
 		PageFunc: func(_ int) (*efs.DescribeFileSystemsOutput, error) {
 			return &efs.DescribeFileSystemsOutput{
 				FileSystems: []efstypes.FileSystemDescription{
@@ -797,16 +721,16 @@ func TestQA_Pagination_FetchEFSFileSystemsPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
-	if mock.lastInput == nil {
+	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.lastInput.Marker == nil || *mock.lastInput.Marker != "marker-page-2" {
-		t.Errorf("Marker not forwarded: got %v, want %q", mock.lastInput.Marker, "marker-page-2")
+	if mock.LastInput.Marker == nil || *mock.LastInput.Marker != "marker-page-2" {
+		t.Errorf("Marker not forwarded: got %v, want %q", mock.LastInput.Marker, "marker-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchEFSFileSystemsPage_Empty(t *testing.T) {
-	mock := &mockEFSDescribeFileSystemsAPIPaginated{
+	mock := &fakeEFSDescribeFileSystems{
 		PageFunc: func(_ int) (*efs.DescribeFileSystemsOutput, error) {
 			return &efs.DescribeFileSystemsOutput{
 				FileSystems: []efstypes.FileSystemDescription{},
@@ -828,7 +752,7 @@ func TestQA_Pagination_FetchEFSFileSystemsPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchEFSFileSystemsPage_Error(t *testing.T) {
-	mock := &mockEFSDescribeFileSystemsAPIPaginated{
+	mock := &fakeEFSDescribeFileSystems{
 		PageFunc: func(_ int) (*efs.DescribeFileSystemsOutput, error) {
 			return nil, errors.New("describe file systems failed")
 		},
@@ -982,29 +906,13 @@ func TestQA_Pagination_FetchHostedZonesPage_Error(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Mock: CloudFront ListDistributions (paginated, uses Marker/NextMarker + IsTruncated)
-// ---------------------------------------------------------------------------
-
-type mockCloudFrontListDistributionsAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*cloudfront.ListDistributionsOutput, error)
-	lastInput *cloudfront.ListDistributionsInput
-}
-
-func (m *mockCloudFrontListDistributionsAPIPaginated) ListDistributions(_ context.Context, in *cloudfront.ListDistributionsInput, _ ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsOutput, error) {
-	m.lastInput = in
-	m.Calls++
-	return m.PageFunc(m.Calls)
-}
-
-// ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchCloudFrontDistributionsPage
 // ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchCloudFrontDistributionsPage_FirstPage(t *testing.T) {
 	enabled := true
 	isTruncated := true
-	mock := &mockCloudFrontListDistributionsAPIPaginated{
+	mock := &fakeCloudFrontListDistributions{
 		PageFunc: func(_ int) (*cloudfront.ListDistributionsOutput, error) {
 			return &cloudfront.ListDistributionsOutput{
 				DistributionList: &cftypes.DistributionList{
@@ -1051,7 +959,7 @@ func TestQA_Pagination_FetchCloudFrontDistributionsPage_FirstPage(t *testing.T) 
 func TestQA_Pagination_FetchCloudFrontDistributionsPage_Continuation(t *testing.T) {
 	enabled := false
 	isTruncated := false
-	mock := &mockCloudFrontListDistributionsAPIPaginated{
+	mock := &fakeCloudFrontListDistributions{
 		PageFunc: func(_ int) (*cloudfront.ListDistributionsOutput, error) {
 			return &cloudfront.ListDistributionsOutput{
 				DistributionList: &cftypes.DistributionList{
@@ -1081,17 +989,17 @@ func TestQA_Pagination_FetchCloudFrontDistributionsPage_Continuation(t *testing.
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
-	if mock.lastInput == nil {
+	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.lastInput.Marker == nil || *mock.lastInput.Marker != "marker-page-2" {
-		t.Errorf("Marker not forwarded: got %v, want %q", mock.lastInput.Marker, "marker-page-2")
+	if mock.LastInput.Marker == nil || *mock.LastInput.Marker != "marker-page-2" {
+		t.Errorf("Marker not forwarded: got %v, want %q", mock.LastInput.Marker, "marker-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchCloudFrontDistributionsPage_Empty(t *testing.T) {
 	isTruncated := false
-	mock := &mockCloudFrontListDistributionsAPIPaginated{
+	mock := &fakeCloudFrontListDistributions{
 		PageFunc: func(_ int) (*cloudfront.ListDistributionsOutput, error) {
 			return &cloudfront.ListDistributionsOutput{
 				DistributionList: &cftypes.DistributionList{
@@ -1116,7 +1024,7 @@ func TestQA_Pagination_FetchCloudFrontDistributionsPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchCloudFrontDistributionsPage_Error(t *testing.T) {
-	mock := &mockCloudFrontListDistributionsAPIPaginated{
+	mock := &fakeCloudFrontListDistributions{
 		PageFunc: func(_ int) (*cloudfront.ListDistributionsOutput, error) {
 			return nil, errors.New("list distributions failed")
 		},
@@ -1132,25 +1040,13 @@ func TestQA_Pagination_FetchCloudFrontDistributionsPage_Error(t *testing.T) {
 // Mock: ACM ListCertificates (paginated)
 // ---------------------------------------------------------------------------
 
-type mockACMListCertificatesAPIPaginated struct {
-	Calls     int
-	PageFunc  func(call int) (*acm.ListCertificatesOutput, error)
-	lastInput *acm.ListCertificatesInput
-}
-
-func (m *mockACMListCertificatesAPIPaginated) ListCertificates(_ context.Context, in *acm.ListCertificatesInput, _ ...func(*acm.Options)) (*acm.ListCertificatesOutput, error) {
-	m.Calls++
-	m.lastInput = in
-	return m.PageFunc(m.Calls)
-}
-
 // ---------------------------------------------------------------------------
 // TestQA_Pagination_FetchACMCertificatesPage
 // ---------------------------------------------------------------------------
 
 func TestQA_Pagination_FetchACMCertificatesPage_FirstPage(t *testing.T) {
 	inUse := true
-	mock := &mockACMListCertificatesAPIPaginated{
+	mock := &fakeACMListCertificates{
 		PageFunc: func(_ int) (*acm.ListCertificatesOutput, error) {
 			return &acm.ListCertificatesOutput{
 				CertificateSummaryList: []acmtypes.CertificateSummary{
@@ -1192,7 +1088,7 @@ func TestQA_Pagination_FetchACMCertificatesPage_FirstPage(t *testing.T) {
 
 func TestQA_Pagination_FetchACMCertificatesPage_Continuation(t *testing.T) {
 	inUse := false
-	mock := &mockACMListCertificatesAPIPaginated{
+	mock := &fakeACMListCertificates{
 		PageFunc: func(_ int) (*acm.ListCertificatesOutput, error) {
 			return &acm.ListCertificatesOutput{
 				CertificateSummaryList: []acmtypes.CertificateSummary{
@@ -1218,16 +1114,16 @@ func TestQA_Pagination_FetchACMCertificatesPage_Continuation(t *testing.T) {
 	if result.Pagination.NextToken != "" {
 		t.Errorf("NextToken: expected empty string, got %q", result.Pagination.NextToken)
 	}
-	if mock.lastInput == nil {
+	if mock.LastInput == nil {
 		t.Fatal("mock was not called")
 	}
-	if mock.lastInput.NextToken == nil || *mock.lastInput.NextToken != "token-page-2" {
-		t.Errorf("NextToken not forwarded: got %v, want %q", mock.lastInput.NextToken, "token-page-2")
+	if mock.LastInput.NextToken == nil || *mock.LastInput.NextToken != "token-page-2" {
+		t.Errorf("NextToken not forwarded: got %v, want %q", mock.LastInput.NextToken, "token-page-2")
 	}
 }
 
 func TestQA_Pagination_FetchACMCertificatesPage_Empty(t *testing.T) {
-	mock := &mockACMListCertificatesAPIPaginated{
+	mock := &fakeACMListCertificates{
 		PageFunc: func(_ int) (*acm.ListCertificatesOutput, error) {
 			return &acm.ListCertificatesOutput{
 				CertificateSummaryList: []acmtypes.CertificateSummary{},
@@ -1249,7 +1145,7 @@ func TestQA_Pagination_FetchACMCertificatesPage_Empty(t *testing.T) {
 }
 
 func TestQA_Pagination_FetchACMCertificatesPage_Error(t *testing.T) {
-	mock := &mockACMListCertificatesAPIPaginated{
+	mock := &fakeACMListCertificates{
 		PageFunc: func(_ int) (*acm.ListCertificatesOutput, error) {
 			return nil, errors.New("list certificates failed")
 		},

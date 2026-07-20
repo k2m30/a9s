@@ -84,7 +84,7 @@ func (f *dbiMaintenanceFake) DescribePendingMaintenanceActions(
 func buildDbiResources(t *testing.T) []resource.Resource {
 	t.Helper()
 	fix := fixtures.NewDBIFixtures()
-	mock := &mockRDSPageClient{instances: fix.Instances}
+	mock := &fakeRDSDescribeDBInstances{Output: &rds.DescribeDBInstancesOutput{DBInstances: fix.Instances}}
 	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
 	if err != nil {
 		t.Fatalf("buildDbiResources: FetchRDSInstancesPage error: %v", err)

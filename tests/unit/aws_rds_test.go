@@ -18,8 +18,8 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestFetchRDSInstances_ParsesMultipleInstances(t *testing.T) {
-	mock := &mockRDSClient{
-		output: &rds.DescribeDBInstancesOutput{
+	mock := &fakeRDSDescribeDBInstances{
+		Output: &rds.DescribeDBInstancesOutput{
 			DBInstances: []rdstypes.DBInstance{
 				{
 					DBInstanceIdentifier: aws.String("prod-db-01"),
@@ -111,9 +111,8 @@ func TestFetchRDSInstances_ParsesMultipleInstances(t *testing.T) {
 }
 
 func TestFetchRDSInstances_ErrorResponse(t *testing.T) {
-	mock := &mockRDSClient{
-		output: nil,
-		err:    fmt.Errorf("AWS API error: access denied"),
+	mock := &fakeRDSDescribeDBInstances{
+		Err: fmt.Errorf("AWS API error: access denied"),
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -128,8 +127,8 @@ func TestFetchRDSInstances_ErrorResponse(t *testing.T) {
 }
 
 func TestFetchRDSInstances_EmptyResponse(t *testing.T) {
-	mock := &mockRDSClient{
-		output: &rds.DescribeDBInstancesOutput{
+	mock := &fakeRDSDescribeDBInstances{
+		Output: &rds.DescribeDBInstancesOutput{
 			DBInstances: []rdstypes.DBInstance{},
 		},
 	}

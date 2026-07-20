@@ -20,8 +20,8 @@ import (
 
 func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 	now := time.Now()
-	mock := &mockEFSClient{
-		output: &efs.DescribeFileSystemsOutput{
+	mock := &fakeEFSDescribeFileSystems{
+		Output: &efs.DescribeFileSystemsOutput{
 			FileSystems: []efstypes.FileSystemDescription{
 				{
 					FileSystemId:         aws.String("fs-12345678"),
@@ -133,8 +133,8 @@ func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 
 func TestFetchEFSFileSystems_RawStructPopulated(t *testing.T) {
 	now := time.Now()
-	mock := &mockEFSClient{
-		output: &efs.DescribeFileSystemsOutput{
+	mock := &fakeEFSDescribeFileSystems{
+		Output: &efs.DescribeFileSystemsOutput{
 			FileSystems: []efstypes.FileSystemDescription{
 				{
 					FileSystemId:         aws.String("fs-raw123"),
@@ -172,8 +172,8 @@ func TestFetchEFSFileSystems_RawStructPopulated(t *testing.T) {
 }
 
 func TestFetchEFSFileSystems_ErrorResponse(t *testing.T) {
-	mock := &mockEFSClient{
-		err: fmt.Errorf("AWS API error: access denied"),
+	mock := &fakeEFSDescribeFileSystems{
+		Err: fmt.Errorf("AWS API error: access denied"),
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -188,8 +188,8 @@ func TestFetchEFSFileSystems_ErrorResponse(t *testing.T) {
 }
 
 func TestFetchEFSFileSystems_EmptyResponse(t *testing.T) {
-	mock := &mockEFSClient{
-		output: &efs.DescribeFileSystemsOutput{
+	mock := &fakeEFSDescribeFileSystems{
+		Output: &efs.DescribeFileSystemsOutput{
 			FileSystems: []efstypes.FileSystemDescription{},
 		},
 	}

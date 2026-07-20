@@ -17,8 +17,8 @@ import (
 // Without pagination, count is wrong and some buckets are missing.
 
 func TestFetchS3Buckets_Paginated(t *testing.T) {
-	mock := &mockPaginatedS3ListBucketsClient{
-		pages: []*s3.ListBucketsOutput{
+	mock := &fakeS3ListBuckets{
+		Pages: []*s3.ListBucketsOutput{
 			{
 				Buckets: []s3types.Bucket{
 					{Name: aws.String("bucket-1")},
@@ -46,8 +46,8 @@ func TestFetchS3Buckets_Paginated(t *testing.T) {
 		t.Errorf("expected 3 buckets across 2 pages, got %d", len(resources))
 	}
 
-	if mock.calls != 2 {
-		t.Errorf("expected 2 API calls (2 pages), got %d", mock.calls)
+	if mock.Calls != 2 {
+		t.Errorf("expected 2 API calls (2 pages), got %d", mock.Calls)
 	}
 
 	// Verify all bucket names

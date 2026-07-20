@@ -16,8 +16,8 @@ import (
 
 func TestQA_DBISnapshots_FetchSuccess(t *testing.T) {
 	now := time.Now()
-	mock := &mockRDSDescribeDBSnapshotsClient{
-		output: &rds.DescribeDBSnapshotsOutput{
+	mock := &fakeRDSDescribeDBSnapshots{
+		Output: &rds.DescribeDBSnapshotsOutput{
 			DBSnapshots: []rdstypes.DBSnapshot{
 				{
 					DBSnapshotIdentifier: aws.String("dbi-snap-auto-001"),
@@ -77,8 +77,8 @@ func TestQA_DBISnapshots_FetchSuccess(t *testing.T) {
 }
 
 func TestQA_DBISnapshots_FetchEmpty(t *testing.T) {
-	mock := &mockRDSDescribeDBSnapshotsClient{
-		output: &rds.DescribeDBSnapshotsOutput{
+	mock := &fakeRDSDescribeDBSnapshots{
+		Output: &rds.DescribeDBSnapshotsOutput{
 			DBSnapshots: []rdstypes.DBSnapshot{},
 		},
 	}
@@ -95,8 +95,8 @@ func TestQA_DBISnapshots_FetchEmpty(t *testing.T) {
 }
 
 func TestQA_DBISnapshots_FetchError(t *testing.T) {
-	mock := &mockRDSDescribeDBSnapshotsClient{
-		err: fmt.Errorf("access denied"),
+	mock := &fakeRDSDescribeDBSnapshots{
+		Err: fmt.Errorf("access denied"),
 	}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {

@@ -2,8 +2,13 @@ package unit
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -12,7 +17,15 @@ import (
 // FetchS3Buckets should only call ListBuckets — no GetBucketLocation.
 // It should accept only a ListBuckets API, not a location API.
 func TestFetchS3Buckets_NoGetBucketLocation(t *testing.T) {
-	listClient := &mockFastListBucketsClient{count: 100}
+	buckets := make([]s3types.Bucket, 100)
+	for i := range buckets {
+		created := time.Now()
+		buckets[i] = s3types.Bucket{
+			Name:         aws.String(fmt.Sprintf("bucket-%03d", i)),
+			CreationDate: &created,
+		}
+	}
+	listClient := &fakeS3ListBuckets{Output: &s3.ListBucketsOutput{Buckets: buckets}}
 
 	start := time.Now()
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {

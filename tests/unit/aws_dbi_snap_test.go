@@ -26,23 +26,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 )
 
-// ---------------------------------------------------------------------------
-// Strict mock — implements RDSDescribeDBSnapshotsAPI
-// ---------------------------------------------------------------------------
-
-type mockDescribeDBSnapshots struct {
-	output *rds.DescribeDBSnapshotsOutput
-	err    error
-}
-
-func (m *mockDescribeDBSnapshots) DescribeDBSnapshots(
-	_ context.Context,
-	_ *rds.DescribeDBSnapshotsInput,
-	_ ...func(*rds.Options),
-) (*rds.DescribeDBSnapshotsOutput, error) {
-	return m.output, m.err
-}
-
 // snapOutput is a convenience builder.
 func snapOutput(snaps ...rdstypes.DBSnapshot) *rds.DescribeDBSnapshotsOutput {
 	return &rds.DescribeDBSnapshotsOutput{DBSnapshots: snaps}
@@ -52,7 +35,7 @@ func snapOutput(snaps ...rdstypes.DBSnapshot) *rds.DescribeDBSnapshotsOutput {
 // resourceRow.status is populated from r.Fields["status"] (not r.Fields["status"]).
 func fetchSnap(t *testing.T, snaps ...rdstypes.DBSnapshot) []resourceRow {
 	t.Helper()
-	mock := &mockDescribeDBSnapshots{output: snapOutput(snaps...)}
+	mock := &fakeRDSDescribeDBSnapshots{Output: snapOutput(snaps...)}
 	result, err := awsclient.FetchDBISnapshotsPage(context.Background(), mock, "")
 	if err != nil {
 		t.Fatalf("FetchDBISnapshotsPage: unexpected error: %v", err)
@@ -482,7 +465,7 @@ func TestDBISnap_Fetcher_NilSnapshotCreateTime(t *testing.T) {
 // produces the expected number of rows.
 func TestDBISnap_Fetcher_AllFixtures_NoError(t *testing.T) {
 	fix := fixtures.NewDBISnapFixtures()
-	mock := &mockDescribeDBSnapshots{output: snapOutput(fix.Instances...)}
+	mock := &fakeRDSDescribeDBSnapshots{Output: snapOutput(fix.Instances...)}
 	result, err := awsclient.FetchDBISnapshotsPage(context.Background(), mock, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

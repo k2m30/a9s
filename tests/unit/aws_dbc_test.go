@@ -26,42 +26,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// helper — minimal DocDB mock for the DescribeDBClusters call only.
-// ---------------------------------------------------------------------------
-
-type mockDocDBClustersClient struct {
-	pages []docdb.DescribeDBClustersOutput
-	call  int
-	err   error
-}
-
-func (m *mockDocDBClustersClient) DescribeDBClusters(
-	_ context.Context,
-	_ *docdb.DescribeDBClustersInput,
-	_ ...func(*docdb.Options),
-) (*docdb.DescribeDBClustersOutput, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	if len(m.pages) == 0 {
-		return &docdb.DescribeDBClustersOutput{}, nil
-	}
-	idx := m.call
-	if idx >= len(m.pages) {
-		return &docdb.DescribeDBClustersOutput{}, nil
-	}
-	m.call++
-	out := m.pages[idx]
-	return &out, nil
-}
-
-// singlePageDocDB returns a mock that returns one page with the given clusters.
-func singlePageDocDB(clusters []docdbtypes.DBCluster) *mockDocDBClustersClient {
-	return &mockDocDBClustersClient{
-		pages: []docdb.DescribeDBClustersOutput{
-			{DBClusters: clusters},
-		},
+// singlePageDocDB returns a fake that returns one page with the given clusters.
+func singlePageDocDB(clusters []docdbtypes.DBCluster) *fakeDocDBDescribeDBClusters {
+	return &fakeDocDBDescribeDBClusters{
+		Output: &docdb.DescribeDBClustersOutput{DBClusters: clusters},
 	}
 }
 
@@ -322,7 +290,7 @@ func TestFetchDocDBClusters_Empty(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFetchDocDBClusters_APIError(t *testing.T) {
-	mock := &mockDocDBClustersClient{err: fmt.Errorf("throttled")}
+	mock := &fakeDocDBDescribeDBClusters{Err: fmt.Errorf("throttled")}
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchDocDBClustersPage(context.Background(), mock, token)
 	})
@@ -338,29 +306,10 @@ func TestFetchDocDBClusters_APIError(t *testing.T) {
 // T-DBC-07: pagination — Marker is threaded; IsTruncated set when Marker present.
 // ---------------------------------------------------------------------------
 
-// mockDocDBClustersMultiPage returns a mock that produces two pages of clusters.
-type mockDocDBClustersMultiPage struct {
-	pages []docdb.DescribeDBClustersOutput
-	call  int
-}
-
-func (m *mockDocDBClustersMultiPage) DescribeDBClusters(
-	_ context.Context,
-	_ *docdb.DescribeDBClustersInput,
-	_ ...func(*docdb.Options),
-) (*docdb.DescribeDBClustersOutput, error) {
-	if m.call >= len(m.pages) {
-		return &docdb.DescribeDBClustersOutput{}, nil
-	}
-	out := m.pages[m.call]
-	m.call++
-	return &out, nil
-}
-
 func TestFetchDocDBClustersPage_Pagination(t *testing.T) {
 	marker := "next-page-token"
-	mock := &mockDocDBClustersMultiPage{
-		pages: []docdb.DescribeDBClustersOutput{
+	mock := &fakeDocDBDescribeDBClusters{
+		Pages: []*docdb.DescribeDBClustersOutput{
 			{
 				DBClusters: []docdbtypes.DBCluster{
 					{DBClusterIdentifier: aws.String("cluster-page1"), Status: aws.String("available")},
@@ -390,8 +339,8 @@ func TestFetchDocDBClustersPage_Pagination(t *testing.T) {
 
 func TestFetchDocDBClusters_MultiPageAccumulates(t *testing.T) {
 	marker := "pg2"
-	mock := &mockDocDBClustersMultiPage{
-		pages: []docdb.DescribeDBClustersOutput{
+	mock := &fakeDocDBDescribeDBClusters{
+		Pages: []*docdb.DescribeDBClustersOutput{
 			{
 				DBClusters: []docdbtypes.DBCluster{
 					{DBClusterIdentifier: aws.String("cluster-a"), Status: aws.String("available")},

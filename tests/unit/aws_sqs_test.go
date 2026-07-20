@@ -16,16 +16,16 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestFetchSQSQueues_ParsesMultipleQueues(t *testing.T) {
-	listMock := &mockSQSListQueuesClient{
-		output: &sqs.ListQueuesOutput{
+	listMock := &fakeSQSListQueues{
+		Output: &sqs.ListQueuesOutput{
 			QueueUrls: []string{
 				"https://sqs.us-east-1.amazonaws.com/123456789012/my-orders-queue",
 				"https://sqs.us-east-1.amazonaws.com/123456789012/my-dlq",
 			},
 		},
 	}
-	attrMock := &mockSQSGetQueueAttributesClient{
-		outputs: map[string]*sqs.GetQueueAttributesOutput{
+	attrMock := &fakeSQSGetQueueAttributes{
+		ByURL: map[string]*sqs.GetQueueAttributesOutput{
 			"https://sqs.us-east-1.amazonaws.com/123456789012/my-orders-queue": {
 				Attributes: map[string]string{
 					"ApproximateNumberOfMessages":           "42",
@@ -105,12 +105,11 @@ func TestFetchSQSQueues_ParsesMultipleQueues(t *testing.T) {
 }
 
 func TestFetchSQSQueues_ErrorOnList(t *testing.T) {
-	listMock := &mockSQSListQueuesClient{
-		output: nil,
-		err:    fmt.Errorf("AWS API error: access denied"),
+	listMock := &fakeSQSListQueues{
+		Err: fmt.Errorf("AWS API error: access denied"),
 	}
-	attrMock := &mockSQSGetQueueAttributesClient{
-		outputs: map[string]*sqs.GetQueueAttributesOutput{},
+	attrMock := &fakeSQSGetQueueAttributes{
+		ByURL: map[string]*sqs.GetQueueAttributesOutput{},
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -125,13 +124,13 @@ func TestFetchSQSQueues_ErrorOnList(t *testing.T) {
 }
 
 func TestFetchSQSQueues_EmptyResponse(t *testing.T) {
-	listMock := &mockSQSListQueuesClient{
-		output: &sqs.ListQueuesOutput{
+	listMock := &fakeSQSListQueues{
+		Output: &sqs.ListQueuesOutput{
 			QueueUrls: []string{},
 		},
 	}
-	attrMock := &mockSQSGetQueueAttributesClient{
-		outputs: map[string]*sqs.GetQueueAttributesOutput{},
+	attrMock := &fakeSQSGetQueueAttributes{
+		ByURL: map[string]*sqs.GetQueueAttributesOutput{},
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -146,15 +145,15 @@ func TestFetchSQSQueues_EmptyResponse(t *testing.T) {
 }
 
 func TestFetchSQSQueues_RawStructIsStructuredAttributes(t *testing.T) {
-	listMock := &mockSQSListQueuesClient{
-		output: &sqs.ListQueuesOutput{
+	listMock := &fakeSQSListQueues{
+		Output: &sqs.ListQueuesOutput{
 			QueueUrls: []string{
 				"https://sqs.us-east-1.amazonaws.com/123456789012/my-orders-queue",
 			},
 		},
 	}
-	attrMock := &mockSQSGetQueueAttributesClient{
-		outputs: map[string]*sqs.GetQueueAttributesOutput{
+	attrMock := &fakeSQSGetQueueAttributes{
+		ByURL: map[string]*sqs.GetQueueAttributesOutput{
 			"https://sqs.us-east-1.amazonaws.com/123456789012/my-orders-queue": {
 				Attributes: map[string]string{
 					"ApproximateNumberOfMessages": "42",

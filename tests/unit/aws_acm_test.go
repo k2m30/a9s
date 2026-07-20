@@ -24,8 +24,8 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	notBefore := time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC)
 	createdAt := time.Date(2025, 6, 14, 12, 0, 0, 0, time.UTC)
 
-	mock := &mockACMListCertificatesClient{
-		output: &acm.ListCertificatesOutput{
+	mock := &fakeACMListCertificates{
+		Output: &acm.ListCertificatesOutput{
 			CertificateSummaryList: []acmtypes.CertificateSummary{
 				{
 					DomainName:         aws.String("api.example.com"),
@@ -182,8 +182,8 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 func TestFetchACMCertificates_SameDomainDistinctARN_UniqueIDs(t *testing.T) {
 	arnA := "arn:aws:acm:eu-central-1:123456789012:certificate/11111111-1111-1111-1111-111111111111"
 	arnB := "arn:aws:acm:eu-central-1:123456789012:certificate/22222222-2222-2222-2222-222222222222"
-	mock := &mockACMListCertificatesClient{
-		output: &acm.ListCertificatesOutput{
+	mock := &fakeACMListCertificates{
+		Output: &acm.ListCertificatesOutput{
 			CertificateSummaryList: []acmtypes.CertificateSummary{
 				{DomainName: aws.String("artifacts.example.com"), Status: acmtypes.CertificateStatusExpired, CertificateArn: aws.String(arnA), InUse: aws.Bool(false)},
 				{DomainName: aws.String("artifacts.example.com"), Status: acmtypes.CertificateStatusIssued, CertificateArn: aws.String(arnB), InUse: aws.Bool(true)},
@@ -211,9 +211,8 @@ func TestFetchACMCertificates_SameDomainDistinctARN_UniqueIDs(t *testing.T) {
 }
 
 func TestFetchACMCertificates_ErrorResponse(t *testing.T) {
-	mock := &mockACMListCertificatesClient{
-		output: nil,
-		err:    fmt.Errorf("AWS API error: access denied"),
+	mock := &fakeACMListCertificates{
+		Err: fmt.Errorf("AWS API error: access denied"),
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -228,8 +227,8 @@ func TestFetchACMCertificates_ErrorResponse(t *testing.T) {
 }
 
 func TestFetchACMCertificates_EmptyResponse(t *testing.T) {
-	mock := &mockACMListCertificatesClient{
-		output: &acm.ListCertificatesOutput{
+	mock := &fakeACMListCertificates{
+		Output: &acm.ListCertificatesOutput{
 			CertificateSummaryList: []acmtypes.CertificateSummary{},
 		},
 	}
@@ -251,7 +250,7 @@ func TestFetchACMCertificates_EmptyResponse(t *testing.T) {
 // These signals are read straight off ListCertificates' CertificateSummary
 // (NotAfter, InUse) — zero extra API calls, hence Wave 1, not Wave 2. Every
 // test in this section drives FetchACMCertificatesPage with
-// mockACMListCertificatesClient ONLY; none needs a DescribeCertificate fake.
+// fakeACMListCertificates ONLY; none needs a DescribeCertificate fake.
 // ---------------------------------------------------------------------------
 
 // TestFetchACMCertificates_ExpiresWithin30Days_WarnFinding pins that an
@@ -260,8 +259,8 @@ func TestFetchACMCertificates_EmptyResponse(t *testing.T) {
 // window.
 func TestFetchACMCertificates_ExpiresWithin30Days_WarnFinding(t *testing.T) {
 	notAfter := time.Now().Add(29 * 24 * time.Hour)
-	mock := &mockACMListCertificatesClient{
-		output: &acm.ListCertificatesOutput{
+	mock := &fakeACMListCertificates{
+		Output: &acm.ListCertificatesOutput{
 			CertificateSummaryList: []acmtypes.CertificateSummary{
 				{
 					DomainName:     aws.String("soon.example.com"),
@@ -306,8 +305,8 @@ func TestFetchACMCertificates_ExpiresWithin30Days_WarnFinding(t *testing.T) {
 // at SevBroken ("!").
 func TestFetchACMCertificates_ExpiresWithin7Days_BrokenFinding(t *testing.T) {
 	notAfter := time.Now().Add(6 * 24 * time.Hour)
-	mock := &mockACMListCertificatesClient{
-		output: &acm.ListCertificatesOutput{
+	mock := &fakeACMListCertificates{
+		Output: &acm.ListCertificatesOutput{
 			CertificateSummaryList: []acmtypes.CertificateSummary{
 				{
 					DomainName:     aws.String("critical.example.com"),
@@ -353,8 +352,8 @@ func TestFetchACMCertificates_ExpiresWithin7Days_BrokenFinding(t *testing.T) {
 // but this cert isn't expiring so orphan surfaces alone.
 func TestFetchACMCertificates_OrphanNotExpired_WarnFinding(t *testing.T) {
 	notAfter := time.Now().Add(90 * 24 * time.Hour)
-	mock := &mockACMListCertificatesClient{
-		output: &acm.ListCertificatesOutput{
+	mock := &fakeACMListCertificates{
+		Output: &acm.ListCertificatesOutput{
 			CertificateSummaryList: []acmtypes.CertificateSummary{
 				{
 					DomainName:     aws.String("orphan.example.com"),
@@ -400,8 +399,8 @@ func TestFetchACMCertificates_OrphanNotExpired_WarnFinding(t *testing.T) {
 // the boundary guard against the new Wave 1 logic over-firing.
 func TestFetchACMCertificates_HealthyIssuedCert_NoFindings(t *testing.T) {
 	notAfter := time.Now().Add(90 * 24 * time.Hour)
-	mock := &mockACMListCertificatesClient{
-		output: &acm.ListCertificatesOutput{
+	mock := &fakeACMListCertificates{
+		Output: &acm.ListCertificatesOutput{
 			CertificateSummaryList: []acmtypes.CertificateSummary{
 				{
 					DomainName:     aws.String("healthy.example.com"),

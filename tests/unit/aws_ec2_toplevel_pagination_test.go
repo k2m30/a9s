@@ -1145,33 +1145,9 @@ func TestFetchRedis_Pagination(t *testing.T) {
 // DocumentDB — DocDB DescribeDBClusters (Marker)
 // ===========================================================================
 
-type mockDocDBPaginatedClient struct {
-	outputs []*docdb.DescribeDBClustersOutput
-	inputs  []*docdb.DescribeDBClustersInput
-	err     error
-	callIdx int
-}
-
-func (m *mockDocDBPaginatedClient) DescribeDBClusters(
-	ctx context.Context,
-	params *docdb.DescribeDBClustersInput,
-	optFns ...func(*docdb.Options),
-) (*docdb.DescribeDBClustersOutput, error) {
-	m.inputs = append(m.inputs, params)
-	if m.err != nil {
-		return nil, m.err
-	}
-	if m.callIdx >= len(m.outputs) {
-		return &docdb.DescribeDBClustersOutput{}, nil
-	}
-	out := m.outputs[m.callIdx]
-	m.callIdx++
-	return out, nil
-}
-
 func TestFetchDocDBClusters_Pagination(t *testing.T) {
-	mock := &mockDocDBPaginatedClient{
-		outputs: []*docdb.DescribeDBClustersOutput{
+	mock := &fakeDocDBDescribeDBClusters{
+		Pages: []*docdb.DescribeDBClustersOutput{
 			{
 				Marker: aws.String("page2-marker"),
 				DBClusters: []docdbtypes.DBCluster{
@@ -1216,17 +1192,17 @@ func TestFetchDocDBClusters_Pagination(t *testing.T) {
 	})
 
 	t.Run("api_called_twice", func(t *testing.T) {
-		if mock.callIdx != 2 {
-			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
+		if mock.Calls != 2 {
+			t.Errorf("expected 2 API calls, got %d", mock.Calls)
 		}
 	})
 
 	t.Run("page2_received_marker", func(t *testing.T) {
-		if len(mock.inputs) < 2 {
-			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		if len(mock.Inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.Inputs))
 		}
-		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
-			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		if mock.Inputs[1].Marker == nil || *mock.Inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.Inputs[1].Marker, "page2-marker")
 		}
 	})
 }
@@ -1235,33 +1211,9 @@ func TestFetchDocDBClusters_Pagination(t *testing.T) {
 // DB Cluster Snapshots — DocDB DescribeDBClusterSnapshots (Marker)
 // ===========================================================================
 
-type mockDBCSnapshotsPaginatedClient struct {
-	outputs []*docdb.DescribeDBClusterSnapshotsOutput
-	inputs  []*docdb.DescribeDBClusterSnapshotsInput
-	err     error
-	callIdx int
-}
-
-func (m *mockDBCSnapshotsPaginatedClient) DescribeDBClusterSnapshots(
-	ctx context.Context,
-	params *docdb.DescribeDBClusterSnapshotsInput,
-	optFns ...func(*docdb.Options),
-) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
-	m.inputs = append(m.inputs, params)
-	if m.err != nil {
-		return nil, m.err
-	}
-	if m.callIdx >= len(m.outputs) {
-		return &docdb.DescribeDBClusterSnapshotsOutput{}, nil
-	}
-	out := m.outputs[m.callIdx]
-	m.callIdx++
-	return out, nil
-}
-
 func TestFetchDocDBClusterSnapshots_Pagination(t *testing.T) {
-	mock := &mockDBCSnapshotsPaginatedClient{
-		outputs: []*docdb.DescribeDBClusterSnapshotsOutput{
+	mock := &fakeDocDBDescribeDBClusterSnapshots{
+		Pages: []*docdb.DescribeDBClusterSnapshotsOutput{
 			{
 				Marker: aws.String("page2-marker"),
 				DBClusterSnapshots: []docdbtypes.DBClusterSnapshot{
@@ -1306,17 +1258,17 @@ func TestFetchDocDBClusterSnapshots_Pagination(t *testing.T) {
 	})
 
 	t.Run("api_called_twice", func(t *testing.T) {
-		if mock.callIdx != 2 {
-			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
+		if mock.Calls != 2 {
+			t.Errorf("expected 2 API calls, got %d", mock.Calls)
 		}
 	})
 
 	t.Run("page2_received_marker", func(t *testing.T) {
-		if len(mock.inputs) < 2 {
-			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		if len(mock.Inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.Inputs))
 		}
-		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
-			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		if mock.Inputs[1].Marker == nil || *mock.Inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.Inputs[1].Marker, "page2-marker")
 		}
 	})
 }
@@ -1325,33 +1277,9 @@ func TestFetchDocDBClusterSnapshots_Pagination(t *testing.T) {
 // DB Instance Snapshots — RDS DescribeDBSnapshots (Marker)
 // ===========================================================================
 
-type mockDBISnapshotsPaginatedClient struct {
-	outputs []*rds.DescribeDBSnapshotsOutput
-	inputs  []*rds.DescribeDBSnapshotsInput
-	err     error
-	callIdx int
-}
-
-func (m *mockDBISnapshotsPaginatedClient) DescribeDBSnapshots(
-	ctx context.Context,
-	params *rds.DescribeDBSnapshotsInput,
-	optFns ...func(*rds.Options),
-) (*rds.DescribeDBSnapshotsOutput, error) {
-	m.inputs = append(m.inputs, params)
-	if m.err != nil {
-		return nil, m.err
-	}
-	if m.callIdx >= len(m.outputs) {
-		return &rds.DescribeDBSnapshotsOutput{}, nil
-	}
-	out := m.outputs[m.callIdx]
-	m.callIdx++
-	return out, nil
-}
-
 func TestFetchDBISnapshots_Pagination(t *testing.T) {
-	mock := &mockDBISnapshotsPaginatedClient{
-		outputs: []*rds.DescribeDBSnapshotsOutput{
+	mock := &fakeRDSDescribeDBSnapshots{
+		Pages: []*rds.DescribeDBSnapshotsOutput{
 			{
 				Marker: aws.String("page2-marker"),
 				DBSnapshots: []rdstypes.DBSnapshot{
@@ -1396,17 +1324,17 @@ func TestFetchDBISnapshots_Pagination(t *testing.T) {
 	})
 
 	t.Run("api_called_twice", func(t *testing.T) {
-		if mock.callIdx != 2 {
-			t.Errorf("expected 2 API calls, got %d", mock.callIdx)
+		if mock.Calls != 2 {
+			t.Errorf("expected 2 API calls, got %d", mock.Calls)
 		}
 	})
 
 	t.Run("page2_received_marker", func(t *testing.T) {
-		if len(mock.inputs) < 2 {
-			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.inputs))
+		if len(mock.Inputs) < 2 {
+			t.Fatalf("expected at least 2 inputs captured, got %d", len(mock.Inputs))
 		}
-		if mock.inputs[1].Marker == nil || *mock.inputs[1].Marker != "page2-marker" {
-			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.inputs[1].Marker, "page2-marker")
+		if mock.Inputs[1].Marker == nil || *mock.Inputs[1].Marker != "page2-marker" {
+			t.Errorf("Marker not forwarded to page 2: got %v, want %q", mock.Inputs[1].Marker, "page2-marker")
 		}
 	})
 }
@@ -1659,7 +1587,7 @@ func TestNetworkingPagination_ErrorPropagation(t *testing.T) {
 	})
 
 	t.Run("docdb_error", func(t *testing.T) {
-		mock := &mockDocDBPaginatedClient{err: testErr}
+		mock := &fakeDocDBDescribeDBClusters{Err: testErr}
 		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 			return awsclient.FetchDocDBClustersPage(context.Background(), mock, token)
 		})
@@ -1669,7 +1597,7 @@ func TestNetworkingPagination_ErrorPropagation(t *testing.T) {
 	})
 
 	t.Run("docdb_snap_error", func(t *testing.T) {
-		mock := &mockDBCSnapshotsPaginatedClient{err: testErr}
+		mock := &fakeDocDBDescribeDBClusterSnapshots{Err: testErr}
 		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 			return awsclient.FetchDocDBClusterSnapshotsPage(context.Background(), mock, token)
 		})
@@ -1679,7 +1607,7 @@ func TestNetworkingPagination_ErrorPropagation(t *testing.T) {
 	})
 
 	t.Run("rds_snap_error", func(t *testing.T) {
-		mock := &mockDBISnapshotsPaginatedClient{err: testErr}
+		mock := &fakeRDSDescribeDBSnapshots{Err: testErr}
 		_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 			return awsclient.FetchDBISnapshotsPage(context.Background(), mock, token)
 		})

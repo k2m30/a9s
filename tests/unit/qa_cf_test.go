@@ -20,8 +20,8 @@ import (
 
 func TestFetchCloudFrontDistributions_ParsesMultiple(t *testing.T) {
 	now := time.Now()
-	mock := &mockCloudFrontClient{
-		output: &cloudfront.ListDistributionsOutput{
+	mock := &fakeCloudFrontListDistributions{
+		Output: &cloudfront.ListDistributionsOutput{
 			DistributionList: &cftypes.DistributionList{
 				Items: []cftypes.DistributionSummary{
 					{
@@ -124,8 +124,8 @@ func TestFetchCloudFrontDistributions_ParsesMultiple(t *testing.T) {
 
 func TestFetchCloudFrontDistributions_RawStructPopulated(t *testing.T) {
 	now := time.Now()
-	mock := &mockCloudFrontClient{
-		output: &cloudfront.ListDistributionsOutput{
+	mock := &fakeCloudFrontListDistributions{
+		Output: &cloudfront.ListDistributionsOutput{
 			DistributionList: &cftypes.DistributionList{
 				Items: []cftypes.DistributionSummary{
 					{
@@ -167,8 +167,8 @@ func TestFetchCloudFrontDistributions_RawStructPopulated(t *testing.T) {
 }
 
 func TestFetchCloudFrontDistributions_ErrorResponse(t *testing.T) {
-	mock := &mockCloudFrontClient{
-		err: fmt.Errorf("AWS API error: access denied"),
+	mock := &fakeCloudFrontListDistributions{
+		Err: fmt.Errorf("AWS API error: access denied"),
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -183,8 +183,8 @@ func TestFetchCloudFrontDistributions_ErrorResponse(t *testing.T) {
 }
 
 func TestFetchCloudFrontDistributions_EmptyResponse(t *testing.T) {
-	mock := &mockCloudFrontClient{
-		output: &cloudfront.ListDistributionsOutput{
+	mock := &fakeCloudFrontListDistributions{
+		Output: &cloudfront.ListDistributionsOutput{
 			DistributionList: &cftypes.DistributionList{
 				Items: []cftypes.DistributionSummary{},
 			},
@@ -203,8 +203,8 @@ func TestFetchCloudFrontDistributions_EmptyResponse(t *testing.T) {
 }
 
 func TestFetchCloudFrontDistributions_NilDistributionList(t *testing.T) {
-	mock := &mockCloudFrontClient{
-		output: &cloudfront.ListDistributionsOutput{
+	mock := &fakeCloudFrontListDistributions{
+		Output: &cloudfront.ListDistributionsOutput{
 			DistributionList: nil,
 		},
 	}

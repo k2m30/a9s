@@ -3,89 +3,18 @@ package unit
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
-	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
-	"github.com/aws/aws-sdk-go-v2/service/rds"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/smithy-go"
 )
-
-// ---------------------------------------------------------------------------
-// S3 mocks
-// ---------------------------------------------------------------------------
-
-// mockS3ListBucketsClient implements awsclient.S3ListBucketsAPI for testing.
-type mockS3ListBucketsClient struct {
-	output *s3.ListBucketsOutput
-	err    error
-}
-
-func (m *mockS3ListBucketsClient) ListBuckets(
-	ctx context.Context,
-	params *s3.ListBucketsInput,
-	optFns ...func(*s3.Options),
-) (*s3.ListBucketsOutput, error) {
-	return m.output, m.err
-}
-
-// S3 ListObjectsV2 mocks: the fake client for this operation now lives in
-// fakes_s3_test.go (fakeS3ListObjectsV2) — see that file's header for the
-// one-fake-per-interface convention.
-
-// mockPaginatedS3ListBucketsClient returns multiple pages of S3 buckets.
-type mockPaginatedS3ListBucketsClient struct {
-	pages []*s3.ListBucketsOutput
-	calls int
-}
-
-func (m *mockPaginatedS3ListBucketsClient) ListBuckets(
-	ctx context.Context,
-	params *s3.ListBucketsInput,
-	optFns ...func(*s3.Options),
-) (*s3.ListBucketsOutput, error) {
-	idx := m.calls
-	if idx >= len(m.pages) {
-		return &s3.ListBucketsOutput{}, nil
-	}
-	m.calls++
-	return m.pages[idx], nil
-}
-
-// mockFastListBucketsClient generates a configurable number of buckets in a single call.
-type mockFastListBucketsClient struct {
-	count int
-}
-
-func (m *mockFastListBucketsClient) ListBuckets(
-	ctx context.Context,
-	params *s3.ListBucketsInput,
-	optFns ...func(*s3.Options),
-) (*s3.ListBucketsOutput, error) {
-	buckets := make([]s3types.Bucket, m.count)
-	for i := range buckets {
-		name := fmt.Sprintf("bucket-%03d", i)
-		created := time.Now()
-		buckets[i] = s3types.Bucket{
-			Name:         aws.String(name),
-			CreationDate: &created,
-		}
-	}
-	return &s3.ListBucketsOutput{Buckets: buckets}, nil
-}
 
 // ---------------------------------------------------------------------------
 // EC2 mocks
@@ -122,24 +51,6 @@ func (m *mockEC2Client) DescribeInstanceStatus(
 }
 
 // ---------------------------------------------------------------------------
-// RDS mocks
-// ---------------------------------------------------------------------------
-
-// mockRDSClient implements awsclient.RDSDescribeDBInstancesAPI for testing.
-type mockRDSClient struct {
-	output *rds.DescribeDBInstancesOutput
-	err    error
-}
-
-func (m *mockRDSClient) DescribeDBInstances(
-	ctx context.Context,
-	params *rds.DescribeDBInstancesInput,
-	optFns ...func(*rds.Options),
-) (*rds.DescribeDBInstancesOutput, error) {
-	return m.output, m.err
-}
-
-// ---------------------------------------------------------------------------
 // ElastiCache (Redis) mocks
 // ---------------------------------------------------------------------------
 
@@ -170,39 +81,6 @@ func (m *mockElastiCacheReplicationGroupsClient) DescribeReplicationGroups(
 	optFns ...func(*elasticache.Options),
 ) (*elasticache.DescribeReplicationGroupsOutput, error) {
 	return m.output, m.err
-}
-
-// ---------------------------------------------------------------------------
-// DocumentDB mocks
-// ---------------------------------------------------------------------------
-
-// mockDocDBClient implements awsclient.DocDBDescribeDBClustersAPI for testing.
-type mockDocDBClient struct {
-	output *docdb.DescribeDBClustersOutput
-	err    error
-}
-
-func (m *mockDocDBClient) DescribeDBClusters(
-	ctx context.Context,
-	params *docdb.DescribeDBClustersInput,
-	optFns ...func(*docdb.Options),
-) (*docdb.DescribeDBClustersOutput, error) {
-	return m.output, m.err
-}
-
-// mockDocDBFilterCapture captures the input to verify filters are passed.
-type mockDocDBFilterCapture struct {
-	output        *docdb.DescribeDBClustersOutput
-	capturedInput *docdb.DescribeDBClustersInput
-}
-
-func (m *mockDocDBFilterCapture) DescribeDBClusters(
-	ctx context.Context,
-	params *docdb.DescribeDBClustersInput,
-	optFns ...func(*docdb.Options),
-) (*docdb.DescribeDBClustersOutput, error) {
-	m.capturedInput = params
-	return m.output, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -478,19 +356,6 @@ func (m *mockLambdaListFunctionsClient) ListFunctions(ctx context.Context, param
 	return m.output, m.err
 }
 
-// ---------------------------------------------------------------------------
-// CloudWatch Alarms mocks
-// ---------------------------------------------------------------------------
-
-type mockCloudWatchDescribeAlarmsClient struct {
-	output *cloudwatch.DescribeAlarmsOutput
-	err    error
-}
-
-func (m *mockCloudWatchDescribeAlarmsClient) DescribeAlarms(ctx context.Context, params *cloudwatch.DescribeAlarmsInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmsOutput, error) {
-	return m.output, m.err
-}
-
 // SNS mocks: the fake client for ListTopics now lives in fakes_sns_test.go
 // (fakeSNSListTopics) — see that file's header for the one-fake-per-
 // interface convention.
@@ -512,34 +377,6 @@ func (m *mockSNSListSubscriptionsByTopicClient) ListSubscriptionsByTopic(ctx con
 	out := m.outputs[m.callIdx]
 	m.callIdx++
 	return out, nil
-}
-
-// ---------------------------------------------------------------------------
-// SQS mocks
-// ---------------------------------------------------------------------------
-
-type mockSQSListQueuesClient struct {
-	output *sqs.ListQueuesOutput
-	err    error
-}
-
-func (m *mockSQSListQueuesClient) ListQueues(ctx context.Context, params *sqs.ListQueuesInput, optFns ...func(*sqs.Options)) (*sqs.ListQueuesOutput, error) {
-	return m.output, m.err
-}
-
-type mockSQSGetQueueAttributesClient struct {
-	outputs map[string]*sqs.GetQueueAttributesOutput
-	err     error
-}
-
-func (m *mockSQSGetQueueAttributesClient) GetQueueAttributes(ctx context.Context, params *sqs.GetQueueAttributesInput, optFns ...func(*sqs.Options)) (*sqs.GetQueueAttributesOutput, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	if out, ok := m.outputs[*params.QueueUrl]; ok {
-		return out, nil
-	}
-	return &sqs.GetQueueAttributesOutput{Attributes: map[string]string{}}, nil
 }
 
 // ---------------------------------------------------------------------------

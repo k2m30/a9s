@@ -1,4 +1,4 @@
-// fakes_s3_test.go is the single source for S3 SDK-interface fakes shared
+// fakes_rds_test.go is the single source for RDS SDK-interface fakes shared
 // across tests/unit.
 //
 // Convention (docs/go-codebase-checklist.md §DRY): one configurable fake per
@@ -12,54 +12,10 @@ package unit
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
 )
 
-// fakeS3ListObjectsV2 implements awsclient.S3ListObjectsV2API.
-//
-// Configure at most one response mode:
-//   - Err: always return this error
-//   - Output: always return this single output (no pagination)
-//   - Pages: sequential paged outputs, one per call, in order
-//   - PageFunc: full control, receives the 1-based call number
-//
-// Calls is always incremented on every invocation, regardless of mode.
-type fakeS3ListObjectsV2 struct {
-	Err      error
-	Output   *s3.ListObjectsV2Output
-	Pages    []*s3.ListObjectsV2Output
-	PageFunc func(call int) (*s3.ListObjectsV2Output, error)
-
-	Calls int
-}
-
-func (f *fakeS3ListObjectsV2) ListObjectsV2(
-	_ context.Context,
-	_ *s3.ListObjectsV2Input,
-	_ ...func(*s3.Options),
-) (*s3.ListObjectsV2Output, error) {
-	if f.PageFunc != nil {
-		f.Calls++
-		return f.PageFunc(f.Calls)
-	}
-	if len(f.Pages) > 0 {
-		idx := f.Calls
-		if idx >= len(f.Pages) {
-			return &s3.ListObjectsV2Output{}, nil
-		}
-		f.Calls++
-		return f.Pages[idx], nil
-	}
-	if f.Err != nil {
-		return nil, f.Err
-	}
-	if f.Output != nil {
-		return f.Output, nil
-	}
-	return &s3.ListObjectsV2Output{}, nil
-}
-
-// fakeS3ListBuckets implements awsclient.S3ListBucketsAPI.
+// fakeRDSDescribeDBInstances implements awsclient.RDSDescribeDBInstancesAPI.
 //
 // Configure at most one response mode:
 //   - Err: always return this error
@@ -71,22 +27,22 @@ func (f *fakeS3ListObjectsV2) ListObjectsV2(
 //
 // Calls, Inputs and LastInput are always recorded so tests can assert on
 // call count and forwarded pagination tokens regardless of response mode.
-type fakeS3ListBuckets struct {
+type fakeRDSDescribeDBInstances struct {
 	Err      error
-	Output   *s3.ListBucketsOutput
-	Pages    []*s3.ListBucketsOutput
-	PageFunc func(call int) (*s3.ListBucketsOutput, error)
+	Output   *rds.DescribeDBInstancesOutput
+	Pages    []*rds.DescribeDBInstancesOutput
+	PageFunc func(call int) (*rds.DescribeDBInstancesOutput, error)
 
 	Calls     int
-	Inputs    []*s3.ListBucketsInput
-	LastInput *s3.ListBucketsInput
+	Inputs    []*rds.DescribeDBInstancesInput
+	LastInput *rds.DescribeDBInstancesInput
 }
 
-func (f *fakeS3ListBuckets) ListBuckets(
+func (f *fakeRDSDescribeDBInstances) DescribeDBInstances(
 	_ context.Context,
-	params *s3.ListBucketsInput,
-	_ ...func(*s3.Options),
-) (*s3.ListBucketsOutput, error) {
+	params *rds.DescribeDBInstancesInput,
+	_ ...func(*rds.Options),
+) (*rds.DescribeDBInstancesOutput, error) {
 	f.Inputs = append(f.Inputs, params)
 	f.LastInput = params
 
@@ -100,7 +56,7 @@ func (f *fakeS3ListBuckets) ListBuckets(
 	if len(f.Pages) > 0 {
 		idx := f.Calls
 		if idx >= len(f.Pages) {
-			return &s3.ListBucketsOutput{}, nil
+			return &rds.DescribeDBInstancesOutput{}, nil
 		}
 		f.Calls++
 		return f.Pages[idx], nil
@@ -108,5 +64,57 @@ func (f *fakeS3ListBuckets) ListBuckets(
 	if f.Output != nil {
 		return f.Output, nil
 	}
-	return &s3.ListBucketsOutput{}, nil
+	return &rds.DescribeDBInstancesOutput{}, nil
+}
+
+// fakeRDSDescribeDBSnapshots implements awsclient.RDSDescribeDBSnapshotsAPI.
+//
+// Configure at most one response mode:
+//   - Err: always return this error
+//   - Output: always return this single output (no pagination)
+//   - Pages: sequential paged outputs, one per call, in order (empty output
+//     once exhausted)
+//   - PageFunc: full control, receives the 1-based call number, takes
+//     precedence over Pages/Output/Err when set
+//
+// Calls, Inputs and LastInput are always recorded so tests can assert on
+// call count and forwarded pagination tokens regardless of response mode.
+type fakeRDSDescribeDBSnapshots struct {
+	Err      error
+	Output   *rds.DescribeDBSnapshotsOutput
+	Pages    []*rds.DescribeDBSnapshotsOutput
+	PageFunc func(call int) (*rds.DescribeDBSnapshotsOutput, error)
+
+	Calls     int
+	Inputs    []*rds.DescribeDBSnapshotsInput
+	LastInput *rds.DescribeDBSnapshotsInput
+}
+
+func (f *fakeRDSDescribeDBSnapshots) DescribeDBSnapshots(
+	_ context.Context,
+	params *rds.DescribeDBSnapshotsInput,
+	_ ...func(*rds.Options),
+) (*rds.DescribeDBSnapshotsOutput, error) {
+	f.Inputs = append(f.Inputs, params)
+	f.LastInput = params
+
+	if f.PageFunc != nil {
+		f.Calls++
+		return f.PageFunc(f.Calls)
+	}
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	if len(f.Pages) > 0 {
+		idx := f.Calls
+		if idx >= len(f.Pages) {
+			return &rds.DescribeDBSnapshotsOutput{}, nil
+		}
+		f.Calls++
+		return f.Pages[idx], nil
+	}
+	if f.Output != nil {
+		return f.Output, nil
+	}
+	return &rds.DescribeDBSnapshotsOutput{}, nil
 }

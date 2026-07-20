@@ -16,8 +16,8 @@ import (
 
 func TestQA_DBCSnapshots_FetchSuccess(t *testing.T) {
 	now := time.Now()
-	mock := &mockDocDBDescribeSnapshotsClient{
-		output: &docdb.DescribeDBClusterSnapshotsOutput{
+	mock := &fakeDocDBDescribeDBClusterSnapshots{
+		Output: &docdb.DescribeDBClusterSnapshotsOutput{
 			DBClusterSnapshots: []docdbtypes.DBClusterSnapshot{
 				{
 					DBClusterSnapshotIdentifier: aws.String("dbc-snap-auto-001"),
@@ -92,8 +92,8 @@ func TestQA_DBCSnapshots_FetchSuccess(t *testing.T) {
 }
 
 func TestQA_DBCSnapshots_FetchEmpty(t *testing.T) {
-	mock := &mockDocDBDescribeSnapshotsClient{
-		output: &docdb.DescribeDBClusterSnapshotsOutput{
+	mock := &fakeDocDBDescribeDBClusterSnapshots{
+		Output: &docdb.DescribeDBClusterSnapshotsOutput{
 			DBClusterSnapshots: []docdbtypes.DBClusterSnapshot{},
 		},
 	}
@@ -110,8 +110,8 @@ func TestQA_DBCSnapshots_FetchEmpty(t *testing.T) {
 }
 
 func TestQA_DBCSnapshots_FetchError(t *testing.T) {
-	mock := &mockDocDBDescribeSnapshotsClient{
-		err: fmt.Errorf("access denied"),
+	mock := &fakeDocDBDescribeDBClusterSnapshots{
+		Err: fmt.Errorf("access denied"),
 	}
 
 	_, err := collectAllPages(func(token string) (resource.FetchResult, error) {

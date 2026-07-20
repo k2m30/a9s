@@ -18,6 +18,7 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
@@ -36,7 +37,7 @@ import (
 func dbiProdResource(t *testing.T) resource.Resource {
 	t.Helper()
 	inst := findDBI(t, fixtures.ProdDbiID)
-	mock := &mockRDSPageClient{instances: []rdstypes.DBInstance{inst}}
+	mock := &fakeRDSDescribeDBInstances{Output: &rds.DescribeDBInstancesOutput{DBInstances: []rdstypes.DBInstance{inst}}}
 	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
 	if err != nil {
 		t.Fatalf("dbiProdResource: FetchRDSInstancesPage error: %v", err)
@@ -51,7 +52,7 @@ func dbiProdResource(t *testing.T) resource.Resource {
 func dbiAuroraResource(t *testing.T) resource.Resource {
 	t.Helper()
 	inst := findDBI(t, fixtures.ProdDbiAuroraID)
-	mock := &mockRDSPageClient{instances: []rdstypes.DBInstance{inst}}
+	mock := &fakeRDSDescribeDBInstances{Output: &rds.DescribeDBInstancesOutput{DBInstances: []rdstypes.DBInstance{inst}}}
 	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
 	if err != nil {
 		t.Fatalf("dbiAuroraResource: error: %v", err)
@@ -136,7 +137,7 @@ func TestDBI_Related_KMS_ReturnsKeyUUID(t *testing.T) {
 // TestDBI_Related_KMS_UnencryptedInstance verifies Count=0 when KmsKeyId is nil.
 func TestDBI_Related_KMS_UnencryptedInstance(t *testing.T) {
 	inst := findDBI(t, fixtures.WarnDbiUnencryptedID)
-	mock := &mockRDSPageClient{instances: []rdstypes.DBInstance{inst}}
+	mock := &fakeRDSDescribeDBInstances{Output: &rds.DescribeDBInstancesOutput{DBInstances: []rdstypes.DBInstance{inst}}}
 	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPage error: %v", err)

@@ -43,7 +43,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching S3 buckets",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchS3BucketsPageWithNotifications(ctx, &mockS3ListBucketsClient{err: sentinel}, nil, token)
+					return awsclient.FetchS3BucketsPageWithNotifications(ctx, &fakeS3ListBuckets{Err: sentinel}, nil, token)
 				})
 				return err
 			},
@@ -61,7 +61,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching RDS instances",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchRDSInstancesPage(ctx, &mockRDSClient{err: sentinel}, token)
+					return awsclient.FetchRDSInstancesPage(ctx, &fakeRDSDescribeDBInstances{Err: sentinel}, token)
 				})
 				return err
 			},
@@ -81,7 +81,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching DocumentDB clusters",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchDocDBClustersPage(ctx, &mockDocDBClient{err: sentinel}, token)
+					return awsclient.FetchDocDBClustersPage(ctx, &fakeDocDBDescribeDBClusters{Err: sentinel}, token)
 				})
 				return err
 			},
@@ -198,7 +198,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching CloudWatch alarms",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchCloudWatchAlarmsPage(ctx, &mockCloudWatchDescribeAlarmsClient{err: sentinel}, token)
+					return awsclient.FetchCloudWatchAlarmsPage(ctx, &fakeCloudWatchDescribeAlarms{Err: sentinel}, token)
 				})
 				return err
 			},
@@ -219,8 +219,8 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 					return awsclient.FetchSQSQueuesPage(ctx,
-						&mockSQSListQueuesClient{err: sentinel},
-						&mockSQSGetQueueAttributesClient{}, token)
+						&fakeSQSListQueues{Err: sentinel},
+						&fakeSQSGetQueueAttributes{}, token)
 				})
 				return err
 			},
@@ -335,7 +335,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching ACM certificates",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchACMCertificatesPage(ctx, &mockACMListCertificatesClient{err: sentinel}, token)
+					return awsclient.FetchACMCertificatesPage(ctx, &fakeACMListCertificates{Err: sentinel}, token)
 				})
 				return err
 			},
@@ -375,7 +375,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching RDS snapshots",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchDBISnapshotsPage(ctx, &mockRDSDescribeDBSnapshotsClient{err: sentinel}, token)
+					return awsclient.FetchDBISnapshotsPage(ctx, &fakeRDSDescribeDBSnapshots{Err: sentinel}, token)
 				})
 				return err
 			},
@@ -425,7 +425,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching DocumentDB cluster snapshots",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchDocDBClusterSnapshotsPage(ctx, &mockDocDBDescribeSnapshotsClient{err: sentinel}, token)
+					return awsclient.FetchDocDBClusterSnapshotsPage(ctx, &fakeDocDBDescribeDBClusterSnapshots{Err: sentinel}, token)
 				})
 				return err
 			},
@@ -461,7 +461,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching CloudFront distributions",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchCloudFrontDistributionsPage(ctx, &mockCloudFrontClient{err: sentinel}, token)
+					return awsclient.FetchCloudFrontDistributionsPage(ctx, &fakeCloudFrontListDistributions{Err: sentinel}, token)
 				})
 				return err
 			},
@@ -501,7 +501,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching EFS file systems",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchEFSFileSystemsPage(ctx, &mockEFSClient{err: sentinel}, token)
+					return awsclient.FetchEFSFileSystemsPage(ctx, &fakeEFSDescribeFileSystems{Err: sentinel}, token)
 				})
 				return err
 			},
@@ -511,7 +511,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			contains: "fetching EventBridge rules",
 			call: func() error {
 				_, err := collectAllPages(func(token string) (resource.FetchResult, error) {
-					return awsclient.FetchEventBridgeRulesPage(ctx, &mockEventBridgeClient{err: sentinel}, token)
+					return awsclient.FetchEventBridgeRulesPage(ctx, &fakeEventBridgeListRules{Err: sentinel}, token)
 				})
 				return err
 			},

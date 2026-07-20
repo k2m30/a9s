@@ -18,8 +18,8 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestFetchEventBridgeRules_ParsesMultiple(t *testing.T) {
-	mock := &mockEventBridgeClient{
-		output: &eventbridge.ListRulesOutput{
+	mock := &fakeEventBridgeListRules{
+		Output: &eventbridge.ListRulesOutput{
 			Rules: []ebtypes.Rule{
 				{
 					Name:               aws.String("daily-backup"),
@@ -92,8 +92,8 @@ func TestFetchEventBridgeRules_ParsesMultiple(t *testing.T) {
 }
 
 func TestFetchEventBridgeRules_RawStructPopulated(t *testing.T) {
-	mock := &mockEventBridgeClient{
-		output: &eventbridge.ListRulesOutput{
+	mock := &fakeEventBridgeListRules{
+		Output: &eventbridge.ListRulesOutput{
 			Rules: []ebtypes.Rule{
 				{
 					Name:         aws.String("raw-rule"),
@@ -126,8 +126,8 @@ func TestFetchEventBridgeRules_RawStructPopulated(t *testing.T) {
 }
 
 func TestFetchEventBridgeRules_ErrorResponse(t *testing.T) {
-	mock := &mockEventBridgeClient{
-		err: fmt.Errorf("AWS API error: access denied"),
+	mock := &fakeEventBridgeListRules{
+		Err: fmt.Errorf("AWS API error: access denied"),
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -142,8 +142,8 @@ func TestFetchEventBridgeRules_ErrorResponse(t *testing.T) {
 }
 
 func TestFetchEventBridgeRules_EmptyResponse(t *testing.T) {
-	mock := &mockEventBridgeClient{
-		output: &eventbridge.ListRulesOutput{
+	mock := &fakeEventBridgeListRules{
+		Output: &eventbridge.ListRulesOutput{
 			Rules: []ebtypes.Rule{},
 		},
 	}

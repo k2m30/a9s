@@ -18,8 +18,8 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestFetchCloudWatchAlarms_ParsesMultipleAlarms(t *testing.T) {
-	mock := &mockCloudWatchDescribeAlarmsClient{
-		output: &cloudwatch.DescribeAlarmsOutput{
+	mock := &fakeCloudWatchDescribeAlarms{
+		Output: &cloudwatch.DescribeAlarmsOutput{
 			MetricAlarms: []cwtypes.MetricAlarm{
 				{
 					AlarmName:          aws.String("high-cpu-alarm"),
@@ -119,9 +119,8 @@ func TestFetchCloudWatchAlarms_ParsesMultipleAlarms(t *testing.T) {
 }
 
 func TestFetchCloudWatchAlarms_ErrorResponse(t *testing.T) {
-	mock := &mockCloudWatchDescribeAlarmsClient{
-		output: nil,
-		err:    fmt.Errorf("AWS API error: access denied"),
+	mock := &fakeCloudWatchDescribeAlarms{
+		Err: fmt.Errorf("AWS API error: access denied"),
 	}
 
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -136,8 +135,8 @@ func TestFetchCloudWatchAlarms_ErrorResponse(t *testing.T) {
 }
 
 func TestFetchCloudWatchAlarms_EmptyResponse(t *testing.T) {
-	mock := &mockCloudWatchDescribeAlarmsClient{
-		output: &cloudwatch.DescribeAlarmsOutput{
+	mock := &fakeCloudWatchDescribeAlarms{
+		Output: &cloudwatch.DescribeAlarmsOutput{
 			MetricAlarms: []cwtypes.MetricAlarm{},
 		},
 	}
@@ -163,8 +162,8 @@ func TestFetchCloudWatchAlarms_EmptyResponse(t *testing.T) {
 // InsufficientDataActions inflates the count and masks alarms with no real
 // actions configured.
 func TestFetchCloudWatchAlarms_ActionsCount_AlarmActionsOnly(t *testing.T) {
-	mock := &mockCloudWatchDescribeAlarmsClient{
-		output: &cloudwatch.DescribeAlarmsOutput{
+	mock := &fakeCloudWatchDescribeAlarms{
+		Output: &cloudwatch.DescribeAlarmsOutput{
 			MetricAlarms: []cwtypes.MetricAlarm{
 				{
 					// Only AlarmActions populated — count must be 1.

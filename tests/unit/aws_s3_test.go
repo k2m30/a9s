@@ -220,8 +220,8 @@ func TestS3_FetcherWithNotifications_PopulatesSQSField(t *testing.T) {
 // bucket with no notification configuration has empty (not absent) notification
 // field values, so downstream checkers don't crash on missing map lookups.
 func TestS3_FetcherWithNotifications_AbsentBucket_EmptyFields(t *testing.T) {
-	listMock := &mockS3ListBucketsClient{
-		output: &s3.ListBucketsOutput{
+	listMock := &fakeS3ListBuckets{
+		Output: &s3.ListBucketsOutput{
 			Buckets: []s3types.Bucket{
 				{
 					Name:         aws.String("bare-bucket"),
@@ -282,8 +282,8 @@ func (f *S3BucketNotificationFake) GetBucketNotificationConfiguration(
 // TestS3_FetcherPage_EmptyBucketList verifies that FetchS3BucketsPage handles
 // an empty ListBuckets response without error and returns zero resources.
 func TestS3_FetcherPage_EmptyBucketList(t *testing.T) {
-	mock := &mockS3ListBucketsClient{
-		output: &s3.ListBucketsOutput{Buckets: nil},
+	mock := &fakeS3ListBuckets{
+		Output: &s3.ListBucketsOutput{Buckets: nil},
 	}
 	result, err := awsclient.FetchS3BucketsPageWithNotifications(context.Background(), mock, nil, "")
 	if err != nil {

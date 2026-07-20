@@ -33,7 +33,7 @@ import (
 
 // ---------------------------------------------------------------------------
 // mockEFSDescribeOnly — implements EFSDescribeFileSystemsAPI for fetcher tests.
-// Delegates to mockEFSClient (defined in mocks_services_test.go).
+// Delegates to fakeEFSDescribeFileSystems (defined in fakes_efs_test.go).
 // ---------------------------------------------------------------------------
 
 func buildEFSResourcesFromFake() ([]resource.Resource, error) {
@@ -381,8 +381,8 @@ func TestEFS_NoCloudWatchMetricCalls(t *testing.T) {
 	//
 	// This test verifies the absence of a CW call by ensuring the fetcher
 	// completes successfully using ONLY the EFS client — no CW client in scope.
-	mock := &mockEFSClient{
-		output: &efs.DescribeFileSystemsOutput{
+	mock := &fakeEFSDescribeFileSystems{
+		Output: &efs.DescribeFileSystemsOutput{
 			FileSystems: []efstypes.FileSystemDescription{
 				{
 					FileSystemId:         aws.String("fs-nocw000000001"),

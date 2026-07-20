@@ -35,8 +35,8 @@ func TestFetchCloudFrontDistributions_WAFColumnResolves(t *testing.T) {
 	now := time.Now()
 	webACLID := "arn:aws:wafv2:us-east-1:123456789012:global/webacl/MyWebACL/abc12345"
 
-	mock := &mockCloudFrontClient{
-		output: &cloudfront.ListDistributionsOutput{
+	mock := &fakeCloudFrontListDistributions{
+		Output: &cloudfront.ListDistributionsOutput{
 			DistributionList: &cftypes.DistributionList{
 				Items: []cftypes.DistributionSummary{
 					{

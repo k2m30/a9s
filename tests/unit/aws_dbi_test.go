@@ -29,24 +29,6 @@ import (
 // helpers
 // ---------------------------------------------------------------------------
 
-// mockRDSPageClient implements awsclient.RDSDescribeDBInstancesAPI for
-// fetcher-behavior tests (single page, no pagination).
-type mockRDSPageClient struct {
-	instances []rdstypes.DBInstance
-	err       error
-}
-
-func (m *mockRDSPageClient) DescribeDBInstances(
-	_ context.Context,
-	_ *rds.DescribeDBInstancesInput,
-	_ ...func(*rds.Options),
-) (*rds.DescribeDBInstancesOutput, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	return &rds.DescribeDBInstancesOutput{DBInstances: m.instances}, nil
-}
-
 // findDBI locates a single DBInstance fixture by identifier.
 func findDBI(t *testing.T, id string) rdstypes.DBInstance {
 	t.Helper()
@@ -69,7 +51,7 @@ func findDBI(t *testing.T, id string) rdstypes.DBInstance {
 // invariant is structurally enforced by the type system.
 func fetchSingle(t *testing.T, inst rdstypes.DBInstance) (status string, fields map[string]string, findings []domain.Finding) {
 	t.Helper()
-	mock := &mockRDSPageClient{instances: []rdstypes.DBInstance{inst}}
+	mock := &fakeRDSDescribeDBInstances{Output: &rds.DescribeDBInstancesOutput{DBInstances: []rdstypes.DBInstance{inst}}}
 	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPage error: %v", err)
@@ -463,7 +445,7 @@ func TestDBI_Fetch_NoCISFlagsField(t *testing.T) {
 // fetchSingleResource calls FetchRDSInstancesPage with one instance and returns the full Resource.
 func fetchSingleResource(t *testing.T, inst rdstypes.DBInstance) resource.Resource {
 	t.Helper()
-	mock := &mockRDSPageClient{instances: []rdstypes.DBInstance{inst}}
+	mock := &fakeRDSDescribeDBInstances{Output: &rds.DescribeDBInstancesOutput{DBInstances: []rdstypes.DBInstance{inst}}}
 	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPage error: %v", err)
@@ -679,7 +661,7 @@ func findDBIFromAll(t *testing.T, id string) rdstypes.DBInstance {
 // fields are populated with correct values for the prod-dbi-1 fixture.
 func TestDBI_Fetch_DetailFieldsPopulated(t *testing.T) {
 	inst := findDBI(t, fixtures.ProdDbiID)
-	mock := &mockRDSPageClient{instances: []rdstypes.DBInstance{inst}}
+	mock := &fakeRDSDescribeDBInstances{Output: &rds.DescribeDBInstancesOutput{DBInstances: []rdstypes.DBInstance{inst}}}
 	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
 	if err != nil {
 		t.Fatalf("FetchRDSInstancesPage error: %v", err)
