@@ -156,3 +156,99 @@ func TestRoot_ProfileRotation_DispatchesNoIdentityFetchBeforeReconnect(t *testin
 		}
 	}
 }
+
+// identityFetchingPlaceholder is the exact loading string renderIdentity's
+// live path shows (views/identity.go's renderLoading, reached whenever
+// rs.identityLoading is true — internal/tui/renderer.go's renderIdentity).
+const identityFetchingPlaceholder = "Fetching identity..."
+
+// TestRoot_NoCacheRotation_IdentityScreenNotStuckLoading is a Codex round-5
+// P2 finding, the last in this identity-rotation chain: core/runtime/
+// handlers.go's no-cache success branch (handleClientsReadySuccess, "Demo /
+// no-cache: synchronous prefetch instead of the async probe pipeline.
+// Identity fetch is skipped in this mode (synthetic creds).") never
+// dispatches TaskKindFetchIdentity. The ClearIdentityIntent case (internal/
+// tui/runtime_adapter.go) sets rs.identityLoading=true on rotation
+// expecting the reconnect's OWN identity fetch to resolve it — true on the
+// live path (handlers.go dispatches TaskKindFetchIdentity itself there) but
+// never true in --no-cache/demo mode, so a rotation while the identity
+// screen is open leaves it showing "Fetching identity..." forever.
+//
+// Cheapest no-cache arrangement: tui.WithNoCache(true) (internal/tui/
+// app_options.go's WithNoCache calls m.core.SetNoCache, the same session.
+// NoCache flag handlers.go's "if s.NoCache" branches on) — the same option
+// already used by the sibling tests above and by text_ports_test.go's reveal
+// tests, paired with tui.WithClients so Init() doesn't need a live connect.
+//
+// The rotation's OWN Connect task cmd fails locally for the bogus
+// "other-profile" (SharedConfigProfileNotExistError — no such profile in
+// ~/.aws/config), so its raw messages.ClientsReady carries a real Err and
+// would take the error branch, never reaching the no-cache success path
+// this test targets. A successful reconnect is modeled instead by reusing
+// that message's own Region/Gen (so the ConnectGen staleness check still
+// matches) with Err cleared and the same demo Clients reinstalled — this is
+// the "no-cache ClientsReady" a genuinely successful rotation would deliver.
+func TestRoot_NoCacheRotation_IdentityScreenNotStuckLoading(t *testing.T) {
+	clients := demo.NewServiceClients()
+	tui.Version = "test"
+	m := tui.New("test-profile", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 0})
+
+	m, cmd := rootApplyMsg(m, rootKeyPress("i"))
+	if cmd == nil {
+		t.Fatal("pressing 'i' with clients ready must return a non-nil fetchIdentity cmd")
+	}
+	loadedMsg := cmd()
+	loaded, ok := loadedMsg.(messages.IdentityLoaded)
+	if !ok || loaded.Identity == nil {
+		t.Fatalf("initial fetchIdentity did not produce messages.IdentityLoaded with a non-nil Identity (cannot reproduce via this harness): got %T: %+v", loadedMsg, loadedMsg)
+	}
+	loadedIdentity, ok := loaded.Identity.(*awsclient.CallerIdentity)
+	if !ok {
+		t.Fatalf("messages.IdentityLoaded.Identity is not a *awsclient.CallerIdentity: got %T", loaded.Identity)
+	}
+	staleARN := loadedIdentity.Arn
+	if staleARN == "" {
+		t.Fatal("precondition: demo STS transport returned an empty ARN — cannot pin staleness against an empty string")
+	}
+	m, _ = rootApplyMsg(m, loaded)
+
+	plain := stripANSI(rootViewContent(m))
+	if !strings.Contains(plain, staleARN) {
+		t.Fatalf("precondition: identity screen must show the fetched ARN %q before rotation, got:\n%s", staleARN, plain)
+	}
+
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetProfile})
+	m, cmd = rootApplyMsg(m, messages.ProfileSelected{Profile: "other-profile"})
+	if cmd == nil {
+		t.Fatal("ProfileSelected must return a non-nil cmd")
+	}
+
+	var rawReady *messages.ClientsReady
+	for _, got := range wave5CollectCmdMsgs(cmd) {
+		if cr, ok := got.(messages.ClientsReady); ok {
+			rawReady = &cr
+			break
+		}
+	}
+	if rawReady == nil {
+		t.Fatal("ProfileSelected's cmd tree produced no messages.ClientsReady to derive a successful reconnect from")
+	}
+	// Reinstall the same demo clients and clear Err — the local connect
+	// attempt fails (no such profile), but the Region/Gen the framework
+	// itself computed are reused so the no-cache success path is entered
+	// under the exact ConnectGen the rotation armed.
+	noCacheReady := messages.ClientsReady{Clients: clients, Region: rawReady.Region, Gen: rawReady.Gen}
+	m, _ = rootApplyMsg(m, noCacheReady)
+
+	final := stripANSI(rootViewContent(m))
+	if strings.Contains(final, staleARN) {
+		t.Errorf("identity screen still shows the stale pre-switch ARN %q after the no-cache reconnect settled; got:\n%s", staleARN, final)
+	}
+	if strings.Contains(final, identityFetchingPlaceholder) {
+		t.Errorf("identity screen is stuck on the %q placeholder after the no-cache reconnect settled — "+
+			"no-cache/demo mode never dispatches TaskKindFetchIdentity (core/runtime/handlers.go), so nothing "+
+			"ever resolves the loading state ClearIdentityIntent set; got:\n%s", identityFetchingPlaceholder, final)
+	}
+}

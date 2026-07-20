@@ -133,17 +133,19 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 		// by SetIdentityIntent's loop over m.stack (app_dispatch.go). Without
 		// this, a rotation that reveals an already-pushed identity rs (e.g.
 		// selector-on-top popped by PopSelectorIntent) would keep showing the
-		// previous pair's ARN. Reset every identity rs to a truthful
-		// "re-fetching" state; loading=true is truthful without dispatching a
-		// fetch here because the reconnect task already in this batch
-		// (HandleClientsReady success, core/runtime/handlers.go) dispatches
-		// TaskKindFetchIdentity itself against the NEW clients — dispatching
-		// our own fetch here would race it using the still-old clients.
+		// previous pair's ARN. Reset every identity rs to a truthful state;
+		// loading=true is only truthful when a post-connect refetch will
+		// actually follow — HandleClientsReady's no-cache branch skips
+		// TaskKindFetchIdentity entirely (core/runtime/handlers.go, "Identity
+		// fetch is skipped in this mode (synthetic creds)"), so no-cache
+		// rotation zeroes the data and leaves loading=false (a blank identity
+		// screen; pressing i again re-fetches) instead of spinning forever.
+		willRefetch := !m.core.NoCache()
 		for _, s := range m.stack {
 			if s.kind == rsKindIdentity {
 				s.identityData = views.IdentityData{}
 				s.identityErr = ""
-				s.identityLoading = true
+				s.identityLoading = willRefetch
 			}
 		}
 	case runtime.PopSelectorIntent:
