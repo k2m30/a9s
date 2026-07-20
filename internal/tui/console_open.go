@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -137,7 +138,10 @@ func openBrowserCmd(consoleURL string) tea.Cmd {
 // preferring $BROWSER when set, else the per-GOOS default opener.
 func browserOpenCommand(consoleURL string) *exec.Cmd {
 	if browser := os.Getenv("BROWSER"); browser != "" {
-		return exec.Command(browser, consoleURL) //nolint:gosec,noctx // G204: argv exec, no shell, URL Valid()-checked upstream (https + console-domain allow-list); $BROWSER is the user's own local opener choice; noctx: fire-and-forget browser launch, no cancellation surface
+		if argv := strings.Fields(browser); len(argv) > 0 {
+			argv = append(argv, consoleURL)
+			return exec.Command(argv[0], argv[1:]...) //nolint:gosec,noctx // G204: argv exec, no shell, URL Valid()-checked upstream (https + console-domain allow-list); $BROWSER is the user's own local opener choice, whitespace-split (no shell quoting); noctx: fire-and-forget browser launch, no cancellation surface
+		}
 	}
 	switch runtime.GOOS {
 	case "darwin":
