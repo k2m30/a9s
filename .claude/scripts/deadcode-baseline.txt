@@ -45,7 +45,6 @@ core/resource/related.go: CleanupFetchByIDsForTest
 core/resource/related.go: CleanupNavigableFieldsForTest
 core/resource/related.go: CleanupRelatedForTest
 core/resource/related.go: IsFieldNavigable
-core/resource/related.go: LoadingRelated
 core/resource/related.go: NoopChecker
 core/resource/related.go: SetFetchByIDsForTest
 core/resource/related.go: SetNavigableFieldsForTest

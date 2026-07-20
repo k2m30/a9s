@@ -261,14 +261,6 @@ func DeferredRelated(targetType string, filter map[string]string) RelatedCheckRe
 	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedDeferred, FetchFilter: filter}
 }
 
-// LoadingRelated returns a RelatedCheckResult representing "no checker result
-// has arrived yet". A checker call is synchronous, so a checker itself never
-// returns this state; it exists for row-mirror producers (and tests) that
-// need a placeholder RelatedCheckResult value.
-func LoadingRelated(targetType string) RelatedCheckResult {
-	return RelatedCheckResult{TargetType: targetType, State: domain.RelatedLoading}
-}
-
 // IsRelatedActionable is the single source of truth for "can the user drill into
 // this related-resource pivot". It is consumed by the TUI right column
 // (isActionableRow), the headless controller (ActionRelatedSelect +
