@@ -76,7 +76,7 @@ sleep 8
 tmux capture-pane -t "$SESSION" -p > "$CAPDIR/ec2_detail.txt"
 
 expect() {
-	if grep -qE "$2" "$CAPDIR/$1"; then
+	if grep -qE -- "$2" "$CAPDIR/$1"; then
 		echo "PASS  $3"
 	else
 		echo "FAIL  $3 — no match for /$2/ in $CAPDIR/$1"
@@ -85,7 +85,7 @@ expect() {
 }
 
 forbid() {
-	if grep -qE "$2" "$CAPDIR/$1"; then
+	if grep -qE -- "$2" "$CAPDIR/$1"; then
 		echo "FAIL  $3 — forbidden /$2/ present in $CAPDIR/$1"
 		FAILURES=$((FAILURES + 1))
 	else
