@@ -39,6 +39,8 @@
 | `w` | Toggle line wrap (in YAML, JSON, detail, and reveal views) |
 | `Tab` | Autocomplete (in command mode) / Switch focus (in detail view with related panel) |
 
+`o` opens via the `BROWSER` environment variable when set (flags supported, never a shell), else the platform default opener — details on the [Environment Variables wiki page](https://github.com/k2m30/a9s/wiki/Environment-Variables). In demo mode `o` shows a notice instead of opening; `O` always copies the URL.
+
 ### Cost Explorer (`:costs`)
 
 | Key | Action |

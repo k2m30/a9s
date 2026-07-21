@@ -150,7 +150,7 @@ a9s -p prod -c events     # open CloudTrail events list in a specific profile
 a9s --version             # print version
 a9s --demo                # run with synthetic demo data (no AWS credentials needed)
 a9s --no-cache            # disable resource availability cache
-a9s --log-file /tmp/a9s.log   # write diagnostics to a file (or set A9S_LOG_FILE); off by default
+a9s --log-file /tmp/a9s.log   # write diagnostics to a file; off by default
 a9s --reset-views         # delete view configs and regenerate defaults
 a9s --reset-themes        # delete theme files and regenerate defaults
 ```
@@ -210,11 +210,7 @@ a9s claims to be read-only — but a dedicated IAM role with an explicit allow-l
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `NO_COLOR` | Set to any value (e.g., `NO_COLOR=1`) to disable all color output. Follows the [no-color.org](https://no-color.org) standard. Useful for accessibility, scripting, or piping output. |
-| `AWS_PROFILE` | Override the active AWS profile (same as `-p` flag). |
-| `AWS_REGION` | Override the active AWS region (same as `-r` flag). |
+All environment variables a9s honors — `A9S_MODE`, `A9S_LOG_FILE`, `A9S_CONFIG_FOLDER`, `BROWSER`, `NO_COLOR`, and the AWS standard variables — are documented on the [Environment Variables wiki page](https://github.com/k2m30/a9s/wiki/Environment-Variables).
 
 ## Why a9s?
 

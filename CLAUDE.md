@@ -191,7 +191,7 @@ When code changes affect any of the following, update the shared source and rege
 - Keybindings, child views, IAM policy changed → **GitHub wiki** (see below)
 
 GitHub wiki — out-of-repo surface, updated MANUALLY on release:
-- The wiki pages (Key Bindings, Child Views, View Customization, Color Themes, Minimal IAM Profile) have no repo-tracked source; **no gate catches their drift**
+- The wiki pages (Key Bindings, Child Views, View Customization, Color Themes, Minimal IAM Profile, Environment Variables) have no repo-tracked source; **no gate catches their drift**
 - Any keybinding, child-view, or IAM-policy change requires a manual wiki edit as part of the release
 - README's keybindings/child-views links point at the website; the wiki remains authoritative only for the pages without a repo-tracked source
 

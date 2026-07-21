@@ -98,4 +98,4 @@ Built-in light themes: `tokyo-night-light`, `catppuccin-latte`, `nord-light`, `g
 
 > **Note:** Dark themes are designed for dark terminal backgrounds; light themes for light terminal backgrounds. Match your theme to your terminal for best results.
 
-To switch themes at runtime, press `:` and type `theme`. Custom themes: copy any built-in file, edit the colors, and point your config at it. Partial themes inherit missing colors from the default (Tokyo Night Dark). The `NO_COLOR` environment variable always forces monochrome, regardless of theme.
+To switch themes at runtime, press `:` and type `theme`. Custom themes: copy any built-in file, edit the colors, and point your config at it. Partial themes inherit missing colors from the default (Tokyo Night Dark). `NO_COLOR` forces monochrome regardless of theme — see the [Environment Variables wiki page](https://github.com/k2m30/a9s/wiki/Environment-Variables).
