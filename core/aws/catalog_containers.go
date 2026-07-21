@@ -443,6 +443,13 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "ECR Images",
 		ShortName: "ecr_images",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			repo := r.Fields["repository_name"]
+			if repo == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "ecr/repositories/"+url.PathEscape(repo)+"/?region="+region)
+		},
 		Columns:   resource.ECRImageColumns(),
 		CopyField: "image_uri",
 		Color:     colorWave1OrHealthy,
@@ -464,10 +471,17 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "Service Tasks",
 		ShortName: "ecs_tasks",
-		Columns:   resource.EcsSvcTaskColumns(),
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["task_arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "ecs/v2/redirect?arn="+url.QueryEscape(arn)+"&region="+region)
+		},
+		Columns: resource.EcsSvcTaskColumns(),
 		FieldKeys: []string{
 			"task_id_short", "status", "health", "task_def_short",
-			"started_at", "stopped_reason", "stop_code",
+			"started_at", "stopped_reason", "stop_code", "task_arn",
 		},
 		Color: func(r domain.Resource) domain.Color {
 			// Structural broken overrides (precedence over wave1).
@@ -504,8 +518,15 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "Service Events",
 		ShortName: "ecs_svc_events",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["service_arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "ecs/v2/redirect?arn="+url.QueryEscape(arn)+"&region="+region)
+		},
 		Columns:   resource.EcsSvcEventColumns(),
-		FieldKeys: []string{"timestamp", "message"},
+		FieldKeys: []string{"timestamp", "message", "service_arn"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchEcsSvcEvents(ctx, c.ECS, parentCtx["cluster"], parentCtx["service_name"], continuationToken)
 		}),
@@ -513,9 +534,12 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "Service Logs",
 		ShortName: "ecs_svc_logs",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group"], r.Fields["log_stream"])
+		},
 		Columns:   resource.EcsSvcLogColumns(),
 		Color:     colorWave1OrHealthy,
-		FieldKeys: []string{"timestamp", "stream_short", "message"},
+		FieldKeys: []string{"timestamp", "stream_short", "message", "log_group", "log_stream"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchEcsSvcLogs(ctx, c.ECS, c.CloudWatchLogs, parentCtx["cluster"], parentCtx["service_name"], parentCtx["task_definition"], continuationToken)
 		}),

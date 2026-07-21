@@ -41,7 +41,7 @@ func FetchAlarmHistory(
 
 	var resources []resource.Resource
 	for _, item := range output.AlarmHistoryItems {
-		resources = append(resources, convertAlarmHistoryItem(item))
+		resources = append(resources, convertAlarmHistoryItem(item, alarmName))
 	}
 
 	nextToken := ""
@@ -67,8 +67,10 @@ func FetchAlarmHistory(
 	}, nil
 }
 
-// convertAlarmHistoryItem converts a single CloudWatch AlarmHistoryItem into a generic Resource.
-func convertAlarmHistoryItem(item cwtypes.AlarmHistoryItem) resource.Resource {
+// convertAlarmHistoryItem converts a single CloudWatch AlarmHistoryItem into
+// a generic Resource. alarmName is threaded through to Fields["alarm_name"]
+// so the console-link builder can deep-link to the parent alarm's page.
+func convertAlarmHistoryItem(item cwtypes.AlarmHistoryItem, alarmName string) resource.Resource {
 	timestamp := ""
 	id := ""
 	if item.Timestamp != nil {
@@ -96,6 +98,7 @@ func convertAlarmHistoryItem(item cwtypes.AlarmHistoryItem) resource.Resource {
 			"timestamp":         timestamp,
 			"history_item_type": historyItemType,
 			"history_summary":   historySummary,
+			"alarm_name":        alarmName,
 		},
 		Findings:  alarmHistoryFindings(historyItemType, historyData),
 		RawStruct: item,

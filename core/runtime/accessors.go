@@ -345,6 +345,21 @@ func (c *Core) AnyLaneResources(rt string) []domain.Resource {
 	return c.session.RowStore.Snapshot(rt).Rows
 }
 
+// AnyLaneResourceByID returns the single row of type rt whose ID matches id,
+// scanning either lane (full or Partial) via a linear search over
+// AnyLaneResources — the row set per type is small enough (list-page-sized,
+// not account-wide) that a scan beats maintaining a second by-ID index.
+// Used to resolve a full cached resource for a related-panel row before
+// falling back to a StubCreator/ID-only synthesis (see core/app ConsoleTarget).
+func (c *Core) AnyLaneResourceByID(rt, id string) (domain.Resource, bool) {
+	for _, r := range c.AnyLaneResources(rt) {
+		if r.ID == id {
+			return r, true
+		}
+	}
+	return domain.Resource{}, false
+}
+
 // listViewCacheEntryFromTypeRows builds the renderer-facing
 // domain.ListViewCacheEntry from a RowStore TypeRows snapshot, threading
 // through the retained ListViewState (filter/sort/cursor/h-scroll) alongside

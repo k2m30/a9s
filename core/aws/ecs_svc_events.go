@@ -37,6 +37,10 @@ func FetchEcsSvcEvents(
 	}
 
 	svc := output.Services[0]
+	serviceArn := ""
+	if svc.ServiceArn != nil {
+		serviceArn = *svc.ServiceArn
+	}
 	var resources []resource.Resource
 
 	for _, event := range svc.Events {
@@ -61,8 +65,9 @@ func FetchEcsSvcEvents(
 			ID:   id,
 			Name: name,
 			Fields: map[string]string{
-				"timestamp": timestamp,
-				"message":   message,
+				"timestamp":   timestamp,
+				"message":     message,
+				"service_arn": serviceArn,
 			},
 			RawStruct: event,
 		}

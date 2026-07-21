@@ -63,7 +63,7 @@ func FetchPipelineStages(
 		}
 
 		for actionIdx, action := range stage.ActionStates {
-			r := convertPipelineStageAction(stageName, stageStatus, action, actionIdx == 0)
+			r := convertPipelineStageAction(stageName, stageStatus, action, actionIdx == 0, pipelineName)
 			resources = append(resources, r)
 		}
 	}
@@ -81,7 +81,9 @@ func FetchPipelineStages(
 // convertPipelineStageAction converts a single stage-action pair into a Resource.
 // showStageName controls whether stage_name is populated (true for the first
 // action in each stage, false for subsequent actions — visual grouping).
-func convertPipelineStageAction(stageName, stageStatus string, action cptypes.ActionState, showStageName bool) resource.Resource {
+// pipelineName is threaded through to Fields["pipeline_name"] so the
+// console-link builder can deep-link to the parent pipeline's page.
+func convertPipelineStageAction(stageName, stageStatus string, action cptypes.ActionState, showStageName bool, pipelineName string) resource.Resource {
 	displayStageName := ""
 	displayStageStatus := ""
 	if showStageName {
@@ -162,6 +164,7 @@ func convertPipelineStageAction(stageName, stageStatus string, action cptypes.Ac
 			"action_error_details": errorDetails,
 			"revision_id":          revisionID,
 			"revision_summary":     revisionSummary,
+			"pipeline_name":        pipelineName,
 		},
 		Findings: pipelineActionFindings(cptypes.ActionExecutionStatus(actionStatus)),
 		RawStruct: PipelineStageRow{

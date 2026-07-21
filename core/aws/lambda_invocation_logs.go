@@ -69,14 +69,21 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 			// Status classification using shared function from log_events.go
 			status := classifyLogEventStatus(message)
 
+			logStream := ""
+			if event.LogStreamName != nil {
+				logStream = *event.LogStreamName
+			}
+
 			resources = append(resources, resource.Resource{
 				ID:       id,
 				Name:     name,
 				Findings: logEventFindings(status),
 				Fields: map[string]string{
-					"timestamp": ts,
-					"message":   message,
-					"status":    status,
+					"timestamp":  ts,
+					"message":    message,
+					"status":     status,
+					"log_group":  logGroup,
+					"log_stream": logStream,
 				},
 				RawStruct: event,
 			})

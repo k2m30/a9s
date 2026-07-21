@@ -96,9 +96,11 @@ func FetchEcsSvcTasks(
 
 // convertEcsTask converts a single ECS Task into a generic Resource.
 func convertEcsTask(task ecstypes.Task) resource.Resource {
+	taskArn := ""
 	taskIDShort := ""
 	if task.TaskArn != nil {
-		parts := strings.Split(*task.TaskArn, "/")
+		taskArn = *task.TaskArn
+		parts := strings.Split(taskArn, "/")
 		taskIDShort = parts[len(parts)-1]
 	}
 
@@ -149,6 +151,7 @@ func convertEcsTask(task ecstypes.Task) resource.Resource {
 			"started_at":     startedAt,
 			"stopped_reason": stoppedReason,
 			"stop_code":      stopCode,
+			"task_arn":       taskArn,
 		},
 		Findings:  findings,
 		RawStruct: task,

@@ -11,9 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/consolelink"
-	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
@@ -24,7 +22,7 @@ import (
 // reveal) are a silent no-op, matching handleCopy's precedent for the same
 // screen kinds.
 func (m Model) handleOpenConsole(copyOnly bool) (tea.Model, tea.Cmd) {
-	td, res, ok := m.consoleTarget()
+	td, res, ok := m.ctrl.ConsoleTarget()
 	if !ok {
 		return m, nil
 	}
@@ -49,71 +47,6 @@ func (m Model) handleOpenConsole(copyOnly bool) (tea.Model, tea.Cmd) {
 	}
 
 	return m, openBrowserCmd(consoleURL)
-}
-
-// consoleTarget resolves the (typeDef, resource) pair for the console-link
-// actions, mirroring handleCopy's screen-kind switch (runtime_adapter_navigate.go):
-// list (including child lists) resolves the highlighted row, detail resolves
-// the detailed resource, and a detail screen with the related panel focused
-// resolves the selected related row instead.
-func (m Model) consoleTarget() (*resource.ResourceTypeDef, resource.Resource, bool) {
-	rs := m.activeRS()
-	switch rs.kind {
-	case rsKindList:
-		td := lookupConsoleTypeDef(rs.resourceType)
-		if td == nil {
-			return nil, resource.Resource{}, false
-		}
-		r, ok := m.ctrl.ListSelected()
-		if !ok {
-			return nil, resource.Resource{}, false
-		}
-		return td, r, true
-	case rsKindDetail:
-		if row, ok := m.ctrl.SelectedRelatedRow(); ok {
-			return consoleTargetFromRelatedRow(row)
-		}
-		td := lookupConsoleTypeDef(rs.resourceType)
-		if td == nil {
-			return nil, resource.Resource{}, false
-		}
-		return td, m.ctrl.GetDetailResource(), true
-	default:
-		return nil, resource.Resource{}, false
-	}
-}
-
-// consoleTargetFromRelatedRow resolves a console-link target from the
-// focused related-panel row. Only a row resolved to exactly one target
-// resource can carry a specific console link — an aggregate row (0 or
-// several targets) has no single resource to link to. td.StubCreator, when
-// registered, synthesizes a resource carrying the fields (e.g. an ARN) the
-// type's ConsoleURL builder needs; otherwise a bare ID-only resource is used.
-func consoleTargetFromRelatedRow(row app.DetailRelatedRow) (*resource.ResourceTypeDef, resource.Resource, bool) {
-	if len(row.ResourceIDs) != 1 {
-		return nil, resource.Resource{}, false
-	}
-	td := lookupConsoleTypeDef(row.TargetType)
-	if td == nil {
-		return nil, resource.Resource{}, false
-	}
-	id := row.ResourceIDs[0]
-	if td.StubCreator != nil {
-		stub := td.StubCreator(id)
-		return td, stub, true
-	}
-	return td, resource.Resource{ID: id, Type: row.TargetType}, true
-}
-
-// lookupConsoleTypeDef resolves shortName against the top-level catalog
-// first, then the child-type registry — the same fallback copyContentList
-// uses, since a child list's rs.resourceType is the child type's own
-// ShortName.
-func lookupConsoleTypeDef(shortName string) *resource.ResourceTypeDef {
-	if td := resource.FindResourceType(shortName); td != nil {
-		return td
-	}
-	return resource.GetChildType(shortName)
 }
 
 // openBrowserCmd returns a tea.Cmd that opens consoleURL in the user's

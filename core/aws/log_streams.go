@@ -35,7 +35,7 @@ func FetchLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGr
 
 	var resources []resource.Resource
 	for _, s := range output.LogStreams {
-		resources = append(resources, convertLogStream(s))
+		resources = append(resources, convertLogStream(s, logGroupName))
 	}
 
 	nextToken := ""
@@ -61,8 +61,10 @@ func FetchLogStreams(ctx context.Context, api CWLogsDescribeLogStreamsAPI, logGr
 	}, nil
 }
 
-// convertLogStream converts a single CloudWatch LogStream into a generic Resource.
-func convertLogStream(s cwlogstypes.LogStream) resource.Resource {
+// convertLogStream converts a single CloudWatch LogStream into a generic
+// Resource. logGroupName is threaded through to Fields["log_group"] so the
+// console-link builder can pair it with the row's own stream name.
+func convertLogStream(s cwlogstypes.LogStream, logGroupName string) resource.Resource {
 	name := ""
 	if s.LogStreamName != nil {
 		name = *s.LogStreamName
@@ -85,6 +87,7 @@ func convertLogStream(s cwlogstypes.LogStream) resource.Resource {
 			"stream_name": name,
 			"last_event":  lastEvent,
 			"first_event": firstEvent,
+			"log_group":   logGroupName,
 		},
 		RawStruct: s,
 	}

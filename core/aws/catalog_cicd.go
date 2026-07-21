@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"net/url"
+	"strings"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/consolelink"
@@ -71,7 +72,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 		Children: []domain.ChildViewDef{
 			{ChildType: "cfn_events", Key: "enter", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
-			{ChildType: "cfn_resources", Key: "R", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
+			{ChildType: "cfn_resources", Key: "R", ContextKeys: map[string]string{"stack_name": "ID", "stack_arn": "arn"}, DisplayNameKey: "Name"},
 		},
 		Color: colorCFN,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -312,6 +313,24 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:      "CodeBuild Builds",
 		ShortName: "cb_builds",
+		ConsoleURL: func(r domain.Resource, region, accountID string) string {
+			buildID := r.Fields["build_id"]
+			if buildID == "" {
+				return ""
+			}
+			proj, _, ok := strings.Cut(buildID, ":")
+			if !ok || proj == "" {
+				return ""
+			}
+			acct := consolelink.AccountFromARN(r.Fields["build_arn"])
+			if acct == "" {
+				acct = accountID
+			}
+			if acct == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "codesuite/codebuild/"+acct+"/projects/"+url.PathEscape(proj)+"/build/"+url.PathEscape(buildID))
+		},
 		Columns:   resource.CBBuildColumns(),
 		CopyField: "build_id",
 		Color:     colorWave1OrHealthy,
@@ -345,9 +364,12 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:      "Build Logs",
 		ShortName: "cb_build_logs",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group_name"], r.Fields["log_stream_name"])
+		},
 		Columns:   resource.CBBuildLogColumns(),
 		CopyField: "message",
-		FieldKeys: []string{"timestamp", "message", "ingestion_time", "event_id"},
+		FieldKeys: []string{"timestamp", "message", "ingestion_time", "event_id", "log_group_name", "log_stream_name"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchCBBuildLogs(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"], continuationToken)
 		}),
@@ -355,13 +377,20 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:      "Pipeline Stages",
 		ShortName: "pipeline_stages",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			name := r.Fields["pipeline_name"]
+			if name == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "codesuite/codepipeline/pipelines/"+url.PathEscape(name)+"/view?region="+region)
+		},
 		Columns:   resource.PipelineStageColumns(),
 		CopyField: "external_url",
 		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{
 			"stage_name", "stage_status", "action_name", "action_status",
 			"last_change_time", "external_url", "action_token",
-			"action_error_details", "revision_id", "revision_summary",
+			"action_error_details", "revision_id", "revision_summary", "pipeline_name",
 		},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchPipelineStages(ctx, c.CodePipeline, parentCtx, continuationToken)

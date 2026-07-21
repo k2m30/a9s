@@ -28,7 +28,7 @@ func FetchTargetHealth(ctx context.Context, api ELBv2DescribeTargetHealthAPI, ta
 	var resources []resource.Resource
 
 	for _, thd := range output.TargetHealthDescriptions {
-		resources = append(resources, convertTargetHealth(thd))
+		resources = append(resources, convertTargetHealth(thd, targetGroupArn))
 	}
 
 	return resource.FetchResult{
@@ -41,8 +41,11 @@ func FetchTargetHealth(ctx context.Context, api ELBv2DescribeTargetHealthAPI, ta
 	}, nil
 }
 
-// convertTargetHealth converts a single ELBv2 TargetHealthDescription into a generic Resource.
-func convertTargetHealth(thd elbv2types.TargetHealthDescription) resource.Resource {
+// convertTargetHealth converts a single ELBv2 TargetHealthDescription into a
+// generic Resource. targetGroupArn is threaded through to
+// Fields["target_group_arn"] so the console-link builder can deep-link to
+// the parent target group's page.
+func convertTargetHealth(thd elbv2types.TargetHealthDescription, targetGroupArn string) resource.Resource {
 	targetID := ""
 	port := ""
 	az := ""
@@ -76,14 +79,15 @@ func convertTargetHealth(thd elbv2types.TargetHealthDescription) resource.Resour
 		ID:   targetID,
 		Name: targetID,
 		Fields: map[string]string{
-			"target_id":    targetID,
-			"port":         port,
-			"az":           az,
-			"status":       health,
-			"health":       health,
-			"reason":       reason,
-			"reason_human": reasonHuman,
-			"description":  description,
+			"target_id":        targetID,
+			"port":             port,
+			"az":               az,
+			"status":           health,
+			"health":           health,
+			"reason":           reason,
+			"reason_human":     reasonHuman,
+			"description":      description,
+			"target_group_arn": targetGroupArn,
 		},
 		Findings:  targetHealthFindings(health, reasonHuman),
 		RawStruct: thd,

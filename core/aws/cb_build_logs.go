@@ -67,11 +67,13 @@ func FetchCBBuildLogs(
 			ID:   id,
 			Name: name,
 			Fields: map[string]string{
-				"timestamp":      ts,
-				"status":         status,
-				"message":        message,
-				"ingestion_time": ingestionTime,
-				"event_id":       id,
+				"timestamp":       ts,
+				"status":          status,
+				"message":         message,
+				"ingestion_time":  ingestionTime,
+				"event_id":        id,
+				"log_group_name":  logGroupName,
+				"log_stream_name": logStreamName,
 			},
 			RawStruct: event,
 		}

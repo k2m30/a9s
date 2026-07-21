@@ -29,6 +29,8 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/consolelink"
+	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/core/session"
@@ -1128,6 +1130,35 @@ func TestController_Handle_IdentityLoadedNoPanic(t *testing.T) {
 	}
 	if snap.Body.Identity.AccountID != "111122223333" {
 		t.Errorf("Snapshot().Body.Identity.AccountID = %q, want %q", snap.Body.Identity.AccountID, "111122223333")
+	}
+}
+
+// TestController_Snapshot_ConsoleURL_ValidListSelectionCarriesOnlyValidURL
+// pins the guard added to (*Controller).consoleURL (core/app/snapshot.go):
+// it must reject and return ("", false) whenever consolelink.Resolve
+// produces a URL that fails consolelink.Valid — the same check
+// openBrowserCmd runs before ever exec'ing a URL. For a normal, well-formed
+// ec2 list selection the guard must be a no-op: Snapshot().ConsoleURL is
+// non-empty, passes consolelink.Valid, and matches the exact regional deep
+// link ec2's ConsoleURL builder produces (core/aws/catalog_compute.go).
+func TestController_Snapshot_ConsoleURL_ValidListSelectionCarriesOnlyValidURL(t *testing.T) {
+	c := newTestController(t)
+
+	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
+	c.ApplyResourcesLoaded("ec2", []resource.Resource{
+		{ID: "i-0a1b2c3d4e5f60001", Name: "web-prod-01", Type: "ec2"},
+	}, nil, false)
+
+	snap := c.Snapshot()
+	if snap.ConsoleURL == "" {
+		t.Fatal("Snapshot().ConsoleURL is empty for a normal ec2 list selection")
+	}
+	if !consolelink.Valid(snap.ConsoleURL) {
+		t.Errorf("Snapshot().ConsoleURL = %q fails consolelink.Valid", snap.ConsoleURL)
+	}
+	want := "https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#InstanceDetails:instanceId=i-0a1b2c3d4e5f60001"
+	if snap.ConsoleURL != want {
+		t.Errorf("Snapshot().ConsoleURL = %q, want %q", snap.ConsoleURL, want)
 	}
 }
 

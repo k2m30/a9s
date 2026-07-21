@@ -58,7 +58,7 @@ func FetchR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, 
 
 	var resources []resource.Resource
 	for _, record := range output.ResourceRecordSets {
-		resources = append(resources, convertR53Record(record))
+		resources = append(resources, convertR53Record(record, hostedZoneId))
 	}
 
 	nextToken := ""
@@ -95,8 +95,11 @@ func FetchR53Records(ctx context.Context, api Route53ListResourceRecordSetsAPI, 
 	}, nil
 }
 
-// convertR53Record converts a single Route53 ResourceRecordSet into a generic Resource.
-func convertR53Record(record r53types.ResourceRecordSet) resource.Resource {
+// convertR53Record converts a single Route53 ResourceRecordSet into a
+// generic Resource. hostedZoneId is threaded through to Fields["zone_id"]
+// (in its raw "/hostedzone/XXXX" form, matching the parent r53 type's own
+// r.ID) so the console-link builder can deep-link to the parent zone's page.
+func convertR53Record(record r53types.ResourceRecordSet, hostedZoneId string) resource.Resource {
 	name := ""
 	if record.Name != nil {
 		name = *record.Name
@@ -133,10 +136,11 @@ func convertR53Record(record r53types.ResourceRecordSet) resource.Resource {
 		ID:   id,
 		Name: name,
 		Fields: map[string]string{
-			"name":   name,
-			"type":   recType,
-			"ttl":    ttl,
-			"values": values,
+			"name":    name,
+			"type":    recType,
+			"ttl":     ttl,
+			"values":  values,
+			"zone_id": hostedZoneId,
 		},
 		RawStruct: record,
 	}

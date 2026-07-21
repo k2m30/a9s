@@ -975,12 +975,16 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 	{
 		Name:      "Lambda Invocations",
 		ShortName: "lambda_invocations",
-		Columns:   resource.LambdaInvocationColumns(),
-		Color:     colorWave1OrHealthy,
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group"], r.Fields["log_stream"])
+		},
+		Columns: resource.LambdaInvocationColumns(),
+		Color:   colorWave1OrHealthy,
 		FieldKeys: []string{
 			"request_id", "timestamp", "status", "duration_ms",
 			"billed_duration_ms", "memory_size_mb", "memory_used_mb",
 			"memory_used", "init_duration_ms", "cold_start", "xray_trace_id",
+			"log_group", "log_stream",
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "lambda_invocation_logs",
@@ -999,9 +1003,12 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 		Name:         "Lambda Invocation Logs",
 		ShortName:    "lambda_invocation_logs",
 		TitleOmitsID: true,
-		Columns:      resource.LambdaInvocationLogColumns(),
-		Color:        colorWave1OrHealthy,
-		FieldKeys:    []string{"timestamp", "message"},
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group"], r.Fields["log_stream"])
+		},
+		Columns:   resource.LambdaInvocationLogColumns(),
+		Color:     colorWave1OrHealthy,
+		FieldKeys: []string{"timestamp", "message", "log_group", "log_stream"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchLambdaInvocationLogs(ctx, c.CloudWatchLogs, parentCtx["log_group"], parentCtx["request_id"], continuationToken)
 		}),
@@ -1009,9 +1016,16 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 	{
 		Name:      "Scaling Activities",
 		ShortName: "asg_activities",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			name := r.Fields["asg_name"]
+			if name == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "ec2/home?region="+region+"#AutoScalingGroupDetails:id="+url.PathEscape(name)+";view=activity")
+		},
 		Columns:   resource.AsgActivityColumns(),
 		Color:     colorWave1OrHealthy,
-		FieldKeys: []string{"start_time", "status_code", "description", "cause"},
+		FieldKeys: []string{"start_time", "status_code", "description", "cause", "asg_name"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchAsgActivities(ctx, c.AutoScaling, parentCtx, continuationToken)
 		}),

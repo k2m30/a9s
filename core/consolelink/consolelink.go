@@ -72,7 +72,7 @@ func AccountFromARN(arn string) string {
 // openBrowserCmd runs before ever exec'ing a URL.
 func Valid(u string) bool {
 	parsed, err := url.Parse(u)
-	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || strings.HasPrefix(parsed.Host, ".") {
 		return false
 	}
 	for _, host := range consoleHosts {

@@ -847,8 +847,14 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "ELB Listeners",
 		ShortName: "elb_listeners",
-		Columns:   resource.ELBListenerColumns(),
-		Color:     colorWave1OrHealthy,
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			if r.ID == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "ec2/home?region="+region+"#ELBListenerV2:listenerArn="+r.ID)
+		},
+		Columns: resource.ELBListenerColumns(),
+		Color:   colorWave1OrHealthy,
 		FieldKeys: []string{
 			"port", "protocol", "default_action_type", "default_action_target",
 			"ssl_policy", "certificate_short", "listener_display",
@@ -869,6 +875,12 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "Listener Rules",
 		ShortName: "elb_listener_rules",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			if r.ID == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "ec2/home?region="+region+"#ListenerRuleDetails:ruleArn="+r.ID)
+		},
 		Columns:   resource.ELBListenerRuleColumns(),
 		CopyField: "conditions_summary",
 		FieldKeys: []string{
@@ -879,12 +891,19 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		}),
 	},
 	{
-		Name:         "Target Health",
-		ShortName:    "tg_health",
+		Name:      "Target Health",
+		ShortName: "tg_health",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["target_group_arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "ec2/home?region="+region+"#TargetGroup:targetGroupArn="+arn)
+		},
 		Columns:      resource.TargetHealthColumns(),
 		Color:        colorWave1OrHealthy,
 		LifecycleKey: "health",
-		FieldKeys:    []string{"target_id", "port", "az", "health", "reason", "reason_human", "description"},
+		FieldKeys:    []string{"target_id", "port", "az", "health", "reason", "reason_human", "description", "target_group_arn"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchTargetHealth(ctx, c.ELBv2, parentCtx["target_group_arn"], continuationToken)
 		}),
@@ -892,6 +911,13 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "Agreements",
 		ShortName: "transfer_agreements",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			sid := r.Fields["server_id"]
+			if sid == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "transfer/home#/servers/"+sid)
+		},
 		Columns: []domain.Column{
 			{Key: "agreement_id", Title: "Agreement Id", Width: 24, Sortable: true},
 			{Key: "description", Title: "Description", Width: 32, Sortable: false},
@@ -902,7 +928,7 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		},
 		Color: colorWave1OrHealthy,
 		FieldKeys: []string{
-			"agreement_id", "description", "status", "local_profile", "partner_profile", "base_directory",
+			"agreement_id", "description", "status", "local_profile", "partner_profile", "base_directory", "server_id",
 		},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchTransferAgreements(ctx, c.Transfer, parentCtx["server_id"], continuationToken)

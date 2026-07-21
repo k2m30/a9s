@@ -349,6 +349,13 @@ var securityChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals //
 	{
 		Name:      "Group Members",
 		ShortName: "iam_group_members",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			user := r.Fields["user_name"]
+			if user == "" {
+				return ""
+			}
+			return consolelink.Global(region, "iam/home#/users/details/"+url.PathEscape(user))
+		},
 		Columns:   resource.IAMGroupMemberColumns(),
 		CopyField: "user_name",
 		FieldKeys: []string{
@@ -361,8 +368,18 @@ var securityChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals //
 	{
 		Name:      "Role Policies",
 		ShortName: "role_policies",
-		Columns:   resource.RolePolicyColumns(),
-		Color:     colorWave1OrHealthy,
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			if arn := r.Fields["policy_arn"]; arn != "" {
+				return consolelink.Global(region, "iam/home#/policies/details/"+url.QueryEscape(arn))
+			}
+			role := r.Fields["role_name"]
+			if role == "" {
+				return ""
+			}
+			return consolelink.Global(region, "iam/home#/roles/details/"+url.PathEscape(role))
+		},
+		Columns: resource.RolePolicyColumns(),
+		Color:   colorWave1OrHealthy,
 		FieldKeys: []string{"policy_name", "policy_arn", "policy_type"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchRolePolicies(ctx, c.IAM, c.IAM, parentCtx, continuationToken)

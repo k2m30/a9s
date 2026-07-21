@@ -146,6 +146,9 @@ func TestConsoleLink_Valid_RejectsNonConsoleOrInsecureURLs(t *testing.T) {
 		"https://console.aws.amazon.com.evil.example.com/x", // suffix-spoofing: real domain as a prefix of an attacker host
 		"",                 // empty
 		"not-a-url-at-all", // unparseable
+		"https://.console.aws.amazon.com/ec2/home",       // empty region label (hypothetical empty region on the commercial partition)
+		"https://.console.amazonaws-us-gov.com/ec2/home", // empty region label, GovCloud partition
+		"https://.console.amazonaws.cn/ec2/home",         // empty region label, China partition
 	}
 	for _, u := range invalid {
 		if consolelink.Valid(u) {

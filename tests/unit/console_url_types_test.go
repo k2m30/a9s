@@ -624,6 +624,59 @@ func TestConsoleURL_Waf_CloudfrontForcesUsEast1RegardlessOfSessionRegion(t *test
 
 // ─── apigw: REST protocol branch (no demo fixture reaches it — synthetic row) ─
 
+// ─── dbc: neptune engine prefix has its own console home, never RDS and
+// never the GoView ARN-resolver fallback (no per-cluster deep link exists
+// for Neptune — the switch's neptune case ignores r.ID entirely) ───────────
+
+// TestConsoleURL_Dbc_NeptuneEngine_UsesNeptuneHome pins the third branch of
+// dbc's engine-prefix switch (core/aws/catalog_databases.go): an engine
+// value starting with "neptune" must resolve to the Neptune console home,
+// not fall through to the default RDS-cluster branch (which the aurora case
+// above already proves is the non-docdb/non-neptune default).
+func TestConsoleURL_Dbc_NeptuneEngine_UsesNeptuneHome(t *testing.T) {
+	td := consoleURLTypeDef(t, "dbc")
+	row := domain.Resource{
+		ID:     "acme-graph-cluster",
+		Name:   "acme-graph-cluster",
+		Fields: map[string]string{"engine": "neptune"},
+	}
+	got := td.ConsoleURL(row, "us-east-1", consoleTestAccountID)
+	want := "https://us-east-1.console.aws.amazon.com/neptune/home?region=us-east-1"
+	if got != want {
+		t.Errorf("dbc neptune branch ConsoleURL = %q, want %q", got, want)
+	}
+}
+
+// TestConsoleURL_Dbc_NeptuneEngine_IgnoresIDAndNeverGoViewFallback proves two
+// things at once: (1) the neptune branch does not thread r.ID into the URL
+// at all (unlike docdb/rds), so a different ID still produces the identical
+// console-home URL; (2) td.ConsoleURL wins outright over consolelink.Resolve's
+// GoView(arn) fallback even when Fields["arn"] is populated — Resolve only
+// ever falls back to GoView when td.ConsoleURL itself returns "", and the
+// neptune branch never does.
+func TestConsoleURL_Dbc_NeptuneEngine_IgnoresIDAndNeverGoViewFallback(t *testing.T) {
+	td := consoleURLTypeDef(t, "dbc")
+	row := domain.Resource{
+		ID:   "some-other-cluster-id",
+		Name: "acme-graph-cluster-2",
+		Fields: map[string]string{
+			"engine": "neptune-graphdb", // still a "neptune"-prefixed engine value
+			"arn":    "arn:aws:rds:us-east-1:123456789012:cluster:acme-graph-cluster-2",
+		},
+	}
+	want := "https://us-east-1.console.aws.amazon.com/neptune/home?region=us-east-1"
+
+	got := td.ConsoleURL(row, "us-east-1", consoleTestAccountID)
+	if got != want {
+		t.Errorf("dbc neptune branch ConsoleURL(id=%q) = %q, want %q (must not thread r.ID in)", row.ID, got, want)
+	}
+
+	resolved, ok := consolelink.Resolve(td, row, "us-east-1", consoleTestAccountID)
+	if !ok || resolved != want {
+		t.Errorf("consolelink.Resolve(dbc neptune, Fields[arn] set) = (%q, %v), want (%q, true) — must never fall back to GoView", resolved, ok, want)
+	}
+}
+
 func TestConsoleURL_Apigw_RestProtocolBranch(t *testing.T) {
 	td := consoleURLTypeDef(t, "apigw")
 	row := domain.Resource{

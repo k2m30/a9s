@@ -299,8 +299,11 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "Log Streams",
 		ShortName: "log_streams",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group"], r.Fields["stream_name"])
+		},
 		Columns:   resource.LogStreamColumns(),
-		FieldKeys: []string{"stream_name", "last_event", "first_event"},
+		FieldKeys: []string{"stream_name", "last_event", "first_event", "log_group"},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "log_events",
 			Key:            "enter",
@@ -315,9 +318,12 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		Name:         "Log Events",
 		ShortName:    "log_events",
 		TitleOmitsID: true,
-		Columns:      resource.LogEventColumns(),
-		Color:        colorWave1OrHealthy,
-		FieldKeys:    []string{"timestamp", "message", "ingestion_time", "event_id"},
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group"], r.Fields["log_stream"])
+		},
+		Columns:   resource.LogEventColumns(),
+		Color:     colorWave1OrHealthy,
+		FieldKeys: []string{"timestamp", "message", "ingestion_time", "event_id", "log_group", "log_stream"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchLogEvents(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"], continuationToken)
 		}),
@@ -329,9 +335,16 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 	{
 		Name:      "Alarm History",
 		ShortName: "alarm_history",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			name := r.Fields["alarm_name"]
+			if name == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "cloudwatch/home?region="+region+"#alarmsV2:alarm/"+url.PathEscape(name))
+		},
 		Columns:   resource.AlarmHistoryColumns(),
 		Color:     colorWave1OrHealthy,
-		FieldKeys: []string{"timestamp", "history_item_type", "history_summary"},
+		FieldKeys: []string{"timestamp", "history_item_type", "history_summary", "alarm_name"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchAlarmHistory(ctx, c.CloudWatch, parentCtx, continuationToken)
 		}),

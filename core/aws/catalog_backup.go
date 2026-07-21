@@ -65,11 +65,18 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 	{
 		Name:      "Stack Events",
 		ShortName: "cfn_events",
-		Columns:   resource.CfnEventColumns(),
-		Color:     colorWave1OrHealthy,
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["stack_arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "cloudformation/home?region="+region+"#/stacks/events?stackId="+arn)
+		},
+		Columns: resource.CfnEventColumns(),
+		Color:   colorWave1OrHealthy,
 		FieldKeys: []string{
 			"timestamp", "logical_resource_id", "resource_type",
-			"resource_status", "resource_status_reason",
+			"resource_status", "resource_status_reason", "stack_arn",
 		},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchCfnEvents(ctx, c.CloudFormation, parentCtx["stack_name"], continuationToken)
@@ -83,14 +90,31 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 	{
 		Name:      "Stack Resources",
 		ShortName: "cfn_resources",
-		Columns:   resource.CfnResourceColumns(),
-		Color:     colorWave1OrHealthy,
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["stack_arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "cloudformation/home?region="+region+"#/stacks/resources?stackId="+arn)
+		},
+		Columns: resource.CfnResourceColumns(),
+		Color:   colorWave1OrHealthy,
 		FieldKeys: []string{
 			"logical_resource_id", "physical_resource_id", "resource_type",
-			"resource_status", "drift_status", "last_updated",
+			"resource_status", "drift_status", "last_updated", "stack_arn",
 		},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-			return FetchCfnResources(ctx, c.CloudFormation, parentCtx["stack_name"], continuationToken)
+			result, err := FetchCfnResources(ctx, c.CloudFormation, parentCtx["stack_name"], continuationToken)
+			if err != nil {
+				return result, err
+			}
+			// StackResourceSummary carries no stack ARN of its own (unlike
+			// StackEvent's StackId), so it's stamped on from parentCtx here
+			// rather than threaded through FetchCfnResources' own signature.
+			for i := range result.Resources {
+				result.Resources[i].Fields["stack_arn"] = parentCtx["stack_arn"]
+			}
+			return result, nil
 		}),
 		Findings: []catalog.FindingDef{
 			{Code: CodeCfnResourceFailed, Phrase: "<status, lowercased>", Severity: domain.SevBroken, Source: "wave1"},

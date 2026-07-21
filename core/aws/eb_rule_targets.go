@@ -43,7 +43,7 @@ func FetchEventBridgeRuleTargets(
 	resources := make([]resource.Resource, 0, len(output.Targets))
 
 	for _, target := range output.Targets {
-		resources = append(resources, convertEventBridgeTarget(target))
+		resources = append(resources, convertEventBridgeTarget(target, ruleName, eventBus))
 	}
 
 	return resource.FetchResult{
@@ -56,8 +56,11 @@ func FetchEventBridgeRuleTargets(
 	}, nil
 }
 
-// convertEventBridgeTarget converts a single EventBridge Target into a generic Resource.
-func convertEventBridgeTarget(target ebtypes.Target) resource.Resource {
+// convertEventBridgeTarget converts a single EventBridge Target into a
+// generic Resource. ruleName and eventBus are threaded through to
+// Fields["rule_name"]/Fields["event_bus"] so the console-link builder can
+// deep-link to the parent rule's page.
+func convertEventBridgeTarget(target ebtypes.Target, ruleName, eventBus string) resource.Resource {
 	targetID := ""
 	if target.Id != nil {
 		targetID = *target.Id
@@ -82,6 +85,8 @@ func convertEventBridgeTarget(target ebtypes.Target) resource.Resource {
 			"role_arn":           roleArn,
 			"resource_type_name": ArnToResourceName(targetArn),
 			"input_summary":      ComputeInputSummary(target),
+			"rule_name":          ruleName,
+			"event_bus":          eventBus,
 		},
 		Findings:  ebRuleTargetFindings(target),
 		RawStruct: target,

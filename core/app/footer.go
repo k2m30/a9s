@@ -56,6 +56,7 @@ func (c *Controller) buildListFooterHints(ctx runtime.ScreenContext, ls *ListSta
 
 	hints = append(hints, KeyHint{Key: "y", Help: "YAML"})
 	hints = append(hints, KeyHint{Key: "J", Help: "JSON"})
+	hints = append(hints, KeyHint{Key: "o", Help: "Open"})
 
 	if td != nil {
 		for _, child := range td.Children {
@@ -142,6 +143,7 @@ func (c *Controller) buildDetailFooterHints(ds *DetailState) []KeyHint {
 		hints = append(hints, KeyHint{Key: "tab", Help: "Fields"})
 		hints = append(hints, KeyHint{Key: "y", Help: "YAML"})
 		hints = append(hints, KeyHint{Key: "J", Help: "JSON"})
+		hints = append(hints, KeyHint{Key: "o", Help: "Open"})
 		if resource.BuildCloudTrailFilter(ds.Resource, ds.ResourceType) != nil {
 			hints = append(hints, KeyHint{Key: "t", Help: "CloudTrail"})
 		}
@@ -167,6 +169,7 @@ func (c *Controller) buildDetailFooterHints(ds *DetailState) []KeyHint {
 
 	hints = append(hints, KeyHint{Key: "y", Help: "YAML"})
 	hints = append(hints, KeyHint{Key: "J", Help: "JSON"})
+	hints = append(hints, KeyHint{Key: "o", Help: "Open"})
 	if resource.BuildCloudTrailFilter(ds.Resource, ds.ResourceType) != nil {
 		hints = append(hints, KeyHint{Key: "t", Help: "CloudTrail"})
 	}

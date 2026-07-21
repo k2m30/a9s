@@ -84,7 +84,7 @@ func FetchTransferAgreements(ctx context.Context, api TransferAPI, serverID stri
 			failures = append(failures, fmt.Sprintf("%s: %s", id, describeErr.Error()))
 			continue
 		}
-		resources = append(resources, buildTransferAgreementResource(describeOutput.Agreement))
+		resources = append(resources, buildTransferAgreementResource(describeOutput.Agreement, serverID))
 	}
 
 	return resource.FetchResult{
@@ -102,8 +102,10 @@ func FetchTransferAgreements(ctx context.Context, api TransferAPI, serverID stri
 // DescribeAgreement response. LocalProfileId/PartnerProfileId are stored
 // raw (the bare profile id); enrichTransferAgreement resolves their As2Id
 // fact and certificate expiry on demand (docs/resources/transfer.md
-// §2.1/§3.2) — an ACTIVE agreement carries zero findings until then.
-func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement) resource.Resource {
+// §2.1/§3.2) — an ACTIVE agreement carries zero findings until then. serverID
+// is threaded through to Fields["server_id"] so the console-link builder can
+// deep-link to the parent server's page.
+func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement, serverID string) resource.Resource {
 	id := aws.ToString(agreement.AgreementId)
 
 	var findings []domain.Finding
@@ -127,6 +129,7 @@ func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement)
 			"local_profile":   aws.ToString(agreement.LocalProfileId),
 			"partner_profile": aws.ToString(agreement.PartnerProfileId),
 			"base_directory":  aws.ToString(agreement.BaseDirectory),
+			"server_id":       serverID,
 		},
 		RawStruct: agreement,
 		Findings:  findings,

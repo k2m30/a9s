@@ -40,7 +40,7 @@ func FetchAsgActivities(
 
 	var resources []resource.Resource
 	for _, activity := range output.Activities {
-		resources = append(resources, convertAsgActivity(activity))
+		resources = append(resources, convertAsgActivity(activity, asgName))
 	}
 
 	nextToken := ""
@@ -66,8 +66,10 @@ func FetchAsgActivities(
 	}, nil
 }
 
-// convertAsgActivity converts a single AutoScaling Activity into a generic Resource.
-func convertAsgActivity(activity asgtypes.Activity) resource.Resource {
+// convertAsgActivity converts a single AutoScaling Activity into a generic
+// Resource. asgName is threaded through to Fields["asg_name"] so the
+// console-link builder can deep-link to the parent ASG's page.
+func convertAsgActivity(activity asgtypes.Activity, asgName string) resource.Resource {
 	id := ""
 	if activity.ActivityId != nil {
 		id = *activity.ActivityId
@@ -103,6 +105,7 @@ func convertAsgActivity(activity asgtypes.Activity) resource.Resource {
 			"status_code": statusCode,
 			"description": description,
 			"cause":       cause,
+			"asg_name":    asgName,
 		},
 		Findings:  asgActivityFindings(activity.StatusCode),
 		RawStruct: activity,

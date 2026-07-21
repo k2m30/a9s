@@ -222,8 +222,16 @@ var dnsCdnChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 	{
 		Name:      "R53 Records",
 		ShortName: "r53_records",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			zoneID := r.Fields["zone_id"]
+			if zoneID == "" {
+				return ""
+			}
+			zone := strings.TrimPrefix(zoneID, "/hostedzone/")
+			return consolelink.Global(region, "route53/v2/hostedzones#ListRecordSets/"+zone)
+		},
 		Columns:   resource.R53RecordColumns(),
-		FieldKeys: []string{"name", "type", "ttl", "values"},
+		FieldKeys: []string{"name", "type", "ttl", "values", "zone_id"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchR53Records(ctx, c.Route53, parentCtx["zone_id"], continuationToken)
 		}),

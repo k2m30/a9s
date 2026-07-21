@@ -138,6 +138,8 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 				"ingestion_time": ingestionTime,
 				"event_id":       id,
 				"status":         status,
+				"log_group":      logGroupName,
+				"log_stream":     logStreamName,
 			},
 			RawStruct: event,
 		}

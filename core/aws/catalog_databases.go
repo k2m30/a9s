@@ -481,10 +481,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			case strings.HasPrefix(engine, "docdb"):
 				return consolelink.Regional(region, "docdb/home?region="+region+"#cluster-details/"+url.PathEscape(r.ID))
 			case strings.HasPrefix(engine, "neptune"):
-				if arn := r.Fields["arn"]; arn != "" {
-					return consolelink.GoView(region, arn)
-				}
-				return ""
+				return consolelink.Regional(region, "neptune/home?region="+region)
 			default:
 				return consolelink.Regional(region, "rds/home?region="+region+"#database:id="+url.PathEscape(r.ID)+";is-cluster=true")
 			}
@@ -965,6 +962,13 @@ var databasesChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 	{
 		Name:      "RDS Events",
 		ShortName: "dbi_events",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			db := r.Fields["source_identifier"]
+			if db == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "rds/home?region="+region+"#database:id="+url.PathEscape(db)+";is-cluster=false")
+		},
 		Columns:   resource.DbiEventColumns(),
 		CopyField: "message",
 		Color:     colorWave1OrHealthy,

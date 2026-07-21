@@ -44,7 +44,9 @@ func FetchSFNExecutionHistory(
 	var resources []resource.Resource
 	var lastStateName string
 	for _, event := range output.Events {
-		resources = append(resources, ConvertHistoryEvent(event, &lastStateName))
+		r := ConvertHistoryEvent(event, &lastStateName)
+		r.Fields["execution_arn"] = executionArn
+		resources = append(resources, r)
 	}
 
 	nextToken := ""

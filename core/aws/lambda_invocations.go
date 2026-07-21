@@ -75,7 +75,7 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 		}
 
 		for _, event := range output.Events {
-			if r, ok := convertReportEvent(event); ok {
+			if r, ok := convertReportEvent(event, logGroup); ok {
 				resources = append(resources, r)
 			}
 		}
@@ -122,7 +122,10 @@ func FetchLambdaInvocations(ctx context.Context, api CWLogsFilterLogEventsAPI, f
 
 // convertReportEvent parses a single FilteredLogEvent for a REPORT line and returns
 // a Resource plus true if the event matched, or a zero Resource plus false if not.
-func convertReportEvent(event cwlogstypes.FilteredLogEvent) (resource.Resource, bool) {
+// logGroup is threaded through to Fields["log_group"] alongside the event's own
+// Fields["log_stream"] (event.LogStreamName) so the console-link builder can
+// deep-link straight to the invocation's own log stream.
+func convertReportEvent(event cwlogstypes.FilteredLogEvent, logGroup string) (resource.Resource, bool) {
 	message := ""
 	if event.Message != nil {
 		message = *event.Message
@@ -179,6 +182,11 @@ func convertReportEvent(event cwlogstypes.FilteredLogEvent) (resource.Resource, 
 	// Memory used display: "used/total MB"
 	memoryUsed := memoryUsedMB + "/" + memorySizeMB + " MB"
 
+	logStream := ""
+	if event.LogStreamName != nil {
+		logStream = *event.LogStreamName
+	}
+
 	return resource.Resource{
 		ID:   requestID,
 		Name: name,
@@ -197,6 +205,8 @@ func convertReportEvent(event cwlogstypes.FilteredLogEvent) (resource.Resource, 
 			"init_duration_ms":       initDurationMs,
 			"cold_start":             coldStart,
 			"xray_trace_id":          xrayTraceID,
+			"log_group":              logGroup,
+			"log_stream":             logStream,
 		},
 		Findings:  lambdaInvocationFindings(status),
 		RawStruct: event,

@@ -1038,6 +1038,7 @@ func Test_DetailFooterHints_PlainField_NoRelated(t *testing.T) {
 	want := []app.KeyHint{
 		{Key: "y", Help: "YAML"},
 		{Key: "J", Help: "JSON"},
+		{Key: "o", Help: "Open"},
 		{Key: "ctrl+r", Help: "Refresh"},
 		{Key: "w", Help: "Wrap"},
 	}
@@ -1066,6 +1067,7 @@ func Test_DetailFooterHints_PlainField_WithRelated(t *testing.T) {
 	want := []app.KeyHint{
 		{Key: "y", Help: "YAML"},
 		{Key: "J", Help: "JSON"},
+		{Key: "o", Help: "Open"},
 		{Key: "r", Help: "Related"},
 		{Key: "ctrl+r", Help: "Refresh"},
 		{Key: "w", Help: "Wrap"},

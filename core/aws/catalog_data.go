@@ -195,6 +195,13 @@ var dataChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:      "Job Runs",
 		ShortName: "glue_runs",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			job := r.Fields["job_name"]
+			if job == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "gluestudio/home?region="+region+"#/editor/job/"+url.PathEscape(job))
+		},
 		Columns:   resource.GlueRunColumns(),
 		CopyField: "error_message",
 		Color:     colorWave1OrHealthy,
@@ -221,8 +228,16 @@ var dataChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:      "S3 Objects",
 		ShortName: "s3_objects",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			bucket := r.Fields["bucket"]
+			key := r.Fields["key"]
+			if bucket == "" || key == "" {
+				return ""
+			}
+			return consolelink.Global(region, "s3/object/"+url.PathEscape(bucket)+"?prefix="+url.QueryEscape(key))
+		},
 		Columns:   resource.S3ObjectColumns(),
-		FieldKeys: []string{"key", "size", "last_modified", "storage_class"},
+		FieldKeys: []string{"key", "size", "last_modified", "storage_class", "bucket"},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "s3_objects",
 			Key:            "enter",

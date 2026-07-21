@@ -122,6 +122,11 @@ func convertCfnEvent(event cfntypes.StackEvent) resource.Resource {
 		resourceStatusReason = strings.ReplaceAll(resourceStatusReason, "\r", " ")
 	}
 
+	stackArn := ""
+	if event.StackId != nil {
+		stackArn = *event.StackId
+	}
+
 	return resource.Resource{
 		ID:       id,
 		Name:     name,
@@ -132,6 +137,7 @@ func convertCfnEvent(event cfntypes.StackEvent) resource.Resource {
 			"resource_type":          resourceType,
 			"resource_status":        resourceStatus,
 			"resource_status_reason": resourceStatusReason,
+			"stack_arn":              stackArn,
 		},
 		RawStruct: event,
 	}

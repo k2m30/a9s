@@ -91,8 +91,10 @@ func FetchEcsSvcLogs(
 			}
 
 			streamShort := ""
+			logStream := ""
 			if event.LogStreamName != nil {
-				streamShort = computeStreamShort(*event.LogStreamName)
+				logStream = *event.LogStreamName
+				streamShort = computeStreamShort(logStream)
 			}
 
 			message := ""
@@ -119,6 +121,8 @@ func FetchEcsSvcLogs(
 					"stream_short": streamShort,
 					"message":      message,
 					"status":       status,
+					"log_group":    logGroup,
+					"log_stream":   logStream,
 				},
 				RawStruct: event,
 			}

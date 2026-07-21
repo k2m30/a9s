@@ -89,55 +89,113 @@ func (c *Controller) snapshot() ViewState {
 }
 
 // consoleURL resolves the AWS console link for the current screen's target
-// resource: the list's selected row, or the detail screen's resource. Type
-// lookup mirrors copyContentList/copyContentDetail's fallback (top-level
-// catalog, then child-type registry, since a child list's Ctx.ResourceType
-// is the child type's own ShortName). Any other screen kind — or a screen
-// with no resolvable target — returns ("", false). The TUI's richer
-// resolution (including the related-panel-focused case) lives in
-// internal/tui/console_open.go; this is the web-only, minimal counterpart.
+// resource via ConsoleTarget (list selected row, detail resource, or a
+// focused single-target related row) and runs it through consolelink.Resolve
+// plus the same Valid guard the TUI's exec path uses before ever spawning a
+// browser. Callers must hold c.mu (consoleTarget is lock-free).
 func (c *Controller) consoleURL() (string, bool) {
-	if len(c.stack) == 0 {
+	td, res, ok := c.consoleTarget()
+	if !ok {
 		return "", false
 	}
-	top := c.stack[len(c.stack)-1]
-
-	var td *resource.ResourceTypeDef
-	var res resource.Resource
-	switch bodyKindForScreen(top) {
-	case BodyKindList:
-		r, ok := c.listSelected()
-		if !ok {
-			return "", false
-		}
-		typeName := top.Ctx.ResourceType
-		td = resource.FindResourceType(typeName)
-		if td == nil {
-			td = resource.GetChildType(typeName)
-		}
-		res = r
-	case BodyKindDetail:
-		ds := c.topDetailState()
-		if ds == nil {
-			return "", false
-		}
-		td = resource.FindResourceType(ds.ResourceType)
-		if td == nil {
-			td = resource.GetChildType(ds.ResourceType)
-		}
-		res = ds.Resource
-	default:
-		return "", false
-	}
-	if td == nil {
-		return "", false
-	}
-
 	accountID := ""
 	if c.identityResult != nil {
 		accountID = c.identityResult.AccountID
 	}
-	return consolelink.Resolve(*td, res, c.core.Region(), accountID)
+	u, ok := consolelink.Resolve(*td, res, c.core.Region(), accountID)
+	if !ok || !consolelink.Valid(u) {
+		return "", false
+	}
+	return u, true
+}
+
+// ConsoleTarget resolves the (typeDef, resource) pair for the console-link
+// actions (the TUI's o/O keys and the web ConsoleURL snapshot field): the
+// active list's selected row (including child lists), the active detail
+// screen's resource, or — when the detail screen's related panel has focus
+// on a row that resolves to exactly one target resource — that related row's
+// resource instead. An aggregate related row (0 or several targets) has no
+// single resource to link to and resolves to false.
+func (c *Controller) ConsoleTarget() (*resource.ResourceTypeDef, resource.Resource, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.consoleTarget()
+}
+
+// consoleTarget is the lock-free core of ConsoleTarget. Callers must already
+// hold c.mu (read or write).
+func (c *Controller) consoleTarget() (*resource.ResourceTypeDef, resource.Resource, bool) {
+	if len(c.stack) == 0 {
+		return nil, resource.Resource{}, false
+	}
+	top := c.stack[len(c.stack)-1]
+	switch bodyKindForScreen(top) {
+	case BodyKindList:
+		r, ok := c.listSelected()
+		if !ok {
+			return nil, resource.Resource{}, false
+		}
+		td := consoleTypeDefFor(top.Ctx.ResourceType)
+		if td == nil {
+			return nil, resource.Resource{}, false
+		}
+		return td, r, true
+	case BodyKindDetail:
+		ds := c.topDetailState()
+		if ds == nil {
+			return nil, resource.Resource{}, false
+		}
+		if ds.RelatedFocus {
+			if row := ds.focusedRelatedRow(); row != nil {
+				return c.consoleTargetFromRelatedRow(*row)
+			}
+		}
+		td := consoleTypeDefFor(ds.ResourceType)
+		if td == nil {
+			return nil, resource.Resource{}, false
+		}
+		return td, ds.Resource, true
+	default:
+		return nil, resource.Resource{}, false
+	}
+}
+
+// consoleTargetFromRelatedRow resolves a console-link target from a focused
+// related-panel row carrying exactly one target ID. Resolution order: (1)
+// the full row already loaded into the session's RowStore for
+// (TargetType, id), so a cached row's complete Fields feed the type's
+// ConsoleURL builder; (2) td.StubCreator, which synthesizes a resource
+// carrying the fields (e.g. an ARN) the builder needs; (3) a bare ID-only
+// resource — safe because every ConsoleURL builder returns "" rather than a
+// wrong URL on missing input.
+func (c *Controller) consoleTargetFromRelatedRow(row DetailRelatedRow) (*resource.ResourceTypeDef, resource.Resource, bool) {
+	if len(row.ResourceIDs) != 1 {
+		return nil, resource.Resource{}, false
+	}
+	td := consoleTypeDefFor(row.TargetType)
+	if td == nil {
+		return nil, resource.Resource{}, false
+	}
+	id := row.ResourceIDs[0]
+	if cached, ok := c.core.AnyLaneResourceByID(row.TargetType, id); ok {
+		return td, cached, true
+	}
+	if td.StubCreator != nil {
+		stub := td.StubCreator(id)
+		return td, stub, true
+	}
+	return td, resource.Resource{ID: id, Type: row.TargetType}, true
+}
+
+// consoleTypeDefFor resolves shortName against the top-level catalog first,
+// then the child-type registry — the same fallback copyContentList uses,
+// since a child list's Ctx.ResourceType (and a related row's TargetType) is
+// the child type's own ShortName.
+func consoleTypeDefFor(shortName string) *resource.ResourceTypeDef {
+	if td := resource.FindResourceType(shortName); td != nil {
+		return td
+	}
+	return resource.GetChildType(shortName)
 }
 
 // ScreenIDs returns the ScreenID of every entry on the controller's screen

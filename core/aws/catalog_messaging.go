@@ -21,10 +21,21 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 	{
 		Name:      "EB Rule Targets",
 		ShortName: "eb_rule_targets",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			rule := r.Fields["rule_name"]
+			if rule == "" {
+				return ""
+			}
+			bus := r.Fields["event_bus"]
+			if bus == "" {
+				bus = "default"
+			}
+			return consolelink.Regional(region, "events/home?region="+region+"#/eventbus/"+url.PathEscape(bus)+"/rules/"+url.PathEscape(rule))
+		},
 		Columns:   resource.EbRuleTargetColumns(),
 		CopyField: "target_arn",
 		Color:     colorWave1OrHealthy,
-		FieldKeys: []string{"target_id", "target_arn", "role_arn", "resource_type_name", "input_summary"},
+		FieldKeys: []string{"target_id", "target_arn", "role_arn", "resource_type_name", "input_summary", "rule_name", "event_bus"},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, continuationToken)
 		}),
@@ -35,6 +46,13 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 	{
 		Name:      "SFN Executions",
 		ShortName: "sfn_executions",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["execution_arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "states/home?region="+region+"#/executions/details/"+arn)
+		},
 		Columns:   resource.SFNExecutionColumns(),
 		CopyField: "execution_arn",
 		Color:     colorWave1OrHealthy,
@@ -62,12 +80,19 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 	{
 		Name:      "SFN Execution History",
 		ShortName: "sfn_execution_history",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["execution_arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "states/home?region="+region+"#/executions/details/"+arn)
+		},
 		Columns:   resource.SFNExecutionHistoryColumns(),
 		CopyField: "event_detail",
 		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{
 			"timestamp", "event_type", "event_type_short",
-			"state_name", "event_detail", "event_id", "previous_event_id",
+			"state_name", "event_detail", "event_id", "previous_event_id", "execution_arn",
 		},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchSFNExecutionHistory(ctx, c.SFN, parentCtx, continuationToken)
@@ -79,6 +104,13 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 	{
 		Name:      "SNS Subscriptions",
 		ShortName: "sns_subscriptions",
+		ConsoleURL: func(r domain.Resource, region, _ string) string {
+			arn := r.Fields["subscription_arn"]
+			if arn == "" {
+				return ""
+			}
+			return consolelink.Regional(region, "sns/v3/home?region="+region+"#/subscription/"+arn)
+		},
 		Columns:   resource.SnsSubscriptionColumns(),
 		CopyField: "endpoint",
 		Color:     colorWave1OrHealthy,
