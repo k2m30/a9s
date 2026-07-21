@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.56.0] - 2026-07-21
+
+### Added
+
+- `o` opens the selected resource in the AWS console; `O` copies the
+  console URL (#477). Every top-level type (70) and child-view type (29)
+  resolves a deep link — each URL shape verified against AWS's own
+  `/go/view` ARN resolver (78 live captures, including the GovCloud and
+  China partition domains) and official documentation. Works on lists,
+  child lists, detail, and the focused related-panel row; region,
+  partition, and per-service quirks (global consoles, WAF scope,
+  DocumentDB vs Aurora vs Neptune engines, account-in-path consoles)
+  are handled per type. Demo mode shows a notice instead of opening —
+  `O` still copies.
+- `$BROWSER` is honored as the opener command (whitespace-split into
+  argv, so `BROWSER="firefox --new-tab"` works; never passed through a
+  shell); unset, the platform opener is used (`open`/`xdg-open`/
+  `rundll32`). Opened URLs must pass an https + console-domain
+  allow-list guard before any process is spawned.
+- Web mode parity: the same keys work in `--web`, via `window.open` and
+  the async clipboard API inside the keydown handler — the server never
+  executes anything.
+- Footer `o Open` hints on list and detail; help-overlay entries; the
+  keybindings reference documents both keys.
+- New wiki page: Environment Variables — every variable a9s honors,
+  including three that were previously documented nowhere
+  (`A9S_MODE`, `A9S_LOG_FILE`, `A9S_CONFIG_FOLDER`); README and website
+  now point there.
+
+### Fixed
+
+- Cache-restored rows keep their console links: `trail`, `msk`, and
+  `codeartifact` wrote fields at fetch time that were missing from
+  their `FieldKeys` lists and silently dropped on the cache round-trip;
+  builders that needed `RawStruct` (which never survives the cache)
+  were migrated to Wave-1 `Fields`.
+- Neptune clusters open the Neptune console (the generic ARN resolver
+  lands them on the RDS console).
+
 ## [3.55.2] - 2026-07-20
 
 ### Fixed
