@@ -234,6 +234,7 @@ core/            # platform-agnostic core — renderer-free, gated by `make veri
   cache/         # on-disk availability/row cache — one dir per profile+region pair, one YAML file per type, no TTL (see Caching Layers)
   catalog/       # canonical resource catalog: ResourceTypeDef + FindingDef, aggregated from `core/aws/catalog_*.go` literals, installed via `aws.Install()` + `catalog.SetTypes(...)`. The sole source of truth; the legacy `Register*` registry is gone.
   config/        # YAML config loading, built-in defaults per service category (defaults_<category>.go)
+  consolelink/   # AWS console deep-link URL builders (partition-aware Regional/Global/GoView, https+console-domain Valid guard, Resolve with the generic /go/view ARN fallback) — backs the o/O keys
   costs/         # Cost Explorer domain state machine (records/store/grid/windows); costs/screen for fetch planning + drill
   demo/          # synthetic fixture data for --demo mode
     fixtures/    #   per-service Go structs (ec2.go, iam.go, etc.)
@@ -313,6 +314,7 @@ type ResourceTypeDef struct {
     IdentityKey string           // column key for enrichment row-marker placement; empty = use 5-step cascade
     CellDecorators map[string]func(domain.Resource, string) string // transforms cell values per column before render
     CopyField   string           // overrides which Fields key `c` copies; empty = copy ID
+    ConsoleURL  func(domain.Resource, string, string) string // AWS console deep link for a row (region, accountID); "" = no page / missing input, Resolve falls back to Fields["arn"] via /go/view
 
     // Behavior — fetchers and enrichers are struct fields, not registrations
     Fetcher             domain.PaginatedFetcher  // Wave 1 paginated fetcher
@@ -483,6 +485,7 @@ Cross-view behaviors that older revisions expressed as per-view capability inter
 | Filter / search state | `ViewState` body fields (`ListBody.Filter`, `DetailBody.Search`, `TextBody.Search`, …) populated by the controller |
 | Footer key hints | `core/app` footer builders (`buildListFooterHints`, `MenuFooterHintsFor`, `CostsFooterHintsFor`) via `ViewState.Footer` |
 | Copy content (`c`) | `Controller.CopyContent()` (`core/app/copy.go`) — one resolution for list/detail/text/identity, exposed as `ViewState.CopyText`/`CopyLabel`; the TUI's `handleCopy` delegates to it, the web client reads the rendered `data-copy-*` attributes. Only the reveal screen's copy stays adapter-local (the controller has no reveal screen). |
+| Console link (`o`/`O`) | `Controller.ConsoleTarget()` (`core/app/snapshot.go`) — one target resolution for list (incl. child lists), detail, and a focused single-target related row (full cached row via `Core.AnyLaneResourceByID`, then `StubCreator`, then bare ID); URL built by `consolelink.Resolve` + `Valid` guard, exposed as `ViewState.ConsoleURL`/`IsDemo`. The TUI's `handleOpenConsole` delegates to it and execs the opener ($BROWSER argv-split, then per-GOOS, never a shell); the web client reads `data-console-url`/`data-is-demo` and calls `window.open`/clipboard in its keydown handler — the server never execs. |
 
 ### Issue Counting & Attention Filter
 
@@ -542,6 +545,7 @@ Key highlights:
 - `!` — error log (session errors with timestamps, rendered via `YAMLModel.NewTextViewer`)
 - `Ctrl+Z` — toggle attention filter: on resource lists, hides rows where `m.typeDef.ResolveColor(r).IsIssue()` is false (dim/routine rows); on main menu, filters to types with issues using quad-state visibility (unknown→visible, confirmed-zero→hidden, truncated-zero→visible, nonzero→visible)
 - `c` — copy resource ID to clipboard
+- `o` — open the selected resource in the AWS console (list/detail only; demo mode flashes instead), `O` — copy the console URL
 - `e`, `L`, `R`, `s` — child view triggers (Events, Logs, Resources, Source)
 - `r` — toggle related panel
 - `x` — reveal secret value
