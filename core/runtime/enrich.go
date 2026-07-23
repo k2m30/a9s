@@ -75,10 +75,11 @@ func (c *Core) HandleEnrichDetail(ev EnrichDetailEvent) ([]UIIntent, []TaskReque
 		return nil, nil
 	}
 	var dctx *awsclient.DetailEnrichmentCtx
-	if c.session.Clients != nil || c.session.PolicyDocCache != nil {
+	if c.session.Clients != nil || c.session.PolicyDocCache != nil || c.session.DetailDocCache != nil {
 		dctx = &awsclient.DetailEnrichmentCtx{
 			Clients:    c.session.Clients,
 			PolicyDocs: c.session.PolicyDocCache,
+			DetailDocs: c.session.DetailDocCache,
 		}
 	}
 	return nil, []TaskRequest{{

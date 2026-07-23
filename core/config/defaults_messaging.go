@@ -26,7 +26,7 @@ func messagingDefaultViews() map[string]ViewDef {
 				{Title: "Topic ARN", Path: "TopicArn", Width: 60},
 			},
 			Detail: []DetailField{
-				{Path: "TopicArn"},
+				{Path: "TopicArn"}, {Path: "Attributes"},
 			},
 		},
 		"sns-sub": {
@@ -108,6 +108,7 @@ func messagingDefaultViews() map[string]ViewDef {
 			},
 			Detail: []DetailField{
 				{Path: "Name"}, {Path: "StateMachineArn"}, {Path: "Type"}, {Path: "CreationDate"},
+				{Path: "Status"}, {Path: "RoleArn"},
 			},
 		},
 		"sns_subscriptions": {

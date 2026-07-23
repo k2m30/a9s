@@ -22,3 +22,5 @@ detail:
   - StateMachineArn
   - Type
   - CreationDate
+  - Status
+  - RoleArn

@@ -141,6 +141,15 @@ Rules for filling list and detail text:
 
 At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Mostly yes — `StackStatus` values like `UPDATE_FAILED` paired with the `StackStatusReason` excerpt in S4 are self-explanatory, and the `rollback: failed create, delete required` phrasing for `ROLLBACK_COMPLETE` removes the ambiguity of a bare status word. The one gap: the stuck `*_IN_PROGRESS > 1h` row must show the elapsed age (`stuck: in progress 2h`) in S4 — the status alone (`UPDATE_IN_PROGRESS`) is indistinguishable from a normal in-flight deploy, so implementations MUST compute and render the age on that row.
 
+## 4.2 On-Demand Detail Enrichment
+
+Opening the detail, YAML, or JSON view triggers one extra read-only call whose result is attached to the resource's raw structure for the stacked views. List views are never affected.
+
+- AWS API: `GetTemplate`
+- Payload: the template body — rendered as structured YAML when the body is JSON, kept as raw text when the template is authored in YAML
+- Cache: session-scoped, version-keyed by the stack's last-update time (falling back to creation time) — an in-session stack update changes the key, so the cache misses and re-fetches instead of serving a pre-update template; cleared on profile/region rotation
+- Failure: a flash message; the view still renders the un-enriched resource
+
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (copied above): `DetectStackDrift` + `DescribeStackDriftDetectionStatus` async polling.

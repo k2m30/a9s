@@ -12,10 +12,53 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// enrichmentOnlyDetailFixtures maps a resource type's shortName to the Detail
+// paths that resolve only against the post-enrichment wrapper (e.g.
+// awsclient.InstanceEnriched), never the raw SDK struct the rest of this
+// file's sweeps use — the detail view legitimately projects the
+// post-enrichment resource (see core/resource.DetailEnricher), and wrapper
+// transparency (embedded raw-struct fields still resolve through fieldpath)
+// is pinned separately by fieldpath_embedded_traversal_test.go. A future
+// enrichment-only path on another resource type needs one entry here, keyed
+// by its config Detail path string, instead of being excluded from its sweep.
+// sfn (Status, RoleArn) and lambda (Concurrency) also gained enrichment-only
+// Detail paths, but deliberately have no entry here: this file's per-path
+// sweep would need brand-new fixtures/tests built from scratch for both
+// (neither has any fixture in this file today), which is redundant with the
+// wrapper-transparency pin (fieldpath_embedded_traversal_test.go) and the
+// enricher-correctness suites (aws_sfn_detail_enrich_test.go,
+// aws_lambda_detail_enrich_test.go); rendered rows are covered end-to-end by
+// the smoke-enrichers gate.
+var enrichmentOnlyDetailFixtures = map[string]map[string]any{
+	"ec2": {
+		"UserData": awsclient.InstanceEnriched{
+			Instance: realisticEC2Instance(),
+			UserData: "#!/bin/bash\necho hi\n",
+		},
+	},
+	"s3": {
+		"Policy": awsclient.BucketEnriched{
+			Bucket: realisticS3Bucket(),
+			Policy: map[string]any{
+				"Version": "2012-10-17",
+				"Statement": []any{
+					map[string]any{
+						"Sid":       "AllowCloudFrontRead",
+						"Effect":    "Allow",
+						"Principal": "*",
+						"Action":    "s3:GetObject",
+					},
+				},
+			},
+		},
+	},
+}
 
 // ===========================================================================
 // Helpers
@@ -301,11 +344,16 @@ func TestQA_ListViewColumns_S3Bucket(t *testing.T) {
 func TestQA_DetailViewPaths_S3Bucket(t *testing.T) {
 	bucket := realisticS3Bucket()
 	vd := config.DefaultViewDef("s3")
+	enrichmentFixtures := enrichmentOnlyDetailFixtures["s3"]
 
 	for _, df := range vd.Detail {
 		path := df.String()
 		t.Run(path, func(t *testing.T) {
-			result := fieldpath.ExtractSubtree(bucket, path)
+			var source any = bucket
+			if fixture, ok := enrichmentFixtures[path]; ok {
+				source = fixture
+			}
+			result := fieldpath.ExtractSubtree(source, path)
 			if result == "" {
 				t.Errorf("ExtractSubtree(%q) returned empty for realistic S3 Bucket", path)
 			}
@@ -502,11 +550,16 @@ func TestQA_ListViewColumns_EC2(t *testing.T) {
 func TestQA_DetailViewPaths_EC2(t *testing.T) {
 	inst := realisticEC2Instance()
 	vd := config.DefaultViewDef("ec2")
+	enrichmentFixtures := enrichmentOnlyDetailFixtures["ec2"]
 
 	for _, df := range vd.Detail {
 		path := df.String()
 		t.Run(path, func(t *testing.T) {
-			result := fieldpath.ExtractSubtree(inst, path)
+			var source any = inst
+			if fixture, ok := enrichmentFixtures[path]; ok {
+				source = fixture
+			}
+			result := fieldpath.ExtractSubtree(source, path)
 			if result == "" {
 				t.Errorf("ExtractSubtree(%q) returned empty for realistic EC2 Instance", path)
 			}

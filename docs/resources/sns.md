@@ -113,6 +113,15 @@ One row per signal from §3:
 
 At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for the orphan-topic row — `~ no subscribers` on a green row is self-explanatory. The missing-KMS row is only actionable if the "sensitive topic" trigger is first defined (tag? name regex?); until then the spec row is documentation, not an implementation target — implementers must resolve the trigger before surfacing this finding, otherwise every unencrypted topic in the account lights up with `~ not encrypted` and the signal degrades to noise.
 
+## 4.2 On-Demand Detail Enrichment
+
+Opening the detail, YAML, or JSON view triggers one extra read-only call whose result is attached to the resource's raw structure for the stacked views. List views are never affected.
+
+- AWS API: `GetTopicAttributes`
+- Payload: the full topic attribute map — subscription counts (confirmed/pending), KMS master key, delivery policies; JSON-valued attributes (`Policy`, `DeliveryPolicy`, `EffectiveDeliveryPolicy`) render as structured YAML
+- Cache: none — a single cheap call, and subscription counts drift during a session
+- Failure: a flash message; the view still renders the un-enriched resource
+
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (copied above).

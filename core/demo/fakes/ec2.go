@@ -6,6 +6,7 @@ package fakes
 
 import (
 	"context"
+	"encoding/base64"
 	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -15,6 +16,16 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
+
+// demoUserData is a short, realistic cloud-init bootstrap script returned by
+// DescribeInstanceAttribute for every fixture instance, base64-encoded to
+// match the real API's on-the-wire shape.
+const demoUserData = `#!/bin/bash
+set -euo pipefail
+yum update -y
+amazon-linux-extras install -y docker
+systemctl enable --now docker
+`
 
 // EC2Fake implements aws.EC2API against fixture data loaded at construction time.
 type EC2Fake struct {
@@ -269,6 +280,21 @@ func (f *EC2Fake) DescribeLaunchTemplateVersions(_ context.Context, input *ec2.D
 	}
 	return &ec2.DescribeLaunchTemplateVersionsOutput{
 		LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{version},
+	}, nil
+}
+
+// DescribeInstanceAttribute backs the on-demand ec2 detail enricher
+// (enrichEc2). Only the UserData attribute is modeled — the only one a9s
+// requests. Returns the same demoUserData script, base64-encoded, for any
+// InstanceId.
+func (f *EC2Fake) DescribeInstanceAttribute(_ context.Context, input *ec2.DescribeInstanceAttributeInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstanceAttributeOutput, error) {
+	if input == nil || input.Attribute != ec2types.InstanceAttributeNameUserData {
+		return &ec2.DescribeInstanceAttributeOutput{}, nil
+	}
+	encoded := base64.StdEncoding.EncodeToString([]byte(demoUserData))
+	return &ec2.DescribeInstanceAttributeOutput{
+		InstanceId: input.InstanceId,
+		UserData:   &ec2types.AttributeValue{Value: &encoded},
 	}, nil
 }
 

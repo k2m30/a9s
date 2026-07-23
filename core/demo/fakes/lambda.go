@@ -66,9 +66,14 @@ func (f *LambdaFake) GetFunction(_ context.Context, input *lambda.GetFunctionInp
 			code.RepositoryType = aws.String("ECR")
 			code.Location = nil
 		}
+		var concurrency *lambdatypes.Concurrency
+		if reserved, ok := f.fix.ReservedConcurrency[bareName]; ok {
+			concurrency = &lambdatypes.Concurrency{ReservedConcurrentExecutions: aws.Int32(reserved)}
+		}
 		return &lambda.GetFunctionOutput{
 			Configuration: &fn,
 			Code:          code,
+			Concurrency:   concurrency,
 		}, nil
 	}
 	return nil, &smithy.GenericAPIError{

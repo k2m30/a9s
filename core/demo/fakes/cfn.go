@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
@@ -50,4 +51,46 @@ func (f *CFNFake) ListStackResources(_ context.Context, input *cloudformation.Li
 		stackName = *input.StackName
 	}
 	return &cloudformation.ListStackResourcesOutput{StackResourceSummaries: f.fix.StackResources[stackName]}, nil
+}
+
+// GetTemplate returns the fixture template body for the stack named or
+// identified by input.StackName (the enricher passes StackId, falling back
+// to StackName — this resolves either against the fixture stack list, as
+// DescribeStacks's own StackName parameter accepts either in real AWS,
+// before looking up TemplateBodies by canonical StackName). An unknown or
+// empty identifier returns the same CFN-validation-shaped error real
+// CloudFormation raises for a nonexistent stack, matching how sibling demo
+// fakes (e.g. EKSFake.DescribeCluster) error on unknown ids instead of
+// silently falling back to generic data. GenericTemplateBody is only used
+// for a KNOWN stack with no dedicated TemplateBodies entry.
+func (f *CFNFake) GetTemplate(_ context.Context, input *cloudformation.GetTemplateInput, _ ...func(*cloudformation.Options)) (*cloudformation.GetTemplateOutput, error) {
+	var want string
+	if input != nil && input.StackName != nil {
+		want = *input.StackName
+	}
+	var stackName string
+	found := false
+	for _, stack := range f.fix.Stacks {
+		if stack.StackName != nil && *stack.StackName == want {
+			stackName = *stack.StackName
+			found = true
+			break
+		}
+		if stack.StackId != nil && *stack.StackId == want && stack.StackName != nil {
+			stackName = *stack.StackName
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil, &smithy.GenericAPIError{
+			Code:    "ValidationError",
+			Message: "Stack with id " + want + " does not exist",
+		}
+	}
+	body, ok := f.fix.TemplateBodies[stackName]
+	if !ok {
+		body = fixtures.GenericTemplateBody
+	}
+	return &cloudformation.GetTemplateOutput{TemplateBody: &body}, nil
 }

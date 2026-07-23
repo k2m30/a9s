@@ -67,7 +67,9 @@ func (f *SFNFake) DescribeStateMachine(_ context.Context, input *sfn.DescribeSta
 	if d, ok := f.fix.Definitions[arn]; ok {
 		definition = d
 	}
-	out := &sfn.DescribeStateMachineOutput{StateMachineArn: &arn, Definition: &definition}
+	// Real DescribeStateMachine always returns a Status — there is no
+	// "unknown" state for an existing state machine.
+	out := &sfn.DescribeStateMachineOutput{StateMachineArn: &arn, Definition: &definition, Status: sfntypes.StateMachineStatusActive}
 	if roleArn, ok := f.fix.RoleArns[arn]; ok {
 		out.RoleArn = &roleArn
 	}

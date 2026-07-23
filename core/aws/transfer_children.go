@@ -152,6 +152,15 @@ func enrichTransferAgreement(ctx context.Context, clients any, res resource.Reso
 	}
 	c := dctx.Clients
 
+	// Same contract as the generic engine's guard (detail_enrich_engine.go):
+	// a disk-cache-seeded row carries Fields only, no RawStruct, until the
+	// live refetch lands. assertStruct would safely return (zero, false) on
+	// nil rather than panic, but that still surfaces as an "enrich failed"
+	// flash for a transient, self-healing state — skip silently instead.
+	if res.RawStruct == nil {
+		return res, nil
+	}
+
 	agreement, ok := assertStruct[transfertypes.DescribedAgreement](res.RawStruct)
 	if !ok {
 		return res, fmt.Errorf("unexpected RawStruct type: %T", res.RawStruct)

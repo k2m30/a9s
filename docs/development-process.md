@@ -139,6 +139,7 @@ This target is the canonical gate. It MUST pass locally with zero edits before a
 14. `make smoke` — tmux-driven demo smoke over the compiled binary (`scripts/smoke-demo.sh`): rendered menu counts, humanized statuses, per-row issue causes, the reference bucket's related panel. Requires tmux. When demo fixtures legitimately change, update the script's assertions in the same PR.
 15. `make smoke-related` — tmux-driven demo smoke dedicated to the RELATED panel (`scripts/smoke-related-demo.sh`): exact fixture witness badges, the zero-count-row cursor skip, a count-1 drill landing on the target detail, a circular drill re-showing cached counts, and the ec2 IAM Role pivot. Requires tmux.
 16. `make smoke-costs` — tmux-driven demo smoke of the Cost Explorer (`scripts/smoke-costs-demo.sh`): month→week→day zoom, metric cycle, account pivot, the planted growth-story drill to usage types, the 14-day resource boundary message. Fixtures anchor to the current month, so assertions stay evergreen. Requires tmux.
+17. `make smoke-enrichers` — tmux-driven demo smoke dedicated to on-demand detail enrichment (`scripts/smoke-enrichers-demo.sh`): every catalog-registered detail enricher's fetched payload asserted on the rendered surface — SFN ASL definition, CFN template body, Lambda deploy-state fields, EC2 decoded user data, SNS topic attributes, S3 policy/CORS/lifecycle documents, IAM policy documents, and the two child-view enrichers (role-policy documents, transfer agreement profile resolution). Session-cache hit behavior is unit-tested, deliberately not asserted here. Requires tmux.
 
 This enumeration is pinned against the Makefile's `ready-to-push` dependency list by a unit test (`tests/unit/docs_gate_sync_test.go`) — when the target changes, that test fails until this list is updated to match.
 
@@ -146,8 +147,12 @@ For changes that touch `core/aws/` real-account behavior, additionally run the l
 
 ```bash
 A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ \
-  -run TestFullRelatedViewValidation -count=1 -v -timeout 600s
+  -run TestFullRelatedViewValidation -count=1 -v -timeout 1800s
 ```
+
+The 1800s budget is sized from practice: the full per-type walk takes
+~19 minutes against a moderately populated account, so a 600s budget
+panics mid-walk with zero assertion failures.
 
 - **Exit**: all green locally. CI is verification, not debugging.
 - **Anti-pattern**: "I'll let CI tell me if it's broken." That is a budget leak and an etiquette violation against reviewers.

@@ -17,7 +17,23 @@ type CFNFixtures struct {
 	StackEvents map[string][]cfntypes.StackEvent
 	// StackResources maps stack name to its resources (for ListStackResources).
 	StackResources map[string][]cfntypes.StackResourceSummary
+	// TemplateBodies maps stack name to its template JSON (for GetTemplate).
+	// Stacks with no entry get the fake's GenericTemplateBody fallback —
+	// GetTemplate has no "not configured" absent-case in real AWS (a stack
+	// always has a template), so every fixture stack must resolve to some body.
+	TemplateBodies map[string]string
 }
+
+// GenericTemplateBody is the GetTemplate fallback for any fixture stack with
+// no entry in TemplateBodies.
+const GenericTemplateBody = `{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Resources": {
+    "DemoResource": {
+      "Type": "AWS::CloudFormation::WaitConditionHandle"
+    }
+  }
+}`
 
 func mustParseCFNTime(s string) time.Time {
 	t, _ := time.Parse(time.RFC3339, s)
@@ -447,10 +463,44 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 		},
 	}
 
+	templateBodies := map[string]string{
+		// Matches acme-vpc-stack's ListStackResources fixture above (VPC,
+		// PublicSubnet1, FlowLogsBucket, FlowLogsRule).
+		"acme-vpc-stack": `{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Core VPC networking stack for Acme Corp production",
+  "Parameters": {
+    "VpcCidr": {"Type": "String", "Default": "10.0.0.0/16"},
+    "Environment": {"Type": "String"}
+  },
+  "Resources": {
+    "VPC": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {"CidrBlock": {"Ref": "VpcCidr"}}
+    },
+    "PublicSubnet1": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {"VpcId": {"Ref": "VPC"}, "CidrBlock": "10.0.0.0/24"}
+    },
+    "FlowLogsBucket": {
+      "Type": "AWS::S3::Bucket"
+    },
+    "FlowLogsRule": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {"ScheduleExpression": "cron(0 3 * * ? *)"}
+    }
+  },
+  "Outputs": {
+    "VpcId": {"Value": {"Ref": "VPC"}, "Description": "Production VPC ID"}
+  }
+}`,
+	}
+
 	return &CFNFixtures{
 		Stacks:         stacks,
 		StackEvents:    stackEvents,
 		StackResources: stackResources,
+		TemplateBodies: templateBodies,
 	}
 })
 

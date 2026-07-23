@@ -28,7 +28,24 @@ type DetailEnrichmentCtx struct {
 
 	// PolicyDocs is the session-scoped IAM policy document cache. Enrichers
 	// that rely on it (role_policies, policy) return an error when it is
-	// nil; other enrichers ignore it. Callers construct one per session and
-	// rotate it on profile/region switch via resetForSessionSwitch.
+	// nil; other enrichers ignore it. Callers construct one per session;
+	// session.Session.Rotate() replaces it on profile/region switch.
 	PolicyDocs *PolicyDocumentCache
+
+	// DetailDocs is the session-scoped cache for on-demand detail documents
+	// (CFN stack templates). Enrichers that rely on it (cfn) return an error
+	// when it is nil; other enrichers ignore it. Callers construct one per
+	// session; session.Session.Rotate() replaces it on profile/region switch.
+	DetailDocs *DetailDocCache
+
+	// SkipCache tells the engine (detail_enrich_engine.go) to bypass the
+	// cache READ for this one enrichment call while still WRITING its fresh
+	// result — set for an explicit refresh (detail Ctrl+R). Without this, a
+	// cached enricher whose key is derived from the list row itself (cfn's
+	// versioned "cfn:<id>:<lastUpdatedUnix>" key) would unwrap the CURRENT
+	// StackEnriched RawStruct — which still carries the pre-refresh
+	// LastUpdatedTime — and rebuild the SAME cache key, hitting the stale
+	// entry despite the operator explicitly asking to refresh. Any future
+	// cached enricher inherits the same guarantee for free.
+	SkipCache bool
 }

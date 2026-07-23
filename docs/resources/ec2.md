@@ -238,6 +238,15 @@ Notes on list-text construction:
 
 At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every row above — the Status column always carries either a human cause (`Server.SpotInstanceShutdown`, `retires in 3d`, `impaired: system checks failing`) or a state keyword paired with age (`stopped 42d ago`), never a bare `stopped` / `stopping` / `impaired` alone. The only residual concern is the `stopping` transitional case, which is inherently short-lived and does not need a cause beyond the verb.
 
+## 4.2 On-Demand Detail Enrichment
+
+Opening the detail, YAML, or JSON view triggers one extra read-only call whose result is attached to the resource's raw structure for the stacked views. List views are never affected.
+
+- AWS API: `DescribeInstanceAttribute` (`Attribute=userData`)
+- Payload: the instance user data, base64-decoded (and gunzipped when gzip-compressed, as cloud-init payloads commonly are) — the bootstrap script, critical when debugging instance launch/config; non-text payloads stay in their original base64 form. Renders both as the last detail-view field and in the YAML/JSON views
+- Cache: none — a single cheap call, and user data can be edited while an instance is stopped
+- Failure: a flash message; the view still renders the un-enriched resource
+
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (CloudWatch `StatusCheckFailed`, IMDSv1 detection).

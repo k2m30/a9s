@@ -209,6 +209,96 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 					}
 				}
 			}`,
+			// The remaining three state machines get a real ASL definition too
+			// (rather than the fake's "{}" fallback) so the on-demand sfn detail
+			// enrichment renders a populated Definition block. Pass/Choice/Wait/
+			// Succeed/Fail states only — no Task states, so these definitions
+			// carry no Lambda ARNs and no "states:::ecs:runTask" resource,
+			// leaving the sfn:lambda and ecs-svc:sfn related-panel pivot counts
+			// (which only order-fulfillment-workflow's definition feeds) unchanged.
+			"arn:aws:states:us-east-1:123456789012:stateMachine:data-pipeline-orchestrator": `{
+				"Comment": "Data pipeline orchestration workflow",
+				"StartAt": "ValidateInput",
+				"States": {
+					"ValidateInput": {
+						"Type": "Choice",
+						"Choices": [
+							{"Variable": "$.recordCount", "NumericGreaterThan": 0, "Next": "ProcessBatch"}
+						],
+						"Default": "NoRecords"
+					},
+					"ProcessBatch": {
+						"Type": "Pass",
+						"Result": {"status": "processed"},
+						"Next": "WaitForDownstream"
+					},
+					"WaitForDownstream": {
+						"Type": "Wait",
+						"Seconds": 30,
+						"Next": "Done"
+					},
+					"NoRecords": {
+						"Type": "Succeed"
+					},
+					"Done": {
+						"Type": "Succeed"
+					}
+				}
+			}`,
+			smARNPaymentValidation: `{
+				"Comment": "Payment validation workflow",
+				"StartAt": "CheckAmount",
+				"States": {
+					"CheckAmount": {
+						"Type": "Choice",
+						"Choices": [
+							{"Variable": "$.amount", "NumericGreaterThan": 10000, "Next": "FlagForReview"}
+						],
+						"Default": "ApprovePayment"
+					},
+					"FlagForReview": {
+						"Type": "Fail",
+						"Error": "PaymentRequiresReview",
+						"Cause": "Amount exceeds auto-approval threshold"
+					},
+					"ApprovePayment": {
+						"Type": "Pass",
+						"Result": {"approved": true},
+						"End": true
+					}
+				}
+			}`,
+			smARNUserOnboarding: `{
+				"Comment": "User onboarding workflow",
+				"StartAt": "CreateProfile",
+				"States": {
+					"CreateProfile": {
+						"Type": "Pass",
+						"Result": {"profileCreated": true},
+						"Next": "WaitForVerification"
+					},
+					"WaitForVerification": {
+						"Type": "Wait",
+						"Seconds": 60,
+						"Next": "CheckVerificationStatus"
+					},
+					"CheckVerificationStatus": {
+						"Type": "Choice",
+						"Choices": [
+							{"Variable": "$.verified", "BooleanEquals": true, "Next": "OnboardingComplete"}
+						],
+						"Default": "OnboardingIncomplete"
+					},
+					"OnboardingComplete": {
+						"Type": "Succeed"
+					},
+					"OnboardingIncomplete": {
+						"Type": "Fail",
+						"Error": "VerificationTimeout",
+						"Cause": "User did not complete verification in time"
+					}
+				}
+			}`,
 		},
 		// order-fulfillment-workflow execution role — required for sfn:role.
 		RoleArns: map[string]string{

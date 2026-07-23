@@ -3,6 +3,7 @@
 package fixtures
 
 import (
+	"strconv"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -97,37 +98,89 @@ var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 		},
 	}
 
-	subsByTopic := map[string][]snstypes.Subscription{
-		"arn:aws:sns:us-east-1:123456789012:alarm-notifications":  subscriptions[:2],
-		"arn:aws:sns:us-east-1:123456789012:order-events":         subscriptions[2:4],
-		"arn:aws:sns:us-east-1:123456789012:deploy-notifications": subscriptions[4:],
-		// webhook-integration-pending — 100% of subscribers PendingConfirmation.
-		"arn:aws:sns:us-east-1:123456789012:webhook-integration-pending": {
-			{
-				TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:webhook-integration-pending"),
-				Protocol:        aws.String("https"),
-				Endpoint:        aws.String("https://partner-webhooks.example.com/sns-callback"),
-				SubscriptionArn: aws.String("PendingConfirmation"),
-				Owner:           aws.String("123456789012"),
-			},
-		},
-		// Every graph-root-reachable topic must have at least one subscription
-		// so sns→sns_subscriptions drill lands on non-empty content.
-		"arn:aws:sns:us-east-1:123456789012:" + S3EventsTopicName: minimalSubscriptions("arn:aws:sns:us-east-1:123456789012:"+S3EventsTopicName, "sqs", "arn:aws:sqs:us-east-1:123456789012:s3-events-queue"),
-		ProdRedisSNSTopicARN: minimalSubscriptions(ProdRedisSNSTopicARN, "email", "redis-oncall@acme-corp.com"),
-		"arn:aws:sns:us-east-1:123456789012:" + SESBounceTopicName: minimalSubscriptions("arn:aws:sns:us-east-1:123456789012:"+SESBounceTopicName, "lambda", "arn:aws:lambda:us-east-1:123456789012:function:ses-bounce-handler"),
-		BackupAlertsSNSTopicARN: minimalSubscriptions(BackupAlertsSNSTopicARN, "email", "backup-ops@acme-corp.com"),
+	// Grouped by each subscription's own TopicArn, not by position — the
+	// six base subscriptions above are NOT laid out in topic-contiguous
+	// blocks (order-events subscriptions interleave with alarm-notifications
+	// and deploy-notifications), so a positional slice split silently
+	// mis-groups them.
+	subsByTopic := map[string][]snstypes.Subscription{}
+	for _, s := range subscriptions {
+		arn := aws.ToString(s.TopicArn)
+		subsByTopic[arn] = append(subsByTopic[arn], s)
 	}
+	// webhook-integration-pending — 100% of subscribers PendingConfirmation.
+	subsByTopic["arn:aws:sns:us-east-1:123456789012:webhook-integration-pending"] = []snstypes.Subscription{
+		{
+			TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:webhook-integration-pending"),
+			Protocol:        aws.String("https"),
+			Endpoint:        aws.String("https://partner-webhooks.example.com/sns-callback"),
+			SubscriptionArn: aws.String("PendingConfirmation"),
+			Owner:           aws.String("123456789012"),
+		},
+	}
+	// Every graph-root-reachable topic must have at least one subscription
+	// so sns→sns_subscriptions drill lands on non-empty content.
+	subsByTopic["arn:aws:sns:us-east-1:123456789012:"+S3EventsTopicName] = minimalSubscriptions("arn:aws:sns:us-east-1:123456789012:"+S3EventsTopicName, "sqs", "arn:aws:sqs:us-east-1:123456789012:s3-events-queue")
+	subsByTopic[ProdRedisSNSTopicARN] = minimalSubscriptions(ProdRedisSNSTopicARN, "email", "redis-oncall@acme-corp.com")
+	subsByTopic["arn:aws:sns:us-east-1:123456789012:"+SESBounceTopicName] = minimalSubscriptions("arn:aws:sns:us-east-1:123456789012:"+SESBounceTopicName, "lambda", "arn:aws:lambda:us-east-1:123456789012:function:ses-bounce-handler")
+	subsByTopic[BackupAlertsSNSTopicARN] = minimalSubscriptions(BackupAlertsSNSTopicARN, "email", "backup-ops@acme-corp.com")
 
 	// TopicAttributes — required for the sns:kms and sns:role related-panel
 	// pivots (checkSNSKMS / checkSNSRole via GetTopicAttributes). The
 	// alarm-notifications topic carries an at-rest encryption key and an
-	// access policy granting the CI deploy role publish access.
+	// access policy granting the CI deploy role publish access. No other
+	// topic gets KmsMasterKeyId/Policy — those two keys are what the
+	// sns:kms/sns:role pivots key off, and their counts are pinned by
+	// smoke/unit assertions.
 	topicAttributes := map[string]map[string]string{
 		"arn:aws:sns:us-east-1:123456789012:alarm-notifications": {
 			"KmsMasterKeyId": "a1b2c3d4-5678-90ab-cdef-111111111111",
 			"Policy":         `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/acme-ci-deploy-role"},"Action":"sns:Publish","Resource":"arn:aws:sns:us-east-1:123456789012:alarm-notifications"}]}`,
 		},
+	}
+
+	// Every real topic returns GetTopicAttributes with at least these common
+	// fields — SubscriptionsConfirmed/SubscriptionsPending are derived from
+	// subsByTopic above so the counts can never drift out of sync with the
+	// subscription fixtures. alarm-notifications keeps its KmsMasterKeyId/
+	// Policy entry above; this loop only adds to it.
+	topicDisplayNames := map[string]string{
+		"arn:aws:sns:us-east-1:123456789012:alarm-notifications":  "Alarm Notifications",
+		"arn:aws:sns:us-east-1:123456789012:order-events":         "Order Events",
+		"arn:aws:sns:us-east-1:123456789012:deploy-notifications": "Deploy Notifications",
+		"arn:aws:sns:us-east-1:123456789012:" + S3EventsTopicName: "S3 Event Notifications",
+		ProdRedisSNSTopicARN: "Redis Production Alerts",
+		"arn:aws:sns:us-east-1:123456789012:" + SESBounceTopicName: "SES Bounce Notifications",
+		BackupAlertsSNSTopicARN: "Backup Vault Alerts",
+		"arn:aws:sns:us-east-1:123456789012:staging-deploy-alerts":       "Staging Deploy Alerts",
+		"arn:aws:sns:us-east-1:123456789012:webhook-integration-pending": "Webhook Integration (Pending)",
+	}
+	for arn, displayName := range topicDisplayNames {
+		confirmed, pending, deleted := 0, 0, 0
+		for _, s := range subsByTopic[arn] {
+			switch aws.ToString(s.SubscriptionArn) {
+			case "PendingConfirmation":
+				pending++
+			// Deleted subscriptions count in AWS's own SubscriptionsDeleted
+			// attribute — neither confirmed nor pending.
+			case "Deleted":
+				deleted++
+			default:
+				confirmed++
+			}
+		}
+		attrs := topicAttributes[arn]
+		if attrs == nil {
+			attrs = map[string]string{}
+		}
+		attrs["TopicArn"] = arn
+		attrs["Owner"] = "123456789012"
+		attrs["DisplayName"] = displayName
+		attrs["SubscriptionsConfirmed"] = strconv.Itoa(confirmed)
+		attrs["SubscriptionsPending"] = strconv.Itoa(pending)
+		attrs["SubscriptionsDeleted"] = strconv.Itoa(deleted)
+		attrs["EffectiveDeliveryPolicy"] = `{"http":{"defaultHealthyRetryPolicy":{"minDelayTarget":20,"maxDelayTarget":20,"numRetries":3,"numMaxDelayRetries":0,"numMinDelayRetries":0,"numNoDelayRetries":0,"backoffFunction":"linear"},"disableSubscriptionOverrides":false}}`
+		topicAttributes[arn] = attrs
 	}
 
 	return &SNSFixtures{

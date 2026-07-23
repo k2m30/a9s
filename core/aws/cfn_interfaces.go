@@ -23,6 +23,13 @@ type CFNListStackResourcesAPI interface {
 	ListStackResources(ctx context.Context, params *cloudformation.ListStackResourcesInput, optFns ...func(*cloudformation.Options)) (*cloudformation.ListStackResourcesOutput, error)
 }
 
+// CFNGetTemplateAPI defines the interface for the CloudFormation GetTemplate
+// operation. Used by the on-demand cfn detail enricher (enrichCfn) — not
+// part of the CFNAPI aggregate since no fetcher or related checker needs it.
+type CFNGetTemplateAPI interface {
+	GetTemplate(ctx context.Context, params *cloudformation.GetTemplateInput, optFns ...func(*cloudformation.Options)) (*cloudformation.GetTemplateOutput, error)
+}
+
 // CFNAPI is the aggregate interface covering all CloudFormation operations used by a9s fetchers.
 // *cloudformation.Client structurally satisfies this interface.
 type CFNAPI interface {

@@ -42,3 +42,4 @@ detail:
   - Layers
   - LoggingConfig
   - LastModified
+  - Concurrency

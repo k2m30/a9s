@@ -417,6 +417,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkEC2SSM},
 			{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEC2Backup, NeedsTargetCache: true, Truncated: true},
 		},
+		DetailEnrich: enrichEc2,
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
 			{FieldPath: "SubnetId", TargetType: "subnet"},
@@ -691,6 +692,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "secrets", DisplayName: "Secrets", Checker: checkLambdaSecrets, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkLambdaSSM, NeedsTargetCache: true, Truncated: true},
 		},
+		DetailEnrich: enrichLambda,
 		Navigable: []domain.NavigableField{
 			{FieldPath: "Role", TargetType: "role"},
 			{FieldPath: "KMSKeyArn", TargetType: "kms"},

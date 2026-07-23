@@ -23,6 +23,7 @@ func computeDefaultViews() map[string]ViewDef {
 				{Path: "PublicIpAddress"}, {Path: "IamInstanceProfile"},
 				{Path: "SecurityGroups"}, {Path: "BlockDeviceMappings"}, {Path: "EbsOptimized"}, {Path: "MetadataOptions"},
 				{Path: "LaunchTime"}, {Path: "Architecture"}, {Path: "Platform"}, {Path: "Tags"},
+				{Path: "UserData"},
 			},
 		},
 		"ecs": {
@@ -97,6 +98,7 @@ func computeDefaultViews() map[string]ViewDef {
 				{Path: "State"}, {Path: "LastUpdateStatus"}, {Path: "LastUpdateStatusReason"},
 				{Path: "Environment"}, {Path: "VpcConfig"}, {Path: "DeadLetterConfig"},
 				{Path: "TracingConfig"}, {Path: "Layers"}, {Path: "LoggingConfig"}, {Path: "LastModified"},
+				{Path: "Concurrency"},
 			},
 		},
 		"asg": {

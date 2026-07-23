@@ -326,6 +326,11 @@ type Session struct {
 	// here instead and are passed to detail enrichers via DetailEnrichmentCtx.
 	PolicyDocCache *awsclient.PolicyDocumentCache
 
+	// DetailDocCache is the session-scoped cache for on-demand detail
+	// documents (SFN definitions, CFN templates). Same rotation rationale as
+	// PolicyDocCache.
+	DetailDocCache *awsclient.DetailDocCache
+
 	// IAMPolicies is the per-session cache for IAM policy resources, keyed by
 	// both PolicyName and ARN. Replaces the package-level globals previously in
 	// core/aws/iam_policies.go. Wired into *ServiceClients.IAMPolicies on
@@ -411,6 +416,7 @@ func New() *Session {
 		EnrichmentGen:          1,
 		AvailabilityGen:        1,
 		PolicyDocCache:         &awsclient.PolicyDocumentCache{},
+		DetailDocCache:         &awsclient.DetailDocCache{},
 		IAMPolicies:            NewPolicyStore(),
 		IdentityStore:          NewIdentityStore(),
 		RuleSets:               NewRuleSetStore(),
@@ -861,6 +867,10 @@ func (s *Session) Rotate() {
 	// Feature caches: swap the PolicyDocumentCache for a fresh instance so
 	// documents fetched in the previous account cannot leak into the next.
 	s.PolicyDocCache = &awsclient.PolicyDocumentCache{}
+
+	// DetailDocCache: same rationale — SFN/CFN detail documents fetched in
+	// the previous account cannot leak into the next.
+	s.DetailDocCache = &awsclient.DetailDocCache{}
 
 	// IAMPolicies: reset to a fresh store so managed/inline entries from the
 	// prior account/profile cannot leak into the next session.

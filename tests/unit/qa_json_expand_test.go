@@ -106,6 +106,98 @@ func TestTryJSONToYAMLLines_NestedObject(t *testing.T) {
 	}
 }
 
+// TestTryJSONToYAMLLines_BigIntRoundTripsLosslessly pins F2: TryJSONToYAMLLines
+// must decode with json.Decoder.UseNumber so an integer above 2^53 renders
+// with its full digits, not a plain json.Unmarshal-into-any float64 that
+// silently rounds 9007199254740993 to 9007199254740992 — corrupting policy
+// documents and templates on render/copy (the same defect core/fieldpath's
+// tryParseJSON was fixed for, extract.go's doc comment).
+func TestTryJSONToYAMLLines_BigIntRoundTripsLosslessly(t *testing.T) {
+	const bigInt = "9007199254740993"
+	lines := jsonyaml.TryJSONToYAMLLines(`{"id":` + bigInt + `}`)
+	if lines == nil {
+		t.Fatal("TryJSONToYAMLLines returned nil for valid JSON object")
+	}
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, bigInt) {
+		t.Errorf("expected the full-precision digits %q in YAML output, got:\n%s (a float64 would render \"9007199254740992\")", bigInt, joined)
+	}
+}
+
+// TestTryJSONToYAMLLines_TrailingGarbage_StillRejected pins F2's other half:
+// switching from json.Unmarshal to a json.Decoder for UseNumber must not
+// relax the "no trailing content" contract — a single Decoder.Decode call
+// does not reject trailing content on its own (unlike json.Unmarshal), so
+// this must still explicitly check Decoder.More() the way core/fieldpath's
+// tryParseJSON does.
+func TestTryJSONToYAMLLines_TrailingGarbage_StillRejected(t *testing.T) {
+	lines := jsonyaml.TryJSONToYAMLLines(`{"a":1} trailing garbage`)
+	if lines != nil {
+		t.Errorf("TryJSONToYAMLLines returned non-nil for JSON with trailing garbage: %v", lines)
+	}
+}
+
+// TestTryJSONToYAMLLines_PlainFloat_StillParses verifies UseNumber doesn't
+// break ordinary float rendering: a ratio value still parses and renders as
+// a plain decimal.
+func TestTryJSONToYAMLLines_PlainFloat_StillParses(t *testing.T) {
+	lines := jsonyaml.TryJSONToYAMLLines(`{"ratio":0.5}`)
+	if lines == nil {
+		t.Fatal("TryJSONToYAMLLines returned nil for valid JSON object with a plain float")
+	}
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "ratio: 0.5") {
+		t.Errorf("expected 'ratio: 0.5' in YAML output, got:\n%s", joined)
+	}
+}
+
+// TestTryJSONToYAMLLines_FloatSpellings_NumericEquality pins NormalizeJSONNumbers'
+// big.Rat-based float-tier check: a json.Number whose lexical spelling merely
+// differs from Go's canonical FormatFloat digits (a formatting mismatch, not
+// a precision loss) must still collapse to a bare, unquoted float64 — not stay
+// quoted as a json.Number string. Decimal fractions float64 cannot hold
+// exactly (0.10 -> exact rational 1/10, which no float64 bit pattern equals)
+// and genuine precision-loss decimals must still stay quoted as json.Number —
+// per NormalizeJSONNumbers' own doc comment, 0.1 is the canonical example of
+// a value that falls through to the quoted tier, not a value the big.Rat
+// check was meant to bare.
+func TestTryJSONToYAMLLines_FloatSpellings_NumericEquality(t *testing.T) {
+	tests := []struct {
+		name       string
+		spelling   string
+		wantBare   string // substring expected when the value collapses to a bare float64
+		wantQuoted bool   // true if the value must stay quoted (no exact float64 equivalent)
+	}{
+		{name: "1.0 collapses to bare float64(1)", spelling: "1.0", wantBare: "value: 1"},
+		{name: "1e3 collapses to bare float64(1000)", spelling: "1e3", wantBare: "value: 1000"},
+		{name: "0.5 collapses to bare float64(0.5) (exact dyadic fraction)", spelling: "0.5", wantBare: "value: 0.5"},
+		{name: "0.10 has no exact float64 equivalent, stays quoted json.Number", spelling: "0.10", wantQuoted: true},
+		{name: "genuine precision loss stays quoted json.Number", spelling: "0.1000000000000000000000000001", wantQuoted: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lines := jsonyaml.TryJSONToYAMLLines(`{"value":` + tt.spelling + `}`)
+			if lines == nil {
+				t.Fatalf("TryJSONToYAMLLines returned nil for {\"value\":%s}", tt.spelling)
+			}
+			joined := strings.Join(lines, "\n")
+			if tt.wantQuoted {
+				if !strings.Contains(joined, `value: "`+tt.spelling+`"`) {
+					t.Errorf("expected %q to stay quoted (precision loss), got:\n%s", tt.spelling, joined)
+				}
+				return
+			}
+			if !strings.Contains(joined, tt.wantBare) {
+				t.Errorf("expected %q in YAML output (bare, unquoted), got:\n%s", tt.wantBare, joined)
+			}
+			if strings.Contains(joined, `"`+tt.spelling+`"`) {
+				t.Errorf("expected %q to render bare, but found it still quoted:\n%s", tt.spelling, joined)
+			}
+		})
+	}
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // CompactValue — unit tests for the shared compact JSON-value rendering helper
 // ════════════════════════════════════════════════════════════════════════════

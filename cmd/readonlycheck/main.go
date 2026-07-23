@@ -36,6 +36,11 @@ var writeVerbRe = regexp.MustCompile(`^(?:Create|Delete|Update|Put|Modify|Termin
 var exemptNames = map[string]bool{
 	"CreateServiceClients": true,
 	"ExecuteTaskAt":        true,
+	// Session-state mutators (in-memory maps on session.Session), moved into
+	// scanned core/runtime when RefreshListEnrichment centralized the
+	// list-refresh mutation list previously living in unscanned internal/tui.
+	"DeleteEnrichmentRan":          true,
+	"DeleteEnrichmentTruncatedIDs": true,
 }
 
 func isWriteVerbCall(name string) bool {

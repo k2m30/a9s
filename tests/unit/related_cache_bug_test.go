@@ -29,18 +29,86 @@ import (
 // drainCmds executes the cmd chain to completion (up to maxDepth) and returns
 // the model after all produced messages have been processed.
 // Returns the final model plus the list of all messages that were produced.
+//
+// Batch-aware (mirrors the extractEnrichmentChecked idiom in
+// qa_enrich_pipeline_dispatch_test.go): detail-open/refresh for an enrichable
+// type now returns a tea.Batch (related-check cmd + enrich cmd), and the real
+// Bubble Tea runtime executes every batch member and delivers each leaf
+// message to Update independently — a walker that treated tea.BatchMsg as an
+// opaque leaf would simulate that unfaithfully. Cmds are processed via a
+// queue rather than a single linear chain so a batch's members (and whatever
+// cmds they each go on to produce) are all drained.
+//
+// maxDepth bounds APPLIED messages only (the pre-batching meaning every
+// caller's budget was tuned to) — a nil cmd, a nil msg, or unwrapping a
+// tea.BatchMsg into its members is free and does not consume the budget.
+// Only a leaf message that is actually applied to the model via rootApplyMsg
+// counts toward maxDepth.
 func drainCmds(t *testing.T, m tui.Model, cmd tea.Cmd, maxDepth int) (tui.Model, []tea.Msg) {
 	t.Helper()
 	var allMsgs []tea.Msg
-	for i := 0; i < maxDepth && cmd != nil; i++ {
-		msg := cmd()
+	pending := []tea.Cmd{cmd}
+	for applied := 0; applied < maxDepth && len(pending) > 0; {
+		cur := pending[0]
+		pending = pending[1:]
+		if cur == nil {
+			continue
+		}
+		msg := cur()
 		if msg == nil {
-			break
+			continue
+		}
+		if batch, ok := msg.(tea.BatchMsg); ok {
+			pending = append(pending, batch...)
+			continue
 		}
 		allMsgs = append(allMsgs, msg)
-		m, cmd = rootApplyMsg(m, msg)
+		applied++
+		var next tea.Cmd
+		m, next = rootApplyMsg(m, msg)
+		if next != nil {
+			pending = append(pending, next)
+		}
 	}
 	return m, allMsgs
+}
+
+// extractLeafMsgs executes cmd (recursing through nested tea.BatchMsg to any
+// depth) and returns every leaf tea.Msg produced. Mirrors extractEnrichmentChecked
+// (qa_enrich_pipeline_dispatch_test.go) but is msg-type-agnostic; unlike
+// drainCmds it does not follow cmds returned by applying those leaf messages
+// to a model — it only flattens the one cmd (and any nested batch) passed in.
+func extractLeafMsgs(cmd tea.Cmd) []tea.Msg {
+	if cmd == nil {
+		return nil
+	}
+	msg := cmd()
+	if msg == nil {
+		return nil
+	}
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		var out []tea.Msg
+		for _, sub := range batch {
+			out = append(out, extractLeafMsgs(sub)...)
+		}
+		return out
+	}
+	return []tea.Msg{msg}
+}
+
+// applyImmediateCmd executes cmd once (batch-aware via extractLeafMsgs) and
+// applies every leaf message it produces to m, in order. It does NOT follow
+// any cmd returned by applying those leaf messages — this is a single
+// "immediate" step, not a full drain (see drainCmds for that) — used by
+// callers that intentionally stop before feeding async checker results back
+// in, so intermediate (e.g. loading) state can be asserted.
+func applyImmediateCmd(t *testing.T, m tui.Model, cmd tea.Cmd) (tui.Model, []tea.Msg) {
+	t.Helper()
+	leaves := extractLeafMsgs(cmd)
+	for _, msg := range leaves {
+		m, _ = rootApplyMsg(m, msg)
+	}
+	return m, leaves
 }
 
 // setupEC2DetailWithResults is a shared helper that:

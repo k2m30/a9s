@@ -1,4 +1,4 @@
-.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security coverage verify-readonly verify-zero-init verify-renderer-free verify-hooks demo readme check-readme check-catalogen mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live smoke-costs check-no-real-data install-hooks ready-to-push ready-to-release generate
+.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security coverage verify-readonly verify-zero-init verify-renderer-free verify-hooks demo readme check-readme check-catalogen mdlint snapshot snapshot-update smoke smoke-live smoke-related smoke-related-live smoke-costs smoke-enrichers check-no-real-data install-hooks ready-to-push ready-to-release generate
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -210,6 +210,15 @@ smoke-related:
 smoke-costs:
 	./scripts/smoke-costs-demo.sh
 
+# smoke-enrichers drives every catalog-registered on-demand DETAIL enricher
+# end to end over the demo fixtures: sfn/cfn/lambda/ec2/sns/s3/policy
+# top-level walks plus the role_policies and transfer_agreements child-view
+# walks, asserting the FETCHED payload actually renders (not just that the
+# view opens). ~60s. Requires tmux. Part of ready-to-push alongside
+# `make smoke`.
+smoke-enrichers:
+	./scripts/smoke-enrichers-demo.sh
+
 # smoke-related-live drives the same RELATED-panel walk against a real
 # *readonly* AWS profile with data-independent assertions (a settled counted
 # badge, a count-1/N drill landing on a detail or list frame, a surviving
@@ -234,7 +243,7 @@ install-hooks:
 
 # Stage 6 — Pre-push gate. The single command every PR must pass before push.
 # See docs/development-process.md.
-ready-to-push: verify-hooks check-no-real-data test-race lint security gofix verify-readonly verify-zero-init verify-renderer-free check-readme check-catalogen snapshot mdlint smoke smoke-related smoke-costs
+ready-to-push: verify-hooks check-no-real-data test-race lint security gofix verify-readonly verify-zero-init verify-renderer-free check-readme check-catalogen snapshot mdlint smoke smoke-related smoke-costs smoke-enrichers
 	@echo "PASS: ready-to-push gate green"
 
 # Stage 7 — Pre-release gate. ADDITIVE on top of Stage 6: it does NOT re-run

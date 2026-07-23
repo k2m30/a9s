@@ -39,6 +39,7 @@ func databasesDefaultViews() map[string]ViewDef {
 			},
 			Detail: []DetailField{
 				{Path: "Name"}, {Path: "BucketArn"}, {Path: "BucketRegion"}, {Path: "CreationDate"},
+				{Path: "Policy"},
 			},
 		},
 		"redis": {

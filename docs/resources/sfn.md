@@ -127,6 +127,15 @@ One row per signal from §3:
 
 At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — the `!` glyph plus the `failing: consecutive failures` Status text names the condition without requiring detail-view navigation, and the `~` + `last run failed` pair is similarly self-explanatory for the single-failure case; the operator still needs the detail view to read the failing ExecutionArn and error cause, which is the expected next step.
 
+## 4.2 On-Demand Detail Enrichment
+
+Opening the detail, YAML, or JSON view triggers one extra read-only call whose result is attached to the resource's raw structure for the stacked views. List views are never affected.
+
+- AWS API: `DescribeStateMachine`
+- Payload: the ASL definition (rendered as structured YAML when it parses as JSON, raw text otherwise), state machine status, and execution role ARN. Status and role ARN render as detail-view fields; the definition lives on the YAML/JSON views
+- Cache: uncached — the ARN survives a redeploy (`UpdateStateMachine` keeps it), so caching would serve a stale definition/status exactly while an operator watches a deploy; `DescribeStateMachine` is a single cheap call, so paying it on every detail open is the right trade
+- Failure: a flash message; the view still renders the un-enriched resource
+
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (copied above).

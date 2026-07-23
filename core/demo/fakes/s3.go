@@ -203,3 +203,38 @@ func (f *S3Fake) GetBucketPolicy(_ context.Context, input *s3.GetBucketPolicyInp
 	}
 	return &s3.GetBucketPolicyOutput{Policy: &policy}, nil
 }
+
+// GetBucketCors returns the bucket's CORS rules. Buckets with no entry in
+// CORSConfigs get NoSuchCORSConfiguration — the canonical AWS response the
+// s3 detail enricher honors as a legitimate 0.
+func (f *S3Fake) GetBucketCors(_ context.Context, input *s3.GetBucketCorsInput, _ ...func(*s3.Options)) (*s3.GetBucketCorsOutput, error) {
+	if input.Bucket == nil {
+		return nil, fmt.Errorf("GetBucketCors: bucket name is required")
+	}
+	rules, ok := f.fix.CORSConfigs[*input.Bucket]
+	if !ok {
+		return nil, &smithy.GenericAPIError{
+			Code:    "NoSuchCORSConfiguration",
+			Message: "The CORS configuration does not exist",
+		}
+	}
+	return &s3.GetBucketCorsOutput{CORSRules: rules}, nil
+}
+
+// GetBucketLifecycleConfiguration returns the bucket's lifecycle rules.
+// Buckets with no entry in LifecycleConfigs get NoSuchLifecycleConfiguration
+// — the canonical AWS response the s3 detail enricher honors as a
+// legitimate 0.
+func (f *S3Fake) GetBucketLifecycleConfiguration(_ context.Context, input *s3.GetBucketLifecycleConfigurationInput, _ ...func(*s3.Options)) (*s3.GetBucketLifecycleConfigurationOutput, error) {
+	if input.Bucket == nil {
+		return nil, fmt.Errorf("GetBucketLifecycleConfiguration: bucket name is required")
+	}
+	rules, ok := f.fix.LifecycleConfigs[*input.Bucket]
+	if !ok {
+		return nil, &smithy.GenericAPIError{
+			Code:    "NoSuchLifecycleConfiguration",
+			Message: "The lifecycle configuration does not exist",
+		}
+	}
+	return &s3.GetBucketLifecycleConfigurationOutput{Rules: rules}, nil
+}

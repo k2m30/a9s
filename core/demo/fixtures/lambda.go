@@ -26,6 +26,11 @@ type LambdaFixtures struct {
 	// the lambda:cfn related-panel pivot (checkLambdaCFN reads
 	// "aws:cloudformation:stack-name").
 	Tags map[string]map[string]string
+	// ReservedConcurrency maps function name -> GetFunction's
+	// Concurrency.ReservedConcurrentExecutions. Real AWS omits this field
+	// entirely unless PutFunctionConcurrency was called — most functions
+	// have none, so only one fixture function carries it.
+	ReservedConcurrency map[string]int32
 }
 
 // NewLambdaFixtures builds and returns a fully-populated LambdaFixtures struct.
@@ -44,6 +49,11 @@ var sharedLambdaFixtures = sync.OnceValue(func() *LambdaFixtures {
 			// the lambda:cfn related-panel pivot witness. acme-eks-cluster is
 			// a real stack fixture (cfn.go).
 			"api-gateway-authorizer": {"aws:cloudformation:stack-name": "acme-eks-cluster"},
+		},
+		ReservedConcurrency: map[string]int32{
+			// process-orders is throttled to protect the downstream SQS
+			// consumer from over-scaling.
+			lambdaProcessOrders: 10,
 		},
 	}
 })

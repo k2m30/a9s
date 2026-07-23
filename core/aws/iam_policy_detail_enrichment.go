@@ -21,50 +21,30 @@ type PolicyEnriched struct {
 
 // enrichPolicy fetches the policy document for a top-level IAM policy.
 // All top-level policies are managed (Scope=Local), so only the managed
-// document path is needed.
+// document path is needed. Session-cached via PolicyDocs.
 func enrichPolicy(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
-	dctx, ok := clients.(*DetailEnrichmentCtx)
-	if !ok || dctx == nil || dctx.Clients == nil || dctx.PolicyDocs == nil {
-		return res, fmt.Errorf("invalid detail-enrichment context")
-	}
-	c := dctx.Clients
-	cache := dctx.PolicyDocs
-
-	// Accept both the original SDK type and an already-enriched wrapper
-	// (re-enrichment happens when detail→YAML/JSON each trigger enrichment).
-	var policy iamtypes.Policy
-	switch raw := res.RawStruct.(type) {
-	case iamtypes.Policy:
-		policy = raw
-	case PolicyEnriched:
-		policy = raw.Policy
-	default:
-		return res, fmt.Errorf("unexpected RawStruct type: %T", res.RawStruct)
-	}
-
-	if policy.Arn == nil || *policy.Arn == "" {
-		return res, fmt.Errorf("policy has no ARN")
-	}
-	policyArn := *policy.Arn
-
-	cacheKey := ManagedKey(policyArn)
-	if cached := cache.Get(cacheKey); cached != nil {
-		res.RawStruct = PolicyEnriched{Policy: policy, Document: cached}
-		return res, nil
-	}
-
-	getPolicyAPI, ok1 := c.IAM.(IAMGetPolicyAPI)
-	getPolicyVersionAPI, ok2 := c.IAM.(IAMGetPolicyVersionAPI)
-	if !ok1 || !ok2 {
-		return res, fmt.Errorf("IAM client does not support GetPolicy/GetPolicyVersion")
-	}
-
-	doc, err := FetchManagedPolicyDocument(ctx, getPolicyAPI, getPolicyVersionAPI, policyArn)
-	if err != nil {
-		return res, err
-	}
-
-	cache.Set(cacheKey, doc)
-	res.RawStruct = PolicyEnriched{Policy: policy, Document: doc}
-	return res, nil
+	return enrichDetail(ctx, clients, res, detailEnrichSpec[iamtypes.Policy, any]{
+		unwrap: unwrapEnriched(func(w PolicyEnriched) iamtypes.Policy { return w.Policy }),
+		id: func(policy iamtypes.Policy, _ resource.Resource) (string, error) {
+			if policy.Arn == nil || *policy.Arn == "" {
+				return "", fmt.Errorf("policy has no ARN")
+			}
+			return *policy.Arn, nil
+		},
+		cache: policyDocsCache,
+		cacheKey: func(id string, _ iamtypes.Policy, _ resource.Resource) string {
+			return ManagedKey(id)
+		},
+		fetch: func(ctx context.Context, c *ServiceClients, id string, _ iamtypes.Policy, _ resource.Resource) (any, error) {
+			getPolicyAPI, ok1 := c.IAM.(IAMGetPolicyAPI)
+			getPolicyVersionAPI, ok2 := c.IAM.(IAMGetPolicyVersionAPI)
+			if !ok1 || !ok2 {
+				return nil, fmt.Errorf("IAM client does not support GetPolicy/GetPolicyVersion")
+			}
+			return FetchManagedPolicyDocument(ctx, getPolicyAPI, getPolicyVersionAPI, id)
+		},
+		wrap: func(policy iamtypes.Policy, doc any) any {
+			return PolicyEnriched{Policy: policy, Document: doc}
+		},
+	})
 }

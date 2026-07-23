@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -17,12 +18,57 @@ import (
 
 // assertStruct extracts a value of type T from an interface that may hold
 // either T or *T. Used for RawStruct type assertions across related checkers.
+// Falls back to searching v's exported anonymous (embedded) struct fields
+// for a T — a detail enricher's wrapper (e.g. InstanceEnriched embedding
+// ec2types.Instance) replaces RawStruct with itself, and every related
+// checker asserting the raw SDK type must still resolve after that
+// replacement.
 func assertStruct[T any](v any) (T, bool) {
 	if val, ok := v.(T); ok {
 		return val, true
 	}
 	if p, ok := v.(*T); ok && p != nil {
 		return *p, true
+	}
+	return findEmbeddedStruct[T](reflect.ValueOf(v))
+}
+
+// findEmbeddedStruct recursively searches rv's exported anonymous struct
+// fields (pointer-deref'd) for a value of type T, returning the first match.
+func findEmbeddedStruct[T any](rv reflect.Value) (T, bool) {
+	for rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			var zero T
+			return zero, false
+		}
+		rv = rv.Elem()
+	}
+	if rv.Kind() != reflect.Struct {
+		var zero T
+		return zero, false
+	}
+	rt := rv.Type()
+	for i := range rt.NumField() {
+		field := rt.Field(i)
+		if !field.Anonymous || !field.IsExported() {
+			continue
+		}
+		fv := rv.Field(i)
+		if fv.Kind() == reflect.Pointer {
+			if fv.IsNil() {
+				continue
+			}
+			fv = fv.Elem()
+		}
+		if fv.Kind() != reflect.Struct {
+			continue
+		}
+		if val, ok := fv.Interface().(T); ok {
+			return val, true
+		}
+		if val, ok := findEmbeddedStruct[T](fv); ok {
+			return val, true
+		}
 	}
 	var zero T
 	return zero, false

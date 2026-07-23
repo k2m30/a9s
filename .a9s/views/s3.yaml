@@ -17,3 +17,4 @@ detail:
   - BucketArn
   - BucketRegion
   - CreationDate
+  - Policy

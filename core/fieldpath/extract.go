@@ -5,6 +5,7 @@ package fieldpath
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"sort"
 	"strconv"
@@ -12,6 +13,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/k2m30/a9s/v3/core/jsonyaml"
 )
 
 // ExtractValue navigates a struct using a dot-separated path matched against JSON tags.
@@ -32,39 +35,64 @@ func ExtractValue(obj any, dotPath string) (reflect.Value, error) {
 			return reflect.Value{}, fmt.Errorf("expected struct at segment %q, got %v", seg, current.Kind())
 		}
 
-		// Find field by JSON tag first, then by field name (case-insensitive).
-		// AWS SDK Go v2 structs have no JSON tags, so field name matching is essential.
-		found := false
-		t := current.Type()
-		for i := 0; i < t.NumField(); i++ {
-			field := t.Field(i)
-			tag := field.Tag.Get("json")
-			if tag != "" {
-				jsonName := strings.Split(tag, ",")[0]
-				if jsonName == seg {
-					current = current.Field(i)
-					found = true
-					break
-				}
-			}
-		}
-		if !found {
-			for i := 0; i < t.NumField(); i++ {
-				field := t.Field(i)
-				if strings.EqualFold(field.Name, seg) {
-					current = current.Field(i)
-					found = true
-					break
-				}
-			}
-		}
-
-		if !found {
+		next, ok := resolveField(current, seg)
+		if !ok {
 			return reflect.Value{}, fmt.Errorf("no field matching %q", seg)
 		}
+		current = next
 	}
 
 	return current, nil
+}
+
+// resolveField finds seg on a struct value: JSON tag first, then field name
+// (case-insensitive; AWS SDK Go v2 structs have no JSON tags, so name
+// matching is essential), then recursively inside exported anonymous
+// embedded structs — Go/encoding-json promotion semantics, so enrichment
+// wrappers stay transparent to path extraction. Direct fields always win
+// over promoted ones.
+func resolveField(current reflect.Value, seg string) (reflect.Value, bool) {
+	t := current.Type()
+	for i := 0; i < t.NumField(); i++ {
+		if !t.Field(i).IsExported() {
+			continue
+		}
+		tag := t.Field(i).Tag.Get("json")
+		if tag != "" && strings.Split(tag, ",")[0] == seg {
+			return current.Field(i), true
+		}
+	}
+	for i := 0; i < t.NumField(); i++ {
+		// Unexported fields never match: a case-insensitive segment hit on
+		// one would hand back a read-only value that panics on Interface().
+		if !t.Field(i).IsExported() {
+			continue
+		}
+		if strings.EqualFold(t.Field(i).Name, seg) {
+			return current.Field(i), true
+		}
+	}
+	for i := 0; i < t.NumField(); i++ {
+		// encoding/json promotes exported fields through anonymous embeds of
+		// unexported struct types too, so no IsExported gate here.
+		if !promotesInline(t.Field(i)) {
+			continue
+		}
+		fv := current.Field(i)
+		for fv.Kind() == reflect.Pointer {
+			if fv.IsNil() {
+				break
+			}
+			fv = fv.Elem()
+		}
+		if fv.Kind() != reflect.Struct {
+			continue
+		}
+		if v, ok := resolveField(fv, seg); ok {
+			return v, true
+		}
+	}
+	return reflect.Value{}, false
 }
 
 // isScalar reports whether a reflect.Value holds a scalar type.
@@ -147,35 +175,11 @@ func ExtractFirstListScalar(obj any, dotPath string) string {
 			return ""
 		}
 
-		// Field lookup: JSON tag first, then case-insensitive field name.
-		// AWS SDK Go v2 structs have no JSON tags, so name matching is essential.
-		t := current.Type()
-		found := false
-		for i := 0; i < t.NumField(); i++ {
-			field := t.Field(i)
-			tag := field.Tag.Get("json")
-			if tag != "" {
-				jsonName := strings.Split(tag, ",")[0]
-				if jsonName == seg {
-					current = current.Field(i)
-					found = true
-					break
-				}
-			}
-		}
-		if !found {
-			for i := 0; i < t.NumField(); i++ {
-				field := t.Field(i)
-				if strings.EqualFold(field.Name, seg) {
-					current = current.Field(i)
-					found = true
-					break
-				}
-			}
-		}
-		if !found {
+		next, ok := resolveField(current, seg)
+		if !ok {
 			return ""
 		}
+		current = next
 	}
 
 	// Final: dereference any remaining pointers, index any remaining slices,
@@ -287,22 +291,8 @@ func extractMultiScalars(v reflect.Value, segments []string) []string {
 	seg := segments[0]
 	switch v.Kind() {
 	case reflect.Struct:
-		t := v.Type()
-		for i := 0; i < t.NumField(); i++ {
-			f := t.Field(i)
-			tag := f.Tag.Get("json")
-			if tag != "" {
-				jsonName := strings.Split(tag, ",")[0]
-				if jsonName == seg {
-					return extractMultiScalars(v.Field(i), segments[1:])
-				}
-			}
-		}
-		for i := 0; i < t.NumField(); i++ {
-			f := t.Field(i)
-			if strings.EqualFold(f.Name, seg) {
-				return extractMultiScalars(v.Field(i), segments[1:])
-			}
+		if fv, ok := resolveField(v, seg); ok {
+			return extractMultiScalars(fv, segments[1:])
 		}
 		return nil
 	case reflect.Slice, reflect.Array:
@@ -314,6 +304,31 @@ func extractMultiScalars(v reflect.Value, segments []string) []string {
 	default:
 		return nil
 	}
+}
+
+// promotesInline reports whether a struct field merges into its parent's
+// map the way encoding/json promotes it: anonymous, a struct (or pointer to
+// one — an anonymous named map type stays a named field, like encoding/json
+// treats it), and neither renamed nor excluded by an explicit json tag.
+func promotesInline(f reflect.StructField) bool {
+	if !f.Anonymous {
+		return false
+	}
+	ft := f.Type
+	for ft.Kind() == reflect.Pointer {
+		ft = ft.Elem()
+	}
+	if ft.Kind() != reflect.Struct {
+		return false
+	}
+	tag := f.Tag.Get("json")
+	if tag == "" {
+		return true
+	}
+	if tag == "-" {
+		return false
+	}
+	return strings.Split(tag, ",")[0] == ""
 }
 
 // ToSafeValue recursively converts a reflect.Value into a representation
@@ -333,9 +348,31 @@ func ToSafeValue(val reflect.Value) any {
 		}
 		m := make(map[string]any)
 		t := val.Type()
+		// Two passes: anonymous embedded structs promote into the parent map
+		// first (mirroring encoding/json, which the JSON view marshals with),
+		// so the outer struct's named fields win any key collision regardless
+		// of declaration order. Without this the YAML and JSON views render
+		// the same RawStruct in two different shapes.
 		for i := 0; i < t.NumField(); i++ {
 			field := t.Field(i)
-			if !field.IsExported() {
+			if !field.IsExported() || !promotesInline(field) {
+				continue
+			}
+			fv := val.Field(i)
+			if isZeroOrNil(fv) {
+				continue
+			}
+			switch sv := ToSafeValue(fv).(type) {
+			case map[string]any:
+				maps.Copy(m, sv)
+			case nil:
+			default:
+				m[field.Name] = sv
+			}
+		}
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			if !field.IsExported() || promotesInline(field) {
 				continue
 			}
 			fv := val.Field(i)
@@ -515,16 +552,28 @@ func stringFieldValue(fv reflect.Value) (string, bool) {
 // tryParseJSON attempts to parse s as JSON. Returns the parsed structure
 // (map/slice/scalar) on success, or nil on failure.
 // Only attempts parsing if s starts with '{' or '[' (quick rejection for non-JSON strings).
+// Numbers decode as json.Number, not float64 — a plain Unmarshal into any
+// silently rounds integers above 2^53 (9007199254740993 → ...992), corrupting
+// policy documents and templates on render/copy.
 func tryParseJSON(s string) any {
 	s = strings.TrimSpace(s)
 	if len(s) == 0 || (s[0] != '{' && s[0] != '[') {
 		return nil
 	}
+	dec := json.NewDecoder(strings.NewReader(s))
+	dec.UseNumber()
 	var parsed any
-	if err := json.Unmarshal([]byte(s), &parsed); err != nil {
+	if err := dec.Decode(&parsed); err != nil {
 		return nil
 	}
-	return parsed
+	// json.Unmarshal rejects trailing content; a single Decode does not —
+	// keep the stricter contract.
+	if dec.More() {
+		return nil
+	}
+	// Ordinary numbers go back to int64/float64 so rendering is unchanged;
+	// only integers that fit no lossless native type stay json.Number.
+	return jsonyaml.NormalizeJSONNumbers(parsed)
 }
 
 // FieldItem is one rendered line from the structured detail extraction pipeline.

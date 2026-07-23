@@ -47,14 +47,11 @@ func TestDetail_Refresh_ResetsRightColumn(t *testing.T) {
 	// but (BUG) does not reset the right column.
 	m, refreshCmd := rootApplyMsg(m, ctrlR())
 
-	// Drain the immediate cmd so RelatedCheckStartedMsg is processed by the root model.
-	// We stop after one level — we do NOT want to feed checker results back in.
-	if refreshCmd != nil {
-		msg := refreshCmd()
-		if msg != nil {
-			m, _ = rootApplyMsg(m, msg)
-		}
-	}
+	// Drain the immediate cmd (batch-aware — detail refresh for an enrichable type
+	// now returns a tea.Batch of the related-check cmd + the enrich cmd) so every
+	// immediate leaf message is processed by the root model. We stop after one level
+	// — we do NOT want to feed checker results back in.
+	m, _ = applyImmediateCmd(t, m, refreshCmd)
 
 	viewAfter := stripANSI(rootViewContent(m))
 

@@ -73,6 +73,13 @@ type S3Fixtures struct {
 	// A missing key or empty value means return NoSuchBucketPolicy.
 	// Used by the s3→role pivot (checkS3Role parses Statement[].Principal.AWS).
 	BucketPolicies map[string]string
+	// CORSConfigs maps bucket names to their CORS rules (for GetBucketCors).
+	// A missing key means return NoSuchCORSConfiguration.
+	CORSConfigs map[string][]s3types.CORSRule
+	// LifecycleConfigs maps bucket names to their lifecycle rules (for
+	// GetBucketLifecycleConfiguration). A missing key means return
+	// NoSuchLifecycleConfiguration.
+	LifecycleConfigs map[string][]s3types.LifecycleRule
 	// Objects maps bucket name → prefix → slice of S3 objects at that prefix level.
 	Objects map[string]map[string][]s3types.Object
 	// CommonPrefixes maps bucket name → prefix → slice of common prefixes (folders).
@@ -98,6 +105,8 @@ var sharedS3Fixtures = sync.OnceValue(func() *S3Fixtures {
 		LoggingConfigs:           buildS3LoggingConfigs(),
 		TaggingConfigs:           buildS3TaggingConfigs(),
 		BucketPolicies:           buildS3BucketPolicies(),
+		CORSConfigs:              buildS3CORSConfigs(),
+		LifecycleConfigs:         buildS3LifecycleConfigs(),
 		Objects:                  buildS3Objects(),
 		CommonPrefixes:           buildS3CommonPrefixes(),
 	}
@@ -395,6 +404,41 @@ func buildS3BucketPolicies() map[string]string {
     }
   ]
 }`,
+	}
+}
+
+// buildS3CORSConfigs returns per-bucket CORS rules. Only the healthy bucket
+// has a CORS configuration; every other bucket's GetBucketCors returns
+// NoSuchCORSConfiguration (an honest 0).
+func buildS3CORSConfigs() map[string][]s3types.CORSRule {
+	return map[string][]s3types.CORSRule{
+		HealthyBucketName: {
+			{
+				AllowedMethods: []string{"GET", "HEAD"},
+				AllowedOrigins: []string{"https://app.example.com"},
+				AllowedHeaders: []string{"Authorization"},
+				ExposeHeaders:  []string{"ETag"},
+				MaxAgeSeconds:  aws.Int32(3000),
+			},
+		},
+	}
+}
+
+// buildS3LifecycleConfigs returns per-bucket lifecycle rules. Only the
+// healthy bucket has a lifecycle configuration; every other bucket's
+// GetBucketLifecycleConfiguration returns NoSuchLifecycleConfiguration.
+func buildS3LifecycleConfigs() map[string][]s3types.LifecycleRule {
+	return map[string][]s3types.LifecycleRule{
+		HealthyBucketName: {
+			{
+				ID:     aws.String("expire-noncurrent-versions"),
+				Status: s3types.ExpirationStatusEnabled,
+				Filter: &s3types.LifecycleRuleFilter{Prefix: aws.String("")},
+				Expiration: &s3types.LifecycleExpiration{
+					Days: aws.Int32(90),
+				},
+			},
+		},
 	}
 }
 

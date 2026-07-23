@@ -258,6 +258,15 @@ Rules for filling list and detail text:
 
 At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for most rows — `failed: <reason-code>`, `update failed: <reason-code>`, `runtime deprecated: <name>`, `no DLQ — async failures dropped`, and `creating` all carry actionable cause in 40 chars. One soft gap: `idle: not invoked recently` for `State==Inactive` is grey-row informational only — the row color already signals "nothing to act on" and this resource may re-activate on next invoke; the text exists so the operator doesn't mistake the dim row for a bug.
 
+## 4.2 On-Demand Detail Enrichment
+
+Opening the detail, YAML, or JSON view triggers one extra read-only call whose result is attached to the resource's raw structure for the stacked views. List views are never affected.
+
+- AWS API: `GetFunction`
+- Payload: the full function configuration — adds `State`, `StateReason`, `LastUpdateStatus*` (absent from `ListFunctions`, exactly the fields needed when a deploy is stuck) — plus code location and reserved concurrency. State, update status, and reserved concurrency render as detail-view fields
+- Cache: none — a single cheap call, and the state fields change during deploys, which is precisely when the operator is looking
+- Failure: a flash message; the view still renders the un-enriched resource
+
 ## 5. Out of Scope
 
 - All §3.3 Wave 3 signals (copied above): CloudWatch `Errors/Invocations`, `Throttles`, `Duration` p99 vs `Timeout`, and `GetFunctionConcurrency` per function.

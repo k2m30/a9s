@@ -148,6 +148,14 @@ type EC2DescribeVpcPeeringConnectionsAPI interface {
 	DescribeVpcPeeringConnections(ctx context.Context, params *ec2.DescribeVpcPeeringConnectionsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcPeeringConnectionsOutput, error)
 }
 
+// EC2DescribeInstanceAttributeAPI defines the interface for the EC2
+// DescribeInstanceAttribute operation. Used by the on-demand ec2 detail
+// enricher (enrichEc2) to fetch the instance's user-data script — not part
+// of the EC2API aggregate since no fetcher or related checker needs it.
+type EC2DescribeInstanceAttributeAPI interface {
+	DescribeInstanceAttribute(ctx context.Context, params *ec2.DescribeInstanceAttributeInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstanceAttributeOutput, error)
+}
+
 // EC2API is the aggregate interface covering all EC2 operations used by a9s fetchers.
 // *ec2.Client structurally satisfies this interface.
 type EC2API interface {

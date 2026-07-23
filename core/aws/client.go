@@ -169,9 +169,15 @@ func NewAWSSessionContext(ctx context.Context, profile, region string) (aws.Conf
 // CreateServiceClients creates all service clients from the given AWS config.
 func CreateServiceClients(cfg aws.Config) *ServiceClients {
 	return &ServiceClients{
-		Region:           cfg.Region,
-		EC2:              ec2.NewFromConfig(cfg),
-		S3:               s3.NewFromConfig(cfg),
+		Region: cfg.Region,
+		EC2:    ec2.NewFromConfig(cfg),
+		// S3/SNS/SFN are wrapped with in-flight call coalescing (coalesce.go)
+		// — a detail open fires the same read (GetBucketPolicy/
+		// GetTopicAttributes/DescribeStateMachine) from a related checker and
+		// an on-demand enricher concurrently; singleflight shares one
+		// in-flight call's result instead of firing it twice, with no cache
+		// and no staleness (a later, sequential call always re-executes).
+		S3:               NewCoalescingS3(s3.NewFromConfig(cfg)),
 		RDS:              rds.NewFromConfig(cfg),
 		ElastiCache:      elasticache.NewFromConfig(cfg),
 		DocDB:            docdb.NewFromConfig(cfg),
@@ -179,7 +185,7 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 		SecretsManager:   secretsmanager.NewFromConfig(cfg),
 		Lambda:           lambda.NewFromConfig(cfg),
 		CloudWatch:       cloudwatch.NewFromConfig(cfg),
-		SNS:              sns.NewFromConfig(cfg),
+		SNS:              NewCoalescingSNS(sns.NewFromConfig(cfg)),
 		SQS:              sqs.NewFromConfig(cfg),
 		ELBv2:            elbv2.NewFromConfig(cfg),
 		ECS:              ecs.NewFromConfig(cfg),
@@ -197,7 +203,7 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 		ECR:              ecr.NewFromConfig(cfg),
 		EFS:              efs.NewFromConfig(cfg),
 		EventBridge:      eventbridge.NewFromConfig(cfg),
-		SFN:              sfn.NewFromConfig(cfg),
+		SFN:              NewCoalescingSFN(sfn.NewFromConfig(cfg)),
 		CodePipeline:     codepipeline.NewFromConfig(cfg),
 		Kinesis:          kinesis.NewFromConfig(cfg),
 		WAFv2:            wafv2.NewFromConfig(cfg),

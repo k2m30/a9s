@@ -5,8 +5,9 @@
 # user-visible contracts that unit suites cannot see rendered end to end:
 # menu availability, humanized status texts (no raw AWS enums), the
 # owner-worded security-group risk phrases, per-row issue causes, and the
-# related panel of the reference bucket. Runs in ~30s; part of
-# `make ready-to-push` (Stage 6).
+# related panel of the reference bucket. Runs in ~45s; part of
+# `make ready-to-push` (Stage 6). On-demand DETAIL enrichment payloads are
+# covered separately by `scripts/smoke-enrichers-demo.sh`.
 #
 # Requires tmux. Fails fast with the offending capture on any miss.
 set -u

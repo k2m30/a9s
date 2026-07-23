@@ -164,11 +164,25 @@ func TestDemo_EC2RelatedPanelsPopulate(t *testing.T) {
 		t.Fatal("expected a related-check command after opening EC2 detail, got nil")
 	}
 
-	// Execute to get RelatedCheckStartedMsg.
-	relatedMsg := relatedCmd()
-	started, ok := relatedMsg.(messages.RelatedCheckStarted)
+	// Execute to get RelatedCheckStartedMsg. Detail-open for an enrichable type
+	// (ec2 now has a detail enricher) returns a tea.Batch of the related-check
+	// cmd + the enrich cmd, so recurse through it (batch-aware) to find the
+	// RelatedCheckStarted leaf rather than asserting the top-level msg directly.
+	leaves := extractLeafMsgs(relatedCmd)
+	var started messages.RelatedCheckStarted
+	var ok bool
+	for _, leaf := range leaves {
+		if s, isStarted := leaf.(messages.RelatedCheckStarted); isStarted {
+			started, ok = s, true
+			break
+		}
+	}
 	if !ok {
-		t.Fatalf("expected RelatedCheckStartedMsg from detail init, got %T", relatedMsg)
+		types := make([]string, len(leaves))
+		for i, leaf := range leaves {
+			types[i] = fmt.Sprintf("%T", leaf)
+		}
+		t.Fatalf("expected RelatedCheckStartedMsg from detail init, got: %v", types)
 	}
 
 	// Dispatch started msg so handleRelatedCheckStarted runs the checkers.

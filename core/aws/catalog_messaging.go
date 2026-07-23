@@ -318,6 +318,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "role", DisplayName: "IAM Role", Checker: checkSNSRole, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("sns")},
 		},
+		DetailEnrich: enrichSns,
 		Findings: []catalog.FindingDef{
 			{Code: snsCodeNoSubscribers, Phrase: "topic has no subscribers", Severity: domain.SevWarn, Source: "wave2"},
 			{Code: snsCodeAllPending, Phrase: "all pending confirmation", Severity: domain.SevWarn, Source: "wave2"},
@@ -605,6 +606,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSFNLambda, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("sfn")},
 		},
+		DetailEnrich: enrichSfn,
 		// RoleArn is declared navigable even though sfntypes.StateMachineListItem (the
 		// list RawStruct) lacks it — the navigable-field registration is an intent
 		// contract: "if the raw struct exposes RoleArn, treat it as a role navigation".

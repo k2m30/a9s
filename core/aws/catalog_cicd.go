@@ -88,6 +88,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkCfnEBRule},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("cfn")},
 		},
+		DetailEnrich: enrichCfn,
 		Navigable: []domain.NavigableField{
 			{FieldPath: "RoleARN", TargetType: "role"},
 			{FieldPath: "NotificationARNs", TargetType: "sns"},

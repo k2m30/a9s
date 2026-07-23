@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -126,11 +127,25 @@ func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 			"are VPC/SG/Subnet RelatedDefs registered for ec2?")
 	}
 
-	// Execute to get RelatedCheckStartedMsg.
-	relatedMsg := relatedCmd()
-	started, ok := relatedMsg.(messages.RelatedCheckStarted)
+	// Execute to get RelatedCheckStartedMsg. Detail-open for an enrichable type
+	// (ec2 now has a detail enricher) returns a tea.Batch of the related-check
+	// cmd + the enrich cmd, so recurse through it (batch-aware) to find the
+	// RelatedCheckStarted leaf rather than asserting the top-level msg directly.
+	leaves := extractLeafMsgs(relatedCmd)
+	var started messages.RelatedCheckStarted
+	var ok bool
+	for _, leaf := range leaves {
+		if s, isStarted := leaf.(messages.RelatedCheckStarted); isStarted {
+			started, ok = s, true
+			break
+		}
+	}
 	if !ok {
-		t.Fatalf("expected RelatedCheckStartedMsg from detail init, got %T", relatedMsg)
+		types := make([]string, len(leaves))
+		for i, leaf := range leaves {
+			types[i] = fmt.Sprintf("%T", leaf)
+		}
+		t.Fatalf("expected RelatedCheckStartedMsg from detail init, got: %v", types)
 	}
 
 	// Dispatch the started msg so handleRelatedCheckStarted runs the actual checkers.

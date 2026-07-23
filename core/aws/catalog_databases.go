@@ -413,6 +413,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkS3Role, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("s3")},
 		},
+		DetailEnrich:           enrichS3,
 		IssueEnricherFieldKeys: []string{"status"},
 		Findings: []catalog.FindingDef{
 			{Code: s3CodePublicAccessBlockIncomplete, Phrase: "public access block incomplete", Severity: domain.SevWarn, Source: "wave2"},

@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	tea "charm.land/bubbletea/v2"
 )
 
 // TestContract_CtrlR_ClearsRelatedCache_ThenRechecks is the full integration test
@@ -46,16 +48,12 @@ func TestContract_CtrlR_ClearsRelatedCache_ThenRechecks(t *testing.T) {
 	// Send the actual Ctrl+R key — exercises the LIVE global handler path.
 	m, refreshCmd := rootApplyMsg(m, ctrlR())
 
-	// Drain exactly one level to process any immediate cmd (e.g., RelatedCheckStartedMsg).
+	// Drain exactly one level (batch-aware — detail refresh for an enrichable
+	// type now returns a tea.Batch of the related-check cmd + the enrich cmd)
+	// to process any immediate leaf messages (e.g., RelatedCheckStartedMsg).
 	// We stop before feeding checker results back to keep the right column in loading state.
-	var immediateMsg any
-	if refreshCmd != nil {
-		msg := refreshCmd()
-		if msg != nil {
-			immediateMsg = msg
-			m, _ = rootApplyMsg(m, msg)
-		}
-	}
+	var immediateMsgs []tea.Msg
+	m, immediateMsgs = applyImmediateCmd(t, m, refreshCmd)
 
 	// (a) Right column must be in loading state — stale "(2)" must be gone.
 	viewAfter := stripANSI(rootViewContent(m))
@@ -67,44 +65,21 @@ func TestContract_CtrlR_ClearsRelatedCache_ThenRechecks(t *testing.T) {
 
 	// (b) RelatedCheckStartedMsg must have appeared in the chain.
 	// It is either the immediate cmd result or needs another drain level.
-	if immediateMsg == nil {
+	if len(immediateMsgs) == 0 {
 		t.Fatal("contract violated: Ctrl+R produced no cmd — " +
 			"RelatedCheckStartedMsg must be dispatched to re-run checkers")
 	}
 
-	// Walk the cmd chain up to 5 levels to find RelatedCheckStartedMsg.
+	// Scan the already-collected immediateMsgs (from applyImmediateCmd above)
+	// for RelatedCheckStartedMsg — do NOT re-execute refreshCmd a second time
+	// via drainCmds. refreshCmd is a tea.Cmd closure; the real Bubble Tea
+	// runtime invokes it exactly once per dispatch, and re-invoking it here
+	// would simulate something the runtime never does.
 	found := false
-	m2 := m
-	cmd := refreshCmd
-	for i := 0; i < 5 && cmd != nil; i++ {
-		msg := cmd()
-		if msg == nil {
-			break
-		}
-		if _, ok := msg.(interface{ isRelatedCheckStarted() }); ok {
+	for _, msg := range immediateMsgs {
+		if fmt.Sprintf("%T", msg) == "messages.RelatedCheckStarted" {
 			found = true
 			break
-		}
-		// Use fmt.Sprintf for type check without importing messages package.
-		typeName := fmt.Sprintf("%T", msg)
-		if typeName == "messages.RelatedCheckStarted" {
-			found = true
-			break
-		}
-		m2, cmd = rootApplyMsg(m2, msg)
-	}
-	_ = m2
-
-	if !found {
-		// Re-drain from scratch with drainCmds for a cleaner check.
-		m3 := setupEC2DetailWithResults(t)
-		m3, refreshCmd3 := rootApplyMsg(m3, ctrlR())
-		_, chainMsgs := drainCmds(t, m3, refreshCmd3, 10)
-		for _, msg := range chainMsgs {
-			if fmt.Sprintf("%T", msg) == "messages.RelatedCheckStarted" {
-				found = true
-				break
-			}
 		}
 	}
 
@@ -171,15 +146,13 @@ func TestContract_CtrlR_RightColumnResets_BeforeRecheck(t *testing.T) {
 	// Press Ctrl+R — exercises the real key path.
 	m, refreshCmd := rootApplyMsg(m, ctrlR())
 
-	// Drain exactly ONE level of the cmd chain (to process RelatedCheckStartedMsg if
-	// it is the immediate result). We intentionally do NOT feed RelatedCheckResultMsg
-	// back in — that would populate the right column again and mask the bug.
-	if refreshCmd != nil {
-		msg := refreshCmd()
-		if msg != nil {
-			m, _ = rootApplyMsg(m, msg)
-		}
-	}
+	// Drain exactly ONE level of the cmd chain (batch-aware — detail refresh for
+	// an enrichable type now returns a tea.Batch of the related-check cmd + the
+	// enrich cmd) to process any immediate leaf messages, including
+	// RelatedCheckStartedMsg if it is among them. We intentionally do NOT feed
+	// RelatedCheckResultMsg back in — that would populate the right column again
+	// and mask the bug.
+	m, _ = applyImmediateCmd(t, m, refreshCmd)
 
 	// The right column must be in loading/empty state — no stale counts visible.
 	viewAfter := stripANSI(rootViewContent(m))
