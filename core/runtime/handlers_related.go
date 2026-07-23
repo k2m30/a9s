@@ -15,6 +15,7 @@ package runtime
 import (
 	"fmt"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/session"
 )
@@ -92,6 +93,20 @@ const (
 	// and this task is never emitted.
 	KindFetchByIDDetail TaskKind = "fetch-by-id-detail"
 )
+
+// FetchResourcesPayload carries the enrichment-rerun token for a
+// KindFetchResources dispatch. TypeGen is 0 for a plain list-open fetch (the
+// common case); Core.RefreshListEnrichment returns a non-zero token when a
+// Ctrl+R list refresh restarts wave-2 enrichment for a type that has a
+// registered issue enricher. ExecuteTaskAt stamps this token onto the
+// resulting messages.ResourcesLoaded.TypeGen so HandleResourcesLoaded's
+// rerun branch (TypeGen != 0 && TypeGen == current per-type gen) applies this
+// rerun's own result instead of treating it as an ordinary list-open fetch.
+type FetchResourcesPayload struct {
+	TypeGen domain.Gen
+}
+
+func (FetchResourcesPayload) isTaskPayload() {}
 
 // FetchMorePayload carries the continuation token the adapter must use when
 // the runtime requests a KindFetchMore fetch. The runtime captures the token

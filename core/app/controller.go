@@ -288,6 +288,45 @@ func (c *Controller) captureDispatch() runtime.DispatchSnapshot {
 	return c.core.CaptureDispatch()
 }
 
+// stampDispatchSnapshotLocked fills Snap on every task in tasks that does
+// not already carry one, from a SINGLE snapshot captured once for the whole
+// batch — these tasks are all produced by one synchronous, already-locked
+// Controller call, so (unlike DrainSync's per-task recapture, which exists
+// specifically to cover a mid-batch TaskKindConnect swap) the session cannot
+// mutate between them.
+//
+// Called at every locked public boundary that returns []runtime.TaskRequest
+// (Apply, Handle, routeClientsReady, RestartAvailabilitySweep,
+// EnsureCostsFetch, ForceRefreshCosts, ApplyEmitNavigate,
+// OpenProfileSelector) so a task deferred by a web request handler and
+// executed later by a background drain reads the session state AS OF THIS
+// DISPATCH, not whatever the session has become by the time a background
+// goroutine reaches it — the same race captureDispatch's own doc comment
+// describes for the drain side, closed here at the producing end instead.
+//
+// A task that already carries a Snap (none do today, but a future producer
+// might pre-stamp one — e.g. a follow-up re-queued from within a drain that
+// already resolved its own snapshot) is left untouched.
+//
+// Callers must hold c.mu.
+func (c *Controller) stampDispatchSnapshotLocked(tasks []runtime.TaskRequest) []runtime.TaskRequest {
+	if len(tasks) == 0 {
+		return tasks
+	}
+	var snap *runtime.DispatchSnapshot
+	for i := range tasks {
+		if tasks[i].Snap != nil {
+			continue
+		}
+		if snap == nil {
+			s := c.core.CaptureDispatch()
+			snap = &s
+		}
+		tasks[i].Snap = snap
+	}
+	return tasks
+}
+
 // RegisterFallbackTypeDef stores a ResourceTypeDef so that buildListBody
 // (columns) and GetListIssueCount (Color func) use the model's explicitly-
 // supplied typeDef rather than the catalog's when they differ. This is critical
@@ -322,7 +361,8 @@ func (c *Controller) registerFallbackTypeDefLocked(td resource.ResourceTypeDef) 
 func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.applyLocked(a)
+	vs, tasks := c.applyLocked(a)
+	return vs, c.stampDispatchSnapshotLocked(tasks)
 }
 
 // selectedResourceForAction resolves the resource a row-dependent action targets:

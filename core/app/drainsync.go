@@ -20,13 +20,18 @@ const maxDrainIterations = 10_000
 
 // DrainSync runs the pending task slice to completion synchronously.
 // It loops while pending is non-empty, executing each TaskRequest via
-// Core.ExecuteTaskAt (against a per-task dispatch snapshot) and feeding the
-// result event through Handle to collect any follow-up tasks. Adapter-only
-// kinds (those for which ExecuteTaskAt returns ErrAdapterOnlyTask) are
-// skipped — they are renderer concerns and have no meaning in a headless
-// sync context — with one exception:
-// TaskKindEmitNavigate is routed through Controller.ApplyEmitNavigate so the
-// one-shot -c/ActionCommand navigation still lands on the headless stack.
+// Core.ExecuteTaskAt against a per-task dispatch snapshot — req.Snap when
+// the Controller boundary that produced this task already stamped one
+// (stampDispatchSnapshotLocked), else a fresh captureDispatch() capture, so
+// a task drained here always executes against the session state as of its
+// own dispatch, not whatever the session has become by the time this loop
+// reaches it — and feeding the result event through Handle to collect any
+// follow-up tasks (which Handle itself stamps before returning, so this loop
+// never re-captures for them). Adapter-only kinds (those for which
+// ExecuteTaskAt returns ErrAdapterOnlyTask) are skipped — they are renderer
+// concerns and have no meaning in a headless sync context — with one
+// exception: TaskKindEmitNavigate is routed through Controller.ApplyEmitNavigate
+// so the one-shot -c/ActionCommand navigation still lands on the headless stack.
 //
 // This is the testing keystone: tests call Apply (or Handle) to get an initial
 // pending slice, then pass it to DrainSync to run tasks inline without a
@@ -77,8 +82,12 @@ func DrainSyncContextProgress(ctx context.Context, c *Controller, pending []runt
 			continue
 		}
 
-		snap := c.captureDispatch()
-		ev, err := c.core.ExecuteTaskAt(ctx, req, snap)
+		snap := req.Snap
+		if snap == nil {
+			s := c.captureDispatch()
+			snap = &s
+		}
+		ev, err := c.core.ExecuteTaskAt(ctx, req, *snap)
 		if err != nil {
 			if errors.Is(err, runtime.ErrAdapterOnlyTask) {
 				// Renderer-only kind — irrelevant in a headless sync context.
@@ -180,8 +189,12 @@ func DrainSyncPerTaskTimeout(
 		}
 
 		taskCtx, cancel := context.WithTimeout(parent, perTaskTimeout)
-		snap := c.captureDispatch()
-		ev, err := c.core.ExecuteTaskAt(taskCtx, req, snap)
+		snap := req.Snap
+		if snap == nil {
+			s := c.captureDispatch()
+			snap = &s
+		}
+		ev, err := c.core.ExecuteTaskAt(taskCtx, req, *snap)
 		budgetExpired := taskCtx.Err() == context.DeadlineExceeded
 		cancel()
 		if err != nil {
@@ -273,8 +286,12 @@ func DrainSyncPartition(
 			continue
 		}
 
-		snap := c.captureDispatch()
-		ev, err := c.core.ExecuteTaskAt(ctx, req, snap)
+		snap := req.Snap
+		if snap == nil {
+			s := c.captureDispatch()
+			snap = &s
+		}
+		ev, err := c.core.ExecuteTaskAt(ctx, req, *snap)
 		if err != nil {
 			if errors.Is(err, runtime.ErrAdapterOnlyTask) {
 				// Renderer-only kind — irrelevant in a headless sync context.

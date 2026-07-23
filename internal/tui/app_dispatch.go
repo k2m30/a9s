@@ -256,12 +256,20 @@ func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 // on appCtx (which is cancelled only by quit).
 func (m Model) executeTaskCmd(req runtime.TaskRequest) tea.Cmd {
 	ctx := m.pairCtx
-	// Capture the session snapshot at dispatch time (synchronous, on the Update
-	// goroutine) so a profile/region switch before this cmd executes cannot
-	// restamp the obsolete task with the new generation or clients.
-	snap := m.core.CaptureDispatch()
+	// Prefer req.Snap when the Controller boundary that produced this task
+	// already stamped one (core/app's stampDispatchSnapshotLocked) — it was
+	// captured under the same lock as the mutation that queued the task, at
+	// least as precise as capturing again here. Otherwise capture the session
+	// snapshot at dispatch time (synchronous, on the Update goroutine) so a
+	// profile/region switch before this cmd executes cannot restamp the
+	// obsolete task with the new generation or clients.
+	snap := req.Snap
+	if snap == nil {
+		s := m.core.CaptureDispatch()
+		snap = &s
+	}
 	return func() tea.Msg {
-		ev, err := m.core.ExecuteTaskAt(ctx, req, snap)
+		ev, err := m.core.ExecuteTaskAt(ctx, req, *snap)
 		if err != nil {
 			if errors.Is(err, runtime.ErrAdapterOnlyTask) {
 				return nil

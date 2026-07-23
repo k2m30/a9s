@@ -189,6 +189,7 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 		}
 	}
 
+	tasks = c.stampDispatchSnapshotLocked(tasks)
 	vs := c.snapshot()
 	dirtyStore := c.costsDirtyStore
 	c.costsDirtyStore = nil
@@ -422,6 +423,20 @@ func (c *Controller) popAutoOpenSinglePlaceholderOnNotFound(msg messages.ByIDFet
 // TUI-safe: only reached from Handle (the headless/web entry point). The TUI
 // drills to by-ID detail in its own adapter and renders from a separate
 // renderer stack, so it never opens detail through this controller path.
+//
+// Two fallbacks so a by-ID drill never strands the placeholder list forever
+// when the target row never lands on the first page:
+//
+//  1. Zero rows, more pages available (HasPagination), no chase already in
+//     flight (!LoadingMore): return the KindFetchMore task that paginates
+//     further, same shape handleActionLoadMore builds.
+//  2. Zero rows, no more pages: synthesize a stub Resource via the type's
+//     registered StubCreator and open its detail directly — the listing
+//     genuinely never surfaced the target (e.g. a cross-account reference),
+//     so there is nothing left to page through.
+//
+// If neither fallback applies (no pagination and no StubCreator), the
+// placeholder list is left as-is, same as before these fallbacks existed.
 func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 	if len(c.stack) == 0 {
 		return nil
@@ -448,11 +463,35 @@ func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 			break
 		}
 	}
+	targetType := top.Ctx.ResourceType
 	if matched == nil {
-		return nil // target row not loaded yet; keep the placeholder list
+		if len(ls.Rows) != 0 {
+			return nil // target row not loaded yet; keep the placeholder list
+		}
+		if ls.HasPagination && !ls.LoadingMore {
+			ls.LoadingMore = true
+			return []runtime.TaskRequest{{
+				Key: runtime.TaskKey{Kind: runtime.KindFetchMore, Scope: targetType},
+				Payload: runtime.FetchMorePayload{
+					ContinuationToken: ls.PaginationCursor,
+					ParentContext:     ls.ParentContext,
+					FetchFilter:       ls.FetchFilter,
+				},
+			}}
+		}
+		td := resource.FindResourceType(targetType)
+		if td == nil {
+			td = resource.GetChildType(targetType)
+		}
+		if td == nil || td.StubCreator == nil {
+			return nil // nothing left to chase or synthesize; keep the placeholder list
+		}
+		stub := td.StubCreator(targetID)
+		ls.AutoOpenSingle = false
+		c.applyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+		return c.openRelatedDetail(stub, targetType)
 	}
 	res := *matched
-	targetType := top.Ctx.ResourceType
 	ls.AutoOpenSingle = false
 	// Replace the placeholder list with the resource's detail.
 	c.applyIntents([]runtime.UIIntent{runtime.PopScreen{}})

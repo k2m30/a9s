@@ -69,7 +69,6 @@ type rendererState struct {
 	rightColVisible     bool
 	rightColAutoShown   bool
 	rightColUserToggled bool
-	pendingRelated      bool // pending related-resource dispatch (set after first SetSize)
 
 	// Main-menu scroll offset (owned by the renderer, not the controller).
 	scrollOffset int

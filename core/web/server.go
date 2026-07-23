@@ -32,6 +32,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/config"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/logging"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
@@ -45,10 +46,20 @@ type sessionEntry struct {
 
 	// inFlight dedups background task drains keyed by runtime.TaskKey (kind +
 	// scope): re-opening the same detail mid-flight must not stack a second
-	// concurrent related-check/enrich fan-out for the same key. Entries are
-	// deleted on completion. Guarded by inFlightMu, independent of mu (the
-	// background drain never holds entry.mu — see drainBackgroundTasks).
-	inFlight   map[runtime.TaskKey]struct{}
+	// concurrent related-check/enrich fan-out for the same key. The map value
+	// is the DetailOperation.ID (runtime.TaskOpID) the running task carries —
+	// zero for non-detail kinds, which fall back to plain same-key dedup. A
+	// new dispatch under the same key is admitted when its op ID is strictly
+	// newer than the recorded one (a fresh detail open/refresh superseding an
+	// older, still-draining fan-out for the same key), not just "not already
+	// running" — otherwise a refresh issued while the original open's
+	// fan-out is still draining is silently dropped (#issue: web detail
+	// refresh mid-flight). Entries are deleted on completion via
+	// compare-and-delete (see drainBackgroundTasks) so a superseded task's
+	// exit cannot clear the newer task's entry. Guarded by inFlightMu,
+	// independent of mu (the background drain never holds entry.mu — see
+	// drainBackgroundTasks).
+	inFlight   map[runtime.TaskKey]domain.Gen
 	inFlightMu sync.Mutex
 }
 
@@ -234,7 +245,7 @@ func (s *Server) getOrCreateSession(sessionID string) *sessionEntry {
 		return entry
 	}
 	ctrl := newSession(s.profile, s.region, s.command, s.demoMode, s.noCache, s.viewCfg)
-	entry := &sessionEntry{ctrl: ctrl, inFlight: make(map[runtime.TaskKey]struct{})}
+	entry := &sessionEntry{ctrl: ctrl, inFlight: make(map[runtime.TaskKey]domain.Gen)}
 	s.sessions[sessionID] = entry
 	s.sessionsMu.Unlock()
 
@@ -314,9 +325,15 @@ const backgroundTaskTimeout = 30 * time.Second
 // the same session are never blocked on a slow related-check/enrich fan-out.
 //
 // In-flight dedup: pending tasks whose Key is already draining (tracked in
-// entry.inFlight) are skipped so re-opening the same detail mid-flight does
-// not stack a second concurrent fan-out for the same key. Each drained key is
-// removed from entry.inFlight on completion (success or timeout).
+// entry.inFlight) are skipped unless the incoming task's DetailOperation ID
+// (runtime.TaskOpID) is strictly newer than the recorded one, in which case
+// it supersedes the running entry — otherwise a refresh dispatched while the
+// original open's fan-out is still draining would be silently dropped for
+// sharing the same Key. Non-detail kinds carry a zero op ID and fall back to
+// plain same-key dedup (running == skip), unchanged from before. Each
+// drained key is removed from entry.inFlight on completion (success or
+// timeout) via compare-and-delete, so a superseded task's own completion
+// cannot clear the newer task's entry.
 func (s *Server) drainBackgroundTasks(entry *sessionEntry, pending []runtime.TaskRequest) {
 	if len(pending) == 0 {
 		return
@@ -325,10 +342,11 @@ func (s *Server) drainBackgroundTasks(entry *sessionEntry, pending []runtime.Tas
 	entry.inFlightMu.Lock()
 	deduped := pending[:0:0]
 	for _, t := range pending {
-		if _, running := entry.inFlight[t.Key]; running {
+		opID := runtime.TaskOpID(t.Payload)
+		if running, ok := entry.inFlight[t.Key]; ok && (opID == 0 || opID <= running) {
 			continue
 		}
-		entry.inFlight[t.Key] = struct{}{}
+		entry.inFlight[t.Key] = opID
 		deduped = append(deduped, t)
 	}
 	entry.inFlightMu.Unlock()
@@ -341,7 +359,10 @@ func (s *Server) drainBackgroundTasks(entry *sessionEntry, pending []runtime.Tas
 		defer func() {
 			entry.inFlightMu.Lock()
 			for _, t := range deduped {
-				delete(entry.inFlight, t.Key)
+				opID := runtime.TaskOpID(t.Payload)
+				if recorded, ok := entry.inFlight[t.Key]; ok && recorded == opID {
+					delete(entry.inFlight, t.Key)
+				}
 			}
 			entry.inFlightMu.Unlock()
 		}()

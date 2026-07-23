@@ -300,6 +300,10 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 	case KindFetchResources:
 		resourceType := req.Key.Scope
 		gen := snap.AvailabilityGen
+		var typeGen domain.Gen
+		if p, ok := req.Payload.(FetchResourcesPayload); ok {
+			typeGen = p.TypeGen
+		}
 		res, err := c.FetchResources(ctx, snap.Clients, resourceType)
 		if err != nil && len(res.Resources) == 0 {
 			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen}, nil
@@ -337,6 +341,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Pagination:   res.Pagination,
 			Err:          err,
 			Gen:          gen,
+			TypeGen:      typeGen,
 		}, nil
 
 	// --- fetch filtered resources ---

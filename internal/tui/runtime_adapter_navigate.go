@@ -530,26 +530,18 @@ func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	rs := m.activeRS()
 
-	// Main menu: restart availability checks (no-op in no-cache mode).
+	// Main menu: restart availability checks (no-op in no-cache mode) via the
+	// shared Controller.RestartAvailabilitySweep mutation-list method
+	// (core/app/actions_list.go — see its doc comment for the exact bundle),
+	// the single source shared with the headless/web menu-refresh branch
+	// (handleActionRefresh). A nil return means --no-cache mode. The returned
+	// TaskKindLoadAvailCache task is discarded: the TUI dispatches its own
+	// loadAvailabilityCache tea.Cmd instead, reaching the same executor logic
+	// through its own Cmd rather than a drained TaskRequest.
 	if rs.kind == rsKindMenu {
-		if m.core.NoCache() {
+		if m.ctrl.RestartAvailabilitySweep() == nil {
 			return m, nil
 		}
-		// Increment gen to cancel any in-flight probes and enrichment.
-		m.core.BumpAvailabilityGen()
-		m.core.BumpEnrichmentGen()
-		m.core.ResetEnrichmentMaps()
-		// Clear stale Wave 2 from all cached rows before resetting ProbeResources.
-		// Without this, opening a cached list before the new enrichment completes
-		// would show the previous run's attention state (PR #310 CodeRabbit
-		// finding B).
-		clearAllWave2(&m)
-		m.core.ResetProbeMaps()
-		// Reset the menu's availability / issue-count state via the controller.
-		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
-		// An explicit manual refresh must always re-probe every type, even
-		// for an already-swept pair — see ClearPairSwept's doc comment.
-		m.core.Session().ClearPairSwept()
 		m.flash = flashState{text: "Refreshing availability...", isError: false, active: true}
 		cmd := m.loadAvailabilityCache()
 		return m, cmd
@@ -641,29 +633,15 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	}
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
-	// Top-level list with a registered enricher: bump per-type gen and
+	// Top-level list with a registered enricher: bump per-type gen (via the
+	// shared Core.RefreshListEnrichment, the single source also used by the
+	// headless/web list-refresh branch in core/app/actions_list.go) and
 	// dispatch a wrapped fetch that stamps TypeGen onto the outgoing
 	// ResourcesLoadedMsg so the tail branch in app.go can seed probeResources
-	// and dispatch probeEnrichment on success.
+	// and dispatch probeEnrichment on success. A 0 token means rt has no
+	// registered issue enricher — dispatch the normal, unstamped refetch.
 	if parentCtx == nil && !escPops {
-		if m.core.HasIssueEnricher(rt) {
-			tok := m.core.BumpEnrichmentTypeGen(rt)
-			m.core.DeleteEnrichmentRan(rt)
-			// Clear per-resource truncation markers too: if the refresh errors
-			// out, stale "?" prefixes must not persist across the rerun.
-			m.core.DeleteEnrichmentTruncatedIDs(rt)
-			// Wave2 already stripped above (pre-fetch cleanup) on the
-			// session-owned mirrors. Strip any rows that entered via
-			// ProbeResources/LazyResourceCache (those paths are NOT covered by
-			// the pre-fetch cleanup above, which only covers the ResourceCache
-			// entry before deletion).
-			(&m).applyEnrichment(rt)
-			// Deliberately NOT clearing the controller's enrichment store
-			// (ApplyEnrichmentState(rt, 0, false, nil)) here — see the
-			// pre-fetch cleanup comment above. The menu issue badge and row
-			// glyphs stay at their last-known value until the rerun's
-			// EnrichmentChecked overwrites c.enrichmentStore[rt] with the
-			// fresh findings, so nothing renders blank in between.
+		if tok := m.core.RefreshListEnrichment(rt); tok != 0 {
 			cmd := m.refreshActiveListWithEnrichmentRerun(tok)
 			return m, cmd
 		}

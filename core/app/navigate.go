@@ -271,7 +271,7 @@ func (c *Controller) ApplyEmitNavigate(p runtime.EmitNavigatePayload) []runtime.
 		ResourceType: p.ResourceType,
 	})
 	tasks = append(tasks, c.applyNavResult(res)...)
-	return tasks
+	return c.stampDispatchSnapshotLocked(tasks)
 }
 
 // ReplayRelatedCache populates the related panel for the top detail screen

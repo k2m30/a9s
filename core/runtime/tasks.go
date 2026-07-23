@@ -159,6 +159,17 @@ type TaskRequest struct {
 	Key     TaskKey
 	Cache   CachePolicy
 	Payload TaskPayload
+	// Snap is the dispatch-time session snapshot (generations, clients) this
+	// task must execute against, captured once by the Controller boundary
+	// that produced this task (core/app's stampDispatchSnapshotLocked) — not
+	// re-derived live at execute time, which could otherwise read a LATER
+	// session state (a profile/region switch, a fresh connect) than the one
+	// active when this task was dispatched. nil for a task built outside a
+	// Controller boundary (e.g. a TUI adapter tea.Cmd that captures its own
+	// snapshot via Core.CaptureDispatch immediately before dispatch); every
+	// consumer (drain loops, executeTaskCmd) falls back to its own
+	// dispatch-time capture when this is nil.
+	Snap *DispatchSnapshot
 }
 
 // ConnectPayload carries the profile/region/gen the adapter must use when
@@ -303,3 +314,21 @@ type RelatedCheckPayload struct {
 }
 
 func (RelatedCheckPayload) isTaskPayload() {}
+
+// TaskOpID returns the DetailOperation.ID carried by a task's payload, for
+// the detail-scope kinds dispatched under one (EnrichDetailPayload,
+// RelatedCheckPayload). Zero for every other kind — those carry no operation
+// identity, so a host doing op-aware in-flight admission (core/web/server.go)
+// treats them as plain same-key dedup, unaffected by op-awareness. A helper
+// here (rather than a type-switch at each call site) keeps the payload set
+// this recognizes in one place as new detail-scope kinds are added.
+func TaskOpID(p TaskPayload) domain.Gen {
+	switch v := p.(type) {
+	case EnrichDetailPayload:
+		return v.Op.ID
+	case RelatedCheckPayload:
+		return v.Op.ID
+	default:
+		return 0
+	}
+}

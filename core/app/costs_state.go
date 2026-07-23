@@ -261,7 +261,7 @@ func (c *Controller) EnsureCostsFetch() []runtime.TaskRequest {
 	if cs == nil {
 		return nil
 	}
-	return costsTaskSlice(c.ensureCostsShapeFetched(cs))
+	return c.stampDispatchSnapshotLocked(costsTaskSlice(c.ensureCostsShapeFetched(cs)))
 }
 
 // costsRefreshTasks re-dispatches the active/beneath costs screen's own top
@@ -294,7 +294,7 @@ func (c *Controller) costsRefreshTasks() []runtime.TaskRequest {
 func (c *Controller) ForceRefreshCosts() []runtime.TaskRequest {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.forceRefreshCostsLocked()
+	return c.stampDispatchSnapshotLocked(c.forceRefreshCostsLocked())
 }
 
 // forceRefreshCostsLocked is ForceRefreshCosts' body, factored out so

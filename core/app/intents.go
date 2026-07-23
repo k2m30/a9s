@@ -357,7 +357,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 func (c *Controller) refreshTasksForIntents(intents []runtime.UIIntent) []runtime.TaskRequest {
 	for _, intent := range intents {
 		if _, ok := intent.(runtime.RefreshActiveListIntent); ok {
-			if tasks := c.activeListRefreshTasks(); tasks != nil {
+			if tasks := c.activeListRefreshTasks(0); tasks != nil {
 				return tasks
 			}
 			return c.costsRefreshTasks()

@@ -29,6 +29,7 @@ package runtime
 
 import (
 	"fmt"
+	"strings"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -157,6 +158,100 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 	}
 
 	return intents, tasks
+}
+
+// RefreshListEnrichment prepares a top-level list refresh for rt: the single
+// mutation-list Core method shared by the TUI's list-refresh-with-enricher
+// branch (internal/tui/runtime_adapter_navigate.go) and the headless/web
+// list-refresh branch (handleActionRefresh, core/app/actions_list.go).
+//
+// Strips rt's RowStore-retained rows of any stale wave2
+// Findings/AttentionDetails, bumps the per-type enrichment generation, and
+// clears EnrichmentRan + EnrichmentTruncatedIDs so the rerun is treated as
+// genuinely fresh rather than a duplicate of an earlier run.
+//
+// Returns the bumped token. Callers must stamp it onto the refetch's
+// dispatch (the TUI wraps its own tea.Cmd's outgoing Msg since its fetch does
+// not go through a runtime.TaskRequest; the headless/web lane attaches it via
+// FetchResourcesPayload.TypeGen on the KindFetchResources task instead) so
+// HandleResourcesLoaded's rerun branch (TypeGen != 0 && TypeGen == current)
+// applies this rerun's own result and rejects a stale, superseded completion.
+//
+// No-op (returns 0) when rt has no registered issue enricher — callers must
+// treat a 0 return as "nothing to stamp; dispatch the normal, unstamped
+// refetch."
+func (c *Core) RefreshListEnrichment(rt string) domain.Gen {
+	canon := canonShortName(rt)
+	if !c.HasIssueEnricher(canon) {
+		return 0
+	}
+	c.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
+		if len(rows) == 0 {
+			return rows
+		}
+		out := make([]resource.Resource, len(rows))
+		copy(out, rows)
+		for i := range out {
+			out[i].Findings = stripWave2Findings(out[i].Findings)
+			out[i].AttentionDetails = nil
+		}
+		return out
+	})
+	tok := c.BumpEnrichmentTypeGen(canon)
+	c.DeleteEnrichmentRan(canon)
+	c.DeleteEnrichmentTruncatedIDs(canon)
+	return tok
+}
+
+// ClearAllWave2Findings strips wave2 findings from every row RowStore retains
+// for every type this session has touched. Used by
+// Controller.RestartAvailabilitySweep (core/app) so a main-menu Ctrl+R never
+// rehydrates stale wave2 attention state on the next list-open, mirroring the
+// TUI's own main-menu Ctrl+R path.
+//
+// Every retained type's rows live in exactly one RowStore entry (task #17
+// wave 1 stage 3), so the type-name set gathered here is the union of the
+// full (ResourceCacheKeys) and Partial (lazy, via ForEachLazyResourceCache)
+// entries plus ProbeOriginTypeNames' Origin=Probe/Disk entries.
+func (c *Core) ClearAllWave2Findings() {
+	canons := make(map[string]struct{})
+	for _, k := range c.ResourceCacheKeys() {
+		canons[k] = struct{}{}
+	}
+	c.ForEachLazyResourceCache(func(rt string, _ []resource.Resource) {
+		canons[rt] = struct{}{}
+	})
+	for _, k := range c.ProbeOriginTypeNames() {
+		canons[k] = struct{}{}
+	}
+	for canon := range canons {
+		c.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
+			if len(rows) == 0 {
+				return rows
+			}
+			out := make([]resource.Resource, len(rows))
+			copy(out, rows)
+			for i := range out {
+				out[i].Findings = stripWave2Findings(out[i].Findings)
+				out[i].AttentionDetails = nil
+			}
+			return out
+		})
+	}
+}
+
+// stripWave2Findings returns findings with wave2-sourced entries removed.
+func stripWave2Findings(findings []domain.Finding) []domain.Finding {
+	if len(findings) == 0 {
+		return findings
+	}
+	out := findings[:0:0]
+	for _, f := range findings {
+		if !strings.HasPrefix(f.Source, "wave2:") {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // EnrichDetailResultEvent is the adapter-translated form of

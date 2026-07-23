@@ -34,6 +34,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/app"
+	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
@@ -258,5 +259,102 @@ func TestDrainSync_NilFollowUpTasks_DoesNotGrow(t *testing.T) {
 		// this would mean FetchIdentity completed without producing IdentityError,
 		// which is unexpected for a nil-client path.
 		t.Error("identity screen shows neither ErrorMsg nor Loading after nil-client FetchIdentity drain")
+	}
+}
+
+// TestTaskSnap_ApplyReturnedTasks_CarryCreationTimeSnap_ImmuneToLaterClientsSwap
+// pins TaskRequest.Snap's creation-time-stamping contract: every task
+// Controller.Apply returns must carry a non-nil Snap whose Clients pointer is
+// exactly whatever session.Clients was AT THE MOMENT Apply returned it — and,
+// crucially, that already-returned snapshot must stay fixed at that value
+// even after a LATER session Clients swap. Without this, a still-pending task
+// dispatched under one profile/region's clients could silently start
+// executing against a different session's transport if the user switches
+// again before it drains.
+func TestTaskSnap_ApplyReturnedTasks_CarryCreationTimeSnap_ImmuneToLaterClientsSwap(t *testing.T) {
+	core, c := newTestControllerWithCore(t)
+
+	clientsA := demo.NewServiceClients()
+	core.HandleClientsReady(runtime.ClientsReadyEvent{ //nolint:errcheck // intentional — we only need the side effect (session.Clients installed)
+		Clients:    clientsA,
+		Gen:        core.ConnectGen(),
+		StackDepth: 1,
+	})
+
+	_, tasks := c.Apply(app.Action{Kind: app.ActionRefresh})
+	if len(tasks) == 0 {
+		t.Skip("Apply(ActionRefresh) on the menu returned no tasks — test depends on RestartAvailabilitySweep wiring")
+	}
+
+	for i, task := range tasks {
+		if task.Snap == nil {
+			t.Fatalf("tasks[%d] (%s): Snap is nil — every task Controller.Apply returns must carry a creation-time DispatchSnapshot", i, task.Key.Kind)
+		}
+		if task.Snap.Clients != clientsA {
+			t.Errorf("tasks[%d] (%s): Snap.Clients = %p, want the clients installed before Apply returned it (%p)", i, task.Key.Kind, task.Snap.Clients, clientsA)
+		}
+	}
+
+	clientsB := demo.NewServiceClients()
+	core.HandleClientsReady(runtime.ClientsReadyEvent{ //nolint:errcheck // intentional — we only need the side effect
+		Clients:    clientsB,
+		Gen:        core.ConnectGen(),
+		StackDepth: 1,
+	})
+
+	for i, task := range tasks {
+		if task.Snap.Clients != clientsA {
+			t.Errorf("tasks[%d] (%s): Snap.Clients changed to %p after a LATER session Clients swap (to %p) — the already-returned snapshot must stay fixed at its creation-time value %p", i, task.Key.Kind, task.Snap.Clients, clientsB, clientsA)
+		}
+	}
+}
+
+// TestTaskSnap_DrainSync_StampedTask_UsesCreationTimeClients_NotLaterSwap is
+// the drain-side half of the same contract: a task dispatched while
+// session.Clients was nil, then drained AFTER a real client set was installed,
+// must still execute against the nil clients it was stamped with at creation
+// time — not the clients that happen to be live when the drain loop finally
+// reaches it.
+//
+// Mechanism: TaskKindFetchIdentity with nil Clients unconditionally produces
+// messages.IdentityError (Core.FetchIdentity's nil-clients guard); with real
+// demo clients it succeeds. Seeding the task while clients are nil, then
+// installing real clients before draining, discriminates cleanly between "the
+// drain loop re-captured a live DispatchSnapshot at execute time" (would
+// succeed here) and "the drain loop honored the task's own creation-time Snap"
+// (must still error here).
+func TestTaskSnap_DrainSync_StampedTask_UsesCreationTimeClients_NotLaterSwap(t *testing.T) {
+	core, c := newTestControllerWithCore(t)
+
+	_, tasks := c.Apply(app.Action{Kind: app.ActionOpenIdentity})
+	if len(tasks) == 0 {
+		t.Skip("Apply(OpenIdentity) returned no tasks — test depends on TaskKindFetchIdentity wiring")
+	}
+	hasFetchIdentity := false
+	for _, task := range tasks {
+		if task.Key.Kind == runtime.TaskKindFetchIdentity {
+			hasFetchIdentity = true
+		}
+	}
+	if !hasFetchIdentity {
+		t.Skipf("no TaskKindFetchIdentity in tasks; got %v — test assumption broken", taskKindStrings(tasks))
+	}
+
+	// Session gains real clients strictly AFTER the task above was dispatched
+	// (creation-time Clients were nil) but strictly BEFORE it is drained.
+	core.HandleClientsReady(runtime.ClientsReadyEvent{ //nolint:errcheck // intentional — we only need the side effect
+		Clients:    demo.NewServiceClients(),
+		Gen:        core.ConnectGen(),
+		StackDepth: 1,
+	})
+
+	app.DrainSync(c, tasks)
+
+	snap := c.Snapshot()
+	if snap.Body.Identity == nil {
+		t.Fatal("Snapshot().Body.Identity is nil after DrainSync — expected IdentityBody")
+	}
+	if snap.Body.Identity.ErrorMsg == "" {
+		t.Error("Snapshot().Body.Identity.ErrorMsg is empty after the drain — the stamped FetchIdentity task must have executed against its creation-time (nil) clients, not the clients installed after dispatch; got a successful identity load instead")
 	}
 }

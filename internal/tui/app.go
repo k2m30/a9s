@@ -265,19 +265,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.propagateSize()
-		rs := m.activeRS()
-		if rs.pendingRelated {
-			rs.pendingRelated = false
-			body := m.ctrl.Snapshot().Body
-			if body.Kind == app.BodyKindDetail && body.Detail != nil {
-				rtype := m.ctrl.GetDetailResourceType()
-				src := m.ctrl.GetDetailResource()
-				op := m.core.BeginDetailOperation(rtype, src, false)
-				if _, relatedTask := m.core.DetailOperationTasks(op); relatedTask != nil {
-					return m, m.dispatchTaskRequests([]runtime.TaskRequest{*relatedTask})
-				}
-			}
-		}
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)

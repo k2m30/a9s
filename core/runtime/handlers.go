@@ -157,10 +157,13 @@ func (c *Core) HandleClearFlash(ev ClearFlashEvent) ([]UIIntent, []TaskRequest) 
 func (c *Core) HandleAPIError(ev APIErrorEvent) ([]UIIntent, []TaskRequest) {
 	code, message, _ := awsclient.ClassifyAWSError(ev.Err)
 	var text string
-	if code != "" && code != "Unknown" {
+	switch {
+	case code != "" && code != "Unknown":
 		text = fmt.Sprintf("[%s] %s", code, message)
-	} else {
+	case ev.Err != nil:
 		text = ev.Err.Error()
+	default:
+		text = "unknown API error"
 	}
 	intents := []UIIntent{
 		FlashIntent{Text: text, IsError: true},

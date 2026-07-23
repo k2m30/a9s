@@ -33,12 +33,12 @@ import (
 
 // applyEnrichment strips every Wave-2 finding (and companion AttentionDetail)
 // from resourceType's cached rows — a per-type Wave-2 clear, mirroring
-// clearAllWave2 but scoped to one canonical type. Both production call sites
-// (handleRefresh's pre-fetch cleanup) pass no finding data of their own: the
-// actual Wave-2 fold that appends fresh findings back onto cached rows lives
-// entirely on runtime.Core.applyEnrichment (core/runtime/helpers.go),
-// reached via handleEnrichmentChecked → AmendRows once the fresh
-// EnrichmentChecked result lands.
+// core/runtime's Core.ClearAllWave2Findings but scoped to one canonical type.
+// Its one production call site (handleRefresh's pre-fetch cleanup) passes no
+// finding data of its own: the actual Wave-2 fold that appends fresh
+// findings back onto cached rows lives entirely on runtime.Core.applyEnrichment
+// (core/runtime/helpers.go), reached via handleEnrichmentChecked → AmendRows
+// once the fresh EnrichmentChecked result lands.
 //
 // Folds into RowStore's retained rows for canon via m.core.AmendRows'
 // copy-on-write mutation (task #17 wave 1 stage 3 — the former
@@ -182,45 +182,8 @@ func stripWave2(findings []domain.Finding) []domain.Finding {
 	return out
 }
 
-// clearAllWave2 strips wave2 findings from every row RowStore retains for
-// every type this session has touched. Used by main-menu Ctrl+R to ensure
-// the next list-open doesn't rehydrate stale wave2 attention state via
-// wave2FindingsByID.
-//
-// Every retained type's rows live in exactly one RowStore entry (task #17
-// wave 1 stage 3 — the former ResourceCache/LazyResourceCache/ProbeResources
-// three-leg walk collapses to one), so the type-name set is the union of the
-// full (ResourceCacheKeys) and Partial (lazy, via ForEachLazyResourceCache)
-// entries, and ProbeOriginTypeNames' Origin=Probe/Disk entries — every one
-// of those is also reachable through the full/Partial split, so gathering
-// via all three sources and deduping is defensive against any entry this
-// enumeration might otherwise miss. AmendRows' copy-on-write fold is the
-// store's only valid mutation path — ForEach{Resource,LazyResource}Cache now
-// hand out a defensive copy (RowStore.Snapshot*), so mutating the callback's
-// rows/entry slice in place would be a silent no-op.
-func clearAllWave2(m *Model) {
-	canons := make(map[string]struct{})
-	for _, c := range m.core.ResourceCacheKeys() {
-		canons[c] = struct{}{}
-	}
-	m.core.ForEachLazyResourceCache(func(rt string, _ []resource.Resource) {
-		canons[rt] = struct{}{}
-	})
-	for _, c := range m.core.ProbeOriginTypeNames() {
-		canons[c] = struct{}{}
-	}
-	for canon := range canons {
-		m.core.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
-			if len(rows) == 0 {
-				return rows
-			}
-			out := make([]resource.Resource, len(rows))
-			copy(out, rows)
-			for i := range out {
-				out[i].Findings = stripWave2(out[i].Findings)
-				out[i].AttentionDetails = nil
-			}
-			return out
-		})
-	}
-}
+// ClearAllWave2Findings (core/runtime) is the neutral, all-types counterpart
+// of applyEnrichment above — used by Controller.RestartAvailabilitySweep
+// (core/app/actions_list.go), the single source shared by the TUI's
+// main-menu Ctrl+R path (runtime_adapter_navigate.go) and the headless/web
+// menu-refresh branch.

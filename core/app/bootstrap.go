@@ -82,5 +82,5 @@ func (c *Controller) routeClientsReady(ev runtime.ClientsReadyEvent) []runtime.T
 	intents, tasks := c.core.HandleClientsReady(ev)
 	c.applyIntents(intents)
 	tasks = append(tasks, c.refreshTasksForIntents(intents)...)
-	return tasks
+	return c.stampDispatchSnapshotLocked(tasks)
 }

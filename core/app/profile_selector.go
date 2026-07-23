@@ -41,5 +41,6 @@ func (c *Controller) OpenProfileSelector() (ViewState, []runtime.TaskRequest) {
 	// which calls EnsureSelectorState right after the same PushScreen — the
 	// lock-free variant, since c.mu is already held here.
 	c.ensureSelectorState(profiles, c.core.Profile(), "aws-profiles")
+	tasks = c.stampDispatchSnapshotLocked(tasks)
 	return c.snapshot(), tasks
 }
