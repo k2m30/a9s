@@ -247,15 +247,11 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 		if c.session.RowStore.Snapshot(shortName).Gen != 0 {
 			continue
 		}
-		pagination := entry.Pagination
-		if pagination == nil && entry.IsTruncated {
-			pagination = &resource.PaginationMeta{IsTruncated: true}
-		}
 		intents = append(intents, PatchResourceCache{
 			ResourceType: shortName,
 			Entry: &domain.ListViewCacheEntry{
 				Resources:  entry.Resources,
-				Pagination: pagination,
+				Pagination: resolveCachedPagePagination(entry),
 			},
 		})
 		addedInBatch[shortName] = struct{}{}

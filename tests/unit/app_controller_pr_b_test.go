@@ -131,7 +131,7 @@ func TestController_Handle_PRB_RelatedCheckResult_IsNoOpPassThrough(t *testing.T
 		SourceResourceID: "i-0fakeec2source",
 		DefDisplayName:   "security-groups",
 		Result:           resource.RelatedCheckResult{},
-		Generation:       0, // AcceptZeroGen=true
+		OperationID:      0, // AcceptZeroGen=true
 	}
 
 	snapBefore := c.Snapshot()
@@ -170,7 +170,7 @@ func TestController_Handle_PRB_EnrichDetailResult_IsNoOpPassThrough(t *testing.T
 		ResourceType: "rds",
 		ResourceID:   "db-fakeinstance-01",
 		EnrichedRes:  resource.Resource{ID: "db-fakeinstance-01", Type: "rds"},
-		Generation:   0, // AcceptZeroGen=true
+		OperationID:  0, // AcceptZeroGen=true
 	}
 
 	snapBefore := c.Snapshot()
@@ -1033,9 +1033,9 @@ func TestController_Handle_PRB_ResultLane_ConsistencyAfterMultipleEvents(t *test
 		messages.ResourcesLoaded{ResourceType: "lambda", Gen: 0},
 		messages.APIError{ResourceType: "ecs", Err: errors.New("fake error"), Gen: 0},
 		messages.ClearFlash{Gen: 0},
-		messages.EnrichDetailResult{ResourceType: "rds", ResourceID: "db-fake-01", Generation: 0},
+		messages.EnrichDetailResult{ResourceType: "rds", ResourceID: "db-fake-01", OperationID: 0},
 		messages.ValueRevealed{ResourceType: "secrets", ResourceID: "fake/secret", Value: "fake-val", Gen: 0},
-		messages.RelatedCheckResult{ResourceType: "ec2", SourceResourceID: "i-0fake", Generation: 0},
+		messages.RelatedCheckResult{ResourceType: "ec2", SourceResourceID: "i-0fake", OperationID: 0},
 		messages.ClientsReady{Region: "us-east-1", Gen: 0},
 	}
 

@@ -332,17 +332,16 @@ func fullIntegrationEnterRelatedSingleDetail(t *testing.T, m *tui.Model, targetT
 	}
 
 	// Fast path: related-panel NavigationKindDetail (cache hit) pushes the detail view
-	// directly and emits RelatedCheckStartedMsg without going through
-	// ResourcesLoadedMsg / NavigateMsg. Detect by scanning for that message
-	// in the returned cmd.
-	for _, inner := range fullIntegrationCollectCmdMessages(cmd) {
-		started, ok := inner.(messages.RelatedCheckStarted)
+	// directly and dispatches the related-check fan-out as messages.RelatedCheckResult
+	// leaves in the same cmd, with no intermediate trigger message and without
+	// going through ResourcesLoadedMsg / NavigateMsg. Detect by collecting
+	// those results directly from the returned cmd.
+	if results := fullIntegrationCollectRelatedCheckResults(cmd); len(results) > 0 {
+		res, ok := m.ActiveDetailResource()
 		if !ok {
-			continue
+			t.Fatalf("related %q navigation dispatched a fan-out but did not land on a detail view", displayName)
 		}
-		res := started.SourceResource
-		results := fullIntegrationApplyStartedAndCollectResults(t, m, started, targetType)
-		return res, results
+		return res, fullIntegrationApplyStartedAndCollectResults(t, m, results, targetType)
 	}
 
 	raw := fullIntegrationExtractMsg(t, cmd, func(msg tea.Msg) bool {
@@ -405,25 +404,17 @@ func fullIntegrationEnterFocusedRelated(t *testing.T, m *tui.Model, targetType, 
 
 func fullIntegrationRunRelatedChecksFromStartCmd(t *testing.T, m *tui.Model, startCmd tea.Cmd, resourceType string) []messages.RelatedCheckResult {
 	t.Helper()
-	// startCmd may be a tea.BatchMsg carrying other detail-load messages
-	// (e.g. EnrichDetailMsg) alongside RelatedCheckStartedMsg — find the
-	// related-check message regardless of where it sits in the batch.
-	raw := fullIntegrationExtractMsg(t, startCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.RelatedCheckStarted)
-		return ok
-	})
-	started, ok := raw.(messages.RelatedCheckStarted)
-	if !ok {
-		t.Fatalf("related check start for %s returned %T, expected messages.RelatedCheckStarted", resourceType, raw)
-	}
-	return fullIntegrationApplyStartedAndCollectResults(t, m, started, resourceType)
+	// The related-check fan-out is now dispatched directly by the
+	// navigation flow itself — startCmd (may be a tea.BatchMsg carrying
+	// other detail-load messages, e.g. EnrichDetailMsg, alongside them)
+	// already carries the terminal messages.RelatedCheckResult leaves, with
+	// no intermediate RelatedCheckStarted trigger message to find first.
+	results := fullIntegrationCollectRelatedCheckResults(startCmd)
+	return fullIntegrationApplyStartedAndCollectResults(t, m, results, resourceType)
 }
 
-func fullIntegrationApplyStartedAndCollectResults(t *testing.T, m *tui.Model, started messages.RelatedCheckStarted, resourceType string) []messages.RelatedCheckResult {
+func fullIntegrationApplyStartedAndCollectResults(t *testing.T, m *tui.Model, results []messages.RelatedCheckResult, resourceType string) []messages.RelatedCheckResult {
 	t.Helper()
-	var cmd tea.Cmd
-	*m, cmd = fullIntegrationApplyMsg(*m, started)
-	results := fullIntegrationCollectRelatedCheckResults(cmd)
 	if len(results) == 0 {
 		t.Fatalf("related check for %s produced no RelatedCheckResultMsg", resourceType)
 	}

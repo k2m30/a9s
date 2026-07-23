@@ -3,6 +3,7 @@
 package messages
 
 import (
+	"errors"
 	"time"
 
 	"github.com/k2m30/a9s/v3/core/costs"
@@ -134,7 +135,12 @@ type RelatedCheckResult struct {
 	SourceResourceID string // ID of the source resource (for cache keying)
 	DefDisplayName   string // unique def.DisplayName — disambiguates multiple defs sharing a TargetType (e.g. ct-events self-pivots)
 	Result           resource.RelatedCheckResult
-	Generation       domain.Gen // dispatch generation — discard if != current RelatedGen
+	// OperationID is the core/runtime.DetailOperation.ID this result was
+	// dispatched under. Accepted only when it matches the session's current
+	// DetailOpGen (see messages.AspectDetailOp) — a fresh detail open or an
+	// explicit refresh begins a new operation, so a result from any earlier
+	// one is discarded regardless of how long it was in flight.
+	OperationID domain.Gen
 	// CachedPages contains full top-level resource pages fetched from AWS on a
 	// cold cache miss, keyed by target resource short name. Non-nil only when
 	// the NeedsTargetCache prefetch executed a live fetch (i.e., target was
@@ -160,27 +166,27 @@ type RelatedCheckResult struct {
 }
 
 func (RelatedCheckResult) isEvent()               {}
-func (m RelatedCheckResult) GenStamp() domain.Gen { return m.Generation }
-func (RelatedCheckResult) GenAspect() Aspect      { return AspectRelated }
+func (m RelatedCheckResult) GenStamp() domain.Gen { return m.OperationID }
+func (RelatedCheckResult) GenAspect() Aspect      { return AspectDetailOp }
 func (RelatedCheckResult) AcceptZeroGen() bool    { return true }
 
 // RelatedCheckBatch is the headless-executor counterpart to the per-def
 // RelatedCheckResult messages the TUI fan-out emits. The executor runs
-// checkers sequentially and bundles all per-def results into one event so
-// DrainSync can route them through Controller.Handle in a single call.
-// The Generation field mirrors the RelatedGen captured at dispatch time —
-// stale batches are dropped by the same IsStale guard used for individual
-// RelatedCheckResult messages.
+// checkers concurrently (bounded by runtime.MaxConcurrentProbes) and bundles
+// all per-def results into one event so DrainSync can route them through
+// Controller.Handle in a single call. OperationID mirrors the
+// DetailOperation.ID captured at dispatch time — stale batches are dropped
+// by the same IsStale guard used for individual RelatedCheckResult messages.
 type RelatedCheckBatch struct {
 	ResourceType     string
 	SourceResourceID string
 	Results          []RelatedCheckResult
-	Generation       domain.Gen
+	OperationID      domain.Gen
 }
 
 func (RelatedCheckBatch) isEvent()               {}
-func (m RelatedCheckBatch) GenStamp() domain.Gen { return m.Generation }
-func (RelatedCheckBatch) GenAspect() Aspect      { return AspectRelated }
+func (m RelatedCheckBatch) GenStamp() domain.Gen { return m.OperationID }
+func (RelatedCheckBatch) GenAspect() Aspect      { return AspectDetailOp }
 func (RelatedCheckBatch) AcceptZeroGen() bool    { return true }
 
 // AvailabilityCacheLoaded delivers cached availability data loaded from disk.
@@ -336,20 +342,22 @@ func (IdentityError) GenAspect() Aspect      { return AspectConnect }
 func (IdentityError) AcceptZeroGen() bool    { return true }
 
 // EnrichDetailResult delivers an enriched resource back to the detail view.
-// On success, the detail view replaces its resource and rebuilds the field list.
-// Generation is stamped by the dispatcher and validated by the adapter to
-// discard stale results after Ctrl+R or navigation away.
+// On success, the detail view replaces its resource and rebuilds the field
+// list. OperationID is the core/runtime.DetailOperation.ID stamped by the
+// dispatcher; discarded when it no longer matches the session's active
+// operation (a Ctrl+R refresh or navigating to a different resource begins a
+// new operation).
 type EnrichDetailResult struct {
 	ResourceType string
 	ResourceID   string
 	EnrichedRes  resource.Resource
 	Err          error
-	Generation   domain.Gen
+	OperationID  domain.Gen
 }
 
 func (EnrichDetailResult) isEvent()               {}
-func (m EnrichDetailResult) GenStamp() domain.Gen { return m.Generation }
-func (EnrichDetailResult) GenAspect() Aspect      { return AspectEnrichDetail }
+func (m EnrichDetailResult) GenStamp() domain.Gen { return m.OperationID }
+func (EnrichDetailResult) GenAspect() Aspect      { return AspectDetailOp }
 func (EnrichDetailResult) AcceptZeroGen() bool    { return true }
 
 // CostsLoaded delivers one Cost Explorer fetch result: the query shape that
@@ -404,3 +412,45 @@ type ThemeFileRead struct {
 }
 
 func (ThemeFileRead) isEvent() {}
+
+// AllEventSamples returns exactly one minimal-but-valid instance of every
+// concrete type implementing Event, in this file's declaration order — the
+// enumerable registry the cross-renderer routing contract test iterates.
+// ADDING A NEW EVENT TYPE WITHOUT A SAMPLE HERE MUST FAIL THE CONTRACT
+// TEST's count check, so keep this adjacent to the type definitions above.
+//
+// Fields are left at their zero value except where a non-zero value is
+// needed to route safely through Controller.Handle without a nil-deref or
+// panic (each such field is commented at its literal below) or to exercise
+// the type's real branch instead of a graceful-degrade no-op (e.g. a
+// registered ResourceType instead of an unregistered empty string). Target:
+// zero exclusions — every concrete Event type below has a sample.
+func AllEventSamples() []Event {
+	return []Event{
+		ResourcesLoaded{ResourceType: "ec2"},
+		// Err must be non-nil: HandleAPIError's routing path
+		// (core/runtime/handlers.go) unconditionally calls ev.Err.Error() in
+		// its non-classified branch — a nil Err panics.
+		APIError{ResourceType: "ec2", Err: errors.New("sample api error")},
+		Flash{Text: "sample"},
+		ByIDFetchFailed{TargetType: "ec2", ID: "i-sample", Reason: "sample reason"},
+		ClearFlash{},
+		ValueRevealed{ResourceType: "secrets", ResourceID: "sample"},
+		Copied{Content: "sample"},
+		ClientsReady{Region: "us-east-1"},
+		RelatedCheckResult{ResourceType: "ec2", SourceResourceID: "i-sample", DefDisplayName: "sample"},
+		RelatedCheckBatch{ResourceType: "ec2", SourceResourceID: "i-sample"},
+		AvailabilityCacheLoaded{},
+		AvailabilityPrefetched{},
+		AvailabilityChecked{ResourceType: "ec2"},
+		EnrichmentChecked{ResourceType: "ec2"},
+		IdentityLoaded{},
+		IdentityError{Err: "sample"},
+		// EnrichedRes carries a Type/ID so a routing path keying off the
+		// resource (cache keys, matching a stacked detail screen) exercises
+		// its real branch instead of an empty-string no-op.
+		EnrichDetailResult{ResourceType: "ec2", ResourceID: "i-sample", EnrichedRes: resource.Resource{Type: "ec2", ID: "i-sample"}},
+		CostsLoaded{},
+		ThemeFileRead{Theme: "sample"},
+	}
+}

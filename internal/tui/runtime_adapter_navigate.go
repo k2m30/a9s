@@ -240,13 +240,11 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			detailRS.rightColVisible = true
 		}
 		m.pushRS(detailRS)
+		op := m.core.BeginDetailOperation(result.ResolvedType, *result.Resource, false)
+		enrichTask, relatedTask := m.core.DetailOperationTasks(op)
 		var cmds []tea.Cmd
-		if result.DispatchEnrich {
-			res := *result.Resource
-			rt := result.ResolvedType
-			cmds = append(cmds, func() tea.Msg {
-				return messages.EnrichDetail{ResourceType: rt, Resource: res}
-			})
+		if result.DispatchEnrich && enrichTask != nil {
+			cmds = append(cmds, m.dispatchTaskRequests([]runtime.TaskRequest{*enrichTask}))
 		}
 		if result.DispatchRelated && detailRS.rightColAutoShown {
 			// D6: no re-fan-out over cached data. ReplayRelatedCache merges
@@ -256,12 +254,8 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			// core/app/navigate.go (applyNavResult). Only dispatch the
 			// TUI's own concurrent fan-out (relatedCheckCmd, one goroutine per
 			// RelatedDef) on a cache miss.
-			if !m.ctrl.ReplayRelatedCache(result.ResolvedType, *result.Resource) {
-				res := *result.Resource
-				rt := result.ResolvedType
-				cmds = append(cmds, func() tea.Msg {
-					return messages.RelatedCheckStarted{ResourceType: rt, SourceResource: res}
-				})
+			if !m.ctrl.ReplayRelatedCache(result.ResolvedType, *result.Resource) && relatedTask != nil {
+				cmds = append(cmds, m.dispatchTaskRequests([]runtime.TaskRequest{*relatedTask}))
 			}
 		}
 		if len(cmds) == 0 {
@@ -409,9 +403,9 @@ func (m Model) pushTextScreen(result runtime.NavigateResult, screenID runtime.Sc
 	textRS.width, textRS.height = w, h
 	m.pushRS(textRS)
 	if result.DispatchEnrich {
-		rt := result.ResolvedType
-		return m, func() tea.Msg {
-			return messages.EnrichDetail{ResourceType: rt, Resource: res}
+		op := m.core.BeginDetailOperation(result.ResolvedType, res, false)
+		if enrichTask, _ := m.core.DetailOperationTasks(op); enrichTask != nil {
+			return m, m.dispatchTaskRequests([]runtime.TaskRequest{*enrichTask})
 		}
 	}
 	return m, nil
@@ -561,7 +555,13 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// Detail view: re-trigger related resource checks and enrichment.
+	// Detail view: begin a fresh DetailOperation and re-dispatch enrich +
+	// related, routed through ctrl.Apply(ActionRefresh) exactly like the
+	// rsKindCosts branch below routes costs refresh — core/app/actions_list.go's
+	// handleActionRefresh owns the RelatedRows reset, the RelatedCache
+	// invalidation, and the operation itself; this branch keeps only the
+	// renderer-only right-column widget reset, the SES cache swap, and the
+	// flash.
 	if rs.kind == rsKindDetail {
 		rt := rs.resourceType
 		srcRes := m.ctrl.GetDetailResource()
@@ -572,13 +572,6 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			rcw := views.ComputeRightColWidth(rs.width, 32)
 			rs.rightCol.SetSize(rcw, rs.height)
 		}
-		// Reset controller's RelatedRows to loading state so View() shows
-		// loading rows immediately rather than stale counts.
-		m.ctrl.ResetDetailRelatedRows(rt)
-		m.core.RelatedCacheDelete(runtime.RelatedCacheKey(rt, srcRes.ID))
-		m.core.BumpRelatedGen()    // cancel in-flight results from previous batch
-		m.core.BumpEnrichGen()     // cancel in-flight enrichment from previous batch
-		m.core.ClearEnrichResKey() // force gen bump on next enrichment dispatch
 		// Invalidate the SES v1 receipt rule set cache so Ctrl+R on a detail
 		// view picks up receipt-rule changes without requiring a profile/region
 		// switch. Swap (not Clear) so that any in-flight blocked
@@ -590,23 +583,11 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			m.core.ResetRuleSets()
 		}
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
-
-		var cmds []tea.Cmd
-		cmds = append(cmds, func() tea.Msg {
-			return messages.RelatedCheckStarted{
-				ResourceType:   rt,
-				SourceResource: srcRes,
-			}
-		})
-		if resource.HasDetailEnricher(rt) {
-			cmds = append(cmds, func() tea.Msg {
-				return messages.EnrichDetail{
-					ResourceType: rt,
-					Resource:     srcRes,
-				}
-			})
+		_, tasks := m.ctrl.Apply(app.Action{Kind: app.ActionRefresh})
+		if len(tasks) == 0 {
+			return m, nil
 		}
-		return m, tea.Batch(cmds...)
+		return m, m.dispatchTaskRequests(tasks)
 	}
 
 	if rs.kind == rsKindCosts {
@@ -801,12 +782,12 @@ func (m Model) handleToggleRelated() (tea.Model, tea.Cmd) {
 		defs := resource.GetRelated(rt)
 		rs.rightCol = views.NewRightColumn(defs, srcRes, rt)
 		m.ctrl.SetDetailRelatedVisible(true, false)
-		return m, func() tea.Msg {
-			return messages.RelatedCheckStarted{
-				ResourceType:   rt,
-				SourceResource: srcRes,
-			}
+		op := m.core.BeginDetailOperation(rt, srcRes, false)
+		_, relatedTask := m.core.DetailOperationTasks(op)
+		if relatedTask == nil {
+			return m, nil
 		}
+		return m, m.dispatchTaskRequests([]runtime.TaskRequest{*relatedTask})
 	}
 	rs.rightCol.SetFocused(false)
 	m.ctrl.SetDetailRelatedVisible(false, true)

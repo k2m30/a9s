@@ -272,11 +272,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if body.Kind == app.BodyKindDetail && body.Detail != nil {
 				rtype := m.ctrl.GetDetailResourceType()
 				src := m.ctrl.GetDetailResource()
-				return m, func() tea.Msg {
-					return messages.RelatedCheckStarted{
-						ResourceType:   rtype,
-						SourceResource: src,
-					}
+				op := m.core.BeginDetailOperation(rtype, src, false)
+				if _, relatedTask := m.core.DetailOperationTasks(op); relatedTask != nil {
+					return m, m.dispatchTaskRequests([]runtime.TaskRequest{*relatedTask})
 				}
 			}
 		}
@@ -364,12 +362,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.coreUpdate(msg)
 	case messages.EnrichmentChecked:
 		return m.coreUpdate(msg)
-	case messages.EnrichDetail:
-		return m.handleEnrichDetail(msg)
 	case messages.EnrichDetailResult:
 		return m.handleEnrichDetailResult(msg)
-	case messages.RelatedCheckStarted:
-		return m.handleRelatedCheckStarted(msg)
 	case messages.RelatedCheckResult:
 		return m.handleRelatedCheckResult(msg)
 	case messages.RelatedNavigate:

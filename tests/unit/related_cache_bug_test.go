@@ -1,14 +1,12 @@
 package unit
 
-// related_cache_bug_test.go — Tests revealing the related-check cache bug.
-//
-// Bug: When a user re-enters the same EC2 detail view after pressing Esc,
-// the root model creates a fresh DetailModel (line 406 app_handlers.go),
-// which always returns NeedsRelatedCheck()==true, causing all related checkers
-// to re-dispatch from scratch instead of using cached results from the first visit.
-//
-// Tests 1 and 2 FAIL with current code (they reveal the bug).
-// Tests 3, 4, and 5 PASS with current code (they verify correct existing behavior).
+// related_cache_bug_test.go — regression coverage for the related-check
+// cache: re-entering the same EC2 detail view after pressing Esc must reuse
+// cached related results (no re-dispatch of the checker fan-out, per D6:
+// no re-fan-out over cached data) and must show the cached count badges
+// immediately (Controller.replayRelatedCache merging RelatedCacheGet's
+// entries into the fresh DetailState). All five tests PASS with current
+// code.
 
 import (
 	"context"
@@ -111,12 +109,29 @@ func applyImmediateCmd(t *testing.T, m tui.Model, cmd tea.Cmd) (tui.Model, []tea
 	return m, leaves
 }
 
-// setupEC2DetailWithResults is a shared helper that:
-//  1. Creates a demo root model at 120×36.
-//  2. Navigates to the EC2 resource list.
-//  3. Presses Enter on the first EC2 instance (detail view).
-//  4. Feeds RelatedCheckResultMsg for every registered EC2 related type (Count=2).
-//  5. Returns the model ready for the Esc+re-enter phase.
+// stubRelatedCount is the uniform stale count every hand-fed
+// messages.RelatedCheckResult fixture in this package hands out for every
+// EC2 related type (setupEC2DetailWithResults and its siblings
+// setupEC2DetailWithResultsNarrow/feedEC2Results/feedEC2RelatedResults).
+// It must never collide with a real demo-fixture count for the first EC2
+// instance (fakes.NewEC2()'s ec2Res[0], "i-0a1b2c3d4e5f60001") on ANY
+// registered related type — otherwise a genuinely fresh, correct count
+// re-arriving after Ctrl+R is indistinguishable from the stale fixture value
+// a test is checking has been cleared. Verified empirically: every one of
+// the 19 registered ec2 RelatedDefs resolves to Count 0, 1, or 2 for that
+// instance against the real demo fixtures (highest: Security Groups=2,
+// CloudTrail Events=2) — stubRelatedCount is more than 3x the highest real
+// value.
+const stubRelatedCount = 7
+
+var stubRelatedIDs = []string{
+	"related-id-1", "related-id-2", "related-id-3", "related-id-4",
+	"related-id-5", "related-id-6", "related-id-7",
+}
+
+// setupEC2DetailWithResults opens a demo EC2 detail view and feeds a
+// RelatedCheckResult (Count=stubRelatedCount) for every registered EC2
+// related type, ready for an Esc+re-enter phase.
 func setupEC2DetailWithResults(t *testing.T) tui.Model {
 	t.Helper()
 
@@ -149,15 +164,16 @@ func setupEC2DetailWithResults(t *testing.T) tui.Model {
 
 	// First Enter → the cmd chain is:
 	//   Enter key → ResourceListModel returns NavigateMsg cmd
-	//   NavigateMsg → root creates DetailModel → returns RelatedCheckStartedMsg cmd
-	//   RelatedCheckStartedMsg → root dispatches async checkers
+	//   NavigateMsg → root creates DetailModel → begins a DetailOperation and
+	//     dispatches the related-check fan-out directly, one leaf
+	//     RelatedCheckResult per registered def.
 	m, firstCmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	m, firstMsgs := drainCmds(t, m, firstCmd, 5)
 
-	// Verify RelatedCheckStartedMsg was produced somewhere in the chain.
+	// Verify a RelatedCheckResult was produced somewhere in the chain.
 	foundRelatedCheck := false
 	for _, msg := range firstMsgs {
-		if _, ok := msg.(messages.RelatedCheckStarted); ok {
+		if _, ok := msg.(messages.RelatedCheckResult); ok {
 			foundRelatedCheck = true
 			break
 		}
@@ -167,17 +183,22 @@ func setupEC2DetailWithResults(t *testing.T) tui.Model {
 		for i, msg := range firstMsgs {
 			types[i] = fmt.Sprintf("%T", msg)
 		}
-		t.Fatalf("first detail entry must produce RelatedCheckStartedMsg in cmd chain; got: %v", types)
+		t.Fatalf("first detail entry must produce a RelatedCheckResult in cmd chain; got: %v", types)
 	}
 
-	// Feed results for all registered EC2 related types.
+	// Feed results for all registered EC2 related types. SourceResourceID must
+	// match the open detail's resource: foldRelatedCheckResultLocked only merges
+	// a result into a stacked ScreenDetail when ds.Resource.ID == SourceResourceID
+	// (core/app/handle.go), and only emits PatchRelatedCache (the session-level
+	// cache replayRelatedCache reads on re-entry) when SourceResourceID != "".
 	for _, def := range resource.GetRelated("ec2") {
 		m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
-			ResourceType: "ec2",
+			ResourceType:     "ec2",
+			SourceResourceID: ec2Res[0].ID,
 			Result: resource.RelatedCheckResult{
 				TargetType:  def.TargetType,
-				Count:       2,
-				ResourceIDs: []string{"related-id-1", "related-id-2"},
+				Count:       stubRelatedCount,
+				ResourceIDs: stubRelatedIDs,
 			},
 		})
 	}
@@ -186,13 +207,9 @@ func setupEC2DetailWithResults(t *testing.T) tui.Model {
 }
 
 // TestBug_RelatedCheckResults_NotCachedOnReentry verifies that re-entering
-// the same EC2 instance's detail view does NOT re-dispatch RelatedCheckStartedMsg.
-//
-// EXPECTED: cached results are reused; no second RelatedCheckStartedMsg.
-// ACTUAL (BUG): fresh DetailModel is created, NeedsRelatedCheck()==true always,
-// so RelatedCheckStartedMsg is emitted again.
-//
-// This test FAILS with current code.
+// the same EC2 instance's detail view does NOT re-dispatch the related-check
+// fan-out — replayRelatedCache (D6: no re-fan-out over cached data) serves
+// the cached results instead.
 func TestBug_RelatedCheckResults_NotCachedOnReentry(t *testing.T) {
 	m := setupEC2DetailWithResults(t)
 
@@ -204,24 +221,21 @@ func TestBug_RelatedCheckResults_NotCachedOnReentry(t *testing.T) {
 	m, secondCmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	_, secondMsgs := drainCmds(t, m, secondCmd, 5)
 
-	// EXPECTED: no RelatedCheckStartedMsg on re-entry (results are cached).
+	// EXPECTED: no RelatedCheckResult on re-entry (results are cached).
 	// BUG: the root model always creates a fresh DetailModel, so it always re-emits.
 	for _, msg := range secondMsgs {
-		if _, ok := msg.(messages.RelatedCheckStarted); ok {
+		if _, ok := msg.(messages.RelatedCheckResult); ok {
 			t.Fatal("BUG: re-entering the same EC2 detail view should NOT re-dispatch " +
-				"RelatedCheckStartedMsg — related check results must be cached from the first visit")
+				"the related-check fan-out — related check results must be cached from the first visit")
 		}
 	}
 }
 
 // TestBug_RelatedCheckResults_RightColShowsCachedCounts verifies that after
 // re-entering the same EC2 instance's detail, the View() output immediately
-// shows the cached related counts (e.g., "(2)") rather than a loading state.
-//
-// EXPECTED: right column shows "Target Groups (2)" (or similar) immediately.
-// ACTUAL (BUG): right column shows loading state because all checkers re-run.
-//
-// This test FAILS with current code.
+// shows the cached related counts (e.g., "(2)") rather than a loading state —
+// replayRelatedCache merges RelatedCacheGet's entries into the freshly
+// pushed DetailState before the first render.
 func TestBug_RelatedCheckResults_RightColShowsCachedCounts(t *testing.T) {
 	m := setupEC2DetailWithResults(t)
 
@@ -234,17 +248,17 @@ func TestBug_RelatedCheckResults_RightColShowsCachedCounts(t *testing.T) {
 
 	view := stripANSI(rootViewContent(m))
 
-	// EXPECTED: at least one related type shows its cached count of 2.
-	// BUG: no "(2)" appears because all checkers were re-dispatched and results are pending.
-	if !strings.Contains(view, "(2)") {
+	// EXPECTED: at least one related type shows its cached count.
+	// BUG: no "(7)" appears because all checkers were re-dispatched and results are pending.
+	if !strings.Contains(view, "(7)") {
 		t.Fatalf("BUG: re-entering detail should show cached related counts immediately; "+
-			"expected '(2)' in view output.\nView:\n%s", view)
+			"expected '(7)' in view output.\nView:\n%s", view)
 	}
 }
 
 // TestBug_RelatedCheckCache_DifferentResource_ShouldRecheck verifies that
 // entering a DIFFERENT EC2 instance's detail view DOES trigger fresh checks.
-// This is a cache-miss scenario and must always produce RelatedCheckStartedMsg.
+// This is a cache-miss scenario and must always produce a RelatedCheckResult.
 //
 // This test PASSES with current code (correct existing behavior).
 func TestBug_RelatedCheckCache_DifferentResource_ShouldRecheck(t *testing.T) {
@@ -256,19 +270,19 @@ func TestBug_RelatedCheckCache_DifferentResource_ShouldRecheck(t *testing.T) {
 	// Move cursor to the SECOND EC2 instance.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyDown))
 
-	// Enter the second EC2 instance → drain cmd chain → must include RelatedCheckStartedMsg.
+	// Enter the second EC2 instance → drain cmd chain → must include a RelatedCheckResult.
 	m, secondCmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	_, secondMsgs := drainCmds(t, m, secondCmd, 5)
 
 	foundRelatedCheck := false
 	for _, msg := range secondMsgs {
-		if _, ok := msg.(messages.RelatedCheckStarted); ok {
+		if _, ok := msg.(messages.RelatedCheckResult); ok {
 			foundRelatedCheck = true
 			break
 		}
 	}
 	if !foundRelatedCheck {
-		t.Fatal("entering a DIFFERENT EC2 instance must dispatch RelatedCheckStartedMsg (cache miss)")
+		t.Fatal("entering a DIFFERENT EC2 instance must dispatch a RelatedCheckResult (cache miss)")
 	}
 }
 
@@ -294,10 +308,10 @@ func TestBug_RelatedCheckCache_InvalidatedOnProfileSwitch(t *testing.T) {
 	_, secondMsgs := drainCmds(t, m, secondCmd, 5)
 
 	// In demo mode, ProfileSelectedMsg returns (m, nil) so the EC2 list is still
-	// active and Enter works normally. Verify RelatedCheckStartedMsg is produced.
+	// active and Enter works normally. Verify a RelatedCheckResult is produced.
 	foundRelatedCheck := false
 	for _, msg := range secondMsgs {
-		if _, ok := msg.(messages.RelatedCheckStarted); ok {
+		if _, ok := msg.(messages.RelatedCheckResult); ok {
 			foundRelatedCheck = true
 			break
 		}
@@ -310,6 +324,6 @@ func TestBug_RelatedCheckCache_InvalidatedOnProfileSwitch(t *testing.T) {
 			types[i] = fmt.Sprintf("%T", msg)
 		}
 		t.Fatalf("after profile switch, re-entering detail must dispatch "+
-			"RelatedCheckStartedMsg (cache invalidated); got: %v", types)
+			"a RelatedCheckResult (cache invalidated); got: %v", types)
 	}
 }

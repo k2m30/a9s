@@ -183,7 +183,7 @@ func TestOpenSelectedListDetail_SecondOpen_CacheHit_NoRelatedCheckTask(t *testin
 				Result:           resource.RelatedCheckResult{TargetType: "sg", Count: 2, ResourceIDs: []string{"sg-a", "sg-b"}},
 			},
 		},
-		Generation: 0, // AcceptZeroGen=true
+		OperationID: 0, // AcceptZeroGen=true
 	})
 
 	// Pop back to the list.
@@ -314,7 +314,7 @@ func TestHandle_RelatedCheckBatch_AfterDetailPopped_NoPanic_TopScreenUnchanged(t
 					Result:           resource.RelatedCheckResult{TargetType: "sg", Count: 1, ResourceIDs: []string{"sg-late"}},
 				},
 			},
-			Generation: 0,
+			OperationID: 0,
 		})
 	}()
 
@@ -325,23 +325,24 @@ func TestHandle_RelatedCheckBatch_AfterDetailPopped_NoPanic_TopScreenUnchanged(t
 	}
 }
 
-// TestHandle_RelatedCheckBatch_StaleGeneration_Dropped verifies that a
-// RelatedCheckBatch stamped with a stale (non-zero) RelatedGen — i.e. a batch
-// dispatched before a profile/region switch bumped RelatedGen further — is
-// dropped by the messages.IsStale guard in Controller.Handle (handle.go:68)
-// rather than merged into the active detail's RelatedRows.
+// TestHandle_RelatedCheckBatch_StaleOperation_Dropped verifies that a
+// RelatedCheckBatch stamped with a stale (non-zero) OperationID — i.e. a
+// batch dispatched under an earlier DetailOperation than the session's
+// active one — is dropped by the messages.IsStale guard in Controller.Handle
+// (handle.go:68) rather than merged into the active detail's RelatedRows.
 //
-// Generation 0 is NOT usable to pin staleness here:
+// OperationID 0 is NOT usable to pin staleness here:
 // messages.RelatedCheckBatch.AcceptZeroGen() returns true by design
-// (core/runtime/messages/event.go:164), because real batches are always
-// stamped with a non-zero generation captured at dispatch time. This test
-// captures the real dispatch-time generation, bumps RelatedGen past it, and
-// delivers a batch stamped with that now-stale non-zero generation.
+// (core/runtime/messages/event.go:189), because real batches are always
+// stamped with the non-zero id of the DetailOperation that dispatched them.
+// This test captures the real dispatch-time operation id, begins a fresh
+// DetailOperation (mirrors a Ctrl+R refresh) so that id is now stale, and
+// delivers a batch stamped with it.
 //
 // Status: expected GREEN already — Handle explicitly gates
 // handleRelatedCheckBatch behind !messages.IsStale(batch, c.core). Pinned per
 // the fix task spec as a regression guard.
-func TestHandle_RelatedCheckBatch_StaleGeneration_Dropped(t *testing.T) {
+func TestHandle_RelatedCheckBatch_StaleOperation_Dropped(t *testing.T) {
 	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: noopChecker},
 	})
@@ -353,11 +354,11 @@ func TestHandle_RelatedCheckBatch_StaleGeneration_Dropped(t *testing.T) {
 	}, nil, false)
 	c.Apply(app.Action{Kind: app.ActionSelect})
 
-	// Capture the generation this batch would have been dispatched at, then
-	// bump RelatedGen (simulating a profile/region switch) so that captured
-	// generation is now stale relative to the current session gen.
-	staleGen := core.RelatedGen()
-	core.BumpRelatedGen()
+	// Capture the operation ID this batch would have been dispatched under,
+	// then begin a fresh DetailOperation (mirrors a Ctrl+R refresh) so that
+	// captured id is now stale relative to the session's active operation.
+	staleOp := core.ActiveDetailOp()
+	core.BeginDetailOperation("ec2", resource.Resource{ID: "i-stale0001"}, true)
 
 	c.Handle(messages.RelatedCheckBatch{
 		ResourceType:     "ec2",
@@ -370,12 +371,12 @@ func TestHandle_RelatedCheckBatch_StaleGeneration_Dropped(t *testing.T) {
 				Result:           resource.RelatedCheckResult{TargetType: "sg", Count: 9, ResourceIDs: []string{"sg-stale"}},
 			},
 		},
-		Generation: staleGen, // captured before BumpRelatedGen above — now stale
+		OperationID: staleOp, // captured before the fresh BeginDetailOperation above — now stale
 	})
 
 	key := runtime.RelatedCacheKey("ec2", "i-stale0001")
 	if _, hit := core.RelatedCacheGet(key); hit {
-		t.Error("RelatedCacheGet hit after a stale-generation RelatedCheckBatch — " +
+		t.Error("RelatedCacheGet hit after a stale-operation RelatedCheckBatch — " +
 			"the stale batch must be dropped entirely, including the RelatedCache write")
 	}
 }

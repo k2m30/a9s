@@ -349,18 +349,20 @@ func relatedReplayDefs() []resource.RelatedDef {
 	}
 }
 
-// findRelatedCheckStartedCmd walks cmd (including nested tea.BatchMsg, one
+// findRelatedCheckResultCmd walks cmd (including nested tea.BatchMsg, one
 // level of batch-of-batch as findNavigateMsg does) and reports whether a
-// messages.RelatedCheckStarted is present anywhere in the produced commands.
-// A nil cmd never contains one. This must NOT recurse into arbitrary
-// non-batch cmds (e.g. tea.Tick) — only tea.BatchMsg is unwrapped, mirroring
-// findNavigateMsg/extractMsg's existing walk depth in this package.
-func findRelatedCheckStartedCmd(cmd tea.Cmd) bool {
+// messages.RelatedCheckResult is present anywhere in the produced commands —
+// the fan-out's own per-def leaf message now that the fan-out dispatches
+// directly (no separate trigger message) off the DetailOperation the
+// navigation began. A nil cmd never contains one. This must NOT recurse into
+// arbitrary non-batch cmds (e.g. tea.Tick) — only tea.BatchMsg is unwrapped,
+// mirroring findNavigateMsg/extractMsg's existing walk depth in this package.
+func findRelatedCheckResultCmd(cmd tea.Cmd) bool {
 	if cmd == nil {
 		return false
 	}
 	msg := cmd()
-	if _, ok := msg.(messages.RelatedCheckStarted); ok {
+	if _, ok := msg.(messages.RelatedCheckResult); ok {
 		return true
 	}
 	batch, ok := msg.(tea.BatchMsg)
@@ -372,7 +374,7 @@ func findRelatedCheckStartedCmd(cmd tea.Cmd) bool {
 			continue
 		}
 		subMsg := subCmd()
-		if _, ok := subMsg.(messages.RelatedCheckStarted); ok {
+		if _, ok := subMsg.(messages.RelatedCheckResult); ok {
 			return true
 		}
 		if subBatch, ok := subMsg.(tea.BatchMsg); ok {
@@ -380,7 +382,7 @@ func findRelatedCheckStartedCmd(cmd tea.Cmd) bool {
 				if innerCmd == nil {
 					continue
 				}
-				if _, ok := innerCmd().(messages.RelatedCheckStarted); ok {
+				if _, ok := innerCmd().(messages.RelatedCheckResult); ok {
 					return true
 				}
 			}
@@ -395,7 +397,7 @@ func findRelatedCheckStartedCmd(cmd tea.Cmd) bool {
 // NavigateKindPushDetail path in runtime_adapter_navigate.go). The detail's
 // related rows must render from cache (both DisplayNames + their counts
 // visible, no "?" loading glyph), and the returned tea.Cmd batch must NOT
-// contain a messages.RelatedCheckStarted — the cache-hit replay must
+// contain a messages.RelatedCheckResult — the cache-hit replay must
 // short-circuit the fan-out entirely rather than dispatching the checker
 // AND replaying stale cache data.
 func TestDetailParity_RelatedReplay_NoRefanout_TUILane(t *testing.T) {
@@ -411,8 +413,8 @@ func TestDetailParity_RelatedReplay_NoRefanout_TUILane(t *testing.T) {
 		Resource:     &res,
 	})
 
-	if findRelatedCheckStartedCmd(navCmd) {
-		t.Error("TUI lane: opening a detail with a related-cache hit dispatched messages.RelatedCheckStarted — the cache-hit replay must short-circuit the fan-out, not run it alongside the replay")
+	if findRelatedCheckResultCmd(navCmd) {
+		t.Error("TUI lane: opening a detail with a related-cache hit dispatched a RelatedCheckResult fan-out — the cache-hit replay must short-circuit the fan-out, not run it alongside the replay")
 	}
 
 	content := stripANSI(rootViewContent(tm))
@@ -506,8 +508,8 @@ func TestDetailParity_RelatedReplay_CacheMiss_StillDispatchesFanout(t *testing.T
 		ResourceType: "ec2",
 		Resource:     &res,
 	})
-	if !findRelatedCheckStartedCmd(navCmd) {
-		t.Error("TUI lane: opening a detail with NO related-cache entry did not dispatch messages.RelatedCheckStarted — a cache miss must still fan out")
+	if !findRelatedCheckResultCmd(navCmd) {
+		t.Error("TUI lane: opening a detail with NO related-cache entry did not dispatch a RelatedCheckResult fan-out — a cache miss must still fan out")
 	}
 
 	// --- Headless lane: no seeding — genuine cache miss. ---

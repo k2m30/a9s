@@ -32,9 +32,8 @@ const (
 	AspectInvalid      Aspect = iota
 	AspectAvailability        // session.AvailabilityGen
 	AspectEnrichment          // session.EnrichmentGen (Wave 2 batch enrichment)
-	AspectRelated             // session.RelatedGen
-	AspectEnrichDetail        // session.EnrichGen (detail-panel enrichment)
 	AspectConnect             // session.ConnectGen
+	AspectDetailOp            // session.DetailOpGen (core/runtime.DetailOperation lifecycle)
 )
 
 // GenSource is implemented by the session (core/session.Session) and

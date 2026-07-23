@@ -6,7 +6,7 @@
 // results on profile/region switch or refresh.
 //
 // Session is held as Session *session.Session on tui.Model. Access sites use
-// m.Session.RelatedGen etc. directly for scalar fields; every cached
+// m.Session.DetailOpGen etc. directly for scalar fields; every cached
 // resource-list row (top-level fetch, Wave-1 probe, disk seed, or sparse
 // FetchByIDs drill) goes through RowStore (see rowstore.go) rather than a
 // session map — there is no separate ResourceCache/LazyResourceCache field.
@@ -317,9 +317,16 @@ type Session struct {
 	// under the type's canonical row-store key would poison that type's
 	// global row set for every other consumer.
 	FilteredRows *FilteredRowsLRU
-	RelatedGen   domain.Gen // bumped on refresh/profile/region switch
-	EnrichGen    domain.Gen // bumped on refresh/profile/region switch (detail-enrichment only)
-	EnrichResKey string     // "resourceType:resourceID" of last detail-enrichment dispatch
+
+	// DetailOpGen is both the dispatch counter and the current value for
+	// core/runtime.DetailOperation — the single identity a detail view's
+	// open/refresh lifecycle carries. core/runtime.Core.BeginDetailOperation
+	// bumps it and stamps the new value as the operation's ID; it is also the
+	// one value every detail-scope GenStamped event (EnrichDetailResult,
+	// RelatedCheckResult, RelatedCheckBatch — see messages.AspectDetailOp)
+	// must match to be accepted. Bumped by Rotate() like every sibling gen so
+	// a profile/region switch makes every in-flight detail-op result stale.
+	DetailOpGen domain.Gen
 
 	// Feature-specific session caches. These used to hang off *ServiceClients
 	// but that blurred the AWS-transport/session-state boundary; they live
@@ -411,10 +418,9 @@ func New() *Session {
 		RelatedCache:           NewRelatedCacheLRU(MaxRelatedCacheEntries),
 		FilteredRows:           NewFilteredRowsLRU(MaxFilteredRowsEntries),
 		SweptPairs:             make(map[string]bool),
-		RelatedGen:             1,
-		EnrichGen:              1,
 		EnrichmentGen:          1,
 		AvailabilityGen:        1,
+		DetailOpGen:            1,
 		PolicyDocCache:         &awsclient.PolicyDocumentCache{},
 		DetailDocCache:         &awsclient.DetailDocCache{},
 		IAMPolicies:            NewPolicyStore(),
@@ -651,12 +657,10 @@ func (s *Session) CurrentGenFor(a messages.Aspect) domain.Gen {
 		return s.AvailabilityGen
 	case messages.AspectEnrichment:
 		return s.EnrichmentGen
-	case messages.AspectRelated:
-		return s.RelatedGen
-	case messages.AspectEnrichDetail:
-		return s.EnrichGen
 	case messages.AspectConnect:
 		return s.ConnectGen
+	case messages.AspectDetailOp:
+		return s.DetailOpGen
 	}
 	return 0
 }
@@ -801,11 +805,10 @@ func (s *Session) AllNewFindingPairs() map[string]map[domain.FindingCode]int {
 func (s *Session) Rotate() {
 	s.RelatedCache.Clear()
 	s.FilteredRows.Clear()
-	s.RelatedGen.Bump()
-	s.EnrichGen.Bump()
 	s.AvailabilityGen.Bump()
 	s.EnrichmentGen.Bump()
 	s.ConnectGen.Bump()
+	s.DetailOpGen.Bump()
 
 	// Session-identity / rollback-latch / fetch-latch fields. Profile/Region/
 	// Clients/PreSuppliedClients/Command/NoCache are deliberately NOT cleared

@@ -194,9 +194,10 @@ func scenarioEC2018RightColumnTypes(t *testing.T) string {
 func scenarioEC2020CountsArrived(t *testing.T) string {
 	m := issue140DemoModel(t, 120, 35)
 	m = issue140NavigateToEC2Detail(t, m)
-	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "asg", Count: 1}})
-	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "alarm", Count: 2}})
-	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "tg", Count: 0}})
+	srcID := mustDemoEC2(t)[0].ID
+	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", SourceResourceID: srcID, Result: resource.RelatedCheckResult{TargetType: "asg", Count: 1}})
+	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", SourceResourceID: srcID, Result: resource.RelatedCheckResult{TargetType: "alarm", Count: 2}})
+	m = issue140ApplyMsg(m, messages.RelatedCheckResult{ResourceType: "ec2", SourceResourceID: srcID, Result: resource.RelatedCheckResult{TargetType: "tg", Count: 0}})
 	return m.View().Content
 }
 

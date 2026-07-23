@@ -548,8 +548,9 @@ func TestLiveGap_HandleDetailKeyMsg_RelatedPanelEnter_OnActionableRow_NavigatesU
 	// focusing the right column below auto-lands the cursor here
 	// (ActionToggleFocus's detailSkipToDrillable).
 	m, _ = chainApplyMsg(m, messages.RelatedCheckResult{
-		ResourceType:   "ec2",
-		DefDisplayName: "Security Groups",
+		ResourceType:     "ec2",
+		SourceResourceID: ec2TestResource().ID,
+		DefDisplayName:   "Security Groups",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "sg",
 			Count:       1,
@@ -623,8 +624,9 @@ func relatedFilterGapModel(t *testing.T, extraKeys ...tea.KeyMsg) tui.Model {
 	m = chainNavigateToEC2Detail(t, m)
 
 	m, _ = chainApplyMsg(m, messages.RelatedCheckResult{
-		ResourceType:   "ec2",
-		DefDisplayName: "Target Groups",
+		ResourceType:     "ec2",
+		SourceResourceID: ec2TestResource().ID,
+		DefDisplayName:   "Target Groups",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
 			Count:       1,
@@ -632,8 +634,9 @@ func relatedFilterGapModel(t *testing.T, extraKeys ...tea.KeyMsg) tui.Model {
 		},
 	})
 	m, _ = chainApplyMsg(m, messages.RelatedCheckResult{
-		ResourceType:   "ec2",
-		DefDisplayName: "Auto Scaling Groups",
+		ResourceType:     "ec2",
+		SourceResourceID: ec2TestResource().ID,
+		DefDisplayName:   "Auto Scaling Groups",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "asg",
 			Count:       1,

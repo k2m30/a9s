@@ -19,10 +19,10 @@ package unit
 //
 // Test approach:
 //   Seed a lazy-only entry for "test-ge-target" via RelatedCheckResultMsg
-//   (LazyAddedResources path). Then dispatch RelatedCheckStartedMsg with a
-//   checker registered for "test-ge-source" that targets "test-ge-target" with
-//   NeedsTargetCache=true. Capture the ResourceCache the checker receives and
-//   assert IsTruncated=true for the lazy-only entry.
+//   (LazyAddedResources path). Then re-dispatch the related-check fan-out
+//   (Ctrl+R) with a checker registered for "test-ge-source" that targets
+//   "test-ge-target" with NeedsTargetCache=true. Capture the ResourceCache
+//   the checker receives and assert IsTruncated=true for the lazy-only entry.
 
 import (
 	"context"
@@ -96,7 +96,10 @@ func TestBuildResourceCacheSnapshot_LazyOnlyTruncated(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	// Navigate to src detail view so RelatedCheckStartedMsg is handled.
+	// Navigate to src detail view — begins the initial DetailOperation. Its
+	// own related-check cmd is intentionally left undrained (the lazy entry
+	// below hasn't been seeded yet); the assertion drives a SEPARATE,
+	// Ctrl+R-triggered fan-out after seeding.
 	srcRes := resource.Resource{ID: "ge-src-001", Name: "ge-src-001"}
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
@@ -117,21 +120,20 @@ func TestBuildResourceCacheSnapshot_LazyOnlyTruncated(t *testing.T) {
 			Count:       1,
 			ResourceIDs: []string{lazyRes.ID},
 		},
-		Generation: 0,
+		OperationID: 0,
 		LazyAddedResources: map[string][]resource.Resource{
 			targetType: {lazyRes},
 		},
 	})
 
-	// Now dispatch RelatedCheckStartedMsg so the model calls buildResourceCacheSnapshot
-	// and passes it to the registered checker.
-	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
-	})
+	// Ctrl+R re-dispatches the related-check fan-out against the CURRENT
+	// cache state (now including the seeded lazy entry) — the real
+	// re-dispatch entry point now that the fan-out has no standalone
+	// trigger message.
+	_, relCmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 
 	if relCmd == nil {
-		t.Fatal("RelatedCheckStartedMsg should return a cmd for related checkers")
+		t.Fatal("Ctrl+R should return a cmd for related checkers")
 	}
 
 	// Execute the cmd tree to trigger the checker goroutines.
@@ -263,19 +265,17 @@ func TestBuildResourceCacheSnapshot_MergeCase_InheritsResourceCacheTruncated(t *
 			TargetType: targetType,
 			Count:      1,
 		},
-		Generation: 0,
+		OperationID: 0,
 		LazyAddedResources: map[string][]resource.Resource{
 			targetType: {{ID: "ge2-lazy-001", Name: "ge2-lazy-001"}},
 		},
 	})
 
-	// Dispatch RelatedCheckStartedMsg.
-	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
-	})
+	// Ctrl+R re-dispatches the related-check fan-out — the real re-dispatch
+	// entry point now that the fan-out has no standalone trigger message.
+	_, relCmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 	if relCmd == nil {
-		t.Skip("no cmd returned from RelatedCheckStartedMsg")
+		t.Skip("no cmd returned from Ctrl+R")
 	}
 	allMsgs := drainAllMessages(relCmd)
 	for _, msg := range allMsgs {

@@ -131,10 +131,32 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 
 	// messages.RelatedCheckBatch is the headless executor's counterpart to the
 	// per-def RelatedCheckResult messages the TUI fan-out emits. Route each
-	// per-def result through the same Core handler and ApplyDetailRelatedResult
-	// path the TUI uses, so DrainSync populates the detail's RelatedRows.
+	// per-def result through the same fold every RelatedCheckResult uses
+	// below, so DrainSync and the TUI populate the detail's RelatedRows
+	// identically. IsStale checks OperationID against the session's active
+	// DetailOperation (messages.AspectDetailOp) — a batch dispatched under an
+	// operation the session has since moved past (a fresh open or an
+	// explicit refresh bumped DetailOpGen) is dropped whole.
 	if batch, ok := ev.(messages.RelatedCheckBatch); ok && !messages.IsStale(batch, c.core) {
 		c.handleRelatedCheckBatch(batch)
+	}
+
+	// messages.RelatedCheckResult is the TUI's per-def progressive-rendering
+	// counterpart to RelatedCheckBatch — both lanes fold through the same
+	// method, gated by the same OperationID acceptance check.
+	if res, ok := ev.(messages.RelatedCheckResult); ok && !messages.IsStale(res, c.core) {
+		c.foldRelatedCheckResultLocked(res)
+	}
+
+	// messages.EnrichDetailResult delivers a completed on-demand
+	// detail-enrichment result. Accepted only when its OperationID matches
+	// the session's active DetailOperation — Rotate() bumping/clearing that
+	// operation makes every in-flight enrichment result from an earlier
+	// operation unacceptable, the same rule RelatedCheckResult/Batch use.
+	if msg, ok := ev.(messages.EnrichDetailResult); ok && !messages.IsStale(msg, c.core) {
+		foldIntents, foldTasks := c.foldEnrichDetailResultLocked(msg)
+		c.applyIntents(foldIntents)
+		tasks = append(tasks, foldTasks...)
 	}
 
 	// messages.APIError: routed entirely through runtime.Core.HandleEvent
@@ -448,59 +470,54 @@ func (c *Controller) HandleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	c.handleResourcesLoadedEvent(msg)
 }
 
-// handleRelatedCheckBatch routes a RelatedCheckBatch (produced by the headless
-// executor's runRelatedCheckers) into the stacked detail screen that matches
-// the batch's (ResourceType, SourceResourceID). For each per-def result it
-// calls HandleRelatedCheckResult on Core (to update the session RelatedCache
-// and resource/lazy caches) and then ApplyDetailRelatedResult to merge the
-// row into the matching detail's RelatedRows — mirroring the TUI's
-// handleRelatedCheckResult path.
-//
-// The matching detail may not be the topmost screen (e.g. a YAML overlay is
-// on top while the detail is stacked underneath). The search walks the stack
-// from top to bottom and applies to the FIRST matching ScreenDetail.
-//
-// Callers must hold c.mu (write).
+// handleRelatedCheckBatch folds every per-def result in a RelatedCheckBatch
+// (produced by the headless executor's runRelatedCheckers) through
+// foldRelatedCheckResultLocked — the single fold shared with the
+// per-message RelatedCheckResult case in Handle. Callers must hold c.mu
+// (write).
 func (c *Controller) handleRelatedCheckBatch(batch messages.RelatedCheckBatch) {
-	// Find the matching detail screen in the stack.
-	var targetDetail *DetailState
-	for i := len(c.stack) - 1; i >= 0; i-- {
-		s := &c.stack[i]
-		if s.ID != runtime.ScreenDetail {
-			continue
-		}
-		ds := s.State.Detail
-		if ds == nil {
-			continue
-		}
-		if ds.ResourceType != batch.ResourceType || ds.Resource.ID != batch.SourceResourceID {
-			continue
-		}
-		targetDetail = ds
-		break
-	}
-
 	for _, result := range batch.Results {
-		// Route through Core to update session caches (RelatedCache, ResourceCache,
-		// LazyResourceCache) — mirrors handleRelatedCheckResult in the TUI adapter.
-		intents, _ := c.core.HandleRelatedCheckResult(runtime.RelatedCheckResultEvent{
-			ResourceType:     result.ResourceType,
-			SourceResourceID: result.SourceResourceID,
-			DefDisplayName:   result.DefDisplayName,
-			Result:           result.Result,
-		})
-		c.applyIntents(intents)
+		c.foldRelatedCheckResultLocked(result)
+	}
+}
 
-		// Merge the row into the matching (possibly stacked) detail's RelatedRows
-		// using the targetDetail pointer resolved above.
-		if targetDetail == nil {
+// foldRelatedCheckResultLocked applies one related-checker result: it routes
+// the result through Core.HandleRelatedCheckResult to update the session
+// caches (RelatedCache, ResourceCache, LazyResourceCache) and merges the row
+// into the RelatedRows of EVERY stacked detail screen matching
+// (ResourceType, SourceResourceID) — not just the top, since a circular
+// drill (e.g. bucket -> trail -> back to the same bucket) can push a second
+// ScreenDetail for the same resource without popping the first, and a
+// checker in flight can complete after the user has navigated to another
+// detail. Shared by the TUI's per-def RelatedCheckResult messages and the
+// headless executor's RelatedCheckBatch, so the two lanes cannot diverge.
+// Callers must hold c.mu (write) and have already applied the OperationID
+// acceptance check (messages.IsStale) — this method applies unconditionally.
+func (c *Controller) foldRelatedCheckResultLocked(result messages.RelatedCheckResult) {
+	intents, _ := c.core.HandleRelatedCheckResult(runtime.RelatedCheckResultEvent{
+		ResourceType:       result.ResourceType,
+		SourceResourceID:   result.SourceResourceID,
+		DefDisplayName:     result.DefDisplayName,
+		Result:             result.Result,
+		CachedPages:        result.CachedPages,
+		LazyAddedResources: result.LazyAddedResources,
+		LazyAddError:       result.LazyAddError,
+	})
+	c.applyIntents(intents)
+
+	errMsg := ""
+	if result.Result.Err != nil {
+		errMsg = result.Result.Err.Error()
+	}
+	for i := range c.stack {
+		if c.stack[i].ID != runtime.ScreenDetail {
 			continue
 		}
-		errMsg := ""
-		if result.Result.Err != nil {
-			errMsg = result.Result.Err.Error()
+		ds := c.stack[i].State.Detail
+		if ds == nil || ds.ResourceType != result.ResourceType || ds.Resource.ID != result.SourceResourceID {
+			continue
 		}
-		mergeDetailRelatedRow(targetDetail, result.DefDisplayName, result.Result.TargetType,
+		mergeDetailRelatedRow(ds, result.DefDisplayName, result.Result.TargetType,
 			result.Result.EffectiveState(), result.Result.Count, false, errMsg, result.Result.Truncated, result.Result.ResourceIDs, result.Result.FetchFilter)
 	}
 }

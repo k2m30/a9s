@@ -3,11 +3,7 @@
 // runtime_adapter.go is the Bubble Tea adapter glue for the platform-
 // agnostic runtime.Core. It owns:
 //
-//  1. handleEnrichDetail — a Model-receiver wrapper that calls
-//     core.HandleEnrichDetail and translates the returned TaskRequests into
-//     tea.Cmd values.
-//
-//  2. applyIntent — the per-intent applier used by the 6 ported
+//  1. applyIntent — the per-intent applier used by the 6 ported
 //     handlers (HandleFlash / HandleClearFlash / HandleAPIError /
 //     HandleClientsReady / HandleProfileSelected / HandleRegionSelected
 //     adapters in app_flash.go and app_session.go) AND any future
@@ -17,14 +13,13 @@
 //     and returns a single tea.Cmd for intents that need follow-up work,
 //     such as RefreshActiveListIntent.
 //
-//  3. runtimeTasksToCmd / enrichDetailCmd — the TaskRequest-to-tea.Cmd
+//  2. runtimeTasksToCmd / enrichDetailCmd — the TaskRequest-to-tea.Cmd
 //     translator. Tasks carry typed Payload values (runtime.TaskPayload
 //     variants); the adapter type-switches on Payload to recover all
 //     fields without parsing TaskKey.Scope or accepting side-channel
-//     arguments. The closure builder stays in the adapter because it
-//     returns tea.Cmd and reads adapter-owned state (m.appCtx,
-//     m.core.Clients(), the session owned by core's EnrichGen and PolicyDocCache)
-//     that has not yet migrated to the runtime core.
+//     arguments. enrichDetailCmd stays in the adapter because it returns
+//     tea.Cmd and wraps a 10 s per-call timeout Core.ExecuteTask's
+//     KindEnrichDetail path does not apply.
 package tui
 
 import (
@@ -38,34 +33,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
-
-// handleEnrichDetail invokes m.core.HandleEnrichDetail (Core builds the payload's
-// DetailCtx + Generation from session state), applies any returned UIIntents to
-// the view stack, then converts the returned TaskRequests into Bubble Tea
-// commands.
-func (m Model) handleEnrichDetail(msg messages.EnrichDetail) (tea.Model, tea.Cmd) {
-	intents, tasks := m.core.HandleEnrichDetail(runtime.EnrichDetailEvent{
-		ResourceType: msg.ResourceType,
-		Resource:     msg.Resource,
-	})
-	var cmds []tea.Cmd
-	for _, in := range intents {
-		if c := m.applyIntent(in); c != nil {
-			cmds = append(cmds, c)
-		}
-	}
-	if tc := m.runtimeTasksToCmd(tasks); tc != nil {
-		cmds = append(cmds, tc)
-	}
-	switch len(cmds) {
-	case 0:
-		return m, nil
-	case 1:
-		return m, cmds[0]
-	default:
-		return m, tea.Batch(cmds...)
-	}
-}
 
 // applyIntent applies a single runtime UIIntent to the adapter-owned
 // Model state. Returns a tea.Cmd when the intent triggers follow-up
@@ -259,28 +226,26 @@ func (m Model) runtimeTasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 
 // enrichDetailCmd builds the Bubble Tea command that runs the on-demand
 // detail enricher and emits an EnrichDetailResultMsg. It reads every
-// runtime-side input (DetailCtx, Generation) from the typed payload —
-// DetailEnrichmentCtx construction lives on Core; the only adapter-owned input
-// here is m.appCtx (the app-wide cancellation context), wrapped in a 10 s
-// per-call timeout the runtime cannot express because tea.Cmd composition
-// happens here.
+// runtime-side input (DetailCtx, the operation) from the typed payload —
+// DetailEnrichmentCtx construction lives on Core; the only adapter-owned
+// input here is m.appCtx (the app-wide cancellation context), wrapped in a
+// 10 s per-call timeout the runtime cannot express because tea.Cmd
+// composition happens here.
 func (m Model) enrichDetailCmd(p runtime.EnrichDetailPayload) tea.Cmd {
-	enricher := resource.GetDetailEnricher(p.ResourceType)
+	enricher := resource.GetDetailEnricher(p.Op.ResourceType)
 	appCtx := m.appCtx
 	dctx := p.DetailCtx
-	gen := p.Generation
-	res := p.Resource
-	resourceType := p.ResourceType
+	op := p.Op
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(appCtx, 10*time.Second)
 		defer cancel()
-		enriched, err := enricher(ctx, dctx, res)
+		enriched, err := enricher(ctx, dctx, op.Resource)
 		return messages.EnrichDetailResult{
-			ResourceType: resourceType,
-			ResourceID:   res.ID,
+			ResourceType: op.ResourceType,
+			ResourceID:   op.Resource.ID,
 			EnrichedRes:  enriched,
 			Err:          err,
-			Generation:   gen,
+			OperationID:  op.ID,
 		}
 	}
 }

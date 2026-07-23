@@ -37,11 +37,10 @@ func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskReques
 	var tasks []runtime.TaskRequest
 	if ds := c.topDetailState(); ds != nil {
 		if len(resource.GetRelated(ds.ResourceType)) > 0 {
-			tasks = append(tasks, runtime.TaskRequest{
-				Key:     runtime.TaskKey{Kind: runtime.KindRelatedCheck, Scope: ds.ResourceType + "/" + ds.Resource.ID},
-				Cache:   runtime.CacheNone,
-				Payload: runtime.RelatedCheckPayload{ResourceType: ds.ResourceType, Resource: ds.Resource},
-			})
+			op := c.core.BeginDetailOperation(ds.ResourceType, ds.Resource, false)
+			if _, relatedTask := c.core.DetailOperationTasks(op); relatedTask != nil {
+				tasks = append(tasks, *relatedTask)
+			}
 		}
 	}
 	return c.snapshot(), tasks
@@ -287,11 +286,10 @@ func (c *Controller) handleActionSelect(_ Action) (ViewState, []runtime.TaskRequ
 			if resource.RelatedEnter(focusedRow.State, focusedRow.Count, focusedRow.Truncated) == resource.RelatedEnterResolveInPlace {
 				var tasks []runtime.TaskRequest
 				if len(resource.GetRelated(ds.ResourceType)) > 0 {
-					tasks = append(tasks, runtime.TaskRequest{
-						Key:     runtime.TaskKey{Kind: runtime.KindRelatedCheck, Scope: ds.ResourceType + "/" + ds.Resource.ID},
-						Cache:   runtime.CacheNone,
-						Payload: runtime.RelatedCheckPayload{ResourceType: ds.ResourceType, Resource: ds.Resource},
-					})
+					op := c.core.BeginDetailOperation(ds.ResourceType, ds.Resource, false)
+					if _, relatedTask := c.core.DetailOperationTasks(op); relatedTask != nil {
+						tasks = append(tasks, *relatedTask)
+					}
 				}
 				return c.snapshot(), tasks
 			}
@@ -517,11 +515,10 @@ func (c *Controller) handleActionRelatedSelect(a Action) (ViewState, []runtime.T
 	if resource.RelatedEnter(targetRow.State, targetRow.Count, targetRow.Truncated) == resource.RelatedEnterResolveInPlace {
 		var tasks []runtime.TaskRequest
 		if len(resource.GetRelated(ds.ResourceType)) > 0 {
-			tasks = append(tasks, runtime.TaskRequest{
-				Key:     runtime.TaskKey{Kind: runtime.KindRelatedCheck, Scope: ds.ResourceType + "/" + ds.Resource.ID},
-				Cache:   runtime.CacheNone,
-				Payload: runtime.RelatedCheckPayload{ResourceType: ds.ResourceType, Resource: ds.Resource},
-			})
+			op := c.core.BeginDetailOperation(ds.ResourceType, ds.Resource, false)
+			if _, relatedTask := c.core.DetailOperationTasks(op); relatedTask != nil {
+				tasks = append(tasks, *relatedTask)
+			}
 		}
 		return c.snapshot(), tasks
 	}

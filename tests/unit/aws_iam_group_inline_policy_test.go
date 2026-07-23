@@ -84,7 +84,10 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 
 	targetGroup := loaded.Resources[targetIdx]
 
-	// Open detail — triggers related-check commands.
+	// Open detail — the enrich + related-check tasks dispatch directly as
+	// a (possibly nested) tea.Batch off this one cmd; RunRelatedDef already
+	// recovers per-checker panics into a RelatedCheckResult carrying
+	// LazyAddError, so no extra recovery wrapper is needed here.
 	var relatedCmd tea.Cmd
 	*m, relatedCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetDetail,
@@ -96,45 +99,9 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 			"are RelatedDefs registered for iam-group?", groupName)
 	}
 
-	// Execute to get RelatedCheckStartedMsg.
-	relatedMsg := relatedCmd()
-	started, ok := relatedMsg.(messages.RelatedCheckStarted)
-	if !ok {
-		t.Fatalf("expected RelatedCheckStartedMsg after detail nav, got %T", relatedMsg)
-	}
-
-	// Dispatch so checkers run.
-	var checkCmds tea.Cmd
-	*m, checkCmds = rootApplyMsg(*m, started)
-	if checkCmds == nil {
-		t.Fatalf("handleRelatedCheckStarted returned nil cmd for group %q", groupName)
-	}
-
-	// Execute checker batch; recover from panics on unrelated checkers.
-	runChecker := func(c tea.Cmd) (msg tea.Msg) {
-		defer func() {
-			if r := recover(); r != nil {
-				msg = nil
-			}
-		}()
-		return c()
-	}
-
-	rawCheck := runChecker(checkCmds)
-	switch v := rawCheck.(type) {
-	case messages.RelatedCheckResult:
-		if v.Result.TargetType == "policy" {
-			return v
-		}
-	case tea.BatchMsg:
-		for _, subCmd := range v {
-			if subCmd == nil {
-				continue
-			}
-			sub := runChecker(subCmd)
-			if r, ok2 := sub.(messages.RelatedCheckResult); ok2 && r.Result.TargetType == "policy" {
-				return r
-			}
+	for _, leaf := range extractLeafMsgs(relatedCmd) {
+		if r, ok := leaf.(messages.RelatedCheckResult); ok && r.Result.TargetType == "policy" {
+			return r
 		}
 	}
 
@@ -551,69 +518,17 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 			"are RelatedDefs/Enrichers registered for policy?")
 	}
 
-	// The returned cmd may be a batch (enrichment + related check).
-	// Drain it to find the RelatedCheckStartedMsg.
-	batchMsg := batchCmd()
-	var started messages.RelatedCheckStarted
-	switch msg := batchMsg.(type) {
-	case messages.RelatedCheckStarted:
-		started = msg
-	case tea.BatchMsg:
-		found := false
-		for _, sub := range msg {
-			if sub == nil {
-				continue
-			}
-			subMsg := sub()
-			if s, ok := subMsg.(messages.RelatedCheckStarted); ok {
-				started = s
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatal("batch did not contain RelatedCheckStartedMsg")
-		}
-	default:
-		t.Fatalf("expected RelatedCheckStartedMsg or BatchMsg, got %T", batchMsg)
-	}
-
-	var checkCmds tea.Cmd
-	*m, checkCmds = rootApplyMsg(*m, started)
-	if checkCmds == nil {
-		t.Fatal("handleRelatedCheckStarted returned nil cmd for inline policy")
-	}
-
-	runChecker := func(c tea.Cmd) (msg tea.Msg) {
-		defer func() {
-			if r := recover(); r != nil {
-				msg = nil
-			}
-		}()
-		return c()
-	}
-
+	// The enrich + related-check tasks dispatch directly off batchCmd as a
+	// (possibly nested) tea.Batch; RunRelatedDef already recovers
+	// per-checker panics into a RelatedCheckResult carrying LazyAddError,
+	// so no extra recovery wrapper is needed here.
 	var groupResult messages.RelatedCheckResult
 	var found bool
-
-	rawCheck := runChecker(checkCmds)
-	switch v := rawCheck.(type) {
-	case messages.RelatedCheckResult:
-		if v.Result.TargetType == "iam-group" {
-			groupResult = v
+	for _, leaf := range extractLeafMsgs(batchCmd) {
+		if r, ok := leaf.(messages.RelatedCheckResult); ok && r.Result.TargetType == "iam-group" {
+			groupResult = r
 			found = true
-		}
-	case tea.BatchMsg:
-		for _, subCmd := range v {
-			if subCmd == nil {
-				continue
-			}
-			sub := runChecker(subCmd)
-			if r, ok2 := sub.(messages.RelatedCheckResult); ok2 && r.Result.TargetType == "iam-group" {
-				groupResult = r
-				found = true
-				break
-			}
+			break
 		}
 	}
 

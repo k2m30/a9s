@@ -88,9 +88,10 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 	})
 
 	srcRes := resource.Resource{ID: "src-la010-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)
@@ -181,9 +182,10 @@ func Test_LA_011_AllOutOfScopePopulatesDrill(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-la011-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)
@@ -259,9 +261,10 @@ func Test_LA_012_AllInScopeNoLazyAdd(t *testing.T) {
 	})
 
 	srcRes := resource.Resource{ID: "src-la012-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)
@@ -349,9 +352,10 @@ func Test_LA_015_ARNvsBareNameTolerance(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-la015-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)
@@ -432,9 +436,10 @@ func Test_LA_016_UUIDvsAliasDisplay(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-la016-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)
@@ -523,9 +528,10 @@ func Test_LA_070_100IDsDrillWithoutTimeout(t *testing.T) {
 
 	done := make(chan messages.RelatedCheckResult, 1)
 	go func() {
-		_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-			ResourceType:   srcType,
-			SourceResource: srcRes,
+		_, batchCmd := rootApplyMsg(m, messages.Navigate{
+			Target:       messages.TargetDetail,
+			ResourceType: srcType,
+			Resource:     &srcRes,
 		})
 		resultMsg, found := collectRelatedResult(t, batchCmd)
 		if found {
@@ -628,9 +634,10 @@ func Test_LA_071_MalformedIDsFiltered(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-la071-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 
 	_, found := collectRelatedResult(t, batchCmd)
@@ -715,9 +722,10 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 
 	// --- First drill: checker emits id1, id2 ---
 	var batchCmd tea.Cmd
-	m, batchCmd = rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	m, batchCmd = rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 
 	firstResult, found := collectRelatedResult(t, batchCmd)
@@ -741,10 +749,11 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 	// --- Second drill: checker now emits id1, id2, id3 (superset) ---
 	checkerIDs = []string{id1, id2, id3}
 
-	_, batchCmd = rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
-	})
+	// A plain re-navigate would hit replayRelatedCache's cache-hit suppression
+	// (D6: no re-fan-out over cached data) and never invoke the checker again,
+	// so Ctrl+R (the only unconditional re-dispatch entry point) drives the
+	// second, genuinely fresh drill.
+	_, batchCmd = rootApplyMsg(m, ctrlR())
 
 	secondResult, found := collectRelatedResult(t, batchCmd)
 	if !found {

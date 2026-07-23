@@ -246,35 +246,33 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}, nil
 
 	// --- related-check fan-out ---
-	// Renderer-neutral coupling resolved: cache-key set from c.ResourceCacheKeys(),
-	// snapshot from c.SnapshotCache() — no m.stack[0] read needed.
-	// The executor runs checkers sequentially (no goroutine fan-out); the TUI
-	// adapter's relatedCheckCmd continues to use its concurrent fan-out with
-	// semaphore and lazy-add for the live renderer.
+	// Bounded concurrent fan-out (MaxConcurrentProbes) over RunRelatedDef —
+	// the exact per-def logic the TUI's own fan-out uses
+	// (internal/tui/runtime_adapter_related.go), so the two lanes can never
+	// diverge on timeout, panic recovery, NeedsTargetCache prefetch, or
+	// lazy-add behavior.
 	case KindRelatedCheck:
 		p, ok := req.Payload.(RelatedCheckPayload)
 		if !ok {
-			// No payload means this task was dispatched without a source resource
-			// (e.g. from HandleRelatedCheckStarted in the TUI path). The headless
-			// executor cannot invoke checkers without the resource; skip gracefully.
 			return nil, nil
 		}
-		resourceType := p.ResourceType
+		op := p.Op
+		resourceType := op.ResourceType
 		if resourceType == "" {
 			resourceType, _ = splitScope(req.Key.Scope)
+			op.ResourceType = resourceType
 		}
 		defs := resource.GetRelated(resourceType)
 		if len(defs) == 0 {
 			return nil, nil
 		}
-		cacheSnap := c.SnapshotCache()
+		cacheSnap := c.BuildResourceCacheSnapshot()
 		fetchKeys := c.FetchOriginCacheKeys()
 		mainCacheKeys := make(map[string]struct{}, len(fetchKeys))
 		for _, k := range fetchKeys {
 			mainCacheKeys[k] = struct{}{}
 		}
-		gen := c.RelatedGen()
-		return c.runRelatedCheckers(ctx, cacheSnap, mainCacheKeys, defs, p.Resource, resourceType, gen), nil
+		return c.runRelatedCheckers(ctx, op, cacheSnap, mainCacheKeys, defs), nil
 
 	// --- enrich detail ---
 	case KindEnrichDetail:
@@ -282,20 +280,20 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		if !ok {
 			return nil, fmt.Errorf("ExecuteTask %s: missing EnrichDetailPayload", req.Key.Kind)
 		}
-		enricher := resource.GetDetailEnricher(p.ResourceType)
+		enricher := resource.GetDetailEnricher(p.Op.ResourceType)
 		if enricher == nil {
-			return nil, fmt.Errorf("ExecuteTask %s: no detail enricher for %s", req.Key.Kind, p.ResourceType)
+			return nil, fmt.Errorf("ExecuteTask %s: no detail enricher for %s", req.Key.Kind, p.Op.ResourceType)
 		}
 		if p.DetailCtx == nil {
 			return nil, fmt.Errorf("ExecuteTask %s: nil DetailCtx", req.Key.Kind)
 		}
-		enriched, err := enricher(ctx, p.DetailCtx, p.Resource)
+		enriched, err := enricher(ctx, p.DetailCtx, p.Op.Resource)
 		return messages.EnrichDetailResult{
-			ResourceType: p.ResourceType,
-			ResourceID:   p.Resource.ID,
+			ResourceType: p.Op.ResourceType,
+			ResourceID:   p.Op.Resource.ID,
 			EnrichedRes:  enriched,
 			Err:          err,
-			Generation:   p.Generation,
+			OperationID:  p.Op.ID,
 		}, nil
 
 	// --- fetch resources (top-level) ---
@@ -704,103 +702,146 @@ func cacheStoreToEvent(store *cache.Store) messages.AvailabilityCacheLoaded {
 	}
 }
 
-// runRelatedCheckers runs all RelatedDef checkers for res sequentially,
-// mirroring the TUI adapter's relatedCheckCmd fan-out logic (same
-// NeedsTargetCache handling, same self-pivot-zero suppression, same
-// result shape). Returns a RelatedCheckBatch carrying one entry per def.
-//
-// Differences from the TUI path (intentional):
-//   - Sequential, not concurrent: the headless executor has no goroutine
-//     budget or semaphore — DrainSync is synchronous by design.
-//   - No lazy-add (FetchByIDs): the lazy-add path enriches the resource cache
-//     for navigation UX (so clicking a related row finds the resource). In the
-//     headless path the cache is not used for navigation, so the extra AWS
-//     call is omitted for now. The per-def result still carries ResourceIDs
-//     so callers can use them if needed.
-//   - Returns a single RelatedCheckBatch instead of N individual
-//     RelatedCheckResult messages so DrainSync can route all results in one
-//     Handle call.
-//
-// snap and mainCacheKeys must be pre-built by the caller via c.SnapshotCache()
-// and c.ResourceCacheKeys() — no renderer state is read here.
+// runRelatedCheckers runs every registered RelatedDef checker for op
+// concurrently, bounded by MaxConcurrentProbes, via RunRelatedDef — the same
+// per-def logic the TUI's own fan-out uses. Returns a RelatedCheckBatch
+// carrying one entry per def; results is written by index (never appended),
+// so concurrent completion order never reorders the returned slice.
 func (c *Core) runRelatedCheckers(
 	ctx context.Context,
-	snap map[string][]resource.Resource,
+	op DetailOperation,
+	cacheSnap resource.ResourceCache,
 	mainCacheKeys map[string]struct{},
 	defs []resource.RelatedDef,
-	res resource.Resource,
-	resourceType string,
-	gen domain.Gen,
-) messages.Event {
-	results := make([]messages.RelatedCheckResult, 0, len(defs))
-
-	for _, def := range defs {
-		localSnap := snap
-
-		if def.NeedsTargetCache {
-			if _, inMain := mainCacheKeys[def.TargetType]; !inMain {
-				if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
-					// E5 partial success: rows may arrive alongside a
-					// composite error (listed-but-denied resources). Seed
-					// whatever rows came — a partially-visible target cache
-					// beats an unknown "?" row.
-					if fr, err := pf(ctx, c.session.Clients, ""); err == nil || len(fr.Resources) > 0 {
-						enriched := make(map[string][]resource.Resource, len(localSnap)+1)
-						maps.Copy(enriched, localSnap)
-						enriched[def.TargetType] = fr.Resources
-						localSnap = enriched
-					}
-				}
-			}
-		}
-
-		var checkResult resource.RelatedCheckResult
-		if def.Checker == nil {
-			// No checker: unknown state so the row shows "?" not 0.
-			checkResult = resource.UnknownRelated(def.TargetType)
-		} else {
-			checkResult = def.Checker(ctx, c.session.Clients, res, resource.ResourceCache(localSnapToCache(localSnap)))
-			checkResult.TargetType = def.TargetType
-		}
-
-		// Self-pivot-zero: when the checker reports 0 and the target type is
-		// the same as the source type, the row is meaningless (a resource
-		// cannot be its own related resource). Mirror the TUI adapter's guard.
-		if checkResult.Count == 0 && def.TargetType == resourceType {
-			checkResult.Count = 0 // stays zero — ApplyDetailRelatedResult will render it; isSelfPivotZero hides it in the UI
-		}
-
-		results = append(results, messages.RelatedCheckResult{
-			ResourceType:     resourceType,
-			SourceResourceID: res.ID,
-			DefDisplayName:   def.DisplayName,
-			Result:           checkResult,
-			Generation:       gen,
-		})
+) messages.RelatedCheckBatch {
+	results := make([]messages.RelatedCheckResult, len(defs))
+	sem := make(chan struct{}, MaxConcurrentProbes)
+	var wg sync.WaitGroup
+	for i, def := range defs {
+		wg.Add(1)
+		go func(i int, def resource.RelatedDef) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			results[i] = RunRelatedDef(ctx, op, cacheSnap, mainCacheKeys, def)
+		}(i, def)
 	}
+	wg.Wait()
 
-	if len(results) == 0 {
-		return nil
-	}
 	return messages.RelatedCheckBatch{
-		ResourceType:     resourceType,
-		SourceResourceID: res.ID,
+		ResourceType:     op.ResourceType,
+		SourceResourceID: op.Resource.ID,
 		Results:          results,
-		Generation:       gen,
+		OperationID:      op.ID,
 	}
 }
 
-// localSnapToCache converts the flat snap map (type→[]Resource) used by the
-// executor into the ResourceCache map type the RelatedChecker signature expects.
-func localSnapToCache(snap map[string][]resource.Resource) map[string]resource.ResourceCacheEntry {
-	if len(snap) == 0 {
-		return nil
+// RunRelatedDef runs one RelatedDef's checker for op.Resource and returns
+// the per-def result stamped with op.ID. Shared by both renderer lanes: the
+// TUI's per-def tea.Cmd fan-out (internal/tui/runtime_adapter_related.go,
+// progressive rendering — scheduling stays a renderer concern) and this
+// file's runRelatedCheckers (bounded concurrent fan-out) call this exact
+// function, so a checker's NeedsTargetCache prefetch, timeout, panic
+// recovery, and lazy-add behavior can never diverge between them.
+//
+// ctx is wrapped with awsclient.WithDetailOp(ctx, op.ID) once here so every
+// AWS call this def's checker (and any NeedsTargetCache prefetch or
+// lazy-add FetchByIDs call) makes shares one coalescing namespace scoped to
+// this operation (core/aws/coalesce.go) — an operation's enricher and every
+// one of its related checkers coalesce concurrent identical calls with each
+// other; a later operation (fresh open or refresh) can never join them.
+func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.ResourceCache, mainCacheKeys map[string]struct{}, def resource.RelatedDef) (result messages.RelatedCheckResult) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = messages.RelatedCheckResult{
+				ResourceType:     op.ResourceType,
+				SourceResourceID: op.Resource.ID,
+				DefDisplayName:   def.DisplayName,
+				Result:           resource.UnknownRelated(def.TargetType),
+				OperationID:      op.ID,
+				LazyAddError:     fmt.Errorf("related checker for %s panicked: %v", def.TargetType, r),
+			}
+		}
+	}()
+
+	if def.Checker == nil {
+		// No checker: unknown state so the row shows "?" not 0.
+		return messages.RelatedCheckResult{
+			ResourceType:     op.ResourceType,
+			SourceResourceID: op.Resource.ID,
+			DefDisplayName:   def.DisplayName,
+			Result:           resource.UnknownRelated(def.TargetType),
+			OperationID:      op.ID,
+		}
 	}
-	out := make(map[string]resource.ResourceCacheEntry, len(snap))
-	for k, v := range snap {
-		out[k] = resource.ResourceCacheEntry{Resources: v}
+
+	checkCtx, cancel := context.WithTimeout(awsclient.WithDetailOp(ctx, op.ID), RelatedCheckerTimeout)
+	defer cancel()
+
+	localCache := cacheSnap
+	var cachedPages map[string]resource.ResourceCacheEntry
+	if def.NeedsTargetCache {
+		if _, inMain := mainCacheKeys[def.TargetType]; !inMain {
+			if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
+				// E5 partial success: rows may arrive alongside a composite
+				// error (listed-but-denied resources). Seed whatever rows
+				// came — a partially-visible target cache beats an unknown
+				// "?" row.
+				if fr, err := pf(checkCtx, op.Clients, ""); err == nil || len(fr.Resources) > 0 {
+					isTrunc := fr.Pagination != nil && fr.Pagination.IsTruncated
+					if prev, hasPrev := localCache[def.TargetType]; hasPrev && prev.IsTruncated {
+						isTrunc = true
+					}
+					entry := resource.ResourceCacheEntry{
+						Resources:   fr.Resources,
+						IsTruncated: isTrunc,
+						Pagination:  fr.Pagination,
+					}
+					enriched := make(resource.ResourceCache, len(localCache)+1)
+					maps.Copy(enriched, localCache)
+					enriched[def.TargetType] = entry
+					localCache = enriched
+					cachedPages = map[string]resource.ResourceCacheEntry{def.TargetType: entry}
+				}
+			}
+		}
 	}
-	return out
+
+	checkResult := def.Checker(checkCtx, op.Clients, op.Resource, localCache)
+	checkResult.TargetType = def.TargetType
+
+	var lazyAdded map[string][]resource.Resource
+	var lazyAddError error
+	// CloudTrail-event pivots are event-derived: the ids come straight from
+	// the event body, so the count needs no fetch. Skip the eager prefetch —
+	// the drill fetches on demand (KindFetchByIDDetail) — so a cross-account
+	// target (an AssumeRole role in another account) does not surface a
+	// "FetchByIDs failed" header error at detail open.
+	if op.Resource.Type != "ct-events" && len(checkResult.ResourceIDs) > 0 {
+		if ff := resource.GetFetchByIDs(def.TargetType); ff != nil {
+			missing := MissingFromCache(localCache, def.TargetType, checkResult.ResourceIDs)
+			if len(missing) > 0 {
+				extra, fetchErr := ff(checkCtx, op.Clients, missing)
+				if fetchErr != nil {
+					lazyAddError = fetchErr
+				}
+				if len(extra) > 0 {
+					lazyAdded = map[string][]resource.Resource{def.TargetType: extra}
+				}
+			}
+		}
+	}
+
+	return messages.RelatedCheckResult{
+		ResourceType:       op.ResourceType,
+		SourceResourceID:   op.Resource.ID,
+		DefDisplayName:     def.DisplayName,
+		Result:             checkResult,
+		OperationID:        op.ID,
+		CachedPages:        cachedPages,
+		LazyAddedResources: lazyAdded,
+		LazyAddError:       lazyAddError,
+	}
 }
 
 // splitScope splits a "type/id" TaskKey.Scope into its two components.

@@ -117,22 +117,21 @@ func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 			Count:       1,
 			ResourceIDs: []string{lazyRes.ID},
 		},
-		Generation: 0,
+		OperationID: 0,
 		LazyAddedResources: map[string][]resource.Resource{
 			targetType: {lazyRes},
 		},
 	})
 
-	// Dispatch RelatedCheckStartedMsg — this triggers the checker goroutine.
-	// In the goroutine, NeedsTargetCache=true checks mainCacheKeys (resourceCache
-	// keys, NOT snapshot keys). Since targetType is lazy-only, it must trigger prefetch.
-	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
-	})
+	// Ctrl+R re-dispatches the related-check fan-out — the real re-dispatch
+	// entry point now that the fan-out has no standalone trigger message. In
+	// the resulting checker call, NeedsTargetCache=true checks mainCacheKeys
+	// (resourceCache keys, NOT snapshot keys). Since targetType is lazy-only,
+	// it must trigger prefetch.
+	_, relCmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 
 	if relCmd == nil {
-		t.Skip("RelatedCheckStartedMsg returned nil cmd — no checker dispatched")
+		t.Skip("Ctrl+R returned nil cmd — no checker dispatched")
 	}
 
 	// Execute the cmd tree to run the checker goroutines.
@@ -256,7 +255,7 @@ func TestLazyFastPath_RequiresAllIDs(t *testing.T) {
 			Count:       2,
 			ResourceIDs: []string{"gg-k1", "gg-k2"},
 		},
-		Generation: 0,
+		OperationID: 0,
 		LazyAddedResources: map[string][]resource.Resource{
 			targetType: {k1Res}, // only k1, k2 is missing
 		},

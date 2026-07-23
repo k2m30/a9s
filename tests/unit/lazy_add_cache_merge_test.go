@@ -78,41 +78,20 @@ func efsCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// execRelatedCheckerResult feeds a RelatedCheckStartedMsg for the given
-// resourceType to the model and synchronously collects the ResultMsg for
-// the given targetType.
+// execRelatedCheckerResult presses Ctrl+R on the already-open detail screen
+// for resourceType/source — the real re-dispatch entry point now that the
+// fan-out has no standalone trigger message — and synchronously collects
+// the RelatedCheckResult for the given targetType from the resulting
+// (possibly nested) tea.Batch.
 func execRelatedCheckerResult(t *testing.T, m tui.Model, resourceType string, source resource.Resource, targetType string) (resource.RelatedCheckResult, bool) {
 	t.Helper()
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   resourceType,
-		SourceResource: source,
-	})
-	if batchCmd == nil {
-		t.Fatalf("handleRelatedCheckStarted returned nil cmd for resource type %q", resourceType)
+	_, refreshCmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
+	if refreshCmd == nil {
+		t.Fatalf("Ctrl+R returned nil cmd for resource type %q", resourceType)
 	}
 
-	rawMsg := batchCmd()
-	if rawMsg == nil {
-		return resource.UnknownRelated(targetType), false
-	}
-
-	batchMsg, ok := rawMsg.(tea.BatchMsg)
-	if !ok {
-		if r, ok2 := rawMsg.(messages.RelatedCheckResult); ok2 && r.Result.TargetType == targetType {
-			return r.Result, true
-		}
-		return resource.UnknownRelated(targetType), false
-	}
-
-	for _, cmd := range batchMsg {
-		if cmd == nil {
-			continue
-		}
-		msg := cmd()
-		if msg == nil {
-			continue
-		}
-		if r, ok2 := msg.(messages.RelatedCheckResult); ok2 && r.Result.TargetType == targetType {
+	for _, leaf := range extractLeafMsgs(refreshCmd) {
+		if r, ok := leaf.(messages.RelatedCheckResult); ok && r.Result.TargetType == targetType {
 			return r.Result, true
 		}
 	}
@@ -444,7 +423,7 @@ func TestCachedPages_DoesNotOverwriteExistingEntry(t *testing.T) {
 		},
 	})
 
-	got, found := execRelatedCheckAndCollectTGResult(t, m, firstInstance)
+	got, found := execRelatedCheckAndCollectTGResult(t, m)
 	if !found {
 		t.Fatal("TG-related checker did not produce a RelatedCheckResultMsg")
 	}

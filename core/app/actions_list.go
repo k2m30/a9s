@@ -3,7 +3,6 @@
 package app
 
 import (
-	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
@@ -173,19 +172,29 @@ func (c *Controller) handleActionRefresh(_ Action) (ViewState, []runtime.TaskReq
 		tasks := c.forceRefreshCostsLocked()
 		return c.snapshot(), tasks
 	}
-	// Detail view: re-dispatch enrich + related.
+	// Detail view: begin a fresh (refresh=true) DetailOperation and
+	// re-dispatch enrich + related under it. The TUI reaches this same
+	// branch via ctrl.Apply(ActionRefresh)
+	// (internal/tui/runtime_adapter_navigate.go's handleRefresh), so both
+	// lanes share one refresh-dispatch policy.
 	if ds := c.topDetailState(); ds != nil {
 		rt := ds.ResourceType
 		srcRes := ds.Resource
+		c.resetDetailRelatedRowsLocked(rt)
+		// The RelatedCacheLRU entry is append-only (PatchRelatedCache never
+		// overwrites) — without clearing it here, every refresh would pile a
+		// duplicate per-def entry onto it, so a later cache-hit replay
+		// (ReplayRelatedCache) would merge stale rows behind the fresh ones.
+		c.core.RelatedCacheDelete(runtime.RelatedCacheKey(rt, srcRes.ID))
+		op := c.core.BeginDetailOperation(rt, srcRes, true)
+		enrichTask, relatedTask := c.core.DetailOperationTasks(op)
 		var tasks []runtime.TaskRequest
-		if resource.HasDetailEnricher(rt) {
-			tasks = append(tasks, runtime.TaskRequest{
-				Key: runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: rt},
-			})
+		if relatedTask != nil {
+			tasks = append(tasks, *relatedTask)
 		}
-		// Emit the enrich detail task so the executor re-runs enrichment.
-		// The related-check task is emitted separately via Handle(RelatedCheckStarted).
-		_ = srcRes
+		if enrichTask != nil {
+			tasks = append(tasks, *enrichTask)
+		}
 		return c.snapshot(), tasks
 	}
 	// List view: delete cache and re-fetch.

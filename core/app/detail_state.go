@@ -9,6 +9,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
 // topDetailState returns the DetailState of the top-of-stack screen when the
@@ -215,16 +216,22 @@ func (c *Controller) clearDetailFindingsForType(resourceType string) {
 func (c *Controller) ApplyDetailEnrichmentForResource(resourceType, resourceID string, enriched resource.Resource, f *domain.Finding, ad *domain.AttentionDetail) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.applyDetailEnrichmentForResourceLocked(resourceType, resourceID, enriched, f, ad)
+}
+
+// applyDetailEnrichmentForResourceLocked is the lock-free implementation of
+// ApplyDetailEnrichmentForResource, shared with foldEnrichDetailResultLocked
+// (both already run under c.mu). Callers must hold c.mu (write).
+func (c *Controller) applyDetailEnrichmentForResourceLocked(resourceType, resourceID string, enriched resource.Resource, f *domain.Finding, ad *domain.AttentionDetail) {
 	// Universal rule 7 / S5: every issue-severity finding the enricher found
 	// must reach ds.Findings, not just the caller-folded (f, ad) pair —
-	// primaryWave2Finding (internal/tui/app_enrich_fold.go) only recognizes
-	// "wave2:"-sourced findings and folds them to a single worst-severity
-	// one, so a wave1-sourced finding set an on-demand DetailEnrich computes
-	// (e.g. transfer_children.go's cert-expiry checks) would otherwise never
-	// reach an already-open detail. applyFindingToState already re-tags every
-	// non-"wave2:" finding as "wave2:controller" before appending, and sorts
-	// Broken before Warning when the Attention block renders — both reused
-	// unchanged here.
+	// primaryWave2Finding only recognizes "wave2:"-sourced findings and folds
+	// them to a single worst-severity one, so a wave1-sourced finding set an
+	// on-demand DetailEnrich computes (e.g. transfer_children.go's
+	// cert-expiry checks) would otherwise never reach an already-open
+	// detail. applyFindingToState already re-tags every non-"wave2:" finding
+	// as "wave2:controller" before appending, and sorts Broken before
+	// Warning when the Attention block renders — both reused unchanged here.
 	fallbackFindings := singleFindingSlice(f)
 	attentionDetails := singleAttentionDetailMap(f, ad)
 	if len(enriched.AttentionDetails) > 0 {
@@ -252,6 +259,103 @@ func (c *Controller) ApplyDetailEnrichmentForResource(resourceType, resourceID s
 		ds.Resource = enriched
 		c.applyFindingToState(ds, findings, attentionDetails)
 	}
+}
+
+// primaryWave2Finding extracts the WORST-severity wave2 Finding (and its
+// companion AttentionDetail, if present) from r.Findings / r.AttentionDetails
+// for wiring into applyDetailEnrichmentForResourceLocked, whose signature
+// carries exactly one Finding + one AttentionDetail. Both return values are
+// nil when no wave2 finding is present (detail view shows no Attention
+// section).
+//
+// This duplicates internal/tui/app_enrich_fold.go's identical helper rather
+// than sharing it: core/app cannot import internal/tui (wrong layering
+// direction — the TUI adapter imports core/app, not the reverse). Both
+// copies must stay in sync if this logic ever changes.
+func primaryWave2Finding(r resource.Resource) (*domain.Finding, *domain.AttentionDetail) {
+	var wave2 []domain.Finding
+	for _, f := range r.Findings {
+		if strings.HasPrefix(f.Source, "wave2:") {
+			wave2 = append(wave2, f)
+		}
+	}
+	if len(wave2) == 0 {
+		return nil, nil
+	}
+	finding := domain.WorstSeverityFinding(wave2)
+	var ad *domain.AttentionDetail
+	if r.AttentionDetails != nil {
+		if got, ok := r.AttentionDetails[finding.Code]; ok && len(got.Rows) > 0 {
+			adVal := got
+			ad = &adVal
+		}
+	}
+	return &finding, ad
+}
+
+// FoldEnrichDetailResult folds a completed on-demand detail-enrichment
+// result into detail state. Callers must have already applied the
+// OperationID acceptance check (messages.IsStale(msg, core) against
+// messages.AspectDetailOp) — this method applies unconditionally, mirroring
+// every other GenStamped case in handle.go.
+//
+// Calls Core.HandleEnrichDetailResult for the intents/tasks (a FlashIntent on
+// error, nothing on success) and, only on success, folds the enriched
+// resource + its worst-severity wave2 finding into every matching stacked
+// detail screen (applyDetailEnrichmentForResourceLocked). On error, returns
+// without touching detail state — a half-populated EnrichedRes must never
+// reach the detail merge.
+//
+// Also regenerates an open YAML/JSON text screen for this resource
+// (regenerateTextScreenLocked) using the same neutral (uncolored)
+// resourceYAMLLines/resourceJSONLines helpers navigate.go's PushYAML/PushJSON
+// branches use — the web/headless lane's own single source of text-viewer
+// content, independent of the TUI's syntax-colored regeneration.
+//
+// Callers must hold c.mu (write).
+func (c *Controller) foldEnrichDetailResultLocked(msg messages.EnrichDetailResult) ([]runtime.UIIntent, []runtime.TaskRequest) {
+	intents, tasks := c.core.HandleEnrichDetailResult(runtime.EnrichDetailResultEvent{
+		ResourceType: msg.ResourceType,
+		Err:          msg.Err,
+	})
+	if msg.Err != nil {
+		return intents, tasks
+	}
+	ef, ad := primaryWave2Finding(msg.EnrichedRes)
+	c.applyDetailEnrichmentForResourceLocked(msg.ResourceType, msg.ResourceID, msg.EnrichedRes, ef, ad)
+	c.regenerateTextScreenLocked(msg.ResourceType, msg.ResourceID, msg.EnrichedRes)
+	return intents, tasks
+}
+
+// regenerateTextScreenLocked replaces the top text screen's (YAML/JSON)
+// Lines and Resource with content regenerated from the enriched resource,
+// when the top screen is a text viewer whose ScreenContext matches
+// (resourceType, resourceID). No-op otherwise (wrong screen, wrong resource,
+// or TextState not yet initialized).
+//
+// Only Lines and Resource are touched — Search/SearchCursor/Wrap/ScrollY are
+// left untouched, exactly like UpdateTextLines/SetTextResource, so an
+// enrichment landing mid-search or mid-scroll does not reset either.
+//
+// Callers must hold c.mu (write).
+func (c *Controller) regenerateTextScreenLocked(resourceType, resourceID string, enriched resource.Resource) {
+	ts := c.topTextState()
+	if ts == nil {
+		return
+	}
+	top := c.stack[len(c.stack)-1]
+	if top.Ctx.ResourceType != resourceType || top.Ctx.ResourceID != resourceID {
+		return
+	}
+	switch top.ID {
+	case runtime.ScreenYAML:
+		ts.Lines = resourceYAMLLines(enriched)
+	case runtime.ScreenJSON:
+		ts.Lines = resourceJSONLines(enriched)
+	default:
+		return
+	}
+	ts.Resource = enriched
 }
 
 // newlyReportedFindings returns the subset of candidates whose Code is not
@@ -473,6 +577,14 @@ func (c *Controller) SetDetailViewportHeight(h int) {
 func (c *Controller) ResetDetailRelatedRows(resourceType string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.resetDetailRelatedRowsLocked(resourceType)
+}
+
+// resetDetailRelatedRowsLocked is the lock-free implementation of
+// ResetDetailRelatedRows, shared with handleActionRefresh's detail branch
+// (core/app/actions_list.go), which already holds c.mu. Callers must hold
+// c.mu (write).
+func (c *Controller) resetDetailRelatedRowsLocked(resourceType string) {
 	ds := c.topDetailState()
 	if ds == nil {
 		return

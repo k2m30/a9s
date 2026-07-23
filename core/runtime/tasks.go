@@ -293,13 +293,13 @@ type SaveCachePayload struct {
 
 func (SaveCachePayload) isTaskPayload() {}
 
-// RelatedCheckPayload carries the source resource the executor needs to
-// invoke RelatedDef.Checker. The Scope field on the parent TaskKey
-// ("type/id") is the dedup key; this struct carries the full resource so
-// runRelatedCheckers can pass it to each checker without re-fetching.
+// RelatedCheckPayload carries the DetailOperation the executor needs to
+// invoke every registered RelatedDef.Checker for op.ResourceType. The Scope
+// field on the parent TaskKey ("type/id") is the dedup key; Op carries the
+// resource, AWS clients, and operation ID every checker call needs — see
+// DetailOperation's doc comment.
 type RelatedCheckPayload struct {
-	ResourceType string
-	Resource     resource.Resource
+	Op DetailOperation
 }
 
 func (RelatedCheckPayload) isTaskPayload() {}

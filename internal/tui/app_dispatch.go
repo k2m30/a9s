@@ -293,6 +293,26 @@ func (m Model) dispatchTaskRequests(tasks []runtime.TaskRequest) tea.Cmd {
 	var cmds []tea.Cmd
 	for _, t := range tasks {
 		switch t.Key.Kind {
+		case runtime.KindEnrichDetail:
+			// Keep adapter-local: enrichDetailCmd wraps a 10 s per-call
+			// timeout that Core.ExecuteTask's KindEnrichDetail path does not
+			// apply.
+			if p, ok := t.Payload.(runtime.EnrichDetailPayload); ok {
+				cmds = append(cmds, m.enrichDetailCmd(p))
+			}
+
+		case runtime.KindRelatedCheck:
+			// Keep adapter-local: relatedCheckCmd's per-def tea.Cmd fan-out
+			// delivers progressive messages.RelatedCheckResult messages as
+			// each def completes, rather than the single batched
+			// messages.RelatedCheckBatch Core.ExecuteTask's KindRelatedCheck
+			// path (the web/headless lane) returns.
+			if p, ok := t.Payload.(runtime.RelatedCheckPayload); ok {
+				if c := m.relatedCheckCmd(p.Op); c != nil {
+					cmds = append(cmds, c)
+				}
+			}
+
 		case runtime.KindFetchByIDDetail:
 			// ExecuteTask returns ResourcesLoaded for this kind, but the
 			// caller must also navigate to the detail view — an

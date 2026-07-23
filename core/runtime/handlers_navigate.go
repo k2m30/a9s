@@ -4,8 +4,7 @@
 //
 //	HandleNavigate — resolves the navigation kind for the requested target,
 //	                 mutates session state where the runtime owns it
-//	                 (canonical-type resolution, EnrichGen / EnrichResKey
-//	                 bumps for detail enrichment), and returns the decision
+//	                 (canonical-type resolution), and returns the decision
 //	                 plus any TaskRequests the adapter should start.
 //
 // View construction, view-stack manipulation, and Bubble Tea specifics
@@ -142,9 +141,8 @@ type FetchCostsPayload struct {
 func (FetchCostsPayload) isTaskPayload() {}
 
 // HandleNavigate resolves the navigation kind for ev, mutating session
-// state the runtime owns (EnrichGen / EnrichResKey bumps for detail
-// enrichment dispatch), and returns the decision plus any fetch tasks the
-// adapter should start.
+// state the runtime owns (canonical-type resolution), and returns the
+// decision plus any fetch tasks the adapter should start.
 //
 // View construction and Bubble Tea specifics remain in the TUI adapter so
 // this handler is platform-agnostic and testable without standing up
@@ -288,11 +286,11 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		if ev.Resource == nil {
 			return NavigateResult{Kind: NavigateKindNoop}, nil
 		}
-		// Canonicalize alias to the registered ShortName so EnrichResKey,
-		// HasDetailEnricher, and downstream Stage 2 message routing all use
-		// the same key the registry returns. When ResourceType is empty the
-		// adapter is responsible for resolving from the active view before
-		// dispatch (the runtime has no view stack to consult).
+		// Canonicalize alias to the registered ShortName so HasDetailEnricher
+		// and downstream Stage 2 message routing all use the same key the
+		// registry returns. When ResourceType is empty the adapter is
+		// responsible for resolving from the active view before dispatch
+		// (the runtime has no view stack to consult).
 		resType := ev.ResourceType
 		if td := resource.FindResourceType(resType); td != nil {
 			resType = td.ShortName
@@ -310,16 +308,7 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 			ReplaceCurrent: ev.ReplaceCurrent,
 			Resource:       ev.Resource,
 		}
-		// Detail-enrichment dispatch is the only state mutation HandleNavigate
-		// performs: bump EnrichGen only when the resource identity changes,
-		// so opening YAML/JSON for the same resource doesn't invalidate an
-		// in-flight enrichment from the detail view open.
 		if resType != "" && resource.HasDetailEnricher(resType) {
-			key := resType + ":" + ev.Resource.ID
-			if key != c.session.EnrichResKey {
-				c.session.EnrichGen++
-				c.session.EnrichResKey = key
-			}
 			result.DispatchEnrich = true
 		}
 		// Related-check is detail-only. The runtime decides *applicability*

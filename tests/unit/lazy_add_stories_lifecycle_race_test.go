@@ -80,9 +80,10 @@ func Test_LA_030_ProfileSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src := resource.Resource{ID: "la030-src-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: src,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &src,
 	})
 	resultMsg, found := collectRelatedResult(t, batchCmd)
 	if !found {
@@ -107,9 +108,10 @@ func Test_LA_030_ProfileSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	m2, _ = rootApplyMsg(m2, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src2 := resource.Resource{ID: "la030-src-002"}
-	_, batchCmd2 := rootApplyMsg(m2, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: src2,
+	_, batchCmd2 := rootApplyMsg(m2, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &src2,
 	})
 	resultMsg2, found2 := collectRelatedResult(t, batchCmd2)
 	if !found2 {
@@ -165,9 +167,10 @@ func Test_LA_031_RegionSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src := resource.Resource{ID: "la031-src-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: src,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &src,
 	})
 	resultMsg, found := collectRelatedResult(t, batchCmd)
 	if !found {
@@ -186,9 +189,10 @@ func Test_LA_031_RegionSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	m2, _ = rootApplyMsg(m2, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src2 := resource.Resource{ID: "la031-src-002"}
-	_, batchCmd2 := rootApplyMsg(m2, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: src2,
+	_, batchCmd2 := rootApplyMsg(m2, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &src2,
 	})
 	resultMsg2, found2 := collectRelatedResult(t, batchCmd2)
 	if !found2 {
@@ -256,9 +260,9 @@ func Test_LA_033_SourceDetailRefresh_RerunsChecker(t *testing.T) {
 	src := resource.Resource{ID: "la033-src-001"}
 
 	// Dispatch first check — simulates "before refresh, checker emitted idA".
-	// We inject an old-generation result manually to test the generation guard.
-	// Generation=0 is always accepted (test sentinel), so we inject gen=1
-	// explicitly via LazyAddedResources to represent the stale pre-refresh result.
+	// We inject a result manually stamped with the session's current (pre-any-
+	// operation) DetailOpGen — AcceptZeroGen is irrelevant here since this is
+	// the live value, not a sentinel.
 	staleResult := messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: src.ID,
@@ -268,17 +272,23 @@ func Test_LA_033_SourceDetailRefresh_RerunsChecker(t *testing.T) {
 			Count:       1,
 			ResourceIDs: []string{idA},
 		},
-		Generation: 1, // matches relatedGen=1 (initial)
+		OperationID: m.Core().ActiveDetailOp(),
 	}
 	m, _ = rootApplyMsg(m, staleResult)
 
-	// Now run the live check (after "refresh"). Since the model's relatedGen is
-	// still 1 here, dispatch a fresh RelatedCheckStartedMsg and collect the new
-	// result (stamped with relatedGen=1, which matches — so it is accepted).
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: src,
+	// Open the source detail. Since a RelatedCache entry already exists for
+	// (srcType, src.ID), replayRelatedCache (D6: no re-fan-out over cached
+	// data) serves it from cache and does NOT dispatch the checker again.
+	m, _ = rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &src,
 	})
+
+	// Ctrl+R is the only entry point that unconditionally invalidates the
+	// RelatedCache and begins a fresh DetailOperation (core/app/actions_list.go
+	// handleActionRefresh), so the checker's CURRENT return value (idB) lands.
+	_, batchCmd := rootApplyMsg(m, ctrlR())
 	freshResult, found := collectRelatedResult(t, batchCmd)
 	if !found {
 		t.Fatal("LA-033: no RelatedCheckResultMsg from re-run")
@@ -359,9 +369,10 @@ func Test_LA_034_MainMenuRoundtrip_LazyAddEntryMarkedTruncated(t *testing.T) {
 	src := resource.Resource{ID: "la034-src-001"}
 
 	// Seed sparse cache via lazy-add (no entry for targetType in cache yet).
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: src,
+	m, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &src,
 	})
 	resultMsg, found := collectRelatedResult(t, batchCmd)
 	if !found {
@@ -380,11 +391,11 @@ func Test_LA_034_MainMenuRoundtrip_LazyAddEntryMarkedTruncated(t *testing.T) {
 	// Verify by dispatching a second check for the SAME source; because the cache
 	// now has an entry for targetType (sparse, IsTruncated=true), the checker sees
 	// the ID as already present and LazyAddedResources will be nil on the second
-	// dispatch.
-	_, batchCmd2 := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: src,
-	})
+	// dispatch. A plain re-navigate would hit replayRelatedCache's cache-hit
+	// suppression (D6: no re-fan-out over cached data) and never invoke the
+	// checker again, so Ctrl+R (the only unconditional re-dispatch entry point)
+	// drives the second check.
+	_, batchCmd2 := rootApplyMsg(m, ctrlR())
 	resultMsg2, found2 := collectRelatedResult(t, batchCmd2)
 	if !found2 {
 		t.Fatal("LA-034: no RelatedCheckResultMsg on second dispatch")
@@ -452,13 +463,14 @@ func Test_LA_040_RepeatDrill_Idempotent(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src := resource.Resource{ID: "la040-src-001"}
-	startMsg := messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: src,
+	startMsg := messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &src,
 	}
 
 	// First dispatch.
-	_, cmd1 := rootApplyMsg(m, startMsg)
+	m, cmd1 := rootApplyMsg(m, startMsg)
 	result1, found1 := collectRelatedResult(t, cmd1)
 	if !found1 {
 		t.Fatal("LA-040: no result from first dispatch")
@@ -466,8 +478,11 @@ func Test_LA_040_RepeatDrill_Idempotent(t *testing.T) {
 	// Feed first result back so cache is populated.
 	m, _ = rootApplyMsg(m, result1)
 
-	// Second dispatch (same source, cache now warm).
-	_, cmd2 := rootApplyMsg(m, startMsg)
+	// Second dispatch: a plain re-navigate would hit replayRelatedCache's
+	// cache-hit suppression (D6: no re-fan-out over cached data) and never
+	// invoke the checker again, so Ctrl+R (the only unconditional re-dispatch
+	// entry point) drives the second, genuinely fresh run.
+	_, cmd2 := rootApplyMsg(m, ctrlR())
 	result2, found2 := collectRelatedResult(t, cmd2)
 	if !found2 {
 		t.Fatal("LA-040: no result from second dispatch")
@@ -537,9 +552,10 @@ func Test_LA_041_RepeatDrill_DifferentSource_SameTarget_SingleEntry(t *testing.T
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Alpha drill.
-	_, cmdAlpha := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcTypeAlpha,
-		SourceResource: resource.Resource{ID: "la041-src-alpha"},
+	_, cmdAlpha := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcTypeAlpha,
+		Resource:     &resource.Resource{ID: "la041-src-alpha"},
 	})
 	resAlpha, foundAlpha := collectRelatedResult(t, cmdAlpha)
 	if !foundAlpha {
@@ -552,9 +568,10 @@ func Test_LA_041_RepeatDrill_DifferentSource_SameTarget_SingleEntry(t *testing.T
 	m, _ = rootApplyMsg(m, resAlpha)
 
 	// Beta drill (cache already has sharedTarget from alpha).
-	_, cmdBeta := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcTypeBeta,
-		SourceResource: resource.Resource{ID: "la041-src-beta"},
+	_, cmdBeta := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcTypeBeta,
+		Resource:     &resource.Resource{ID: "la041-src-beta"},
 	})
 	resBeta, foundBeta := collectRelatedResult(t, cmdBeta)
 	if !foundBeta {
@@ -640,9 +657,10 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src := resource.Resource{ID: "la042-src-001"}
-	startMsg := messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: src,
+	startMsg := messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &src,
 	}
 
 	// Helper to collect X result from a batch (there are two defs; pick targetX).
@@ -672,7 +690,7 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 	}
 
 	// First X drill.
-	_, cmd1 := rootApplyMsg(m, startMsg)
+	m, cmd1 := rootApplyMsg(m, startMsg)
 	res1, found1 := collectX(t, cmd1)
 	if !found1 {
 		t.Fatal("LA-042: no X result from first drill")
@@ -689,12 +707,15 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 			Count:       1,
 			ResourceIDs: []string{idForY},
 		},
-		Generation: 0, // Generation=0 is always accepted (test sentinel)
+		OperationID: 0, // zero OperationID is always accepted (test sentinel)
 	}
 	m, _ = rootApplyMsg(m, yResult)
 
-	// Second X drill (after Y nav).
-	_, cmd2 := rootApplyMsg(m, startMsg)
+	// Second X drill: a plain re-navigate would hit replayRelatedCache's
+	// cache-hit suppression (D6: no re-fan-out over cached data) and never
+	// invoke either checker again, so Ctrl+R (the only unconditional
+	// re-dispatch entry point) drives the genuinely fresh re-run.
+	_, cmd2 := rootApplyMsg(m, ctrlR())
 	res2, found2 := collectX(t, cmd2)
 	if !found2 {
 		t.Fatal("LA-042: no X result from second drill")
@@ -760,21 +781,26 @@ func Test_LA_043_SourceDetailReEntry_UsesCachedResult(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src := resource.Resource{ID: "la043-src-001"}
-	startMsg := messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: src,
+	startMsg := messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &src,
 	}
 
 	// First dispatch.
-	_, cmd1 := rootApplyMsg(m, startMsg)
+	m, cmd1 := rootApplyMsg(m, startMsg)
 	res1, found1 := collectRelatedResult(t, cmd1)
 	if !found1 {
 		t.Fatal("LA-043: no result from first dispatch")
 	}
 	m, _ = rootApplyMsg(m, res1)
 
-	// Second dispatch (same source).
-	_, cmd2 := rootApplyMsg(m, startMsg)
+	// Second dispatch: a plain re-navigate would hit replayRelatedCache's
+	// cache-hit suppression (D6: no re-fan-out over cached data) at the
+	// navigation level and never invoke the checker at all, so Ctrl+R (the
+	// only unconditional re-dispatch entry point) drives a genuinely fresh
+	// checker invocation for the "not checker-memoized" pin below.
+	_, cmd2 := rootApplyMsg(m, ctrlR())
 	res2, found2 := collectRelatedResult(t, cmd2)
 	if !found2 {
 		t.Fatal("LA-043: no result from second dispatch")
@@ -798,9 +824,11 @@ func Test_LA_043_SourceDetailReEntry_UsesCachedResult(t *testing.T) {
 	}
 }
 
-// Test_LA_044_NoRelatedPivots_ReturnsNilCmd verifies that
-// handleRelatedCheckStarted returns nil when no RelatedDefs are registered for
-// the source type (len(defs)==0 early return at app_related.go:27-29).
+// Test_LA_044_NoRelatedPivots_ReturnsNilCmd verifies that opening detail for a
+// resource type with no RelatedDefs registered (and no detail enricher)
+// dispatches no task at all — DetailOperationTasks returns nil for both, and
+// with no related panel to auto-show, handleNavigate's PushDetail case
+// returns a nil cmd overall.
 func Test_LA_044_NoRelatedPivots_ReturnsNilCmd(t *testing.T) {
 	const srcType = "test-la044-source-no-defs"
 	// Deliberately do NOT register any RelatedDefs for srcType.
@@ -808,14 +836,16 @@ func Test_LA_044_NoRelatedPivots_ReturnsNilCmd(t *testing.T) {
 	m := tui.New("test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, cmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "la044-src-001"},
+	_, cmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "la044-src-001"},
 	})
 
-	// The early-return path (len(defs)==0) must produce a nil cmd.
+	// No related defs and no detail enricher registered for srcType — no task
+	// dispatches, so the overall cmd must be nil.
 	if cmd != nil {
-		t.Errorf("LA-044: cmd=%v, want nil — no RelatedDefs registered for %q, handleRelatedCheckStarted should return nil early", cmd, srcType)
+		t.Errorf("LA-044: cmd=%v, want nil — no RelatedDefs or detail enricher registered for %q", cmd, srcType)
 	}
 }
 
@@ -865,14 +895,15 @@ func Test_LA_050_DrillDuringEnrichment_ResultLandsWithoutDrop(t *testing.T) {
 	m := tui.New("test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "la050-src-001"},
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "la050-src-001"},
 	})
 
 	// batchCmd must not be nil.
 	if batchCmd == nil {
-		t.Fatal("LA-050: batchCmd is nil — handleRelatedCheckStarted must return a non-nil cmd")
+		t.Fatal("LA-050: batchCmd is nil — opening detail must dispatch the related-check task")
 	}
 
 	// Run with a 1-second timeout via a channel to catch hangs.
@@ -898,14 +929,15 @@ func Test_LA_050_DrillDuringEnrichment_ResultLandsWithoutDrop(t *testing.T) {
 	}
 }
 
-// Test_LA_051_EscDuringResolution_StaleResultDropped pins the generation guard
-// at app.go:541-543: a RelatedCheckResultMsg whose Generation != current
-// relatedGen is silently dropped and never reaches the view.
+// Test_LA_051_EscDuringResolution_StaleResultDropped pins the acceptance
+// guard (messages.IsStale against messages.AspectDetailOp): a
+// RelatedCheckResult whose OperationID no longer matches the session's
+// active DetailOperation is silently dropped and never reaches the view.
 //
-// Simulation: dispatch a check (captures gen=1), bump relatedGen via a
-// ProfileSelectedMsg (relatedGen becomes 2), then deliver the old result
-// (gen=1). Assert: the model does not panic, and the stale result is dropped
-// (no view update for the stale gen).
+// Simulation: open detail (begins a DetailOperation, captures its result),
+// bump the session's DetailOpGen via a ProfileSelectedMsg (Rotate()), then
+// deliver the pre-switch result. Assert: the model does not panic, and the
+// stale result is dropped (no view update for the stale operation).
 func Test_LA_051_EscDuringResolution_StaleResultDropped(t *testing.T) {
 	const (
 		srcType    = "test-la051-source"
@@ -941,39 +973,37 @@ func Test_LA_051_EscDuringResolution_StaleResultDropped(t *testing.T) {
 	m := tui.New("test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	// Dispatch check at gen=1; collect the result cmd but do NOT feed it back yet.
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "la051-src-001"},
+	// Open detail — begins a DetailOperation; collect the result cmd but do
+	// NOT feed it back yet.
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "la051-src-001"},
 	})
 	staleResult, found := collectRelatedResult(t, batchCmd)
 	if !found {
 		t.Fatal("LA-051: no stale result collected")
 	}
 
-	// Bump relatedGen via ProfileSelectedMsg (simulates "Esc / profile switch").
+	// Bump the session's DetailOpGen via ProfileSelectedMsg (Rotate() —
+	// simulates "Esc / profile switch").
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "new-profile-la051"})
 
-	// Construct a result with the old gen (1).
-	// Note: the collected staleResult already has Generation=1 (stamped at dispatch).
-	// If Generation is 0 (test sentinel — always accepted), force it to 1.
-	if staleResult.Generation == 0 {
-		staleResult.Generation = 1
-	}
-
-	// Deliver the stale result. The generation guard (app.go:541-543) must drop it.
-	// The observable: Update must not panic, and the returned cmd must be nil
-	// (no downstream effects for a dropped message).
+	// Deliver the stale result. Its OperationID predates the profile switch's
+	// Rotate(), so the acceptance guard (messages.IsStale against
+	// AspectDetailOp) must drop it. The observable: Update must not panic,
+	// and the returned cmd must be nil (no downstream effects for a dropped
+	// message).
 	_, dropCmd := rootApplyMsg(m, staleResult)
 
 	// dropCmd may be nil or a batch of no-ops; it must not be a fresh
-	// RelatedCheckResultMsg delivery that updates a view.  We accept nil or
-	// any cmd that does NOT produce a RelatedCheckResultMsg with the stale gen.
+	// RelatedCheckResultMsg delivery that updates a view. We accept nil or
+	// any cmd that does NOT produce a RelatedCheckResult with the stale operation.
 	if dropCmd != nil {
 		rawMsg := dropCmd()
 		if r, ok := rawMsg.(messages.RelatedCheckResult); ok {
-			if r.Generation == staleResult.Generation {
-				t.Errorf("LA-051: stale result (gen=%d) was forwarded to view — generation guard did not drop it", staleResult.Generation)
+			if r.OperationID == staleResult.OperationID {
+				t.Errorf("LA-051: stale result (op=%d) was forwarded to view — the operation guard did not drop it", staleResult.OperationID)
 			}
 		}
 	}
@@ -1023,15 +1053,25 @@ func Test_LA_052_RapidConsecutiveDispatches_CheckerRunsEachTime(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src := resource.Resource{ID: "la052-src-001"}
-	startMsg := messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: src,
+	startMsg := messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &src,
 	}
 
-	// Collect and run all five batches.
+	// Collect and run all five batches. The first is a genuine cache-miss
+	// Navigate; a plain re-navigate afterward would hit replayRelatedCache's
+	// cache-hit suppression (D6: no re-fan-out over cached data) and never
+	// invoke the checker again, so the remaining four use Ctrl+R (the only
+	// unconditional re-dispatch entry point) to force a genuinely fresh run.
 	var results []messages.RelatedCheckResult
 	for i := 0; i < repeats; i++ {
-		_, batchCmd := rootApplyMsg(m, startMsg)
+		var batchCmd tea.Cmd
+		if i == 0 {
+			m, batchCmd = rootApplyMsg(m, startMsg)
+		} else {
+			m, batchCmd = rootApplyMsg(m, ctrlR())
+		}
 		r, ok := collectRelatedResult(t, batchCmd)
 		if !ok {
 			t.Fatalf("LA-052: no result from dispatch %d", i+1)
@@ -1056,9 +1096,10 @@ func Test_LA_052_RapidConsecutiveDispatches_CheckerRunsEachTime(t *testing.T) {
 }
 
 // Test_LA_053_ProfileSwitchMidResolution_StaleResultDiscarded is LA-030 +
-// LA-051 combined: dispatch a check, bump relatedGen via ProfileSelectedMsg,
-// then deliver the pre-switch result. Assert the stale result is dropped by
-// the generation guard (app.go:541-543).
+// LA-051 combined: open detail (begins a DetailOperation), bump the
+// session's DetailOpGen via ProfileSelectedMsg (Rotate()), then deliver the
+// pre-switch result. Assert the stale result is dropped by the acceptance
+// guard (messages.IsStale against AspectDetailOp).
 func Test_LA_053_ProfileSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 	const (
 		srcType    = "test-la053-source"
@@ -1094,47 +1135,47 @@ func Test_LA_053_ProfileSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 	m := tui.New("profile-A", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	// Collect in-flight result (gen=1) but don't deliver it yet.
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "la053-src-001"},
+	// Open detail (begins a DetailOperation) and collect the in-flight
+	// result, but don't deliver it yet.
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "la053-src-001"},
 	})
 	inFlightResult, found := collectRelatedResult(t, batchCmd)
 	if !found {
 		t.Fatal("LA-053: no in-flight result")
 	}
 
-	// Simulate profile switch mid-resolution: bumps relatedGen.
+	// Simulate profile switch mid-resolution: Rotate() bumps DetailOpGen.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "profile-B-la053"})
 
-	// Deliver stale result (old gen).
-	if inFlightResult.Generation == 0 {
-		inFlightResult.Generation = 1
-	}
+	// Deliver the stale (pre-switch operation) result.
 	_, dropCmd := rootApplyMsg(m, inFlightResult)
 
-	// The stale message must be dropped — no downstream cmd carrying the stale gen.
+	// The stale message must be dropped — no downstream cmd carrying the stale operation.
 	if dropCmd != nil {
 		raw := dropCmd()
 		if r, ok := raw.(messages.RelatedCheckResult); ok {
-			if r.Generation == inFlightResult.Generation {
-				t.Errorf("LA-053: stale result (gen=%d) was forwarded after profile switch — generation guard failed", inFlightResult.Generation)
+			if r.OperationID == inFlightResult.OperationID {
+				t.Errorf("LA-053: stale result (op=%d) was forwarded after profile switch — operation guard failed", inFlightResult.OperationID)
 			}
 		}
 	}
 
-	// Additionally: a new check on the post-switch model should produce a fresh
-	// result stamped with the new gen (not gen=1 from profile A).
-	_, freshCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "la053-src-002"},
+	// Additionally: a new check on the post-switch model should produce a
+	// fresh result stamped with a new operation ID (not the pre-switch one).
+	_, freshCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "la053-src-002"},
 	})
 	freshResult, foundFresh := collectRelatedResult(t, freshCmd)
 	if !foundFresh {
 		t.Fatal("LA-053: no fresh result after profile switch")
 	}
-	if freshResult.Generation == inFlightResult.Generation {
-		t.Errorf("LA-053: fresh result gen=%d == stale gen=%d — relatedGen was not bumped by profile switch", freshResult.Generation, inFlightResult.Generation)
+	if freshResult.OperationID == inFlightResult.OperationID {
+		t.Errorf("LA-053: fresh result op=%d == stale op=%d — DetailOpGen was not bumped by profile switch", freshResult.OperationID, inFlightResult.OperationID)
 	}
 }
 
@@ -1175,44 +1216,43 @@ func Test_LA_054_RegionSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 	m := tui.New("test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	// Collect in-flight result (gen=1).
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "la054-src-001"},
+	// Open detail (begins a DetailOperation) and collect the in-flight result.
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "la054-src-001"},
 	})
 	inFlightResult, found := collectRelatedResult(t, batchCmd)
 	if !found {
 		t.Fatal("LA-054: no in-flight result")
 	}
 
-	// Region switch mid-resolution bumps relatedGen.
+	// Region switch mid-resolution: Rotate() bumps DetailOpGen.
 	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
 
-	// Deliver stale result.
-	if inFlightResult.Generation == 0 {
-		inFlightResult.Generation = 1
-	}
+	// Deliver the stale (pre-switch operation) result.
 	_, dropCmd := rootApplyMsg(m, inFlightResult)
 
 	if dropCmd != nil {
 		raw := dropCmd()
 		if r, ok := raw.(messages.RelatedCheckResult); ok {
-			if r.Generation == inFlightResult.Generation {
-				t.Errorf("LA-054: stale result (gen=%d) forwarded after region switch — generation guard failed", inFlightResult.Generation)
+			if r.OperationID == inFlightResult.OperationID {
+				t.Errorf("LA-054: stale result (op=%d) forwarded after region switch — operation guard failed", inFlightResult.OperationID)
 			}
 		}
 	}
 
-	// Fresh result after switch must carry a different (newer) gen.
-	_, freshCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "la054-src-002"},
+	// Fresh result after switch must carry a different (newer) operation ID.
+	_, freshCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "la054-src-002"},
 	})
 	freshResult, foundFresh := collectRelatedResult(t, freshCmd)
 	if !foundFresh {
 		t.Fatal("LA-054: no fresh result after region switch")
 	}
-	if freshResult.Generation == inFlightResult.Generation {
-		t.Errorf("LA-054: fresh result gen=%d == stale gen=%d — relatedGen was not bumped by region switch", freshResult.Generation, inFlightResult.Generation)
+	if freshResult.OperationID == inFlightResult.OperationID {
+		t.Errorf("LA-054: fresh result op=%d == stale op=%d — DetailOpGen was not bumped by region switch", freshResult.OperationID, inFlightResult.OperationID)
 	}
 }

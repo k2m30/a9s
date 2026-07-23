@@ -7,9 +7,9 @@ package unit
 // Lambda, RDS, KMS, Secrets, VPC Endpoints, SGs, DynamoDB, CFN, plus four
 // self-pivot ct-events entries). This test verifies that:
 //   1. Navigating to the ct-events list produces fixture events.
-//   2. Opening detail for the first event triggers a RelatedCheckStartedMsg.
-//   3. handleRelatedCheckStarted dispatches checkers (returns non-nil cmd).
-//   4. At least one checker returns a RelatedCheckResultMsg with Count >= 0
+//   2. Opening detail for the first event dispatches the related-check tasks
+//      directly (Core.BeginDetailOperation + Core.DetailOperationTasks).
+//   3. At least one checker returns a RelatedCheckResult with Count >= 0
 //      (not the -1 panic-recovery sentinel), confirming the live checker path
 //      works against the demo transport — no demoMode shortcut is taken.
 //
@@ -122,56 +122,25 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 			"are RelatedDefs registered for ct-events?")
 	}
 
-	// Execute to get RelatedCheckStartedMsg.
-	relatedMsg := relatedCmd()
-	started, ok := relatedMsg.(messages.RelatedCheckStarted)
-	if !ok {
-		t.Fatalf("expected RelatedCheckStartedMsg from ct-events detail init, got %T", relatedMsg)
-	}
-
-	// Dispatch started msg so handleRelatedCheckStarted runs the actual checkers.
-	var checkCmds tea.Cmd
-	*m, checkCmds = rootApplyMsg(*m, started)
-	if checkCmds == nil {
-		t.Fatal("handleRelatedCheckStarted returned nil cmd — no checkers dispatched for ct-events?")
-	}
-
-	// runChecker executes a cmd recovering from panics.
-	runChecker := func(c tea.Cmd) (msg tea.Msg) {
-		defer func() {
-			if r := recover(); r != nil {
-				msg = nil
-			}
-		}()
-		return c()
-	}
-
-	// Collect all RelatedCheckResultMsg values from the batch.
+	// The enrich + related-check tasks dispatch directly off relatedCmd as a
+	// (possibly nested) tea.Batch; RunRelatedDef already recovers
+	// per-checker panics into a RelatedCheckResult carrying LazyAddError, so
+	// this collects every per-def RelatedCheckResult leaf directly.
+	leaves := extractLeafMsgs(relatedCmd)
 	var results []messages.RelatedCheckResult
-
-	collectFromMsg := func(batchResult tea.Msg) {
-		switch v := batchResult.(type) {
-		case messages.RelatedCheckResult:
-			results = append(results, v)
-		case tea.BatchMsg:
-			for _, subCmd := range v {
-				if subCmd == nil {
-					continue
-				}
-				sub := runChecker(subCmd)
-				if r, ok2 := sub.(messages.RelatedCheckResult); ok2 {
-					results = append(results, r)
-				}
-			}
+	for _, leaf := range leaves {
+		if r, ok := leaf.(messages.RelatedCheckResult); ok {
+			results = append(results, r)
 		}
 	}
 
-	rawCheck := runChecker(checkCmds)
-	collectFromMsg(rawCheck)
-
 	if len(results) == 0 {
-		t.Fatal("no RelatedCheckResultMsg collected after running ct-events checkers — " +
-			"all checkers panicked or returned unexpected types")
+		types := make([]string, len(leaves))
+		for i, leaf := range leaves {
+			types[i] = fmt.Sprintf("%T", leaf)
+		}
+		t.Fatalf("no RelatedCheckResult collected after opening ct-events detail — "+
+			"all checkers panicked or returned unexpected types; leaves: %v", types)
 	}
 
 	// Build result map for diagnostics.
@@ -248,13 +217,15 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 
 // TestDemoColdCacheCtEvents_NoDemoShortcut verifies that the ct-events related
 // checks do NOT take a demo shortcut. Specifically: after the coder removes all
-// demoMode branches (T034–T037), the RelatedCheckStartedMsg path must go through
-// def.Checker (live path), not a demo override. This test passes when the live
-// path produces the same or better results than any shortcut would have.
+// demoMode branches (T034–T037), the related-check task dispatch must go
+// through def.Checker (live path), not a demo override. This test passes when
+// the live path produces the same or better results than any shortcut would
+// have.
 //
 // This is a structural test: it verifies that the dispatch produces real
-// RelatedCheckResultMsg values (not nil messages or panics), which only holds
-// if the live checker path is active.
+// RelatedCheckResult values (not nil messages or panics) carrying the exact
+// resource identity that was opened, which only holds if the live checker
+// path is active.
 func TestDemoColdCacheCtEvents_NoDemoShortcut(t *testing.T) {
 	t.Parallel()
 	m := newDemoColdCacheApp(t)
@@ -295,21 +266,31 @@ func TestDemoColdCacheCtEvents_NoDemoShortcut(t *testing.T) {
 		t.Fatal("expected related-check cmd after opening ct-events detail")
 	}
 
-	relatedMsg := relatedCmd()
-	started, ok := relatedMsg.(messages.RelatedCheckStarted)
-	if !ok {
-		t.Fatalf("expected RelatedCheckStartedMsg; got %T", relatedMsg)
+	// Every per-def RelatedCheckResult leaf must identify the ct-events
+	// resource type and the exact event we opened — confirming the
+	// dispatch actually ran the live checker path against this operation's
+	// resource, not a demo shortcut carrying placeholder identity.
+	leaves := extractLeafMsgs(relatedCmd)
+	var found bool
+	for _, leaf := range leaves {
+		r, ok := leaf.(messages.RelatedCheckResult)
+		if !ok {
+			continue
+		}
+		found = true
+		if r.ResourceType != "ct-events" {
+			t.Errorf("RelatedCheckResult.ResourceType = %q; want \"ct-events\"", r.ResourceType)
+		}
+		if r.SourceResourceID != firstEvent.ID {
+			t.Errorf("RelatedCheckResult.SourceResourceID = %q; want %q", r.SourceResourceID, firstEvent.ID)
+		}
 	}
-
-	// The started msg must identify the ct-events resource type.
-	if started.ResourceType != "ct-events" {
-		t.Errorf("RelatedCheckStartedMsg.ResourceType = %q; want \"ct-events\"", started.ResourceType)
-	}
-
-	// The source resource must match the event we opened.
-	if started.SourceResource.ID != firstEvent.ID {
-		t.Errorf("RelatedCheckStartedMsg.SourceResource.ID = %q; want %q",
-			started.SourceResource.ID, firstEvent.ID)
+	if !found {
+		types := make([]string, len(leaves))
+		for i, leaf := range leaves {
+			types[i] = fmt.Sprintf("%T", leaf)
+		}
+		t.Fatalf("expected at least one RelatedCheckResult after opening ct-events detail; got: %v", types)
 	}
 }
 

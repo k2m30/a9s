@@ -7,7 +7,7 @@ package unit
 // replay in the NavigationKindDetail branch of handleRelatedNavigate
 // (internal/tui/runtime_adapter_related.go) runs BEFORE the first render of
 // the re-pushed detail screen, and nothing re-seeds the panel on a cache
-// MISS either (no RelatedCheckStarted dispatch).
+// MISS either (no related-check task dispatch).
 //
 // Harness follows related_cache_bug_test.go / related_navigate_cache_enter_child_test.go:
 // build a demo root model, drive it via rootApplyMsg/drainCmds, and assert
@@ -99,14 +99,15 @@ func circularReentrySetup(t *testing.T) (tui.Model, resource.Resource, resource.
 // related_cache_bug_test.go), which drives the PatchRelatedCache intent
 // (core/runtime/handlers_resources.go) that populates
 // session.RelatedCacheLRU keyed by RelatedCacheKey("ec2", instance.ID).
-func feedEC2RelatedResults(m tui.Model, _ string) tui.Model {
+func feedEC2RelatedResults(m tui.Model, sourceID string) tui.Model {
 	for _, def := range resource.GetRelated("ec2") {
 		m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
-			ResourceType: "ec2",
+			ResourceType:     "ec2",
+			SourceResourceID: sourceID,
 			Result: resource.RelatedCheckResult{
 				TargetType:  def.TargetType,
-				Count:       2,
-				ResourceIDs: []string{"related-id-1", "related-id-2"},
+				Count:       stubRelatedCount,
+				ResourceIDs: stubRelatedIDs,
 			},
 		})
 	}
@@ -123,8 +124,7 @@ func feedEC2RelatedResults(m tui.Model, _ string) tui.Model {
 // the SAME A renders A's RELATED panel with the cached count badges
 // immediately, exactly as a direct Esc-based re-entry would (see
 // TestBug_RelatedCheckResults_RightColShowsCachedCounts in
-// related_cache_bug_test.go for the non-circular analog). RED today: the
-// panel renders every row bare.
+// related_cache_bug_test.go for the non-circular analog).
 func TestRelatedCircularReentry_CacheHit_ShowsCachedBadges(t *testing.T) {
 	m, instance, vpc := circularReentrySetup(t)
 	m = feedEC2RelatedResults(m, instance.ID)
@@ -169,19 +169,19 @@ func TestRelatedCircularReentry_CacheHit_ShowsCachedBadges(t *testing.T) {
 	}
 	foundBadge := false
 	for _, def := range defs {
-		if strings.Contains(viewA, def.DisplayName+" (2)") {
+		if strings.Contains(viewA, def.DisplayName+" (7)") {
 			foundBadge = true
 			break
 		}
 	}
 	if !foundBadge {
 		t.Fatalf("BUG: re-entering ec2 detail A via a circular A->B->A drill must show the CACHED related count badge (e.g. %q) immediately, not bare rows; got:\n%s",
-			defs[0].DisplayName+" (2)", viewA)
+			defs[0].DisplayName+" (7)", viewA)
 	}
 
 	for _, msg := range reentryMsgs {
-		if _, ok := msg.(messages.RelatedCheckStarted); ok {
-			t.Errorf("BUG: circular re-entry into a resource with CACHED related results must not re-dispatch RelatedCheckStarted (cache hit); got one in the cmd chain")
+		if _, ok := msg.(messages.RelatedCheckResult); ok {
+			t.Errorf("BUG: circular re-entry into a resource with CACHED related results must not re-dispatch the related-check fan-out (cache hit); got a RelatedCheckResult in the cmd chain")
 		}
 	}
 }
@@ -193,8 +193,8 @@ func TestRelatedCircularReentry_CacheHit_ShowsCachedBadges(t *testing.T) {
 
 // TestRelatedCircularReentry_CacheMiss_DispatchesChecks verifies the
 // cache-MISS half of the same circular drill: when A has never accumulated
-// related results before the B hop, drilling back into A must dispatch a
-// RelatedCheckStarted to populate the panel. This is the only reliable,
+// related results before the B hop, drilling back into A must dispatch the
+// related-check fan-out to populate the panel. This is the only reliable,
 // falsifiable signal available: renderRelatedPanel
 // (internal/tui/views/detail_helpers.go) renders a Loading row as
 // "  "+blk.Name — byte-identical, after ANSI stripping, to a bare/never-set
@@ -236,14 +236,14 @@ func TestRelatedCircularReentry_CacheMiss_DispatchesChecks(t *testing.T) {
 
 	dispatchedCheck := false
 	for _, msg := range reentryMsgs {
-		if _, ok := msg.(messages.RelatedCheckStarted); ok {
+		if _, ok := msg.(messages.RelatedCheckResult); ok {
 			dispatchedCheck = true
 			break
 		}
 	}
 
 	if !dispatchedCheck {
-		t.Fatalf("BUG: circular re-entry into A with an EMPTY related cache must dispatch RelatedCheckStarted so the panel is populated instead of staying bare; got no RelatedCheckStarted in the cmd chain. View:\n%s", viewA)
+		t.Fatalf("BUG: circular re-entry into A with an EMPTY related cache must dispatch the related-check fan-out so the panel is populated instead of staying bare; got no RelatedCheckResult in the cmd chain. View:\n%s", viewA)
 	}
 }
 

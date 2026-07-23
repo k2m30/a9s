@@ -43,14 +43,14 @@ import (
 // setupLiveModeEC2Detail creates a NON-demo root model (so the real checker path runs),
 // navigates to EC2 detail for the first fixture, and returns the model plus EC2 fixtures.
 //
-// Non-demo mode is required because demo mode's handleRelatedCheckStarted bypasses
+// Non-demo mode is required because demo mode's related-check dispatch bypasses
 // buildResourceCacheSnapshot() entirely and uses registered demo checkers instead.
 // Only the live-mode path calls the real checker with the cache snapshot.
 func setupLiveModeEC2Detail(t *testing.T) (tui.Model, []resource.Resource) {
 	t.Helper()
 
 	// Non-demo model: no WithIsDemo option.
-	// This makes handleRelatedCheckStarted use the real checker path (not demo fixtures).
+	// This makes the related-check dispatch use the real checker path (not demo fixtures).
 	m := tui.New("test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
@@ -71,63 +71,40 @@ func setupLiveModeEC2Detail(t *testing.T) (tui.Model, []resource.Resource) {
 		Resources:    ec2Res,
 	})
 
-	// Enter first EC2 detail. In non-demo mode this produces RelatedCheckStartedMsg
-	// which triggers live-mode checker dispatch. We drain but ignore those cmds —
-	// we only care about the subsequent write-back path.
+	// Enter first EC2 detail. In non-demo mode this dispatches the related-check
+	// tasks directly, triggering live-mode checker dispatch. We drain but ignore
+	// those cmds — we only care about the subsequent write-back path.
 	m, firstCmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	m, _ = drainCmds(t, m, firstCmd, 3)
 
 	return m, ec2Res
 }
 
-// execRelatedCheckAndCollectTGResult feeds a RelatedCheckStartedMsg to the model
-// and synchronously executes all resulting cmds, collecting the "tg" RelatedCheckResultMsg.
-// Returns (result, found).
+// execRelatedCheckAndCollectTGResult presses Ctrl+R on the (already-open) ec2
+// detail screen — the real re-dispatch entry point now that the fan-out has
+// no standalone trigger message — and collects the "tg" RelatedCheckResult
+// from the resulting (possibly nested) tea.Batch. Returns (result, found).
 //
-// In non-demo mode, handleRelatedCheckStarted:
-//  1. Calls buildResourceCacheSnapshot() — reads from m.ResourceCache (set by write-back)
-//  2. For each RelatedDef: if target is already in cache, calls the real checker directly
-//  3. Returns a tea.BatchMsg of cmds, each returning RelatedCheckResultMsg
+// handleActionRefresh (core/app/actions_list.go) invalidates RelatedCache and
+// begins a fresh DetailOperation unconditionally on Ctrl+R, so the resulting
+// related-check fan-out always calls the real checker against the CURRENT
+// buildResourceCacheSnapshot() state (set by the write-back this test
+// exercises) rather than replaying a cached result.
 //
-// Executing the "tg" cmd reveals what IsTruncated the write-back persisted:
+// Executing the "tg" leaf reveals what IsTruncated the write-back persisted:
 //
 //	IsTruncated=true (correct)  → checker returns {Count:0, Truncated:true} (honest lower bound)
 //	IsTruncated=false (bug)     → checker returns {Count:0, Truncated:false} (wrong definitive zero)
-func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model, sourceResource resource.Resource) (result resource.RelatedCheckResult, found bool) {
+func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model) (result resource.RelatedCheckResult, found bool) {
 	t.Helper()
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   "ec2",
-		SourceResource: sourceResource,
-	})
-	if batchCmd == nil {
-		t.Fatal("handleRelatedCheckStarted returned nil cmd — expected batch of checker cmds")
+	_, refreshCmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
+	if refreshCmd == nil {
+		t.Fatal("Ctrl+R on ec2 detail returned nil cmd — expected batch of checker cmds")
 	}
 
-	// Execute the batch. tea.Batch returns a cmd that, when called, returns tea.BatchMsg.
-	rawMsg := batchCmd()
-	if rawMsg == nil {
-		return resource.UnknownRelated("tg"), false
-	}
-
-	batchMsg, ok := rawMsg.(tea.BatchMsg)
-	if !ok {
-		// Single cmd, not a batch — handle it.
-		if r, ok2 := rawMsg.(messages.RelatedCheckResult); ok2 && r.Result.TargetType == "tg" {
-			return r.Result, true
-		}
-		return resource.UnknownRelated("tg"), false
-	}
-
-	for _, cmd := range batchMsg {
-		if cmd == nil {
-			continue
-		}
-		msg := cmd()
-		if msg == nil {
-			continue
-		}
-		if r, ok2 := msg.(messages.RelatedCheckResult); ok2 && r.Result.TargetType == "tg" {
+	for _, leaf := range extractLeafMsgs(refreshCmd) {
+		if r, ok := leaf.(messages.RelatedCheckResult); ok && r.Result.TargetType == "tg" {
 			return r.Result, true
 		}
 	}
@@ -147,7 +124,7 @@ func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model, sourceResourc
 // Execution path:
 //
 //	RelatedCheckResultMsg{CachedPages:{"tg":{[],true}}} → app.go:378-387 write-back
-//	→ RelatedCheckStartedMsg → handleRelatedCheckStarted → buildResourceCacheSnapshot()
+//	→ Ctrl+R refresh → fresh DetailOperation → buildResourceCacheSnapshot()
 //	→ checkEC2TargetGroups sees cache["tg"].IsTruncated → must be true → {Count:0, Truncated:true}
 //
 // This test FAILS with current code because app.go:383 guards persistence with
@@ -176,11 +153,11 @@ func TestContract_EmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 	})
 
 	// Step 2: Trigger a fresh related check to observe what the write-back persisted.
-	// handleRelatedCheckStarted calls buildResourceCacheSnapshot() which reads
+	// Ctrl+R's checker fan-out calls buildResourceCacheSnapshot() which reads
 	// m.ResourceCache["tg"].pagination to reconstruct IsTruncated.
 	// If the write-back preserved it: IsTruncated=true → {Count:0, Truncated:true} (correct)
 	// If the write-back dropped it:   IsTruncated=false → {Count:0, Truncated:false} (bug)
-	got, found := execRelatedCheckAndCollectTGResult(t, m, firstInstance)
+	got, found := execRelatedCheckAndCollectTGResult(t, m)
 	if !found {
 		t.Fatal("TG-related checker did not produce a RelatedCheckResultMsg — cannot verify write-back contract")
 	}
@@ -230,7 +207,7 @@ func TestContract_NonEmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 		},
 	})
 
-	got, found := execRelatedCheckAndCollectTGResult(t, m, firstInstance)
+	got, found := execRelatedCheckAndCollectTGResult(t, m)
 	if !found {
 		t.Fatal("TG-related checker did not produce a RelatedCheckResultMsg")
 	}
@@ -268,7 +245,7 @@ func TestContract_EmptyCompletePage_IsTruncatedFalse(t *testing.T) {
 		},
 	})
 
-	got, found := execRelatedCheckAndCollectTGResult(t, m, firstInstance)
+	got, found := execRelatedCheckAndCollectTGResult(t, m)
 	if !found {
 		t.Fatal("TG-related checker did not produce a RelatedCheckResultMsg")
 	}

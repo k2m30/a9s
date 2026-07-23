@@ -72,9 +72,10 @@ func Test_LA_001_KMSDrillAWSManagedKey(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "src-la001-rds"},
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "src-la001-rds"},
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)
@@ -155,9 +156,10 @@ func Test_LA_002_AMIDrillPublicAMI(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "src-la002-ec2"},
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "src-la002-ec2"},
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)
@@ -236,9 +238,10 @@ func Test_LA_003_EBSSnapDrillSharedSnapshot(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "src-la003-ebs"},
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "src-la003-ebs"},
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)
@@ -316,9 +319,10 @@ func Test_LA_004_IAMPolicyDrillAWSManaged(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "src-la004-role"},
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "src-la004-role"},
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)
@@ -414,9 +418,10 @@ func Test_LA_081_ColdCacheDrillTriggersPrefetch(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "src-la081"},
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "src-la081"},
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)
@@ -528,9 +533,10 @@ func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 	// during the actual drill below, not the seed step).
 	atomic.StoreInt32(&paginatedCalls, 0)
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "src-la082"},
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "src-la082"},
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)

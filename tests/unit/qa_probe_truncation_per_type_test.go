@@ -19,10 +19,11 @@ package unit
 //
 // Test approach: follows the checker-capture pattern from
 // qa_lazy_cache_snapshot_truncated_test.go. We seed probe resources via
-// AvailabilityPrefetchedMsg (the real handler path), then trigger
-// RelatedCheckStartedMsg so the model calls buildResourceCacheSnapshot and
-// passes the resulting cache to our registered checker. We capture the cache
-// and assert on its IsTruncated value.
+// AvailabilityPrefetchedMsg (the real handler path), then open the source
+// resource's detail view so the resulting DetailOperation calls
+// buildResourceCacheSnapshot and passes the resulting cache to our
+// registered checker. We capture the cache and assert on its IsTruncated
+// value.
 
 import (
 	"context"
@@ -99,22 +100,18 @@ func TestBuildResourceCacheSnapshot_ProbeAuthoritative_SinglePageComplete(t *tes
 		Gen: m.Core().Session().AvailabilityGen,
 	})
 
-	// Navigate to src detail view so RelatedCheckStartedMsg is handled.
+	// Navigate to src detail view — begins a DetailOperation and dispatches
+	// the related-check task directly, invoking buildResourceCacheSnapshot
+	// and passing the snapshot to every registered checker for srcType.
 	srcRes := resource.Resource{ID: "pt1-src-001", Name: "pt1-src-001"}
-	m, _ = rootApplyMsg(m, messages.Navigate{
+	var relCmd tea.Cmd
+	m, relCmd = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &srcRes,
 		ResourceType: srcType,
 	})
-
-	// Dispatch RelatedCheckStartedMsg — triggers buildResourceCacheSnapshot and
-	// passes the snapshot to all registered checkers for srcType.
-	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
-	})
 	if relCmd == nil {
-		t.Fatal("RelatedCheckStartedMsg returned nil cmd — checker never invoked")
+		t.Fatal("opening srcType detail returned nil cmd — checker never invoked")
 	}
 
 	// Execute the cmd tree to trigger the checker goroutines.
@@ -204,18 +201,14 @@ func TestBuildResourceCacheSnapshot_ProbeTruncated_StampsTrue(t *testing.T) {
 	})
 
 	srcRes := resource.Resource{ID: "pt2-src-001", Name: "pt2-src-001"}
-	m, _ = rootApplyMsg(m, messages.Navigate{
+	var relCmd tea.Cmd
+	m, relCmd = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &srcRes,
 		ResourceType: srcType,
 	})
-
-	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
-	})
 	if relCmd == nil {
-		t.Fatal("RelatedCheckStartedMsg returned nil cmd")
+		t.Fatal("opening srcType detail returned nil cmd")
 	}
 
 	allMsgs := drainAllMessages(relCmd)

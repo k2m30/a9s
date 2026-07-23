@@ -6,6 +6,8 @@
 // with the session runtime rather than hanging off transport objects.
 package aws
 
+import "github.com/k2m30/a9s/v3/core/domain"
+
 // DetailEnrichmentCtx bundles the AWS service clients together with
 // feature-specific session-scoped caches for on-demand detail enrichment.
 //
@@ -48,4 +50,11 @@ type DetailEnrichmentCtx struct {
 	// entry despite the operator explicitly asking to refresh. Any future
 	// cached enricher inherits the same guarantee for free.
 	SkipCache bool
+
+	// OpID is the core/runtime.DetailOperation.ID this enrichment call was
+	// dispatched under. enrichDetail (detail_enrich_engine.go) wraps the
+	// fetch-side ctx with WithDetailOp(ctx, OpID) so every coalescing
+	// decorator (coalesce.go) keys its singleflight group per-operation —
+	// see WithDetailOp's doc comment.
+	OpID domain.Gen
 }

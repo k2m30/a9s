@@ -3,6 +3,8 @@
 package runtime
 
 import (
+	"time"
+
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -12,29 +14,11 @@ const KindRelatedCheck TaskKind = "related-check"
 // MaxConcurrentProbes caps concurrent checker goroutines per detail view open.
 const MaxConcurrentProbes = 4
 
-// RelatedCheckStartedEvent carries the resource type and source resource.
-type RelatedCheckStartedEvent struct {
-	ResourceType   string
-	SourceResource resource.Resource
-}
-
-// HandleRelatedCheckStarted dispatches a KindRelatedCheck TaskRequest when
-// defs are registered for the event's resource type. The RelatedCheckPayload
-// carries the full source resource so the headless executor (runRelatedCheckers)
-// can invoke checkers without re-fetching. The TUI adapter's relatedCheckCmd
-// fan-out uses the payload as a fallback source but continues its own concurrent
-// path — the payload is additive and does not change the TUI code path.
-func (c *Core) HandleRelatedCheckStarted(ev RelatedCheckStartedEvent) ([]UIIntent, []TaskRequest) {
-	defs := resource.GetRelated(ev.ResourceType)
-	if len(defs) == 0 {
-		return nil, nil
-	}
-	return nil, []TaskRequest{{
-		Key:     TaskKey{Kind: KindRelatedCheck, Scope: ev.ResourceType + "/" + ev.SourceResource.ID},
-		Cache:   CacheNone,
-		Payload: RelatedCheckPayload{ResourceType: ev.ResourceType, Resource: ev.SourceResource},
-	}}
-}
+// RelatedCheckerTimeout bounds a single RelatedDef checker call (including
+// its NeedsTargetCache prefetch and lazy-add FetchByIDs call, if any) — the
+// same per-checker budget the TUI's fan-out has always used, now shared with
+// the headless executor's fan-out via RunRelatedDef (executor.go).
+const RelatedCheckerTimeout = 10 * time.Second
 
 // RelatedTitleSuffix returns the " -- id (name)" suffix for list titles.
 func RelatedTitleSuffix(src resource.Resource) string {
@@ -74,19 +58,8 @@ func MissingFromCache(cache resource.ResourceCache, targetType string, ids []str
 	return missing
 }
 
-// BuildResourceCacheSnapshot is defined in probes.go. The
-// related-check fan-out in runtime_adapter_related.go calls Core.BuildResourceCacheSnapshot
-// directly, so no wrapper is needed here.
-
-// SnapshotCache returns a flat map snapshot of every RowStore-retained type
-// (task #17 wave 1 stage 3 — the former ResourceCache/LazyResourceCache
-// two-map merge is gone; a type's rows live in exactly one RowStore entry,
-// full or Partial alike, so there is no merge-precedence left to apply).
-func (c *Core) SnapshotCache() map[string][]resource.Resource {
-	all := c.session.RowStore.SnapshotAll(true)
-	snap := make(map[string][]resource.Resource, len(all))
-	for shortName, tr := range all {
-		snap[shortName] = tr.Rows
-	}
-	return snap
-}
+// BuildResourceCacheSnapshot is defined in probes.go. Every RunRelatedDef
+// caller — the TUI's per-def fan-out (runtime_adapter_related.go) and the
+// executor's KindRelatedCheck case (executor.go) alike — builds its
+// cacheSnap argument via Core.BuildResourceCacheSnapshot, so both lanes see
+// the identical IsTruncated-aware snapshot.

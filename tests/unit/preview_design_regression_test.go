@@ -90,12 +90,14 @@ func TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter(t *testing.T) {
 	})
 
 	// tg=0 (dim), asg=2 (available), others dim. SourceResourceID and
-	// Generation must be set — a compliant adapter (session-backed
+	// OperationID must be set — a compliant adapter (session-backed
 	// Controller) drops any RelatedCheckResult missing the source ID or
-	// carrying a stale generation, leaving every row unresolved regardless
-	// of the test's intent. Generation: 1 is the fresh session's initial
-	// RelatedGen (session.New() seeds it at 1, never 0; bumped only on
-	// refresh/profile/region switch — neither happens here).
+	// carrying a stale operation id, leaving every row unresolved regardless
+	// of the test's intent. activeOp is the live DetailOperation the
+	// Navigate above just began (read via the Core accessor rather than
+	// hardcoding a value — no refresh/profile/region switch happens between
+	// Navigate and this loop).
+	activeOp := m.Core().ActiveDetailOp()
 	for _, tc := range []struct {
 		target string
 		count  int
@@ -116,7 +118,7 @@ func TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter(t *testing.T) {
 		m, _ = previewApplyMsg(m, messages.RelatedCheckResult{
 			ResourceType:     "ec2",
 			SourceResourceID: ec2Res.ID,
-			Generation:       1,
+			OperationID:      activeOp,
 			Result:           resource.RelatedCheckResult{TargetType: tc.target, Count: tc.count, ResourceIDs: tc.ids},
 		})
 	}
@@ -222,6 +224,7 @@ func TestPreview_RightColumnFocus_HLAndTabToggleFocus(t *testing.T) {
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
 	})
+	activeOp := m.Core().ActiveDetailOp()
 	for _, tc := range []struct {
 		target string
 		count  int
@@ -233,7 +236,7 @@ func TestPreview_RightColumnFocus_HLAndTabToggleFocus(t *testing.T) {
 		m, _ = previewApplyMsg(m, messages.RelatedCheckResult{
 			ResourceType:     "ec2",
 			SourceResourceID: ec2Res.ID,
-			Generation:       1,
+			OperationID:      activeOp,
 			Result:           resource.RelatedCheckResult{TargetType: tc.target, Count: tc.count, ResourceIDs: tc.ids},
 		})
 	}

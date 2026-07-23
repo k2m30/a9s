@@ -31,9 +31,10 @@ import (
 
 // TestRelatedCheckCmd_CheckerPanic_SurfacesErrorAndFallsBackToUnknown
 // registers a related checker that panics, drives it through the real
-// relatedCheckCmd fan-out (via messages.RelatedCheckStarted), and asserts
-// the recovered result carries a non-nil, descriptive LazyAddError while
-// Result is preserved as resource.UnknownRelated.
+// relatedCheckCmd fan-out (by opening the resource's detail view, which
+// begins a DetailOperation and dispatches the related-check task directly),
+// and asserts the recovered result carries a non-nil, descriptive
+// LazyAddError while Result is preserved as resource.UnknownRelated.
 func TestRelatedCheckCmd_CheckerPanic_SurfacesErrorAndFallsBackToUnknown(t *testing.T) {
 	const (
 		srcType    = "test-related-panic-source"
@@ -56,9 +57,10 @@ func TestRelatedCheckCmd_CheckerPanic_SurfacesErrorAndFallsBackToUnknown(t *test
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-panic-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)

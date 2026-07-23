@@ -9,9 +9,16 @@
 // enrichS3). golang.org/x/sync/singleflight coalesces concurrent identical
 // in-flight calls into one underlying call and shares its result across
 // every caller waiting on that key; it does NOT cache — a call made after
-// the previous one already completed always re-executes. Shared in-flight
-// result, uncached subsequent opens: no staleness risk, only the redundant
-// concurrent duplicate work is removed.
+// the previous one already completed always re-executes.
+//
+// Every decorator keys its singleflight group as the active
+// core/runtime.DetailOperation's ID (WithDetailOp) plus the existing
+// per-call key: the enricher and its related checkers, opened together
+// under one operation, share one in-flight call per underlying API key; a
+// refresh begins a brand-new operation — a new ID, a new namespace — so it
+// is structurally unable to join whatever pre-refresh call is still in
+// flight under the old ID. No Forget call is needed for this: the
+// namespaces simply never collide.
 //
 // Wired only at the live client bootstrap (CreateServiceClients, below in
 // this package). Demo mode's fakes (core/demo/client.go) are instant,
@@ -30,46 +37,57 @@ package aws
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 
+	"github.com/k2m30/a9s/v3/core/domain"
+
 	"golang.org/x/sync/singleflight"
 )
 
-// coalesceBypassKey is the unexported context-key type for
-// WithCoalesceBypass/CoalesceBypassed — unexported so no other package can
+// detailOpKey is the unexported context-key type for
+// WithDetailOp/DetailOpFromContext — unexported so no other package can
 // collide with or forge the marker.
-type coalesceBypassKey struct{}
+type detailOpKey struct{}
 
-// WithCoalesceBypass marks ctx so a coalescing decorator's Do call below is
-// skipped for this one call. Wired by enrichDetail (detail_enrich_engine.go)
-// when DetailEnrichmentCtx.SkipCache is set (an explicit Ctrl+R refresh), and
-// by core/runtime's related-checker fan-out for an explicit detail refresh:
-// the refresh must not join whatever pre-refresh call is already in flight on
-// the same key, because a shared singleflight response can't be freshened
-// after the fact — only a call that actually re-executes can. Exported so
-// core/runtime (a separate package) can wrap the same marker onto a related
-// checker's context.
-func WithCoalesceBypass(ctx context.Context) context.Context {
-	return context.WithValue(ctx, coalesceBypassKey{}, true)
+// WithDetailOp marks ctx with id, the active core/runtime.DetailOperation's
+// ID, so every coalescing decorator below can key its singleflight group
+// per-operation via DetailOpFromContext. Every AWS call made on behalf of
+// one operation — its detail enricher and every one of its related
+// checkers — should be wrapped with the SAME id, so they coalesce with each
+// other; a call made under a later operation (a fresh detail open, or an
+// explicit Ctrl+R refresh, both of which mint a new ID via
+// core/runtime.Core.BeginDetailOperation) can never join it.
+func WithDetailOp(ctx context.Context, id domain.Gen) context.Context {
+	return context.WithValue(ctx, detailOpKey{}, id)
 }
 
-// CoalesceBypassed reports whether ctx carries the WithCoalesceBypass marker.
-// Exported as the read-side contract probe alongside WithCoalesceBypass.
-func CoalesceBypassed(ctx context.Context) bool {
-	v, _ := ctx.Value(coalesceBypassKey{}).(bool)
-	return v
+// DetailOpFromContext returns the operation ID WithDetailOp attached to ctx,
+// or 0 when none was attached (no operation — coalesces only against other
+// same-key calls that also carry no operation).
+func DetailOpFromContext(ctx context.Context) domain.Gen {
+	id, _ := ctx.Value(detailOpKey{}).(domain.Gen)
+	return id
+}
+
+// coalesceKey renders the ctx's operation ID (DetailOpFromContext) and the
+// caller's own per-call key into the one singleflight key every decorator
+// below uses, so two calls only coalesce when both the operation AND the
+// underlying resource identifier match.
+func coalesceKey(ctx context.Context, key string) string {
+	return strconv.FormatUint(uint64(DetailOpFromContext(ctx)), 10) + "/" + key
 }
 
 // coalescingSFN wraps SFNAPI, coalescing concurrent identical
-// DescribeStateMachine calls (same StateMachineArn) into one underlying
-// call. SFNAPI (sfn_interfaces.go) is already the complete aggregate of
-// every SFN operation asserted anywhere in core/aws, so embedding it alone
-// is sufficient — no narrower interface elsewhere needs a separate
-// pass-through.
+// DescribeStateMachine calls (same operation, same StateMachineArn) into one
+// underlying call. SFNAPI (sfn_interfaces.go) is already the complete
+// aggregate of every SFN operation asserted anywhere in core/aws, so
+// embedding it alone is sufficient — no narrower interface elsewhere needs a
+// separate pass-through.
 //
 // Callers must treat the shared *sfn.DescribeStateMachineOutput as
 // read-only: every current consumer (the four listed above) only reads
@@ -96,15 +114,7 @@ func NewCoalescingSFN(api SFNAPI) SFNAPI {
 }
 
 func (c *coalescingSFN) DescribeStateMachine(ctx context.Context, params *sfn.DescribeStateMachineInput, optFns ...func(*sfn.Options)) (*sfn.DescribeStateMachineOutput, error) {
-	key := aws.ToString(params.StateMachineArn)
-	if CoalesceBypassed(ctx) {
-		// Explicit refresh: forget any in-flight call under this key so a
-		// later concurrent caller starts a fresh flight instead of joining
-		// the stale one, then call through directly — this call itself must
-		// not join (or register as) a shared flight either.
-		c.g.Forget(key)
-		return c.SFNAPI.DescribeStateMachine(ctx, params, optFns...)
-	}
+	key := coalesceKey(ctx, aws.ToString(params.StateMachineArn))
 	v, err, _ := c.g.Do(key, func() (any, error) {
 		return c.SFNAPI.DescribeStateMachine(ctx, params, optFns...)
 	})
@@ -130,9 +140,9 @@ type SNSFullAPI interface {
 }
 
 // coalescingSNS wraps SNSFullAPI, coalescing concurrent identical
-// GetTopicAttributes calls (same TopicArn) into one underlying call —
-// checkSNSKMS, checkSNSRole, and enrichSns each call it independently on
-// every sns detail open.
+// GetTopicAttributes calls (same operation, same TopicArn) into one
+// underlying call — checkSNSKMS, checkSNSRole, and enrichSns each call it
+// independently on every sns detail open.
 //
 // Callers must treat the shared *sns.GetTopicAttributesOutput as read-only:
 // every current consumer only reads from it.
@@ -153,13 +163,7 @@ func NewCoalescingSNS(api SNSFullAPI) SNSFullAPI {
 }
 
 func (c *coalescingSNS) GetTopicAttributes(ctx context.Context, params *sns.GetTopicAttributesInput, optFns ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
-	key := aws.ToString(params.TopicArn)
-	if CoalesceBypassed(ctx) {
-		// See coalescingSFN.DescribeStateMachine's bypass branch — same
-		// explicit-refresh reasoning applies verbatim.
-		c.g.Forget(key)
-		return c.SNSFullAPI.GetTopicAttributes(ctx, params, optFns...)
-	}
+	key := coalesceKey(ctx, aws.ToString(params.TopicArn))
 	v, err, _ := c.g.Do(key, func() (any, error) {
 		return c.SNSFullAPI.GetTopicAttributes(ctx, params, optFns...)
 	})
@@ -194,8 +198,8 @@ type S3FullAPI interface {
 }
 
 // coalescingS3 wraps S3FullAPI, coalescing concurrent identical
-// GetBucketPolicy calls (same Bucket) into one underlying call — the
-// s3→role related checker (s3_related.go) and enrichS3
+// GetBucketPolicy calls (same operation, same Bucket) into one underlying
+// call — the s3→role related checker (s3_related.go) and enrichS3
 // (s3_detail_enrichment.go) each call it independently on every s3 detail
 // open.
 //
@@ -217,13 +221,7 @@ func NewCoalescingS3(api S3FullAPI) S3FullAPI {
 }
 
 func (c *coalescingS3) GetBucketPolicy(ctx context.Context, params *s3.GetBucketPolicyInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyOutput, error) {
-	key := aws.ToString(params.Bucket)
-	if CoalesceBypassed(ctx) {
-		// See coalescingSFN.DescribeStateMachine's bypass branch — same
-		// explicit-refresh reasoning applies verbatim.
-		c.g.Forget(key)
-		return c.S3FullAPI.GetBucketPolicy(ctx, params, optFns...)
-	}
+	key := coalesceKey(ctx, aws.ToString(params.Bucket))
 	v, err, _ := c.g.Do(key, func() (any, error) {
 		return c.S3FullAPI.GetBucketPolicy(ctx, params, optFns...)
 	})

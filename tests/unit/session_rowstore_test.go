@@ -960,7 +960,7 @@ func TestRowStoreControllerPin_RelatedCheckResult_DualLane_BothWriteRowStore(t *
 		ResourceType:       "ec2",
 		SourceResourceID:   "i-source-1",
 		DefDisplayName:     "KMS Keys",
-		Generation:         s.RelatedGen,
+		OperationID:        core.ActiveDetailOp(),
 		LazyAddedResources: map[string][]resource.Resource{"kms": lazyRows},
 	})
 

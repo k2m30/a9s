@@ -190,27 +190,6 @@ func (c *Core) EnrichmentGen() domain.Gen { return c.session.EnrichmentGen }
 // BumpEnrichmentGen increments the Wave-2 enrichment counter.
 func (c *Core) BumpEnrichmentGen() { c.session.EnrichmentGen++ }
 
-// RelatedGen returns the related-cache staleness counter.
-func (c *Core) RelatedGen() domain.Gen { return c.session.RelatedGen }
-
-// BumpRelatedGen increments the related-cache counter so in-flight
-// related-check results from the prior batch are discarded.
-func (c *Core) BumpRelatedGen() { c.session.RelatedGen++ }
-
-// EnrichGen returns the detail-enrichment staleness counter.
-func (c *Core) EnrichGen() domain.Gen { return c.session.EnrichGen }
-
-// BumpEnrichGen increments the detail-enrichment counter.
-func (c *Core) BumpEnrichGen() { c.session.EnrichGen++ }
-
-// EnrichResKey returns the "resourceType:resourceID" of the last
-// detail-enrichment dispatch.
-func (c *Core) EnrichResKey() string { return c.session.EnrichResKey }
-
-// ClearEnrichResKey clears the last-dispatched detail-enrichment key so the
-// next enrichment dispatch is forced to bump.
-func (c *Core) ClearEnrichResKey() { c.session.EnrichResKey = "" }
-
 // EnrichmentTypeGen returns the per-type Wave-2 enrichment counter for the
 // given resource short name. Zero when no enrichment has run yet for the
 // type.

@@ -94,9 +94,10 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 	srcRes := resource.Resource{ID: "src-237-instance"}
 
 	// Dispatch: returns a batch of checker cmds.
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 	if batchCmd == nil {
 		t.Fatal("handleRelatedCheckStarted returned nil — expected checker batch")
@@ -156,11 +157,12 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 // Business rule: the right column must not show counts from a previous check batch
 // after the user has triggered a refresh (Ctrl+R).
 //
-// Mechanism: relatedGen starts at 1. The initial batch stamps gen=1. Ctrl+R
-// increments relatedGen to 2. Late results from the initial batch (gen=1) must
-// be discarded — they no longer match relatedGen=2.
+// Mechanism: setupEC2DetailWithResults opens the detail once, beginning one
+// DetailOperation. Ctrl+R begins a fresh one (BeginDetailOperation bumps
+// session.DetailOpGen). Late results from the PRIOR operation must be
+// discarded — their OperationID no longer matches the session's active one.
 //
-// Observable proxy: if a gen=1 stale result is applied after relatedGen=2,
+// Observable proxy: if a stale-operation result is applied after Ctrl+R,
 // the right column shows the stale count; if discarded, no count appears.
 func TestIssue239_StaleGenerationResult_IsDiscarded(t *testing.T) {
 	const viewedResourceID = "i-0a1b2c3d4e5f60001"
@@ -168,27 +170,33 @@ func TestIssue239_StaleGenerationResult_IsDiscarded(t *testing.T) {
 	// Set up EC2 detail view using demo fixtures so the right column is rendered.
 	m := setupEC2DetailWithResults(t)
 
+	// Capture the operation ID BEFORE Ctrl+R — this is the id a late result
+	// from the initial batch would carry, guaranteed stale once Ctrl+R begins
+	// a new operation.
+	staleOp := m.Core().ActiveDetailOp()
+
 	// Verify precondition: the view shows related counts after setup.
 	viewBefore := stripANSI(rootViewContent(m))
-	if !strings.Contains(viewBefore, "(2)") {
-		t.Fatalf("precondition: expected '(2)' in view before test; got:\n%s", viewBefore)
+	if !strings.Contains(viewBefore, "(7)") {
+		t.Fatalf("precondition: expected '(7)' in view before test; got:\n%s", viewBefore)
 	}
 
-	// Trigger Ctrl+R: increments relatedGen from 1 to 2 and clears the relatedCache
-	// entry so the right column returns to loading state.
+	// Trigger Ctrl+R: begins a fresh DetailOperation and clears the
+	// relatedCache entry so the right column returns to loading state.
 	m, _ = rootApplyMsg(m, ctrlR())
 
 	viewAfterRefresh := stripANSI(rootViewContent(m))
-	if strings.Contains(viewAfterRefresh, "(2)") {
-		t.Fatalf("precondition: after Ctrl+R stale '(2)' still visible — relatedCache not cleared:\n%s", viewAfterRefresh)
+	if strings.Contains(viewAfterRefresh, "(7)") {
+		t.Fatalf("precondition: after Ctrl+R stale '(7)' still visible — relatedCache not cleared:\n%s", viewAfterRefresh)
 	}
 
-	// Inject a result with gen=1 (the initial batch's generation, now stale since
-	// relatedGen=2). This simulates a late arrival from the previous batch.
+	// Replay a result stamped with the pre-Ctrl+R operation ID — stale
+	// relative to the operation Ctrl+R just began. This simulates a late
+	// arrival from the previous batch.
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: viewedResourceID,
-		Generation:       1, // initial batch generation — stale after Ctrl+R (relatedGen=2)
+		OperationID:      staleOp,
 		Result: resource.RelatedCheckResult{
 			TargetType: "tg",
 			Count:      99, // distinctive count — must NOT appear
@@ -197,29 +205,29 @@ func TestIssue239_StaleGenerationResult_IsDiscarded(t *testing.T) {
 
 	viewAfterStale := stripANSI(rootViewContent(m))
 	if strings.Contains(viewAfterStale, "99") {
-		t.Errorf("stale gen=1 result applied after relatedGen=2 — it must be discarded.\n"+
-			"Fix: the initial relatedGen must be >0 so gen=0 (unset) is always stale "+
-			"and gen=1 results are correctly rejected after the first Ctrl+R.\n"+
+		t.Errorf("stale-operation result applied after Ctrl+R began a new operation — it must be discarded.\n"+
 			"View:\n%s", viewAfterStale)
 	}
 }
 
 // TestIssue239_CurrentGenerationResult_IsAccepted verifies that results stamped with
-// the current relatedGen ARE applied to the right column.
+// the CURRENT DetailOperation ID ARE applied to the right column.
 //
-// After Ctrl+R, relatedGen becomes 2. A result with gen=2 must be accepted;
-// a result with gen=0 (test injection sentinel) must also be accepted.
+// After Ctrl+R begins a fresh operation, a result stamped with that exact
+// operation ID must be accepted.
 func TestIssue239_CurrentGenerationResult_IsAccepted(t *testing.T) {
 	const viewedResourceID = "i-0a1b2c3d4e5f60001"
 
 	m := setupEC2DetailWithResults(t)
-	m, _ = rootApplyMsg(m, ctrlR()) // relatedGen: 1 → 2
+	m, _ = rootApplyMsg(m, ctrlR()) // begins a fresh DetailOperation
 
-	// gen=2 matches relatedGen=2 → accepted.
+	currentOp := m.Core().ActiveDetailOp()
+
+	// A result stamped with the CURRENT operation ID must be accepted.
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: viewedResourceID,
-		Generation:       2, // current generation after one Ctrl+R
+		OperationID:      currentOp,
 		Result: resource.RelatedCheckResult{
 			TargetType: "tg",
 			Count:      7,
@@ -228,7 +236,7 @@ func TestIssue239_CurrentGenerationResult_IsAccepted(t *testing.T) {
 
 	view := stripANSI(rootViewContent(m))
 	if !strings.Contains(view, "(7)") {
-		t.Errorf("gen=2 result should be accepted when relatedGen=2; right column should show '(7)'.\nView:\n%s", view)
+		t.Errorf("current-operation result should be accepted; right column should show '(7)'.\nView:\n%s", view)
 	}
 }
 
@@ -284,9 +292,10 @@ func TestIssue240_FieldOnlyChecker_NoPrefetch(t *testing.T) {
 		Fields: map[string]string{"has_target": "true"},
 	}
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 	if batchCmd == nil {
 		t.Fatal("handleRelatedCheckStarted returned nil")
@@ -369,9 +378,10 @@ func TestIssue240_CacheDependentChecker_DoesPrefetch(t *testing.T) {
 
 	srcRes := resource.Resource{ID: "src-240-cache"}
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 	if batchCmd == nil {
 		t.Fatal("handleRelatedCheckStarted returned nil")
@@ -480,9 +490,10 @@ func TestIssue241_ConcurrentProbesCappedAt4(t *testing.T) {
 
 	srcRes := resource.Resource{ID: "src-241"}
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 	if batchCmd == nil {
 		t.Fatal("handleRelatedCheckStarted returned nil")

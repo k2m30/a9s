@@ -50,6 +50,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 )
 
 // concurrentGateSleep gives N goroutines launched just before it time to
@@ -593,135 +594,94 @@ func TestNewCoalescingS3_InterfaceTransparency_NonAggregateNarrowInterfaces(t *t
 	}
 }
 
-// TestNewCoalescingS3_Bypass_ForgetGivesFreshResultAndPreventsLaterJoin pins
-// F3: enrichDetail (core/aws/detail_enrich_engine.go) marks ctx with an
-// unexported coalesce-bypass marker when DetailEnrichmentCtx.SkipCache is
-// set (an explicit detail refresh); on that marker the coalescing
-// decorator's gated method forgets any in-flight entry for the key
-// (singleflight.Group.Forget) and calls the inner client directly instead
-// of joining. The marker itself has no exported constructor (coalesce.go's
-// withCoalesceBypass/coalesceBypassed are package-private), so the only way
-// to exercise it from this external package is the same way production
-// does: through enrichS3 with SkipCache: true, sharing one coalescing
-// client instance with a plain concurrent caller — exactly how
-// checkS3Role and enrichS3 share one ServiceClients.S3 in production
-// (coalesce.go's doc comment).
-func TestNewCoalescingS3_Bypass_ForgetGivesFreshResultAndPreventsLaterJoin(t *testing.T) {
+// TestWithDetailOp_SameOperation_ConcurrentIdenticalCalls_ShareOneUnderlyingCall
+// pins the coalescing namespace WithDetailOp/DetailOpFromContext establish
+// (coalesce.go's coalesceKey): every AWS call made on behalf of the SAME
+// core/runtime.DetailOperation shares one singleflight group per underlying
+// key, exactly like the plain (no-op-context) axis above — WithDetailOp only
+// adds a namespace prefix to the same key, it does not change the dedup
+// mechanism itself.
+func TestWithDetailOp_SameOperation_ConcurrentIdenticalCalls_ShareOneUnderlyingCall(t *testing.T) {
 	const bucket = "acme-app-logs-prod"
-	flightAEntered := make(chan struct{})
-	flightAGate := make(chan struct{})
-	var seq atomic.Int64
+	fake := &coalesceS3Fake{getPolicyBlock: make(chan struct{})}
+	decorated := awsclient.NewCoalescingS3(fake)
+	ctx := awsclient.WithDetailOp(context.Background(), domain.Gen(7))
 
-	fake := &coalesceS3Fake{
-		getPolicyFn: func(in *s3.GetBucketPolicyInput) (*s3.GetBucketPolicyOutput, error) {
-			n := seq.Add(1)
-			if n == 1 {
-				// Flight A: the first call in, blocks until the test
-				// releases it — everything else (bypass, and a later
-				// plain caller) must not wait on this.
-				close(flightAEntered)
-				<-flightAGate
-			}
-			return &s3.GetBucketPolicyOutput{Policy: aws.String(fmt.Sprintf("%s#%d", aws.ToString(in.Bucket), n))}, nil
-		},
+	const n = 8
+	results := make([]*s3.GetBucketPolicyOutput, n)
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for i := range n {
+		go func(i int) {
+			defer wg.Done()
+			results[i], errs[i] = decorated.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
+		}(i)
 	}
-	coalesced := awsclient.NewCoalescingS3(fake)
+	time.Sleep(concurrentGateSleep)
+	close(fake.getPolicyBlock)
+	wg.Wait()
 
-	// Flight A: a plain call directly on the decorator.
-	var flightAResult *s3.GetBucketPolicyOutput
-	var flightAErr error
-	var wgA sync.WaitGroup
-	wgA.Add(1)
-	go func() {
-		defer wgA.Done()
-		flightAResult, flightAErr = coalesced.GetBucketPolicy(context.Background(), &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
-	}()
-	<-flightAEntered
-
-	// The bypass call: drive it through the real enrichS3 pipeline with
-	// SkipCache: true, sharing the SAME coalescing client instance as
-	// flight A.
-	enricher := s3Enricher(t)
-	dctx := &awsclient.DetailEnrichmentCtx{
-		Clients:    &awsclient.ServiceClients{S3: coalesced},
-		PolicyDocs: &awsclient.PolicyDocumentCache{},
-		DetailDocs: &awsclient.DetailDocCache{},
-		SkipCache:  true,
+	if got := fake.getPolicyCalls.Load(); got != 1 {
+		t.Errorf("GetBucketPolicy reached the inner fake %d times across %d concurrent calls under the SAME operation, want 1", got, n)
 	}
-	bypassGot, err := enricher(context.Background(), dctx, makeS3Res(bucket))
-	if err != nil {
-		t.Fatalf("bypass (SkipCache) enrichS3 call error: %v", err)
-	}
-	if got := fake.getPolicyCalls.Load(); got != 2 {
-		t.Fatalf("GetBucketPolicy reached the inner fake %d times for flight A + the bypass call, want 2 (bypass must not wait for flight A)", got)
-	}
-	bypassEnriched, ok := bypassGot.RawStruct.(awsclient.BucketEnriched)
-	if !ok {
-		t.Fatalf("bypass RawStruct = %T, want BucketEnriched", bypassGot.RawStruct)
-	}
-	bypassPolicy, ok := bypassEnriched.Policy.(string)
-	if !ok {
-		t.Fatalf("bypass enriched.Policy = %T (%v), want string", bypassEnriched.Policy, bypassEnriched.Policy)
-	}
-
-	// A caller issued right after the bypass (which must have already
-	// Forgotten the key) must not join flight A, which is STILL blocked at
-	// this point — it must start its own call. Bounded-wait so a wrongly
-	// preserved join manifests as a clean failure, not a hang.
-	thirdDone := make(chan struct{})
-	var thirdResult *s3.GetBucketPolicyOutput
-	var thirdErr error
-	go func() {
-		defer close(thirdDone)
-		thirdResult, thirdErr = coalesced.GetBucketPolicy(context.Background(), &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
-	}()
-	select {
-	case <-thirdDone:
-	case <-time.After(500 * time.Millisecond):
-		close(flightAGate) // release flight A so the leaked goroutines above don't outlive the test
-		wgA.Wait()
-		t.Fatal("a caller issued right after the bypass appears to have joined flight A's still-blocked in-flight call instead of starting its own — Forget must evict the key immediately, not defer to flight A's completion")
-	}
-	if thirdErr != nil {
-		t.Fatalf("third call error: %v", thirdErr)
-	}
-
-	close(flightAGate)
-	wgA.Wait()
-	if flightAErr != nil {
-		t.Fatalf("flight A error: %v", flightAErr)
-	}
-
-	if got := fake.getPolicyCalls.Load(); got != 3 {
-		t.Errorf("GetBucketPolicy reached the inner fake %d times for flight A + bypass + the post-Forget caller, want 3", got)
-	}
-	if flightAResult == nil || *flightAResult.Policy == bypassPolicy {
-		t.Errorf("flight A's result %v must differ from the bypass result %q — the bypass caller must get its own fresh call, not flight A's shared one", flightAResult, bypassPolicy)
-	}
-	if thirdResult == nil || *thirdResult.Policy == bypassPolicy {
-		t.Errorf("the post-Forget caller's result %v must differ from the bypass result %q — it must be its own fresh call, not a join of a forgotten entry", thirdResult, bypassPolicy)
+	for i := range n {
+		if errs[i] != nil {
+			t.Fatalf("call %d: unexpected error: %v", i, errs[i])
+		}
+		if results[i] != results[0] {
+			t.Errorf("call %d: result pointer %p != call 0's %p — every caller under the same operation must share the identical singleflight result", i, results[i], results[0])
+		}
 	}
 }
 
-// TestCoalesceBypass_ExportedPair pins the exported WithCoalesceBypass/
-// CoalesceBypassed pair (renames of the former unexported
-// withCoalesceBypass/coalesceBypassed) — runtime.RunRelatedDef (the new
-// single-sourced related-check executor shared by both the TUI and neutral
-// lanes) constructs the bypass marker directly via this pair instead of
-// going through enrichDetail/SkipCache, so the pair itself must now be
-// externally constructible and observable. Unlike
-// TestNewCoalescingS3_Bypass_ForgetGivesFreshResultAndPreventsLaterJoin
-// above (which had to route through enrichS3 because the marker had no
-// exported constructor), this test builds the bypassed ctx directly.
-func TestCoalesceBypass_ExportedPair(t *testing.T) {
-	if awsclient.CoalesceBypassed(context.Background()) {
-		t.Error("CoalesceBypassed(context.Background()) = true, want false for a bare context")
-	}
-	bypassed := awsclient.WithCoalesceBypass(context.Background())
-	if !awsclient.CoalesceBypassed(bypassed) {
-		t.Error("CoalesceBypassed(WithCoalesceBypass(ctx)) = false, want true")
-	}
+// TestWithDetailOp_DifferentOperations_BothExecuteIndependently pins that two
+// operations calling the identical underlying key never coalesce with each
+// other — a fresh detail open or an explicit refresh mints a new
+// DetailOperation.ID, and coalesceKey folds that ID into the singleflight key,
+// so the two operations occupy disjoint namespaces even though the AWS-level
+// key (Bucket) is identical.
+func TestWithDetailOp_DifferentOperations_BothExecuteIndependently(t *testing.T) {
+	const bucket = "acme-app-logs-prod"
+	fake := &coalesceS3Fake{getPolicyBlock: make(chan struct{})}
+	decorated := awsclient.NewCoalescingS3(fake)
+	ctxOp1 := awsclient.WithDetailOp(context.Background(), domain.Gen(1))
+	ctxOp2 := awsclient.WithDetailOp(context.Background(), domain.Gen(2))
 
+	var errs [2]error
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, errs[0] = decorated.GetBucketPolicy(ctxOp1, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
+	}()
+	go func() {
+		defer wg.Done()
+		_, errs[1] = decorated.GetBucketPolicy(ctxOp2, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
+	}()
+	time.Sleep(concurrentGateSleep)
+	close(fake.getPolicyBlock)
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("call %d: unexpected error: %v", i, err)
+		}
+	}
+	if got := fake.getPolicyCalls.Load(); got != 2 {
+		t.Errorf("GetBucketPolicy reached the inner fake %d times for two DIFFERENT operations calling the same key, want 2 (operations must not coalesce with each other)", got)
+	}
+}
+
+// TestWithDetailOp_NewOperationNeverJoinsOlderOperationsInFlightCall pins the
+// structural guarantee coalesce.go's doc comment describes: a refresh begins
+// a brand-new operation — a new ID, a new namespace — so it is structurally
+// unable to join whatever pre-refresh call is still in flight under the old
+// ID. No Forget call is involved (unlike the deleted bypass mechanism this
+// test replaces): the namespaces simply never collide, so the new
+// operation's call executes immediately rather than waiting for the older,
+// still-blocked one to complete.
+func TestWithDetailOp_NewOperationNeverJoinsOlderOperationsInFlightCall(t *testing.T) {
 	const bucket = "acme-app-logs-prod"
 	flightAEntered := make(chan struct{})
 	flightAGate := make(chan struct{})
@@ -731,8 +691,8 @@ func TestCoalesceBypass_ExportedPair(t *testing.T) {
 		getPolicyFn: func(in *s3.GetBucketPolicyInput) (*s3.GetBucketPolicyOutput, error) {
 			n := seq.Add(1)
 			if n == 1 {
-				// Flight A: the first call in, blocks until the test releases
-				// it — the bypassed call below must not wait on this.
+				// Flight A (operation 1): the first call in, blocks until the
+				// test releases it — operation 2's call below must not wait.
 				close(flightAEntered)
 				<-flightAGate
 			}
@@ -747,27 +707,89 @@ func TestCoalesceBypass_ExportedPair(t *testing.T) {
 	wgA.Add(1)
 	go func() {
 		defer wgA.Done()
-		flightAResult, flightAErr = decorated.GetBucketPolicy(context.Background(), &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
+		ctxOp1 := awsclient.WithDetailOp(context.Background(), domain.Gen(1))
+		flightAResult, flightAErr = decorated.GetBucketPolicy(ctxOp1, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
 	}()
 	<-flightAEntered
 
-	// The bypassed call: same key, ctx built directly via the exported pair —
-	// must not join flight A's still-blocked in-flight call.
-	bypassCtx := awsclient.WithCoalesceBypass(context.Background())
-	bypassResult, err := decorated.GetBucketPolicy(bypassCtx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
-	if err != nil {
-		t.Fatalf("bypass call error: %v", err)
+	// Operation 2's call: same underlying key, still-blocked flight A must
+	// not delay it. Bounded-wait so an accidental cross-operation join
+	// manifests as a clean failure, not a hang.
+	op2Done := make(chan struct{})
+	var op2Result *s3.GetBucketPolicyOutput
+	var op2Err error
+	go func() {
+		defer close(op2Done)
+		ctxOp2 := awsclient.WithDetailOp(context.Background(), domain.Gen(2))
+		op2Result, op2Err = decorated.GetBucketPolicy(ctxOp2, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
+	}()
+	select {
+	case <-op2Done:
+	case <-time.After(500 * time.Millisecond):
+		close(flightAGate) // release flight A so the leaked goroutine above doesn't outlive the test
+		wgA.Wait()
+		t.Fatal("operation 2's call appears to have joined operation 1's still-blocked in-flight call instead of starting its own — a later operation must never join an earlier one's namespace")
 	}
-	if got := fake.getPolicyCalls.Load(); got != 2 {
-		t.Fatalf("GetBucketPolicy reached the inner fake %d times for flight A + the bypass call, want 2 (bypass must not wait for flight A)", got)
+	if op2Err != nil {
+		t.Fatalf("operation 2 call error: %v", op2Err)
 	}
 
 	close(flightAGate)
 	wgA.Wait()
 	if flightAErr != nil {
-		t.Fatalf("flight A error: %v", flightAErr)
+		t.Fatalf("flight A (operation 1) error: %v", flightAErr)
 	}
-	if flightAResult == nil || bypassResult == nil || *flightAResult.Policy == *bypassResult.Policy {
-		t.Errorf("flight A's result %v and the bypass result %v must differ — the bypass call must not join flight A's shared in-flight call", flightAResult, bypassResult)
+
+	if got := fake.getPolicyCalls.Load(); got != 2 {
+		t.Errorf("GetBucketPolicy reached the inner fake %d times for operation 1 + operation 2, want 2", got)
+	}
+	if flightAResult == nil || op2Result == nil || *flightAResult.Policy == *op2Result.Policy {
+		t.Errorf("operation 1's result %v and operation 2's result %v must differ — each operation must get its own fresh call", flightAResult, op2Result)
+	}
+}
+
+// TestWithDetailOp_NoOpContext_CoalescesAsSharedDefaultNamespace pins
+// DetailOpFromContext's zero-value fallback: a context that never passed
+// through WithDetailOp (e.g. a call site not yet wired into the
+// DetailOperation lifecycle) resolves to operation ID 0, and every such
+// caller shares that SAME default namespace — they coalesce with each other
+// exactly as same-operation callers do, never as if each had its own
+// unnamespaced identity.
+func TestWithDetailOp_NoOpContext_CoalescesAsSharedDefaultNamespace(t *testing.T) {
+	if awsclient.DetailOpFromContext(context.Background()) != domain.Gen(0) {
+		t.Fatalf("DetailOpFromContext(context.Background()) = %d, want 0", awsclient.DetailOpFromContext(context.Background()))
+	}
+
+	const bucket = "acme-app-logs-prod"
+	fake := &coalesceS3Fake{getPolicyBlock: make(chan struct{})}
+	decorated := awsclient.NewCoalescingS3(fake)
+
+	const n = 4
+	results := make([]*s3.GetBucketPolicyOutput, n)
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for i := range n {
+		go func(i int) {
+			defer wg.Done()
+			// No WithDetailOp — a bare context, exactly like a call site that
+			// has not (yet) been wired into the DetailOperation lifecycle.
+			results[i], errs[i] = decorated.GetBucketPolicy(context.Background(), &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
+		}(i)
+	}
+	time.Sleep(concurrentGateSleep)
+	close(fake.getPolicyBlock)
+	wg.Wait()
+
+	if got := fake.getPolicyCalls.Load(); got != 1 {
+		t.Errorf("GetBucketPolicy reached the inner fake %d times across %d concurrent no-op-context calls, want 1 (they must share the default namespace)", got, n)
+	}
+	for i := range n {
+		if errs[i] != nil {
+			t.Fatalf("call %d: unexpected error: %v", i, errs[i])
+		}
+		if results[i] != results[0] {
+			t.Errorf("call %d: result pointer %p != call 0's %p — no-op-context callers must share the identical singleflight result", i, results[i], results[0])
+		}
 	}
 }

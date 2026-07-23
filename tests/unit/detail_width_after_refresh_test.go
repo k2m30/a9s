@@ -44,7 +44,7 @@ const narrowTerminalWidth = 80
 
 // setupEC2DetailWithResultsNarrow is like setupEC2DetailWithResults but uses an
 // 80-col terminal so that currentRightColWidth() returns 26, not 32.
-func setupEC2DetailWithResultsNarrow(t *testing.T) tui.Model {
+func setupEC2DetailWithResultsNarrow(t *testing.T) (tui.Model, resource.Resource) {
 	t.Helper()
 
 	m := tui.New("demo", "us-east-1",
@@ -78,30 +78,37 @@ func setupEC2DetailWithResultsNarrow(t *testing.T) tui.Model {
 	m, _ = drainCmds(t, m, firstCmd, 5)
 
 	// Feed results for every EC2 related type so right column is visible.
+	// SourceResourceID must match the open detail's resource: foldRelatedCheckResultLocked
+	// only merges a result into a stacked ScreenDetail when
+	// ds.Resource.ID == SourceResourceID (core/app/handle.go).
+	firstInstance := ec2Res[0]
 	for _, def := range resource.GetRelated("ec2") {
 		m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
-			ResourceType: "ec2",
+			ResourceType:     "ec2",
+			SourceResourceID: firstInstance.ID,
 			Result: resource.RelatedCheckResult{
 				TargetType:  def.TargetType,
-				Count:       2,
-				ResourceIDs: []string{"related-id-1", "related-id-2"},
+				Count:       stubRelatedCount,
+				ResourceIDs: stubRelatedIDs,
 			},
 		})
 	}
 
-	return m
+	return m, firstInstance
 }
 
-// feedEC2Results feeds RelatedCheckResultMsg for all EC2 related types with Count=2.
-func feedEC2Results(t *testing.T, m tui.Model) tui.Model {
+// feedEC2Results feeds RelatedCheckResultMsg for all EC2 related types with
+// Count=stubRelatedCount, stamped for srcID (see setupEC2DetailWithResultsNarrow).
+func feedEC2Results(t *testing.T, m tui.Model, srcID string) tui.Model {
 	t.Helper()
 	for _, def := range resource.GetRelated("ec2") {
 		m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
-			ResourceType: "ec2",
+			ResourceType:     "ec2",
+			SourceResourceID: srcID,
 			Result: resource.RelatedCheckResult{
 				TargetType:  def.TargetType,
-				Count:       2,
-				ResourceIDs: []string{"related-id-1", "related-id-2"},
+				Count:       stubRelatedCount,
+				ResourceIDs: stubRelatedIDs,
 			},
 		})
 	}
@@ -138,12 +145,12 @@ func maxLineWidth(view string) int {
 //
 // This test FAILS with current code.
 func TestDetail_CtrlR_UsesCurrentRightColWidth_NarrowTerminal(t *testing.T) {
-	m := setupEC2DetailWithResultsNarrow(t)
+	m, firstInstance := setupEC2DetailWithResultsNarrow(t)
 
 	// Confirm right column is visible — related counts must appear.
 	viewBefore := stripANSI(rootViewContent(m))
-	if !strings.Contains(viewBefore, "(2)") {
-		t.Fatalf("precondition failed: expected '(2)' in view before Ctrl+R to confirm "+
+	if !strings.Contains(viewBefore, "(7)") {
+		t.Fatalf("precondition failed: expected '(7)' in view before Ctrl+R to confirm "+
 			"related counts are visible at width=%d.\nView:\n%s", narrowTerminalWidth, viewBefore)
 	}
 
@@ -160,7 +167,7 @@ func TestDetail_CtrlR_UsesCurrentRightColWidth_NarrowTerminal(t *testing.T) {
 	// Re-feed results — now the right column is filled again.
 	// With the bug the right col's internal viewport is 32 wide → overflow.
 	// With the fix it is 26 wide → no overflow.
-	m = feedEC2Results(t, m)
+	m = feedEC2Results(t, m, firstInstance.ID)
 
 	viewAfter := rootViewContent(m) // keep ANSI so lipgloss.Width is accurate
 	maxW := maxLineWidth(viewAfter)
@@ -191,12 +198,12 @@ func TestDetail_CtrlR_UsesCurrentRightColWidth_NarrowTerminal(t *testing.T) {
 //
 // This test FAILS with current code.
 func TestDetail_ResetRightColumn_UsesCurrentRightColWidth_NarrowTerminal(t *testing.T) {
-	m := setupEC2DetailWithResultsNarrow(t)
+	m, firstInstance := setupEC2DetailWithResultsNarrow(t)
 
 	// Confirm right column is visible.
 	viewBefore := stripANSI(rootViewContent(m))
-	if !strings.Contains(viewBefore, "(2)") {
-		t.Fatalf("precondition failed: expected '(2)' in view before reset; "+
+	if !strings.Contains(viewBefore, "(7)") {
+		t.Fatalf("precondition failed: expected '(7)' in view before reset; "+
 			"view:\n%s", viewBefore)
 	}
 
@@ -214,7 +221,7 @@ func TestDetail_ResetRightColumn_UsesCurrentRightColWidth_NarrowTerminal(t *test
 	// Re-feed results to fill the reset right column.
 	// With the bug: ResetRightColumn used m.rightColWidth=32, right col renders at 32.
 	// With the fix: ResetRightColumn uses currentRightColWidth()=26, right col renders at 26.
-	m = feedEC2Results(t, m)
+	m = feedEC2Results(t, m, firstInstance.ID)
 
 	viewAfter := rootViewContent(m) // keep ANSI for accurate lipgloss.Width
 	maxW := maxLineWidth(viewAfter)

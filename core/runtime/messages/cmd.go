@@ -95,17 +95,6 @@ type LoadResources struct {
 
 func (LoadResources) isCmd() {}
 
-// RelatedCheckStarted requests that the app core dispatch related-resource
-// checkers. Emitted by DetailModel when user presses 'r'. The core handles
-// this because it owns clients and ResourceCache — views cannot dispatch AWS
-// calls directly.
-type RelatedCheckStarted struct {
-	ResourceType   string
-	SourceResource resource.Resource // the resource being viewed
-}
-
-func (RelatedCheckStarted) isCmd() {}
-
 // RelatedNavigate requests navigation to a related resource type.
 // Emitted by: (a) detail view when Enter pressed on navigable field,
 // (b) rightColumnModel when Enter pressed on selected row.
@@ -141,11 +130,28 @@ type RelatedNavigate struct {
 
 func (RelatedNavigate) isCmd() {}
 
-// EnrichDetail signals that the active detail view's resource should be
-// enriched with additional data (e.g., policy document fetched on demand).
-type EnrichDetail struct {
-	ResourceType string
-	Resource     resource.Resource
+// AllCmdSamples returns exactly one minimal-but-valid instance of every
+// concrete type implementing Cmd, in this file's declaration order — the
+// enumerable registry the cross-renderer routing contract test iterates.
+// ADDING A NEW COMMAND TYPE WITHOUT A SAMPLE HERE MUST FAIL THE CONTRACT
+// TEST's count check, so keep this adjacent to the type definitions above.
+//
+// Fields are left at their zero value except where a non-zero value avoids
+// a nil-deref/panic on the routing path or exercises the type's real branch
+// (a registered ResourceType/TargetType, or a Resource carrying a Type/ID,
+// instead of an unregistered empty-string no-op). Target: zero exclusions —
+// every concrete Cmd type below has a sample.
+func AllCmdSamples() []Cmd {
+	return []Cmd{
+		Navigate{Target: TargetMainMenu},
+		PopView{},
+		LoadMore{ResourceType: "ec2"},
+		ProfileSelected{Profile: "sample"},
+		RegionSelected{Region: "us-east-1"},
+		ThemeSelected{Theme: "tokyo-night"},
+		InitConnect{Profile: "sample", Region: "us-east-1"},
+		EnterChildView{ChildType: "sample", DisplayName: "sample"},
+		LoadResources{ResourceType: "ec2"},
+		RelatedNavigate{TargetType: "vpc", SourceResource: resource.Resource{Type: "ec2", ID: "i-sample"}, SourceType: "ec2", TargetID: "vpc-sample"},
+	}
 }
-
-func (EnrichDetail) isCmd() {}

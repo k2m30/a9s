@@ -94,40 +94,17 @@ func (m *Model) popRSWithCtrlPop(ctrlPop bool) (bool, tea.Cmd) {
 	if ctrlPop && m.activeRS().ctrlBacked {
 		depthBefore := len(m.ctrl.ScreenIDs())
 		_, tasks := m.ctrl.Apply(app.Action{Kind: app.ActionBack})
-		cmd = relatedCheckStartedCmdFromTasks(tasks)
+		// handleActionBack (owner decision #38) may return a KindRelatedCheck
+		// task when the pop reveals a detail screen with registered related
+		// defs — dispatchTaskRequests routes it to the same relatedCheckCmd
+		// fan-out every other related-check dispatch uses.
+		cmd = m.dispatchTaskRequests(tasks)
 		if len(m.ctrl.ScreenIDs()) == depthBefore {
 			return false, cmd
 		}
 	}
 	m.stack = m.stack[:len(m.stack)-1]
 	return true, cmd
-}
-
-// relatedCheckStartedCmdFromTasks translates a KindRelatedCheck TaskRequest
-// (as emitted by handleActionBack when a pop reveals a detail screen with
-// registered related defs, owner decision #38) into the TUI's own
-// messages.RelatedCheckStarted trigger, so the existing concurrent per-def
-// fan-out (relatedCheckCmd, wired from handleRelatedCheckStarted) runs
-// exactly as it does for any other related-check dispatch — no separate,
-// independently-derived TUI decision is needed. Returns nil when tasks
-// carries no KindRelatedCheck entry.
-func relatedCheckStartedCmdFromTasks(tasks []runtime.TaskRequest) tea.Cmd {
-	for _, t := range tasks {
-		if t.Key.Kind != runtime.KindRelatedCheck {
-			continue
-		}
-		p, ok := t.Payload.(runtime.RelatedCheckPayload)
-		if !ok {
-			continue
-		}
-		return func() tea.Msg {
-			return messages.RelatedCheckStarted{
-				ResourceType:   p.ResourceType,
-				SourceResource: p.Resource,
-			}
-		}
-	}
-	return nil
 }
 
 // innerSize returns the content area dimensions inside the frame.
@@ -413,9 +390,12 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 			if resource.RelatedEnter(row.State, row.Count, row.Truncated) == resource.RelatedEnterResolveInPlace {
 				res := m.ctrl.GetDetailResource()
 				rt := rs.resourceType
-				return m, func() tea.Msg {
-					return messages.RelatedCheckStarted{ResourceType: rt, SourceResource: res}
+				op := m.core.BeginDetailOperation(rt, res, false)
+				_, relatedTask := m.core.DetailOperationTasks(op)
+				if relatedTask == nil {
+					return m, nil
 				}
+				return m, m.dispatchTaskRequests([]runtime.TaskRequest{*relatedTask})
 			}
 			var checker resource.RelatedChecker
 			for _, def := range resource.GetRelated(rs.resourceType) {

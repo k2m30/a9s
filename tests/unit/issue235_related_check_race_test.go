@@ -115,44 +115,28 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 		resource.CleanupPaginatedForTest(typeZ)
 	})
 
-	// Non-demo model so handleRelatedCheckStarted hits the live-mode path
+	// Non-demo model so the related-check dispatch hits the live-mode path
 	// (demo mode returns early before touching localCache).
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-235-instance"}
 
-	// Send RelatedCheckStartedMsg — root returns a tea.Batch of 3 checker cmds.
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	// Open detail for srcRes — begins a DetailOperation and dispatches the
+	// related-check fan-out directly, one leaf RelatedCheckResult per def.
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 	if batchCmd == nil {
-		t.Fatal("handleRelatedCheckStarted returned nil cmd — expected batch of 3 checker cmds")
+		t.Fatal("opening srcType detail returned nil cmd — expected batch of 3 checker cmds")
 	}
 
-	// Execute the batch to get the BatchMsg (all 3 sub-commands).
-	rawMsg := batchCmd()
-	if rawMsg == nil {
-		t.Fatal("batch cmd returned nil msg")
-	}
-
-	batchMsg, ok := rawMsg.(tea.BatchMsg)
-	if !ok {
-		t.Fatalf("expected tea.BatchMsg, got %T", rawMsg)
-	}
-
-	// Execute each sub-command and collect RelatedCheckResultMsg by target type.
+	// Execute every leaf and collect RelatedCheckResult by target type.
 	results := make(map[string]messages.RelatedCheckResult)
-	for _, cmd := range batchMsg {
-		if cmd == nil {
-			continue
-		}
-		msg := cmd()
-		if msg == nil {
-			continue
-		}
-		if r, ok2 := msg.(messages.RelatedCheckResult); ok2 {
+	for _, leaf := range extractLeafMsgs(batchCmd) {
+		if r, ok := leaf.(messages.RelatedCheckResult); ok {
 			results[r.Result.TargetType] = r
 		}
 	}

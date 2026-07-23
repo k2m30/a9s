@@ -153,16 +153,19 @@ func issue140SetupRightColumnFocus(t *testing.T, counts map[string]int) (m tui.M
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
 	})
-	// SourceResourceID and Generation must be set — a compliant adapter drops
-	// any RelatedCheckResult missing the source ID or carrying a stale
-	// generation. Generation: 1 is the fresh session's initial RelatedGen
-	// (session.New() seeds it at 1, never 0; bumped only on refresh/profile/
-	// region switch — neither happens here). ResourceIDs must also match
-	// Count — a real RelatedChecker always returns exactly Count IDs; a
-	// Count>0 result with no IDs is a data shape production never produces,
-	// and downstream (runtime_adapter_related.go's NavigationKindFilteredList
-	// branch) keys its title-suffix/pendingFilter wiring off len(RelatedIDs),
-	// not Count alone.
+	// SourceResourceID and OperationID must be set — a compliant adapter
+	// drops any RelatedCheckResult missing the source ID or carrying a
+	// stale operation id. activeOp is the live DetailOperation the Navigate
+	// above just began (read via the Core accessor rather than hardcoding a
+	// value — no refresh/profile/region switch happens between Navigate and
+	// this loop, so every result below is current relative to it).
+	// ResourceIDs must also match Count — a real RelatedChecker always
+	// returns exactly Count IDs; a Count>0 result with no IDs is a data
+	// shape production never produces, and downstream
+	// (runtime_adapter_related.go's NavigationKindFilteredList branch) keys
+	// its title-suffix/pendingFilter wiring off len(RelatedIDs), not Count
+	// alone.
+	activeOp := m.Core().ActiveDetailOp()
 	for _, target := range []string{"tg", "asg", "alarm", "cfn"} {
 		ids := make([]string, counts[target])
 		for i := range ids {
@@ -171,7 +174,7 @@ func issue140SetupRightColumnFocus(t *testing.T, counts map[string]int) (m tui.M
 		m, _ = previewApplyMsg(m, messages.RelatedCheckResult{
 			ResourceType:     "ec2",
 			SourceResourceID: ec2Res.ID,
-			Generation:       1,
+			OperationID:      activeOp,
 			Result:           resource.RelatedCheckResult{TargetType: target, Count: counts[target], ResourceIDs: ids},
 		})
 	}

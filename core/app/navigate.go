@@ -179,38 +179,27 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		// is already held by Apply or Handle.
 		c.ensureDetailState(*res.Resource, res.ResolvedType)
 		var tasks []runtime.TaskRequest
+		op := c.core.BeginDetailOperation(res.ResolvedType, *res.Resource, false)
+		enrichTask, relatedTask := c.core.DetailOperationTasks(op)
 		if res.DispatchRelated {
 			c.initDetailRelatedRows(res.ResolvedType)
 			// Populate the related panel: replay the related cache if present
 			// (D6: no re-fan-out over cached data — replayRelatedCache is the
 			// single source of truth for the hit path, shared with the TUI
 			// adapter's NavigateKindPushDetail case in
-			// runtime_adapter_navigate.go); otherwise dispatch a KindRelatedCheck
-			// task so DrainSync/the web renderer run the checkers headlessly.
-			if len(resource.GetRelated(res.ResolvedType)) > 0 && !c.replayRelatedCache(res.ResolvedType, *res.Resource) {
-				if ds := c.topDetailState(); ds != nil {
-					src := *res.Resource
-					tasks = append(tasks, runtime.TaskRequest{
-						Key:     runtime.TaskKey{Kind: runtime.KindRelatedCheck, Scope: res.ResolvedType + "/" + src.ID},
-						Cache:   runtime.CacheNone,
-						Payload: runtime.RelatedCheckPayload{ResourceType: res.ResolvedType, Resource: src},
-					})
-				}
+			// runtime_adapter_navigate.go); otherwise dispatch the operation's
+			// related-check task so DrainSync/the web renderer run the checkers
+			// headlessly. Cache-hit suppression is a caching concern, not an
+			// operation concern, so it stays here rather than in
+			// DetailOperationTasks.
+			if relatedTask != nil && !c.replayRelatedCache(res.ResolvedType, *res.Resource) {
+				tasks = append(tasks, *relatedTask)
 			}
 		}
-		if res.DispatchEnrich {
-			// Mirrors the TUI adapter's handleEnrichDetail: the runtime is the
-			// single source of truth for the dispatch gate (only resource types
-			// with a registered detail enricher get a TaskRequest back), so the
-			// headless controller invokes the same Core method rather than
-			// re-checking resource.HasDetailEnricher itself. KindEnrichDetail is
-			// classified background by IsBackgroundTaskKind, so it never blocks
-			// the initial detail render.
-			_, enrichTasks := c.core.HandleEnrichDetail(runtime.EnrichDetailEvent{
-				ResourceType: res.ResolvedType,
-				Resource:     *res.Resource,
-			})
-			tasks = append(tasks, enrichTasks...)
+		if res.DispatchEnrich && enrichTask != nil {
+			// KindEnrichDetail is classified background by IsBackgroundTaskKind,
+			// so it never blocks the initial detail render.
+			tasks = append(tasks, *enrichTask)
 		}
 		return tasks
 
@@ -228,6 +217,12 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		}
 		c.applyIntents([]runtime.UIIntent{intent})
 		c.ensureTextState(lines)
+		if res.DispatchEnrich {
+			op := c.core.BeginDetailOperation(res.ResolvedType, *res.Resource, false)
+			if enrichTask, _ := c.core.DetailOperationTasks(op); enrichTask != nil {
+				return []runtime.TaskRequest{*enrichTask}
+			}
+		}
 
 	case runtime.NavigateKindPushJSON:
 		if res.Resource == nil {
@@ -243,6 +238,12 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		}
 		c.applyIntents([]runtime.UIIntent{intent})
 		c.ensureTextState(lines)
+		if res.DispatchEnrich {
+			op := c.core.BeginDetailOperation(res.ResolvedType, *res.Resource, false)
+			if enrichTask, _ := c.core.DetailOperationTasks(op); enrichTask != nil {
+				return []runtime.TaskRequest{*enrichTask}
+			}
+		}
 
 	case runtime.NavigateKindFetchReveal:
 		// No stack push yet — the push happens when Handle receives
@@ -279,9 +280,9 @@ func (c *Controller) ApplyEmitNavigate(p runtime.EmitNavigatePayload) []runtime.
 // replayed (the caller must NOT also dispatch a fan-out check — D6: no
 // re-fan-out over cached data) and false when the type has no registered
 // related defs, no matching detail screen is on top of the stack, or the
-// cache misses (the caller is responsible for dispatching the fan-out check
-// via its own platform-specific path — TUI: messages.RelatedCheckStarted;
-// headless/web: a KindRelatedCheck TaskRequest).
+// cache misses (the caller is responsible for dispatching the fan-out
+// check — a KindRelatedCheck TaskRequest from Core.DetailOperationTasks —
+// itself; both the TUI and headless/web reach the same task this way).
 //
 // Exported so the TUI adapter's NavigateKindPushDetail handling
 // (runtime_adapter_navigate.go) can share this replay instead of carrying
@@ -397,10 +398,11 @@ func (c *Controller) dispatchRelatedNavigate(ev runtime.RelatedNavigateEvent) []
 }
 
 // openRelatedDetail pushes a detail screen for the already-fetched resource
-// cached and seeds its related panel — replaying the related cache when present,
-// otherwise returning a KindRelatedCheck task. Shared by the cache-hit related-
-// navigate path (NavigationKindDetail) and the web by-ID auto-open path.
-// Caller must hold c.mu (write).
+// cached, begins its DetailOperation, and seeds its related panel —
+// replaying the related cache when present, otherwise returning the
+// operation's related-check task. Shared by the cache-hit related-navigate
+// path (NavigationKindDetail) and the web by-ID auto-open path. Caller must
+// hold c.mu (write).
 func (c *Controller) openRelatedDetail(cached resource.Resource, targetType string) []runtime.TaskRequest {
 	c.applyIntents([]runtime.UIIntent{runtime.PushScreen{
 		ID:      runtime.ScreenDetail,
@@ -408,12 +410,23 @@ func (c *Controller) openRelatedDetail(cached resource.Resource, targetType stri
 	}})
 	c.ensureDetailState(cached, targetType)
 	ds := c.topDetailState()
-	if ds == nil || len(resource.GetRelated(targetType)) == 0 {
+	if ds == nil {
 		return nil
+	}
+
+	op := c.core.BeginDetailOperation(targetType, cached, false)
+	enrichTask, relatedTask := c.core.DetailOperationTasks(op)
+	var tasks []runtime.TaskRequest
+	if enrichTask != nil {
+		tasks = append(tasks, *enrichTask)
+	}
+
+	if len(resource.GetRelated(targetType)) == 0 {
+		return tasks
 	}
 	c.initDetailRelatedRows(targetType)
 	// Populate the related panel: replay the related cache if present, else
-	// dispatch a KindRelatedCheck task — same as ActionOpenDetail.
+	// dispatch the operation's related-check task — same as ActionOpenDetail.
 	ck := runtime.RelatedCacheKey(targetType, cached.ID)
 	if cachedRows, hit := c.core.RelatedCacheGet(ck); hit && len(cachedRows) > 0 {
 		for _, entry := range cachedRows {
@@ -424,13 +437,12 @@ func (c *Controller) openRelatedDetail(cached resource.Resource, targetType stri
 			mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType,
 				entry.Result.EffectiveState(), entry.Result.Count, false, errMsg, entry.Result.Truncated, entry.Result.ResourceIDs, entry.Result.FetchFilter)
 		}
-		return nil
+		return tasks
 	}
-	return []runtime.TaskRequest{{
-		Key:     runtime.TaskKey{Kind: runtime.KindRelatedCheck, Scope: targetType + "/" + cached.ID},
-		Cache:   runtime.CacheNone,
-		Payload: runtime.RelatedCheckPayload{ResourceType: targetType, Resource: cached},
-	}}
+	if relatedTask != nil {
+		tasks = append(tasks, *relatedTask)
+	}
+	return tasks
 }
 
 // applyRelatedNavResult converts a NavigationResult into stack operations and

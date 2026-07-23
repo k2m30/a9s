@@ -1,25 +1,41 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // runtime_adapter_resources.go — Bubble Tea adapter glue for runtime.Core's
-// resource-flow handlers. Each resolves adapter-only state, delegates the
-// platform-agnostic work (wave-1 derive, cache writes, error flash) to
-// runtime.Core, and routes the result into controller detail/list state:
+// resource-flow handlers.
 //
 //	handleResourcesLoaded     — wave-1 derive on msg.Resources, route through
 //	                            ctrl.HandleResourcesLoadedEvent (replaces the
 //	                            old updateActiveView path), then delegate
 //	                            cross-view cache write + rerun probe to Core.
-//	handleRelatedCheckResult  — resolve the source detail, delegate cache writes
-//	                            + error-flash surface to Core, then merge the row
-//	                            into the source detail's controller state via
+//	handleEnrichDetailResult  — calls Core.HandleEnrichDetailResult directly
+//	                            (not Controller.Handle) so the returned
+//	                            FlashIntent applies synchronously via
+//	                            dispatchDetailOpResultIntents — Controller.Handle
+//	                            only returns tasks to its TUI caller, discarding
+//	                            the ViewState/Flash a synchronous single-Update
+//	                            render needs — then applies the enriched
+//	                            resource to detail state via the exported
+//	                            ctrl.ApplyDetailEnrichmentForResource (the same
+//	                            merge the web/headless lane's
+//	                            foldEnrichDetailResultLocked calls), and
+//	                            regenerates syntax-colored YAML/JSON content
+//	                            when a text screen for this resource is open —
+//	                            a TUI-only rendering concern with no Controller
+//	                            equivalent.
+//	handleRelatedCheckResult  — the same direct-Core-call +
+//	                            dispatchDetailOpResultIntents + exported-merge
+//	                            pattern as handleEnrichDetailResult, calling
+//	                            Core.HandleRelatedCheckResult and
 //	                            ctrl.ApplyDetailRelatedResultForResource.
-//	handleEnrichDetailResult  — stale-gen drop, delegate flash-on-error to
-//	                            Core, then on success apply the enriched resource
-//	                            via ctrl.ApplyDetailEnrichmentForResource.
-//
-// Each shim's case body in app.go.Update() shrinks to a one-line dispatch
-// (`return m.handle*(msg)`), bringing the three affected switch cases
-// under the ≤6-line acceptance grep per spec.
+//	dispatchDetailOpResultIntents — the shared intent-applier for the two
+//	                            shims above: forwards the whole intents slice to
+//	                            ctrl.ApplyIntents (the Patch{Resource,Related,
+//	                            Lazy}Cache session writes either Core method can
+//	                            emit — dispatchHandlerResult's applyIntent has
+//	                            no case for these, and would silently drop
+//	                            them), then direct-mutates m.flash for any
+//	                            FlashIntent so it renders within this single
+//	                            Update() call.
 package tui
 
 import (
@@ -139,63 +155,20 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 	return m, coreCmd
 }
 
-// handleRelatedCheckResult is the adapter shim for
-// messages.RelatedCheckResult. The stale-gen check is performed up-front
-// (the orchestrator's GenStamped gate covers HandleEvent-routed messages
-// but this message is dispatched through the shim, not HandleEvent).
+// handleEnrichDetailResult is the adapter shim for messages.EnrichDetailResult.
+// Calls Core.HandleEnrichDetailResult directly (bypassing Controller.Handle,
+// whose TUI-facing signature returns only tasks) so the FlashIntent on
+// enrichment failure applies synchronously via dispatchDetailOpResultIntents —
+// within this single Update() call, with no cmd round-trip. On success,
+// applies the enriched resource to detail state via
+// ctrl.ApplyDetailEnrichmentForResource (the same merge
+// Controller.foldEnrichDetailResultLocked calls for the web/headless lane),
+// then regenerates syntax-colored YAML/JSON content when the active screen is
+// a text viewer for this resource: a TUI-only rendering concern with no
+// Controller equivalent.
 //
-// Source ID resolution: messages.SourceResourceID is authoritative when
-// set; otherwise the shim falls back to the active detail controller
-// state's resource ID (replacing the old m.activeView().(*views.DetailModel)
-// fallback).
-func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Model, tea.Cmd) {
-	if messages.IsStale(msg, m.core) {
-		return m, nil
-	}
-	sourceID := msg.SourceResourceID
-	if sourceID == "" && m.activeRS().kind == rsKindDetail {
-		sourceID = m.ctrl.GetDetailResource().ID
-	}
-	// W1.4b.3: fetcher-emitted rows already carry Findings; no re-derive needed
-	// on cached pages or lazy-added resources before Core writes them to cache.
-	intents, tasks := m.core.HandleRelatedCheckResult(runtime.RelatedCheckResultEvent{
-		ResourceType:       msg.ResourceType,
-		SourceResourceID:   sourceID,
-		DefDisplayName:     msg.DefDisplayName,
-		Result:             msg.Result,
-		CachedPages:        msg.CachedPages,
-		LazyAddedResources: msg.LazyAddedResources,
-		LazyAddError:       msg.LazyAddError,
-	})
-	coreCmd := m.dispatchCoreScreenResult(intents, tasks)
-	// Update the controller's detail related rows with this result.
-	errMsg := ""
-	if msg.Result.Err != nil {
-		errMsg = msg.Result.Err.Error()
-	}
-	m.ctrl.ApplyDetailRelatedResultForResource(
-		msg.ResourceType,
-		sourceID,
-		msg.DefDisplayName,
-		msg.Result.TargetType,
-		msg.Result.EffectiveState(),
-		msg.Result.Count,
-		false,
-		errMsg,
-		msg.Result.Truncated,
-		msg.Result.ResourceIDs,
-		msg.Result.FetchFilter,
-	)
-	return m, coreCmd
-}
-
-// handleEnrichDetailResult is the adapter shim for
-// messages.EnrichDetailResult. The stale-gen check stays adapter-side
-// for the same reason as handleRelatedCheckResult.
-//
-// The Err branch returns early so the success-path detail update never
-// fires on a half-populated EnrichedRes — matches the original case-body's
-// early-return on err.
+// The Err branch returns early so the detail-state merge and the
+// syntax-color regeneration never fire on a half-populated EnrichedRes.
 func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Model, tea.Cmd) {
 	if messages.IsStale(msg, m.core) {
 		return m, nil
@@ -204,13 +177,12 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 		ResourceType: msg.ResourceType,
 		Err:          msg.Err,
 	})
-	coreCmd := m.dispatchCoreScreenResult(intents, tasks)
+	m.dispatchDetailOpResultIntents(intents)
+	coreCmd := m.dispatchTaskRequests(tasks)
 	if msg.Err != nil {
 		return m, coreCmd
 	}
-	// Apply the enriched resource to the controller's detail state. This
-	// replaces the old updateActiveView path where DetailModel.Update absorbed
-	// the enriched resource and rebuilt its field list.
+
 	ef, ad := primaryWave2Finding(msg.EnrichedRes)
 	m.ctrl.ApplyDetailEnrichmentForResource(msg.ResourceType, msg.ResourceID, msg.EnrichedRes, ef, ad)
 
@@ -252,4 +224,75 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 		}
 	}
 	return m, coreCmd
+}
+
+// handleRelatedCheckResult is the adapter shim for messages.RelatedCheckResult.
+// Calls Core.HandleRelatedCheckResult directly (bypassing Controller.Handle,
+// whose TUI-facing signature returns only tasks) so its PatchRelatedCache /
+// PatchResourceCache / PatchLazyResourceCache session writes and any
+// LazyAddError/checker-error FlashIntent apply via dispatchDetailOpResultIntents
+// within this single Update() call, with no cmd round-trip. Then merges the
+// row into every matching stacked detail's RelatedRows via
+// ctrl.ApplyDetailRelatedResultForResource, the same exported method
+// Controller.foldRelatedCheckResultLocked calls for the web/headless lane and
+// the TUI's own related-navigation fetch-by-ID path
+// (runtime_adapter_related.go) already calls, so the merge itself has one
+// implementation regardless of which caller reaches it.
+func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Model, tea.Cmd) {
+	if messages.IsStale(msg, m.core) {
+		return m, nil
+	}
+	intents, tasks := m.core.HandleRelatedCheckResult(runtime.RelatedCheckResultEvent{
+		ResourceType:       msg.ResourceType,
+		SourceResourceID:   msg.SourceResourceID,
+		DefDisplayName:     msg.DefDisplayName,
+		Result:             msg.Result,
+		CachedPages:        msg.CachedPages,
+		LazyAddedResources: msg.LazyAddedResources,
+		LazyAddError:       msg.LazyAddError,
+	})
+	m.dispatchDetailOpResultIntents(intents)
+	cmd := m.dispatchTaskRequests(tasks)
+
+	errMsg := ""
+	if msg.Result.Err != nil {
+		errMsg = msg.Result.Err.Error()
+	}
+	m.ctrl.ApplyDetailRelatedResultForResource(
+		msg.ResourceType,
+		msg.SourceResourceID,
+		msg.DefDisplayName,
+		msg.Result.TargetType,
+		msg.Result.EffectiveState(),
+		msg.Result.Count,
+		false,
+		errMsg,
+		msg.Result.Truncated,
+		msg.Result.ResourceIDs,
+		msg.Result.FetchFilter,
+	)
+	return m, cmd
+}
+
+// dispatchDetailOpResultIntents applies the intents returned by
+// Core.HandleEnrichDetailResult / Core.HandleRelatedCheckResult. Forwards the
+// whole slice to ctrl.ApplyIntents first — the PatchResourceCache /
+// PatchRelatedCache / PatchLazyResourceCache session writes either Core
+// method can emit (dispatchHandlerResult's applyIntent has no case for these
+// three and would silently drop them, since its only callers today — the 6
+// ported handlers in app_flash.go/app_session.go — never emit them) — then
+// direct-mutates m.flash for any FlashIntent present so it renders within the
+// same Update() call, with no cmd round-trip. Neither Core method ever
+// returns a FlashTickPayload task alongside its FlashIntent (verified against
+// both bodies), so there is no auto-clear tick to schedule here, matching the
+// Controller.Handle web-lane fold these two callers bypass.
+func (m *Model) dispatchDetailOpResultIntents(intents []runtime.UIIntent) {
+	m.ctrl.ApplyIntents(intents)
+	for _, in := range intents {
+		if fi, ok := in.(runtime.FlashIntent); ok {
+			m.flash.text = fi.Text
+			m.flash.isError = fi.IsError
+			m.flash.active = true
+		}
+	}
 }

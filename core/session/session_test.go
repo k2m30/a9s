@@ -44,11 +44,8 @@ func TestSession_New_InitializesMaps(t *testing.T) {
 
 	// Seed=1 convention: generation counters start at 1 so that Gen==0
 	// (unset in synthetic messages) is always rejected by gen guards.
-	if s.RelatedGen != 1 {
-		t.Errorf("RelatedGen = %d, want 1", s.RelatedGen)
-	}
-	if s.EnrichGen != 1 {
-		t.Errorf("EnrichGen = %d, want 1", s.EnrichGen)
+	if s.DetailOpGen != 1 {
+		t.Errorf("DetailOpGen = %d, want 1", s.DetailOpGen)
 	}
 	if s.EnrichmentGen != 1 {
 		t.Errorf("EnrichmentGen = %d, want 1", s.EnrichmentGen)
@@ -70,18 +67,14 @@ func TestSession_Rotate_BumpsGenerations(t *testing.T) {
 
 	s := session.New()
 
-	s.RelatedGen = 5
-	s.EnrichGen = 5
+	s.DetailOpGen = 5
 	s.AvailabilityGen = 5
 	s.EnrichmentGen = 5
 
 	s.Rotate()
 
-	if s.RelatedGen != 6 {
-		t.Errorf("RelatedGen after Rotate() = %d, want 6", s.RelatedGen)
-	}
-	if s.EnrichGen != 6 {
-		t.Errorf("EnrichGen after Rotate() = %d, want 6", s.EnrichGen)
+	if s.DetailOpGen != 6 {
+		t.Errorf("DetailOpGen after Rotate() = %d, want 6", s.DetailOpGen)
 	}
 	if s.AvailabilityGen != 6 {
 		t.Errorf("AvailabilityGen after Rotate() = %d, want 6", s.AvailabilityGen)

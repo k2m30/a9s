@@ -154,15 +154,14 @@ func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resou
 		}
 	}
 
-	fetchCtx := ctx
-	if dctx.SkipCache {
-		// An explicit refresh must not share a response with whatever
-		// pre-refresh call is already in flight on a coalescing decorator
-		// (core/aws/coalesce.go) — that shared response can't be freshened
-		// after the fact. Mark ctx so the decorator bypasses singleflight
-		// for this one call.
-		fetchCtx = WithCoalesceBypass(ctx)
-	}
+	// Every coalescing decorator (core/aws/coalesce.go) keys its singleflight
+	// group by this operation's ID: calls this enricher and its sibling
+	// related checkers make while opening/refreshing THIS detail share
+	// in-flight work, but an explicit refresh mints a brand-new operation ID
+	// (core/runtime.Core.BeginDetailOperation), so it can never join a
+	// pre-refresh call still in flight under the old one — no bypass call
+	// needed.
+	fetchCtx := WithDetailOp(ctx, dctx.OpID)
 	payload, err := spec.fetch(fetchCtx, dctx.Clients, id, item, res)
 	if err != nil {
 		return res, err

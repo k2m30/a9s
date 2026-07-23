@@ -8,14 +8,21 @@ package tui
 // The Wave-2 fold itself lives on runtime.Core.applyEnrichment (internal/
 // runtime/helpers.go); Model.applyEnrichment here is CLEAR-only, stripping
 // wave2 findings from one type's cached rows ahead of a rerun.
-// primaryWave2Finding, wave2FindingsByID, and wave2DetailsByID rebuild
-// detail/list view input from the authoritative r.Findings +
-// r.AttentionDetails state on each cached row — a row may carry several
-// independently-evaluated wave2 findings. primaryWave2Finding reduces to the
-// single WORST-severity one for its narrow on-demand detail-enrich consumer
-// (see its own doc comment for why); wave2FindingsByID and wave2DetailsByID
-// carry every one of them through unreduced into
+// wave2FindingsByID and wave2DetailsByID rebuild list-view input from the
+// authoritative r.Findings + r.AttentionDetails state on each cached row —
+// a row may carry several independently-evaluated wave2 findings, and both
+// helpers carry every one of them through unreduced into
 // Controller.ApplyEnrichmentState's plural storage layer.
+//
+// The web/headless lane's on-demand detail-enrichment fold lives in core/app
+// (Controller.foldEnrichDetailResultLocked, reached via Controller.Handle)
+// and calls its own copy of primaryWave2Finding (core/app/detail_state.go) —
+// core/app cannot import internal/tui, so the two copies cannot share code.
+// The TUI's own runtime_adapter_resources.go's handleEnrichDetailResult calls
+// Core.HandleEnrichDetailResult directly (not Controller.Handle) so a flash
+// on enrichment error applies synchronously within one Update() call, then
+// calls primaryWave2Finding below before folding into detail state via
+// ctrl.ApplyDetailEnrichmentForResource.
 
 import (
 	"strings"
@@ -60,17 +67,9 @@ func (m *Model) applyEnrichment(resourceType string) {
 }
 
 // primaryWave2Finding extracts the WORST-severity wave2 Finding (and its
-// companion AttentionDetail, if present) from r.Findings / r.AttentionDetails
-// for wiring into detail views via Controller.ApplyDetailEnrichmentForResource,
-// whose signature carries exactly one Finding + one AttentionDetail — a
-// legitimate render-boundary derivation, not a compat shim: no production
-// DetailEnricher (core/aws's enrichPolicy/enrichRolePolicy) emits more
-// than one wave2 Finding on its returned resource today, and the multi-
-// finding detail contract (every independently-evaluated condition reaching
-// an already-open detail) is carried by the PatchDetail plural apply
-// (handleEnrichmentChecked → ListEnrichmentPatch/PatchDetail), not this
-// narrow on-demand lane. Both return values are nil when no wave2 finding is
-// present (detail view shows no Attention section).
+// companion AttentionDetail, if present) from r.Findings / r.AttentionDetails.
+// Both return values are nil when no wave2 finding is present (detail view
+// shows no Attention section).
 func primaryWave2Finding(r resource.Resource) (*domain.Finding, *domain.AttentionDetail) {
 	var wave2 []domain.Finding
 	for _, f := range r.Findings {

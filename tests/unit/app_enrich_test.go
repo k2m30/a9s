@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -328,27 +329,24 @@ func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
 		Resource:     &res,
 	})
 
-	// Send enrichment result with an error
-	_, cmd := rootApplyMsg(m, messages.EnrichDetailResult{
+	// Send enrichment result with an error. HandleEnrichDetailResult applies
+	// the failure as a FlashIntent (core/runtime/handlers_resources.go).
+	// internal/tui/app.go's messages.EnrichDetailResult case (handleEnrichDetailResult)
+	// calls m.ctrl.Handle directly and forwards only the returned TaskRequests,
+	// never the ViewState or its Flash — unlike Model.applyIntents
+	// (app_dispatch.go), which re-emits a FlashIntent as a messages.Flash cmd.
+	// The FlashIntent therefore never reaches m.flash (or a returned cmd), so
+	// this test verifies the rendered view and stays RED until that TUI-side
+	// gap is closed.
+	m, _ = rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "role_policies",
 		ResourceID:   res.ID,
 		Err:          fmt.Errorf("GetPolicy: access denied"),
 	})
 
-	// The app.go handler returns a FlashMsg command on error
-	if cmd == nil {
-		t.Fatal("expected a flash command on enrichment error")
-	}
-	msg := cmd()
-	flash, ok := msg.(messages.Flash)
-	if !ok {
-		t.Fatalf("expected FlashMsg, got %T", msg)
-	}
-	if !flash.IsError {
-		t.Error("expected flash to be an error")
-	}
-	if !strings.Contains(flash.Text, "enrich failed") {
-		t.Errorf("expected flash text to contain 'enrich failed', got %q", flash.Text)
+	view := stripANSI(rootViewContent(m))
+	if !strings.Contains(view, "enrich failed") {
+		t.Errorf("expected view to show 'enrich failed' flash, got:\n%s", view)
 	}
 }
 
@@ -361,6 +359,12 @@ func TestEnrichResult_StaleGeneration_IsDiscarded(t *testing.T) {
 		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
+	// Capture the operation ID active BEFORE this detail even opens — the
+	// Navigate below begins a brand-new DetailOperation via
+	// Core.BeginDetailOperation, so this pre-existing value is guaranteed
+	// stale once that happens.
+	staleOp := m.Core().ActiveDetailOp()
+
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/gen-test", "gen-test", "Managed")
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
@@ -368,13 +372,14 @@ func TestEnrichResult_StaleGeneration_IsDiscarded(t *testing.T) {
 		Resource:     &res,
 	})
 
-	// Send enrichment result with a stale generation (999 != current enrichGen)
+	// Replay an enrichment result stamped with the pre-open operation ID —
+	// stale relative to the operation the Navigate above just began.
 	enrichedRes := withDocument(res, map[string]any{"Version": "2012-10-17"})
 	m, _ = rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "role_policies",
 		ResourceID:   res.ID,
 		EnrichedRes:  enrichedRes,
-		Generation:   999, // stale — does not match enrichGen (which is 1)
+		OperationID:  staleOp,
 	})
 
 	content := stripANSI(rootViewContent(m))
@@ -583,12 +588,13 @@ func TestRefresh_OnDetailView_DispatchesEnrichment(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TestHandleEnrichDetail_NoEnricher_ReturnsNilCmd
-// Verifies that handleEnrichDetail returns a nil command when no enricher is
-// registered for the resource type. "ec2" has no detail enricher.
+// TestDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask
+// Verifies that Core.DetailOperationTasks gates the enrich task on
+// resource.GetDetailEnricher — "ec2" has no detail enricher, so the
+// operation it builds must carry no enrich task at all.
 // ---------------------------------------------------------------------------
 
-func TestHandleEnrichDetail_NoEnricher_ReturnsNilCmd(t *testing.T) {
+func TestDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) {
 	app := tui.New("demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
@@ -611,26 +617,23 @@ func TestHandleEnrichDetail_NoEnricher_ReturnsNilCmd(t *testing.T) {
 		},
 	}
 
-	// Dispatch EnrichDetailMsg directly — exercises handleEnrichDetail.
-	_, cmd := rootApplyMsg(m, messages.EnrichDetail{
-		ResourceType: "ec2",
-		Resource:     ec2Res,
-	})
+	op := m.Core().BeginDetailOperation("ec2", ec2Res, false)
+	enrichTask, _ := m.Core().DetailOperationTasks(op)
 
-	// No enricher registered → cmd must be nil.
-	if cmd != nil {
-		t.Error("handleEnrichDetail should return nil cmd when no enricher is registered for the type")
+	if enrichTask != nil {
+		t.Error("DetailOperationTasks should return a nil enrich task when no enricher is registered for the type")
 	}
 }
 
 // ---------------------------------------------------------------------------
-// TestHandleEnrichDetail_WithEnricher_ReturnsEnrichDetailResultMsg
-// Verifies that handleEnrichDetail with a registered enricher returns a cmd
-// that, when executed, produces an EnrichDetailResultMsg with the correct
-// ResourceType and ResourceID.
+// TestDetailOperationTasks_WithEnricher_ExecutesToEnrichDetailResult
+// Verifies that Core.DetailOperationTasks builds a non-nil enrich task when
+// an enricher is registered, and that executing it (Core.ExecuteTaskAt)
+// produces an EnrichDetailResult carrying the correct ResourceType and
+// ResourceID.
 // ---------------------------------------------------------------------------
 
-func TestHandleEnrichDetail_WithEnricher_ReturnsEnrichDetailResultMsg(t *testing.T) {
+func TestDetailOperationTasks_WithEnricher_ExecutesToEnrichDetailResult(t *testing.T) {
 	if !resource.HasDetailEnricher("role_policies") {
 		t.Fatal("expected role_policies detail enricher to be registered")
 	}
@@ -645,26 +648,24 @@ func TestHandleEnrichDetail_WithEnricher_ReturnsEnrichDetailResultMsg(t *testing
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/enrich-direct", "enrich-direct", "Managed")
 
-	// Dispatch EnrichDetailMsg directly to exercise handleEnrichDetail.
-	_, cmd := rootApplyMsg(m, messages.EnrichDetail{
-		ResourceType: "role_policies",
-		Resource:     res,
-	})
-
-	if cmd == nil {
-		t.Fatal("handleEnrichDetail should return a non-nil cmd when an enricher is registered")
+	op := m.Core().BeginDetailOperation("role_policies", res, false)
+	enrichTask, _ := m.Core().DetailOperationTasks(op)
+	if enrichTask == nil {
+		t.Fatal("DetailOperationTasks should return a non-nil enrich task when an enricher is registered")
 	}
 
-	// Execute the cmd — it calls the enricher and returns EnrichDetailResultMsg.
-	result := cmd()
-	resultMsg, ok := result.(messages.EnrichDetailResult)
+	ev, err := m.Core().ExecuteTaskAt(context.Background(), *enrichTask, m.Core().CaptureDispatch())
+	if err != nil {
+		t.Fatalf("ExecuteTaskAt: unexpected error: %v", err)
+	}
+	resultMsg, ok := ev.(messages.EnrichDetailResult)
 	if !ok {
-		t.Fatalf("cmd() should return EnrichDetailResultMsg, got %T", result)
+		t.Fatalf("ExecuteTaskAt should return EnrichDetailResult, got %T", ev)
 	}
 	if resultMsg.ResourceType != "role_policies" {
-		t.Errorf("EnrichDetailResultMsg.ResourceType = %q, want %q", resultMsg.ResourceType, "role_policies")
+		t.Errorf("EnrichDetailResult.ResourceType = %q, want %q", resultMsg.ResourceType, "role_policies")
 	}
 	if resultMsg.ResourceID != res.ID {
-		t.Errorf("EnrichDetailResultMsg.ResourceID = %q, want %q", resultMsg.ResourceID, res.ID)
+		t.Errorf("EnrichDetailResult.ResourceID = %q, want %q", resultMsg.ResourceID, res.ID)
 	}
 }

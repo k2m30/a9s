@@ -740,7 +740,7 @@ func (s *fullIntegrationScenario) shouldDrainFollowups(msg tea.Msg) bool {
 		return true
 	case messages.ClientsReady:
 		return true
-	case messages.RelatedCheckStarted:
+	case messages.RelatedCheckResult:
 		return true
 	case messages.RelatedNavigate:
 		return true
@@ -790,12 +790,23 @@ func (s *fullIntegrationScenario) observe(msg tea.Msg) {
 		if msg.Target == messages.TargetResourceList {
 			s.currentListType = msg.ResourceType
 		}
-	case messages.RelatedCheckStarted:
-		s.currentResourceType = msg.ResourceType
-		copy := msg.SourceResource
-		s.currentResource = &copy
-		s.lastRelatedByName = make(map[string]messages.RelatedCheckResult)
 	case messages.RelatedCheckResult:
+		// The cache-hit fast path (RelatedNavigate pushing a detail directly,
+		// e.g. fullIntegrationEnterRelatedSingleDetail) never emits its own
+		// Navigate{Target:TargetDetail} message, so a RelatedCheckResult for a
+		// resource this scenario isn't already tracking is the first signal
+		// that a new detail is active — read the resolved resource back from
+		// the model (the fan-out landed synchronously when RelatedNavigate
+		// was applied) rather than from the message, which carries only the
+		// source ID, not a full resource.Resource.
+		if s.currentResource == nil || s.currentResourceType != msg.ResourceType || s.currentResource.ID != msg.SourceResourceID {
+			s.currentResourceType = msg.ResourceType
+			if res, ok := s.model.ActiveDetailResource(); ok {
+				copy := res
+				s.currentResource = &copy
+			}
+			s.lastRelatedByName = make(map[string]messages.RelatedCheckResult)
+		}
 		if s.lastRelatedByName == nil {
 			s.lastRelatedByName = make(map[string]messages.RelatedCheckResult)
 		}

@@ -87,9 +87,10 @@ func Test_LA_020_PartialResolution_ChecksStillDelivered(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "src-la020-001"},
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "src-la020-001"},
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)
@@ -208,9 +209,10 @@ func Test_LA_024_GetPolicyDenied_PartialMetadataOK(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "src-la024-role-001"},
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "src-la024-role-001"},
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)
@@ -329,9 +331,10 @@ func Test_LA_060_PivotCountEqualsRowCount(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: resource.Resource{ID: "src-la060-001"},
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &resource.Resource{ID: "src-la060-001"},
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)

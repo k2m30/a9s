@@ -105,9 +105,10 @@ func TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker(t *testing.T) {
 
 	srcRes := resource.Resource{ID: "src-dedup-001"}
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)
@@ -183,9 +184,10 @@ func TestLazyAdd_FetchByIDsErrorSwallowed_ChecksResultStillDelivered(t *testing.
 
 	srcRes := resource.Resource{ID: "src-error-001"}
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
-		ResourceType:   srcType,
-		SourceResource: srcRes,
+	_, batchCmd := rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: srcType,
+		Resource:     &srcRes,
 	})
 
 	resultMsg, found := collectRelatedResult(t, batchCmd)

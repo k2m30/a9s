@@ -5,8 +5,9 @@ package unit
 //
 // Bug (app_related.go:88-98 and 122-131): when TargetID or a single RelatedID
 // matches an entry in resourceCache, the code pushes a detail view and returns
-// (m, nil). It never calls NeedsRelatedCheck() / dispatches RelatedCheckStartedMsg.
-// This leaves the right column in permanent loading state for those navigations.
+// (m, nil). It never calls NeedsRelatedCheck() / dispatches the related-check
+// task. This leaves the right column in permanent loading state for those
+// navigations.
 //
 // TestRelatedNavigate_CachedTargetID_DispatchesRelatedCheck — FAILS with current code.
 // TestRelatedNavigate_CachedTargetID_UsesCachedResults       — FAILS with current code.
@@ -62,11 +63,12 @@ func setupEC2ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 	return m, ec2Res
 }
 
-// containsRelatedCheckStartedMsg returns true if any message in msgs is a
-// RelatedCheckStartedMsg.
-func containsRelatedCheckStartedMsg(msgs []tea.Msg) bool {
+// containsRelatedCheckResultMsg returns true if any message in msgs is a
+// RelatedCheckResult — the signal that the related-check fan-out actually
+// dispatched and ran.
+func containsRelatedCheckResultMsg(msgs []tea.Msg) bool {
 	for _, msg := range msgs {
-		if _, ok := msg.(messages.RelatedCheckStarted); ok {
+		if _, ok := msg.(messages.RelatedCheckResult); ok {
 			return true
 		}
 	}
@@ -78,7 +80,7 @@ func containsRelatedCheckStartedMsg(msgs []tea.Msg) bool {
 //
 // Given: EC2 resources are loaded into resourceCache["ec2"].
 // When:  RelatedNavigateMsg{TargetType:"ec2", TargetID: ec2[0].ID} is sent.
-// Then:  The returned cmd is non-nil and produces a RelatedCheckStartedMsg.
+// Then:  The returned cmd is non-nil and produces a RelatedCheckResult.
 //
 // This FAILS now: the cache-hit branch returns (m, nil).
 // ---------------------------------------------------------------------------
@@ -105,18 +107,18 @@ func TestRelatedNavigate_CachedTargetID_DispatchesRelatedCheck(t *testing.T) {
 	m, cmd := rootApplyMsg(m, navMsg)
 	if cmd == nil {
 		t.Fatal("BUG: RelatedNavigateMsg with cached TargetID returned nil cmd — " +
-			"must dispatch RelatedCheckStartedMsg so the detail right column loads")
+			"must dispatch the related-check fan-out so the detail right column loads")
 	}
 
-	// Drain one level of the cmd chain to find RelatedCheckStartedMsg.
+	// Drain one level of the cmd chain to find a RelatedCheckResult.
 	_, msgs := drainCmds(t, m, cmd, 3)
 
-	if !containsRelatedCheckStartedMsg(msgs) {
+	if !containsRelatedCheckResultMsg(msgs) {
 		types := make([]string, len(msgs))
 		for i, msg := range msgs {
 			types[i] = fmt.Sprintf("%T", msg)
 		}
-		t.Fatalf("BUG: RelatedNavigateMsg (cached TargetID) must produce RelatedCheckStartedMsg "+
+		t.Fatalf("BUG: RelatedNavigateMsg (cached TargetID) must produce a RelatedCheckResult "+
 			"in cmd chain; got: %v", types)
 	}
 }
@@ -124,15 +126,12 @@ func TestRelatedNavigate_CachedTargetID_DispatchesRelatedCheck(t *testing.T) {
 // ---------------------------------------------------------------------------
 // TestRelatedNavigate_CachedTargetID_UsesCachedResults
 //
-// Given: EC2 detail has been opened, related results delivered (Count=2), then Esc'd.
+// Given: EC2 detail has been opened, related results delivered (Count=stubRelatedCount), then Esc'd.
 //        The relatedCache now holds the results for ec2[0].
 // When:  RelatedNavigateMsg{TargetID: ec2[0].ID} is sent again for same resource.
-// Then:  The detail view immediately shows cached counts (e.g. "(2)") without
-//        waiting for async re-dispatch.
-//
-// This FAILS now: the cache-hit branch in handleRelatedNavigate returns (m, nil)
-// WITHOUT applying any cached results to the new detail view. The right column
-// is always in loading state after re-navigation via RelatedNavigateMsg.
+// Then:  The detail view immediately shows cached counts (e.g. "(7)") without
+//        waiting for async re-dispatch — openRelatedDetail (core/app/navigate.go)
+//        merges RelatedCacheGet's entries into the freshly pushed DetailState.
 // ---------------------------------------------------------------------------
 
 func TestRelatedNavigate_CachedTargetID_UsesCachedResults(t *testing.T) {
@@ -141,7 +140,7 @@ func TestRelatedNavigate_CachedTargetID_UsesCachedResults(t *testing.T) {
 		t.Fatal("no ec2 related defs registered — core/aws import should register them")
 	}
 
-	// Use setupEC2DetailWithResults to build state with results cached (Count=2 per type).
+	// Use setupEC2DetailWithResults to build state with results cached (Count=stubRelatedCount per type).
 	m := setupEC2DetailWithResults(t)
 
 	// Esc back to EC2 list.
@@ -170,12 +169,12 @@ func TestRelatedNavigate_CachedTargetID_UsesCachedResults(t *testing.T) {
 
 	view := stripANSI(rootViewContent(m))
 
-	// After the fix: cached results (Count=2) must appear immediately in the view.
+	// After the fix: cached results (Count=stubRelatedCount) must appear immediately in the view.
 	// BUG: the view shows the right column in loading state because cached results
 	// are not applied when navigating via RelatedNavigateMsg (cache-hit branch).
-	if !strings.Contains(view, "(2)") {
+	if !strings.Contains(view, "(7)") {
 		t.Fatalf("BUG: after RelatedNavigateMsg to a resource with cached related results, "+
-			"the detail view must immediately show '(2)' — but it was not found.\nView:\n%s", view)
+			"the detail view must immediately show '(7)' — but it was not found.\nView:\n%s", view)
 	}
 }
 
@@ -184,7 +183,7 @@ func TestRelatedNavigate_CachedTargetID_UsesCachedResults(t *testing.T) {
 //
 // Given: EC2 resources are loaded into resourceCache["ec2"].
 // When:  RelatedNavigateMsg{TargetType:"ec2", RelatedIDs:[]string{ec2[0].ID}} is sent.
-// Then:  The returned cmd is non-nil and produces a RelatedCheckStartedMsg.
+// Then:  The returned cmd is non-nil and produces a RelatedCheckResult.
 //
 // This FAILS now: the single-RelatedID cache-hit branch also returns (m, nil).
 // ---------------------------------------------------------------------------
@@ -211,18 +210,18 @@ func TestRelatedNavigate_SingleRelatedID_CacheHit_DispatchesRelatedCheck(t *test
 	m, cmd := rootApplyMsg(m, navMsg)
 	if cmd == nil {
 		t.Fatal("BUG: RelatedNavigateMsg with single cached RelatedID returned nil cmd — " +
-			"must dispatch RelatedCheckStartedMsg so the detail right column loads")
+			"must dispatch the related-check fan-out so the detail right column loads")
 	}
 
-	// Drain one level to find RelatedCheckStartedMsg.
+	// Drain one level to find a RelatedCheckResult.
 	_, msgs := drainCmds(t, m, cmd, 3)
 
-	if !containsRelatedCheckStartedMsg(msgs) {
+	if !containsRelatedCheckResultMsg(msgs) {
 		types := make([]string, len(msgs))
 		for i, msg := range msgs {
 			types[i] = fmt.Sprintf("%T", msg)
 		}
 		t.Fatalf("BUG: RelatedNavigateMsg (single cached RelatedID) must produce "+
-			"RelatedCheckStartedMsg in cmd chain; got: %v", types)
+			"a RelatedCheckResult in cmd chain; got: %v", types)
 	}
 }

@@ -48,7 +48,7 @@ func (c *Core) observeResourcesLoadedRows(msg messages.ResourcesLoaded) {
 func (c *Core) observeRelatedCheckResultRows(msg messages.RelatedCheckResult) {
 	for aliasName, entry := range msg.CachedPages {
 		canon := canonShortName(aliasName)
-		c.ObserveRows(canon, entry.Resources, entry.Pagination, session.OriginFetch, false)
+		c.ObserveRows(canon, entry.Resources, resolveCachedPagePagination(entry), session.OriginFetch, false)
 	}
 	for aliasName, extra := range msg.LazyAddedResources {
 		if len(extra) == 0 {
@@ -57,4 +57,20 @@ func (c *Core) observeRelatedCheckResultRows(msg messages.RelatedCheckResult) {
 		canon := canonShortName(aliasName)
 		c.ObservePartialRows(canon, extra)
 	}
+}
+
+// resolveCachedPagePagination derives the PaginationMeta to store for one
+// RelatedCheckResult CachedPages entry: entry.Pagination verbatim when
+// present, or a synthesized {IsTruncated: true} when the entry reports
+// truncation without carrying pagination detail (e.g. a related-checker's
+// NeedsTargetCache prefetch that only inspected a first page). Shared by
+// observeRelatedCheckResultRows's RowStore dual-write above and
+// HandleRelatedCheckResult's PatchResourceCache intent
+// (handlers_resources.go) so the two writers of the same CachedPages data
+// cannot diverge on which entries the truncation assumption applies to.
+func resolveCachedPagePagination(entry resource.ResourceCacheEntry) *resource.PaginationMeta {
+	if entry.Pagination == nil && entry.IsTruncated {
+		return &resource.PaginationMeta{IsTruncated: true}
+	}
+	return entry.Pagination
 }

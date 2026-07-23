@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// runtime_adapter_related.go — Bubble Tea adapter glue for two runtime entry
-// points: HandleRelatedNavigate and HandleRelatedCheckStarted.
+// runtime_adapter_related.go — Bubble Tea adapter glue for runtime.Core's
+// HandleRelatedNavigate entry point, plus relatedCheckCmd, the TUI's own
+// per-def related-check fan-out.
 //
 // handleRelatedNavigate replaces the deleted entry point from
 // internal/tui/app_handlers_related_navigate.go. It constructs a transient
@@ -13,22 +14,23 @@
 // handleRelatedNavigateChild stays here as a TUI-only helper because it
 // dispatches a messages.EnterChildView — a Bubble Tea message type.
 //
-// handleRelatedCheckStarted is the BT adapter for messages.RelatedCheckStarted.
-// It asks runtime.Core whether any RelatedDefs are registered for the source
-// type, and if so fans out one checker goroutine per def via relatedCheckCmd
-// (capped by runtime.MaxConcurrentProbes). The actual probe loop stays here in
-// the adapter because it depends on m.core.Clients(), m.appCtx, and tea.Cmd —
-// platform glue that does not belong in core/runtime.
+// relatedCheckCmd fans out one goroutine per RelatedDef registered for a
+// DetailOperation's resource type (capped by runtime.MaxConcurrentProbes),
+// each calling runtime.RunRelatedDef — the exact per-def logic
+// core/runtime/executor.go's KindRelatedCheck case also calls, so the two
+// lanes cannot diverge on timeout, panic recovery, NeedsTargetCache
+// prefetch, or lazy-add behavior. Dispatched from dispatchTaskRequests
+// (app_dispatch.go)'s KindRelatedCheck case, so every TUI call site that
+// returns a KindRelatedCheck TaskRequest (detail/YAML/JSON open, Ctrl+R
+// refresh, ActionBack reveal, related-panel resolve-in-place) reaches this
+// same fan-out.
 //
 // Exact-ID drills now route through the runtime's KindFetchByIDDetail task for
 // any type with a registered FetchByIDs helper (ami, kms, policy, ebs-snap).
 package tui
 
 import (
-	"context"
 	"fmt"
-	"maps"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -214,6 +216,14 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 				detailRS.rightColVisible = true
 			}
 			m.pushRS(detailRS)
+
+			op := m.core.BeginDetailOperation(msg.TargetType, r, false)
+			enrichTask, relatedTask := m.core.DetailOperationTasks(op)
+			var cmds []tea.Cmd
+			if enrichTask != nil {
+				cmds = append(cmds, m.dispatchTaskRequests([]runtime.TaskRequest{*enrichTask}))
+			}
+
 			needsRelated := detail.NeedsRelatedCheck()
 			if needsRelated {
 				ck := runtime.RelatedCacheKey(msg.TargetType, r.ID)
@@ -237,15 +247,13 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 							relMsg.Result.FetchFilter,
 						)
 					}
+				} else if relatedTask != nil {
+					cmds = append(cmds, m.dispatchTaskRequests([]runtime.TaskRequest{*relatedTask}))
+				}
+				if len(cmds) == 0 {
 					return m, nil
 				}
-				srcRes := r
-				return m, func() tea.Msg {
-					return messages.RelatedCheckStarted{
-						ResourceType:   msg.TargetType,
-						SourceResource: srcRes,
-					}
-				}
+				return m, tea.Batch(cmds...)
 			}
 			// Cache miss: the runtime resolved NavigationKindDetail from its own
 			// snapshot, but the target isn't in the adapter's caches (e.g. a
@@ -253,10 +261,12 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			// CloudTrail event). Fall back to a by-ID fetch that navigates
 			// straight to the detail rather than silently no-op'ing.
 			if targetID != "" && resource.GetFetchByIDs(msg.TargetType) != nil {
-				fetchCmd := m.fetchByIDDetail(msg.TargetType, targetID)
-				return m, fetchCmd
+				cmds = append(cmds, m.fetchByIDDetail(msg.TargetType, targetID))
 			}
-			return m, nil
+			if len(cmds) == 0 {
+				return m, nil
+			}
+			return m, tea.Batch(cmds...)
 		}
 
 	case runtime.NavigationKindResourceList:
@@ -349,139 +359,33 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 	}
 }
 
-// handleRelatedCheckStarted is the BT adapter entry point for
-// messages.RelatedCheckStarted. Normalises src.Type from msg.ResourceType
-// when the detail view stores type separately from SourceResource.Type.
-func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStarted) (tea.Model, tea.Cmd) {
-	src := msg.SourceResource
-	if src.Type == "" {
-		src.Type = msg.ResourceType
-	}
-	_, tasks := m.core.HandleRelatedCheckStarted(runtime.RelatedCheckStartedEvent{
-		ResourceType:   msg.ResourceType,
-		SourceResource: src,
-	})
-	if len(tasks) == 0 {
-		return m, nil
-	}
-	return m, m.relatedCheckCmd(src)
-}
-
-// relatedCheckCmd fans out one goroutine per RelatedDef for res, capped by
-// runtime.MaxConcurrentProbes.
-func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
-	defs := resource.GetRelated(res.Type)
+// relatedCheckCmd fans out one goroutine per RelatedDef registered for
+// op.ResourceType, capped by runtime.MaxConcurrentProbes. Each goroutine
+// calls runtime.RunRelatedDef — the exact per-def logic
+// core/runtime/executor.go's KindRelatedCheck case also calls — so a
+// checker's timeout, panic recovery, NeedsTargetCache prefetch, and
+// lazy-add behavior can never diverge between the TUI's progressive
+// per-def rendering and the headless/web bounded-concurrent fan-out.
+func (m Model) relatedCheckCmd(op runtime.DetailOperation) tea.Cmd {
+	defs := resource.GetRelated(op.ResourceType)
 	if len(defs) == 0 {
 		return nil
 	}
 
-	cache := m.buildResourceCacheSnapshot()
-	gen := m.core.RelatedGen()
-
+	cacheSnap := m.buildResourceCacheSnapshot()
 	keys := m.core.FetchOriginCacheKeys()
 	mainCacheKeys := make(map[string]struct{}, len(keys))
 	for _, k := range keys {
 		mainCacheKeys[k] = struct{}{}
 	}
 
-	clients := m.core.Clients()
 	sem := make(chan struct{}, runtime.MaxConcurrentProbes)
 	cmds := make([]tea.Cmd, 0, len(defs))
-
 	for _, def := range defs {
-		localCache := cache
-		cmds = append(cmds, func() (out tea.Msg) {
+		cmds = append(cmds, func() tea.Msg {
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			defer func() {
-				if r := recover(); r != nil {
-					out = messages.RelatedCheckResult{
-						ResourceType:     res.Type,
-						SourceResourceID: res.ID,
-						DefDisplayName:   def.DisplayName,
-						Result:           resource.UnknownRelated(def.TargetType),
-						Generation:       gen,
-						LazyAddError:     fmt.Errorf("related checker for %s panicked: %v", def.TargetType, r),
-					}
-				}
-			}()
-			if def.Checker == nil {
-				return messages.RelatedCheckResult{
-					ResourceType:     res.Type,
-					SourceResourceID: res.ID,
-					DefDisplayName:   def.DisplayName,
-					Result:           resource.UnknownRelated(def.TargetType),
-					Generation:       gen,
-				}
-			}
-			ctx, cancel := context.WithTimeout(m.appCtx, 10*time.Second)
-			defer cancel()
-			var cachedPages map[string]resource.ResourceCacheEntry
-			if def.NeedsTargetCache {
-				if _, inMainCache := mainCacheKeys[def.TargetType]; !inMainCache {
-					if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
-						// E5 partial success: seed whatever rows came even
-						// alongside a composite error (listed-but-denied
-						// resources) — a partially-visible target cache
-						// beats an unknown "?" row.
-						if fr, err := pf(ctx, clients, ""); err == nil || len(fr.Resources) > 0 {
-							isTrunc := fr.Pagination != nil && fr.Pagination.IsTruncated
-							if prev, hasPrev := localCache[def.TargetType]; hasPrev && prev.IsTruncated {
-								isTrunc = true
-							}
-							entry := resource.ResourceCacheEntry{
-								Resources:   fr.Resources,
-								IsTruncated: isTrunc,
-								Pagination:  fr.Pagination,
-							}
-							enriched := make(resource.ResourceCache, len(localCache)+1)
-							maps.Copy(enriched, localCache)
-							enriched[def.TargetType] = entry
-							localCache = enriched
-							cachedPages = map[string]resource.ResourceCacheEntry{def.TargetType: entry}
-						}
-					}
-				}
-			}
-			result := def.Checker(ctx, clients, res, localCache)
-			result.TargetType = def.TargetType
-			var lazyAdded map[string][]resource.Resource
-			var lazyAddError error
-			// CloudTrail-event pivots are event-derived: the ids come straight from
-			// the event body, so the count needs no fetch. Skip the eager
-			// prefetch — the drill fetches on demand (KindFetchByIDDetail) — so a
-			// cross-account target (an AssumeRole role in another account) no
-			// longer surfaces a "FetchByIDs failed" header error at detail open.
-			if res.Type != "ct-events" && len(result.ResourceIDs) > 0 {
-				if ff := resource.GetFetchByIDs(def.TargetType); ff != nil {
-					missing := runtime.MissingFromCache(localCache, def.TargetType, result.ResourceIDs)
-					if len(missing) > 0 {
-						extra, fetchErr := ff(ctx, clients, missing)
-						if fetchErr != nil {
-							lazyAddError = fetchErr
-						}
-						if len(extra) > 0 {
-							entry := localCache[def.TargetType]
-							entry.Resources = append(append([]resource.Resource(nil), entry.Resources...), extra...)
-							enriched := make(resource.ResourceCache, len(localCache)+1)
-							maps.Copy(enriched, localCache)
-							enriched[def.TargetType] = entry
-							localCache = enriched
-							lazyAdded = map[string][]resource.Resource{def.TargetType: extra}
-						}
-					}
-				}
-			}
-			return messages.RelatedCheckResult{
-				ResourceType:       res.Type,
-				SourceResourceID:   res.ID,
-				DefDisplayName:     def.DisplayName,
-				Result:             result,
-				Generation:         gen,
-				CachedPages:        cachedPages,
-				LazyAddedResources: lazyAdded,
-				LazyAddError:       lazyAddError,
-			}
+			return runtime.RunRelatedDef(m.appCtx, op, cacheSnap, mainCacheKeys, def)
 		})
 	}
 	return tea.Batch(cmds...)

@@ -164,66 +164,24 @@ func TestDemo_EC2RelatedPanelsPopulate(t *testing.T) {
 		t.Fatal("expected a related-check command after opening EC2 detail, got nil")
 	}
 
-	// Execute to get RelatedCheckStartedMsg. Detail-open for an enrichable type
-	// (ec2 now has a detail enricher) returns a tea.Batch of the related-check
-	// cmd + the enrich cmd, so recurse through it (batch-aware) to find the
-	// RelatedCheckStarted leaf rather than asserting the top-level msg directly.
+	// The enrich + related-check tasks dispatch directly off relatedCmd as a
+	// (possibly nested) tea.Batch; RunRelatedDef already recovers
+	// per-checker panics into a RelatedCheckResult carrying LazyAddError, so
+	// this collects every per-def RelatedCheckResult leaf directly.
 	leaves := extractLeafMsgs(relatedCmd)
-	var started messages.RelatedCheckStarted
-	var ok bool
+	var results []messages.RelatedCheckResult
 	for _, leaf := range leaves {
-		if s, isStarted := leaf.(messages.RelatedCheckStarted); isStarted {
-			started, ok = s, true
-			break
+		if r, ok := leaf.(messages.RelatedCheckResult); ok {
+			results = append(results, r)
 		}
 	}
-	if !ok {
+	if len(results) == 0 {
 		types := make([]string, len(leaves))
 		for i, leaf := range leaves {
 			types[i] = fmt.Sprintf("%T", leaf)
 		}
-		t.Fatalf("expected RelatedCheckStartedMsg from detail init, got: %v", types)
+		t.Fatalf("expected at least one RelatedCheckResult from detail init, got: %v", types)
 	}
-
-	// Dispatch started msg so handleRelatedCheckStarted runs the checkers.
-	var checkCmds tea.Cmd
-	*m, checkCmds = rootApplyMsg(*m, started)
-	if checkCmds == nil {
-		t.Fatal("handleRelatedCheckStarted returned nil cmd — no checkers dispatched for ec2?")
-	}
-
-	// runChecker executes a cmd recovering from panics (pre-fix behaviour).
-	runChecker := func(c tea.Cmd) (msg tea.Msg) {
-		defer func() {
-			if r := recover(); r != nil {
-				msg = nil
-			}
-		}()
-		return c()
-	}
-
-	// Collect all RelatedCheckResultMsg values from the batch.
-	var results []messages.RelatedCheckResult
-
-	collectResults := func(batchResult tea.Msg) {
-		switch v := batchResult.(type) {
-		case messages.RelatedCheckResult:
-			results = append(results, v)
-		case tea.BatchMsg:
-			for _, subCmd := range v {
-				if subCmd == nil {
-					continue
-				}
-				sub := runChecker(subCmd)
-				if r, ok2 := sub.(messages.RelatedCheckResult); ok2 {
-					results = append(results, r)
-				}
-			}
-		}
-	}
-
-	rawCheck := runChecker(checkCmds)
-	collectResults(rawCheck)
 
 	// Deliver all results to the model.
 	for _, r := range results {

@@ -607,8 +607,10 @@ func TestExecuteTask_EnrichDetail_MissingPayload_ReturnsError(t *testing.T) {
 func TestExecuteTask_EnrichDetail_NoEnricher_ReturnsError(t *testing.T) {
 	c := newExecutorCore(t)
 	p := runtime.EnrichDetailPayload{
-		ResourceType: "nonexistent-type-000",
-		Resource:     resource.Resource{ID: "some-id"},
+		Op: runtime.DetailOperation{
+			ResourceType: "nonexistent-type-000",
+			Resource:     resource.Resource{ID: "some-id"},
+		},
 	}
 	_, err := c.ExecuteTask(context.Background(), reqP(runtime.KindEnrichDetail, "nonexistent-type-000/some-id", p))
 	if err == nil {
@@ -630,9 +632,11 @@ func TestExecuteTask_EnrichDetail_NilDetailCtx_ReturnsError(t *testing.T) {
 		t.Skip("no detail enrichers registered; cannot test nil-DetailCtx path")
 	}
 	p := runtime.EnrichDetailPayload{
-		ResourceType: enricherType,
-		Resource:     resource.Resource{ID: "some-id-000000000000"},
-		DetailCtx:    nil, // triggers nil-DetailCtx error
+		Op: runtime.DetailOperation{
+			ResourceType: enricherType,
+			Resource:     resource.Resource{ID: "some-id-000000000000"},
+		},
+		DetailCtx: nil, // triggers nil-DetailCtx error
 	}
 	_, err := c.ExecuteTask(context.Background(), reqP(runtime.KindEnrichDetail, enricherType+"/some-id-000000000000", p))
 	if err == nil {

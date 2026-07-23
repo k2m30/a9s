@@ -8,33 +8,30 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// TestCoreHandleEnrichDetail_NoEnricher_ReturnsNilNil verifies that the
-// runtime returns no UIIntents and no TaskRequests for a resource type
+// TestCoreDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask verifies that
+// Core.DetailOperationTasks returns a nil enrich task for a resource type
 // with no registered detail enricher. This pins the SSOT contract: the
 // runtime is the single decision-maker for the dispatch gate, so the
 // adapter does not need to re-check enricher existence.
-func TestCoreHandleEnrichDetail_NoEnricher_ReturnsNilNil(t *testing.T) {
+func TestCoreDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) {
 	if resource.HasDetailEnricher("ec2") {
 		t.Skip("ec2 now has a detail enricher — pick a different no-enricher type")
 	}
 	core := runtime.New(session.New(), resource.AllResourceTypes())
-	intents, tasks := core.HandleEnrichDetail(runtime.EnrichDetailEvent{
-		ResourceType: "ec2",
-		Resource:     resource.Resource{ID: "i-1234567890abcdef0", Name: "no-enricher"},
-	})
-	if intents != nil {
-		t.Errorf("expected nil intents, got %d", len(intents))
-	}
-	if tasks != nil {
-		t.Errorf("expected nil tasks, got %d", len(tasks))
+	op := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-1234567890abcdef0", Name: "no-enricher"}, false)
+	enrichTask, _ := core.DetailOperationTasks(op)
+	if enrichTask != nil {
+		t.Errorf("expected nil enrich task, got %+v", enrichTask)
 	}
 }
 
-// TestCoreHandleEnrichDetail_WithEnricher_EmitsTaskRequest verifies the
-// shape of the TaskRequest emitted for a resource type with a registered
-// detail enricher: kind, scope, cache policy, and typed Payload all
-// match the contract the adapter type-switches on.
-func TestCoreHandleEnrichDetail_WithEnricher_EmitsTaskRequest(t *testing.T) {
+// TestCoreDetailOperationTasks_WithEnricher_EmitsTaskRequest verifies the shape
+// of the TaskRequest Core.DetailOperationTasks emits for a resource type
+// with a registered detail enricher: kind, scope, cache policy, and the
+// EnrichDetailPayload the adapter type-switches on — Op the constructed
+// DetailOperation verbatim, DetailCtx.SkipCache mirroring op.Refresh,
+// DetailCtx.OpID mirroring op.ID.
+func TestCoreDetailOperationTasks_WithEnricher_EmitsTaskRequest(t *testing.T) {
 	if !resource.HasDetailEnricher("role_policies") {
 		t.Fatal("expected role_policies detail enricher to be registered")
 	}
@@ -43,34 +40,54 @@ func TestCoreHandleEnrichDetail_WithEnricher_EmitsTaskRequest(t *testing.T) {
 		Name: "runtime-test",
 	}
 	core := runtime.New(session.New(), resource.AllResourceTypes())
-	intents, tasks := core.HandleEnrichDetail(runtime.EnrichDetailEvent{
-		ResourceType: "role_policies",
-		Resource:     res,
-	})
-	if intents != nil {
-		t.Errorf("expected nil intents (no UI patches at dispatch time), got %d", len(intents))
+	op := core.BeginDetailOperation("role_policies", res, false)
+	enrichTask, _ := core.DetailOperationTasks(op)
+	if enrichTask == nil {
+		t.Fatal("expected a non-nil enrich task")
 	}
-	if got := len(tasks); got != 1 {
-		t.Fatalf("expected exactly 1 task, got %d", got)
+	if enrichTask.Key.Kind != runtime.KindEnrichDetail {
+		t.Errorf("Key.Kind = %q, want %q", enrichTask.Key.Kind, runtime.KindEnrichDetail)
 	}
-	task := tasks[0]
-	if task.Key.Kind != runtime.KindEnrichDetail {
-		t.Errorf("Key.Kind = %q, want %q", task.Key.Kind, runtime.KindEnrichDetail)
+	if want := "role_policies/" + res.ID; enrichTask.Key.Scope != want {
+		t.Errorf("Key.Scope = %q, want %q", enrichTask.Key.Scope, want)
 	}
-	if want := "role_policies/" + res.ID; task.Key.Scope != want {
-		t.Errorf("Key.Scope = %q, want %q", task.Key.Scope, want)
+	if enrichTask.Cache != runtime.CacheNone {
+		t.Errorf("Cache = %v, want CacheNone", enrichTask.Cache)
 	}
-	if task.Cache != runtime.CacheNone {
-		t.Errorf("Cache = %v, want CacheNone", task.Cache)
-	}
-	payload, ok := task.Payload.(runtime.EnrichDetailPayload)
+	payload, ok := enrichTask.Payload.(runtime.EnrichDetailPayload)
 	if !ok {
-		t.Fatalf("Payload type = %T, want runtime.EnrichDetailPayload", task.Payload)
+		t.Fatalf("Payload type = %T, want runtime.EnrichDetailPayload", enrichTask.Payload)
 	}
-	if payload.ResourceType != "role_policies" {
-		t.Errorf("Payload.ResourceType = %q, want %q", payload.ResourceType, "role_policies")
+
+	// Payload.Op must equal the constructed op verbatim (field-by-field,
+	// not reflect.DeepEqual: resource.Resource carries map fields that
+	// obscure which one differs on failure).
+	if payload.Op.ID != op.ID {
+		t.Errorf("Payload.Op.ID = %d, want %d", payload.Op.ID, op.ID)
 	}
-	if payload.Resource.ID != res.ID {
-		t.Errorf("Payload.Resource.ID = %q, want %q", payload.Resource.ID, res.ID)
+	if payload.Op.ResourceType != op.ResourceType {
+		t.Errorf("Payload.Op.ResourceType = %q, want %q", payload.Op.ResourceType, op.ResourceType)
+	}
+	if payload.Op.Resource.ID != op.Resource.ID {
+		t.Errorf("Payload.Op.Resource.ID = %q, want %q", payload.Op.Resource.ID, op.Resource.ID)
+	}
+	if payload.Op.Clients != op.Clients {
+		t.Errorf("Payload.Op.Clients = %v, want %v", payload.Op.Clients, op.Clients)
+	}
+	if payload.Op.Refresh != op.Refresh {
+		t.Errorf("Payload.Op.Refresh = %v, want %v", payload.Op.Refresh, op.Refresh)
+	}
+
+	if payload.DetailCtx == nil {
+		t.Fatal("expected a non-nil DetailCtx (session.New() seeds PolicyDocCache/DetailDocCache)")
+	}
+	if payload.DetailCtx.SkipCache != op.Refresh {
+		t.Errorf("DetailCtx.SkipCache = %v, want op.Refresh = %v", payload.DetailCtx.SkipCache, op.Refresh)
+	}
+	if payload.DetailCtx.OpID != op.ID {
+		t.Errorf("DetailCtx.OpID = %d, want op.ID = %d", payload.DetailCtx.OpID, op.ID)
+	}
+	if payload.DetailCtx.Clients != op.Clients {
+		t.Errorf("DetailCtx.Clients = %v, want op.Clients = %v", payload.DetailCtx.Clients, op.Clients)
 	}
 }
