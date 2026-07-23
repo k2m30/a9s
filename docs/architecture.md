@@ -452,7 +452,7 @@ Representative fields on `session.Session` (`core/session/session.go`):
 - `EnrichmentRan map[string]bool` — banner visibility signal; `true` only after Wave 2 completed for that type.
 - `EnrichmentTypeGen map[string]domain.Gen` — per-type Wave 2 generation counter; bumped on Ctrl+R rerun to invalidate stale in-flight results.
 - `EnrichmentTruncatedIDs map[string]map[string]bool` — per-type set of resource IDs the enricher had to skip due to API truncation.
-- `EnrichmentGen`, `AvailabilityGen`, `RelatedGen`, `EnrichGen` — per-purpose session-wide generation counters; guard stale in-flight async results.
+- `EnrichmentGen`, `AvailabilityGen`, `DetailOpGen` — per-purpose session-wide generation counters; guard stale in-flight async results. `DetailOpGen` doubles as the `DetailOperation` ID source: the detail view's entire open/refresh lifecycle (enrichment + related checks) runs under one operation identity rather than separate counters.
 - `RowStore *session.RowStore` — the single session-scoped per-type row store (see Caching Layers); `RelatedCache` — the related-check LRU. Both cleared on `Rotate()`.
 - Sparse related-panel lazy adds — a checker emits IDs outside the top-level fetcher's scope filter (e.g. AWS-managed KMS key, public AMI, IAM `AdministratorAccess`) — land as `Partial` `RowStore` entries via `ObservePartial`. `handleRelatedNavigate` reads one store entry per type (full-beats-partial is a flag on the entry, not a two-map merge), and partial-only entries are visible to related checkers — that is their purpose — but NEVER eligible for the main-menu top-level list, the enrich queue, navigation seeds, or disk saves.
 
@@ -643,32 +643,52 @@ a9s has two distinct enrichment pipelines with disjoint contracts:
 
 ### On-Demand Detail Enhancement
 
-When a detail, YAML, or JSON view opens for a resource type with a registered enricher, the app async-fetches additional data and merges it into the resource.
+When a detail, YAML, or JSON view opens (or is refreshed with Ctrl+R) for a resource type with a registered enricher or related defs, all resulting async work runs under one **detail operation**.
+
+**The identity rule** (`core/runtime/detail_op.go`): every identity question a detail view's async work can ask — which generation am I, which AWS clients do I use, which in-flight calls may I share, is my result still wanted — has exactly one answer: the `DetailOperation` created synchronously at the user action.
+
+```go
+type DetailOperation struct {
+    ID           domain.Gen                 // session.DetailOpGen, bumped per open/refresh
+    ResourceType string
+    Resource     resource.Resource
+    Clients      *awsclient.ServiceClients  // captured at creation, under the controller lock
+    Refresh      bool                       // Ctrl+R (drives cache-read bypass)
+}
+```
 
 **Flow:**
 
 ```text
-View opens (detail, YAML, or JSON)
-  → resource.HasDetailEnricher(resType)?
-    → increment enrichGen (invalidate prior in-flight results)
-    → emit EnrichDetailMsg
-      → handleEnrichDetail runs enricher in goroutine (10s timeout)
-        → EnrichDetailResultMsg arrives
-          → app.go: generation guard + error flash
-            → view: ResourceType + ResourceID guard
-              → m.res = enriched, re-render content
+View opens or Ctrl+R (TUI keypress or web action — both under the controller lock)
+  → Core.BeginDetailOperation(rt, res, refresh)   // bumps DetailOpGen, becomes the active op
+    → Core.DetailOperationTasks(op)
+        → KindEnrichDetail task   (iff a DetailEnricher is registered;
+                                   DetailEnrichmentCtx from op.Clients + session caches,
+                                   SkipCache = op.Refresh, OpID = op.ID)
+        → KindRelatedCheck task   (iff related defs are registered)
+  → BOTH renderers execute the SAME TaskRequests
+      TUI: tea.Cmds — per-def runtime.RunRelatedDef fan-out for progressive rendering
+      web: background drain — executor fan-out, same RunRelatedDef
+  → results carry OperationID (EnrichDetailResult, RelatedCheckResult / RelatedCheckBatch)
+    → ONE acceptance rule, in the shared Controller fold:
+      a result folds iff its OperationID matches the active detail operation
 ```
 
-**Generation guard**: `enrichGen uint64` is incremented on every new enrichable view open, Ctrl+R, profile switch, and region switch. Stale results (wrong generation) are silently discarded. Generation=0 (test injection) is always accepted.
+There are no intermediary dispatch messages: the operation's tasks are created at the action, so there is no window in which a refresh can re-label an older open's work (the older operation's results simply stop matching). `Rotate()` bumps `DetailOpGen`, so results from a previous profile/region can never fold into the next.
 
-**Error handling**: Enrichment errors produce a `FlashMsg` with `IsError: true`. The view is not updated on error.
+**Call coalescing** (`core/aws/coalesce.go`): SFN/SNS/S3 transports are wrapped in singleflight decorators whose keys are namespaced by the operation ID (`WithDetailOp` on the context, applied once per lane — the generic engine for enrichers, `RunRelatedDef` for checkers). Within one operation, the enricher and every related checker share a single in-flight call per API key (an SFN detail refresh performs one `DescribeStateMachine` in total); a refresh is a new operation and therefore a new namespace, structurally unable to join pre-refresh work. This is in-flight dedup only — never a cache; a call made after the previous one finished always re-executes.
+
+**Execution engine**: enrichers are `detailEnrichSpec`-based instances of the generic `enrichDetail` engine (`core/aws/detail_enrich_engine.go`) — unwrap/id/cache/fetch/wrap per resource type, wrapper structs embedding the original raw struct so field extraction and related checkers see the enriched value transparently. Per-def related-check execution — target-cache prefetch, timeout, panic recovery, lazy-add — lives once in `runtime.RunRelatedDef`, shared by both renderers.
+
+**Error handling**: enrichment and lazy-add errors surface as an error flash through the same fold; no state is updated on error.
 
 **Caching policy**:
-- **Default**: no cache. Re-fetch on each enrichable view open when the data is cheap enough or may change during a session.
-- **If caching is justified**: use a session-scoped, feature-specific cache owned by `session.Session` and passed to detail enrichers via `*awsclient.DetailEnrichmentCtx`. This is appropriate when the enrichment is relatively expensive and the data is unlikely to change within a session.
+- **Default**: no cache. Re-fetch on each enrichable view open when the data is cheap enough or may change during a session (`sfn`, `lambda`, `ec2`, `sns`, `s3`).
+- **If caching is justified**: use a session-scoped, feature-specific cache owned by `session.Session` and passed to detail enrichers via `*awsclient.DetailEnrichmentCtx`. `SkipCache` (set on refresh) bypasses the cache read so Ctrl+R always fetches fresh.
 - **Never**: use package-global cache state for enrichers.
 
-**Current example**: IAM policy document enrichment uses a session-scoped `PolicyDocumentCache` owned by `session.Session.PolicyDocCache` and passed to enrichers via `*awsclient.DetailEnrichmentCtx`. Cache keys are explicitly namespaced: `managed:<policyArn>` for managed policies, `inline:<roleName>/<policyName>` for inline. `session.Session.Rotate()` replaces the cache with a fresh instance on profile/region rotation so entries from a previous account cannot leak into the next.
+**Enricher inventory** (issue #261 expanded the set): cached via `PolicyDocumentCache` (`session.Session.PolicyDocCache`, keys `managed:<policyArn>` / `inline:<roleName>/<policyName>`) — `policy`, `role_policies`; cached via `DetailDocCache` (same ownership/rotation rules, key `cfn:<stackId>:<lastUpdatedUnixSeconds>`, version-keyed so an in-session stack update forces a natural miss) — `cfn` (template body via `GetTemplate`); uncached — `transfer_agreements`, `sfn` (definition/status/role via `DescribeStateMachine` — the ARN survives a redeploy, so caching would serve a stale definition exactly while an operator watches a deploy), `lambda` (`GetFunction`), `ec2` (`DescribeInstanceAttribute` user data, base64/gzip-decoded), `sns` (`GetTopicAttributes`), `s3` (`GetBucketPolicy` + `GetBucketCors` + `GetBucketLifecycleConfiguration`). Both caches are replaced with fresh instances by `session.Session.Rotate()` so entries from a previous account cannot leak into the next.
 
 ---
 
@@ -711,7 +731,7 @@ One session field is deliberately EXEMPT from `Rotate()`'s clean-slate rule: `Se
 | **Disk availability cache** | `core/cache/` | Persisted at `~/.a9s/cache/<profile>--<region>/` — one directory per pair, one YAML file per resource type (`<shortName>.yaml`) | No TTL by contract (C1: cached content renders stale-marked and is re-verified on sight); each type's file replaced atomically via temp+rename |
 | **Row store** | `session.Session.RowStore` (owned by `runtime.Core`) | In-memory `map[string]session.TypeRows` — one entry per canonical resource type | Cleared on profile/region switch via `session.Rotate()` |
 | **Related cache** | `session.Session.RelatedCache` | In-memory LRU with fixed capacity | Cleared on `Rotate()`; entry deleted on Ctrl+R |
-| **Detail-enricher caches** | Feature-specific cache on `session.Session`, delivered to enrichers via `*awsclient.DetailEnrichmentCtx` (current example: `PolicyDocumentCache`) | In-memory, session-scoped | Rotated by `session.Rotate()` on profile/region switch |
+| **Detail-enricher caches** | Feature-specific caches on `session.Session`, delivered to enrichers via `*awsclient.DetailEnrichmentCtx` (`PolicyDocumentCache`, `DetailDocCache`) | In-memory, session-scoped | Rotated by `session.Rotate()` on profile/region switch; refresh bypasses the read via `SkipCache` |
 | **Enrichment visibility state** | `EnrichmentRan`, `EnrichmentTypeGen`, `EnrichmentTruncatedIDs`, `EnrichmentGen` on `session.Session` (Wave 2 progress/control); per-resource findings are folded into `resource.Resource.Findings` on cached rows — see "Wave 2 findings (where they live)" above | In-memory, session-scoped | Cleared per-type on Ctrl+R rerun start; cleared entirely on `Rotate()` |
 
 **Disk availability cache** (`core/cache/cache.go`): Tracks which resource types have resources, their counts, issue counts, and render-sufficient row snapshots. Loaded on startup to instantly grey-out empty types, show issue badges in the main menu, and seed list screens with real rows before any live fetch. Layout: one directory per profile+region pair (`<cache root>/<profile>--<region>/`) containing one self-contained YAML file per resource type (`<shortName>.yaml`) — C7: per-type files, no merge logic. Each file is a `TypeFile{Version, HasResources, Count, Exact, Issues, IssuesKnown, IssuesTruncated, Rows, SavedAt}`; `Rows` carry `{ID, Name, Fields, Findings, FindingFirstSeen}`. The schema is v2 (`cache.SchemaVersion`): v2 added `Row.FindingFirstSeen` (#463), and `LoadDirIn` still accepts a v1 file, backfilling `FindingFirstSeen` from the file's own `SavedAt` so a pre-#463 cache never regresses to "no cache". The `IssuesKnown` bool distinguishes "probed and found zero issues" from "not yet probed" (both unmarshal as int 0 without this flag). There is deliberately NO TTL ([`design/cache-requirements.md`](design/cache-requirements.md) C1): arbitrarily old rows may render, stale-marked, while re-verification runs in the background. When caching is enabled (not `--no-cache`), per-type files are saved after Wave 1 probes complete and again after Wave 2 enrichment completes (atomic temp+rename per file), so enriched findings persist across restarts; `Core.SaveAvailabilityCache` (`core/runtime/probes.go`) skips a type's write entirely when the counts-only scalars are unchanged against the existing on-disk entry. When `--no-cache` is active, the save lanes are no-ops.
@@ -728,7 +748,7 @@ The numbered rules above (C1, C5, C6, C9) are the cache contract in [`design/cac
 
 **Related cache**: LRU mapping `"resourceType:resourceID"` → related check results. Avoids re-running related checks when re-entering a detail view for the same resource.
 
-**Enricher caches**: Caching is optional, not automatic. The default is no cache. When an enricher does cache, it should use a session-scoped, feature-specific cache on `session.Session` and reach the enricher through `*awsclient.DetailEnrichmentCtx`, so cache lifetime matches session lifetime and is rotated by `session.Rotate()`. The current example is the policy document enricher, which caches decoded documents by `managed:<policyArn>` or `inline:<roleName>/<policyName>`.
+**Enricher caches**: Caching is optional, not automatic. The default is no cache. When an enricher does cache, it should use a session-scoped, feature-specific cache on `session.Session` and reach the enricher through `*awsclient.DetailEnrichmentCtx`, so cache lifetime matches session lifetime and is rotated by `session.Rotate()`. Examples: the policy document enricher (`PolicyDocumentCache`, keys `managed:<policyArn>` / `inline:<roleName>/<policyName>`) and the CloudFormation template enricher (`DetailDocCache`, version-keyed `cfn:<stackId>:<lastUpdatedUnixSeconds>`). An explicit refresh sets `SkipCache`, bypassing the cache read while still writing the fresh result back.
 
 ---
 
@@ -1002,7 +1022,7 @@ The stack model maps naturally to drill-down navigation (list → detail → YAM
 
 ### Why generation counters?
 
-Async operations (related checks, enrichment) can outlive the view that triggered them. Generation counters (`AvailabilityGen`, `EnrichmentGen`, `RelatedGen`, `EnrichGen`, `EnrichmentTypeGen`) — all typed `domain.Gen` (`uint64`) after Phase 05a-gens — are incremented on context changes, causing stale in-flight results to be silently discarded. `EnrichmentTypeGen` is a per-type counter for Wave 2: bumped on profile/region switch and on Ctrl+R when the active view is a top-level list with a registered enricher. The dual-generation guard (`Gen` on `EnrichmentCheckedMsg` for session-wide staleness, `TypeGen` for per-type rerun staleness) lets multiple types enrich concurrently while rerun invalidation only cancels the refreshed type.
+Async operations (related checks, enrichment) can outlive the view that triggered them. Generation counters (`AvailabilityGen`, `EnrichmentGen`, `DetailOpGen`, `EnrichmentTypeGen`) — all typed `domain.Gen` (`uint64`) after Phase 05a-gens — are incremented on context changes, causing stale in-flight results to be silently discarded. Detail-view work (enrichment + related checks) shares the single `DetailOpGen`-derived operation identity (see On-Demand Detail Enhancement) instead of per-concern counters — the earlier split (`RelatedGen`/`EnrichGen`) let the two halves of one user action disagree about freshness. `EnrichmentTypeGen` is a per-type counter for Wave 2: bumped on profile/region switch and on Ctrl+R when the active view is a top-level list with a registered enricher. The dual-generation guard (`Gen` on `EnrichmentCheckedMsg` for session-wide staleness, `TypeGen` for per-type rerun staleness) lets multiple types enrich concurrently while rerun invalidation only cancels the refreshed type.
 
 ### Why a separate enricher pattern?
 

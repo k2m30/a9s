@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Detail views fetch what the list APIs don't return (#261). Opening a
+  detail, YAML, or JSON view now enriches on demand: Step Functions
+  show the full ASL definition, live status, and role; CloudFormation
+  stacks show the template body (session-cached, version-keyed so an
+  updated stack never serves its pre-update template); Lambda functions
+  show state, code metadata, and reserved concurrency; EC2 instances
+  show decoded user data (base64 and gzip handled); SNS topics show
+  their full attribute set including effective delivery policy; S3
+  buckets show bucket policy, CORS rules, and lifecycle configuration.
+  All nine enrichers (the six new plus IAM policy documents, role
+  policies, and Transfer agreements) run on one generic engine, and a
+  dedicated demo smoke gate walks every one of them on every push.
+- Detail open/refresh runs under a single operation identity: the
+  enrichment and every related-panel check created by one user action
+  share one generation, one set of AWS clients, and one call-coalescing
+  namespace, and their results are accepted only while that operation
+  is still the active one. A refresh supersedes in-flight work instead
+  of racing it; concurrent calls within one operation collapse to a
+  single AWS request per API (an SFN refresh performs one
+  `DescribeStateMachine` in total); rotation invalidates everything
+  in flight.
+
+### Fixed
+
+- Web mode: detail enrichment now works end to end — results fold into
+  the shared controller state and directly opened YAML/JSON views
+  dispatch enrichment, so the web view shows what the terminal shows.
+- Web mode: related-panel drill-ins find targets outside the cached
+  list (lazy-add previously ran only in the terminal), and background
+  task execution no longer reads session state unlocked while request
+  handlers mutate it.
+- Enrichment and related-panel errors surface as an error flash in the
+  terminal again; both previously rendered no feedback at all.
+- Documents keep numeric fidelity: integers above 2^53 in policy
+  documents, templates, ASL definitions, and topic attributes no longer
+  silently round (9007199254740993 stayed ...992 before).
+- YAML and JSON views render the same shape for the same resource: the
+  YAML view promotes embedded struct fields exactly like the JSON view
+  (`encoding/json` semantics) instead of nesting them under the
+  embedded type's name.
+- Related-panel counts over truncated target populations render "N+"
+  instead of a misleading exact "N", and an empty truncated page no
+  longer erases the truncation marker from the cached row store.
+
 ## [3.56.0] - 2026-07-21
 
 ### Added
