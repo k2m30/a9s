@@ -270,6 +270,24 @@ func (c *Controller) UIMode() string {
 	return c.uiMode
 }
 
+// captureDispatch snapshots the session generations and clients under c.mu
+// (read lock — CaptureDispatch only reads session fields). The headless drain
+// lanes (DrainSync and its variants in drainsync.go) call this once per task,
+// immediately before that task's Core.ExecuteTaskAt, instead of once per
+// batch: a bootstrap drain's TaskKindConnect task can swap session.Clients
+// mid-queue, and a snapshot taken at batch start would hand every later task
+// in that same batch the pre-connect (nil) clients. Per-task capture also
+// closes the same dispatch-time-identity gap the TUI's synchronous Update
+// closes for free — a web request handler can mutate session.Clients/
+// generations through a locked Controller method concurrently with a drain
+// loop's unlocked Core.ExecuteTaskAt call, so the snapshot for each task must
+// be taken under lock rather than read live inside ExecuteTaskAt.
+func (c *Controller) captureDispatch() runtime.DispatchSnapshot {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.core.CaptureDispatch()
+}
+
 // RegisterFallbackTypeDef stores a ResourceTypeDef so that buildListBody
 // (columns) and GetListIssueCount (Color func) use the model's explicitly-
 // supplied typeDef rather than the catalog's when they differ. This is critical

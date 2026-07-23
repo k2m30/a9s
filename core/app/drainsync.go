@@ -20,10 +20,11 @@ const maxDrainIterations = 10_000
 
 // DrainSync runs the pending task slice to completion synchronously.
 // It loops while pending is non-empty, executing each TaskRequest via
-// Core.ExecuteTask and feeding the result event through Handle to collect
-// any follow-up tasks. Adapter-only kinds (those for which ExecuteTask
-// returns ErrAdapterOnlyTask) are skipped — they are renderer concerns
-// and have no meaning in a headless sync context — with one exception:
+// Core.ExecuteTaskAt (against a per-task dispatch snapshot) and feeding the
+// result event through Handle to collect any follow-up tasks. Adapter-only
+// kinds (those for which ExecuteTaskAt returns ErrAdapterOnlyTask) are
+// skipped — they are renderer concerns and have no meaning in a headless
+// sync context — with one exception:
 // TaskKindEmitNavigate is routed through Controller.ApplyEmitNavigate so the
 // one-shot -c/ActionCommand navigation still lands on the headless stack.
 //
@@ -61,7 +62,7 @@ func DrainSyncContextProgress(ctx context.Context, c *Controller, pending []runt
 		pending = pending[1:]
 
 		if req.Key.Kind == runtime.TaskKindEmitNavigate {
-			// Adapter-only from Core.ExecuteTask's perspective — the TUI
+			// Adapter-only from Core.ExecuteTaskAt's perspective — the TUI
 			// intercepts this kind before ExecuteTask and translates it into
 			// a view-stack push (runtime_adapter.go's emitNavigateCmd); the
 			// headless/web lane does the same via Controller.ApplyEmitNavigate
@@ -76,7 +77,8 @@ func DrainSyncContextProgress(ctx context.Context, c *Controller, pending []runt
 			continue
 		}
 
-		ev, err := c.core.ExecuteTask(ctx, req)
+		snap := c.captureDispatch()
+		ev, err := c.core.ExecuteTaskAt(ctx, req, snap)
 		if err != nil {
 			if errors.Is(err, runtime.ErrAdapterOnlyTask) {
 				// Renderer-only kind — irrelevant in a headless sync context.
@@ -100,7 +102,7 @@ func DrainSyncContextProgress(ctx context.Context, c *Controller, pending []runt
 
 // DrainSyncPerTaskTimeout is the per-task-budget variant of
 // DrainSyncContextProgress: instead of one deadline shared across the whole
-// batch, each Core.ExecuteTask call gets its own context.WithTimeout(parent,
+// batch, each Core.ExecuteTaskAt call gets its own context.WithTimeout(parent,
 // perTaskTimeout), released as soon as that task completes. parent carries
 // cancellation only (e.g. server/session shutdown) — it must NOT itself carry
 // a deadline shorter than perTaskTimeout, or every task would inherit that
@@ -120,7 +122,7 @@ func DrainSyncContextProgress(ctx context.Context, c *Controller, pending []runt
 //
 // Per-task timeouts are not silently swallowed: every task whose OWN
 // per-task budget (taskCtx, not some inner AWS-call deadline the task set up
-// on its own) is exhausted by the time ExecuteTask returns is counted — this
+// on its own) is exhausted by the time ExecuteTaskAt returns is counted — this
 // is checked via taskCtx.Err() == context.DeadlineExceeded, not
 // errors.Is(err, context.DeadlineExceeded) against the returned error, since
 // the latter also matches an unrelated inner deadline the task itself created
@@ -165,7 +167,7 @@ func DrainSyncPerTaskTimeout(
 
 		if req.Key.Kind == runtime.TaskKindEmitNavigate {
 			// See DrainSyncContextProgress — adapter-only from
-			// Core.ExecuteTask's perspective; route through
+			// Core.ExecuteTaskAt's perspective; route through
 			// Controller.ApplyEmitNavigate instead of dropping it.
 			if p, ok := req.Payload.(runtime.EmitNavigatePayload); ok {
 				followUp := c.ApplyEmitNavigate(p)
@@ -178,7 +180,8 @@ func DrainSyncPerTaskTimeout(
 		}
 
 		taskCtx, cancel := context.WithTimeout(parent, perTaskTimeout)
-		ev, err := c.core.ExecuteTask(taskCtx, req)
+		snap := c.captureDispatch()
+		ev, err := c.core.ExecuteTaskAt(taskCtx, req, snap)
 		budgetExpired := taskCtx.Err() == context.DeadlineExceeded
 		cancel()
 		if err != nil {
@@ -221,7 +224,7 @@ func DrainSyncPerTaskTimeout(
 // instead of being run inline, INCLUDING follow-up tasks emitted by tasks
 // that WERE executed. Tasks classified blocking (isBackground returns false)
 // run exactly as DrainSyncContextProgress would: executed via
-// Core.ExecuteTask, results fed through Controller.Handle, with any
+// Core.ExecuteTaskAt, results fed through Controller.Handle, with any
 // follow-ups re-enqueued (subject to the same background/blocking split).
 //
 // This lets a caller (e.g. a web request handler) drain only the tasks whose
@@ -258,7 +261,7 @@ func DrainSyncPartition(
 
 		if req.Key.Kind == runtime.TaskKindEmitNavigate {
 			// See DrainSyncContextProgress — adapter-only from
-			// Core.ExecuteTask's perspective; route through
+			// Core.ExecuteTaskAt's perspective; route through
 			// Controller.ApplyEmitNavigate instead of dropping it.
 			if p, ok := req.Payload.(runtime.EmitNavigatePayload); ok {
 				followUp := c.ApplyEmitNavigate(p)
@@ -270,7 +273,8 @@ func DrainSyncPartition(
 			continue
 		}
 
-		ev, err := c.core.ExecuteTask(ctx, req)
+		snap := c.captureDispatch()
+		ev, err := c.core.ExecuteTaskAt(ctx, req, snap)
 		if err != nil {
 			if errors.Is(err, runtime.ErrAdapterOnlyTask) {
 				// Renderer-only kind — irrelevant in a headless sync context.
