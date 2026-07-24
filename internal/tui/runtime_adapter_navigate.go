@@ -240,28 +240,22 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			detailRS.rightColVisible = true
 		}
 		m.pushRS(detailRS)
-		op := m.core.BeginDetailOperation(result.ResolvedType, *result.Resource, false)
-		enrichTask, relatedTask := m.core.DetailOperationTasks(op)
-		var cmds []tea.Cmd
-		if result.DispatchEnrich && enrichTask != nil {
-			cmds = append(cmds, m.dispatchTaskRequests([]runtime.TaskRequest{*enrichTask}))
+		// BeginDetailWorkload begins the op and returns its complete workload
+		// (enrich + related) in one call — cache-replay suppression (D6: no
+		// re-fan-out over cached data) is decided INSIDE it (shared with the
+		// headless/web NavigateKindPushDetail case in core/app/navigate.go),
+		// not re-derived here via a separate ReplayRelatedCache call.
+		_, workloadTasks := m.ctrl.BeginDetailWorkload(result.ResolvedType, *result.Resource, false, false)
+		if !detailRS.rightColAutoShown {
+			// Narrow terminal or no registered related defs: the right
+			// column never shows, so drop the related half — the enrich
+			// half (detail fields) is unaffected by column visibility.
+			workloadTasks = dropTaskKind(workloadTasks, runtime.KindRelatedCheck)
 		}
-		if result.DispatchRelated && detailRS.rightColAutoShown {
-			// D6: no re-fan-out over cached data. ReplayRelatedCache merges
-			// cached rows directly into the controller's DetailState and
-			// reports whether it did — single source of truth shared with the
-			// headless/web NavigateKindPushDetail case in
-			// core/app/navigate.go (applyNavResult). Only dispatch the
-			// TUI's own concurrent fan-out (relatedCheckCmd, one goroutine per
-			// RelatedDef) on a cache miss.
-			if !m.ctrl.ReplayRelatedCache(result.ResolvedType, *result.Resource) && relatedTask != nil {
-				cmds = append(cmds, m.dispatchTaskRequests([]runtime.TaskRequest{*relatedTask}))
-			}
-		}
-		if len(cmds) == 0 {
+		if len(workloadTasks) == 0 {
 			return m, nil
 		}
-		return m, tea.Batch(cmds...)
+		return m, m.dispatchTaskRequests(workloadTasks)
 
 	case runtime.NavigateKindPushYAML:
 		y := views.NewYAMLWithCtrl(*result.Resource, result.ResolvedType, m.keys, m.ctrl)
@@ -402,13 +396,33 @@ func (m Model) pushTextScreen(result runtime.NavigateResult, screenID runtime.Sc
 	w, h := m.innerSize()
 	textRS.width, textRS.height = w, h
 	m.pushRS(textRS)
-	if result.DispatchEnrich {
-		op := m.core.BeginDetailOperation(result.ResolvedType, res, false)
-		if enrichTask, _ := m.core.DetailOperationTasks(op); enrichTask != nil {
-			return m, m.dispatchTaskRequests([]runtime.TaskRequest{*enrichTask})
+	// Dispatch the operation's COMPLETE workload, not just enrich: the
+	// related-check task's result still writes RelatedCache for the detail
+	// screen beneath this YAML/JSON overlay, or for the next plain-detail
+	// open of this same resource — mirrors core/app/navigate.go's
+	// NavigateKindPushYAML/JSON cases (applyNavResult).
+	_, tasks := m.ctrl.BeginDetailWorkload(result.ResolvedType, res, false, false)
+	if len(tasks) == 0 {
+		return m, nil
+	}
+	return m, m.dispatchTaskRequests(tasks)
+}
+
+// dropTaskKind returns tasks with every entry whose Key.Kind matches kind
+// removed. Used where a renderer-only gate (narrow terminal, right column not
+// auto-shown) must suppress one task from the complete workload
+// Controller.BeginDetailWorkload returns — the builder decides the workload
+// from registration + cache state alone and cannot know about renderer
+// visibility, so the adapter filters its opaque result rather than asking
+// the builder for a partial one.
+func dropTaskKind(tasks []runtime.TaskRequest, kind runtime.TaskKind) []runtime.TaskRequest {
+	out := tasks[:0:0]
+	for _, t := range tasks {
+		if t.Key.Kind != kind {
+			out = append(out, t)
 		}
 	}
-	return m, nil
+	return out
 }
 
 // pushSelectorScreen handles the shared push logic for NavigateKindPushRegion
@@ -760,12 +774,11 @@ func (m Model) handleToggleRelated() (tea.Model, tea.Cmd) {
 		defs := resource.GetRelated(rt)
 		rs.rightCol = views.NewRightColumn(defs, srcRes, rt)
 		m.ctrl.SetDetailRelatedVisible(true, false)
-		op := m.core.BeginDetailOperation(rt, srcRes, false)
-		_, relatedTask := m.core.DetailOperationTasks(op)
-		if relatedTask == nil {
+		_, tasks := m.ctrl.BeginDetailWorkload(rt, srcRes, false, false)
+		if len(tasks) == 0 {
 			return m, nil
 		}
-		return m, m.dispatchTaskRequests([]runtime.TaskRequest{*relatedTask})
+		return m, m.dispatchTaskRequests(tasks)
 	}
 	rs.rightCol.SetFocused(false)
 	m.ctrl.SetDetailRelatedVisible(false, true)

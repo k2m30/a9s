@@ -8,16 +8,25 @@
 // enrichSns), and s3's GetBucketPolicy (the s3→role related checker +
 // enrichS3). golang.org/x/sync/singleflight coalesces concurrent identical
 // in-flight calls into one underlying call and shares its result across
-// every caller waiting on that key; it does NOT cache — a call made after
-// the previous one already completed always re-executes.
+// every caller waiting on that key. Layered on top, completedResultMemo
+// (below) retains a completed operation-scoped call's result so a caller
+// arriving AFTER the flight already finished — e.g. the web drain, which
+// runs the related-checker batch to completion before dispatching
+// enrichment, releasing the singleflight entry in between — reuses it
+// instead of re-fetching: within one operation, a key is fetched at most
+// once, ever, independent of whether callers happened to overlap in time.
+// opID == 0 (no active DetailOperation) bypasses the memo entirely, keeping
+// every non-operation caller's exact pre-existing re-fetch-every-time
+// semantics.
 //
-// Every decorator keys its singleflight group as the active
-// core/runtime.DetailOperation's ID (WithDetailOp) plus the existing
-// per-call key: the enricher and its related checkers, opened together
-// under one operation, share one in-flight call per underlying API key; a
-// refresh begins a brand-new operation — a new ID, a new namespace — so it
-// is structurally unable to join whatever pre-refresh call is still in
-// flight under the old ID. No Forget call is needed for this: the
+// Every decorator keys its singleflight group (and its completedResultMemo)
+// as the active core/runtime.DetailOperation's ID (WithDetailOp) plus the
+// existing per-call key: the enricher and its related checkers, opened
+// together under one operation, share one in-flight call AND one memoized
+// result per underlying API key; a refresh begins a brand-new operation — a
+// new ID, a new namespace — so it is structurally unable to join whatever
+// pre-refresh call is still in flight, or reuse whatever pre-refresh result
+// is memoized, under the old ID. No Forget call is needed for this: the
 // namespaces simply never collide.
 //
 // Wired only at the live client bootstrap (CreateServiceClients, below in
@@ -36,8 +45,10 @@
 package aws
 
 import (
+	"container/list"
 	"context"
 	"strconv"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -82,6 +93,95 @@ func coalesceKey(ctx context.Context, key string) string {
 	return strconv.FormatUint(uint64(DetailOpFromContext(ctx)), 10) + "/" + key
 }
 
+// maxCompletedResultMemoEntries bounds each decorator's completedResultMemo.
+// 128 comfortably covers every key a realistic session touches concurrently
+// (a handful of open/refreshed detail operations, one key each); an
+// abandoned operation's entries age out under normal LRU eviction pressure
+// from newer operations rather than via any explicit per-operation cleanup.
+const maxCompletedResultMemoEntries = 128
+
+// completedResultMemo is a small, thread-safe, bounded LRU that retains one
+// AWS call's successful result per coalesceKey (opID + underlying resource
+// key) after its singleflight flight completes.
+//
+// singleflight.Group alone only coalesces CONCURRENT calls sharing a key —
+// once the in-flight call finishes, the group forgets it, so a call arriving
+// AFTER completion always re-executes. The web drain runs sequentially (it
+// drains the related-checker batch to completion before dispatching
+// enrichment, releasing the singleflight entry in between), so sfn/sns/s3's
+// related checker and its detail enricher — both wanting the identical AWS
+// call for the identical operation — fetch it twice, possibly observing two
+// different snapshots of the same resource. This memo closes that gap:
+// within one operation a key is fetched at most once, EVER, not merely while
+// concurrent callers happen to overlap.
+//
+// Per-decorator (one instance alongside each decorator's own
+// singleflight.Group) rather than shared across sfn/sns/s3: the underlying
+// per-call keys (StateMachineArn, TopicArn, Bucket) are arbitrary strings
+// with no type tag, so a shared memo could theoretically collide two
+// different resource kinds' identically-spelled keys under the same
+// operation. One memo per decorator, exactly mirroring its own `g` field,
+// makes that collision structurally impossible instead of merely unlikely.
+//
+// opID == 0 (no active DetailOperation — a caller outside any detail
+// open/refresh) is NEVER memoized: only a real operation's calls are
+// deduplicated across its own lifetime, so every non-operation flow keeps
+// its exact pre-existing re-fetch-every-time semantics. A failed fetch is
+// also never memoized — an AWS error should remain retryable on the next
+// call within the same operation, not get permanently pinned to a transient
+// failure for the operation's remaining lifetime.
+type completedResultMemo struct {
+	mu    sync.Mutex
+	index map[string]*list.Element
+	order *list.List
+}
+
+type completedResultMemoItem struct {
+	key   string
+	value any
+}
+
+func newCompletedResultMemo() *completedResultMemo {
+	return &completedResultMemo{
+		index: make(map[string]*list.Element),
+		order: list.New(),
+	}
+}
+
+// get retrieves the memoized value for key, promoting it to
+// most-recently-used. ok is false on a miss.
+func (m *completedResultMemo) get(key string) (v any, ok bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	el, ok := m.index[key]
+	if !ok {
+		return nil, false
+	}
+	m.order.MoveToFront(el)
+	return el.Value.(*completedResultMemoItem).value, true
+}
+
+// set stores value for key, evicting the least-recently-used entry if the
+// insert would exceed maxCompletedResultMemoEntries.
+func (m *completedResultMemo) set(key string, value any) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if el, ok := m.index[key]; ok {
+		m.order.MoveToFront(el)
+		el.Value.(*completedResultMemoItem).value = value
+		return
+	}
+	el := m.order.PushFront(&completedResultMemoItem{key: key, value: value})
+	m.index[key] = el
+	if m.order.Len() > maxCompletedResultMemoEntries {
+		back := m.order.Back()
+		if back != nil {
+			m.order.Remove(back)
+			delete(m.index, back.Value.(*completedResultMemoItem).key)
+		}
+	}
+}
+
 // coalescingSFN wraps SFNAPI, coalescing concurrent identical
 // DescribeStateMachine calls (same operation, same StateMachineArn) into one
 // underlying call. SFNAPI (sfn_interfaces.go) is already the complete
@@ -102,7 +202,8 @@ func coalesceKey(ctx context.Context, key string) string {
 // re-executes; there is no cache and no staleness.
 type coalescingSFN struct {
 	SFNAPI
-	g singleflight.Group
+	g    singleflight.Group
+	memo *completedResultMemo
 }
 
 // NewCoalescingSFN wraps api with in-flight DescribeStateMachine call
@@ -110,18 +211,28 @@ type coalescingSFN struct {
 // (client.go) and from external tests; the concrete decorator type stays
 // unexported.
 func NewCoalescingSFN(api SFNAPI) SFNAPI {
-	return &coalescingSFN{SFNAPI: api}
+	return &coalescingSFN{SFNAPI: api, memo: newCompletedResultMemo()}
 }
 
 func (c *coalescingSFN) DescribeStateMachine(ctx context.Context, params *sfn.DescribeStateMachineInput, optFns ...func(*sfn.Options)) (*sfn.DescribeStateMachineOutput, error) {
+	opID := DetailOpFromContext(ctx)
 	key := coalesceKey(ctx, aws.ToString(params.StateMachineArn))
+	if opID != 0 {
+		if v, ok := c.memo.get(key); ok {
+			return v.(*sfn.DescribeStateMachineOutput), nil
+		}
+	}
 	v, err, _ := c.g.Do(key, func() (any, error) {
 		return c.SFNAPI.DescribeStateMachine(ctx, params, optFns...)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return v.(*sfn.DescribeStateMachineOutput), nil
+	out := v.(*sfn.DescribeStateMachineOutput)
+	if opID != 0 {
+		c.memo.set(key, out)
+	}
+	return out, nil
 }
 
 // SNSFullAPI widens SNSAPI with the two SNS operations used only via a
@@ -151,7 +262,8 @@ type SNSFullAPI interface {
 // coalescingSFN's doc comment; the same reasoning applies verbatim.
 type coalescingSNS struct {
 	SNSFullAPI
-	g singleflight.Group
+	g    singleflight.Group
+	memo *completedResultMemo
 }
 
 // NewCoalescingSNS wraps api with in-flight GetTopicAttributes call
@@ -159,18 +271,28 @@ type coalescingSNS struct {
 // (client.go) and from external tests; the concrete decorator type stays
 // unexported.
 func NewCoalescingSNS(api SNSFullAPI) SNSFullAPI {
-	return &coalescingSNS{SNSFullAPI: api}
+	return &coalescingSNS{SNSFullAPI: api, memo: newCompletedResultMemo()}
 }
 
 func (c *coalescingSNS) GetTopicAttributes(ctx context.Context, params *sns.GetTopicAttributesInput, optFns ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
+	opID := DetailOpFromContext(ctx)
 	key := coalesceKey(ctx, aws.ToString(params.TopicArn))
+	if opID != 0 {
+		if v, ok := c.memo.get(key); ok {
+			return v.(*sns.GetTopicAttributesOutput), nil
+		}
+	}
 	v, err, _ := c.g.Do(key, func() (any, error) {
 		return c.SNSFullAPI.GetTopicAttributes(ctx, params, optFns...)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return v.(*sns.GetTopicAttributesOutput), nil
+	out := v.(*sns.GetTopicAttributesOutput)
+	if opID != 0 {
+		c.memo.set(key, out)
+	}
+	return out, nil
 }
 
 // S3FullAPI widens S3API with the six S3 operations used only via a narrow
@@ -210,23 +332,34 @@ type S3FullAPI interface {
 // coalescingSFN's doc comment; the same reasoning applies verbatim.
 type coalescingS3 struct {
 	S3FullAPI
-	g singleflight.Group
+	g    singleflight.Group
+	memo *completedResultMemo
 }
 
 // NewCoalescingS3 wraps api with in-flight GetBucketPolicy call coalescing.
 // Exported for construction at the live client bootstrap (client.go) and
 // from external tests; the concrete decorator type stays unexported.
 func NewCoalescingS3(api S3FullAPI) S3FullAPI {
-	return &coalescingS3{S3FullAPI: api}
+	return &coalescingS3{S3FullAPI: api, memo: newCompletedResultMemo()}
 }
 
 func (c *coalescingS3) GetBucketPolicy(ctx context.Context, params *s3.GetBucketPolicyInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyOutput, error) {
+	opID := DetailOpFromContext(ctx)
 	key := coalesceKey(ctx, aws.ToString(params.Bucket))
+	if opID != 0 {
+		if v, ok := c.memo.get(key); ok {
+			return v.(*s3.GetBucketPolicyOutput), nil
+		}
+	}
 	v, err, _ := c.g.Do(key, func() (any, error) {
 		return c.S3FullAPI.GetBucketPolicy(ctx, params, optFns...)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return v.(*s3.GetBucketPolicyOutput), nil
+	out := v.(*s3.GetBucketPolicyOutput)
+	if opID != 0 {
+		c.memo.set(key, out)
+	}
+	return out, nil
 }

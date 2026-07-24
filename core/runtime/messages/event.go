@@ -106,13 +106,6 @@ func (m ValueRevealed) GenStamp() domain.Gen { return m.Gen }
 func (ValueRevealed) GenAspect() Aspect      { return AspectConnect }
 func (ValueRevealed) AcceptZeroGen() bool    { return true }
 
-// Copied is sent after a successful clipboard copy.
-type Copied struct {
-	Content string
-}
-
-func (Copied) isEvent() {}
-
 // ClientsReady is sent when AWS clients are initialized.
 // Clients is typed as any to avoid importing aws/ from the messages package.
 // The adapter type-asserts it to *awsclient.ServiceClients.
@@ -436,7 +429,6 @@ func AllEventSamples() []Event {
 		ByIDFetchFailed{TargetType: "ec2", ID: "i-sample", Reason: "sample reason"},
 		ClearFlash{},
 		ValueRevealed{ResourceType: "secrets", ResourceID: "sample"},
-		Copied{Content: "sample"},
 		ClientsReady{Region: "us-east-1"},
 		RelatedCheckResult{ResourceType: "ec2", SourceResourceID: "i-sample", DefDisplayName: "sample"},
 		RelatedCheckBatch{ResourceType: "ec2", SourceResourceID: "i-sample"},

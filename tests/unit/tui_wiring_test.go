@@ -42,7 +42,7 @@ func TestWiring_CopyInResourceList_ReturnsFlashMsg(t *testing.T) {
 		t.Fatal("pressing 'c' in resource list should return a command for clipboard copy")
 	}
 
-	// Execute the command — should return a FlashMsg or CopiedMsg
+	// Execute the command — should return a FlashMsg
 	msg := cmd()
 	switch v := msg.(type) {
 	case messages.Flash:
@@ -50,12 +50,8 @@ func TestWiring_CopyInResourceList_ReturnsFlashMsg(t *testing.T) {
 			// Clipboard may fail in CI, but should still produce a FlashMsg
 			t.Logf("clipboard copy returned error flash: %s (expected in headless env)", v.Text)
 		}
-	case messages.Copied:
-		if v.Content != "i-abc123" {
-			t.Errorf("CopiedMsg.Content should be 'i-abc123', got %q", v.Content)
-		}
 	default:
-		t.Errorf("expected FlashMsg or CopiedMsg, got %T", msg)
+		t.Errorf("expected FlashMsg, got %T", msg)
 	}
 }
 
@@ -85,10 +81,8 @@ func TestWiring_CopyInDetailView_ReturnsFlashMsg(t *testing.T) {
 	switch msg.(type) {
 	case messages.Flash:
 		// OK — clipboard may succeed or fail
-	case messages.Copied:
-		// OK
 	default:
-		t.Errorf("expected FlashMsg or CopiedMsg, got %T", msg)
+		t.Errorf("expected FlashMsg, got %T", msg)
 	}
 }
 
@@ -117,16 +111,12 @@ func TestWiring_CopyInDetailView_UsesActiveFieldValue(t *testing.T) {
 
 	msg := cmd()
 	switch v := msg.(type) {
-	case messages.Copied:
-		if v.Content != "i-abc123" {
-			t.Errorf("CopiedMsg.Content should be the active field value, got %q", v.Content)
-		}
 	case messages.Flash:
 		if !strings.Contains(v.Text, "i-abc123") && !strings.HasPrefix(v.Text, "Copy failed:") {
 			t.Errorf("flash should mention copied field value, got %q", v.Text)
 		}
 	default:
-		t.Errorf("expected FlashMsg or CopiedMsg, got %T", msg)
+		t.Errorf("expected FlashMsg, got %T", msg)
 	}
 }
 
@@ -191,10 +181,8 @@ func TestWiring_CopyInYAMLView_ReturnsFlashMsg(t *testing.T) {
 	switch msg.(type) {
 	case messages.Flash:
 		// OK
-	case messages.Copied:
-		// OK
 	default:
-		t.Errorf("expected FlashMsg or CopiedMsg, got %T", msg)
+		t.Errorf("expected FlashMsg, got %T", msg)
 	}
 }
 
@@ -218,10 +206,8 @@ func TestWiring_CopyInRevealView_ReturnsFlashMsg(t *testing.T) {
 	switch msg.(type) {
 	case messages.Flash:
 		// OK
-	case messages.Copied:
-		// OK
 	default:
-		t.Errorf("expected FlashMsg or CopiedMsg, got %T", msg)
+		t.Errorf("expected FlashMsg, got %T", msg)
 	}
 }
 

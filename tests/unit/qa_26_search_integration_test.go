@@ -785,9 +785,9 @@ func TestSearch_O03_PageUpDownWorksWhileSearchActive(t *testing.T) {
 }
 
 // 26-O04: Copy (c) works while search is active — the copy command returns a
-// FlashMsg or CopiedMsg (clipboard write may fail in headless CI, that is OK).
+// FlashMsg (clipboard write may fail in headless CI, that is OK).
 // We verify that pressing c produces a command and that executing the command
-// yields a FlashMsg or CopiedMsg — confirming the copy path runs while search
+// yields a FlashMsg — confirming the copy path runs while search
 // is active without panicking or swallowing the key.
 func TestSearch_O04_CopyWorksWhileSearchActive(t *testing.T) {
 	tui.Version = "0.6.0"
@@ -802,7 +802,7 @@ func TestSearch_O04_CopyWorksWhileSearchActive(t *testing.T) {
 	}
 
 	// Press c — copy. The model returns an updated model plus a command.
-	// The command produces a FlashMsg or CopiedMsg.
+	// The command produces a FlashMsg.
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, rootKeyPress("c"))
 
@@ -815,10 +815,8 @@ func TestSearch_O04_CopyWorksWhileSearchActive(t *testing.T) {
 	switch msg.(type) {
 	case messages.Flash:
 		// OK — clipboard may succeed or fail in CI, but the copy path fired.
-	case messages.Copied:
-		// OK — clipboard succeeded.
 	default:
-		t.Errorf("O04: expected FlashMsg or CopiedMsg from copy command, got %T", msg)
+		t.Errorf("O04: expected FlashMsg from copy command, got %T", msg)
 	}
 
 	// Apply the flash/copy message back into the model and confirm search is still active.

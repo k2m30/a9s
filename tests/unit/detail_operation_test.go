@@ -2,10 +2,11 @@ package unit_test
 
 // detail_operation_test.go — lifecycle contract tests for the single
 // per-detail-view identity core/runtime.DetailOperation was rebuilt around
-// (Core.BeginDetailOperation / Core.DetailOperationTasks / OperationID /
-// messages.AspectDetailOp), replacing the old per-message
-// RelatedCheckStarted/EnrichDetail trigger messages and the Generation
-// staleness field.
+// (Core.BeginDetailOperation / OperationID / messages.AspectDetailOp),
+// replacing the old per-message RelatedCheckStarted/EnrichDetail trigger
+// messages and the Generation staleness field. Core.DetailOperationTasks was
+// later deleted (#261 boundary-sealing wave): BeginDetailOperation itself now
+// returns (op, enrichTask, relatedTask) in one call — see Group 4.
 //
 // Five invariants, one per group below:
 //
@@ -22,9 +23,10 @@ package unit_test
 //     (via awsclient.NewCoalescingSFN + awsclient.WithDetailOp), and two
 //     separate operations — even for the identical AWS-level key — never
 //     coalesce with each other.
-//  4. Core.DetailOperationTasks' gating table: enrich/related tasks are
-//     present only when the resource type has a registered enricher/related
-//     defs, and Refresh=true sets EnrichDetailPayload.DetailCtx.SkipCache.
+//  4. Core.BeginDetailOperation's task-gating table: enrich/related tasks
+//     are present only when the resource type has a registered
+//     enricher/related defs, and Refresh=true sets
+//     EnrichDetailPayload.DetailCtx.SkipCache.
 //  5. Core.BeginDetailOperation is strictly monotonic across calls, and
 //     Core.ActiveDetailOp always reflects the most recently begun operation.
 
@@ -81,7 +83,7 @@ func TestDetailOperation_AcceptanceOrdering_SupersededResultNeverFoldsRegardless
 			// A refresh begins a brand-new operation, superseding staleOp —
 			// exactly what Ctrl+R does (core/app/actions_list.go's
 			// handleActionRefresh).
-			currentOp := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-order0001"}, true)
+			currentOp, _, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-order0001"}, true)
 
 			staleMsg := messages.RelatedCheckResult{
 				ResourceType:     "ec2",
@@ -235,7 +237,7 @@ func TestDetailOperation_OneFlightPerOperation_ConcurrentCallsUnderSameOpCoalesc
 	decorated := awsclient.NewCoalescingSFN(fake)
 
 	_, core := newTestControllerAndCore(t)
-	op := core.BeginDetailOperation("sfn", resource.Resource{ID: arn}, false)
+	op, _, _ := core.BeginDetailOperation("sfn", resource.Resource{ID: arn}, false)
 	ctx := awsclient.WithDetailOp(context.Background(), op.ID)
 
 	const n = 6
@@ -274,8 +276,8 @@ func TestDetailOperation_OneFlightPerOperation_DifferentOperationsNeverCoalesce(
 
 	_, core := newTestControllerAndCore(t)
 	res := resource.Resource{ID: arn}
-	op1 := core.BeginDetailOperation("sfn", res, false)
-	op2 := core.BeginDetailOperation("sfn", res, true)
+	op1, _, _ := core.BeginDetailOperation("sfn", res, false)
+	op2, _, _ := core.BeginDetailOperation("sfn", res, true)
 
 	if op2.ID == op1.ID {
 		t.Fatal("BeginDetailOperation must return a fresh ID for the refresh — got the same ID as the initial open")
@@ -351,8 +353,7 @@ func TestDetailOperationTasks_GatingTable(t *testing.T) {
 
 			_, core := newTestControllerAndCore(t)
 			res := resource.Resource{ID: "gate-" + tc.name}
-			op := core.BeginDetailOperation(shortName, res, tc.refresh)
-			enrichTask, relatedTask := core.DetailOperationTasks(op)
+			op, enrichTask, relatedTask := core.BeginDetailOperation(shortName, res, tc.refresh)
 
 			if tc.hasEnricher {
 				if enrichTask == nil {
@@ -411,9 +412,9 @@ func TestBeginDetailOperation_MonotonicallyIncreasingAcrossCalls(t *testing.T) {
 	_, core := newTestControllerAndCore(t)
 	res := resource.Resource{ID: "i-mono0001"}
 
-	op1 := core.BeginDetailOperation("ec2", res, false)
-	op2 := core.BeginDetailOperation("ec2", res, false)
-	op3 := core.BeginDetailOperation("ec2", res, true)
+	op1, _, _ := core.BeginDetailOperation("ec2", res, false)
+	op2, _, _ := core.BeginDetailOperation("ec2", res, false)
+	op3, _, _ := core.BeginDetailOperation("ec2", res, true)
 
 	if op2.ID <= op1.ID {
 		t.Errorf("op2.ID (%d) must be strictly greater than op1.ID (%d)", op2.ID, op1.ID)

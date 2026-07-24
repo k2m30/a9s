@@ -3,7 +3,7 @@
 // Package runtime — see orchestrator.go for the package overview.
 //
 // enrich.go owns the KindEnrichDetail task family. Dispatch is decided by
-// Core.DetailOperationTasks (detail_op.go) — a resource type either has a
+// Core.BeginDetailOperation (detail_op.go) — a resource type either has a
 // registered detail enricher or it doesn't; there is no separate policy
 // gate here anymore.
 package runtime
@@ -21,7 +21,7 @@ const KindEnrichDetail TaskKind = "enrich-detail"
 // EnrichDetailPayload is the typed TaskPayload variant for KindEnrichDetail.
 // Op carries the resource type/resource/AWS clients/refresh flag every
 // enrich dispatch needs (see DetailOperation's doc comment); DetailCtx is
-// the DetailEnrichmentCtx Core.DetailOperationTasks built from op.Clients +
+// the DetailEnrichmentCtx Core.BeginDetailOperation built from op.Clients +
 // session.PolicyDocCache + session.DetailDocCache, with SkipCache/OpID
 // already stamped from op. The DetailCtx pointer is nil only when both
 // op.Clients and the session's document caches are unset (test harnesses

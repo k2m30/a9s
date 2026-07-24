@@ -390,12 +390,11 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 			if resource.RelatedEnter(row.State, row.Count, row.Truncated) == resource.RelatedEnterResolveInPlace {
 				res := m.ctrl.GetDetailResource()
 				rt := rs.resourceType
-				op := m.core.BeginDetailOperation(rt, res, false)
-				_, relatedTask := m.core.DetailOperationTasks(op)
-				if relatedTask == nil {
+				_, tasks := m.ctrl.BeginDetailWorkload(rt, res, false, true)
+				if len(tasks) == 0 {
 					return m, nil
 				}
-				return m, m.dispatchTaskRequests([]runtime.TaskRequest{*relatedTask})
+				return m, m.dispatchTaskRequests(tasks)
 			}
 			var checker resource.RelatedChecker
 			for _, def := range resource.GetRelated(rs.resourceType) {

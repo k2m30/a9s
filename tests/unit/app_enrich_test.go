@@ -10,6 +10,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -562,6 +563,62 @@ func TestPolicyDocCache_ZeroValueSafe(t *testing.T) {
 	}
 }
 
+// TestPolicyDocCache_SetIfNewer_StaleOpRefused_NewerOpReplaces mirrors
+// TestDetailDocCache_SetIfNewer_StaleOpRefused_NewerOpReplaces
+// (detail_doc_cache_test.go) for PolicyDocumentCache: the two caches are
+// independently implemented (no shared underlying type), so a stale-op
+// write-refusal bug in one is not automatically caught by testing the
+// other. Assumed API surface: SetIfNewer(key string, doc any, opID
+// domain.Gen) bool, additive alongside the existing plain Set every
+// pre-existing TestPolicyDocCache_* test above still uses unmodified.
+func TestPolicyDocCache_SetIfNewer_StaleOpRefused_NewerOpReplaces(t *testing.T) {
+	var cache awsclient.PolicyDocumentCache
+	key := awsclient.ManagedKey("arn:aws:iam::123456789012:policy/test")
+
+	if ok := cache.SetIfNewer(key, "op-7-value", domain.Gen(7)); !ok {
+		t.Fatal("SetIfNewer(op 7) on an empty key must succeed")
+	}
+	if got := cache.Get(key); got != "op-7-value" {
+		t.Fatalf("Get after op-7 write = %v, want %q", got, "op-7-value")
+	}
+
+	if ok := cache.SetIfNewer(key, "op-5-value", domain.Gen(5)); ok {
+		t.Error("SetIfNewer(op 5) reported success — a strictly-older op must be refused")
+	}
+	if got := cache.Get(key); got != "op-7-value" {
+		t.Errorf("Get after refused op-5 write = %v, want op-7's value %q unchanged", got, "op-7-value")
+	}
+
+	if ok := cache.SetIfNewer(key, "op-9-value", domain.Gen(9)); !ok {
+		t.Error("SetIfNewer(op 9) reported failure — a strictly-newer op must replace the recorded writer's value")
+	}
+	if got := cache.Get(key); got != "op-9-value" {
+		t.Errorf("Get after op-9 write = %v, want %q", got, "op-9-value")
+	}
+}
+
+// TestPolicyDocCache_SetIfNewer_OpZero_WritesEmptyKey_DoesNotBlockLaterOp
+// mirrors the DetailDocCache opID-0 axis: op 0 writes a never-written key
+// successfully but never raises the bar, so a later op 3 write still lands.
+func TestPolicyDocCache_SetIfNewer_OpZero_WritesEmptyKey_DoesNotBlockLaterOp(t *testing.T) {
+	var cache awsclient.PolicyDocumentCache
+	key := awsclient.InlineKey("my-role", "trust-policy")
+
+	if ok := cache.SetIfNewer(key, "op-0-value", domain.Gen(0)); !ok {
+		t.Fatal("SetIfNewer(op 0) on an empty key must succeed")
+	}
+	if got := cache.Get(key); got != "op-0-value" {
+		t.Fatalf("Get after op-0 write = %v, want %q", got, "op-0-value")
+	}
+
+	if ok := cache.SetIfNewer(key, "op-3-value", domain.Gen(3)); !ok {
+		t.Error("SetIfNewer(op 3) reported failure — an op-0 write must never block a later op from writing the same key")
+	}
+	if got := cache.Get(key); got != "op-3-value" {
+		t.Errorf("Get after op-3 write = %v, want %q", got, "op-3-value")
+	}
+}
+
 func TestRefresh_OnDetailView_DispatchesEnrichment(t *testing.T) {
 	app := tui.New("demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
@@ -617,20 +674,21 @@ func TestDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) {
 		},
 	}
 
-	op := m.Core().BeginDetailOperation("ec2", ec2Res, false)
-	enrichTask, _ := m.Core().DetailOperationTasks(op)
+	_, enrichTask, _ := m.Core().BeginDetailOperation("ec2", ec2Res, false)
 
 	if enrichTask != nil {
-		t.Error("DetailOperationTasks should return a nil enrich task when no enricher is registered for the type")
+		t.Error("BeginDetailOperation should return a nil enrich task when no enricher is registered for the type")
 	}
 }
 
 // ---------------------------------------------------------------------------
 // TestDetailOperationTasks_WithEnricher_ExecutesToEnrichDetailResult
-// Verifies that Core.DetailOperationTasks builds a non-nil enrich task when
+// Verifies that Core.BeginDetailOperation builds a non-nil enrich task when
 // an enricher is registered, and that executing it (Core.ExecuteTaskAt)
 // produces an EnrichDetailResult carrying the correct ResourceType and
-// ResourceID.
+// ResourceID. (BeginDetailOperation folded the former separate
+// DetailOperationTasks call into its own return values — #261
+// boundary-sealing wave.)
 // ---------------------------------------------------------------------------
 
 func TestDetailOperationTasks_WithEnricher_ExecutesToEnrichDetailResult(t *testing.T) {
@@ -648,10 +706,9 @@ func TestDetailOperationTasks_WithEnricher_ExecutesToEnrichDetailResult(t *testi
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/enrich-direct", "enrich-direct", "Managed")
 
-	op := m.Core().BeginDetailOperation("role_policies", res, false)
-	enrichTask, _ := m.Core().DetailOperationTasks(op)
+	_, enrichTask, _ := m.Core().BeginDetailOperation("role_policies", res, false)
 	if enrichTask == nil {
-		t.Fatal("DetailOperationTasks should return a non-nil enrich task when an enricher is registered")
+		t.Fatal("BeginDetailOperation should return a non-nil enrich task when an enricher is registered")
 	}
 
 	ev, err := m.Core().ExecuteTaskAt(context.Background(), *enrichTask, m.Core().CaptureDispatch())

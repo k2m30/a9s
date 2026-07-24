@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 )
 
 func TestDetailDocCache_ZeroValueSafe(t *testing.T) {
@@ -149,5 +150,69 @@ func TestDetailDocCache_ConcurrentAccess_NoRace(t *testing.T) {
 	sharedInt, ok := shared.(int)
 	if !ok || sharedInt < 0 || sharedInt >= goroutines {
 		t.Errorf("cache.Get(sharedKey) = %v (type ok=%v), want a valid goroutine id in [0,%d)", shared, ok, goroutines)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Stale-op write refusal (boundary-sealing wave, #261): a write from an
+// operation strictly older than the key's recorded writer must be refused —
+// otherwise a slow, already-superseded detail-refresh's write could land
+// AFTER a newer operation's fresh write and silently resurrect stale
+// content. Assumed API surface: SetIfNewer(key string, doc any, opID
+// domain.Gen) bool — additive alongside the existing plain Set (which stays
+// the op-oblivious write path every pre-existing test above still uses
+// unmodified) rather than a breaking signature change to Set itself.
+// ---------------------------------------------------------------------------
+
+// TestDetailDocCache_SetIfNewer_StaleOpRefused_NewerOpReplaces pins the core
+// ordering contract: op 7 writes K, a strictly-older op 5 write is refused
+// (K keeps op 7's value), and a strictly-newer op 9 write replaces it.
+func TestDetailDocCache_SetIfNewer_StaleOpRefused_NewerOpReplaces(t *testing.T) {
+	var cache awsclient.DetailDocCache
+	const key = "sfn:arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"
+
+	if ok := cache.SetIfNewer(key, "op-7-value", domain.Gen(7)); !ok {
+		t.Fatal("SetIfNewer(op 7) on an empty key must succeed")
+	}
+	if got := cache.Get(key); got != "op-7-value" {
+		t.Fatalf("Get after op-7 write = %v, want %q", got, "op-7-value")
+	}
+
+	if ok := cache.SetIfNewer(key, "op-5-value", domain.Gen(5)); ok {
+		t.Error("SetIfNewer(op 5) reported success — a strictly-older op must be refused")
+	}
+	if got := cache.Get(key); got != "op-7-value" {
+		t.Errorf("Get after refused op-5 write = %v, want op-7's value %q unchanged", got, "op-7-value")
+	}
+
+	if ok := cache.SetIfNewer(key, "op-9-value", domain.Gen(9)); !ok {
+		t.Error("SetIfNewer(op 9) reported failure — a strictly-newer op must replace the recorded writer's value")
+	}
+	if got := cache.Get(key); got != "op-9-value" {
+		t.Errorf("Get after op-9 write = %v, want %q", got, "op-9-value")
+	}
+}
+
+// TestDetailDocCache_SetIfNewer_OpZero_WritesEmptyKey_DoesNotBlockLaterOp
+// covers the opID-0 axis: a write under op 0 to a never-written key must
+// still land (op 0 is a valid writer, just never allowed to raise the bar
+// against a later write), and a subsequent op 3 write to the same key must
+// not be refused because of it.
+func TestDetailDocCache_SetIfNewer_OpZero_WritesEmptyKey_DoesNotBlockLaterOp(t *testing.T) {
+	var cache awsclient.DetailDocCache
+	const key = "cfn:prod-vpc-network"
+
+	if ok := cache.SetIfNewer(key, "op-0-value", domain.Gen(0)); !ok {
+		t.Fatal("SetIfNewer(op 0) on an empty key must succeed")
+	}
+	if got := cache.Get(key); got != "op-0-value" {
+		t.Fatalf("Get after op-0 write = %v, want %q", got, "op-0-value")
+	}
+
+	if ok := cache.SetIfNewer(key, "op-3-value", domain.Gen(3)); !ok {
+		t.Error("SetIfNewer(op 3) reported failure — an op-0 write must never block a later op from writing the same key")
+	}
+	if got := cache.Get(key); got != "op-3-value" {
+		t.Errorf("Get after op-3 write = %v, want %q", got, "op-3-value")
 	}
 }

@@ -190,20 +190,13 @@ func (c *Controller) handleActionRefresh(_ Action) (ViewState, []runtime.TaskReq
 		rt := ds.ResourceType
 		srcRes := ds.Resource
 		c.resetDetailRelatedRowsLocked(rt)
-		// The RelatedCacheLRU entry is append-only (PatchRelatedCache never
-		// overwrites) — without clearing it here, every refresh would pile a
-		// duplicate per-def entry onto it, so a later cache-hit replay
-		// (ReplayRelatedCache) would merge stale rows behind the fresh ones.
-		c.core.RelatedCacheDelete(runtime.RelatedCacheKey(rt, srcRes.ID))
-		op := c.core.BeginDetailOperation(rt, srcRes, true)
-		enrichTask, relatedTask := c.core.DetailOperationTasks(op)
-		var tasks []runtime.TaskRequest
-		if relatedTask != nil {
-			tasks = append(tasks, *relatedTask)
-		}
-		if enrichTask != nil {
-			tasks = append(tasks, *enrichTask)
-		}
+		// forceRelated deletes the RelatedCache entry before
+		// beginDetailWorkloadLocked's own cache-replay attempt — the
+		// RelatedCacheLRU entry is append-only (PatchRelatedCache never
+		// overwrites), so without that delete every refresh would pile a
+		// duplicate per-def entry onto it and a later cache-hit replay would
+		// merge stale rows behind the fresh ones.
+		_, tasks := c.beginDetailWorkloadLocked(rt, srcRes, true, true)
 		return c.snapshot(), tasks
 	}
 	// List view: delete cache and re-fetch.

@@ -180,8 +180,14 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 		ds.RelatedHidden = true
 		if !ds.RelatedVisible {
 			ds.RelatedFocus = false
+			return c.snapshot(), nil, true
 		}
-		return c.snapshot(), nil, true
+		// Toggling the panel ON dispatches the full detail workload, same as
+		// the TUI's handleToggleRelated: the builder's cache replay serves an
+		// already-populated panel without a network task, so this fetches only
+		// when the panel has nothing to show (e.g. after an earlier error).
+		_, tasks := c.beginDetailWorkloadLocked(ds.ResourceType, ds.Resource, false, false)
+		return c.snapshot(), tasks, true
 
 	case ActionToggleFocus:
 		// Tab: toggle focus between left (field) column and right (related) column.

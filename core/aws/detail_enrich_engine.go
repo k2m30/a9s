@@ -13,16 +13,24 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/jsonyaml"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // docCache is the minimal cache contract shared by PolicyDocumentCache and
-// DetailDocCache — both already satisfy it via their existing Get/Set
-// methods, so no adapter type is needed.
+// DetailDocCache — both already satisfy it via their existing Get/Set/
+// SetIfNewer methods, so no adapter type is needed.
 type docCache interface {
 	Get(key string) any
 	Set(key string, doc any)
+	// SetIfNewer stores doc under key unless opID is strictly older than the
+	// opID a prior SetIfNewer call recorded for that key — see either
+	// concrete type's own doc comment for the full contract. enrichDetail
+	// uses this instead of bare Set so a stale, already-superseded
+	// operation's late-arriving write can never overwrite the fresh entry a
+	// newer operation (open, refresh) already wrote.
+	SetIfNewer(key string, doc any, opID domain.Gen) bool
 }
 
 // policyDocsCache and detailDocsCache adapt DetailEnrichmentCtx's two
@@ -168,7 +176,13 @@ func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resou
 	}
 
 	if cache != nil {
-		cache.Set(cacheKey, payload)
+		// Op-aware write (item 3, #261 boundary wave): dctx.OpID is 0 for a
+		// caller with no active DetailOperation (Set's own semantics apply
+		// unchanged); non-zero for a real operation, where a write from an
+		// operation strictly older than the recorded writer is refused rather
+		// than silently overwriting a fresher entry a newer operation (or an
+		// explicit refresh) already wrote.
+		cache.SetIfNewer(cacheKey, payload, dctx.OpID)
 	}
 
 	res.RawStruct = spec.wrap(item, payload)

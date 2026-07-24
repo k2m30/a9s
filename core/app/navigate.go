@@ -178,29 +178,13 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		// Use lock-free variants — applyNavResult is always called while c.mu
 		// is already held by Apply or Handle.
 		c.ensureDetailState(*res.Resource, res.ResolvedType)
-		var tasks []runtime.TaskRequest
-		op := c.core.BeginDetailOperation(res.ResolvedType, *res.Resource, false)
-		enrichTask, relatedTask := c.core.DetailOperationTasks(op)
-		if res.DispatchRelated {
-			c.initDetailRelatedRows(res.ResolvedType)
-			// Populate the related panel: replay the related cache if present
-			// (D6: no re-fan-out over cached data — replayRelatedCache is the
-			// single source of truth for the hit path, shared with the TUI
-			// adapter's NavigateKindPushDetail case in
-			// runtime_adapter_navigate.go); otherwise dispatch the operation's
-			// related-check task so DrainSync/the web renderer run the checkers
-			// headlessly. Cache-hit suppression is a caching concern, not an
-			// operation concern, so it stays here rather than in
-			// DetailOperationTasks.
-			if relatedTask != nil && !c.replayRelatedCache(res.ResolvedType, *res.Resource) {
-				tasks = append(tasks, *relatedTask)
-			}
-		}
-		if res.DispatchEnrich && enrichTask != nil {
-			// KindEnrichDetail is classified background by IsBackgroundTaskKind,
-			// so it never blocks the initial detail render.
-			tasks = append(tasks, *enrichTask)
-		}
+		c.initDetailRelatedRows(res.ResolvedType)
+		// beginDetailWorkloadLocked owns the complete workload (enrich +
+		// related, cache-replay-suppressed) — no per-half gate at this call
+		// site anymore: DispatchEnrich/DispatchRelated (HandleNavigate) were
+		// redundant with the builder's own registration checks (HasDetailEnricher
+		// / GetRelated) for every NavigateTargetDetail navigation reaching here.
+		_, tasks := c.beginDetailWorkloadLocked(res.ResolvedType, *res.Resource, false, false)
 		return tasks
 
 	case runtime.NavigateKindPushYAML:
@@ -217,12 +201,14 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		}
 		c.applyIntents([]runtime.UIIntent{intent})
 		c.ensureTextState(lines)
-		if res.DispatchEnrich {
-			op := c.core.BeginDetailOperation(res.ResolvedType, *res.Resource, false)
-			if enrichTask, _ := c.core.DetailOperationTasks(op); enrichTask != nil {
-				return []runtime.TaskRequest{*enrichTask}
-			}
-		}
+		// Dispatch the operation's COMPLETE workload, not just enrich: the
+		// related-check task's result still writes RelatedCache (via
+		// foldRelatedCheckResultLocked's stack-wide merge) for the detail
+		// screen beneath this YAML overlay, or for the next plain-detail open
+		// of this same resource — a YAML/JSON view showing no related panel
+		// itself is not a reason to strand that write-through.
+		_, tasks := c.beginDetailWorkloadLocked(res.ResolvedType, *res.Resource, false, false)
+		return tasks
 
 	case runtime.NavigateKindPushJSON:
 		if res.Resource == nil {
@@ -238,12 +224,9 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		}
 		c.applyIntents([]runtime.UIIntent{intent})
 		c.ensureTextState(lines)
-		if res.DispatchEnrich {
-			op := c.core.BeginDetailOperation(res.ResolvedType, *res.Resource, false)
-			if enrichTask, _ := c.core.DetailOperationTasks(op); enrichTask != nil {
-				return []runtime.TaskRequest{*enrichTask}
-			}
-		}
+		// See NavigateKindPushYAML above — same complete-workload dispatch.
+		_, tasks := c.beginDetailWorkloadLocked(res.ResolvedType, *res.Resource, false, false)
+		return tasks
 
 	case runtime.NavigateKindFetchReveal:
 		// No stack push yet — the push happens when Handle receives
@@ -397,51 +380,81 @@ func (c *Controller) dispatchRelatedNavigate(ev runtime.RelatedNavigateEvent) []
 	return merged
 }
 
+// BeginDetailWorkload is the locked, exported form of
+// beginDetailWorkloadLocked for callers outside an already-held c.mu — the
+// TUI adapter, which has no Controller lock of its own (Bubble Tea's single
+// Update() goroutine is its serialization discipline instead).
+func (c *Controller) BeginDetailWorkload(rt string, res resource.Resource, refresh, forceRelated bool) (runtime.DetailOperation, []runtime.TaskRequest) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	op, tasks := c.beginDetailWorkloadLocked(rt, res, refresh, forceRelated)
+	return op, c.stampDispatchSnapshotLocked(tasks)
+}
+
+// beginDetailWorkloadLocked begins a new DetailOperation for (rt, res) and
+// returns its COMPLETE workload — the single builder every site that begins
+// a detail operation must route through, replacing the former two-call
+// Core.BeginDetailOperation + Core.DetailOperationTasks pattern that let a
+// caller mint a fresh op ID (invalidating any earlier operation's in-flight
+// enrich/related results) while dispatching only one of the two replacement
+// tasks, silently stranding the other half forever. Callers append the
+// ENTIRE returned slice — there is no "half" left to selectively discard.
+//
+// Cache-replay suppression: attempts to replay a cached related result into
+// the top detail screen (replayRelatedCache) and omits the related task ONLY
+// when that replay actually populated the panel (D6 — no re-fan-out over
+// cached data). Callers never make this choice themselves; it used to be
+// duplicated ad hoc at each call site (applyNavResult's PushDetail case,
+// openRelatedDetail's own hand-rolled copy), which is exactly the kind of
+// divergence risk a single builder closes.
+//
+// forceRelated deletes the resource's RelatedCache entry before attempting
+// the replay above, so a caller whose entire purpose is recomputing a
+// row the user is already looking at (resolve-in-place Enter/click, and
+// owner decision #38's reveal-on-Back recompute) can never have that
+// recompute silently swallowed by its own stale cached result — the same
+// "delete first" idiom the detail Ctrl+R path already used ad hoc, now
+// shared instead of duplicated. It leaves refresh (enrich cache SkipCache)
+// untouched: these callers want a fresh RELATED check, not a forced live
+// re-fetch of cached enrichment (SFN/CFN/IAM policy documents etc.) as an
+// unrelated side effect.
+//
+// Callers must hold c.mu (write).
+func (c *Controller) beginDetailWorkloadLocked(rt string, res resource.Resource, refresh, forceRelated bool) (runtime.DetailOperation, []runtime.TaskRequest) {
+	op, enrichTask, relatedTask := c.core.BeginDetailOperation(rt, res, refresh)
+	var tasks []runtime.TaskRequest
+	if enrichTask != nil {
+		tasks = append(tasks, *enrichTask)
+	}
+	if relatedTask != nil {
+		if forceRelated {
+			c.core.RelatedCacheDelete(runtime.RelatedCacheKey(rt, res.ID))
+		}
+		if !c.replayRelatedCache(rt, res) {
+			tasks = append(tasks, *relatedTask)
+		}
+	}
+	return op, tasks
+}
+
 // openRelatedDetail pushes a detail screen for the already-fetched resource
-// cached, begins its DetailOperation, and seeds its related panel —
-// replaying the related cache when present, otherwise returning the
-// operation's related-check task. Shared by the cache-hit related-navigate
-// path (NavigationKindDetail) and the web by-ID auto-open path. Caller must
-// hold c.mu (write).
+// cached and begins its detail workload (enrich + related, cache-replay
+// suppressed via beginDetailWorkloadLocked — same builder as ActionOpenDetail;
+// this method used to carry its own hand-rolled duplicate of that
+// cache-replay logic). Shared by the cache-hit related-navigate path
+// (NavigationKindDetail) and the web by-ID auto-open path. Caller must hold
+// c.mu (write).
 func (c *Controller) openRelatedDetail(cached resource.Resource, targetType string) []runtime.TaskRequest {
 	c.applyIntents([]runtime.UIIntent{runtime.PushScreen{
 		ID:      runtime.ScreenDetail,
 		Context: runtime.ScreenContext{ResourceType: targetType, ResourceID: cached.ID},
 	}})
 	c.ensureDetailState(cached, targetType)
-	ds := c.topDetailState()
-	if ds == nil {
+	if c.topDetailState() == nil {
 		return nil
 	}
-
-	op := c.core.BeginDetailOperation(targetType, cached, false)
-	enrichTask, relatedTask := c.core.DetailOperationTasks(op)
-	var tasks []runtime.TaskRequest
-	if enrichTask != nil {
-		tasks = append(tasks, *enrichTask)
-	}
-
-	if len(resource.GetRelated(targetType)) == 0 {
-		return tasks
-	}
 	c.initDetailRelatedRows(targetType)
-	// Populate the related panel: replay the related cache if present, else
-	// dispatch the operation's related-check task — same as ActionOpenDetail.
-	ck := runtime.RelatedCacheKey(targetType, cached.ID)
-	if cachedRows, hit := c.core.RelatedCacheGet(ck); hit && len(cachedRows) > 0 {
-		for _, entry := range cachedRows {
-			errMsg := ""
-			if entry.Result.Err != nil {
-				errMsg = entry.Result.Err.Error()
-			}
-			mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType,
-				entry.Result.EffectiveState(), entry.Result.Count, false, errMsg, entry.Result.Truncated, entry.Result.ResourceIDs, entry.Result.FetchFilter)
-		}
-		return tasks
-	}
-	if relatedTask != nil {
-		tasks = append(tasks, *relatedTask)
-	}
+	_, tasks := c.beginDetailWorkloadLocked(targetType, cached, false, false)
 	return tasks
 }
 

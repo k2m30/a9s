@@ -44,42 +44,31 @@ type DetailOperation struct {
 // this call, and no earlier operation's in-flight AWS calls can be joined by
 // calls this operation makes (see DetailOperation's doc comment).
 //
+// Also returns the operation's COMPLETE workload — enrichTask (non-nil only
+// when resource.GetDetailEnricher(resourceType) is registered) and
+// relatedTask (non-nil only when resource.GetRelated(resourceType) is
+// non-empty) — in the SAME call that mints the op ID. This used to be two
+// separate calls (BeginDetailOperation + the now-deleted
+// Core.DetailOperationTasks); splitting them let a caller mint a fresh op ID
+// — invalidating any earlier operation's in-flight enrich/related work —
+// while dispatching only one of the two replacement tasks, silently
+// stranding the other half forever. Merged into one call whose sole caller
+// is core/app's beginDetailWorkloadLocked builder, which folds these two
+// pointers into one opaque []TaskRequest slice before any application code
+// ever sees them — the caller-facing type no longer has a "half" to discard.
+//
 // Must be called while the caller's own serialization is already held:
-// core/app's call sites (navigate.go, actions_list.go, actions_nav.go) call
-// this under Controller.mu; internal/tui's direct call sites rely on Bubble
-// Tea's single Update() goroutine, the same discipline every other
-// session-mutating Core method in this package already relies on.
-func (c *Core) BeginDetailOperation(resourceType string, res resource.Resource, refresh bool) DetailOperation {
+// core/app's beginDetailWorkloadLocked calls this under Controller.mu.
+func (c *Core) BeginDetailOperation(resourceType string, res resource.Resource, refresh bool) (op DetailOperation, enrichTask, relatedTask *TaskRequest) {
 	id := c.session.DetailOpGen.Bump()
-	return DetailOperation{
+	op = DetailOperation{
 		ID:           id,
 		ResourceType: resourceType,
 		Resource:     res,
 		Clients:      c.session.Clients,
 		Refresh:      refresh,
 	}
-}
 
-// ActiveDetailOp returns the session's current detail-operation ID — the
-// value a detail-scope GenStamped event (EnrichDetailResult,
-// RelatedCheckResult, RelatedCheckBatch) must match to be accepted.
-func (c *Core) ActiveDetailOp() domain.Gen {
-	return c.session.DetailOpGen
-}
-
-// DetailOperationTasks returns the enrich-detail and related-check
-// TaskRequests for op, gated by catalog registration: enrichTask is
-// non-nil only when resource.GetDetailEnricher(op.ResourceType) is
-// registered; relatedTask is non-nil only when
-// resource.GetRelated(op.ResourceType) is non-empty — mirroring the
-// dispatch gate the former per-navigation HandleEnrichDetail/
-// HandleRelatedCheckStarted calls used.
-//
-// Callers that intend to replay a cached related result instead of
-// dispatching a fresh fan-out (Controller.ReplayRelatedCache) must drop
-// relatedTask themselves — cache-hit replay is a caching concern, not an
-// operation concern, so it stays at the call site.
-func (c *Core) DetailOperationTasks(op DetailOperation) (enrichTask, relatedTask *TaskRequest) {
 	scope := op.ResourceType + "/" + op.Resource.ID
 
 	if resource.GetDetailEnricher(op.ResourceType) != nil {
@@ -108,5 +97,12 @@ func (c *Core) DetailOperationTasks(op DetailOperation) (enrichTask, relatedTask
 		}
 	}
 
-	return enrichTask, relatedTask
+	return op, enrichTask, relatedTask
+}
+
+// ActiveDetailOp returns the session's current detail-operation ID — the
+// value a detail-scope GenStamped event (EnrichDetailResult,
+// RelatedCheckResult, RelatedCheckBatch) must match to be accepted.
+func (c *Core) ActiveDetailOp() domain.Gen {
+	return c.session.DetailOpGen
 }

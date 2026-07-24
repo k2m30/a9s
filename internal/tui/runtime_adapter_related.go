@@ -217,43 +217,33 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			}
 			m.pushRS(detailRS)
 
-			op := m.core.BeginDetailOperation(msg.TargetType, r, false)
-			enrichTask, relatedTask := m.core.DetailOperationTasks(op)
-			var cmds []tea.Cmd
-			if enrichTask != nil {
-				cmds = append(cmds, m.dispatchTaskRequests([]runtime.TaskRequest{*enrichTask}))
-			}
+			// BeginDetailWorkload begins the op and returns its complete
+			// workload (enrich + related) in one call — cache-replay
+			// suppression (D6: no re-fan-out over cached data) is decided
+			// INSIDE it (Controller.replayRelatedCache, merging directly into
+			// the same DetailState this screen renders from), replacing the
+			// hand-rolled RelatedCacheReplay/ApplyDetailRelatedResultForResource
+			// duplicate that used to live here.
+			_, tasks := m.ctrl.BeginDetailWorkload(msg.TargetType, r, false, false)
 
 			needsRelated := detail.NeedsRelatedCheck()
 			if needsRelated {
-				ck := runtime.RelatedCacheKey(msg.TargetType, r.ID)
-				if cached, ok := m.core.RelatedCacheGet(ck); ok && len(cached) > 0 {
-					for _, relMsg := range runtime.RelatedCacheReplay(msg.TargetType, cached) {
-						errMsg := ""
-						if relMsg.Result.Err != nil {
-							errMsg = relMsg.Result.Err.Error()
-						}
-						m.ctrl.ApplyDetailRelatedResultForResource(
-							msg.TargetType,
-							r.ID,
-							relMsg.DefDisplayName,
-							relMsg.Result.TargetType,
-							relMsg.Result.EffectiveState(),
-							relMsg.Result.Count,
-							false,
-							errMsg,
-							relMsg.Result.Truncated,
-							relMsg.Result.ResourceIDs,
-							relMsg.Result.FetchFilter,
-						)
-					}
-				} else if relatedTask != nil {
-					cmds = append(cmds, m.dispatchTaskRequests([]runtime.TaskRequest{*relatedTask}))
+				var cmds []tea.Cmd
+				if len(tasks) > 0 {
+					cmds = append(cmds, m.dispatchTaskRequests(tasks))
 				}
 				if len(cmds) == 0 {
 					return m, nil
 				}
 				return m, tea.Batch(cmds...)
+			}
+			// needsRelated is false (narrow terminal or no registered related
+			// defs): the right column never shows, so drop the related half —
+			// dispatch only enrich — then fall through to the cache-miss
+			// fallback below, exactly mirroring the pre-builder shape.
+			var cmds []tea.Cmd
+			if enrichOnly := dropTaskKind(tasks, runtime.KindRelatedCheck); len(enrichOnly) > 0 {
+				cmds = append(cmds, m.dispatchTaskRequests(enrichOnly))
 			}
 			// Cache miss: the runtime resolved NavigationKindDetail from its own
 			// snapshot, but the target isn't in the adapter's caches (e.g. a

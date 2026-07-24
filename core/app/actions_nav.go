@@ -36,12 +36,7 @@ func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskReques
 	// recompute from this single ActionBack effect.
 	var tasks []runtime.TaskRequest
 	if ds := c.topDetailState(); ds != nil {
-		if len(resource.GetRelated(ds.ResourceType)) > 0 {
-			op := c.core.BeginDetailOperation(ds.ResourceType, ds.Resource, false)
-			if _, relatedTask := c.core.DetailOperationTasks(op); relatedTask != nil {
-				tasks = append(tasks, *relatedTask)
-			}
-		}
+		_, tasks = c.beginDetailWorkloadLocked(ds.ResourceType, ds.Resource, false, true)
 	}
 	return c.snapshot(), tasks
 }
@@ -284,13 +279,7 @@ func (c *Controller) handleActionSelect(_ Action) (ViewState, []runtime.TaskRequ
 			// "(N+)"; resource.RelatedEnter is the single arbiter so keyboard, mouse
 			// and TUI Enter can never diverge on the zero lower bound.
 			if resource.RelatedEnter(focusedRow.State, focusedRow.Count, focusedRow.Truncated) == resource.RelatedEnterResolveInPlace {
-				var tasks []runtime.TaskRequest
-				if len(resource.GetRelated(ds.ResourceType)) > 0 {
-					op := c.core.BeginDetailOperation(ds.ResourceType, ds.Resource, false)
-					if _, relatedTask := c.core.DetailOperationTasks(op); relatedTask != nil {
-						tasks = append(tasks, *relatedTask)
-					}
-				}
+				_, tasks := c.beginDetailWorkloadLocked(ds.ResourceType, ds.Resource, false, true)
 				return c.snapshot(), tasks
 			}
 			// Derive the single target ID when there is exactly one related
@@ -513,13 +502,7 @@ func (c *Controller) handleActionRelatedSelect(a Action) (ViewState, []runtime.T
 	// navigates to a scoped list exactly like "(N+)"; resource.RelatedEnter is
 	// the single arbiter shared with the keyboard and TUI Enter paths.
 	if resource.RelatedEnter(targetRow.State, targetRow.Count, targetRow.Truncated) == resource.RelatedEnterResolveInPlace {
-		var tasks []runtime.TaskRequest
-		if len(resource.GetRelated(ds.ResourceType)) > 0 {
-			op := c.core.BeginDetailOperation(ds.ResourceType, ds.Resource, false)
-			if _, relatedTask := c.core.DetailOperationTasks(op); relatedTask != nil {
-				tasks = append(tasks, *relatedTask)
-			}
-		}
+		_, tasks := c.beginDetailWorkloadLocked(ds.ResourceType, ds.Resource, false, true)
 		return c.snapshot(), tasks
 	}
 

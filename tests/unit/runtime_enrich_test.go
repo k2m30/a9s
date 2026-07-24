@@ -9,24 +9,25 @@ import (
 )
 
 // TestCoreDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask verifies that
-// Core.DetailOperationTasks returns a nil enrich task for a resource type
+// Core.BeginDetailOperation returns a nil enrich task for a resource type
 // with no registered detail enricher. This pins the SSOT contract: the
 // runtime is the single decision-maker for the dispatch gate, so the
-// adapter does not need to re-check enricher existence.
+// adapter does not need to re-check enricher existence. (BeginDetailOperation
+// folded the former separate DetailOperationTasks call into its own return
+// values — #261 boundary-sealing wave.)
 func TestCoreDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) {
 	if resource.HasDetailEnricher("ec2") {
 		t.Skip("ec2 now has a detail enricher — pick a different no-enricher type")
 	}
 	core := runtime.New(session.New(), resource.AllResourceTypes())
-	op := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-1234567890abcdef0", Name: "no-enricher"}, false)
-	enrichTask, _ := core.DetailOperationTasks(op)
+	_, enrichTask, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-1234567890abcdef0", Name: "no-enricher"}, false)
 	if enrichTask != nil {
 		t.Errorf("expected nil enrich task, got %+v", enrichTask)
 	}
 }
 
 // TestCoreDetailOperationTasks_WithEnricher_EmitsTaskRequest verifies the shape
-// of the TaskRequest Core.DetailOperationTasks emits for a resource type
+// of the TaskRequest Core.BeginDetailOperation emits for a resource type
 // with a registered detail enricher: kind, scope, cache policy, and the
 // EnrichDetailPayload the adapter type-switches on — Op the constructed
 // DetailOperation verbatim, DetailCtx.SkipCache mirroring op.Refresh,
@@ -40,8 +41,7 @@ func TestCoreDetailOperationTasks_WithEnricher_EmitsTaskRequest(t *testing.T) {
 		Name: "runtime-test",
 	}
 	core := runtime.New(session.New(), resource.AllResourceTypes())
-	op := core.BeginDetailOperation("role_policies", res, false)
-	enrichTask, _ := core.DetailOperationTasks(op)
+	op, enrichTask, _ := core.BeginDetailOperation("role_policies", res, false)
 	if enrichTask == nil {
 		t.Fatal("expected a non-nil enrich task")
 	}

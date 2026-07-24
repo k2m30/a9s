@@ -220,6 +220,80 @@ func (f *coalesceS3Fake) GetBucketLogging(_ context.Context, _ *s3.GetBucketLogg
 var _ awsclient.S3FullAPI = (*coalesceS3Fake)(nil)
 
 // ---------------------------------------------------------------------------
+// Sequential one-fetch-per-op memoization (boundary-sealing wave).
+//
+// TestNewCoalescingSFN_SequentialCalls_BothReexecute above pins the
+// pre-existing, still-true axis: two sequential calls under a bare
+// context.Background() (opID 0) must both reach the inner fake — "opID 0
+// never memoized" is not a new carve-out, it is that exact test, unchanged.
+// The two tests below add the genuinely new axis: a NON-ZERO op now
+// memoizes a completed result across sequential (non-overlapping) calls —
+// singleflight alone (coalesce.go's pre-existing mechanism) cannot do this,
+// since a call made after the previous one already returned always starts a
+// fresh singleflight entry and re-executes.
+// ---------------------------------------------------------------------------
+
+// TestNewCoalescingSFN_SequentialCalls_SameNonZeroOp_MemoizesToOneUnderlyingCall
+// drives two SEQUENTIAL calls (the first fully returns before the second
+// starts — no goroutines, no gate channel) under the SAME non-zero
+// WithDetailOp id and the same StateMachineArn. The inner fake must be
+// reached exactly once; the second call's result must still carry the
+// correct (memoized) content, proving the second call was served from the
+// memo rather than merely also happening to succeed independently.
+func TestNewCoalescingSFN_SequentialCalls_SameNonZeroOp_MemoizesToOneUnderlyingCall(t *testing.T) {
+	const arn = "arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"
+	fake := &coalesceSfnFake{}
+	decorated := awsclient.NewCoalescingSFN(fake)
+	ctx := awsclient.WithDetailOp(context.Background(), domain.Gen(5))
+
+	first, err := decorated.DescribeStateMachine(ctx, &sfn.DescribeStateMachineInput{StateMachineArn: aws.String(arn)})
+	if err != nil {
+		t.Fatalf("first call error: %v", err)
+	}
+	second, err := decorated.DescribeStateMachine(ctx, &sfn.DescribeStateMachineInput{StateMachineArn: aws.String(arn)})
+	if err != nil {
+		t.Fatalf("second call error: %v", err)
+	}
+
+	if got := fake.describeCalls.Load(); got != 1 {
+		t.Errorf("DescribeStateMachine reached the inner fake %d times across two SEQUENTIAL calls under the same non-zero op, want 1 (completed result must be memoized per (op, key))", got)
+	}
+	if first == nil || first.RoleArn == nil || *first.RoleArn != arn {
+		t.Fatalf("first call result = %+v, want RoleArn echoing %q", first, arn)
+	}
+	if second == nil || second.RoleArn == nil || *second.RoleArn != arn {
+		t.Errorf("second call result = %+v, want the memoized result still echoing RoleArn %q", second, arn)
+	}
+}
+
+// TestNewCoalescingSFN_SequentialCalls_DifferentNonZeroOps_EachFetchesIndependently
+// extends TestWithDetailOp_DifferentOperations_BothExecuteIndependently
+// (concurrent axis) to the sequential case: two non-zero operations calling
+// the identical underlying key, one strictly after the other completes,
+// must each still reach the inner fake — a memo is scoped per (op, key), so
+// a different op never rides on an earlier op's memoized entry for the same
+// key.
+func TestNewCoalescingSFN_SequentialCalls_DifferentNonZeroOps_EachFetchesIndependently(t *testing.T) {
+	const arn = "arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"
+	fake := &coalesceSfnFake{}
+	decorated := awsclient.NewCoalescingSFN(fake)
+
+	ctxOp1 := awsclient.WithDetailOp(context.Background(), domain.Gen(1))
+	ctxOp2 := awsclient.WithDetailOp(context.Background(), domain.Gen(2))
+
+	if _, err := decorated.DescribeStateMachine(ctxOp1, &sfn.DescribeStateMachineInput{StateMachineArn: aws.String(arn)}); err != nil {
+		t.Fatalf("operation 1 call error: %v", err)
+	}
+	if _, err := decorated.DescribeStateMachine(ctxOp2, &sfn.DescribeStateMachineInput{StateMachineArn: aws.String(arn)}); err != nil {
+		t.Fatalf("operation 2 call error: %v", err)
+	}
+
+	if got := fake.describeCalls.Load(); got != 2 {
+		t.Errorf("DescribeStateMachine reached the inner fake %d times for two sequential DIFFERENT non-zero operations on the same key, want 2 (each operation gets its own memo entry)", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // SFN: NewCoalescingSFN
 // ---------------------------------------------------------------------------
 
