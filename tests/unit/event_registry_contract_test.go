@@ -436,3 +436,191 @@ func TestEventRouting_EveryCmdClassificationHasReason(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Executable routing contract: go/parser extraction of the REAL dispatch
+// sites, replacing trust in the hand-maintained ercEventRoutes/ercCmdRoutes
+// citations above. Removing a real case from Controller.Handle,
+// Core.HandleEvent, or internal/tui's Update switch now fails the suite even
+// if the map text is never touched.
+//
+// Structure found (verified by reading, then confirmed mechanically by the
+// test below — reported here since the three functions do NOT share one
+// dispatch shape):
+//   - core/app/handle.go's Controller.Handle: a SEQUENCE of
+//     `if msg, ok := ev.(messages.X); ok` type ASSERTIONS — no type-switch
+//     statement at all.
+//   - core/runtime/orchestrator.go's Core.HandleEvent: one genuine
+//     `switch msg := ev.(type) { case messages.X: ... }` type-switch
+//     statement.
+//   - internal/tui/app.go's Model.Update: one genuine type-switch statement,
+//     mixing messages.* cases with non-messages cases (tea.BatchMsg,
+//     tea.QuitMsg, tea.WindowSizeMsg, tea.KeyMsg, tea.PasteMsg) and one
+//     TUI-private bare-identifier case (profilesLoadedMsg) — all filtered
+//     out by ercCollectMessagesCaseNames, which only matches a qualified
+//     `messages.X` selector.
+//
+// ercCollectMessagesCaseNames handles both shapes (and any nested/multiple
+// switches, or multiple scattered assertions) by walking the ENTIRE function
+// body via ast.Inspect rather than assuming a single top-level construct.
+// ---------------------------------------------------------------------------
+
+// ercHandleGoPath, ercOrchestratorGoPath, ercTUIAppGoPath are the
+// repo-relative paths to the three files under contract, following the same
+// filepath.Join("..", "..") repo-root pattern ercMessagesDir uses.
+func ercHandleGoPath() string {
+	return filepath.Join("..", "..", "core", "app", "handle.go")
+}
+func ercOrchestratorGoPath() string {
+	return filepath.Join("..", "..", "core", "runtime", "orchestrator.go")
+}
+func ercTUIAppGoPath() string {
+	return filepath.Join("..", "..", "internal", "tui", "app.go")
+}
+
+// ercFindFuncDeclByName parses path and returns the *ast.FuncDecl (function
+// or method, any receiver) named name, or nil if not found.
+func ercFindFuncDeclByName(t *testing.T, path, name string) *ast.FuncDecl {
+	t.Helper()
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, path, nil, 0)
+	if err != nil {
+		t.Fatalf("ParseFile(%s): %v", path, err)
+	}
+	for _, decl := range file.Decls {
+		if fd, ok := decl.(*ast.FuncDecl); ok && fd.Name.Name == name {
+			return fd
+		}
+	}
+	t.Fatalf("no func/method named %q found in %s", name, path)
+	return nil
+}
+
+// ercSelectorPkgType returns (pkgName, typeName, true) when expr is a
+// qualified identifier of the form pkgName.typeName (an *ast.SelectorExpr
+// whose X is a bare *ast.Ident) — the shape both `case messages.X:` and
+// `v.(messages.X)` use for a same-package-import selector. Anything else
+// (a bare *ast.Ident case like profilesLoadedMsg, a non-selector expr, or a
+// dotted expr with a non-Ident base) returns ("", "", false).
+func ercSelectorPkgType(expr ast.Expr) (pkgName, typeName string, ok bool) {
+	sel, isSel := expr.(*ast.SelectorExpr)
+	if !isSel {
+		return "", "", false
+	}
+	ident, isIdent := sel.X.(*ast.Ident)
+	if !isIdent {
+		return "", "", false
+	}
+	return ident.Name, sel.Sel.Name, true
+}
+
+// ercCollectMessagesCaseNames walks fn's ENTIRE body via ast.Inspect —
+// deliberately not limited to one top-level construct, so nested or
+// multiple type-switch statements and scattered type-assertion expressions
+// are all found honestly — and returns the set of type names asserted or
+// switched on with a `messages.` qualifier, via either mechanism:
+//
+//   - *ast.TypeSwitchStmt: every case clause's type expression(s)
+//     (`case messages.X, messages.Y:` included — a case clause's List can
+//     hold more than one type).
+//   - *ast.TypeAssertExpr with a non-nil Type (the `v.(messages.X)` form;
+//     the special `v.(type)` switch guard is represented with Type == nil
+//     and is correctly skipped here — it is already covered by the
+//     TypeSwitchStmt branch above).
+//
+// switchCases and assertCases report how many of each mechanism contributed
+// at least one messages.* name, for the "report structure found" pin.
+func ercCollectMessagesCaseNames(fn *ast.FuncDecl) (names map[string]bool, switchCases, assertCases int) {
+	names = make(map[string]bool)
+	ast.Inspect(fn, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.TypeSwitchStmt:
+			for _, stmt := range node.Body.List {
+				cc, ok := stmt.(*ast.CaseClause)
+				if !ok {
+					continue
+				}
+				for _, expr := range cc.List {
+					if pkg, name, ok := ercSelectorPkgType(expr); ok && pkg == "messages" {
+						names[name] = true
+						switchCases++
+					}
+				}
+			}
+		case *ast.TypeAssertExpr:
+			if node.Type == nil {
+				return true // the `v.(type)` switch guard itself — not a real assertion
+			}
+			if pkg, name, ok := ercSelectorPkgType(node.Type); ok && pkg == "messages" {
+				names[name] = true
+				assertCases++
+			}
+		}
+		return true
+	})
+	return names, switchCases, assertCases
+}
+
+// ercExpectedKind derives the classification a name's actual reachability
+// implies: neutral if reachable from either headless surface (Controller.Handle
+// or Core.HandleEvent), else renderer-only if the TUI's Update switch has it,
+// else unrouted. This is the mechanical cross-check ercEventRoutes' hand-written
+// Kind is compared against below — computed purely from the parsed sets, never
+// from the map itself, so the two can actually disagree when the map goes stale.
+func ercExpectedKind(inHandle, inHandleEvent, inTUI bool) ercRouteKind {
+	if inHandle || inHandleEvent {
+		return ercNeutralHandled
+	}
+	if inTUI {
+		return ercRendererOnly
+	}
+	return ercUnrouted
+}
+
+// TestEventRouting_ParsedCases_MatchClassificationTwoWay is the executable
+// routing contract: it parses the three REAL dispatch sites and asserts,
+// for every AST-declared Event type (ercScanMarkerReceivers — the same
+// exhaustive declared-set source the enumeration gate above uses), that
+// ercEventRoutes' hand-written Kind matches what the parsed case sets alone
+// imply. A future PR that deletes a case from Controller.Handle,
+// Core.HandleEvent, or internal/tui's Update switch — without touching this
+// file — flips that name's parsed reachability and fails this test.
+func TestEventRouting_ParsedCases_MatchClassificationTwoWay(t *testing.T) {
+	handleFn := ercFindFuncDeclByName(t, ercHandleGoPath(), "Handle")
+	handleEventFn := ercFindFuncDeclByName(t, ercOrchestratorGoPath(), "HandleEvent")
+	tuiUpdateFn := ercFindFuncDeclByName(t, ercTUIAppGoPath(), "Update")
+
+	handleNames, handleSwitchN, handleAssertN := ercCollectMessagesCaseNames(handleFn)
+	handleEventNames, handleEventSwitchN, handleEventAssertN := ercCollectMessagesCaseNames(handleEventFn)
+	tuiNames, tuiSwitchN, tuiAssertN := ercCollectMessagesCaseNames(tuiUpdateFn)
+
+	t.Logf("structure found: Controller.Handle — %d type-switch case(s), %d type-assertion(s)", handleSwitchN, handleAssertN)
+	t.Logf("structure found: Core.HandleEvent — %d type-switch case(s), %d type-assertion(s)", handleEventSwitchN, handleEventAssertN)
+	t.Logf("structure found: internal/tui Model.Update — %d type-switch case(s), %d type-assertion(s)", tuiSwitchN, tuiAssertN)
+
+	declared := ercScanMarkerReceivers(t, ercMessagesDir(), "isEvent")
+
+	var names []string
+	for name := range declared {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		route, classified := ercEventRoutes[name]
+		if !classified {
+			// Already reported by TestEventRouting_Classification_SetEqualsDeclaredEvents;
+			// avoid a redundant failure here with an undefined route.Kind.
+			continue
+		}
+		inHandle := handleNames[name]
+		inHandleEvent := handleEventNames[name]
+		inTUI := tuiNames[name]
+		want := ercExpectedKind(inHandle, inHandleEvent, inTUI)
+		if route.Kind != want {
+			t.Errorf("%s: ercEventRoutes classifies Kind=%d, but the parsed dispatch sites imply Kind=%d "+
+				"(inControllerHandle=%v inCoreHandleEvent=%v inTUIUpdate=%v) — update the classification or the code has drifted",
+				name, route.Kind, want, inHandle, inHandleEvent, inTUI)
+		}
+	}
+}

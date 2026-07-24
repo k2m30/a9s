@@ -165,7 +165,11 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 // Controller.foldEnrichDetailResultLocked calls for the web/headless lane),
 // then regenerates syntax-colored YAML/JSON content when the active screen is
 // a text viewer for this resource: a TUI-only rendering concern with no
-// Controller equivalent.
+// Controller equivalent. Calling the SAME Core.HandleEnrichDetailResult the
+// web/headless lane calls also means this lane's successful Ctrl+R clears
+// the resource's pending sticky-refresh demand — that used to be a
+// web/headless-only fold step, which left a successful TUI refresh's latch
+// armed forever and forced every later cfn/IAM open to re-fetch live.
 //
 // The Err branch returns early so the detail-state merge and the
 // syntax-color regeneration never fire on a half-populated EnrichedRes.
@@ -175,6 +179,8 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 	}
 	intents, tasks := m.core.HandleEnrichDetailResult(runtime.EnrichDetailResultEvent{
 		ResourceType: msg.ResourceType,
+		ResourceID:   msg.ResourceID,
+		OperationID:  msg.OperationID,
 		Err:          msg.Err,
 	})
 	m.dispatchDetailOpResultIntents(intents)

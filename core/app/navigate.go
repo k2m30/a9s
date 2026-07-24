@@ -398,7 +398,10 @@ func (c *Controller) BeginDetailWorkload(rt string, res resource.Resource, refre
 // caller mint a fresh op ID (invalidating any earlier operation's in-flight
 // enrich/related results) while dispatching only one of the two replacement
 // tasks, silently stranding the other half forever. Callers append the
-// ENTIRE returned slice — there is no "half" left to selectively discard.
+// ENTIRE returned slice — there is no "half" left to selectively discard;
+// Core.BeginDetailOperation itself now returns that slice directly (no
+// *TaskRequest out-params to fold together), and the per-entry-point tests
+// in tests/unit/detail_workload_test.go pin that no caller drops an element.
 //
 // Cache-replay suppression: attempts to replay a cached related result into
 // the top detail screen (replayRelatedCache) and omits the related task ONLY
@@ -419,22 +422,52 @@ func (c *Controller) BeginDetailWorkload(rt string, res resource.Resource, refre
 // re-fetch of cached enrichment (SFN/CFN/IAM policy documents etc.) as an
 // unrelated side effect.
 //
+// Sticky refresh: an explicit refresh (refresh=true) is a demand on the
+// RESOURCE, not on the one operation that happened to carry it — a
+// non-refresh operation for the same resource beginning before the refresh's
+// enrichment has folded (a panel toggle, a related-row retry) must not
+// silently downgrade back to cached enrichment. effectiveRefresh inherits any
+// still-pending refresh recorded for this resource key
+// (session.PendingDetailRefresh, cleared only by a successful
+// foldEnrichDetailResultLocked whose operation is >= the recorded one — see
+// that method). A refresh request re-arms the entry with this operation's own
+// ID even when it was already set, since op IDs only increase.
+//
 // Callers must hold c.mu (write).
 func (c *Controller) beginDetailWorkloadLocked(rt string, res resource.Resource, refresh, forceRelated bool) (runtime.DetailOperation, []runtime.TaskRequest) {
-	op, enrichTask, relatedTask := c.core.BeginDetailOperation(rt, res, refresh)
-	var tasks []runtime.TaskRequest
-	if enrichTask != nil {
-		tasks = append(tasks, *enrichTask)
+	key := runtime.RelatedCacheKey(rt, res.ID)
+	_, pendingRefresh := c.core.PendingDetailRefreshGet(key)
+	effectiveRefresh := refresh || pendingRefresh
+
+	op, built := c.core.BeginDetailOperation(rt, res, effectiveRefresh)
+	if refresh {
+		c.core.PendingDetailRefreshSet(key, op.ID)
 	}
-	if relatedTask != nil {
-		if forceRelated {
-			c.core.RelatedCacheDelete(runtime.RelatedCacheKey(rt, res.ID))
-		}
-		if !c.replayRelatedCache(rt, res) {
-			tasks = append(tasks, *relatedTask)
+
+	hasRelated := false
+	for _, t := range built {
+		if t.Key.Kind == runtime.KindRelatedCheck {
+			hasRelated = true
+			break
 		}
 	}
-	return op, tasks
+	if !hasRelated {
+		return op, built
+	}
+
+	if forceRelated {
+		c.core.RelatedCacheDelete(key)
+	}
+	if c.replayRelatedCache(rt, res) {
+		tasks := make([]runtime.TaskRequest, 0, len(built)-1)
+		for _, t := range built {
+			if t.Key.Kind != runtime.KindRelatedCheck {
+				tasks = append(tasks, t)
+			}
+		}
+		return op, tasks
+	}
+	return op, built
 }
 
 // openRelatedDetail pushes a detail screen for the already-fetched resource

@@ -200,5 +200,48 @@ func TestDetailEnricherContract(t *testing.T) {
 				}
 			})
 		})
+
+		// The two subtests below pin engine validation order (#261
+		// boundary-sealing wave, item c): a nil RawStruct with a nil Clients
+		// must still silently skip (a pre-connect open of a disk-cache-seeded
+		// row has a non-nil *DetailEnrichmentCtx but a nil Clients — it must
+		// hit the RawStruct-nil skip, not a Clients error), while a non-nil
+		// RawStruct with a nil Clients must still error — Clients is required
+		// once there is real work to do.
+		t.Run(shortName+"/nil_raw_struct_nil_clients", func(t *testing.T) {
+			runGuarded(t, func(t *testing.T) {
+				ctx := &awsclient.DetailEnrichmentCtx{
+					PolicyDocs: &awsclient.PolicyDocumentCache{},
+					DetailDocs: &awsclient.DetailDocCache{},
+				}
+				res := resource.Resource{ID: "contract-test-id", RawStruct: nil}
+				got, err := enricher(context.Background(), ctx, res)
+
+				if err != nil {
+					t.Errorf("%s: expected nil error for nil RawStruct with nil Clients (pre-connect, cache-seeded row) — the RawStruct-nil check must run before the Clients-nil check in EVERY enricher, engine-based or hand-rolled, got %v", shortName, err)
+				}
+				if !reflect.DeepEqual(got, res) {
+					t.Errorf("%s: resource changed on nil-RawStruct/nil-Clients path; got %+v, want unchanged %+v", shortName, got, res)
+				}
+			})
+		})
+
+		t.Run(shortName+"/raw_struct_present_nil_clients", func(t *testing.T) {
+			runGuarded(t, func(t *testing.T) {
+				ctx := &awsclient.DetailEnrichmentCtx{
+					PolicyDocs: &awsclient.PolicyDocumentCache{},
+					DetailDocs: &awsclient.DetailDocCache{},
+				}
+				res := resource.Resource{ID: "contract-test-id", RawStruct: struct{ X int }{1}}
+				got, err := enricher(context.Background(), ctx, res)
+
+				if err == nil {
+					t.Fatalf("%s: expected error for a non-nil RawStruct with nil Clients, got nil", shortName)
+				}
+				if !reflect.DeepEqual(got, res) {
+					t.Errorf("%s: resource changed on RawStruct-present/nil-Clients error; got %+v, want unchanged %+v", shortName, got, res)
+				}
+			})
+		})
 	}
 }

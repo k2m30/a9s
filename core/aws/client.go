@@ -175,8 +175,12 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 		// — a detail open fires the same read (GetBucketPolicy/
 		// GetTopicAttributes/DescribeStateMachine) from a related checker and
 		// an on-demand enricher concurrently; singleflight shares one
-		// in-flight call's result instead of firing it twice, with no cache
-		// and no staleness (a later, sequential call always re-executes).
+		// in-flight call's result instead of firing it twice. Once a call
+		// completes under a detail operation, its result is also memoized for
+		// the rest of that operation (completedResultMemo) so a later,
+		// sequential call under the SAME operation still doesn't re-fetch;
+		// calls with no active operation, and any call under a later
+		// operation, always re-execute.
 		S3:               NewCoalescingS3(s3.NewFromConfig(cfg)),
 		RDS:              rds.NewFromConfig(cfg),
 		ElastiCache:      elasticache.NewFromConfig(cfg),

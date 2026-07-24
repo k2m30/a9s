@@ -147,19 +147,23 @@ func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement,
 // always passes.
 func enrichTransferAgreement(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
 	dctx, ok := clients.(*DetailEnrichmentCtx)
-	if !ok || dctx == nil || dctx.Clients == nil {
+	if !ok || dctx == nil {
 		return res, fmt.Errorf("invalid detail-enrichment context")
 	}
-	c := dctx.Clients
 
-	// Same contract as the generic engine's guard (detail_enrich_engine.go):
-	// a disk-cache-seeded row carries Fields only, no RawStruct, until the
-	// live refetch lands. assertStruct would safely return (zero, false) on
-	// nil rather than panic, but that still surfaces as an "enrich failed"
-	// flash for a transient, self-healing state — skip silently instead.
+	// Same contract and same check ORDER as the generic engine's guard
+	// (detail_enrich_engine.go): a disk-cache-seeded row carries Fields only,
+	// no RawStruct, until the live refetch lands, and pre-connect the session
+	// caches exist while Clients is still nil — so the thin-row skip must run
+	// before requiring Clients, or a pre-connect open of a seeded row flashes
+	// an error for a transient, self-healing state.
 	if res.RawStruct == nil {
 		return res, nil
 	}
+	if dctx.Clients == nil {
+		return res, fmt.Errorf("invalid detail-enrichment context")
+	}
+	c := dctx.Clients
 
 	agreement, ok := assertStruct[transfertypes.DescribedAgreement](res.RawStruct)
 	if !ok {

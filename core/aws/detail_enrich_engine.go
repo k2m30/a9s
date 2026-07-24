@@ -113,7 +113,7 @@ type detailEnrichSpec[R any, P any] struct {
 // res.RawStruct.
 func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resource, spec detailEnrichSpec[R, P]) (resource.Resource, error) {
 	dctx, ok := clients.(*DetailEnrichmentCtx)
-	if !ok || dctx == nil || dctx.Clients == nil {
+	if !ok || dctx == nil {
 		return res, fmt.Errorf("invalid detail-enrichment context")
 	}
 
@@ -132,9 +132,17 @@ func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resou
 	// seconds (the first open after live rows land, or Ctrl+R, re-enriches
 	// normally). Deriving a wrapper from res.ID alone was rejected — it
 	// would embed a zero SDK struct and render misleading empty fields on
-	// the YAML/JSON views instead of just deferring.
+	// the YAML/JSON views instead of just deferring. This must be checked
+	// before requiring dctx.Clients below: session caches (and so a valid
+	// dctx) are constructed before the AWS clients are, so a pre-connect
+	// open of a disk-seeded row has a non-nil dctx with a nil Clients — it
+	// must hit this silent-skip, not the Clients error below.
 	if res.RawStruct == nil {
 		return res, nil
+	}
+
+	if dctx.Clients == nil {
+		return res, fmt.Errorf("invalid detail-enrichment context")
 	}
 
 	item, ok := spec.unwrap(res.RawStruct)

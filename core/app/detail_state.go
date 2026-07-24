@@ -306,6 +306,14 @@ func primaryWave2Finding(r resource.Resource) (*domain.Finding, *domain.Attentio
 // without touching detail state — a half-populated EnrichedRes must never
 // reach the detail merge.
 //
+// Core.HandleEnrichDetailResult itself is where a pending sticky-refresh
+// demand for this resource is cleared on success (session.PendingDetailRefresh
+// — see beginDetailWorkloadLocked's "sticky refresh" doc comment): that call
+// is shared with the TUI's direct-Core handleEnrichDetailResult shim, so
+// clearing lives once, in the one place both lanes route through, rather
+// than duplicated in each lane's fold (a duplicate here previously left the
+// TUI lane's own successful Ctrl+R never clearing the latch).
+//
 // Also regenerates an open YAML/JSON text screen for this resource
 // (regenerateTextScreenLocked) using the same neutral (uncolored)
 // resourceYAMLLines/resourceJSONLines helpers navigate.go's PushYAML/PushJSON
@@ -316,6 +324,8 @@ func primaryWave2Finding(r resource.Resource) (*domain.Finding, *domain.Attentio
 func (c *Controller) foldEnrichDetailResultLocked(msg messages.EnrichDetailResult) ([]runtime.UIIntent, []runtime.TaskRequest) {
 	intents, tasks := c.core.HandleEnrichDetailResult(runtime.EnrichDetailResultEvent{
 		ResourceType: msg.ResourceType,
+		ResourceID:   msg.ResourceID,
+		OperationID:  msg.OperationID,
 		Err:          msg.Err,
 	})
 	if msg.Err != nil {

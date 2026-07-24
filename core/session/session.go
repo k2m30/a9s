@@ -328,6 +328,21 @@ type Session struct {
 	// a profile/region switch makes every in-flight detail-op result stale.
 	DetailOpGen domain.Gen
 
+	// PendingDetailRefresh records, per resource key (runtime.RelatedCacheKey
+	// format), the DetailOperation ID of the most recent explicit refresh
+	// (Ctrl+R) requested for that resource whose enrichment has not yet
+	// folded successfully. An explicit refresh is a demand on the resource,
+	// not on the one operation that happened to carry it: a later
+	// non-refresh operation for the same resource (panel toggle, related-row
+	// retry) beginning before the refresh's own result lands must inherit its
+	// SkipCache semantics too, or the fresh fetch the user asked for is
+	// silently replaced by a stale cached document. Cleared only when an
+	// EnrichDetailResult for the key folds SUCCESSFULLY with an operation ID
+	// >= the recorded one (core/app's foldEnrichDetailResultLocked) — a
+	// failed refresh must not downgrade the next open back to cache. Cleared
+	// entirely by Rotate().
+	PendingDetailRefresh map[string]domain.Gen
+
 	// Feature-specific session caches. These used to hang off *ServiceClients
 	// but that blurred the AWS-transport/session-state boundary; they live
 	// here instead and are passed to detail enrichers via DetailEnrichmentCtx.
@@ -421,6 +436,7 @@ func New() *Session {
 		EnrichmentGen:          1,
 		AvailabilityGen:        1,
 		DetailOpGen:            1,
+		PendingDetailRefresh:   make(map[string]domain.Gen),
 		PolicyDocCache:         &awsclient.PolicyDocumentCache{},
 		DetailDocCache:         &awsclient.DetailDocCache{},
 		IAMPolicies:            NewPolicyStore(),
@@ -809,6 +825,7 @@ func (s *Session) Rotate() {
 	s.EnrichmentGen.Bump()
 	s.ConnectGen.Bump()
 	s.DetailOpGen.Bump()
+	s.PendingDetailRefresh = make(map[string]domain.Gen)
 
 	// Session-identity / rollback-latch / fetch-latch fields. Profile/Region/
 	// Clients/PreSuppliedClients/Command/NoCache are deliberately NOT cleared

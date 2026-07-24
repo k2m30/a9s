@@ -256,24 +256,43 @@ func stripWave2Findings(findings []domain.Finding) []domain.Finding {
 
 // EnrichDetailResultEvent is the adapter-translated form of
 // messages.EnrichDetailResult restricted to the fields Core inspects.
-// EnrichedRes and ResourceID stay adapter-side because the renderer
-// passes the result through updateActiveView for the detail view; the
-// Core handler only decides whether to emit an error flash.
+// EnrichedRes stays adapter-side because the renderer passes the result
+// through updateActiveView for the detail view; the Core handler only
+// decides whether to emit an error flash and whether a pending sticky
+// refresh (ResourceID/OperationID, below) has been satisfied.
 type EnrichDetailResultEvent struct {
 	ResourceType string
+	ResourceID   string
+	OperationID  domain.Gen
 	Err          error
 }
 
 // HandleEnrichDetailResult emits a single FlashIntent on enrichment
-// failure. The success path is a no-op from Core's perspective — the
-// adapter shim derives wave-1 findings and routes the enriched resource
-// through updateActiveView so the detail view rebuilds its field list.
+// failure. The success path is otherwise a no-op from Core's perspective —
+// the adapter shim derives wave-1 findings and routes the enriched resource
+// through updateActiveView so the detail view rebuilds its field list —
+// except for one session-state decision that belongs here rather than in
+// either adapter: on success, clear a pending sticky-refresh demand for the
+// resource (session.PendingDetailRefresh, see beginDetailWorkloadLocked's
+// "sticky refresh" doc comment) once fresh data has actually landed for an
+// operation at least as new as the one that demanded the refresh. This is
+// the single call both the TUI (runtime_adapter_resources.go, direct Core
+// call) and web/headless (foldEnrichDetailResultLocked) lanes make, so
+// clearing it here — rather than in one lane's fold only — guarantees a
+// successful Ctrl+R retires its own demand regardless of which lane handled
+// it. A stale-op call cannot mis-clear it: its OperationID is strictly less
+// than the recorded one. An error leaves the demand recorded — a failed
+// refresh must never downgrade the next open back to cache.
 func (c *Core) HandleEnrichDetailResult(ev EnrichDetailResultEvent) ([]UIIntent, []TaskRequest) {
 	if ev.Err != nil {
 		return []UIIntent{FlashIntent{
 			Text:    "enrich failed: " + ev.Err.Error(),
 			IsError: true,
 		}}, nil
+	}
+	key := RelatedCacheKey(ev.ResourceType, ev.ResourceID)
+	if recorded, ok := c.PendingDetailRefreshGet(key); ok && ev.OperationID >= recorded {
+		c.PendingDetailRefreshClear(key)
 	}
 	return nil, nil
 }

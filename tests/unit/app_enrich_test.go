@@ -12,6 +12,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -674,10 +675,10 @@ func TestDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) {
 		},
 	}
 
-	_, enrichTask, _ := m.Core().BeginDetailOperation("ec2", ec2Res, false)
+	_, tasks := m.Core().BeginDetailOperation("ec2", ec2Res, false)
 
-	if enrichTask != nil {
-		t.Error("BeginDetailOperation should return a nil enrich task when no enricher is registered for the type")
+	if enrichTask := findTaskKind(tasks, runtime.KindEnrichDetail); enrichTask != nil {
+		t.Error("BeginDetailOperation should return no KindEnrichDetail task when no enricher is registered for the type")
 	}
 }
 
@@ -706,9 +707,10 @@ func TestDetailOperationTasks_WithEnricher_ExecutesToEnrichDetailResult(t *testi
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/enrich-direct", "enrich-direct", "Managed")
 
-	_, enrichTask, _ := m.Core().BeginDetailOperation("role_policies", res, false)
+	_, tasks := m.Core().BeginDetailOperation("role_policies", res, false)
+	enrichTask := findTaskKind(tasks, runtime.KindEnrichDetail)
 	if enrichTask == nil {
-		t.Fatal("BeginDetailOperation should return a non-nil enrich task when an enricher is registered")
+		t.Fatal("BeginDetailOperation should return a KindEnrichDetail task when an enricher is registered")
 	}
 
 	ev, err := m.Core().ExecuteTaskAt(context.Background(), *enrichTask, m.Core().CaptureDispatch())

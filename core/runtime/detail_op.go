@@ -44,23 +44,28 @@ type DetailOperation struct {
 // this call, and no earlier operation's in-flight AWS calls can be joined by
 // calls this operation makes (see DetailOperation's doc comment).
 //
-// Also returns the operation's COMPLETE workload — enrichTask (non-nil only
-// when resource.GetDetailEnricher(resourceType) is registered) and
-// relatedTask (non-nil only when resource.GetRelated(resourceType) is
-// non-empty) — in the SAME call that mints the op ID. This used to be two
-// separate calls (BeginDetailOperation + the now-deleted
-// Core.DetailOperationTasks); splitting them let a caller mint a fresh op ID
-// — invalidating any earlier operation's in-flight enrich/related work —
-// while dispatching only one of the two replacement tasks, silently
-// stranding the other half forever. Merged into one call whose sole caller
-// is core/app's beginDetailWorkloadLocked builder, which folds these two
-// pointers into one opaque []TaskRequest slice before any application code
-// ever sees them — the caller-facing type no longer has a "half" to discard.
+// Also returns the operation's COMPLETE workload as one slice — an
+// EnrichDetailPayload task only when resource.GetDetailEnricher(resourceType)
+// is registered, a RelatedCheckPayload task only when
+// resource.GetRelated(resourceType) is non-empty — in the SAME call that
+// mints the op ID. No public type here names "half a workload": earlier
+// revisions returned the two as separate *TaskRequest out-params, which let
+// a caller keep one and drop the other; a single opaque slice has no such
+// seam. The sole caller is core/app's beginDetailWorkloadLocked builder,
+// which may itself trim the related entry out (cache-replay suppression) but
+// never receives it as a separately addressable value.
 //
 // Must be called while the caller's own serialization is already held:
 // core/app's beginDetailWorkloadLocked calls this under Controller.mu.
-func (c *Core) BeginDetailOperation(resourceType string, res resource.Resource, refresh bool) (op DetailOperation, enrichTask, relatedTask *TaskRequest) {
+func (c *Core) BeginDetailOperation(resourceType string, res resource.Resource, refresh bool) (op DetailOperation, tasks []TaskRequest) {
 	id := c.session.DetailOpGen.Bump()
+	// Live fetchers (e.g. S3, CloudTrail events) may leave res.Type empty;
+	// the operation is the single identity downstream code (e.g. RunRelatedDef's
+	// ct-events lazy-add exemption) trusts, so it must carry a real type even
+	// when the caller's own resource value doesn't.
+	if res.Type == "" {
+		res.Type = resourceType
+	}
 	op = DetailOperation{
 		ID:           id,
 		ResourceType: resourceType,
@@ -82,22 +87,22 @@ func (c *Core) BeginDetailOperation(resourceType string, res resource.Resource, 
 				OpID:       op.ID,
 			}
 		}
-		enrichTask = &TaskRequest{
+		tasks = append(tasks, TaskRequest{
 			Key:     TaskKey{Kind: KindEnrichDetail, Scope: scope},
 			Cache:   CacheNone,
 			Payload: EnrichDetailPayload{Op: op, DetailCtx: dctx},
-		}
+		})
 	}
 
 	if len(resource.GetRelated(op.ResourceType)) > 0 {
-		relatedTask = &TaskRequest{
+		tasks = append(tasks, TaskRequest{
 			Key:     TaskKey{Kind: KindRelatedCheck, Scope: scope},
 			Cache:   CacheNone,
 			Payload: RelatedCheckPayload{Op: op},
-		}
+		})
 	}
 
-	return op, enrichTask, relatedTask
+	return op, tasks
 }
 
 // ActiveDetailOp returns the session's current detail-operation ID — the

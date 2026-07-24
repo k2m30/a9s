@@ -22,6 +22,7 @@ package unit
 // caught the same way a real caller would trigger it.
 
 import (
+	"errors"
 	"strconv"
 	"testing"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
@@ -302,4 +304,190 @@ func TestDetailWorkload_RelatedPanelToggle(t *testing.T) {
 
 	_, onTasks := c.Apply(app.Action{Kind: app.ActionToggleRelated})
 	assertCompleteWorkload(t, onTasks)
+}
+
+// ---------------------------------------------------------------------------
+// Sticky-refresh contract (boundary-sealing wave): an explicit Ctrl+R
+// refresh is a demand on the RESOURCE, not on the one DetailOperation that
+// happened to carry it (core/app/navigate.go's beginDetailWorkloadLocked doc
+// comment). A non-refresh successor operation for the same resource,
+// beginning before the refresh's own enrichment result has folded, inherits
+// SkipCache=true from session.PendingDetailRefresh — otherwise a
+// panel-toggle or related-row retry fired mid-refresh would silently
+// downgrade back to cached (pre-refresh) enrichment. The pending demand is
+// cleared only by foldEnrichDetailResultLocked's success path (an error
+// fold returns before reaching the clear), and by Session.Rotate().
+// ---------------------------------------------------------------------------
+
+// mintSuccessorWorkload seeds a fresh RelatedUnknown row for id's "cfn"
+// related def and fires ActionRelatedSelect on it — resource.RelatedEnter
+// resolves a blank Unknown row to RelatedEnterResolveInPlace, so this both
+// begins a brand-new, non-refresh (refresh=false) DetailOperation AND
+// immediately re-dispatches its complete workload, the vehicle every test
+// below uses to mint a "successor" operation after an initial Ctrl+R. Forcing
+// the row back to Unknown at the start of every call makes it safe to call
+// repeatedly in one test regardless of what a prior call or fold left the
+// row's state at.
+func mintSuccessorWorkload(t *testing.T, c *app.Controller, id string) []runtime.TaskRequest {
+	t.Helper()
+	def0, idx0 := workloadRelatedDefByTarget(t, "cfn")
+	c.ApplyDetailRelatedResultForResource(workloadSrcType, id, def0.DisplayName, def0.TargetType,
+		domain.RelatedUnknown, 0, false, "", false, nil, nil)
+	_, tasks := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: strconv.Itoa(idx0)})
+	return tasks
+}
+
+// enrichSkipCache extracts DetailCtx.SkipCache from tasks' KindEnrichDetail
+// task, failing the test if the task or its DetailCtx is absent — every
+// workload in this suite is for "ec2", which always registers a detail
+// enricher.
+func enrichSkipCache(t *testing.T, tasks []runtime.TaskRequest) bool {
+	t.Helper()
+	enrich := findTaskKind(tasks, runtime.KindEnrichDetail)
+	if enrich == nil {
+		t.Fatalf("tasks missing KindEnrichDetail; got %v", taskKindsOf(tasks))
+	}
+	payload, ok := enrich.Payload.(runtime.EnrichDetailPayload)
+	if !ok {
+		t.Fatalf("KindEnrichDetail Payload = %T, want runtime.EnrichDetailPayload", enrich.Payload)
+	}
+	if payload.DetailCtx == nil {
+		t.Fatal("EnrichDetailPayload.DetailCtx is nil")
+	}
+	return payload.DetailCtx.SkipCache
+}
+
+// TestStickyRefresh_SuccessorInheritsSkipCacheWhilePending covers (i): Ctrl+R
+// begins a refresh operation N (its own enrich task's SkipCache is true, the
+// existing per-op contract); a successor operation N+1 minted before N's
+// enrichment result folds (mintSuccessorWorkload's resolve-in-place retry)
+// must ALSO carry SkipCache=true — inherited from the still-pending refresh,
+// not the successor's own refresh=false.
+func TestStickyRefresh_SuccessorInheritsSkipCacheWhilePending(t *testing.T) {
+	c := newTestController(t)
+	const id = "i-sticky0000001"
+	openWorkloadDetail(t, c, id)
+
+	_, refreshTasks := c.Apply(app.Action{Kind: app.ActionRefresh})
+	if !enrichSkipCache(t, refreshTasks) {
+		t.Fatal("precondition failed: Ctrl+R's own enrich task must carry SkipCache=true")
+	}
+
+	successorTasks := mintSuccessorWorkload(t, c, id)
+	if !enrichSkipCache(t, successorTasks) {
+		t.Error("successor operation's DetailCtx.SkipCache = false, want true — it must inherit the still-pending refresh demand")
+	}
+}
+
+// TestStickyRefresh_SuccessfulFoldAtOpGreaterOrEqualClearsIt covers (ii): once
+// an EnrichDetailResult for this resource folds successfully (Err == nil) at
+// an operation ID >= the refresh op, the NEXT non-refresh workload for the
+// same resource must have SkipCache=false again — the pending demand is
+// satisfied, not permanently sticky.
+func TestStickyRefresh_SuccessfulFoldAtOpGreaterOrEqualClearsIt(t *testing.T) {
+	c := newTestController(t)
+	const id = "i-sticky0000002"
+	openWorkloadDetail(t, c, id)
+
+	_, refreshTasks := c.Apply(app.Action{Kind: app.ActionRefresh})
+	refreshOp := runtime.TaskOpID(findTaskKind(refreshTasks, runtime.KindEnrichDetail).Payload)
+	if refreshOp == 0 {
+		t.Fatal("precondition failed: refresh enrich task's TaskOpID is 0")
+	}
+
+	c.Handle(messages.EnrichDetailResult{
+		ResourceType: workloadSrcType,
+		ResourceID:   id,
+		// EnrichedRes replaces ds.Resource wholesale on a successful fold
+		// (applyDetailEnrichmentForResourceLocked) — must carry the same
+		// identity as the resource under test, or the detail's Resource.ID
+		// goes blank and mintSuccessorWorkload's
+		// ApplyDetailRelatedResultForResource match silently no-ops.
+		EnrichedRes: workloadRes(id),
+		OperationID: refreshOp,
+		Err:         nil,
+	})
+
+	successorTasks := mintSuccessorWorkload(t, c, id)
+	if enrichSkipCache(t, successorTasks) {
+		t.Error("successor operation's DetailCtx.SkipCache = true after a successful enrich fold at op >= the refresh op, want false (cleared)")
+	}
+}
+
+// TestStickyRefresh_ErrorFoldDoesNotClearIt covers (iii): an EnrichDetailResult
+// fold with a non-nil Err must NOT clear the pending refresh — the next
+// successor workload still inherits SkipCache=true, since the refresh demand
+// was never actually satisfied (foldEnrichDetailResultLocked returns before
+// reaching the clear when msg.Err != nil).
+func TestStickyRefresh_ErrorFoldDoesNotClearIt(t *testing.T) {
+	c := newTestController(t)
+	const id = "i-sticky0000003"
+	openWorkloadDetail(t, c, id)
+
+	_, refreshTasks := c.Apply(app.Action{Kind: app.ActionRefresh})
+	refreshOp := runtime.TaskOpID(findTaskKind(refreshTasks, runtime.KindEnrichDetail).Payload)
+	if refreshOp == 0 {
+		t.Fatal("precondition failed: refresh enrich task's TaskOpID is 0")
+	}
+
+	c.Handle(messages.EnrichDetailResult{
+		ResourceType: workloadSrcType,
+		ResourceID:   id,
+		OperationID:  refreshOp,
+		Err:          errors.New("enrich boom"),
+	})
+
+	successorTasks := mintSuccessorWorkload(t, c, id)
+	if !enrichSkipCache(t, successorTasks) {
+		t.Error("successor operation's DetailCtx.SkipCache = false after an ERROR enrich fold, want true — an error fold must never clear the pending refresh")
+	}
+}
+
+// TestStickyRefresh_DifferentResourceUnaffected covers (iv): resource A's
+// pending refresh must never leak onto a DIFFERENT resource B's (same type,
+// different ID) workload — the pending-refresh map is keyed by the full
+// resource identity (runtime.RelatedCacheKey: type+ID), not by type alone.
+func TestStickyRefresh_DifferentResourceUnaffected(t *testing.T) {
+	c := newTestController(t)
+	const idA = "i-sticky0000004"
+	const idB = "i-sticky0000005"
+
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: workloadSrcType})
+	c.ApplyResourcesLoaded(workloadSrcType, []resource.Resource{workloadRes(idA), workloadRes(idB)}, nil, false)
+
+	c.Apply(app.Action{Kind: app.ActionSelect}) // opens A (cursor 0)
+	_, refreshTasksA := c.Apply(app.Action{Kind: app.ActionRefresh})
+	if !enrichSkipCache(t, refreshTasksA) {
+		t.Fatal("precondition failed: A's own Ctrl+R enrich task must carry SkipCache=true")
+	}
+
+	c.Apply(app.Action{Kind: app.ActionBack})     // back to the list (A, B)
+	c.Apply(app.Action{Kind: app.ActionMoveDown}) // cursor -> B
+	_, openTasksB := c.Apply(app.Action{Kind: app.ActionSelect})
+
+	if enrichSkipCache(t, openTasksB) {
+		t.Error("resource B's fresh (non-refresh) detail open has DetailCtx.SkipCache = true, want false — A's pending refresh must not leak onto a different resource")
+	}
+}
+
+// TestStickyRefresh_RotateClearsIt covers (v): Session.Rotate() (profile/
+// region switch) must clear every recorded pending refresh — a successor
+// workload for the same resource after Rotate must not carry SkipCache=true
+// forward into the new session.
+func TestStickyRefresh_RotateClearsIt(t *testing.T) {
+	c, core := newDetailParityHeadlessController(t)
+	const id = "i-sticky0000006"
+	openWorkloadDetail(t, c, id)
+
+	_, refreshTasks := c.Apply(app.Action{Kind: app.ActionRefresh})
+	if !enrichSkipCache(t, refreshTasks) {
+		t.Fatal("precondition failed: Ctrl+R's own enrich task must carry SkipCache=true")
+	}
+
+	core.Session().Rotate()
+
+	successorTasks := mintSuccessorWorkload(t, c, id)
+	if enrichSkipCache(t, successorTasks) {
+		t.Error("successor operation's DetailCtx.SkipCache = true after Session.Rotate(), want false — Rotate must clear all pending-refresh state")
+	}
 }

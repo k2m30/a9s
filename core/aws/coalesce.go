@@ -195,11 +195,15 @@ func (m *completedResultMemo) set(key string, value any) {
 // callers is safe.
 //
 // This does not violate "transport carries no session state" (this
-// package's own convention, e.g. client.go's header comment): a
-// singleflight.Group retains nothing once its in-flight call completes —
-// it is purely request-shape behavior, like RetryOnThrottle's backoff loop,
-// not persisted state. A call made after the previous one finished always
-// re-executes; there is no cache and no staleness.
+// package's own convention, e.g. client.go's header comment): singleflight.Group
+// retains nothing once its in-flight call completes, and memo (below) is
+// keyed by operation ID, so a superseded operation's entries are never
+// looked up again by any caller — no code path re-attaches an old operation's
+// ID to a new call — and simply age out under normal LRU eviction pressure
+// from newer entries (completedResultMemo, bounded). A call made with no
+// active operation (opID == 0), or under any operation other than the one
+// that produced the memoized entry, always re-executes; this is targeted,
+// bounded, per-operation memoization, not a general-purpose cache.
 type coalescingSFN struct {
 	SFNAPI
 	g    singleflight.Group

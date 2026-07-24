@@ -32,6 +32,7 @@ package unit_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -43,10 +44,25 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
+
+// detailOpFindTaskKind returns the first task in tasks whose Key.Kind
+// matches kind, or nil. BeginDetailOperation now returns its workload as one
+// merged []TaskRequest (task pair no longer public — #261 boundary-sealing
+// wave, Core API reshape) instead of two separately named *TaskRequest
+// pointers.
+func detailOpFindTaskKind(tasks []runtime.TaskRequest, kind runtime.TaskKind) *runtime.TaskRequest {
+	for i := range tasks {
+		if tasks[i].Key.Kind == kind {
+			return &tasks[i]
+		}
+	}
+	return nil
+}
 
 // ---------------------------------------------------------------------------
 // Group 1 — acceptance ordering invariant
@@ -83,7 +99,7 @@ func TestDetailOperation_AcceptanceOrdering_SupersededResultNeverFoldsRegardless
 			// A refresh begins a brand-new operation, superseding staleOp —
 			// exactly what Ctrl+R does (core/app/actions_list.go's
 			// handleActionRefresh).
-			currentOp, _, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-order0001"}, true)
+			currentOp, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-order0001"}, true)
 
 			staleMsg := messages.RelatedCheckResult{
 				ResourceType:     "ec2",
@@ -237,7 +253,7 @@ func TestDetailOperation_OneFlightPerOperation_ConcurrentCallsUnderSameOpCoalesc
 	decorated := awsclient.NewCoalescingSFN(fake)
 
 	_, core := newTestControllerAndCore(t)
-	op, _, _ := core.BeginDetailOperation("sfn", resource.Resource{ID: arn}, false)
+	op, _ := core.BeginDetailOperation("sfn", resource.Resource{ID: arn}, false)
 	ctx := awsclient.WithDetailOp(context.Background(), op.ID)
 
 	const n = 6
@@ -276,8 +292,8 @@ func TestDetailOperation_OneFlightPerOperation_DifferentOperationsNeverCoalesce(
 
 	_, core := newTestControllerAndCore(t)
 	res := resource.Resource{ID: arn}
-	op1, _, _ := core.BeginDetailOperation("sfn", res, false)
-	op2, _, _ := core.BeginDetailOperation("sfn", res, true)
+	op1, _ := core.BeginDetailOperation("sfn", res, false)
+	op2, _ := core.BeginDetailOperation("sfn", res, true)
 
 	if op2.ID == op1.ID {
 		t.Fatal("BeginDetailOperation must return a fresh ID for the refresh — got the same ID as the initial open")
@@ -353,7 +369,9 @@ func TestDetailOperationTasks_GatingTable(t *testing.T) {
 
 			_, core := newTestControllerAndCore(t)
 			res := resource.Resource{ID: "gate-" + tc.name}
-			op, enrichTask, relatedTask := core.BeginDetailOperation(shortName, res, tc.refresh)
+			op, tasks := core.BeginDetailOperation(shortName, res, tc.refresh)
+			enrichTask := detailOpFindTaskKind(tasks, runtime.KindEnrichDetail)
+			relatedTask := detailOpFindTaskKind(tasks, runtime.KindRelatedCheck)
 
 			if tc.hasEnricher {
 				if enrichTask == nil {
@@ -412,9 +430,9 @@ func TestBeginDetailOperation_MonotonicallyIncreasingAcrossCalls(t *testing.T) {
 	_, core := newTestControllerAndCore(t)
 	res := resource.Resource{ID: "i-mono0001"}
 
-	op1, _, _ := core.BeginDetailOperation("ec2", res, false)
-	op2, _, _ := core.BeginDetailOperation("ec2", res, false)
-	op3, _, _ := core.BeginDetailOperation("ec2", res, true)
+	op1, _ := core.BeginDetailOperation("ec2", res, false)
+	op2, _ := core.BeginDetailOperation("ec2", res, false)
+	op3, _ := core.BeginDetailOperation("ec2", res, true)
 
 	if op2.ID <= op1.ID {
 		t.Errorf("op2.ID (%d) must be strictly greater than op1.ID (%d)", op2.ID, op1.ID)
@@ -424,5 +442,175 @@ func TestBeginDetailOperation_MonotonicallyIncreasingAcrossCalls(t *testing.T) {
 	}
 	if got := core.ActiveDetailOp(); got != op3.ID {
 		t.Errorf("ActiveDetailOp() = %d, want %d (the most recently begun operation)", got, op3.ID)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Group 6 — Operation Type backfill (#261 Codex-flagged gap)
+// ---------------------------------------------------------------------------
+
+// TestBeginDetailOperation_BackfillsEmptyResourceType pins that
+// Core.BeginDetailOperation backfills op.Resource.Type from the resourceType
+// argument whenever the caller's own resource value carries an empty Type
+// (live fetchers such as CloudTrail events leave it unset) — every task
+// payload BeginDetailOperation mints copies op by value, so a correct
+// backfill here is the single fix point for every downstream reader
+// (RunRelatedDef's ct-events lazy-add exemption, below, is one such reader).
+func TestBeginDetailOperation_BackfillsEmptyResourceType(t *testing.T) {
+	shortName := "test-backfill-type"
+	resource.SetDetailEnricherForTest(shortName, func(_ context.Context, _ any, res resource.Resource) (resource.Resource, error) {
+		return res, nil
+	})
+	t.Cleanup(func() { resource.CleanupDetailEnricherForTest(shortName) })
+	resource.SetRelatedForTest(shortName, []resource.RelatedDef{
+		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
+	})
+	t.Cleanup(func() { resource.CleanupRelatedForTest(shortName) })
+
+	_, core := newTestControllerAndCore(t)
+	res := resource.Resource{ID: "backfill-0001"} // Type intentionally empty
+
+	op, tasks := core.BeginDetailOperation(shortName, res, false)
+
+	if op.Resource.Type != shortName {
+		t.Fatalf("op.Resource.Type = %q, want backfilled %q", op.Resource.Type, shortName)
+	}
+
+	enrichTask := detailOpFindTaskKind(tasks, runtime.KindEnrichDetail)
+	if enrichTask == nil {
+		t.Fatal("expected a non-nil enrich task")
+	}
+	enrichPayload, ok := enrichTask.Payload.(runtime.EnrichDetailPayload)
+	if !ok {
+		t.Fatalf("enrichTask.Payload = %T, want runtime.EnrichDetailPayload", enrichTask.Payload)
+	}
+	if enrichPayload.Op.Resource.Type != shortName {
+		t.Errorf("EnrichDetailPayload.Op.Resource.Type = %q, want backfilled %q", enrichPayload.Op.Resource.Type, shortName)
+	}
+
+	relatedTask := detailOpFindTaskKind(tasks, runtime.KindRelatedCheck)
+	if relatedTask == nil {
+		t.Fatal("expected a non-nil related task")
+	}
+	relatedPayload, ok := relatedTask.Payload.(runtime.RelatedCheckPayload)
+	if !ok {
+		t.Fatalf("relatedTask.Payload = %T, want runtime.RelatedCheckPayload", relatedTask.Payload)
+	}
+	if relatedPayload.Op.Resource.Type != shortName {
+		t.Errorf("RelatedCheckPayload.Op.Resource.Type = %q, want backfilled %q", relatedPayload.Op.Resource.Type, shortName)
+	}
+}
+
+// TestRunRelatedDef_CTEventsBackfilledType_SkipsFetchByIDsLazyAdd pins the
+// behavioral consequence of the Type backfill above: RunRelatedDef's
+// ct-events lazy-add exemption (core/runtime/executor.go, "op.Resource.Type
+// != ct-events") reads op.Resource.Type, not the resourceType string
+// BeginDetailOperation was called with — so a ct-events resource whose own
+// Type was empty at op creation must still trip the exemption and skip
+// FetchByIDs, never issuing a cross-account lookup for event-derived IDs.
+func TestRunRelatedDef_CTEventsBackfilledType_SkipsFetchByIDsLazyAdd(t *testing.T) {
+	const targetType = "test-ctevents-lazy-target"
+	var fetchCalls atomic.Int64
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
+		fetchCalls.Add(1)
+		return nil, nil
+	})
+	t.Cleanup(func() { resource.CleanupFetchByIDsForTest(targetType) })
+
+	_, core := newTestControllerAndCore(t)
+	// Type intentionally empty, as a live CloudTrail-events fetcher leaves it.
+	res := resource.Resource{ID: "evt-000001"}
+	op, _ := core.BeginDetailOperation("ct-events", res, false)
+
+	if op.Resource.Type != "ct-events" {
+		t.Fatalf("op.Resource.Type = %q, want backfilled %q — the exemption below reads this field", op.Resource.Type, "ct-events")
+	}
+
+	def := resource.RelatedDef{
+		TargetType:  targetType,
+		DisplayName: "Lazy Target",
+		Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+			return resource.RelatedCheckResult{TargetType: targetType, Count: 1, ResourceIDs: []string{"lazy-id-1"}}
+		},
+	}
+
+	result := runtime.RunRelatedDef(context.Background(), op, nil, nil, def)
+
+	if got := fetchCalls.Load(); got != 0 {
+		t.Errorf("FetchByIDs called %d time(s), want 0 — the backfilled ct-events Type must trip RunRelatedDef's lazy-add exemption", got)
+	}
+	if len(result.LazyAddedResources) != 0 {
+		t.Errorf("result.LazyAddedResources = %v, want empty", result.LazyAddedResources)
+	}
+	if result.LazyAddError != nil {
+		t.Errorf("result.LazyAddError = %v, want nil", result.LazyAddError)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Group 7 — pending sticky-refresh clear converges on Core.HandleEnrichDetailResult
+// ---------------------------------------------------------------------------
+
+// TestHandleEnrichDetailResult_PendingRefreshClear exercises
+// Core.HandleEnrichDetailResult directly — the TUI lane's shape
+// (internal/tui/runtime_adapter_resources.go calls it without ever routing
+// through app.Controller.Handle) — pinning that clearing a pending sticky
+// refresh (session.PendingDetailRefresh) is a single decision made here, not
+// duplicated per lane: a successful result at or after the recorded refresh
+// op clears it, an error never clears it, and a stale (older) op never
+// clears it either.
+func TestHandleEnrichDetailResult_PendingRefreshClear(t *testing.T) {
+	const rt, id = "ec2", "i-pending0001"
+	key := runtime.RelatedCacheKey(rt, id)
+
+	cases := []struct {
+		name        string
+		resultOpAt  func(refreshOp, laterOp domain.Gen) domain.Gen
+		err         error
+		wantCleared bool
+	}{
+		{
+			name:        "SuccessAtExactRefreshOp_Clears",
+			resultOpAt:  func(refreshOp, _ domain.Gen) domain.Gen { return refreshOp },
+			wantCleared: true,
+		},
+		{
+			name:        "SuccessAtLaterOp_Clears",
+			resultOpAt:  func(_, laterOp domain.Gen) domain.Gen { return laterOp },
+			wantCleared: true,
+		},
+		{
+			name:        "Error_DoesNotClear",
+			resultOpAt:  func(refreshOp, _ domain.Gen) domain.Gen { return refreshOp },
+			err:         errors.New("enrich boom"),
+			wantCleared: false,
+		},
+		{
+			name:        "StaleOlderOp_DoesNotClear",
+			resultOpAt:  func(refreshOp, _ domain.Gen) domain.Gen { return refreshOp - 1 },
+			wantCleared: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, core := newTestControllerAndCore(t)
+			refreshOp, _ := core.BeginDetailOperation(rt, resource.Resource{ID: id}, true)
+			laterOp, _ := core.BeginDetailOperation(rt, resource.Resource{ID: id}, false)
+			core.PendingDetailRefreshSet(key, refreshOp.ID)
+
+			core.HandleEnrichDetailResult(runtime.EnrichDetailResultEvent{
+				ResourceType: rt,
+				ResourceID:   id,
+				OperationID:  tc.resultOpAt(refreshOp.ID, laterOp.ID),
+				Err:          tc.err,
+			})
+
+			_, stillPending := core.PendingDetailRefreshGet(key)
+			cleared := !stillPending
+			if cleared != tc.wantCleared {
+				t.Errorf("cleared = %v, want %v", cleared, tc.wantCleared)
+			}
+		})
 	}
 }

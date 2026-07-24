@@ -611,6 +611,26 @@ func (c *Core) RelatedCacheSet(key string, results []RelatedCacheResult) {
 // key so the next related-fanout re-runs the checkers.
 func (c *Core) RelatedCacheDelete(key string) { c.session.RelatedCache.Delete(key) }
 
+// PendingDetailRefreshGet returns the DetailOperation ID of the most recent
+// unsatisfied explicit refresh recorded for the given resource key (see
+// session.Session.PendingDetailRefresh), and whether one is recorded at all.
+func (c *Core) PendingDetailRefreshGet(key string) (domain.Gen, bool) {
+	op, ok := c.session.PendingDetailRefresh[key]
+	return op, ok
+}
+
+// PendingDetailRefreshSet records opID as the most recent explicit-refresh
+// demand for the given resource key.
+func (c *Core) PendingDetailRefreshSet(key string, opID domain.Gen) {
+	c.session.PendingDetailRefresh[key] = opID
+}
+
+// PendingDetailRefreshClear drops the recorded refresh demand for the given
+// resource key — called once its enrichment has folded successfully.
+func (c *Core) PendingDetailRefreshClear(key string) {
+	delete(c.session.PendingDetailRefresh, key)
+}
+
 // FilteredRowsGet returns the cached rows for a server-side-filtered
 // related drill of resourceType under the given fetch filter.
 func (c *Core) FilteredRowsGet(resourceType string, filter map[string]string) (session.FilteredRowsEntry, bool) {

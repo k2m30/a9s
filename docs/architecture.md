@@ -661,12 +661,20 @@ type DetailOperation struct {
 
 ```text
 View opens or Ctrl+R (TUI keypress or web action — both under the controller lock)
-  → Core.BeginDetailOperation(rt, res, refresh)   // bumps DetailOpGen, becomes the active op
-    → Core.DetailOperationTasks(op)
+  → Controller.beginDetailWorkloadLocked(rt, res, refresh, forceRelated)
+      // the one entry point every such action routes through
+    → Core.BeginDetailOperation(rt, res, effectiveRefresh)
+        // bumps DetailOpGen, becomes the active op; returns the op AND its
+        // complete []TaskRequest workload in one call — no separate
+        // half-workload step
         → KindEnrichDetail task   (iff a DetailEnricher is registered;
                                    DetailEnrichmentCtx from op.Clients + session caches,
                                    SkipCache = op.Refresh, OpID = op.ID)
         → KindRelatedCheck task   (iff related defs are registered)
+    → the related task is omitted when a cache replay already populated the
+      panel (D6), or dropped after first deleting the stale cache entry when
+      the caller is an explicit recompute (forceRelated — resolve-in-place,
+      Back-reveal recompute, refresh)
   → BOTH renderers execute the SAME TaskRequests
       TUI: tea.Cmds — per-def runtime.RunRelatedDef fan-out for progressive rendering
       web: background drain — executor fan-out, same RunRelatedDef
@@ -677,7 +685,9 @@ View opens or Ctrl+R (TUI keypress or web action — both under the controller l
 
 There are no intermediary dispatch messages: the operation's tasks are created at the action, so there is no window in which a refresh can re-label an older open's work (the older operation's results simply stop matching). `Rotate()` bumps `DetailOpGen`, so results from a previous profile/region can never fold into the next.
 
-**Call coalescing** (`core/aws/coalesce.go`): SFN/SNS/S3 transports are wrapped in singleflight decorators whose keys are namespaced by the operation ID (`WithDetailOp` on the context, applied once per lane — the generic engine for enrichers, `RunRelatedDef` for checkers). Within one operation, the enricher and every related checker share a single in-flight call per API key (an SFN detail refresh performs one `DescribeStateMachine` in total); a refresh is a new operation and therefore a new namespace, structurally unable to join pre-refresh work. This is in-flight dedup only — never a cache; a call made after the previous one finished always re-executes.
+**Sticky refresh**: an explicit refresh (`refresh=true`, Ctrl+R) is a demand on the resource, not on the one operation that happened to carry it. `session.PendingDetailRefresh` records the demanding operation's ID per resource key; `effectiveRefresh` (`beginDetailWorkloadLocked`) ORs the requested flag with any still-pending demand for that key, so a non-refresh operation beginning before the refresh's own enrichment has folded (a panel toggle, a related-row retry) inherits `SkipCache` too instead of silently reading the stale cached document. The entry is cleared only when an `EnrichDetailResult` for the key folds successfully with an operation ID `>=` the recorded one (`foldEnrichDetailResultLocked`) — a failed refresh never clears it, so it never downgrades the next open back to cache.
+
+**Call coalescing** (`core/aws/coalesce.go`): SFN/SNS/S3 transports are wrapped in singleflight decorators whose keys are namespaced by the operation ID (`WithDetailOp` on the context, applied once per lane — the generic engine for enrichers, `RunRelatedDef` for checkers). Within one operation, the enricher and every related checker share a single in-flight call per API key while it is still in flight (in-flight dedup, exactly as before); once that call completes, its result is retained in a small per-decorator, per-operation bounded LRU (`completedResultMemo`, 128 entries) so any LATER call for the same key under the SAME operation returns the memoized result instead of re-fetching — an SFN detail refresh performs one `DescribeStateMachine` in total even when the web drain runs the enricher and every related checker sequentially rather than concurrently. The memo is never shared across operations (keyed by operation ID; a refresh mints a new operation and therefore a new, empty namespace) and never applies to non-operation calls (`opID == 0`) — those always re-execute after the previous one finishes, exactly as before this memo existed.
 
 **Execution engine**: enrichers are `detailEnrichSpec`-based instances of the generic `enrichDetail` engine (`core/aws/detail_enrich_engine.go`) — unwrap/id/cache/fetch/wrap per resource type, wrapper structs embedding the original raw struct so field extraction and related checkers see the enriched value transparently. Per-def related-check execution — target-cache prefetch, timeout, panic recovery, lazy-add — lives once in `runtime.RunRelatedDef`, shared by both renderers.
 

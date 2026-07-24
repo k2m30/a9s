@@ -20,9 +20,9 @@ func TestCoreDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) 
 		t.Skip("ec2 now has a detail enricher — pick a different no-enricher type")
 	}
 	core := runtime.New(session.New(), resource.AllResourceTypes())
-	_, enrichTask, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-1234567890abcdef0", Name: "no-enricher"}, false)
-	if enrichTask != nil {
-		t.Errorf("expected nil enrich task, got %+v", enrichTask)
+	_, tasks := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-1234567890abcdef0", Name: "no-enricher"}, false)
+	if enrichTask := findTaskKind(tasks, runtime.KindEnrichDetail); enrichTask != nil {
+		t.Errorf("expected no KindEnrichDetail task, got %+v", enrichTask)
 	}
 }
 
@@ -41,9 +41,10 @@ func TestCoreDetailOperationTasks_WithEnricher_EmitsTaskRequest(t *testing.T) {
 		Name: "runtime-test",
 	}
 	core := runtime.New(session.New(), resource.AllResourceTypes())
-	op, enrichTask, _ := core.BeginDetailOperation("role_policies", res, false)
+	op, tasks := core.BeginDetailOperation("role_policies", res, false)
+	enrichTask := findTaskKind(tasks, runtime.KindEnrichDetail)
 	if enrichTask == nil {
-		t.Fatal("expected a non-nil enrich task")
+		t.Fatal("expected a KindEnrichDetail task")
 	}
 	if enrichTask.Key.Kind != runtime.KindEnrichDetail {
 		t.Errorf("Key.Kind = %q, want %q", enrichTask.Key.Kind, runtime.KindEnrichDetail)
