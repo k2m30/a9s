@@ -25,10 +25,12 @@ package domain
 // serializes Update, no atomic operations are required.
 //
 // Zero value: a freshly-constructed Session sets every Gen to 1 (via
-// session.New). The zero value 0 is reserved for "pre-guard dispatch"
-// sentinels — handlers that see a message with Gen == 0 accept it
-// unconditionally so synthetic test messages and early-return paths
-// don't require a live session to round-trip a gen.
+// session.New), and every per-operation ID (e.g. DetailOperation.ID) is
+// minted via Bump, which can never return 0. A message's Gen field
+// reaching 0 is therefore never a legitimate current value — every
+// messages.GenStamped event's AcceptZeroGen() returns false, so a zero
+// stamp is always treated as stale (see messages.GenStamped's doc comment
+// for the uniform rule and why no exception is warranted).
 type Gen uint64
 
 // Bump increments the generation in place and returns the new value.

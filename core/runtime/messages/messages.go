@@ -57,13 +57,28 @@ type GenStamped interface {
 	// event is stamped against.
 	GenAspect() Aspect
 	// AcceptZeroGen returns true when a zero GenStamp should NOT be treated as
-	// stale. Every session generation counter (core/session.Session.New) is
-	// seeded at 1, so for an event whose real dispatch sites always stamp the
-	// live counter, zero is never a legitimate value and AcceptZeroGen must
-	// return false — a zero stamp slipping past a true-returning event is how
-	// a stale cross-account result (identity, reveal, costs) got accepted as
-	// current pre-fix (see the AspectConnect events' history). AvailabilityChecked
-	// and AvailabilityPrefetched likewise return false for the same reason.
+	// stale.
+	//
+	// The rule, uniform across every implementer and every Aspect: always
+	// return false. Every session generation counter (core/session.Session.New
+	// seeds ConnectGen/AvailabilityGen/EnrichmentGen/DetailOpGen at 1; every
+	// per-operation OperationID is minted by domain.Gen.Bump(), which can never
+	// return 0 either) starts nonzero, and every production dispatch site
+	// stamps the live counter (never a hardcoded zero) — so a zero GenStamp
+	// reaching a handler is always either an unstamped synthetic message or a
+	// genuinely stale one, never a legitimate current value. There are no
+	// exceptions: all thirteen GenStamped events in this file return false.
+	//
+	// A zero stamp slipping past a true-returning event is exactly how a stale
+	// cross-account result (identity, reveal, costs) used to get accepted as
+	// current after a profile/region switch, before ConnectGen was seeded and
+	// every AspectConnect event's AcceptZeroGen was flipped to false — do not
+	// reintroduce a true-returning exception without first verifying (as that
+	// fix required) that the counter is seeded away from zero AND that no
+	// production dispatch site can legitimately emit a zero stamp. A test or
+	// demo helper that constructs an event with an unset Gen field is not such
+	// a site — it is exercising the same gap this rule closes, and belongs
+	// updated to stamp a live counter, not accommodated here.
 	AcceptZeroGen() bool
 }
 

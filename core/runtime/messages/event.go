@@ -28,8 +28,8 @@ type ResourcesLoaded struct {
 	// Gen is the session AvailabilityGen captured at dispatch time. A
 	// ResourcesLoaded whose Gen no longer matches the current session gen is
 	// silently discarded (profile/region switch happened between dispatch and
-	// delivery). Zero is never treated as stale (AcceptZeroGen=true) so that
-	// test/demo callers that do not set Gen always pass the guard.
+	// delivery). AvailabilityGen is seeded at 1 (session.New()), so zero is
+	// always a genuinely unstamped/stale value — AcceptZeroGen=false.
 	Gen domain.Gen
 	// Err is non-nil when the paginated fetcher returned a partial-success
 	// composite error: SOME resources made it back AND something failed
@@ -42,22 +42,23 @@ type ResourcesLoaded struct {
 func (ResourcesLoaded) isEvent()               {}
 func (m ResourcesLoaded) GenStamp() domain.Gen { return m.Gen }
 func (ResourcesLoaded) GenAspect() Aspect      { return AspectAvailability }
-func (ResourcesLoaded) AcceptZeroGen() bool    { return true }
+func (ResourcesLoaded) AcceptZeroGen() bool    { return false }
 
 // APIError is sent when an AWS API call fails.
 type APIError struct {
 	ResourceType string
 	Err          error
 	// Gen is the session AvailabilityGen captured at dispatch time. A stale
-	// APIError (from a prior profile/region) is silently discarded. Zero is
-	// never stale (AcceptZeroGen=true).
+	// APIError (from a prior profile/region) is silently discarded.
+	// AvailabilityGen is seeded at 1 (session.New()), so zero is always a
+	// genuinely unstamped/stale value — AcceptZeroGen=false.
 	Gen domain.Gen
 }
 
 func (APIError) isEvent()               {}
 func (m APIError) GenStamp() domain.Gen { return m.Gen }
 func (APIError) GenAspect() Aspect      { return AspectAvailability }
-func (APIError) AcceptZeroGen() bool    { return true }
+func (APIError) AcceptZeroGen() bool    { return false }
 
 // Flash sets a transient message in the header right side.
 type Flash struct {
@@ -140,7 +141,10 @@ type RelatedCheckResult struct {
 	// dispatched under. Accepted only when it matches the session's current
 	// DetailOpGen (see messages.AspectDetailOp) — a fresh detail open or an
 	// explicit refresh begins a new operation, so a result from any earlier
-	// one is discarded regardless of how long it was in flight.
+	// one is discarded regardless of how long it was in flight. DetailOpGen
+	// is seeded at 1 (session.New()) and every OperationID is minted by
+	// domain.Gen.Bump() (core/runtime.BeginDetailOperation), which can never
+	// return 0 — so 0 is always a genuinely unstamped/stale value.
 	OperationID domain.Gen
 	// CachedPages contains full top-level resource pages fetched from AWS on a
 	// cold cache miss, keyed by target resource short name. Non-nil only when
@@ -169,7 +173,7 @@ type RelatedCheckResult struct {
 func (RelatedCheckResult) isEvent()               {}
 func (m RelatedCheckResult) GenStamp() domain.Gen { return m.OperationID }
 func (RelatedCheckResult) GenAspect() Aspect      { return AspectDetailOp }
-func (RelatedCheckResult) AcceptZeroGen() bool    { return true }
+func (RelatedCheckResult) AcceptZeroGen() bool    { return false }
 
 // RelatedCheckBatch is the headless-executor counterpart to the per-def
 // RelatedCheckResult messages the TUI fan-out emits. The executor runs
@@ -188,7 +192,7 @@ type RelatedCheckBatch struct {
 func (RelatedCheckBatch) isEvent()               {}
 func (m RelatedCheckBatch) GenStamp() domain.Gen { return m.OperationID }
 func (RelatedCheckBatch) GenAspect() Aspect      { return AspectDetailOp }
-func (RelatedCheckBatch) AcceptZeroGen() bool    { return true }
+func (RelatedCheckBatch) AcceptZeroGen() bool    { return false }
 
 // AvailabilityCacheLoaded delivers cached availability data loaded from disk.
 // Entries maps resource short names to resource counts.
@@ -259,7 +263,7 @@ type AvailabilityChecked struct {
 func (AvailabilityChecked) isEvent()               {}
 func (m AvailabilityChecked) GenStamp() domain.Gen { return m.Gen }
 func (AvailabilityChecked) GenAspect() Aspect      { return AspectAvailability }
-func (AvailabilityChecked) AcceptZeroGen() bool    { return false } // session counter starts at 0; zero stamp is always stale
+func (AvailabilityChecked) AcceptZeroGen() bool    { return false } // AvailabilityGen is seeded at 1; zero stamp is always stale
 
 // EnrichmentChecked reports one resource type's Wave 2 enrichment result.
 type EnrichmentChecked struct {
@@ -296,7 +300,7 @@ type EnrichmentChecked struct {
 	// enricher could not fully inspect them (per-resource API error or page cap).
 	TruncatedIDs map[string]bool
 	Err          error      // enrichment error (nil on success)
-	Gen          domain.Gen // session-wide generation counter (stale probe protection; profile/region switch)
+	Gen          domain.Gen // session-wide generation counter (stale probe protection; profile/region switch). EnrichmentGen is seeded at 1, so zero is always stale.
 	TypeGen      domain.Gen // per-type generation counter; bumped on every rerun for that type. Stale
 	// results whose TypeGen doesn't match the current per-type gen are discarded.
 	// Duration is the wall time ExecuteTaskAt spent inside ProbeEnrichment for
@@ -308,7 +312,7 @@ type EnrichmentChecked struct {
 func (EnrichmentChecked) isEvent()               {}
 func (m EnrichmentChecked) GenStamp() domain.Gen { return m.Gen }
 func (EnrichmentChecked) GenAspect() Aspect      { return AspectEnrichment }
-func (EnrichmentChecked) AcceptZeroGen() bool    { return true }
+func (EnrichmentChecked) AcceptZeroGen() bool    { return false }
 
 // IdentityLoaded is sent when the caller identity has been fetched.
 // Identity is typed as any to avoid importing aws/ from the messages package.
@@ -349,7 +353,8 @@ func (IdentityError) AcceptZeroGen() bool    { return false }
 // list. OperationID is the core/runtime.DetailOperation.ID stamped by the
 // dispatcher; discarded when it no longer matches the session's active
 // operation (a Ctrl+R refresh or navigating to a different resource begins a
-// new operation).
+// new operation). DetailOpGen is seeded at 1 and every OperationID is minted
+// by domain.Gen.Bump() (never 0), so a zero OperationID is always stale.
 type EnrichDetailResult struct {
 	ResourceType string
 	ResourceID   string
@@ -361,7 +366,7 @@ type EnrichDetailResult struct {
 func (EnrichDetailResult) isEvent()               {}
 func (m EnrichDetailResult) GenStamp() domain.Gen { return m.OperationID }
 func (EnrichDetailResult) GenAspect() Aspect      { return AspectDetailOp }
-func (EnrichDetailResult) AcceptZeroGen() bool    { return true }
+func (EnrichDetailResult) AcceptZeroGen() bool    { return false }
 
 // CostsLoaded delivers one Cost Explorer fetch result: the query shape that
 // was fetched, the mapped grid/attrs/anomalies, and the request count for
