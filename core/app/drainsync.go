@@ -66,47 +66,74 @@ func DrainSyncContextProgress(ctx context.Context, c *Controller, pending []runt
 		req := pending[0]
 		pending = pending[1:]
 
-		if req.Key.Kind == runtime.TaskKindEmitNavigate {
-			// Adapter-only from Core.ExecuteTaskAt's perspective — the TUI
-			// intercepts this kind before ExecuteTask and translates it into
-			// a view-stack push (runtime_adapter.go's emitNavigateCmd); the
-			// headless/web lane does the same via Controller.ApplyEmitNavigate
-			// so the one-shot -c navigation is not silently dropped.
-			if p, ok := req.Payload.(runtime.EmitNavigatePayload); ok {
-				followUp := c.ApplyEmitNavigate(p)
-				pending = append(pending, followUp...)
-				if onEvent != nil {
-					onEvent()
-				}
-			}
-			continue
-		}
-
-		snap := req.Snap
-		if snap == nil {
-			s := c.captureDispatch()
-			snap = &s
-		}
-		ev, err := c.core.ExecuteTaskAt(ctx, req, *snap)
+		followUp, handled, err := c.ExecuteOne(ctx, req)
 		if err != nil {
-			if errors.Is(err, runtime.ErrAdapterOnlyTask) {
-				// Renderer-only kind — irrelevant in a headless sync context.
-				continue
-			}
-			// Execution error: no event to dispatch, no follow-up tasks.
+			// Adapter-only kind or a genuine execution error: no event to
+			// dispatch, no follow-up tasks either way.
 			continue
 		}
-		if ev == nil {
-			// Task completed with no result to dispatch (e.g. save-cache no-op).
+		if !handled {
+			// Task completed with no result to dispatch (e.g. save-cache
+			// no-op, or an EmitNavigate payload of the wrong concrete type).
 			continue
 		}
-
-		_, followUp := c.Handle(ev)
 		pending = append(pending, followUp...)
 		if onEvent != nil {
 			onEvent()
 		}
 	}
+}
+
+// ExecuteOne runs exactly one TaskRequest to completion: resolving its
+// dispatch snapshot (req.Snap when already stamped, else a fresh
+// captureDispatch()), executing it via Core.ExecuteTaskAt, and folding any
+// resulting event through Handle. handled reports whether a result actually
+// arrived (an Event was produced and folded, or an EmitNavigate payload of
+// the expected concrete type was applied) — the same condition every Drain*
+// variant uses to decide whether to call its own onEvent hook.
+//
+// This is the single per-task step every Drain* variant repeats in FIFO
+// queue order (DrainSyncContextProgress calls it with pending[0] every
+// iteration). core/app/apptest's interleaving scheduler calls the identical
+// step with a test-chosen index instead — completing an older task after a
+// newer one is otherwise unreachable, since every Drain* variant always
+// executes the front of the queue. Exporting this one step (rather than
+// duplicating DrainSyncContextProgress's body in a different package) keeps
+// "what happens when a task completes" in exactly one place regardless of
+// what decides which task and when.
+func (c *Controller) ExecuteOne(ctx context.Context, req runtime.TaskRequest) (followUp []runtime.TaskRequest, handled bool, err error) {
+	if req.Key.Kind == runtime.TaskKindEmitNavigate {
+		// Adapter-only from Core.ExecuteTaskAt's perspective — the TUI
+		// intercepts this kind before ExecuteTask and translates it into
+		// a view-stack push (runtime_adapter.go's emitNavigateCmd); the
+		// headless/web lane does the same via Controller.ApplyEmitNavigate
+		// so the one-shot -c navigation is not silently dropped.
+		p, ok := req.Payload.(runtime.EmitNavigatePayload)
+		if !ok {
+			return nil, false, nil
+		}
+		return c.ApplyEmitNavigate(p), true, nil
+	}
+
+	snap := req.Snap
+	if snap == nil {
+		s := c.captureDispatch()
+		snap = &s
+	}
+	ev, execErr := c.core.ExecuteTaskAt(ctx, req, *snap)
+	if execErr != nil {
+		// Includes ErrAdapterOnlyTask (renderer-only kind — irrelevant in a
+		// headless sync context) and any genuine execution error; the
+		// caller decides whether either is worth surfacing.
+		return nil, false, execErr
+	}
+	if ev == nil {
+		// Task completed with no result to dispatch (e.g. save-cache no-op).
+		return nil, false, nil
+	}
+
+	_, followUp = c.Handle(ev)
+	return followUp, true, nil
 }
 
 // DrainSyncPerTaskTimeout is the per-task-budget variant of

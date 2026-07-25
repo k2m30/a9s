@@ -30,6 +30,12 @@
 // is memoized, under the old ID. No Forget call is needed for this: the
 // namespaces simply never collide.
 //
+// The memo lookup and the singleflight join/execute decision are folded into
+// one shared helper, coalesceCall (below the four decorator types) — see its
+// doc comment for why a caller can never observe "no memo, no in-flight
+// entry" while a result for its key actually exists, without needing a
+// second lock.
+//
 // Wired only at the live client bootstrap (CreateServiceClients, below in
 // this package). Demo mode's fakes (core/demo/client.go) are instant,
 // in-process, and deterministic — coalescing them would add complexity for
@@ -111,8 +117,8 @@ func coalesceKey(ctx context.Context, key string) string {
 const maxCompletedResultMemoEntries = 128
 
 // completedResultMemo is a small, thread-safe, bounded LRU that retains one
-// AWS call's successful result per coalesceKey (opID + underlying resource
-// key) after its singleflight flight completes.
+// AWS call's result (value AND error — see coalescedResult) per coalesceKey
+// (opID + underlying resource key) after its singleflight flight completes.
 //
 // singleflight.Group alone only coalesces CONCURRENT calls sharing a key —
 // once the in-flight call finishes, the group forgets it, so a call arriving
@@ -123,7 +129,9 @@ const maxCompletedResultMemoEntries = 128
 // call for the identical operation — fetch it twice, possibly observing two
 // different snapshots of the same resource. This memo closes that gap:
 // within one operation a key is fetched at most once, EVER, not merely while
-// concurrent callers happen to overlap.
+// concurrent callers happen to overlap — coalesceCall's inner recheck
+// (below) is what makes that guarantee hold even when a caller's OWN check
+// races a flight's completion, not just when it races a flight's start.
 //
 // Per-decorator (one instance alongside each decorator's own
 // singleflight.Group) rather than shared across sfn/sns/s3: the underlying
@@ -137,9 +145,10 @@ const maxCompletedResultMemoEntries = 128
 // open/refresh) is NEVER memoized: only a real operation's calls are
 // deduplicated across its own lifetime, so every non-operation flow keeps
 // its exact pre-existing re-fetch-every-time semantics. A failed fetch is
-// also never memoized — an AWS error should remain retryable on the next
-// call within the same operation, not get permanently pinned to a transient
-// failure for the operation's remaining lifetime.
+// also never memoized unless the caller's shouldMemoize predicate says
+// otherwise (S3's benign NoSuchBucketPolicy) — an AWS error is otherwise
+// retryable on the next call within the same operation, not permanently
+// pinned to a transient failure for the operation's remaining lifetime.
 type completedResultMemo struct {
 	mu    sync.Mutex
 	index map[string]*list.Element
@@ -238,53 +247,12 @@ func NewCoalescingSFNWithLedger(api SFNAPI, ledger *CallLedger) SFNAPI {
 }
 
 func (c *coalescingSFN) DescribeStateMachine(ctx context.Context, params *sfn.DescribeStateMachineInput, optFns ...func(*sfn.Options)) (*sfn.DescribeStateMachineOutput, error) {
-	const api = "sfn.DescribeStateMachine"
-	opID := DetailOpFromContext(ctx)
-	argKey := aws.ToString(params.StateMachineArn)
-	key := coalesceKey(ctx, argKey)
-	if opID != 0 {
-		if v, ok := c.memo.get(key); ok {
-			c.ledger.record(opID, api, argKey, CallServed)
-			if trace.Enabled() {
-				trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
-			}
-			return v.(*sfn.DescribeStateMachineOutput), nil
-		}
-	}
-	// memo.set runs INSIDE the singleflight function, before doCall's deferred
-	// cleanup deletes the group's entry for key — a caller arriving between
-	// "flight done" and "memo populated" would otherwise slip past both layers
-	// and issue a second AWS call, violating the at-most-once-per-operation
-	// contract this memo exists to keep.
-	var executed bool
-	v, err, shared := c.g.Do(key, func() (any, error) {
-		executed = true
-		out, err := c.SFNAPI.DescribeStateMachine(ctx, params, optFns...)
-		c.ledger.record(opID, api, argKey, CallExecuted)
-		if trace.Enabled() {
-			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "executed"})
-		}
-		if err == nil && opID != 0 {
-			c.memo.set(key, out)
-		}
-		return out, err
-	})
-	if shared && !executed {
-		// Joined another goroutine's already-in-flight identical call
-		// (checkSFNRole/checkSFNKMS/checkSFNLambda/enrichSfn racing on the
-		// same StateMachineArn): no second AWS request, so this caller's ask
-		// is recorded too, as served — the ledger must be able to see BOTH
-		// askers to prove dedup happened, not just infer it from a single
-		// executed entry.
-		c.ledger.record(opID, api, argKey, CallServed)
-		if trace.Enabled() {
-			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
-		}
-	}
-	if err != nil {
-		return nil, err
-	}
-	return v.(*sfn.DescribeStateMachineOutput), nil
+	return coalesceCall(ctx, &c.g, c.memo, c.ledger, "sfn.DescribeStateMachine", aws.ToString(params.StateMachineArn),
+		func() (*sfn.DescribeStateMachineOutput, error) {
+			return c.SFNAPI.DescribeStateMachine(ctx, params, optFns...)
+		},
+		alwaysMemoizeSuccess[*sfn.DescribeStateMachineOutput],
+	)
 }
 
 // SNSFullAPI widens SNSAPI with the two SNS operations used only via a
@@ -336,48 +304,12 @@ func NewCoalescingSNSWithLedger(api SNSFullAPI, ledger *CallLedger) SNSFullAPI {
 }
 
 func (c *coalescingSNS) GetTopicAttributes(ctx context.Context, params *sns.GetTopicAttributesInput, optFns ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
-	const api = "sns.GetTopicAttributes"
-	opID := DetailOpFromContext(ctx)
-	argKey := aws.ToString(params.TopicArn)
-	key := coalesceKey(ctx, argKey)
-	if opID != 0 {
-		if v, ok := c.memo.get(key); ok {
-			c.ledger.record(opID, api, argKey, CallServed)
-			if trace.Enabled() {
-				trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
-			}
-			return v.(*sns.GetTopicAttributesOutput), nil
-		}
-	}
-	// memo.set runs INSIDE the singleflight function — see coalescingSFN's
-	// DescribeStateMachine for why (the race this closes).
-	var executed bool
-	v, err, shared := c.g.Do(key, func() (any, error) {
-		executed = true
-		out, err := c.SNSFullAPI.GetTopicAttributes(ctx, params, optFns...)
-		c.ledger.record(opID, api, argKey, CallExecuted)
-		if trace.Enabled() {
-			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "executed"})
-		}
-		if err == nil && opID != 0 {
-			c.memo.set(key, out)
-		}
-		return out, err
-	})
-	if shared && !executed {
-		// Joined another goroutine's already-in-flight identical call
-		// (checkSNSKMS/checkSNSRole/enrichSns racing on the same TopicArn) —
-		// see coalescingSFN's DescribeStateMachine for why this must still
-		// be recorded, as served.
-		c.ledger.record(opID, api, argKey, CallServed)
-		if trace.Enabled() {
-			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
-		}
-	}
-	if err != nil {
-		return nil, err
-	}
-	return v.(*sns.GetTopicAttributesOutput), nil
+	return coalesceCall(ctx, &c.g, c.memo, c.ledger, "sns.GetTopicAttributes", aws.ToString(params.TopicArn),
+		func() (*sns.GetTopicAttributesOutput, error) {
+			return c.SNSFullAPI.GetTopicAttributes(ctx, params, optFns...)
+		},
+		alwaysMemoizeSuccess[*sns.GetTopicAttributesOutput],
+	)
 }
 
 // S3FullAPI widens S3API with the six S3 operations used only via a narrow
@@ -436,61 +368,19 @@ func NewCoalescingS3WithLedger(api S3FullAPI, ledger *CallLedger) S3FullAPI {
 	return &coalescingS3{S3FullAPI: api, memo: newCompletedResultMemo(), ledger: ledger}
 }
 
-// s3BucketPolicyResult is the memoized value for GetBucketPolicy: it wraps
-// BOTH the output and the error, because a benign NoSuchBucketPolicy (very
-// common — most buckets have no policy) is a definitive, memoizable answer
-// for the rest of the operation, not a transient failure — the plain-output
-// memo the SFN/SNS decorators use has no room for an error half. Genuinely
-// retryable errors (anything else) are never stored here.
-type s3BucketPolicyResult struct {
-	out *s3.GetBucketPolicyOutput
-	err error
-}
-
 func (c *coalescingS3) GetBucketPolicy(ctx context.Context, params *s3.GetBucketPolicyInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyOutput, error) {
-	const api = "s3.GetBucketPolicy"
-	opID := DetailOpFromContext(ctx)
-	argKey := aws.ToString(params.Bucket)
-	key := coalesceKey(ctx, argKey)
-	if opID != 0 {
-		if v, ok := c.memo.get(key); ok {
-			c.ledger.record(opID, api, argKey, CallServed)
-			if trace.Enabled() {
-				trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
-			}
-			r := v.(s3BucketPolicyResult)
-			return r.out, r.err
-		}
-	}
-	// memo.set runs INSIDE the singleflight function — see coalescingSFN's
-	// DescribeStateMachine for why (the race this closes).
-	var executed bool
-	v, err, shared := c.g.Do(key, func() (any, error) {
-		executed = true
-		out, err := c.S3FullAPI.GetBucketPolicy(ctx, params, optFns...)
-		c.ledger.record(opID, api, argKey, CallExecuted)
-		if trace.Enabled() {
-			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "executed"})
-		}
-		if opID != 0 && (err == nil || s3BenignAbsenceErr(err, "NoSuchBucketPolicy")) {
-			c.memo.set(key, s3BucketPolicyResult{out: out, err: err})
-		}
-		return out, err
-	})
-	if shared && !executed {
-		// Joined another goroutine's already-in-flight identical call (the
-		// s3→role related checker and enrichS3 racing on the same Bucket) —
-		// see coalescingSFN's DescribeStateMachine for why this must still
-		// be recorded, as served.
-		c.ledger.record(opID, api, argKey, CallServed)
-		if trace.Enabled() {
-			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
-		}
-	}
-	if err != nil {
-		return nil, err
-	}
-	return v.(*s3.GetBucketPolicyOutput), nil
+	return coalesceCall(ctx, &c.g, c.memo, c.ledger, "s3.GetBucketPolicy", aws.ToString(params.Bucket),
+		func() (*s3.GetBucketPolicyOutput, error) {
+			return c.S3FullAPI.GetBucketPolicy(ctx, params, optFns...)
+		},
+		// A benign NoSuchBucketPolicy (most buckets have no policy) is a
+		// definitive, memoizable answer for the rest of the operation, not a
+		// transient failure — the only one of the four decorators whose
+		// shouldMemoize predicate accepts a non-nil error.
+		func(_ *s3.GetBucketPolicyOutput, err error) bool {
+			return err == nil || s3BenignAbsenceErr(err, "NoSuchBucketPolicy")
+		},
+	)
 }
 
 // coalescingLambda wraps LambdaAPI, coalescing concurrent identical
@@ -536,46 +426,135 @@ func NewCoalescingLambdaWithLedger(api LambdaAPI, ledger *CallLedger) LambdaAPI 
 }
 
 func (c *coalescingLambda) GetFunction(ctx context.Context, params *lambda.GetFunctionInput, optFns ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error) {
-	const api = "lambda.GetFunction"
-	opID := DetailOpFromContext(ctx)
-	argKey := aws.ToString(params.FunctionName)
-	key := coalesceKey(ctx, argKey)
-	if opID != 0 {
-		if v, ok := c.memo.get(key); ok {
-			c.ledger.record(opID, api, argKey, CallServed)
-			if trace.Enabled() {
-				trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
-			}
-			return v.(*lambda.GetFunctionOutput), nil
-		}
+	return coalesceCall(ctx, &c.g, c.memo, c.ledger, "lambda.GetFunction", aws.ToString(params.FunctionName),
+		func() (*lambda.GetFunctionOutput, error) {
+			return c.LambdaAPI.GetFunction(ctx, params, optFns...)
+		},
+		alwaysMemoizeSuccess[*lambda.GetFunctionOutput],
+	)
+}
+
+// alwaysMemoizeSuccess is the shouldMemoize predicate shared by every
+// decorator except coalescingS3: memoize exactly when the call succeeded,
+// exactly the pre-existing `err == nil` gate each one used before this file
+// was collapsed onto coalesceCall.
+func alwaysMemoizeSuccess[T any](_ T, err error) bool {
+	return err == nil
+}
+
+// coalescedResult is the (value, error) pair completedResultMemo retains per
+// coalesceCall instantiation — carrying both halves lets a definitive,
+// memoizable error (S3's benign NoSuchBucketPolicy) be stored exactly like a
+// successful value, without each decorator inventing its own error-carrying
+// wrapper type (coalescingS3 used to keep s3BucketPolicyResult for this).
+type coalescedResult[T any] struct {
+	out T
+	err error
+}
+
+// recordCoalesceCall records one call outcome to the ledger (nil-receiver
+// safe, a no-op when the caller opted out) and, when enabled, to the
+// process-wide trace stream — the two-observer emission every decorator's
+// method used to repeat at three separate call sites.
+func recordCoalesceCall(ledger *CallLedger, opID domain.Gen, api, argKey string, executed bool) {
+	outcome, outcomeStr := CallServed, "served"
+	if executed {
+		outcome, outcomeStr = CallExecuted, "executed"
 	}
-	// memo.set runs INSIDE the singleflight function — see coalescingSFN's
-	// DescribeStateMachine for why (the race this closes).
+	ledger.record(opID, api, argKey, outcome)
+	if trace.Enabled() {
+		trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: outcomeStr})
+	}
+}
+
+// coalesceCall is the single "check memo → join-or-become-leader →
+// re-check memo → execute at most once" sequence every coalescing
+// decorator's method reduces to: call is the underlying AWS invocation,
+// shouldMemoize decides whether a (value, err) pair is a safe permanent
+// answer for the rest of the operation to reuse.
+//
+// The race this closes: completedResultMemo.get and singleflight.Group.Do
+// used to be two independent steps with a gap between them. A caller could
+// miss the memo, and then — before it reached Do — observe an entirely
+// different goroutine's flight for the SAME key run to completion (execute
+// the real call, record it, populate the memo, return from its closure, and
+// have singleflight delete its now-finished in-flight entry) inside that
+// gap. Arriving at Do afterward, the caller finds neither a memo hit nor an
+// in-flight entry to join, so Do hands it a brand-new leadership — and,
+// without a recheck, it blindly re-executes the identical call singleflight
+// and the memo both exist to prevent, even though the answer was already
+// sitting in the memo the entire time. Each primitive is individually
+// correctly locked, so -race never flags this; it is a logic-level
+// check-then-act race between two synchronization primitives that do not
+// share a critical section.
+//
+// The fix does not add a second lock. Do already guarantees at most one
+// closure runs per key at any moment, and every OTHER concurrent caller for
+// that key is either blocked waiting to share this closure's result or has
+// not reached Do yet at all — so re-checking the memo as the very first
+// thing INSIDE the closure (i.e. only once Do has made this goroutine the
+// sole, serialized leader for the key) observes every prior leader's
+// memo.set with a real happens-before edge, via the memo's own mutex. That
+// is the entire fix: fold the memo recheck into the singleflight closure's
+// leadership window, rather than performing it before a leadership decision
+// has even been made. A per-key mutex (guarding the outer check and Do as
+// one critical section) would achieve the same serialization but requires
+// its own lifecycle (creating, sharing, and eventually discarding one mutex
+// per key) for a guarantee Do already provides for free.
+func coalesceCall[T any](
+	ctx context.Context,
+	g *singleflight.Group,
+	memo *completedResultMemo,
+	ledger *CallLedger,
+	api string,
+	argKey string,
+	call func() (T, error),
+	shouldMemoize func(T, error) bool,
+) (T, error) {
+	opID := DetailOpFromContext(ctx)
+	key := coalesceKey(ctx, argKey)
+
+	memoHit := func() (coalescedResult[T], bool) {
+		if opID == 0 {
+			return coalescedResult[T]{}, false
+		}
+		v, ok := memo.get(key)
+		if !ok {
+			return coalescedResult[T]{}, false
+		}
+		return v.(coalescedResult[T]), true
+	}
+
+	if r, ok := memoHit(); ok {
+		recordCoalesceCall(ledger, opID, api, argKey, false)
+		return r.out, r.err
+	}
+
 	var executed bool
-	v, err, shared := c.g.Do(key, func() (any, error) {
+	v, _, shared := g.Do(key, func() (any, error) {
+		// See coalesceCall's doc comment: this recheck, not the one above,
+		// is what closes the race — it runs only once Do has granted this
+		// goroutine sole leadership for key.
+		if r, ok := memoHit(); ok {
+			recordCoalesceCall(ledger, opID, api, argKey, false)
+			return r, r.err
+		}
 		executed = true
-		out, err := c.LambdaAPI.GetFunction(ctx, params, optFns...)
-		c.ledger.record(opID, api, argKey, CallExecuted)
-		if trace.Enabled() {
-			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "executed"})
+		out, callErr := call()
+		recordCoalesceCall(ledger, opID, api, argKey, true)
+		r := coalescedResult[T]{out: out, err: callErr}
+		if opID != 0 && shouldMemoize(out, callErr) {
+			memo.set(key, r)
 		}
-		if err == nil && opID != 0 {
-			c.memo.set(key, out)
-		}
-		return out, err
+		return r, callErr
 	})
 	if shared && !executed {
-		// Joined another goroutine's already-in-flight identical call
-		// (checkLambdaECR and enrichLambda racing on the same FunctionName)
-		// — see coalescingSFN's DescribeStateMachine for why this must
-		// still be recorded, as served.
-		c.ledger.record(opID, api, argKey, CallServed)
-		if trace.Enabled() {
-			trace.Emit(trace.Event{Kind: trace.KindAWSCall, OperationID: uint64(opID), API: api, Args: argKey, Outcome: "served"})
-		}
+		// Joined another goroutine's already-in-flight identical call: no
+		// second AWS request, so this caller's ask is recorded too, as
+		// served — the ledger must be able to see BOTH askers to prove
+		// dedup happened, not just infer it from a single executed entry.
+		recordCoalesceCall(ledger, opID, api, argKey, false)
 	}
-	if err != nil {
-		return nil, err
-	}
-	return v.(*lambda.GetFunctionOutput), nil
+	r := v.(coalescedResult[T])
+	return r.out, r.err
 }

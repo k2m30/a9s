@@ -309,3 +309,173 @@ func TestCallLedger_LambdaConcurrentJoin_BothAskersVisible(t *testing.T) {
 		t.Errorf("outcomes = (executed=%d, served=%d), want (1, 1) — the joining goroutine must be recorded too, not just the executing one", executed, served)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Operation-0 gap (coalesceCall's memoHit/memo.set both gate on opID != 0,
+// but g.Do is called unconditionally): no automated pin existed for either
+// half before this — an "obviously fine" branch that silently changes shape
+// during the next refactor of coalesce.go. The sequential case is pinned
+// side by side with the non-zero contrast (TestCallLedger_SequentialSameOp_
+// OneExecutedOneServed's own SFN case, deliberately repeated here rather than
+// only cross-referenced) so a reader sees both behaviors in one place;
+// covers SFN and Lambda so this is a property of the shared coalesceCall
+// helper, not one client.
+// ---------------------------------------------------------------------------
+
+// TestCallLedger_OpIDZero_SequentialCalls_NeverMemoized_VsNonZeroMemoizes
+// pins the two sequential behaviors coalesceCall's opID guard is responsible
+// for, per decorator: opID 0 never hits the memo (ordinary list/probe
+// traffic must re-execute every time, never be silently cached), while a
+// real (non-zero) operation memoizes its second identical call.
+func TestCallLedger_OpIDZero_SequentialCalls_NeverMemoized_VsNonZeroMemoizes(t *testing.T) {
+	const sfnArn = "arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"
+	const fnName = "process-payment"
+
+	cases := []struct {
+		name         string
+		opID         domain.Gen
+		run          func(ctx context.Context) *awsclient.CallLedger
+		wantExecuted int
+		wantServed   int
+	}{
+		{
+			name: "sfn/opID-zero-both-calls-execute",
+			opID: 0,
+			run: func(ctx context.Context) *awsclient.CallLedger {
+				fake := &coalesceSfnFake{}
+				ledger := awsclient.NewCallLedger()
+				decorated := awsclient.NewCoalescingSFNWithLedger(fake, ledger)
+				for range 2 {
+					_, _ = decorated.DescribeStateMachine(ctx, &sfn.DescribeStateMachineInput{StateMachineArn: aws.String(sfnArn)})
+				}
+				return ledger
+			},
+			wantExecuted: 2,
+			wantServed:   0,
+		},
+		{
+			name: "sfn/opID-nonzero-second-call-served-from-memo",
+			opID: 11,
+			run: func(ctx context.Context) *awsclient.CallLedger {
+				fake := &coalesceSfnFake{}
+				ledger := awsclient.NewCallLedger()
+				decorated := awsclient.NewCoalescingSFNWithLedger(fake, ledger)
+				for range 2 {
+					_, _ = decorated.DescribeStateMachine(ctx, &sfn.DescribeStateMachineInput{StateMachineArn: aws.String(sfnArn)})
+				}
+				return ledger
+			},
+			wantExecuted: 1,
+			wantServed:   1,
+		},
+		{
+			name: "lambda/opID-zero-both-calls-execute",
+			opID: 0,
+			run: func(ctx context.Context) *awsclient.CallLedger {
+				fake := &coalesceLambdaFake{}
+				ledger := awsclient.NewCallLedger()
+				decorated := awsclient.NewCoalescingLambdaWithLedger(fake, ledger)
+				for range 2 {
+					_, _ = decorated.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: aws.String(fnName)})
+				}
+				return ledger
+			},
+			wantExecuted: 2,
+			wantServed:   0,
+		},
+		{
+			name: "lambda/opID-nonzero-second-call-served-from-memo",
+			opID: 11,
+			run: func(ctx context.Context) *awsclient.CallLedger {
+				fake := &coalesceLambdaFake{}
+				ledger := awsclient.NewCallLedger()
+				decorated := awsclient.NewCoalescingLambdaWithLedger(fake, ledger)
+				for range 2 {
+					_, _ = decorated.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: aws.String(fnName)})
+				}
+				return ledger
+			},
+			wantExecuted: 1,
+			wantServed:   1,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := awsclient.WithDetailOp(context.Background(), tc.opID)
+			ledger := tc.run(ctx)
+			executed, served := clCountOutcomes(ledger.Records())
+			if executed != tc.wantExecuted || served != tc.wantServed {
+				t.Errorf("outcomes = (executed=%d, served=%d), want (%d, %d)", executed, served, tc.wantExecuted, tc.wantServed)
+			}
+		})
+	}
+}
+
+// TestCallLedger_OpIDZero_ConcurrentCalls_StillDedupViaSingleflight is the
+// CONCURRENT twin of the sequential opID-0 case above: opID 0 bypasses the
+// memo entirely, but g.Do is still called unconditionally, so two genuinely
+// concurrent identical callers under opID 0 must still coalesce into one
+// execution — ordinary (non-operation) traffic gets the same in-flight
+// dedup as operation-scoped traffic, just never the memo's "already
+// finished" half. Uses the file's existing blocked-fake + concurrentGateSleep
+// idiom so the overlap is deterministic rather than hoped for. Covers SFN
+// and Lambda.
+func TestCallLedger_OpIDZero_ConcurrentCalls_StillDedupViaSingleflight(t *testing.T) {
+	const sfnArn = "arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"
+	const fnName = "process-payment"
+
+	t.Run("sfn", func(t *testing.T) {
+		fake := &coalesceSfnFake{describeBlock: make(chan struct{})}
+		ledger := awsclient.NewCallLedger()
+		decorated := awsclient.NewCoalescingSFNWithLedger(fake, ledger)
+		ctx := context.Background() // opID 0 — no WithDetailOp
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+		for range 2 {
+			go func() {
+				defer wg.Done()
+				_, _ = decorated.DescribeStateMachine(ctx, &sfn.DescribeStateMachineInput{StateMachineArn: aws.String(sfnArn)})
+			}()
+		}
+		time.Sleep(concurrentGateSleep)
+		close(fake.describeBlock)
+		wg.Wait()
+
+		if got := fake.describeCalls.Load(); got != 1 {
+			t.Fatalf("DescribeStateMachine reached the inner fake %d times across 2 concurrent opID-0 calls, want 1", got)
+		}
+		executed, served := clCountOutcomes(ledger.Records())
+		if executed != 1 || served != 1 {
+			t.Errorf("outcomes = (executed=%d, served=%d), want (1, 1) — opID 0 still dedups CONCURRENT identical callers via singleflight, even though it is never memoized for sequential ones", executed, served)
+		}
+	})
+
+	t.Run("lambda", func(t *testing.T) {
+		fake := &coalesceLambdaFake{getFunctionBlock: make(chan struct{})}
+		ledger := awsclient.NewCallLedger()
+		decorated := awsclient.NewCoalescingLambdaWithLedger(fake, ledger)
+		ctx := context.Background() // opID 0 — no WithDetailOp
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+		for range 2 {
+			go func() {
+				defer wg.Done()
+				_, _ = decorated.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: aws.String(fnName)})
+			}()
+		}
+		time.Sleep(concurrentGateSleep)
+		close(fake.getFunctionBlock)
+		wg.Wait()
+
+		if got := fake.getFunctionCalls.Load(); got != 1 {
+			t.Fatalf("GetFunction reached the inner fake %d times across 2 concurrent opID-0 calls, want 1", got)
+		}
+		executed, served := clCountOutcomes(ledger.Records())
+		if executed != 1 || served != 1 {
+			t.Errorf("outcomes = (executed=%d, served=%d), want (1, 1) — opID 0 still dedups CONCURRENT identical callers via singleflight", executed, served)
+		}
+	})
+}

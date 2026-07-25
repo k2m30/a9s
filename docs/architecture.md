@@ -1018,6 +1018,44 @@ Two off-by-default, zero-cost-when-disabled facilities make detail-operation con
 
 **Trace stream** (`core/trace`) — a process-wide JSON-lines event stream covering four moments: a detail operation beginning (`core/runtime.Core.BeginDetailOperation`), an AWS call (executed vs served, the same call sites the ledger hooks), a cache read/write in the on-demand enrich engine (`core/aws/detail_enrich_engine.go`), and a result fold's accept/reject decision (`core/app/handle.go`). Off by default — `trace.Enabled()` is a single atomic bool read, checked before any event field is even built. Enabled by `cmd/a9s --trace <path>`, or directly in a test via `trace.Enable(io.Writer)` / `trace.EnableFile(path)`. Always writes to a file (or whatever `io.Writer` a test supplies) — never `os.Stdout` — so it can run alongside a live TUI session without corrupting the rendered frame.
 
+### Deterministic Interleaving Harness
+
+The call ledger and trace stream let a test observe one specific run. Neither helps write the test in the first place: the defect shape found repeatedly in the detail-operation orchestration layer is "action B lands while action A is still in flight" — a refresh completing before an earlier open's enrichment, a related-check batch resolving after a newer operation has already superseded it — and an example-based test ("given this state, this action produces that output") never enters that space, because it drives one action to completion before starting the next. `core/app/apptest` makes the interleaving itself the thing under test.
+
+**The scheduler seam.** `Controller.ExecuteOne(ctx, req)` is the single per-task unit — resolve the task's dispatch snapshot, run it through `Core.ExecuteTaskAt`, fold any resulting event through `Handle` — that both production draining (`DrainSyncContextProgress`, which always steps `pending[0]`) and `apptest.Scheduler.Complete(i)` call. A test builds a `Scheduler`, `Submit`s the tasks a user action spawned, and calls `Complete` at whatever index it chooses — including completing a task an earlier action spawned strictly after a later action's own tasks have already completed, the exact ordering `DrainSync*` can never produce. Production gains no scheduler-awareness branch: the FIFO drain loop and the test-chosen order are two callers of the same extracted step, not two code paths.
+
+**The explorer.** `apptest.Explorer` enumerates every legal interleaving of a fixed `[]Action` script against the completion order of the tasks those actions spawn, and runs each one to quiescence against its own fresh `Controller`:
+
+```go
+explorer := &apptest.Explorer{
+    NewController: newDemoController,
+    Actions: []apptest.Action{
+        {Name: "open(ec2/i-1)", Run: openDetail},
+        {Name: "refresh", Run: refresh},
+    },
+    Check: func(vs app.ViewState, pending []runtime.TaskRequest, events []trace.Event) error {
+        return apptest.NoOrphanLoadingRelated(vs, pending)
+    },
+}
+if f := explorer.Explore(ctx); f != nil {
+    t.Fatalf("%s", f) // e.g. "open(ec2/i-1) → refresh → complete(enrich@op1) → complete(related@op2): ..."
+}
+```
+
+`Explore` returns nil when every interleaving reaches quiescence clean, or a `*Failure` at the first violation whose `Replay` is a directly reproducible sequence ("open(ec2/i-1) → refresh → complete(enrich@op1) → complete(related@op2)") and whose `Err` is whichever invariant fired — the replay string is the point: a failing interleaving must be readable and re-runnable by a human, not just a stack trace from a flaky goroutine race.
+
+**The five invariants**, exported so `Check` (or a hand-driven `Scheduler` test) can call any subset:
+
+- `NoOrphanLoadingRelated` — a detail screen's related-panel row is never stuck `Loading` once no `related-check` task is left in flight to ever resolve it.
+- `MonotonicDetailFold` — an accepted enrich/related fold's `OperationID` never regresses across a single Controller's fold history (the acceptance guard actually held, not just claimed to).
+- `MonotonicCacheWrites` — a cache write for a given key never lands from an older operation than one that already wrote it (the freshness-guard contract, mechanically checked).
+- `NoDuplicateAWSCalls` — wraps `aws.CallLedger.Duplicates()` as a descriptive failure; "at most one call per (operation, api, args)" reused, not reimplemented.
+- `LatchCleared` — a `session.PendingDetailRefresh` entry armed by an explicit refresh is actually cleared by quiescence, not left stuck.
+
+**Single-Controller scoping is a hard rule, not a suggestion.** `TraceRecorder`, `MonotonicDetailFold`, and `MonotonicCacheWrites` all key on `OperationID`, which is per-session (`session.DetailOpGen` restarts at 1 for every fresh `Controller`). `Explorer` constructs a fresh `Controller` per search-tree node, so a `TraceRecorder` wrapped around an entire `Explore()` call accumulates events from many independent op-ID namespaces and reports a violation that is really just two unrelated sessions' numbering colliding — not a regression. Set `Explorer.Trace = true` instead of managing a recorder by hand: the explorer then installs and resets a fresh `TraceRecorder` per replay and passes only that replay's own events to `Check`. Driving one `Scheduler` directly (one `Controller`, one `StartTraceRecorder`) is the other correctly-scoped shape. This was found the hard way — an early smoke-check of the harness itself reported a fold-order violation that turned out to be exactly this cross-session mixing, confirmed clean once the same interleaving was replayed against a single Controller.
+
+**Why `core/app/apptest` is a separate package.** `core/app` already has small, stable non-`_test.go` seams that ship in the binary (`DrainSync`, `testing.go`'s `ApplyResourcesLoaded`) because a test-only file inside the package that other test packages import is an accepted, minimal exception. The interleaving harness is a larger amount of purpose-built machinery with no reason to compile into `cmd/a9s`, so it lives in its own package instead: nothing under `cmd/` or `internal/` imports `core/app/apptest`, which makes its absence from the production binary path a property of the import graph rather than a claim that has to be re-verified by inspection.
+
 ---
 
 ## Design Decisions

@@ -327,6 +327,18 @@ func (c *Controller) stampDispatchSnapshotLocked(tasks []runtime.TaskRequest) []
 	return tasks
 }
 
+// PendingDetailRefreshGet exposes Core.PendingDetailRefreshGet to callers
+// outside package app — core/app/apptest's quiescence check needs to confirm
+// that a refresh latch armed by beginDetailWorkloadLocked's "sticky refresh"
+// path (session.PendingDetailRefresh, see that method's doc comment) was
+// actually cleared by the run it drove, not just readable from inside the
+// locked call that arms it.
+func (c *Controller) PendingDetailRefreshGet(key string) (domain.Gen, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.core.PendingDetailRefreshGet(key)
+}
+
 // RegisterFallbackTypeDef stores a ResourceTypeDef so that buildListBody
 // (columns) and GetListIssueCount (Color func) use the model's explicitly-
 // supplied typeDef rather than the catalog's when they differ. This is critical
