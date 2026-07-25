@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
@@ -46,7 +47,13 @@ func enrichSns(ctx context.Context, clients any, res resource.Resource) (resourc
 			}
 			attrs := make(map[string]any, len(out.Attributes))
 			for k, v := range out.Attributes {
-				if len(v) > 0 && (v[0] == '{' || v[0] == '[') {
+				// Structure only object/array values: SNS returns scalars as
+				// strings too (SubscriptionsConfirmed "3", a display name), and
+				// handing those to a JSON parse would retype them. Leading
+				// whitespace is legal JSON, so trim before the shape test —
+				// while parsing the ORIGINAL value, so the raw-string fallback
+				// preserves it byte for byte.
+				if t := strings.TrimLeft(v, " \t\r\n"); t != "" && (t[0] == '{' || t[0] == '[') {
 					attrs[k] = parseJSONOrRaw(v)
 					continue
 				}

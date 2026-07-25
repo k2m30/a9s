@@ -295,3 +295,49 @@ func TestDetailEnricherRegistry_Sns_IsNonNil(t *testing.T) {
 		t.Fatal("sns detail enricher must be registered and non-nil")
 	}
 }
+
+// TestEnrichSns_WhitespacePrefixedJSONAttribute_StillParsed pins that leading
+// whitespace — legal JSON, and present in real SNS policies — does not defeat
+// the object/array shape test that decides whether an attribute is structured.
+// The guard exists so scalar attributes ("3", a display name) stay strings
+// instead of being retyped by a JSON parse, so this also pins that a
+// whitespace-padded scalar is still left alone.
+func TestEnrichSns_WhitespacePrefixedJSONAttribute_StillParsed(t *testing.T) {
+	fake := &enrichSnsFake{
+		getAttrsFn: func(_ *sns.GetTopicAttributesInput) (*sns.GetTopicAttributesOutput, error) {
+			return &sns.GetTopicAttributesOutput{
+				Attributes: map[string]string{
+					"TopicArn":               snsTestArn,
+					"Policy":                 "\n  " + snsTestPolicyJSON,
+					"DeliveryPolicy":         "\t[1,2]",
+					"SubscriptionsConfirmed": "  3  ",
+				},
+			}, nil
+		},
+	}
+
+	got, err := snsEnricher(t)(context.Background(), makeSnsCtx(fake), makeSnsRes(snsTestArn))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	enriched, ok := got.RawStruct.(awsclient.TopicEnriched)
+	if !ok {
+		t.Fatalf("RawStruct = %T, want TopicEnriched", got.RawStruct)
+	}
+
+	policy, ok := enriched.Attributes["Policy"].(map[string]any)
+	if !ok {
+		t.Fatalf("Attributes[Policy] = %T, want map[string]any — leading whitespace must not defeat JSON detection", enriched.Attributes["Policy"])
+	}
+	if policy["Version"] != "2012-10-17" {
+		t.Errorf("Attributes[Policy][Version] = %v, want 2012-10-17", policy["Version"])
+	}
+
+	if _, ok := enriched.Attributes["DeliveryPolicy"].([]any); !ok {
+		t.Errorf("Attributes[DeliveryPolicy] = %T, want []any — a whitespace-prefixed array must parse too", enriched.Attributes["DeliveryPolicy"])
+	}
+
+	if got := enriched.Attributes["SubscriptionsConfirmed"]; got != "  3  " {
+		t.Errorf("Attributes[SubscriptionsConfirmed] = %v (%T), want the untouched string %q — scalars must never be retyped", got, got, "  3  ")
+	}
+}
