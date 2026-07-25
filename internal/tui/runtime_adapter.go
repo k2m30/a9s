@@ -287,8 +287,9 @@ func emitNavigateCmd(p runtime.EmitNavigatePayload) tea.Cmd {
 // route the error through HandleAPIError's classification flow.
 func emitAPIErrorCmd(p runtime.EmitAPIErrorPayload) tea.Cmd {
 	err := p.Err
+	gen := p.Gen
 	return func() tea.Msg {
-		return messages.APIError{Err: err}
+		return messages.APIError{Err: err, Gen: gen}
 	}
 }
 

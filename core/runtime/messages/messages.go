@@ -59,26 +59,26 @@ type GenStamped interface {
 	// AcceptZeroGen returns true when a zero GenStamp should NOT be treated as
 	// stale.
 	//
-	// The rule, uniform across every implementer and every Aspect: always
-	// return false. Every session generation counter (core/session.Session.New
-	// seeds ConnectGen/AvailabilityGen/EnrichmentGen/DetailOpGen at 1; every
-	// per-operation OperationID is minted by domain.Gen.Bump(), which can never
-	// return 0 either) starts nonzero, and every production dispatch site
-	// stamps the live counter (never a hardcoded zero) — so a zero GenStamp
-	// reaching a handler is always either an unstamped synthetic message or a
-	// genuinely stale one, never a legitimate current value. There are no
-	// exceptions: all thirteen GenStamped events in this file return false.
+	// The actual contract: every session generation counter
+	// (core/session.Session.New seeds ConnectGen/AvailabilityGen/
+	// EnrichmentGen/DetailOpGen at 1) starts nonzero, and every per-operation
+	// OperationID is minted by domain.Gen.Bump(), which can never return 0
+	// either — so in PRODUCTION, a real dispatch never carries Gen 0. Zero
+	// only ever originates from a synthetic/unstamped construction (most
+	// commonly a test or demo helper that builds an event literal without
+	// setting the Gen/OperationID field).
 	//
-	// A zero stamp slipping past a true-returning event is exactly how a stale
-	// cross-account result (identity, reveal, costs) used to get accepted as
-	// current after a profile/region switch, before ConnectGen was seeded and
-	// every AspectConnect event's AcceptZeroGen was flipped to false — do not
-	// reintroduce a true-returning exception without first verifying (as that
-	// fix required) that the counter is seeded away from zero AND that no
-	// production dispatch site can legitimately emit a zero stamp. A test or
-	// demo helper that constructs an event with an unset Gen field is not such
-	// a site — it is exercising the same gap this rule closes, and belongs
-	// updated to stamp a live counter, not accommodated here.
+	// Most events return true: accepting zero costs nothing in production
+	// (it can never arrive from a live dispatch) and lets those synthetic
+	// callers skip round-tripping a live session gen — a deliberate
+	// test-construction affordance, not a claim that zero is ever a
+	// legitimate current value. AvailabilityChecked and AvailabilityPrefetched
+	// return false instead: a mid-sweep rebuild can legitimately re-emit a
+	// message stamped with a pre-rotation gen, and rejecting zero alongside
+	// every other stale value closes that specific hazard (see
+	// AvailabilityPrefetched's own doc comment) — an exception grounded in a
+	// real production race, not a convenience choice, so treat it as the
+	// template for any future false-returning event.
 	AcceptZeroGen() bool
 }
 

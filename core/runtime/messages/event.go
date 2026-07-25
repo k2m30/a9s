@@ -28,8 +28,11 @@ type ResourcesLoaded struct {
 	// Gen is the session AvailabilityGen captured at dispatch time. A
 	// ResourcesLoaded whose Gen no longer matches the current session gen is
 	// silently discarded (profile/region switch happened between dispatch and
-	// delivery). AvailabilityGen is seeded at 1 (session.New()), so zero is
-	// always a genuinely unstamped/stale value — AcceptZeroGen=false.
+	// delivery). AvailabilityGen is seeded at 1 and every production dispatch
+	// site stamps the live value, so Gen==0 only ever originates from a
+	// synthetic/unstamped construction (never a real fetch) — AcceptZeroGen=true
+	// so those messages still pass the guard rather than requiring every such
+	// caller to round-trip a live session gen.
 	Gen domain.Gen
 	// Err is non-nil when the paginated fetcher returned a partial-success
 	// composite error: SOME resources made it back AND something failed
@@ -42,7 +45,7 @@ type ResourcesLoaded struct {
 func (ResourcesLoaded) isEvent()               {}
 func (m ResourcesLoaded) GenStamp() domain.Gen { return m.Gen }
 func (ResourcesLoaded) GenAspect() Aspect      { return AspectAvailability }
-func (ResourcesLoaded) AcceptZeroGen() bool    { return false }
+func (ResourcesLoaded) AcceptZeroGen() bool    { return true }
 
 // APIError is sent when an AWS API call fails.
 type APIError struct {
@@ -50,15 +53,17 @@ type APIError struct {
 	Err          error
 	// Gen is the session AvailabilityGen captured at dispatch time. A stale
 	// APIError (from a prior profile/region) is silently discarded.
-	// AvailabilityGen is seeded at 1 (session.New()), so zero is always a
-	// genuinely unstamped/stale value — AcceptZeroGen=false.
+	// AvailabilityGen is seeded at 1 and every production dispatch site
+	// stamps the live value, so Gen==0 only ever originates from a
+	// synthetic/unstamped construction — AcceptZeroGen=true so those messages
+	// still pass the guard.
 	Gen domain.Gen
 }
 
 func (APIError) isEvent()               {}
 func (m APIError) GenStamp() domain.Gen { return m.Gen }
 func (APIError) GenAspect() Aspect      { return AspectAvailability }
-func (APIError) AcceptZeroGen() bool    { return false }
+func (APIError) AcceptZeroGen() bool    { return true }
 
 // Flash sets a transient message in the header right side.
 type Flash struct {
@@ -98,16 +103,17 @@ type ValueRevealed struct {
 	Err          error
 	// Gen is the session ConnectGen captured at dispatch time. A stale
 	// ValueRevealed (secret from a prior profile) is silently discarded to
-	// prevent cross-account secret display. ConnectGen is seeded at 1
-	// (session.New()), so zero is always a genuinely unstamped/stale value,
-	// never a legitimate dispatch — AcceptZeroGen=false.
+	// prevent cross-account secret display. ConnectGen is seeded at 1 and
+	// every production dispatch site stamps the live value, so Gen==0 only
+	// ever originates from a synthetic/unstamped construction — AcceptZeroGen=true
+	// so those messages still pass the guard.
 	Gen domain.Gen
 }
 
 func (ValueRevealed) isEvent()               {}
 func (m ValueRevealed) GenStamp() domain.Gen { return m.Gen }
 func (ValueRevealed) GenAspect() Aspect      { return AspectConnect }
-func (ValueRevealed) AcceptZeroGen() bool    { return false }
+func (ValueRevealed) AcceptZeroGen() bool    { return true }
 
 // ClientsReady is sent when AWS clients are initialized.
 // Clients is typed as any to avoid importing aws/ from the messages package.
@@ -123,12 +129,13 @@ func (ClientsReady) isEvent()               {}
 func (m ClientsReady) GenStamp() domain.Gen { return m.Gen }
 func (ClientsReady) GenAspect() Aspect      { return AspectConnect }
 
-// AcceptZeroGen is false: ConnectGen is seeded at 1 (session.New()), so a
-// genuine dispatch never carries Gen 0. Every real construction site (see
-// internal/tui/fetch_adapter.go's connectAWS, core/runtime/executor.go's
-// TaskKindConnect case) stamps the live ConnectGen; the pre-supplied-clients
-// bootstrap path (internal/tui/app.go's Init) stamps it too.
-func (ClientsReady) AcceptZeroGen() bool { return false }
+// AcceptZeroGen is true: ConnectGen is seeded at 1 and every production
+// dispatch site (internal/tui/fetch_adapter.go's connectAWS,
+// core/runtime/executor.go's TaskKindConnect case, the pre-supplied-clients
+// bootstrap in internal/tui/app.go's Init) stamps the live ConnectGen, so
+// Gen==0 only ever originates from a synthetic/unstamped construction, never
+// a real connect result.
+func (ClientsReady) AcceptZeroGen() bool { return true }
 
 // RelatedCheckResult delivers one checker's async result back to the detail view.
 // The adapter delegates this to the active view (detail model's rightColumnModel).
@@ -142,9 +149,10 @@ type RelatedCheckResult struct {
 	// DetailOpGen (see messages.AspectDetailOp) — a fresh detail open or an
 	// explicit refresh begins a new operation, so a result from any earlier
 	// one is discarded regardless of how long it was in flight. DetailOpGen
-	// is seeded at 1 (session.New()) and every OperationID is minted by
-	// domain.Gen.Bump() (core/runtime.BeginDetailOperation), which can never
-	// return 0 — so 0 is always a genuinely unstamped/stale value.
+	// is seeded at 1 and every OperationID is minted by domain.Gen.Bump()
+	// (core/runtime.BeginDetailOperation), which can never return 0 — so a
+	// zero OperationID only ever originates from a synthetic/unstamped
+	// construction, never a real detail operation.
 	OperationID domain.Gen
 	// CachedPages contains full top-level resource pages fetched from AWS on a
 	// cold cache miss, keyed by target resource short name. Non-nil only when
@@ -173,7 +181,7 @@ type RelatedCheckResult struct {
 func (RelatedCheckResult) isEvent()               {}
 func (m RelatedCheckResult) GenStamp() domain.Gen { return m.OperationID }
 func (RelatedCheckResult) GenAspect() Aspect      { return AspectDetailOp }
-func (RelatedCheckResult) AcceptZeroGen() bool    { return false }
+func (RelatedCheckResult) AcceptZeroGen() bool    { return true }
 
 // RelatedCheckBatch is the headless-executor counterpart to the per-def
 // RelatedCheckResult messages the TUI fan-out emits. The executor runs
@@ -192,7 +200,7 @@ type RelatedCheckBatch struct {
 func (RelatedCheckBatch) isEvent()               {}
 func (m RelatedCheckBatch) GenStamp() domain.Gen { return m.OperationID }
 func (RelatedCheckBatch) GenAspect() Aspect      { return AspectDetailOp }
-func (RelatedCheckBatch) AcceptZeroGen() bool    { return false }
+func (RelatedCheckBatch) AcceptZeroGen() bool    { return true }
 
 // AvailabilityCacheLoaded delivers cached availability data loaded from disk.
 // Entries maps resource short names to resource counts.
@@ -300,7 +308,7 @@ type EnrichmentChecked struct {
 	// enricher could not fully inspect them (per-resource API error or page cap).
 	TruncatedIDs map[string]bool
 	Err          error      // enrichment error (nil on success)
-	Gen          domain.Gen // session-wide generation counter (stale probe protection; profile/region switch). EnrichmentGen is seeded at 1, so zero is always stale.
+	Gen          domain.Gen // session-wide generation counter (stale probe protection; profile/region switch)
 	TypeGen      domain.Gen // per-type generation counter; bumped on every rerun for that type. Stale
 	// results whose TypeGen doesn't match the current per-type gen are discarded.
 	// Duration is the wall time ExecuteTaskAt spent inside ProbeEnrichment for
@@ -312,7 +320,7 @@ type EnrichmentChecked struct {
 func (EnrichmentChecked) isEvent()               {}
 func (m EnrichmentChecked) GenStamp() domain.Gen { return m.Gen }
 func (EnrichmentChecked) GenAspect() Aspect      { return AspectEnrichment }
-func (EnrichmentChecked) AcceptZeroGen() bool    { return false }
+func (EnrichmentChecked) AcceptZeroGen() bool    { return true }
 
 // IdentityLoaded is sent when the caller identity has been fetched.
 // Identity is typed as any to avoid importing aws/ from the messages package.
@@ -322,15 +330,16 @@ type IdentityLoaded struct {
 	// Gen is the session ConnectGen captured at dispatch time. A stale
 	// IdentityLoaded (account ID from a prior profile) is silently discarded
 	// to prevent stale identity from appearing in the header after a switch.
-	// ConnectGen is seeded at 1 (session.New()), so zero is always a
-	// genuinely unstamped/stale value — AcceptZeroGen=false.
+	// ConnectGen is seeded at 1 and every production dispatch site stamps the
+	// live value, so Gen==0 only ever originates from a synthetic/unstamped
+	// construction — AcceptZeroGen=true so those messages still pass the guard.
 	Gen domain.Gen
 }
 
 func (IdentityLoaded) isEvent()               {}
 func (m IdentityLoaded) GenStamp() domain.Gen { return m.Gen }
 func (IdentityLoaded) GenAspect() Aspect      { return AspectConnect }
-func (IdentityLoaded) AcceptZeroGen() bool    { return false }
+func (IdentityLoaded) AcceptZeroGen() bool    { return true }
 
 // IdentityError is sent when the caller identity fetch fails.
 type IdentityError struct {
@@ -338,15 +347,16 @@ type IdentityError struct {
 	// Gen is the session ConnectGen captured at dispatch time. A stale
 	// IdentityError (from a prior profile's fetch) is silently discarded to
 	// avoid clearing IdentityFetching for the new session's in-flight fetch.
-	// ConnectGen is seeded at 1 (session.New()), so zero is always a
-	// genuinely unstamped/stale value — AcceptZeroGen=false.
+	// ConnectGen is seeded at 1 and every production dispatch site stamps the
+	// live value, so Gen==0 only ever originates from a synthetic/unstamped
+	// construction — AcceptZeroGen=true so those messages still pass the guard.
 	Gen domain.Gen
 }
 
 func (IdentityError) isEvent()               {}
 func (m IdentityError) GenStamp() domain.Gen { return m.Gen }
 func (IdentityError) GenAspect() Aspect      { return AspectConnect }
-func (IdentityError) AcceptZeroGen() bool    { return false }
+func (IdentityError) AcceptZeroGen() bool    { return true }
 
 // EnrichDetailResult delivers an enriched resource back to the detail view.
 // On success, the detail view replaces its resource and rebuilds the field
@@ -354,7 +364,8 @@ func (IdentityError) AcceptZeroGen() bool    { return false }
 // dispatcher; discarded when it no longer matches the session's active
 // operation (a Ctrl+R refresh or navigating to a different resource begins a
 // new operation). DetailOpGen is seeded at 1 and every OperationID is minted
-// by domain.Gen.Bump() (never 0), so a zero OperationID is always stale.
+// by domain.Gen.Bump() (never 0 in production), so a zero OperationID only
+// ever originates from a synthetic/unstamped construction.
 type EnrichDetailResult struct {
 	ResourceType string
 	ResourceID   string
@@ -366,7 +377,7 @@ type EnrichDetailResult struct {
 func (EnrichDetailResult) isEvent()               {}
 func (m EnrichDetailResult) GenStamp() domain.Gen { return m.OperationID }
 func (EnrichDetailResult) GenAspect() Aspect      { return AspectDetailOp }
-func (EnrichDetailResult) AcceptZeroGen() bool    { return false }
+func (EnrichDetailResult) AcceptZeroGen() bool    { return true }
 
 // CostsLoaded delivers one Cost Explorer fetch result: the query shape that
 // was fetched, the mapped grid/attrs/anomalies, and the request count for
@@ -396,15 +407,16 @@ type CostsLoaded struct {
 	// event uses — CostsState is per-screen but the Store it merges into
 	// is loaded per-profile, so an in-flight fetch surviving a profile
 	// switch must never merge into the new profile's cache. ConnectGen is
-	// seeded at 1 (session.New()), so zero is always a genuinely
-	// unstamped/stale value — AcceptZeroGen=false.
+	// seeded at 1 and every production dispatch site stamps the live value,
+	// so Gen==0 only ever originates from a synthetic/unstamped construction
+	// — AcceptZeroGen=true so those messages still pass the guard.
 	Gen domain.Gen
 }
 
 func (CostsLoaded) isEvent()               {}
 func (m CostsLoaded) GenStamp() domain.Gen { return m.Gen }
 func (CostsLoaded) GenAspect() Aspect      { return AspectConnect }
-func (CostsLoaded) AcceptZeroGen() bool    { return false }
+func (CostsLoaded) AcceptZeroGen() bool    { return true }
 
 // ThemeFileRead delivers the bytes of a theme YAML file read from disk
 // in response to a TaskKindReadThemeFile dispatch. Theme is the theme

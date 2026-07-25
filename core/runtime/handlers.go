@@ -301,7 +301,7 @@ func (c *Core) handleClientsReadySuccess(ev ClientsReadyEvent) ([]UIIntent, []Ta
 		wrongType := fmt.Errorf("internal: unexpected ClientsReadyMsg.Clients type %T", ev.Clients)
 		return nil, []TaskRequest{{
 			Key:     TaskKey{Kind: TaskKindEmitAPIError},
-			Payload: EmitAPIErrorPayload{Err: wrongType},
+			Payload: EmitAPIErrorPayload{Err: wrongType, Gen: s.AvailabilityGen},
 		}}
 	}
 

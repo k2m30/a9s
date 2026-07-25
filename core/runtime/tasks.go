@@ -228,9 +228,14 @@ func (EmitNavigatePayload) isTaskPayload() {}
 
 // EmitAPIErrorPayload carries the error the adapter must dispatch as
 // messages.APIError. Used by HandleClientsReady's impossible
-// "wrong concrete type on Clients" branch.
+// "wrong concrete type on Clients" branch. Gen is the session
+// AvailabilityGen captured at dispatch time (APIError.GenAspect() is
+// AspectAvailability) — stamped so this dispatch is subject to the same
+// staleness guard as every other APIError construction site, even though
+// the branch is unreachable today.
 type EmitAPIErrorPayload struct {
 	Err error
+	Gen domain.Gen
 }
 
 func (EmitAPIErrorPayload) isTaskPayload() {}
