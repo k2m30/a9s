@@ -158,11 +158,26 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 	allNames := resource.AllShortNames()
 
 	var tasks []TaskRequest
-	if c.session.PairSwept() {
+	switch {
+	case c.session.PairSwept():
 		c.session.AvailTotal = len(allNames)
 		c.session.AvailChecked = c.session.AvailTotal
 		intents = append(intents, PatchMenuCheckProgress{Checked: c.session.AvailChecked, Total: c.session.AvailTotal})
-	} else {
+	case c.session.AvailTotal > 0:
+		// A sweep for this pair is already under way: an earlier
+		// AvailabilityCacheLoaded already built AvailQueue (messages.
+		// AvailabilityCacheLoaded carries no Gen, so both the pre-connect
+		// disk-cache seed and handleClientsReadySuccess's own unconditional
+		// TaskKindLoadAvailCache dispatch land here for the same pair before
+		// PairSwept goes true). Rebuilding AvailQueue/AvailChecked/AvailTotal
+		// here would restart the sweep on top of probes already in flight,
+		// double-dispatching every type and re-running this handler's
+		// completion bookkeeping once per rebuild — report the current, real
+		// progress instead. ClearPairSwept (manual full-menu refresh) resets
+		// AvailTotal to 0 alongside the swept memo specifically so that
+		// restart still reaches the fresh-start case below.
+		intents = append(intents, PatchMenuCheckProgress{Checked: c.session.AvailChecked, Total: c.session.AvailTotal})
+	default:
 		c.session.AvailQueue = allNames
 		c.session.AvailChecked = 0
 		c.session.AvailTotal = len(allNames)
@@ -411,6 +426,17 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 
 	// Queue is drained but other probes may still be in flight.
 	if c.session.AvailChecked < c.session.AvailTotal {
+		return intents, tasks
+	}
+
+	// Completion latch: once this pair's sweep has already been marked
+	// swept, a further AvailabilityChecked delivery reaching this point (a
+	// redelivered/duplicate probe result pushing AvailChecked to or past
+	// AvailTotal again) must not re-run completion. MarkPairSwept itself is
+	// idempotent, but startEnrichment below rebuilds EnrichQueue and bumps
+	// EnrichmentGen unconditionally, discarding whatever Wave-2 probes the
+	// first completion already dispatched.
+	if c.session.PairSwept() {
 		return intents, tasks
 	}
 

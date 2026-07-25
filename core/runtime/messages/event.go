@@ -97,14 +97,16 @@ type ValueRevealed struct {
 	Err          error
 	// Gen is the session ConnectGen captured at dispatch time. A stale
 	// ValueRevealed (secret from a prior profile) is silently discarded to
-	// prevent cross-account secret display. Zero is never stale (AcceptZeroGen=true).
+	// prevent cross-account secret display. ConnectGen is seeded at 1
+	// (session.New()), so zero is always a genuinely unstamped/stale value,
+	// never a legitimate dispatch — AcceptZeroGen=false.
 	Gen domain.Gen
 }
 
 func (ValueRevealed) isEvent()               {}
 func (m ValueRevealed) GenStamp() domain.Gen { return m.Gen }
 func (ValueRevealed) GenAspect() Aspect      { return AspectConnect }
-func (ValueRevealed) AcceptZeroGen() bool    { return true }
+func (ValueRevealed) AcceptZeroGen() bool    { return false }
 
 // ClientsReady is sent when AWS clients are initialized.
 // Clients is typed as any to avoid importing aws/ from the messages package.
@@ -119,7 +121,13 @@ type ClientsReady struct {
 func (ClientsReady) isEvent()               {}
 func (m ClientsReady) GenStamp() domain.Gen { return m.Gen }
 func (ClientsReady) GenAspect() Aspect      { return AspectConnect }
-func (ClientsReady) AcceptZeroGen() bool    { return true }
+
+// AcceptZeroGen is false: ConnectGen is seeded at 1 (session.New()), so a
+// genuine dispatch never carries Gen 0. Every real construction site (see
+// internal/tui/fetch_adapter.go's connectAWS, core/runtime/executor.go's
+// TaskKindConnect case) stamps the live ConnectGen; the pre-supplied-clients
+// bootstrap path (internal/tui/app.go's Init) stamps it too.
+func (ClientsReady) AcceptZeroGen() bool { return false }
 
 // RelatedCheckResult delivers one checker's async result back to the detail view.
 // The adapter delegates this to the active view (detail model's rightColumnModel).
@@ -310,14 +318,15 @@ type IdentityLoaded struct {
 	// Gen is the session ConnectGen captured at dispatch time. A stale
 	// IdentityLoaded (account ID from a prior profile) is silently discarded
 	// to prevent stale identity from appearing in the header after a switch.
-	// Zero is never stale (AcceptZeroGen=true).
+	// ConnectGen is seeded at 1 (session.New()), so zero is always a
+	// genuinely unstamped/stale value — AcceptZeroGen=false.
 	Gen domain.Gen
 }
 
 func (IdentityLoaded) isEvent()               {}
 func (m IdentityLoaded) GenStamp() domain.Gen { return m.Gen }
 func (IdentityLoaded) GenAspect() Aspect      { return AspectConnect }
-func (IdentityLoaded) AcceptZeroGen() bool    { return true }
+func (IdentityLoaded) AcceptZeroGen() bool    { return false }
 
 // IdentityError is sent when the caller identity fetch fails.
 type IdentityError struct {
@@ -325,14 +334,15 @@ type IdentityError struct {
 	// Gen is the session ConnectGen captured at dispatch time. A stale
 	// IdentityError (from a prior profile's fetch) is silently discarded to
 	// avoid clearing IdentityFetching for the new session's in-flight fetch.
-	// Zero is never stale (AcceptZeroGen=true).
+	// ConnectGen is seeded at 1 (session.New()), so zero is always a
+	// genuinely unstamped/stale value — AcceptZeroGen=false.
 	Gen domain.Gen
 }
 
 func (IdentityError) isEvent()               {}
 func (m IdentityError) GenStamp() domain.Gen { return m.Gen }
 func (IdentityError) GenAspect() Aspect      { return AspectConnect }
-func (IdentityError) AcceptZeroGen() bool    { return true }
+func (IdentityError) AcceptZeroGen() bool    { return false }
 
 // EnrichDetailResult delivers an enriched resource back to the detail view.
 // On success, the detail view replaces its resource and rebuilds the field
@@ -380,15 +390,16 @@ type CostsLoaded struct {
 	// dropped by the same IsStale guard every other ConnectGen-stamped
 	// event uses — CostsState is per-screen but the Store it merges into
 	// is loaded per-profile, so an in-flight fetch surviving a profile
-	// switch must never merge into the new profile's cache. Zero is never
-	// stale (AcceptZeroGen=true).
+	// switch must never merge into the new profile's cache. ConnectGen is
+	// seeded at 1 (session.New()), so zero is always a genuinely
+	// unstamped/stale value — AcceptZeroGen=false.
 	Gen domain.Gen
 }
 
 func (CostsLoaded) isEvent()               {}
 func (m CostsLoaded) GenStamp() domain.Gen { return m.Gen }
 func (CostsLoaded) GenAspect() Aspect      { return AspectConnect }
-func (CostsLoaded) AcceptZeroGen() bool    { return true }
+func (CostsLoaded) AcceptZeroGen() bool    { return false }
 
 // ThemeFileRead delivers the bytes of a theme YAML file read from disk
 // in response to a TaskKindReadThemeFile dispatch. Theme is the theme

@@ -251,6 +251,13 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 					Pagination: &resource.PaginationMeta{
 						IsTruncated: tr.Pagination != nil && tr.Pagination.IsTruncated,
 					},
+					// TotalCount: RowStore.Observe's own shrink guard already
+					// guarantees tr.TotalCount >= len(tr.Rows) (never the reverse,
+					// unlike the disk-store fallback's tf.Count below), so a bare
+					// pass-through is enough to carry a count wider than this
+					// seeded page (e.g. handleAvailabilityCacheLoaded's
+					// ObserveCountRows call) through to the first rendered frame.
+					TotalCount: tr.TotalCount,
 				}
 			}
 		} else {

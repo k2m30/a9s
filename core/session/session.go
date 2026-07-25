@@ -433,6 +433,7 @@ func New() *Session {
 		RelatedCache:           NewRelatedCacheLRU(MaxRelatedCacheEntries),
 		FilteredRows:           NewFilteredRowsLRU(MaxFilteredRowsEntries),
 		SweptPairs:             make(map[string]bool),
+		ConnectGen:             1,
 		EnrichmentGen:          1,
 		AvailabilityGen:        1,
 		DetailOpGen:            1,
@@ -504,10 +505,20 @@ func (s *Session) MarkPairSwept() {
 // skipping it. Used by the manual full-menu refresh gesture (Ctrl+R on the
 // main menu) — an explicit user refresh must always re-probe even an
 // already-swept pair.
+//
+// Also resets AvailQueue/AvailChecked/AvailTotal to their pre-sweep zero
+// values: handleAvailabilityCacheLoaded (core/runtime) treats a nonzero
+// AvailTotal as "a sweep for this pair is already under way" and refuses to
+// rebuild the queue for a second, redundant cache load — this reset is what
+// lets the restarted sweep's own cache load reach that rebuild instead of
+// being mistaken for the redundant one it is not.
 func (s *Session) ClearPairSwept() {
 	s.pairMu.Lock()
 	defer s.pairMu.Unlock()
 	delete(s.SweptPairs, sweptPairKey(s.Profile, s.Region))
+	s.AvailQueue = nil
+	s.AvailChecked = 0
+	s.AvailTotal = 0
 }
 
 // EnsureCacheStore returns the *cache.Store for the current Profile/Region

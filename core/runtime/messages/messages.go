@@ -57,9 +57,13 @@ type GenStamped interface {
 	// event is stamped against.
 	GenAspect() Aspect
 	// AcceptZeroGen returns true when a zero GenStamp should NOT be treated as
-	// stale. Most events return true (zero is used as a "test/demo sentinel"
-	// that always passes the guard). AvailabilityChecked returns false because
-	// its session counter starts at zero, so zero would be a real stale signal.
+	// stale. Every session generation counter (core/session.Session.New) is
+	// seeded at 1, so for an event whose real dispatch sites always stamp the
+	// live counter, zero is never a legitimate value and AcceptZeroGen must
+	// return false — a zero stamp slipping past a true-returning event is how
+	// a stale cross-account result (identity, reveal, costs) got accepted as
+	// current pre-fix (see the AspectConnect events' history). AvailabilityChecked
+	// and AvailabilityPrefetched likewise return false for the same reason.
 	AcceptZeroGen() bool
 }
 

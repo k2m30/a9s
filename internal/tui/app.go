@@ -194,8 +194,9 @@ func (m Model) CloseController() {
 // ClientsReadyMsg immediately. Otherwise initiates the live AWS connection flow.
 func (m Model) Init() tea.Cmd {
 	if m.core.PreSuppliedClients() != nil {
+		gen := m.core.ConnectGen()
 		preCmd := func() tea.Msg {
-			return messages.ClientsReady{Clients: m.core.PreSuppliedClients()}
+			return messages.ClientsReady{Clients: m.core.PreSuppliedClients(), Gen: gen}
 		}
 		if m.configErr != nil {
 			return tea.Batch(preCmd, func() tea.Msg {

@@ -448,13 +448,24 @@ type IdentityErrorEvent struct {
 	Err string
 }
 
-// HandleIdentityError clears IdentityFetching. The adapter shim
-// additionally calls IdentityModel.SetError when an identity view is
-// active — that branch needs renderer-side view-stack inspection so it
-// stays out of Core.
+// HandleIdentityError clears IdentityFetching and any previously-resolved
+// Identity — a failed fetch on the current profile/region must never leave
+// a prior pair's ARN displayed in the header indefinitely. ClearIdentityIntent
+// is the same intent HandleProfileSelected/HandleRegionSelected use to drop a
+// stale identity on rotation; it clears both the adapter's identity-overlay
+// mirror (TUI rendererState / Controller.identityResult) and — combined with
+// the session write above — the header, which derives its badge/role fresh
+// from session.Identity every render. The adapter shim additionally calls
+// IdentityModel.SetError when an identity view is active — that branch needs
+// renderer-side view-stack inspection so it stays out of Core.
 func (c *Core) HandleIdentityError(ev IdentityErrorEvent) ([]UIIntent, []TaskRequest) {
 	c.session.IdentityFetching = false
+	hadIdentity := c.session.Identity != nil
+	c.session.Identity = nil
 	_ = ev.Err // not surfaced as a flash today; reserved for future hook
+	if hadIdentity {
+		return []UIIntent{ClearIdentityIntent{}}, nil
+	}
 	return nil, nil
 }
 
