@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (security)
+
+- Switching profile or region could leave the previous account's data on
+  screen: its caller identity in the header, a revealed secret's
+  decrypted value, or its Cost Explorer figures — all attributed to the
+  newly-selected account. Work started before the switch carried a
+  freshness stamp that still looked current afterwards, because one of
+  the four generation counters started at zero instead of one. A failed
+  identity fetch on the new account also left the old ARN in the header
+  indefinitely. Both are closed, with regression coverage for identity,
+  revealed values and costs.
+
 ### Added
 
 - Detail views fetch what the list APIs don't return (#261). Opening a
