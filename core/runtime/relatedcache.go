@@ -2,8 +2,8 @@
 
 // relatedcache.go — related-cache helpers.
 //
-// RelatedCacheKey and RelatedCacheReplay are free functions that live here
-// (rather than core/session) so renderer adapters can call them via
+// RelatedCacheKey is a free function that lives here (rather than
+// core/session) so renderer adapters can resolve cache keys via
 // core/runtime instead of importing core/session. RelatedCacheResult is
 // re-exported as a type alias so callers can construct cache entries using
 // the runtime name; the underlying type still lives in core/session
@@ -12,7 +12,6 @@
 package runtime
 
 import (
-	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
@@ -27,20 +26,4 @@ type RelatedCacheResult = session.RelatedCacheResult
 // core/session.
 func RelatedCacheKey(resourceType, resourceID string) string {
 	return resourceType + ":" + resourceID
-}
-
-// RelatedCacheReplay converts cached related-check results into the
-// RelatedCheckResultMsg form the detail view expects, preserving both the
-// resourceType and the per-row DefDisplayName so rightcolumn replay can
-// match the correct row on detail re-entry.
-func RelatedCacheReplay(resourceType string, cached []RelatedCacheResult) []messages.RelatedCheckResult {
-	out := make([]messages.RelatedCheckResult, len(cached))
-	for i, c := range cached {
-		out[i] = messages.RelatedCheckResult{
-			ResourceType:   resourceType,
-			DefDisplayName: c.DefDisplayName,
-			Result:         c.Result,
-		}
-	}
-	return out
 }

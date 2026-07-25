@@ -194,7 +194,11 @@ func fullIntegrationNewReadyModelWithClients(t *testing.T, profile, region strin
 	t.Helper()
 	m := tui.New(profile, region, tui.WithClients(clients), tui.WithNoCache(true))
 	m, _ = fullIntegrationApplyMsg(m, tea.WindowSizeMsg{Width: 240, Height: 220})
-	m, _ = fullIntegrationApplyMsg(m, messages.ClientsReady{Clients: clients, Region: region})
+	// Stamp the live ConnectGen, as every production dispatch site does:
+	// HandleClientsReady compares it for strict equality, so an unstamped
+	// message is silently dropped and the model never leaves the pre-connect
+	// state — every downstream assertion then reads an empty app.
+	m, _ = fullIntegrationApplyMsg(m, messages.ClientsReady{Clients: clients, Region: region, Gen: m.Core().ConnectGen()})
 	return m
 }
 

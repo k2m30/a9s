@@ -263,6 +263,54 @@ func TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch(t *testin
 	}
 }
 
+// TestRowStoreSeededPair_CachedEntryCarriesTotalCount pins the RowStore-observed
+// sibling of TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch
+// above: HandleNavigate's OTHER cache-hit branch (core/runtime/handlers_navigate.go,
+// `tr := c.session.RowStore.Snapshot(canon); if tr.Gen != 0 { ... }`) used to
+// build its ListViewCacheEntry/CachedEntry WITHOUT carrying tr.TotalCount, so a
+// count wider than the retained page (e.g. handleAvailabilityCacheLoaded's
+// ObserveCountRows seeding 50 rows then a counts-only RowStore.ObserveCount(55))
+// was silently dropped on the first rendered frame — the title showed "s3(50+)"
+// instead of "s3(55+)". This exercises the RowStore path directly (Observe +
+// ObserveCount, no on-disk cache.Store involved at all), distinct from the
+// disk-store-fallback branch the sibling test above covers.
+func TestRowStoreSeededPair_CachedEntryCarriesTotalCount(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("A9S_CONFIG_FOLDER", tmp)
+	const profile, region = "rowstore-seeded-pair-prof", "us-east-1"
+
+	m := tuitest.Sized(profile, region)
+	t.Cleanup(func() { m.CloseController() })
+
+	// Seed RowStore directly: 50 observed rows (Gen bumped to non-zero), then
+	// a counts-only ObserveCount raising TotalCount to 55 without touching
+	// Rows — the same C6a "counts-only write never touches Rows" shape as
+	// the disk-store sibling test, but through RowStore's own API.
+	rows := make([]resource.Resource, 50)
+	for i := range rows {
+		rows[i] = resource.Resource{ID: "obj-" + itoaC6a(i), Type: "s3"}
+	}
+	rs := m.Core().Session().RowStore
+	rs.Observe("s3", rows, &resource.PaginationMeta{IsTruncated: true}, session.OriginDisk, false)
+	rs.ObserveCount("s3", 55)
+	if tr := rs.Snapshot("s3"); tr.Gen == 0 || len(tr.Rows) != 50 || tr.TotalCount != 55 {
+		t.Fatalf("precondition: RowStore.Snapshot(s3) = %+v, want Gen!=0, len(Rows)=50, TotalCount=55", tr)
+	}
+
+	m, _ = tuitest.Step(m, messages.Navigate{
+		Target:       messages.TargetResourceList,
+		ResourceType: "s3",
+	})
+
+	plain := stripANSITL(tuitest.Render(m))
+	if !strings.Contains(plain, "s3(55+)") {
+		t.Errorf("RowStore-seeded pair: expected title s3(55+) (TotalCount, not len(Rows)=50), got: %s", plain[:min(200, len(plain))])
+	}
+	if strings.Contains(plain, "s3(50") {
+		t.Errorf("RowStore-seeded pair: title must not show s3(50...) (len(Rows)) while TotalCount=55 is authoritative, got: %s", plain[:min(200, len(plain))])
+	}
+}
+
 // -----------------------------------------------------------------------
 // Pin (d): the refreshing marker is present on the FIRST rendered frame.
 // -----------------------------------------------------------------------

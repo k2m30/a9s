@@ -609,8 +609,9 @@ func TestCostsReview3_P5_ClientsReady_RecoversPreConnectCostsError(t *testing.T)
 		t.Fatal("precondition: the pre-connect costs fetch failure must set ErrorMsg")
 	}
 
-	// The real connection now completes.
-	c.Handle(messages.ClientsReady{Clients: demo.NewServiceClients(), Region: "us-east-1"})
+	// The real connection now completes. Gen:1 — ConnectGen seeds at 1
+	// (session.New()); this session is never rotated.
+	c.Handle(messages.ClientsReady{Clients: demo.NewServiceClients(), Region: "us-east-1", Gen: 1})
 
 	vs := c.Snapshot()
 	if vs.Body.Costs.ErrorMsg != "" {

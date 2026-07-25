@@ -591,7 +591,7 @@ func TestPort_RevealCopy_CopiesExactValue(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	// WithClients only pre-supplies the session's PreSuppliedClients; the
 	// fetch path reads session.Clients, populated by a live ClientsReady.
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 0})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 1})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: shortName})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: shortName,
@@ -630,7 +630,7 @@ func TestPort_RevealCopy_JSONValueStaysRaw(t *testing.T) {
 	clients := demo.NewServiceClients()
 	m := tui.New("test", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 0})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 1})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: shortName})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: shortName,
@@ -671,7 +671,7 @@ func TestPort_RevealCopy_EmptyValue(t *testing.T) {
 	clients := demo.NewServiceClients()
 	m := tui.New("test", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 0})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 1})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: shortName})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: shortName,

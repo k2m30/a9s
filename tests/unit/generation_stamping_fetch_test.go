@@ -24,13 +24,19 @@
 package unit
 
 import (
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/costs"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
+	"github.com/k2m30/a9s/v3/core/session"
 )
 
 // ── AC #1 — stale ResourcesLoaded is dropped ────────────────────────────────
@@ -546,7 +552,135 @@ func TestAvailabilityPrefetched_ZeroGen_Dropped(t *testing.T) {
 	}
 }
 
+// ── The ConnectGen cross-account leak pin ───────────────────────────────────
+
+// TestConnectGenLeak_PreSwitchStamp_DoesNotFoldAfterRotate pins the exact
+// regression path closed by seeding ConnectGen at 1 in session.New(): before
+// that fix, a fresh session's ConnectGen was 0, so a task dispatched before
+// any profile/region switch captured stamp 0 — which slipped past
+// AcceptZeroGen=true on every AspectConnect event once a SINGLE subsequent
+// Rotate() bumped ConnectGen off zero, installing the previous account's
+// identity, a decrypted secret, or cost data into the new session. With the
+// fix, that same pre-switch dispatch captures the seed value 1, so it now
+// loses a plain inequality against the post-Rotate value 2 regardless of
+// AcceptZeroGen. Each subtest drives the real dispatch path (rootApplyMsg /
+// Controller.Handle) rather than hand-calling messages.IsStale, so a future
+// regression in either the seed or the guard is caught either way.
+func TestConnectGenLeak_PreSwitchStamp_DoesNotFoldAfterRotate(t *testing.T) {
+	t.Run("Identity", func(t *testing.T) {
+		m := newRootSizedModel()
+		preSwitchGen := m.Core().Session().ConnectGen
+		if preSwitchGen != 1 {
+			t.Fatalf("precondition: fresh session's ConnectGen = %d, want 1 (the seed)", preSwitchGen)
+		}
+
+		m.Core().Session().Rotate() // simulates the profile/region switch
+
+		staleIdentity := &awsclient.CallerIdentity{AccountID: "111122223333"}
+		m, _ = rootApplyMsg(m, messages.IdentityLoaded{
+			Identity: staleIdentity,
+			Gen:      preSwitchGen,
+		})
+
+		if m.Core().Session().Identity != nil {
+			t.Errorf("pre-switch-stamped IdentityLoaded (Gen=%d) folded after Rotate() bumped ConnectGen to %d — "+
+				"cross-account identity leak regression: Session.Identity = %+v, want nil",
+				preSwitchGen, m.Core().Session().ConnectGen, m.Core().Session().Identity)
+		}
+	})
+
+	t.Run("ValueRevealed", func(t *testing.T) {
+		m := newRootSizedModel()
+		preSwitchGen := m.Core().Session().ConnectGen
+		if preSwitchGen != 1 {
+			t.Fatalf("precondition: fresh session's ConnectGen = %d, want 1 (the seed)", preSwitchGen)
+		}
+
+		m.Core().Session().Rotate()
+
+		const staleSecret = "PRE_SWITCH_SECRET_leak_check_xyz"
+		m, _ = rootApplyMsg(m, messages.ValueRevealed{
+			ResourceType: "secrets",
+			ResourceID:   "prod/api/key",
+			Value:        staleSecret,
+			Gen:          preSwitchGen,
+		})
+
+		plain := stripANSI(rootViewContent(m))
+		if strings.Contains(plain, staleSecret) {
+			t.Errorf("pre-switch-stamped ValueRevealed (Gen=%d) folded after Rotate() bumped ConnectGen to %d — "+
+				"secret leak regression: value %q appears in rendered output", preSwitchGen, m.Core().Session().ConnectGen, staleSecret)
+		}
+	})
+
+	t.Run("Costs", func(t *testing.T) {
+		now := time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC)
+		s, c := leakPinCostsController(t, now)
+
+		preSwitchGen := s.ConnectGen
+		if preSwitchGen != 1 {
+			t.Fatalf("precondition: fresh session's ConnectGen = %d, want 1 (the seed)", preSwitchGen)
+		}
+
+		q := costs.Query{Granularity: costs.GranularityMonth.APIGranularity(), GroupBy: []costs.Dimension{costs.DimensionService}}
+
+		// Seed a pre-switch error, accepted because it is dispatched at the
+		// live (pre-rotate) gen.
+		c.Handle(messages.CostsLoaded{
+			Query: q,
+			Err:   errors.New("cost explorer: no client configured for this session"),
+			Gen:   preSwitchGen,
+		})
+		if got := c.Snapshot().Body.Costs.ErrorMsg; got == "" {
+			t.Fatal("precondition: the pre-switch costs fetch failure must set ErrorMsg")
+		}
+
+		s.Rotate() // simulates the profile/region switch
+
+		// The pre-switch task's late-arriving "recovery" carries a stamp
+		// (preSwitchGen) that no longer matches the post-Rotate ConnectGen —
+		// it must be dropped, not folded into the new session's costs state.
+		c.Handle(messages.CostsLoaded{
+			Query: q,
+			Grid: costs.GridResult{Fetched: true, Records: []costs.Record{{
+				Period:  costs.Period{Start: "2026-07-01", End: "2026-08-01"},
+				Keys:    []string{"Amazon EC2"},
+				Metrics: map[costs.Metric]costs.Amount{costs.MetricInvoice: {Value: 999.0, Unit: "USD"}},
+			}}},
+			Gen: preSwitchGen,
+		})
+
+		if got := c.Snapshot().Body.Costs.ErrorMsg; got == "" {
+			t.Errorf("pre-switch-stamped CostsLoaded (Gen=%d) folded after Rotate() bumped ConnectGen to %d — "+
+				"the pre-switch error was cleared as if the stale delivery were fresh (cost-data cross-account leak regression)",
+				preSwitchGen, s.ConnectGen)
+		}
+	})
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+// leakPinCostsController builds a *session.Session + *app.Controller with
+// ScreenCosts pushed and EnsureCostsState seeded, for the leak pin's Costs
+// subtest above. A blessed construction helper
+// (qa_controller_construction_discipline_test.go's ccdBlessedHelpers) — pairs
+// t.TempDir() + t.Cleanup(c.Close) in the correct LIFO order, mirroring
+// costs_state_test.go's already-allowlisted newCostsController, but also
+// returning the *session.Session so the caller can read/Rotate() ConnectGen
+// directly.
+func leakPinCostsController(t *testing.T, now time.Time) (*session.Session, *app.Controller) {
+	t.Helper()
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	s := session.New()
+	s.Profile = "leak-pin-costs"
+	s.Region = "us-east-1"
+	core := runtime.New(s, nil)
+	c := app.New(core)
+	t.Cleanup(c.Close)
+	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
+	c.EnsureCostsState(now)
+	return s, c
+}
 
 // errString is a minimal error implementation for test stubs.
 type errString string

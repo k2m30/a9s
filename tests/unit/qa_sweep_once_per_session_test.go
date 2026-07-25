@@ -141,6 +141,98 @@ func TestSweepOnce_FreshPair_FirstVisit_FiresProbes(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
+// 1b — Mid-sweep double delivery: a second AvailabilityCacheLoaded landing
+// before the first sweep completes must not rebuild the queue or re-fire
+// probes (handlers_availability.go's handleAvailabilityCacheLoaded: both the
+// pre-connect disk-cache seed and handleClientsReadySuccess's own
+// TaskKindLoadAvailCache dispatch land for the same pair before PairSwept
+// goes true, since messages.AvailabilityCacheLoaded carries no Gen).
+// -----------------------------------------------------------------------
+
+func TestSweepOnce_MidSweepDuplicateCacheLoaded_DoesNotRebuildQueueOrReprobe(t *testing.T) {
+	s, _, c := newRowStoreControllerPin(t)
+
+	tasks := fireAvailabilitySweep(c, s, map[string]int{"ec2": 1}, map[string]bool{"ec2": false})
+	if s.PairSwept() {
+		t.Fatal("precondition: PairSwept() must be false before the sweep completes")
+	}
+	if s.AvailTotal == 0 {
+		t.Fatal("precondition: AvailTotal must be non-zero after the first-visit cache load")
+	}
+	if n := countProbeTasks(tasks); n == 0 {
+		t.Fatal("precondition: the first cache load must have fired at least one probe task")
+	}
+	queueLenBefore := len(s.AvailQueue)
+	checkedBefore := s.AvailChecked
+	totalBefore := s.AvailTotal
+
+	// A second AvailabilityCacheLoaded lands mid-sweep, for the SAME pair,
+	// before AvailChecked ever reaches AvailTotal.
+	_, secondTasks := c.Handle(messages.AvailabilityCacheLoaded{
+		Entries:   map[string]int{"ec2": 1},
+		Truncated: map[string]bool{"ec2": false},
+	})
+
+	if n := countProbeTasks(secondTasks); n != 0 {
+		t.Errorf("second, mid-sweep AvailabilityCacheLoaded fired %d probe tasks, want 0 — a sweep already under way must not re-dispatch probes", n)
+	}
+	if len(s.AvailQueue) != queueLenBefore {
+		t.Errorf("AvailQueue len = %d after the mid-sweep second cache load, want unchanged %d — the queue must not be rebuilt", len(s.AvailQueue), queueLenBefore)
+	}
+	if s.AvailChecked != checkedBefore {
+		t.Errorf("AvailChecked = %d after the mid-sweep second cache load, want unchanged %d", s.AvailChecked, checkedBefore)
+	}
+	if s.AvailTotal != totalBefore {
+		t.Errorf("AvailTotal = %d after the mid-sweep second cache load, want unchanged %d — a rebuild would reset it to len(AllShortNames())", s.AvailTotal, totalBefore)
+	}
+}
+
+// -----------------------------------------------------------------------
+// 1c — Duplicate post-completion delivery: once a sweep has completed
+// (PairSwept() true), a further AvailabilityChecked for an already-checked
+// type must not re-run completion — no second TaskKindSaveCache dispatch, no
+// second startEnrichment (would rebuild EnrichQueue and bump EnrichmentGen,
+// discarding whatever Wave-2 probes the first completion already
+// dispatched).
+// -----------------------------------------------------------------------
+
+func TestSweepOnce_DuplicateAvailabilityCheckedAfterCompletion_DoesNotRerunCompletion(t *testing.T) {
+	s, _, c := newRowStoreControllerPin(t)
+
+	tasks := fireAvailabilitySweep(c, s, map[string]int{"ec2": 1}, map[string]bool{"ec2": false})
+	drainAvailabilitySweep(c, s, tasks)
+
+	if !s.PairSwept() {
+		t.Fatal("precondition: sweep must be fully drained and PairSwept() true before testing the duplicate-delivery guard")
+	}
+	enrichGenBefore := s.EnrichmentGen
+
+	// A duplicate/redelivered AvailabilityChecked reaches
+	// handleAvailabilityChecked again after PairSwept() is already true.
+	_, dupTasks := c.Handle(messages.AvailabilityChecked{
+		ResourceType: "ec2",
+		Gen:          s.AvailabilityGen,
+		HasResources: true,
+		Count:        1,
+	})
+
+	for _, tr := range dupTasks {
+		if tr.Key.Kind == runtime.TaskKindSaveCache {
+			t.Error("duplicate AvailabilityChecked after PairSwept() re-dispatched TaskKindSaveCache — completion re-ran")
+		}
+		if tr.Key.Kind == runtime.TaskKindProbeEnrich {
+			t.Error("duplicate AvailabilityChecked after PairSwept() re-dispatched TaskKindProbeEnrich — startEnrichment re-ran")
+		}
+	}
+	if s.EnrichmentGen != enrichGenBefore {
+		t.Errorf("EnrichmentGen = %d after a duplicate AvailabilityChecked post-completion, want unchanged %d — startEnrichment must not re-run", s.EnrichmentGen, enrichGenBefore)
+	}
+	if !s.PairSwept() {
+		t.Error("PairSwept() = false after a duplicate AvailabilityChecked post-completion, want still true")
+	}
+}
+
+// -----------------------------------------------------------------------
 // 2 — Completion memo: driving AvailChecked to AvailTotal marks the pair
 // swept.
 // -----------------------------------------------------------------------

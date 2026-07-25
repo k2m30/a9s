@@ -36,8 +36,9 @@ func TestBug_ProfileSwitch_RefreshesResourceList(t *testing.T) {
 		t.Fatal("ProfileSelectedMsg should return a command to reconnect")
 	}
 
-	// Simulate ClientsReadyMsg (successful reconnect)
-	m, cmd = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1}) // nil clients for test
+	// Simulate ClientsReadyMsg (successful reconnect). Gen:2 — ConnectGen
+	// seeds at 1 (session.New()); one ProfileSelected Rotate()s it to 2.
+	m, cmd = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 2}) // nil clients for test
 
 	// After reconnect, should trigger a refresh (return a fetch command)
 	// The active view should still be the resource list
@@ -61,9 +62,10 @@ func TestBug_ProfileSwitch_UpdatesHeaderProfile(t *testing.T) {
 		t.Fatal("header should show initial profile")
 	}
 
-	// Switch profile
+	// Switch profile. Gen:2 — ConnectGen seeds at 1 (session.New()); one
+	// ProfileSelected Rotate()s it to 2.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "new-profile"})
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 2})
 
 	content = rootViewContent(m)
 	if !strings.Contains(content, "new-profile") {
@@ -88,8 +90,9 @@ func TestBug_RegionSwitch_RefreshesResourceList(t *testing.T) {
 		t.Fatal("RegionSelectedMsg should return a reconnect command")
 	}
 
-	// Simulate successful reconnect
-	_, cmd = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
+	// Simulate successful reconnect. Gen:2 — ConnectGen seeds at 1
+	// (session.New()); one RegionSelected Rotate()s it to 2.
+	_, cmd = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 2})
 	if cmd == nil {
 		t.Error("After ClientsReadyMsg following region switch, should return a fetch command to refresh")
 	}
@@ -156,8 +159,9 @@ func TestBug_RegionShownInHeader_AfterConnect(t *testing.T) {
 	m := tui.New("test-dev", "")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 
-	// After ClientsReadyMsg, region should be populated in header
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil})
+	// After ClientsReadyMsg, region should be populated in header. Gen:1 —
+	// ConnectGen seeds at 1 (session.New()); this model is never rotated.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
 
 	content := rootViewContent(m)
 	plain := stripANSI(content)
@@ -227,8 +231,10 @@ func TestBug_ProfileSwitch_FlashClears(t *testing.T) {
 		t.Error("should show switching flash")
 	}
 
-	// ClientsReadyMsg arrives — "Connected. Refreshing..." replaces the switching flash
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
+	// ClientsReadyMsg arrives — "Connected. Refreshing..." replaces the switching
+	// flash. Gen:2 — ConnectGen seeds at 1 (session.New()); one ProfileSelected
+	// Rotate()s it to 2.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 2})
 	content = rootViewContent(m)
 	if strings.Contains(content, "Switching to test-prod") {
 		t.Error("'Switching to...' flash should be replaced after ClientsReadyMsg")
@@ -252,8 +258,9 @@ func TestBug_ProfileSwitch_ClearsRegion(t *testing.T) {
 
 	// After ClientsReadyMsg, region should be resolved from the NEW profile's config
 	// (not the old "us-west-2"). Since we can't control ~/.aws/config in tests,
-	// we verify that m.region was cleared by checking it gets re-resolved.
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
+	// we verify that m.region was cleared by checking it gets re-resolved. Gen:2 —
+	// ConnectGen seeds at 1 (session.New()); one ProfileSelected Rotate()s it to 2.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 2})
 
 	content = rootViewContent(m)
 	// The old region should NOT persist after profile switch
@@ -273,9 +280,11 @@ func TestBug_RefreshFlashClears_AfterResourcesLoaded(t *testing.T) {
 		Resources:    []resource.Resource{{ID: "i-1", Fields: map[string]string{"instance_id": "i-1"}}},
 	})
 
-	// Simulate profile switch flow that sets "Connected. Refreshing..." flash
+	// Simulate profile switch flow that sets "Connected. Refreshing..." flash.
+	// Gen:2 — ConnectGen seeds at 1 (session.New()); one ProfileSelected
+	// Rotate()s it to 2.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "other"})
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 2})
 
 	// At this point, flash should show "Connected. Refreshing..."
 	content := rootViewContent(m)
@@ -330,8 +339,10 @@ func TestBug_RefreshFlashClears_AfterCtrlR(t *testing.T) {
 func TestBug_ProfileSwitch_FromMainMenu_NoRefresh(t *testing.T) {
 	m := newRootSizedModel()
 	// Switch profile from main menu (no resource list active)
+	// Gen:2 — ConnectGen seeds at 1 (session.New()); one ProfileSelected
+	// Rotate()s it to 2.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "other-profile"})
-	m, cmd := rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
+	m, cmd := rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 2})
 
 	// From main menu, no resource list to refresh — cmd should be nil
 	if cmd != nil {

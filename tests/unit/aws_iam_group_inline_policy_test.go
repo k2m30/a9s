@@ -43,7 +43,7 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
 	// Navigate to IAM groups list.
 	var navCmd tea.Cmd
@@ -168,7 +168,7 @@ func TestIAMPolicyList_IncludesInlinePolicies(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
 	// Navigate to the policy resource list.
 	var navCmd tea.Cmd
@@ -464,7 +464,7 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
 	// Fetch the policy list.
 	var navCmd tea.Cmd

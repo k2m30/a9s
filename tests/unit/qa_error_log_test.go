@@ -360,10 +360,10 @@ func TestErrorHistoryFromClientsReady(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	// Gen 0 matches the model's initial connectGen (zero value).
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: errors.New("could not resolve credentials"),
-		Gen: 0,
+		Gen: 1,
 	})
 
 	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: '!'})

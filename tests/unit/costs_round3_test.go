@@ -89,9 +89,11 @@ func TestCostsRound3_CLICommand_EmitsNavigateTargetCosts(t *testing.T) {
 			)
 			m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
+			// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
 			_, cmd := rootApplyMsg(m, messages.ClientsReady{
 				Clients: demo.NewServiceClients(),
 				Region:  "us-east-1",
+				Gen:     1,
 			})
 
 			nav := extractMsg(t, cmd, func(msg tea.Msg) bool {

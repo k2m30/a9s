@@ -469,7 +469,8 @@ func buildModelWithMockClients(t *testing.T) tui.Model {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := buildMockClients(t)
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients})
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Gen: 1})
 	return m
 }
 

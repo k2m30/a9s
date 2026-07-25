@@ -167,7 +167,8 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 	// Pre-supply clients so probeEnrichment's nil-clients guard passes.
 	// noCache=true means handleClientsReady skips fetchIdentity and goes through
 	// demoPrefetchCounts instead. We discard that cmd (no real AWS data needed).
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: &awsclient.ServiceClients{}, Gen: 0})
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: &awsclient.ServiceClients{}, Gen: 1})
 
 	probeRes := []resource.Resource{
 		{ID: "res-pe-001", Name: "res-pe-001"},

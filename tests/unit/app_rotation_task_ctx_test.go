@@ -185,9 +185,10 @@ func registerProbeWindow(t *testing.T, fake resource.AvailabilityFetcher) (targe
 // dispatchProbeWindow drives the ClientsReady-then-AvailabilityCacheLoaded
 // sequence documented in this file's package comment and returns the
 // resulting model plus the clean 4-cmd probe batch. gen must match the
-// session's current ConnectGen (0 on a fresh model, bumped by 1 per
-// ProfileSelected/RegionSelected via Session.Rotate) or
-// Core.HandleClientsReady's staleness guard silently drops the event.
+// session's current ConnectGen (1 on a fresh model — ConnectGen seeds at 1 in
+// session.New() — bumped by 1 per ProfileSelected/RegionSelected via
+// Session.Rotate) or Core.HandleClientsReady's staleness guard silently drops
+// the event.
 func dispatchProbeWindow(t *testing.T, m tui.Model, region string, gen domain.Gen) (tui.Model, tea.Cmd) {
 	t.Helper()
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
@@ -219,7 +220,8 @@ func TestExecuteTaskCmd_ProbeAvailabilityCtx_CancelledByProfileSwitch(t *testing
 	// NoCache at all, so the probe-dispatch flow below is unaffected.
 	m := tui.New("profile-a", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
-	_, batchCmd := dispatchProbeWindow(t, m, "us-east-1", 0)
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
+	_, batchCmd := dispatchProbeWindow(t, m, "us-east-1", 1)
 
 	wait := startBatch(batchCmd)
 	defer wait()
@@ -272,10 +274,10 @@ func TestExecuteTaskCmd_ProbeAvailabilityCtx_LiveAfterProfileSwitch(t *testing.T
 	// Rotate to a new pair before ever dispatching a probe for the first —
 	// mirrors a switch made from the main menu before its sweep started.
 	// Session.Rotate() (invoked by HandleProfileSelected) bumps ConnectGen
-	// from 0 to 1, so the follow-up ClientsReady below must stamp Gen:1 or
-	// HandleClientsReady's staleness guard silently drops it.
+	// from 1 (session.New()'s seed) to 2, so the follow-up ClientsReady below
+	// must stamp Gen:2 or HandleClientsReady's staleness guard silently drops it.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "profile-b"})
-	_, batchCmd := dispatchProbeWindow(t, m, "us-west-2", 1)
+	_, batchCmd := dispatchProbeWindow(t, m, "us-west-2", 2)
 
 	wait := startBatch(batchCmd)
 	defer wait()

@@ -239,7 +239,9 @@ func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testin
 	// what drains the first batch (fireNextAvailabilityProbes(4)) — mirror
 	// that real sequence here so the sweep this test's Refreshing assertion
 	// depends on is actually queued.
-	vs, readyTasks := ctrl.Handle(messages.ClientsReady{})
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this controller's session
+	// is never rotated.
+	vs, readyTasks := ctrl.Handle(messages.ClientsReady{Gen: 1})
 	tasks = append(tasks, readyTasks...)
 
 	hasProbeTask := false

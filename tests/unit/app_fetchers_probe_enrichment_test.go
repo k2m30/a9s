@@ -120,7 +120,8 @@ func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 	// nil-clients early-return (branch b) is NOT taken. The fake enricher ignores
 	// the *ServiceClients argument so a zero value is safe.
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: &awsclient.ServiceClients{}})
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: &awsclient.ServiceClients{}, Gen: 1})
 	m = navigateToDBIList(m)
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{

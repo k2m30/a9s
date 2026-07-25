@@ -84,6 +84,7 @@ var ccdBlessedHelpers = map[string]bool{
 	"newRootSizedModel":                 true,
 	"newDetailParityHeadlessController": true,
 	"newCostsScreenController":          true, // costs_round3_test.go — closure-wave harness dedup collapsed round3CostsController/round6NewCostsController/round8NewCostsController/reviewCostsController into this one
+	"leakPinCostsController":            true, // generation_stamping_fetch_test.go — the ConnectGen leak pin's Costs subtest; mirrors costs_state_test.go's already-allowlisted newCostsController but also returns *session.Session so the caller can Rotate() it directly
 }
 
 // knownConstructionDebt pins the exact inventory of call sites (keyed

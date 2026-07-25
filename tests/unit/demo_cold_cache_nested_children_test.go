@@ -34,7 +34,7 @@ func setupDemoApp(t *testing.T) *tui.Model {
 	m := newDemoColdCacheApp(t)
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 	return m
 }
 

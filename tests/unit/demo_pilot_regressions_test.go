@@ -28,7 +28,7 @@ func TestDemo_S3ListDoesNotPanic(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
 	// Navigate to S3. If the S3 client is nil this will panic inside the fetch cmd.
 	var navCmd tea.Cmd
@@ -128,7 +128,7 @@ func TestDemo_EC2RelatedPanelsPopulate(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
 	// Navigate to EC2 list.
 	var navCmd tea.Cmd
@@ -235,7 +235,7 @@ func TestDemo_CtxCommandBlocked(t *testing.T) {
 		m := newDemoColdCacheApp(t)
 
 		clients := demo.NewServiceClients()
-		*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
+		*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
 		// Dispatch TargetProfile — same path as :ctx command.
 		var profileCmd tea.Cmd
@@ -266,7 +266,7 @@ func TestDemo_CtxCommandBlocked(t *testing.T) {
 		m := newDemoColdCacheApp(t)
 
 		clients := demo.NewServiceClients()
-		*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
+		*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
 		// Dispatch TargetRegion — same path as :region command.
 		var regionCmd tea.Cmd

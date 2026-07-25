@@ -402,7 +402,7 @@ func TestBug193_ProfileSwitch_FailedConnect_RollsBackProfile(t *testing.T) {
 	// Connection fails
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: fmt.Errorf("connection failed: no such profile"),
-		Gen: 1, // matches connectGen after one ProfileSelectedMsg
+		Gen: 2, // ConnectGen seeds at 1 (session.New()); one ProfileSelected Rotate()s it to 2
 	})
 
 	plain = stripANSI(rootViewContent(m))
@@ -434,7 +434,7 @@ func TestBug193_RegionSwitch_FailedConnect_RollsBackRegion(t *testing.T) {
 	// Connection fails
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: fmt.Errorf("connection failed: invalid region"),
-		Gen: 1, // matches connectGen after one RegionSelectedMsg
+		Gen: 2, // ConnectGen seeds at 1 (session.New()); one RegionSelected Rotate()s it to 2
 	})
 
 	plain = stripANSI(rootViewContent(m))
@@ -457,8 +457,9 @@ func TestBug193_ProfileSwitch_SuccessfulConnect_CommitsProfile(t *testing.T) {
 
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "new-profile"})
 
-	// Successful connect (nil clients is acceptable for this test)
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
+	// Successful connect (nil clients is acceptable for this test). Gen:2 —
+	// ConnectGen seeds at 1 (session.New()); one ProfileSelected Rotate()s it to 2.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 2})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "new-profile") {
@@ -475,8 +476,9 @@ func TestBug193_RegionSwitch_SuccessfulConnect_CommitsRegion(t *testing.T) {
 
 	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
 
-	// Successful connect
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
+	// Successful connect. Gen:2 — ConnectGen seeds at 1 (session.New()); one
+	// RegionSelected Rotate()s it to 2.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 2})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "eu-west-1") {
@@ -498,7 +500,7 @@ func TestBug193_EmptyProfile_FailedConnect_RollsBack(t *testing.T) {
 	// Connect fails
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: fmt.Errorf("connection refused"),
-		Gen: 1, // matches connectGen after one ProfileSelectedMsg
+		Gen: 2, // ConnectGen seeds at 1 (session.New()); one ProfileSelected Rotate()s it to 2
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -523,7 +525,7 @@ func TestBug193_ProfileSwitch_FailedConnect_ShowsErrorFlash(t *testing.T) {
 
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: fmt.Errorf("NoCredentialProviders: no valid providers in chain"),
-		Gen: 1, // matches connectGen after one ProfileSelectedMsg
+		Gen: 2, // ConnectGen seeds at 1 (session.New()); one ProfileSelected Rotate()s it to 2
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -542,14 +544,14 @@ func TestBug193_RapidSwitch_StaleResponseIgnored(t *testing.T) {
 	m := tui.New("profile-A", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// First switch: A → B (connectGen becomes 1)
+	// First switch: A → B (ConnectGen seeds at 1, becomes 2)
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "profile-B"})
 
-	// Second switch before B's response: B → C (connectGen becomes 2)
+	// Second switch before B's response: B → C (connectGen becomes 3)
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "profile-C"})
 
-	// Stale response from B's connect arrives (Gen: 1, current connectGen: 2)
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
+	// Stale response from B's connect arrives (Gen: 2, current connectGen: 3)
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 2})
 
 	plain := stripANSI(rootViewContent(m))
 	// Header should still show profile-C (the latest switch), not profile-B
@@ -557,8 +559,8 @@ func TestBug193_RapidSwitch_StaleResponseIgnored(t *testing.T) {
 		t.Errorf("stale response from B should be ignored, header must show 'profile-C'; got:\n%s", plain[:min(300, len(plain))])
 	}
 
-	// Now C's response arrives successfully (Gen: 2)
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 2})
+	// Now C's response arrives successfully (Gen: 3)
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 3})
 
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "profile-C") {
@@ -573,18 +575,18 @@ func TestBug193_RapidSwitch_FailedFinalConnect_RollsBackToOriginal(t *testing.T)
 	m := tui.New("profile-A", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// Rapid switches: A → B → C (connectGen becomes 2)
+	// Rapid switches: A → B → C (ConnectGen seeds at 1, becomes 3)
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "profile-B"})
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "profile-C"})
 
 	// Stale B response — ignored
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
-		Err: fmt.Errorf("B failed"), Gen: 1,
+		Err: fmt.Errorf("B failed"), Gen: 2,
 	})
 
-	// C's response fails (Gen: 2, matches connectGen)
+	// C's response fails (Gen: 3, matches connectGen)
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
-		Err: fmt.Errorf("C failed"), Gen: 2,
+		Err: fmt.Errorf("C failed"), Gen: 3,
 	})
 
 	plain := stripANSI(rootViewContent(m))
@@ -606,10 +608,11 @@ func TestBug193_FailedSwitch_RestoresIdentityAndAvailability(t *testing.T) {
 	m := tui.New("original", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// Attempt switch and fail
+	// Attempt switch and fail. Gen:2 — ConnectGen seeds at 1 (session.New());
+	// one ProfileSelected Rotate()s it to 2.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "broken"})
 	m, cmd := rootApplyMsg(m, messages.ClientsReady{
-		Err: fmt.Errorf("access denied"), Gen: 1,
+		Err: fmt.Errorf("access denied"), Gen: 2,
 	})
 
 	// The returned cmd must be non-nil — it should contain at least the

@@ -71,7 +71,11 @@ func fullIntegrationNewDemoScenario(t *testing.T) *fullIntegrationScenario {
 	// instead against a "demo" scenario.
 	m := tui.New(demo.DemoProfile, demo.DemoRegion, tui.WithClients(clients), tui.WithIsDemo(true), tui.WithNoCache(true))
 	m, _ = fullIntegrationApplyMsg(m, tea.WindowSizeMsg{Width: 240, Height: 220})
-	m, _ = fullIntegrationApplyMsg(m, messages.ClientsReady{Clients: clients, Region: demo.DemoRegion})
+	// Stamp the live ConnectGen, as every production dispatch site does:
+	// HandleClientsReady compares it for strict equality, so an unstamped
+	// message is silently dropped and the scenario runs against an app that
+	// never connected.
+	m, _ = fullIntegrationApplyMsg(m, messages.ClientsReady{Clients: clients, Region: demo.DemoRegion, Gen: m.Core().ConnectGen()})
 	return &fullIntegrationScenario{
 		t:                 t,
 		model:             m,
@@ -139,7 +143,7 @@ func fullIntegrationNewLiveScenarioFromClients(t *testing.T, profile, region str
 // fullIntegrationNewReadyModelWithClients for the shared-clients path).
 func fullIntegrationScenarioFromClients(t *testing.T, profile, region string, clients *awsclient.ServiceClients, m tui.Model) *fullIntegrationScenario {
 	t.Helper()
-	ready := messages.ClientsReady{Clients: clients, Region: region}
+	ready := messages.ClientsReady{Clients: clients, Region: region, Gen: m.Core().ConnectGen()}
 	return &fullIntegrationScenario{
 		t:                 t,
 		model:             m,

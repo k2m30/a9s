@@ -135,7 +135,7 @@ func TestRoot_ProfileRotation_DispatchesNoIdentityFetchBeforeReconnect(t *testin
 	tui.Version = "test"
 	m := tui.New("test-profile", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 0})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 1})
 
 	_, cmd := rootApplyMsg(m, messages.ProfileSelected{Profile: "other-profile"})
 	if cmd == nil {
@@ -193,7 +193,7 @@ func TestRoot_NoCacheRotation_IdentityScreenNotStuckLoading(t *testing.T) {
 	tui.Version = "test"
 	m := tui.New("test-profile", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 0})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 1})
 
 	m, cmd := rootApplyMsg(m, rootKeyPress("i"))
 	if cmd == nil {

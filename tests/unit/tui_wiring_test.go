@@ -282,8 +282,9 @@ func TestWiring_ClientsReady_DemoMode_TriggersAvailabilityProbes(t *testing.T) {
 		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// Send ClientsReadyMsg — demo mode should still fire availability probes
-	_, cmd := rootApplyMsg(m, messages.ClientsReady{})
+	// Send ClientsReadyMsg — demo mode should still fire availability probes.
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
+	_, cmd := rootApplyMsg(m, messages.ClientsReady{Gen: 1})
 
 	if cmd == nil {
 		t.Fatal("ClientsReadyMsg in demo mode should return non-nil cmd (identity + availability probes)")
@@ -308,8 +309,10 @@ func TestWiring_ClientsReady_DemoMode_NoCache_SkipsAvailability(t *testing.T) {
 		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// Send ClientsReadyMsg — with --no-cache, should only produce identity, NOT availability
-	_, cmd := rootApplyMsg(m, messages.ClientsReady{})
+	// Send ClientsReadyMsg — with --no-cache, should only produce identity, NOT
+	// availability. Gen:1 — ConnectGen seeds at 1 (session.New()); this model
+	// is never rotated.
+	_, cmd := rootApplyMsg(m, messages.ClientsReady{Gen: 1})
 
 	if cmd == nil {
 		t.Fatal("ClientsReadyMsg in demo+no-cache should still return identity cmd")
@@ -378,8 +381,9 @@ func TestWiring_AvailabilityComplete_ClearsFlash(t *testing.T) {
 
 	// ClientsReady drains the latched sweep's first batch of 4 — mirroring
 	// the real boot sequence where the disk-cache load races ahead of the
-	// AWS connect.
-	m, _ = rootApplyMsg(m, messages.ClientsReady{})
+	// AWS connect. Gen:1 — ConnectGen seeds at 1 (session.New()); this model
+	// is never rotated.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Gen: 1})
 
 	// Now drain the queue by sending AvailabilityCheckedMsg for all resource
 	// types. The queue was built from AllShortNames() minus the 4 ClientsReady
@@ -424,8 +428,9 @@ func TestWiring_RefreshOnMainMenu_DemoMode_TriggersProbes(t *testing.T) {
 		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// First send ClientsReadyMsg so probes can run
-	m, _ = rootApplyMsg(m, messages.ClientsReady{})
+	// First send ClientsReadyMsg so probes can run. Gen:1 — ConnectGen seeds
+	// at 1 (session.New()); this model is never rotated.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Gen: 1})
 
 	// Press ctrl+r on the main menu
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
@@ -463,7 +468,8 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 		tui.WithProfileForTest(demo.DemoProfile),
 		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: demo.NewServiceClients()})
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: demo.NewServiceClients(), Gen: 1})
 
 	// Step 3: Send AvailabilityCacheLoadedMsg to start the probe pipeline.
 	// In demo mode, loadAvailabilityCache returns no cache file, so we can
@@ -591,8 +597,9 @@ func TestWiring_EmptyProfileShowsDefaultInHeader(t *testing.T) {
 	m := tui.New("", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// Simulate AWS connection completing
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Err: nil})
+	// Simulate AWS connection completing. Gen:1 — ConnectGen seeds at 1
+	// (session.New()); this model is never rotated.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Err: nil, Gen: 1})
 
 	rendered := stripANSI(rootViewContent(m))
 	if !strings.Contains(rendered, "default") {
@@ -603,8 +610,9 @@ func TestWiring_EmptyProfileShowsDefaultInHeader(t *testing.T) {
 func TestWiring_ViewConfigLoadedOnClientsReady(t *testing.T) {
 	m := newRootSizedModel()
 
-	// Send ClientsReadyMsg — viewConfig should be loaded
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Err: nil})
+	// Send ClientsReadyMsg — viewConfig should be loaded. Gen:1 — ConnectGen
+	// seeds at 1 (session.New()); this model is never rotated.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Err: nil, Gen: 1})
 
 	// Navigate to resource list — it should work (viewConfig used internally)
 	m, _ = rootApplyMsg(m, messages.Navigate{

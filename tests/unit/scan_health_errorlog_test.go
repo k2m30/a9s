@@ -133,7 +133,8 @@ func TestScanHealthErrorLog_FailedProbe_AddsEntry(t *testing.T) {
 	registerFullAvailabilitySweepFakes(t, target, failingAvailFetcher)
 
 	m := newProbeWindowModel(t)
-	m, batchCmd := dispatchProbeWindow(t, m, "us-east-1", 0)
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
+	m, batchCmd := dispatchProbeWindow(t, m, "us-east-1", 1)
 	m, _ = deliverProbeWindow(t, m, batchCmd)
 
 	m = openErrorLog(m)
@@ -154,7 +155,8 @@ func TestScanHealthErrorLog_SuccessfulProbe_AddsNoEntry(t *testing.T) {
 	registerFullAvailabilitySweepFakes(t, target, stubAvailFetcher)
 
 	m := newProbeWindowModel(t)
-	m, batchCmd := dispatchProbeWindow(t, m, "us-east-1", 0)
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
+	m, batchCmd := dispatchProbeWindow(t, m, "us-east-1", 1)
 	m, _ = deliverProbeWindow(t, m, batchCmd)
 
 	m = openErrorLog(m)
@@ -175,7 +177,8 @@ func TestScanHealthErrorLog_DuplicateDeliveryInSameSweep_DoesNotDuplicateEntry(t
 	registerFullAvailabilitySweepFakes(t, target, failingAvailFetcher)
 
 	m := newProbeWindowModel(t)
-	m, batchCmd := dispatchProbeWindow(t, m, "us-east-1", 0)
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
+	m, batchCmd := dispatchProbeWindow(t, m, "us-east-1", 1)
 	m, leaves := deliverProbeWindow(t, m, batchCmd)
 
 	var targetMsg messages.AvailabilityChecked

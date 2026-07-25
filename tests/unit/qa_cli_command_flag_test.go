@@ -67,6 +67,7 @@ func TestQA_CLICommand_ClientsReady_EmitsNavigateMsg(t *testing.T) {
 	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: demo.NewServiceClients(),
 		Region:  "us-east-1",
+		Gen:     1, // ConnectGen seeds at 1 (session.New()); these models are never rotated
 	})
 
 	nav := extractMsg(t, cmd, func(msg tea.Msg) bool {
@@ -101,6 +102,7 @@ func TestQA_CLICommand_ClientsReady_NoNavigateMsg_WhenUnset(t *testing.T) {
 	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: demo.NewServiceClients(),
 		Region:  "us-east-1",
+		Gen:     1, // ConnectGen seeds at 1 (session.New()); these models are never rotated
 	})
 
 	nav := findNavigateMsg(cmd)
@@ -126,6 +128,7 @@ func TestQA_CLICommand_ClientsReady_ClearedAfterFirstUse(t *testing.T) {
 	crm := messages.ClientsReady{
 		Clients: demo.NewServiceClients(),
 		Region:  "us-east-1",
+		Gen:     1, // ConnectGen seeds at 1 (session.New()); these models are never rotated
 	}
 
 	// First ClientsReadyMsg — should emit NavigateMsg for "s3".
@@ -162,6 +165,7 @@ func TestQA_CLICommand_DemoMode_EmitsNavigateMsg(t *testing.T) {
 	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: demo.NewServiceClients(),
 		Region:  "us-east-1",
+		Gen:     1, // ConnectGen seeds at 1 (session.New()); these models are never rotated
 	})
 
 	nav := extractMsg(t, cmd, func(msg tea.Msg) bool {
@@ -205,6 +209,7 @@ func TestQA_CLICommand_LivePath_ClientsReady_ArmsButDoesNotEmitNavigateYet(t *te
 	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: demo.NewServiceClients(),
 		Region:  "us-east-1",
+		Gen:     1, // ConnectGen seeds at 1 (session.New()); these models are never rotated
 	})
 
 	if nav := findNavigateMsg(cmd); nav != nil {
@@ -233,6 +238,7 @@ func TestQA_CLICommand_LivePath_AvailabilityCacheLoaded_EmitsNavigateMsg(t *test
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Clients: demo.NewServiceClients(),
 		Region:  "us-east-1",
+		Gen:     1, // ConnectGen seeds at 1 (session.New()); these models are never rotated
 	})
 
 	_, cmd := rootApplyMsg(m, messages.AvailabilityCacheLoaded{
@@ -277,6 +283,7 @@ func TestQA_CLICommand_SkippedWhenUserNavigatedAway(t *testing.T) {
 	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: demo.NewServiceClients(),
 		Region:  "us-east-1",
+		Gen:     1, // ConnectGen seeds at 1 (session.New()); these models are never rotated
 	})
 
 	nav := findNavigateMsg(cmd)

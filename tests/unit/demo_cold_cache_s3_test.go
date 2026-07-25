@@ -29,7 +29,7 @@ func TestDemoColdCacheS3_ListPopulates(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
 	var navCmd tea.Cmd
 	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
@@ -82,7 +82,7 @@ func TestDemoColdCacheS3_ObjectsChildView(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
 	// Load the S3 bucket list first.
 	var navCmd tea.Cmd
@@ -161,7 +161,7 @@ func TestDemoColdCacheS3_UnknownBucketReturnsError(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
 	// Navigate to S3 list first so the model has clients wired.
 	var navCmd tea.Cmd

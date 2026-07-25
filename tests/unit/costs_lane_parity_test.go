@@ -483,7 +483,9 @@ func TestCostsLaneParity_E_PreConnectThenClientsReady(t *testing.T) {
 	if got := c.Snapshot().Body.Costs.ErrorMsg; got == "" {
 		t.Fatal("headless precondition: the pre-connect costs fetch failure must set ErrorMsg")
 	}
-	_, headlessTasks := c.Handle(messages.ClientsReady{Clients: demo.NewServiceClients(), Region: "us-east-1"})
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this headless controller's
+	// session is never rotated.
+	_, headlessTasks := c.Handle(messages.ClientsReady{Clients: demo.NewServiceClients(), Region: "us-east-1", Gen: 1})
 	headlessVS := c.Snapshot()
 	_, headlessRetried := m2FindFetchCostsTask(headlessTasks)
 
@@ -495,7 +497,9 @@ func TestCostsLaneParity_E_PreConnectThenClientsReady(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 	m, _ = rootApplyMsg(m, messages.CostsLoaded{Query: q, Err: fmt.Errorf("%s", preConnectErr)})
 
-	m, tuiCmd := rootApplyMsg(m, messages.ClientsReady{Clients: demo.NewServiceClients(), Region: "us-east-1"})
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this TUI model is never
+	// rotated.
+	m, tuiCmd := rootApplyMsg(m, messages.ClientsReady{Clients: demo.NewServiceClients(), Region: "us-east-1", Gen: 1})
 
 	if headlessVS.Body.Costs.ErrorMsg != "" {
 		t.Errorf("PARITY: headless lane's ErrorMsg %q did not clear after ClientsReady recovered the pre-connect failure", headlessVS.Body.Costs.ErrorMsg)

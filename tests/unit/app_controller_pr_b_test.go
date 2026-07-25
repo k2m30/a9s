@@ -289,7 +289,7 @@ func TestController_Handle_PRB_ClientsReady_Success_DispatchesToCore(t *testing.
 		Clients: nil, // no pre-supplied clients on this controller — HandleClientsReady still dispatches identity/avail-cache tasks
 		Err:     nil,
 		Region:  "us-east-1",
-		Gen:     0, // AcceptZeroGen=true
+		Gen:     1, // ConnectGen seeds at 1 (session.New()); newTestController's session is never rotated
 	}
 
 	snapBefore := c.Snapshot()
@@ -333,8 +333,8 @@ func TestController_Handle_PRB_ClientsReady_Success_DispatchesToCore(t *testing.
 // Handle fed a messages.ClientsReady with Err set routes through
 // Core.HandleClientsReady's failure path (issue #464): an error flash is
 // applied to the snapshot and the returned tasks include the FlashTick that
-// clears it. Gen:0 matches newTestController's fresh session (ConnectGen
-// defaults to the zero value, never rotated), so the event is not dropped
+// clears it. Gen:1 matches newTestController's fresh session (ConnectGen
+// seeds at 1 in session.New(), never rotated), so the event is not dropped
 // as stale.
 func TestController_Handle_ClientsReady_Error_RoutesFailurePath(t *testing.T) {
 	c := newTestController(t)
@@ -343,7 +343,7 @@ func TestController_Handle_ClientsReady_Error_RoutesFailurePath(t *testing.T) {
 		Clients: nil,
 		Err:     errors.New("NoCredentialProviders: no valid providers in chain"),
 		Region:  "",
-		Gen:     0,
+		Gen:     1,
 	}
 
 	var vs app.ViewState

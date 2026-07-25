@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/resource"
-	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
@@ -82,57 +81,6 @@ func TestRelatedCacheLRU_Clear(t *testing.T) {
 	}
 }
 
-// TestRelatedCacheReplay_PreservesDefDisplayName pins the cache-replay
-// contract used by handleNavigate / handleRelatedNavigate on detail
-// re-entry: entries stored with distinct DefDisplayName values must reach
-// the rightcolumn view as distinct RelatedCheckResultMsg messages so the
-// per-row match by DefDisplayName resolves every row.
-//
-// This guards against regressing back to a shape where the cache stores
-// only `resource.RelatedCheckResult` — the case that left all four
-// ct-events self-pivot rows ("by AccessKeyId" / "by Username" /
-// "by EventName" / "by SharedEventId") stuck loading because the
-// rightcolumn's strict-match fallback refused to bind when matches > 1
-// for the shared TargetType="ct-events".
-func TestRelatedCacheReplay_PreservesDefDisplayName(t *testing.T) {
-	c := session.NewRelatedCacheLRU(10)
-	key := runtime.RelatedCacheKey("ct-events", "src-evt-0001")
-
-	in := []session.RelatedCacheResult{
-		{DefDisplayName: "CT events by AccessKeyId", Result: resource.RelatedCheckResult{TargetType: "ct-events", Count: 3, ResourceIDs: []string{"e1"}}},
-		{DefDisplayName: "CT events by Username", Result: resource.RelatedCheckResult{TargetType: "ct-events", Count: 2, ResourceIDs: []string{"e2"}}},
-		{DefDisplayName: "CT events by EventName", Result: resource.RelatedCheckResult{TargetType: "ct-events", Count: 1, ResourceIDs: []string{"e3"}}},
-		{DefDisplayName: "CT events by SharedEventId", Result: resource.RelatedCheckResult{TargetType: "ct-events", Count: 4, ResourceIDs: []string{"e4"}}},
-	}
-	c.Set(key, in)
-
-	got, ok := c.Get(key)
-	if !ok {
-		t.Fatal("expected cached entry")
-	}
-	if len(got) != len(in) {
-		t.Fatalf("len(cached) = %d, want %d", len(got), len(in))
-	}
-
-	// runtime.RelatedCacheReplay must project cached entries back into messages
-	// carrying the original DefDisplayName so every row resolves.
-	msgs := runtime.RelatedCacheReplay("ct-events", got)
-	if len(msgs) != len(in) {
-		t.Fatalf("len(replay) = %d, want %d", len(msgs), len(in))
-	}
-	for i, m := range msgs {
-		if m.ResourceType != "ct-events" {
-			t.Errorf("replay[%d].ResourceType = %q, want ct-events", i, m.ResourceType)
-		}
-		if m.DefDisplayName != in[i].DefDisplayName {
-			t.Errorf("replay[%d].DefDisplayName = %q, want %q — losing this breaks self-pivot row binding",
-				i, m.DefDisplayName, in[i].DefDisplayName)
-		}
-		if m.Result.Count != in[i].Result.Count {
-			t.Errorf("replay[%d].Result.Count = %d, want %d", i, m.Result.Count, in[i].Result.Count)
-		}
-	}
-}
 
 // TestRelatedCacheLRU_Delete verifies that Delete() removes a specific key
 // while leaving other entries intact.

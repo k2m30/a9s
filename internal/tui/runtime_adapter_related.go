@@ -220,10 +220,8 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			// BeginDetailWorkload begins the op and returns its complete
 			// workload (enrich + related) in one call — cache-replay
 			// suppression (D6: no re-fan-out over cached data) is decided
-			// INSIDE it (Controller.replayRelatedCache, merging directly into
-			// the same DetailState this screen renders from), replacing the
-			// hand-rolled RelatedCacheReplay/ApplyDetailRelatedResultForResource
-			// duplicate that used to live here.
+			// INSIDE it, merging directly into the same DetailState this
+			// screen renders from.
 			_, tasks := m.ctrl.BeginDetailWorkload(msg.TargetType, r, false, false)
 
 			needsRelated := detail.NeedsRelatedCheck()

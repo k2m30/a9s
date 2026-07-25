@@ -27,10 +27,10 @@ func TestDemoColdCacheEC2_ListPopulates(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// Wire the pre-supplied fake clients by injecting a ClientsReadyMsg so that
-	// m.clients is set before any fetch commands run. connectGen is 0 (zero value)
-	// so Gen=0 passes the stale-result guard in handleClientsReady.
+	// m.clients is set before any fetch commands run. ConnectGen seeds at 1
+	// (session.New()) and this model is never rotated, so Gen=1 matches it.
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
 	// Navigate to the EC2 resource list. handleNavigate pushes the list and
 	// returns a batch cmd containing the resource list's Init + fetchResources("ec2").
@@ -88,7 +88,7 @@ func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
 	// Navigate to EC2 list and extract the ResourcesLoadedMsg from the batch.
 	var navCmd tea.Cmd

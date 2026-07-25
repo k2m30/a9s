@@ -18,9 +18,11 @@ func TestQA_ClientsReady_CorrectType_Assigns(t *testing.T) {
 	m := newRootSizedModel()
 
 	clients := &awsclient.ServiceClients{}
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Clients: clients,
 		Region:  "us-east-1",
+		Gen:     1,
 	})
 
 	view := stripANSI(rootViewContent(m))
@@ -45,9 +47,11 @@ func TestQA_ClientsReady_NilClients_DemoFallback(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Send ClientsReadyMsg with nil Clients — should trigger demo fallback.
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Clients: nil,
 		Region:  "us-east-1",
+		Gen:     1,
 	})
 
 	view := stripANSI(rootViewContent(m))
@@ -72,9 +76,11 @@ func TestQA_ClientsReady_WrongType_EmitsError(t *testing.T) {
 	m := newRootSizedModel()
 
 	// "definitely not a client" — a string, which is not *awsclient.ServiceClients.
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
 	m, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: "definitely not a client",
 		Region:  "us-east-1",
+		Gen:     1,
 	})
 
 	// Primary check: the returned cmd, if non-nil, should resolve to an

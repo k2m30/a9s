@@ -249,7 +249,8 @@ func TestFetchChildResources_PartialSuccess_ReturnsResourcesLoadedWithErr(t *tes
 		tui.WithNoCache(true),
 	)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
-	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: demo.DemoRegion, Gen: 0})
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: demo.DemoRegion, Gen: 1})
 
 	const childType = "test_child_partial_success"
 	partialErr := errors.New("partial: 1 of 2 child objects failed to fetch")
@@ -597,10 +598,11 @@ func TestDemoPrefetchCounts_ViaClientReady(t *testing.T) {
 
 	// Send ClientsReadyMsg with the demo clients so handleClientsReady runs the
 	// noCache branch which calls demoPrefetchCounts().
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
 	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: clients,
 		Region:  demo.DemoRegion,
-		Gen:     0,
+		Gen:     1,
 	})
 	if cmd == nil {
 		t.Fatal("ClientsReadyMsg with noCache=true and valid clients should return demoPrefetchCounts cmd")

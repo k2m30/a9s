@@ -57,6 +57,18 @@ func TestSession_New_InitializesMaps(t *testing.T) {
 	if s.AvailabilityGen != 1 {
 		t.Errorf("AvailabilityGen = %d, want 1", s.AvailabilityGen)
 	}
+	// ConnectGen was the one counter that shipped seeded at 0 instead of 1 —
+	// a fresh session's identity/reveal/costs dispatch captured stamp 0 and
+	// slipped past every AspectConnect event's IsStale check once a
+	// profile/region switch bumped ConnectGen off zero, installing the
+	// previous account's identity, a decrypted secret, or cost data into the
+	// new session (the ConnectGen cross-account leak). This omission from
+	// the seed-value assertion above is precisely why the bug shipped
+	// unnoticed: the other three counters were pinned at 1, ConnectGen never
+	// was.
+	if s.ConnectGen != 1 {
+		t.Errorf("ConnectGen = %d, want 1", s.ConnectGen)
+	}
 }
 
 // TestSession_Rotate_BumpsGenerations verifies that Rotate() increments every

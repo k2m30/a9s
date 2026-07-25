@@ -226,7 +226,8 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 
 	// Wire the pre-supplied clients into m.clients by sending the ClientsReadyMsg
 	// that Init() would normally emit as a command (but we don't run the event loop).
-	m = applyMsg(m, messages.ClientsReady{Clients: clients})
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
+	m = applyMsg(m, messages.ClientsReady{Clients: clients, Gen: 1})
 
 	// Push an SES detail view onto the stack.
 	m = applyMsg(m, messages.Navigate{

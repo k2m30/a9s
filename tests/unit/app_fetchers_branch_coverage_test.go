@@ -100,11 +100,12 @@ func TestLoadAvailabilityCache_PopulatedCacheReturnsEntries(t *testing.T) {
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// Trigger handleClientsReady which calls loadAvailabilityCache.
+	// Trigger handleClientsReady which calls loadAvailabilityCache. Gen:1 —
+	// ConnectGen seeds at 1 (session.New()); this model is never rotated.
 	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: clients,
 		Region:  region,
-		Gen:     0,
+		Gen:     1,
 	})
 	if cmd == nil {
 		t.Fatal("ClientsReadyMsg should return a cmd batch containing loadAvailabilityCache cmd")
@@ -157,10 +158,11 @@ func TestLoadAvailabilityCache_IssueFieldsMapped(t *testing.T) {
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
+	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
 	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: clients,
 		Region:  region,
-		Gen:     0,
+		Gen:     1,
 	})
 	if cmd == nil {
 		t.Fatal("ClientsReadyMsg should return a cmd batch")

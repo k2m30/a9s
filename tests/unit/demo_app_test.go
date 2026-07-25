@@ -11,8 +11,11 @@ import (
 )
 
 // demoClientsReadyMsg creates a ClientsReadyMsg backed by all typed fakes.
+// Gen:1 matches every caller's fresh, never-rotated session (ConnectGen seeds
+// at 1 in session.New()) — HandleClientsReady's `ev.Gen != c.session.ConnectGen`
+// strict-equality gate silently drops the message otherwise.
 func demoClientsReadyMsg() messages.ClientsReady {
-	return messages.ClientsReady{Clients: demo.NewServiceClients()}
+	return messages.ClientsReady{Clients: demo.NewServiceClients(), Gen: 1}
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

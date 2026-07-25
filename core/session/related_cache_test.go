@@ -162,16 +162,15 @@ func TestRelatedCacheLRU_SetUpdateExisting(t *testing.T) {
 	}
 }
 
-// TestRelatedCacheReplay_PreservesDefDisplayName pins the cache-replay
-// contract used by handleNavigate / handleRelatedNavigate on detail
-// re-entry: entries stored with distinct DefDisplayName values must reach
-// the rightcolumn view as distinct messages so every per-row match resolves.
+// TestRelatedCacheLRU_PreservesDefDisplayName pins what the cache must
+// STORE for detail re-entry to work: entries keep their distinct
+// DefDisplayName, so the replay in core/app can bind each row separately.
 //
 // This guards against regressing to a shape where the cache stores only
 // resource.RelatedCheckResult — losing DefDisplayName left all four
 // ct-events self-pivot rows stuck loading because the strict-match fallback
 // refused to bind when TargetType matched multiple rows.
-func TestRelatedCacheReplay_PreservesDefDisplayName(t *testing.T) {
+func TestRelatedCacheLRU_PreservesDefDisplayName(t *testing.T) {
 	t.Parallel()
 
 	c := session.NewRelatedCacheLRU(10)
