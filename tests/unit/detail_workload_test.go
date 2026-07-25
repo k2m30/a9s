@@ -24,6 +24,7 @@ package unit
 import (
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/app"
@@ -731,4 +732,118 @@ func TestStickyRefresh_EnricherlessTypeDoesNotArmIt(t *testing.T) {
 	if _, armed := core.PendingDetailRefreshGet(runtime.RelatedCacheKey(rt, id)); armed {
 		t.Error("refresh on an enricher-less type armed the pending-refresh record — nothing can ever clear it")
 	}
+}
+
+// ---------------------------------------------------------------------------
+// regenerateTextScreenLocked stack-wide regeneration (#261 Codex-flagged
+// regression, item b): open YAML, open JSON on top of it — a newer
+// DetailOperation begins for the JSON open, invalidating the YAML
+// operation's own in-flight enrich result, so only the JSON operation's
+// result ever folds. Before the fix, regenerateTextScreenLocked only touched
+// c.stack[len(c.stack)-1] (JSON, the top), so popping back to the buried
+// YAML screen revealed it permanently unenriched. It now regenerates EVERY
+// stacked YAML/JSON screen whose (ResourceType, ResourceID) matches.
+//
+// ActionBack behavior found landed (core/app/actions_nav.go,
+// handleActionBack): unchanged — its re-dispatch branch only fires for
+// c.topDetailState() (a revealed ScreenDetail), nothing analogous exists for
+// a revealed text screen. Regeneration alone suffices: a revealed YAML/JSON
+// screen already shows enriched content from the stack-wide fold, with no
+// new task dispatch on the pop.
+// ---------------------------------------------------------------------------
+
+func TestDetailState_RegenerateTextScreen_StackedYAMLBeneathJSON_BothRegenerateOnEnrich(t *testing.T) {
+	c := newTestController(t)
+	const id = "i-workload0000016"
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: workloadSrcType})
+	c.ApplyResourcesLoaded(workloadSrcType, []resource.Resource{{
+		ID: id, Type: workloadSrcType, Fields: map[string]string{"marker": "before"},
+	}}, nil, false)
+
+	c.Apply(app.Action{Kind: app.ActionOpenYAML})
+	_, jsonTasks := c.Apply(app.Action{Kind: app.ActionOpenJSON}) // push JSON on top of YAML
+
+	enrichTask := findTaskKind(jsonTasks, runtime.KindEnrichDetail)
+	if enrichTask == nil {
+		t.Fatalf("KindEnrichDetail task missing on the JSON open; tasks: %v", taskKindsOf(jsonTasks))
+	}
+	jsonOp := runtime.TaskOpID(enrichTask.Payload)
+
+	enrichedRes := resource.Resource{ID: id, Type: workloadSrcType, Fields: map[string]string{"marker": "after-enriched"}}
+	c.Handle(messages.EnrichDetailResult{
+		ResourceType: workloadSrcType,
+		ResourceID:   id,
+		EnrichedRes:  enrichedRes,
+		OperationID:  jsonOp,
+	})
+
+	// The visible (top, JSON) screen must show the enriched content.
+	snapJSON := c.Snapshot()
+	if snapJSON.Body.Text == nil || !containsLine(snapJSON.Body.Text.Lines, "after-enriched") {
+		t.Fatalf("top JSON screen did not regenerate with enriched content; lines: %v", linesOrNil(snapJSON.Body.Text))
+	}
+
+	_, backTasks := c.Apply(app.Action{Kind: app.ActionBack}) // pop JSON, reveal YAML
+
+	if findTaskKind(backTasks, runtime.KindEnrichDetail) != nil || findTaskKind(backTasks, runtime.KindRelatedCheck) != nil {
+		t.Errorf("ActionBack revealing a text screen dispatched a workload task; want none (regeneration alone suffices). tasks: %v", taskKindsOf(backTasks))
+	}
+
+	snapYAML := c.Snapshot()
+	if snapYAML.Body.Kind != app.BodyKindText {
+		t.Fatalf("Body.Kind after popping JSON = %v, want BodyKindText (the revealed YAML screen)", snapYAML.Body.Kind)
+	}
+	if snapYAML.Body.Text == nil || !containsLine(snapYAML.Body.Text.Lines, "after-enriched") {
+		t.Errorf("revealed YAML screen did not regenerate with enriched content from the JSON operation's result; lines: %v", linesOrNil(snapYAML.Body.Text))
+	}
+}
+
+// TestDetailState_RegenerateTextScreen_SingleYAMLScreen_RegressionGuard pins
+// the original single-screen contract unchanged: no stacking, just a plain
+// YAML open, must still regenerate on its own operation's enrichment result.
+func TestDetailState_RegenerateTextScreen_SingleYAMLScreen_RegressionGuard(t *testing.T) {
+	c := newTestController(t)
+	const id = "i-workload0000017"
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: workloadSrcType})
+	c.ApplyResourcesLoaded(workloadSrcType, []resource.Resource{{
+		ID: id, Type: workloadSrcType, Fields: map[string]string{"marker": "before"},
+	}}, nil, false)
+
+	_, tasks := c.Apply(app.Action{Kind: app.ActionOpenYAML})
+	enrichTask := findTaskKind(tasks, runtime.KindEnrichDetail)
+	if enrichTask == nil {
+		t.Fatalf("KindEnrichDetail task missing on the YAML open; tasks: %v", taskKindsOf(tasks))
+	}
+	op := runtime.TaskOpID(enrichTask.Payload)
+
+	enrichedRes := resource.Resource{ID: id, Type: workloadSrcType, Fields: map[string]string{"marker": "after-enriched"}}
+	c.Handle(messages.EnrichDetailResult{
+		ResourceType: workloadSrcType,
+		ResourceID:   id,
+		EnrichedRes:  enrichedRes,
+		OperationID:  op,
+	})
+
+	snap := c.Snapshot()
+	if snap.Body.Text == nil || !containsLine(snap.Body.Text.Lines, "after-enriched") {
+		t.Errorf("single YAML screen did not regenerate with enriched content; lines: %v", linesOrNil(snap.Body.Text))
+	}
+}
+
+// containsLine reports whether any line in lines contains substr.
+func containsLine(lines []string, substr string) bool {
+	for _, l := range lines {
+		if strings.Contains(l, substr) {
+			return true
+		}
+	}
+	return false
+}
+
+// linesOrNil renders tb.Lines for a failure message, or nil for a nil TextBody.
+func linesOrNil(tb *app.TextBody) []string {
+	if tb == nil {
+		return nil
+	}
+	return tb.Lines
 }

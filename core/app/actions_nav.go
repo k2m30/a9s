@@ -34,6 +34,23 @@ func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskReques
 	// openRelatedDetail (core/app/navigate.go) already produce, so this
 	// is renderer-agnostic — both TUI and web/headless callers get the
 	// recompute from this single ActionBack effect.
+	//
+	// Deliberately NOT mirrored for a revealed text (YAML/JSON) screen (N2):
+	// unlike a detail's related panel, a text screen has no persistent
+	// "unresolved" badge state to repair on every reveal — it is either
+	// enriched or not, and regenerateTextScreenLocked (detail_state.go) now
+	// repairs every matching stacked text screen, not just the top one, the
+	// moment ANY sibling operation for the same resource successfully folds
+	// (e.g. YAML then JSON: JSON's result now regenerates the buried YAML
+	// screen too). The only residual gap is Back pressed before either
+	// operation's enrichment ever lands at all — the same kind of transient,
+	// self-healing "not yet enriched" state enrichDetail's RawStruct==nil
+	// case already treats as normal (detail_enrich_engine.go) — and
+	// re-entering the view (detail → y/J) already re-triggers a fresh
+	// workload via PushYAML/PushJSON's own beginDetailWorkloadLocked call.
+	// Unconditionally recomputing on every text-screen reveal would cost a
+	// real AWS re-fetch on the overwhelmingly common case (a screen the user
+	// already fully viewed) to cover this rare, self-recovering window.
 	var tasks []runtime.TaskRequest
 	if ds := c.topDetailState(); ds != nil {
 		_, tasks = c.beginDetailWorkloadLocked(ds.ResourceType, ds.Resource, false, true)

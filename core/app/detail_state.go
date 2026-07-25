@@ -337,11 +337,19 @@ func (c *Controller) foldEnrichDetailResultLocked(msg messages.EnrichDetailResul
 	return intents, tasks
 }
 
-// regenerateTextScreenLocked replaces the top text screen's (YAML/JSON)
+// regenerateTextScreenLocked replaces EVERY stacked text screen's (YAML/JSON)
 // Lines and Resource with content regenerated from the enriched resource,
-// when the top screen is a text viewer whose ScreenContext matches
-// (resourceType, resourceID). No-op otherwise (wrong screen, wrong resource,
-// or TextState not yet initialized).
+// for each screen whose ScreenContext matches (resourceType, resourceID) —
+// not just the top one. Mirrors the stack-wide matching every sibling fold
+// in this file uses (applyDetailFindingsForResource,
+// clearDetailFindingsForType, applyDetailEnrichmentForResourceLocked): open
+// YAML, then open JSON on top of it — a newer detail operation begins,
+// invalidating the YAML operation's own in-flight enrich result, so only the
+// JSON operation's result ever folds. Both screens describe the SAME
+// underlying resource, so that one result is valid content for both; without
+// this, popping back to the buried YAML screen revealed it permanently
+// unenriched, since nothing else ever regenerates a non-top screen. No-op
+// for a stack with no matching text screen.
 //
 // Only Lines and Resource are touched — Search/SearchCursor/Wrap/ScrollY are
 // left untouched, exactly like UpdateTextLines/SetTextResource, so an
@@ -349,23 +357,26 @@ func (c *Controller) foldEnrichDetailResultLocked(msg messages.EnrichDetailResul
 //
 // Callers must hold c.mu (write).
 func (c *Controller) regenerateTextScreenLocked(resourceType, resourceID string, enriched resource.Resource) {
-	ts := c.topTextState()
-	if ts == nil {
-		return
+	for i := range c.stack {
+		s := &c.stack[i]
+		if s.ID != runtime.ScreenYAML && s.ID != runtime.ScreenJSON {
+			continue
+		}
+		if s.Ctx.ResourceType != resourceType || s.Ctx.ResourceID != resourceID {
+			continue
+		}
+		ts := s.State.Text
+		if ts == nil {
+			continue
+		}
+		switch s.ID {
+		case runtime.ScreenYAML:
+			ts.Lines = resourceYAMLLines(enriched)
+		case runtime.ScreenJSON:
+			ts.Lines = resourceJSONLines(enriched)
+		}
+		ts.Resource = enriched
 	}
-	top := c.stack[len(c.stack)-1]
-	if top.Ctx.ResourceType != resourceType || top.Ctx.ResourceID != resourceID {
-		return
-	}
-	switch top.ID {
-	case runtime.ScreenYAML:
-		ts.Lines = resourceYAMLLines(enriched)
-	case runtime.ScreenJSON:
-		ts.Lines = resourceJSONLines(enriched)
-	default:
-		return
-	}
-	ts.Resource = enriched
 }
 
 // newlyReportedFindings returns the subset of candidates whose Code is not

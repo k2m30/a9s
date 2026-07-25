@@ -438,6 +438,17 @@ func (c *Controller) popAutoOpenSinglePlaceholderOnNotFound(msg messages.ByIDFet
 //     listing genuinely never surfaced the target (e.g. a cross-account
 //     reference), so there is nothing left to page through.
 //
+// Both fallbacks require ls.Loading to already be false — Handle calls this
+// after ANY accepted ResourcesLoaded, not only the one matching this
+// placeholder's own target type, so an unrelated type's fetch landing while
+// this placeholder's own fetch is still in flight has empty Rows and no
+// pagination too: indistinguishable from "fetched, genuinely empty, no more
+// pages" by those fields alone. ls.Loading (cleared only by
+// applyResourcesLoaded, itself only reached for the screen whose type
+// matches the incoming message — handleResourcesLoadedEvent) is the
+// existing, already-correct signal for "has this placeholder's own fetch
+// ever actually returned" — reused here rather than adding a new field.
+//
 // If neither fallback applies (no pagination and no StubCreator), the
 // placeholder list is left as-is, same as before these fallbacks existed.
 func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
@@ -468,6 +479,9 @@ func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 	}
 	targetType := top.Ctx.ResourceType
 	if matched == nil {
+		if ls.Loading {
+			return nil // this placeholder's own fetch has not landed yet; do not infer exhaustion from a page that was simply never fetched
+		}
 		// A page that HAS rows but not the target is exactly the "never lands
 		// on the first page" case fallback 1 exists for — keying this on
 		// len(ls.Rows) instead of "was the target found" stranded any target

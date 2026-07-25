@@ -221,3 +221,131 @@ func TestApply_AutoOpenSingleDetail_LoadingMoreAlreadyTrue_NoPrematureStubCreati
 		t.Errorf("Body.Kind = %v, want BodyKindList — a chase already in flight on the top-of-stack placeholder must never fall through to premature stub synthesis, even when an unrelated ResourcesLoaded event arrives", snap.Body.Kind)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Codex-flagged regression: the stub fallback must not fire while the
+// placeholder's OWN fetch is still outstanding (its very first response has
+// not landed at all yet — LoadingMore is still false, HasPagination is still
+// false, exactly the zero-value shape "fetched, empty, exhausted" also has).
+// An unrelated ResourcesLoaded arriving in that window must be a pure no-op
+// for the placeholder; only its OWN type's response may resolve it.
+// ---------------------------------------------------------------------------
+
+// TestApply_AutoOpenSingleDetail_UnrelatedResourcesLoaded_NoStubNoDetailOpen
+// pins the core regression: a by-ID placeholder pending its OWN fetch (never
+// having received any ResourcesLoaded of its own yet) must not react to an
+// unrelated type's ResourcesLoaded at all — no stub, no detail open, no
+// state change.
+func TestApply_AutoOpenSingleDetail_UnrelatedResourcesLoaded_NoStubNoDetailOpen(t *testing.T) {
+	const targetID = "ami-0pending000000001"
+	c := newTestController(t)
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ami"})
+	c.SetListAutoOpenSingle(true)
+	c.PatchListRelatedIDSet([]string{targetID})
+
+	c.Handle(messages.ResourcesLoaded{
+		ResourceType: "ec2",
+		Resources:    []resource.Resource{{ID: "i-unrelated0001", Type: "ec2"}},
+		Pagination:   nil,
+	})
+
+	snap := c.Snapshot()
+	if snap.Body.Kind != app.BodyKindList {
+		t.Errorf("Body.Kind = %v, want BodyKindList — an unrelated type's ResourcesLoaded must never resolve a DIFFERENT type's still-pending by-ID placeholder", snap.Body.Kind)
+	}
+}
+
+// TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypeEmptyNoPagination_StubFiresOnOwnType
+// extends the above: after the unrelated event is correctly ignored, the
+// placeholder's OWN type resolving empty with no pagination must still
+// trigger the StubCreator fallback exactly as before the guard.
+func TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypeEmptyNoPagination_StubFiresOnOwnType(t *testing.T) {
+	const targetID = "ami-0pending000000002"
+	c := newTestController(t)
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ami"})
+	c.SetListAutoOpenSingle(true)
+	c.PatchListRelatedIDSet([]string{targetID})
+
+	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: nil, Pagination: nil})
+	c.Handle(messages.ResourcesLoaded{ResourceType: "ami", Resources: nil, Pagination: nil})
+
+	snap := c.Snapshot()
+	if snap.Body.Kind != app.BodyKindDetail {
+		t.Fatalf("Body.Kind = %v after the placeholder's OWN type resolved empty/no-pagination, want BodyKindDetail (stub fallback)", snap.Body.Kind)
+	}
+	if got := c.GetDetailResource().ID; got != targetID {
+		t.Errorf("GetDetailResource().ID = %q, want the synthesized stub's target ID %q", got, targetID)
+	}
+}
+
+// TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypePagination_ChaseFallbackStillFires
+// pins that the pagination-chase fallback is unaffected by the type guard:
+// after an unrelated event is ignored, the placeholder's OWN type resolving
+// with pagination still queues KindFetchMore rather than giving up or
+// synthesizing a stub early.
+func TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypePagination_ChaseFallbackStillFires(t *testing.T) {
+	const targetID = "ami-0pending000000003"
+	c := newTestController(t)
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ami"})
+	c.SetListAutoOpenSingle(true)
+	c.PatchListRelatedIDSet([]string{targetID})
+
+	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: nil, Pagination: nil})
+	_, tasks := c.Handle(messages.ResourcesLoaded{
+		ResourceType: "ami",
+		Resources:    nil,
+		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "chase-tok-guard"},
+	})
+
+	var fetchMore *runtime.TaskRequest
+	for i := range tasks {
+		if tasks[i].Key.Kind == runtime.KindFetchMore {
+			fetchMore = &tasks[i]
+		}
+	}
+	if fetchMore == nil {
+		t.Fatalf("expected a KindFetchMore task once the placeholder's OWN type resolved with pagination remaining; tasks: %+v", tasks)
+	}
+	if fetchMore.Key.Scope != "ami" {
+		t.Errorf("KindFetchMore Scope = %q, want %q", fetchMore.Key.Scope, "ami")
+	}
+
+	snap := c.Snapshot()
+	if snap.Body.Kind != app.BodyKindList {
+		t.Errorf("Body.Kind = %v, want BodyKindList — the chase must still be in flight, no stub or detail opened yet", snap.Body.Kind)
+	}
+}
+
+// TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypeRealResult_OpensRealResourceNotStub
+// pins the last axis: once the placeholder's OWN type actually delivers the
+// target row, the REAL resource opens — not a stub — even after an
+// unrelated event was seen first. ami's StubCreator sets Name to the bare
+// ID; a real row's distinct Name is the observable proof this is not that
+// synthesized shape.
+func TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypeRealResult_OpensRealResourceNotStub(t *testing.T) {
+	const targetID = "ami-0pending000000004"
+	const realName = "real-production-ami"
+	c := newTestController(t)
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ami"})
+	c.SetListAutoOpenSingle(true)
+	c.PatchListRelatedIDSet([]string{targetID})
+
+	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: nil, Pagination: nil})
+	c.Handle(messages.ResourcesLoaded{
+		ResourceType: "ami",
+		Resources:    []resource.Resource{{ID: targetID, Name: realName, Type: "ami"}},
+		Pagination:   nil,
+	})
+
+	snap := c.Snapshot()
+	if snap.Body.Kind != app.BodyKindDetail {
+		t.Fatalf("Body.Kind = %v after the placeholder's OWN type delivered the real target row, want BodyKindDetail", snap.Body.Kind)
+	}
+	got := c.GetDetailResource()
+	if got.ID != targetID {
+		t.Errorf("GetDetailResource().ID = %q, want %q", got.ID, targetID)
+	}
+	if got.Name != realName {
+		t.Errorf("GetDetailResource().Name = %q, want the REAL row's %q (a stub's Name would equal the bare ID %q)", got.Name, realName, targetID)
+	}
+}
