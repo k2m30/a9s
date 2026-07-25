@@ -9,9 +9,7 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/jsonyaml"
@@ -204,16 +202,9 @@ func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resou
 // degrade to something copyable when the payload isn't JSON (e.g. a CFN
 // template authored as YAML).
 func parseJSONOrRaw(s string) any {
-	dec := json.NewDecoder(strings.NewReader(s))
-	dec.UseNumber()
-	var parsed any
-	if err := dec.Decode(&parsed); err != nil {
+	parsed, ok := jsonyaml.ParseStrict(s)
+	if !ok {
 		return s
 	}
-	// json.Unmarshal rejects trailing content; a single Decode does not —
-	// keep the stricter contract.
-	if dec.More() {
-		return s
-	}
-	return jsonyaml.NormalizeJSONNumbers(parsed)
+	return parsed
 }

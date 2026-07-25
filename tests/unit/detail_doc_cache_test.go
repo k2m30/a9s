@@ -254,12 +254,16 @@ func TestDetailDocCache_SetIfNewer_NewerVersionedKey_EvictsSupersededDoc(t *test
 	}
 }
 
-// TestDetailDocCache_SetIfNewer_EvictedKey_WriterOpBookkeepingAlsoCleared
-// pins that eviction removes the superseded key's writerOp entry too, not
-// just its doc: re-using the OLD key's name after eviction with an opID that
-// would have been refused against its ORIGINAL writer must now succeed,
-// since nothing records that original writer any longer.
-func TestDetailDocCache_SetIfNewer_EvictedKey_WriterOpBookkeepingAlsoCleared(t *testing.T) {
+// TestDetailDocCache_SetIfNewer_EvictionAndCrossVersionFreshness pins the two
+// halves of version-keyed eviction together, because they constrain each
+// other. Eviction drops the superseded version so a stack updated repeatedly
+// through a session cannot grow the cache without bound. Freshness is then a
+// property of the RESOURCE, not of one version's key: a late write for an
+// OLDER version arrives under a key nothing has written yet, so the per-key
+// generation check alone would wave it through — and it would evict the newer
+// version and become the resource's latest, which is the stale-wins outcome
+// op-aware caching exists to prevent.
+func TestDetailDocCache_SetIfNewer_EvictionAndCrossVersionFreshness(t *testing.T) {
 	var cache awsclient.DetailDocCache
 	const keyV1 = "cfn:prod-vpc-network:100"
 	const keyV2 = "cfn:prod-vpc-network:200"
@@ -267,18 +271,35 @@ func TestDetailDocCache_SetIfNewer_EvictedKey_WriterOpBookkeepingAlsoCleared(t *
 	if ok := cache.SetIfNewer(keyV1, "template-v1", domain.Gen(9)); !ok {
 		t.Fatal("SetIfNewer(v1, op 9) must succeed")
 	}
-	if ok := cache.SetIfNewer(keyV2, "template-v2", domain.Gen(9)); !ok {
-		t.Fatal("SetIfNewer(v2, op 9) must succeed — evicts v1's doc and writerOp entry")
+	if ok := cache.SetIfNewer(keyV2, "template-v2", domain.Gen(12)); !ok {
+		t.Fatal("SetIfNewer(v2, op 12) must succeed — supersedes v1")
+	}
+	if got := cache.Get(keyV1); got != nil {
+		t.Errorf("Get(v1) after supersede = %v, want nil — the superseded version must be evicted", got)
 	}
 
-	// Re-writing keyV1 (now absent) with an op strictly OLDER than the op 9
-	// that originally wrote it must succeed — op 9 no longer has a recorded
-	// claim on keyV1, since eviction cleared it.
-	if ok := cache.SetIfNewer(keyV1, "template-v1-again", domain.Gen(1)); !ok {
-		t.Error("SetIfNewer(v1, op 1) after eviction reported failure — the evicted key's writerOp entry must have been cleared, not just its doc")
+	// A straggling op-9 write for the older version must NOT resurrect it: the
+	// resource's newest content came from op 12.
+	if ok := cache.SetIfNewer(keyV1, "template-v1-late", domain.Gen(9)); ok {
+		t.Error("SetIfNewer(v1, op 9) after op 12 wrote v2 was accepted — an older operation must not displace a newer version of the same resource")
 	}
-	if got := cache.Get(keyV1); got != "template-v1-again" {
-		t.Errorf("Get(v1) after re-write = %v, want %q", got, "template-v1-again")
+	if got := cache.Get(keyV2); got != "template-v2" {
+		t.Errorf("Get(v2) = %v, want %q — the newer version must survive a late older-op write", got, "template-v2")
+	}
+	if got := cache.Get(keyV1); got != nil {
+		t.Errorf("Get(v1) = %v, want nil — the refused write must not be stored", got)
+	}
+
+	// A genuinely newer operation reporting a rolled-back template is accepted
+	// and becomes the resource's latest.
+	if ok := cache.SetIfNewer(keyV1, "template-v1-rollback", domain.Gen(15)); !ok {
+		t.Fatal("SetIfNewer(v1, op 15) must succeed — a newer operation defines current content, whatever version it names")
+	}
+	if got := cache.Get(keyV1); got != "template-v1-rollback" {
+		t.Errorf("Get(v1) after rollback = %v, want %q", got, "template-v1-rollback")
+	}
+	if got := cache.Get(keyV2); got != nil {
+		t.Errorf("Get(v2) after rollback = %v, want nil — the superseded version must be evicted", got)
 	}
 }
 

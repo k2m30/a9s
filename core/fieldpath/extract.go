@@ -3,9 +3,7 @@
 package fieldpath
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"maps"
 	"reflect"
 	"sort"
@@ -567,22 +565,13 @@ func tryParseJSON(s string) any {
 	if len(s) == 0 || (s[0] != '{' && s[0] != '[') {
 		return nil
 	}
-	dec := json.NewDecoder(strings.NewReader(s))
-	dec.UseNumber()
-	var parsed any
-	if err := dec.Decode(&parsed); err != nil {
-		return nil
-	}
-	// json.Unmarshal rejects trailing content; a single Decode does not —
-	// keep the stricter contract. dec.More() is not sufficient: it reports
-	// whether another VALUE follows, so stray closing delimiters ("{...}}",
-	// "[1,2]]") slip through. Only an EOF token proves nothing trails.
-	if tok, err := dec.Token(); err != io.EOF || tok != nil {
-		return nil
-	}
 	// Ordinary numbers go back to int64/float64 so rendering is unchanged;
 	// only integers that fit no lossless native type stay json.Number.
-	return jsonyaml.NormalizeJSONNumbers(parsed)
+	parsed, ok := jsonyaml.ParseStrict(s)
+	if !ok {
+		return nil
+	}
+	return parsed
 }
 
 // FieldItem is one rendered line from the structured detail extraction pipeline.

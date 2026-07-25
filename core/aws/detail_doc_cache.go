@@ -78,6 +78,18 @@ func (s *opAwareDocStore) setIfNewer(key, resource string, doc any, opID domain.
 		if recorded, ok := s.writerOp[key]; ok && opID < recorded {
 			return false
 		}
+		// Cross-version guard: a version-stamped key is unique per version, so
+		// a late write for an OLDER version arrives under a key nothing has
+		// written yet, passes the per-key check above, and would then evict
+		// the newer version below and become the resource's latest. Freshness
+		// is a property of the RESOURCE, not of one version's key.
+		if resource != "" {
+			if prev, ok := s.latestKey[resource]; ok && prev != key {
+				if recorded, ok := s.writerOp[prev]; ok && opID < recorded {
+					return false
+				}
+			}
+		}
 	}
 	if s.m == nil {
 		s.m = make(map[string]any)

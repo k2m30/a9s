@@ -1,6 +1,7 @@
 package unit_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -337,5 +338,65 @@ func TestQA_JSONExpand_CloudTrail_OutOfScope(t *testing.T) {
 		// If the policy version appears, it was rendered by the CT summarizer
 		// as a compact string — not by expandJSONItems. That's fine.
 		// The key assertion is that we don't crash and CT path is taken.
+	}
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ParseStrict — the single strict-parse contract
+// ════════════════════════════════════════════════════════════════════════════
+
+// TestParseStrict_RejectsTrailingContent pins the contract every caller that
+// turns a stored string into structure depends on — the detail-enrichment
+// engine (parseJSONOrRaw), the YAML/JSON views (TryJSONToYAMLLines), and field
+// extraction (tryParseJSON) all delegate here, so a malformed document is
+// preserved verbatim rather than silently rendered as structure.
+//
+// The stray-closing-delimiter cases are the ones a Decoder.More() check waves
+// through: More() reports whether another VALUE follows, and "}" alone is not
+// a value. Each of these three call sites carried its own copy of that wrong
+// check before they were collapsed onto this one.
+func TestParseStrict_RejectsTrailingContent(t *testing.T) {
+	accepted := []string{
+		`{"Version":"2012-10-17"}`,
+		`[1,2,3]`,
+		`{"a":{"b":[1,{"c":2}]}}`,
+		"  {\"a\":1}\n\t",
+	}
+	for _, s := range accepted {
+		if _, ok := jsonyaml.ParseStrict(s); !ok {
+			t.Errorf("ParseStrict(%q) rejected a complete JSON value, want accepted", s)
+		}
+	}
+
+	rejected := []string{
+		`{"a":1}}`,
+		`[1,2]]`,
+		`{"a":1}garbage`,
+		`{"a":1}{"b":2}`,
+		`{"a":1}[2]`,
+		`{"a":1`,
+		``,
+	}
+	for _, s := range rejected {
+		if v, ok := jsonyaml.ParseStrict(s); ok {
+			t.Errorf("ParseStrict(%q) accepted malformed input as %v — the original string must be preserved instead", s, v)
+		}
+	}
+}
+
+// TestParseStrict_PreservesLargeIntegers pins that the shared parse keeps the
+// lossless-number contract: an integer beyond float64's exact range must not
+// round on the way through.
+func TestParseStrict_PreservesLargeIntegers(t *testing.T) {
+	v, ok := jsonyaml.ParseStrict(`{"n":9007199254740993}`)
+	if !ok {
+		t.Fatal("ParseStrict rejected a valid object")
+	}
+	m, isMap := v.(map[string]any)
+	if !isMap {
+		t.Fatalf("ParseStrict returned %T, want map[string]any", v)
+	}
+	if got := fmt.Sprintf("%v", m["n"]); got != "9007199254740993" {
+		t.Errorf("large integer became %q, want %q — a float64 round-trip loses the last digit", got, "9007199254740993")
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"strconv"
 	"strings"
@@ -23,6 +24,31 @@ import (
 // constant rather than hard-coding 2 — it is configured via yaml.NewEncoder
 // because yaml.Marshal's default is 4.
 const YAMLIndentSpaces = 2
+
+// ParseStrict decodes s as exactly one complete JSON value and returns it with
+// numbers normalized (NormalizeJSONNumbers), reporting false when s is not
+// valid JSON or carries anything after that value.
+//
+// It is the single implementation of the strict-parse contract every caller
+// that turns a stored string into structure needs — the detail-enrichment
+// engine, the YAML/JSON views, and field extraction. Keeping one copy matters
+// because the obvious trailing-content check is wrong in a way that reads as
+// correct: Decoder.More() reports whether another VALUE follows, so a stray
+// closing delimiter ("{...}}", "[1,2]]") slips past it and the malformed text
+// is silently rendered as structure instead of preserved verbatim. Only an
+// EOF token proves nothing trails.
+func ParseStrict(s string) (any, bool) {
+	dec := json.NewDecoder(strings.NewReader(s))
+	dec.UseNumber()
+	var parsed any
+	if err := dec.Decode(&parsed); err != nil {
+		return nil, false
+	}
+	if tok, err := dec.Token(); err != io.EOF || tok != nil {
+		return nil, false
+	}
+	return NormalizeJSONNumbers(parsed), true
+}
 
 // TryJSONToYAMLLines attempts to parse s as JSON. On success, it converts the
 // parsed structure to YAML and returns the individual lines. Returns nil if s
@@ -37,18 +63,10 @@ func TryJSONToYAMLLines(s string) []string {
 	if s[0] != '{' && s[0] != '[' {
 		return nil
 	}
-	dec := json.NewDecoder(strings.NewReader(s))
-	dec.UseNumber()
-	var parsed any
-	if err := dec.Decode(&parsed); err != nil {
+	parsed, ok := ParseStrict(s)
+	if !ok {
 		return nil
 	}
-	// json.Unmarshal rejects trailing content; a single Decode does not —
-	// keep the stricter contract.
-	if dec.More() {
-		return nil
-	}
-	parsed = NormalizeJSONNumbers(parsed)
 	switch v := parsed.(type) {
 	case map[string]any:
 		if len(v) == 0 {
