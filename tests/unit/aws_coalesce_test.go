@@ -37,6 +37,7 @@ package unit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -44,13 +45,17 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // concurrentGateSleep gives N goroutines launched just before it time to
@@ -450,6 +455,28 @@ func TestNewCoalescingSNS_SequentialCalls_BothReexecute(t *testing.T) {
 	}
 }
 
+// TestNewCoalescingSNS_SequentialCalls_SameNonZeroOp_MemoizesToOneUnderlyingCall
+// mirrors TestNewCoalescingSFN_SequentialCalls_SameNonZeroOp_MemoizesToOneUnderlyingCall
+// for SNS: two sequential calls under the same non-zero op must reach the
+// inner fake exactly once.
+func TestNewCoalescingSNS_SequentialCalls_SameNonZeroOp_MemoizesToOneUnderlyingCall(t *testing.T) {
+	const topicArn = "arn:aws:sns:us-east-1:123456789012:order-events"
+	fake := &coalesceSnsFake{}
+	decorated := awsclient.NewCoalescingSNS(fake)
+	ctx := awsclient.WithDetailOp(context.Background(), domain.Gen(5))
+
+	if _, err := decorated.GetTopicAttributes(ctx, &sns.GetTopicAttributesInput{TopicArn: aws.String(topicArn)}); err != nil {
+		t.Fatalf("first call error: %v", err)
+	}
+	if _, err := decorated.GetTopicAttributes(ctx, &sns.GetTopicAttributesInput{TopicArn: aws.String(topicArn)}); err != nil {
+		t.Fatalf("second call error: %v", err)
+	}
+
+	if got := fake.getAttrsCalls.Load(); got != 1 {
+		t.Errorf("GetTopicAttributes reached the inner fake %d times across two SEQUENTIAL calls under the same non-zero op, want 1 (completed result must be memoized per (op, key))", got)
+	}
+}
+
 func TestNewCoalescingSNS_ConcurrentDifferentKeys_BothExecuteIndependently(t *testing.T) {
 	fake := &coalesceSnsFake{getAttrsBlock: make(chan struct{})}
 	decorated := awsclient.NewCoalescingSNS(fake)
@@ -582,6 +609,88 @@ func TestNewCoalescingS3_SequentialCalls_BothReexecute(t *testing.T) {
 
 	if got := fake.getPolicyCalls.Load(); got != 2 {
 		t.Errorf("GetBucketPolicy reached the inner fake %d times across two sequential identical calls, want 2 (no caching, only in-flight dedup)", got)
+	}
+}
+
+// TestNewCoalescingS3_SequentialCalls_SameNonZeroOp_MemoizesToOneUnderlyingCall
+// mirrors TestNewCoalescingSFN_SequentialCalls_SameNonZeroOp_MemoizesToOneUnderlyingCall
+// for S3's successful-result axis: two sequential calls under the same
+// non-zero op must reach the inner fake exactly once.
+func TestNewCoalescingS3_SequentialCalls_SameNonZeroOp_MemoizesToOneUnderlyingCall(t *testing.T) {
+	const bucket = "acme-app-logs-prod"
+	fake := &coalesceS3Fake{}
+	decorated := awsclient.NewCoalescingS3(fake)
+	ctx := awsclient.WithDetailOp(context.Background(), domain.Gen(5))
+
+	if _, err := decorated.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)}); err != nil {
+		t.Fatalf("first call error: %v", err)
+	}
+	if _, err := decorated.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)}); err != nil {
+		t.Fatalf("second call error: %v", err)
+	}
+
+	if got := fake.getPolicyCalls.Load(); got != 1 {
+		t.Errorf("GetBucketPolicy reached the inner fake %d times across two SEQUENTIAL calls under the same non-zero op, want 1 (completed result must be memoized per (op, key))", got)
+	}
+}
+
+// TestNewCoalescingS3_SequentialCalls_BenignNoSuchBucketPolicy_MemoizedWithinOp
+// pins coalescingS3's benign-absence memoization split (#261 boundary-sealing
+// wave, item c): a NoSuchBucketPolicy error — the common, expected "no
+// policy attached" case — is a definitive answer for the rest of the
+// operation, so a second sequential call under the SAME op must be served
+// from the memo, not re-fetched.
+func TestNewCoalescingS3_SequentialCalls_BenignNoSuchBucketPolicy_MemoizedWithinOp(t *testing.T) {
+	const bucket = "acme-app-logs-prod"
+	benignErr := &smithy.GenericAPIError{Code: "NoSuchBucketPolicy", Message: "no policy"}
+	fake := &coalesceS3Fake{
+		getPolicyFn: func(_ *s3.GetBucketPolicyInput) (*s3.GetBucketPolicyOutput, error) {
+			return nil, benignErr
+		},
+	}
+	decorated := awsclient.NewCoalescingS3(fake)
+	ctx := awsclient.WithDetailOp(context.Background(), domain.Gen(5))
+
+	_, err1 := decorated.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
+	_, err2 := decorated.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
+
+	if got := fake.getPolicyCalls.Load(); got != 1 {
+		t.Errorf("GetBucketPolicy reached the inner fake %d times across two SEQUENTIAL calls under the same op with a benign NoSuchBucketPolicy result, want 1 (memoized)", got)
+	}
+	if !errors.Is(err1, benignErr) {
+		t.Errorf("first call error = %v, want the benign NoSuchBucketPolicy error", err1)
+	}
+	if !errors.Is(err2, benignErr) {
+		t.Errorf("second call error = %v, want the SAME memoized benign NoSuchBucketPolicy error", err2)
+	}
+}
+
+// TestNewCoalescingS3_SequentialCalls_RetryableError_NotMemoizedWithinOp pins
+// the other half of the split: a genuinely retryable error (anything other
+// than the benign absence case) must never be memoized — the next call
+// within the same operation must retry against the inner fake, not
+// permanently pin a transient failure for the operation's remaining
+// lifetime.
+func TestNewCoalescingS3_SequentialCalls_RetryableError_NotMemoizedWithinOp(t *testing.T) {
+	const bucket = "acme-app-logs-prod"
+	retryableErr := &smithy.GenericAPIError{Code: "InternalError", Message: "we messed up"}
+	fake := &coalesceS3Fake{
+		getPolicyFn: func(_ *s3.GetBucketPolicyInput) (*s3.GetBucketPolicyOutput, error) {
+			return nil, retryableErr
+		},
+	}
+	decorated := awsclient.NewCoalescingS3(fake)
+	ctx := awsclient.WithDetailOp(context.Background(), domain.Gen(5))
+
+	if _, err := decorated.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)}); err == nil {
+		t.Fatal("first call: expected the retryable error, got nil")
+	}
+	if _, err := decorated.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)}); err == nil {
+		t.Fatal("second call: expected the retryable error, got nil")
+	}
+
+	if got := fake.getPolicyCalls.Load(); got != 2 {
+		t.Errorf("GetBucketPolicy reached the inner fake %d times across two SEQUENTIAL calls under the same op with a retryable error, want 2 (never memoized)", got)
 	}
 }
 
@@ -865,5 +974,267 @@ func TestWithDetailOp_NoOpContext_CoalescesAsSharedDefaultNamespace(t *testing.T
 		if results[i] != results[0] {
 			t.Errorf("call %d: result pointer %p != call 0's %p — no-op-context callers must share the identical singleflight result", i, results[i], results[0])
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Lambda: NewCoalescingLambda (#261 boundary-sealing wave, item d) —
+// coalesceLambdaFake implements awsclient.LambdaAPI. LambdaAPI is already
+// the complete aggregate of every Lambda operation asserted anywhere in
+// core/aws (coalesce.go's own doc comment), so no wider FullAPI type exists
+// for Lambda, unlike SNS/S3.
+// ---------------------------------------------------------------------------
+
+type coalesceLambdaFake struct {
+	getFunctionCalls atomic.Int64
+	getFunctionBlock chan struct{} // non-nil: GetFunction blocks here before returning
+	listFuncCalls    atomic.Int64
+}
+
+func (f *coalesceLambdaFake) GetFunction(_ context.Context, in *lambda.GetFunctionInput, _ ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error) {
+	f.getFunctionCalls.Add(1)
+	if f.getFunctionBlock != nil {
+		<-f.getFunctionBlock
+	}
+	return &lambda.GetFunctionOutput{
+		Configuration: &lambdatypes.FunctionConfiguration{
+			// FunctionName echoes the input key back so a test can verify a
+			// shared result carries the right per-key payload without adding
+			// a dedicated field.
+			FunctionName: in.FunctionName,
+		},
+		// Code.ImageUri lets checkLambdaECR (core/aws/lambda_related.go)
+		// resolve a repo name end to end, for the integration test below
+		// that exercises the real checker through this fake.
+		Code: &lambdatypes.FunctionCodeLocation{
+			ImageUri: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"),
+		},
+	}, nil
+}
+
+func (f *coalesceLambdaFake) ListFunctions(_ context.Context, _ *lambda.ListFunctionsInput, _ ...func(*lambda.Options)) (*lambda.ListFunctionsOutput, error) {
+	f.listFuncCalls.Add(1)
+	return &lambda.ListFunctionsOutput{}, nil
+}
+func (f *coalesceLambdaFake) ListEventSourceMappings(_ context.Context, _ *lambda.ListEventSourceMappingsInput, _ ...func(*lambda.Options)) (*lambda.ListEventSourceMappingsOutput, error) {
+	return &lambda.ListEventSourceMappingsOutput{}, nil
+}
+func (f *coalesceLambdaFake) ListTags(_ context.Context, _ *lambda.ListTagsInput, _ ...func(*lambda.Options)) (*lambda.ListTagsOutput, error) {
+	return &lambda.ListTagsOutput{}, nil
+}
+
+var _ awsclient.LambdaAPI = (*coalesceLambdaFake)(nil)
+
+func TestNewCoalescingLambda_ConcurrentIdenticalCalls_ShareOneUnderlyingCallAndResult(t *testing.T) {
+	const fnName = "process-payment"
+	fake := &coalesceLambdaFake{getFunctionBlock: make(chan struct{})}
+	decorated := awsclient.NewCoalescingLambda(fake)
+
+	const n = 8
+	results := make([]*lambda.GetFunctionOutput, n)
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for i := range n {
+		go func(i int) {
+			defer wg.Done()
+			results[i], errs[i] = decorated.GetFunction(context.Background(), &lambda.GetFunctionInput{FunctionName: aws.String(fnName)})
+		}(i)
+	}
+	time.Sleep(concurrentGateSleep)
+	close(fake.getFunctionBlock)
+	wg.Wait()
+
+	if got := fake.getFunctionCalls.Load(); got != 1 {
+		t.Errorf("GetFunction reached the inner fake %d times across %d concurrent identical calls, want 1", got, n)
+	}
+	for i := range n {
+		if errs[i] != nil {
+			t.Fatalf("call %d: unexpected error: %v", i, errs[i])
+		}
+		if results[i] == nil || results[i].Configuration == nil || results[i].Configuration.FunctionName == nil || *results[i].Configuration.FunctionName != fnName {
+			t.Errorf("call %d: result = %+v, want Configuration.FunctionName echoing %q", i, results[i], fnName)
+		}
+		if results[i] != results[0] {
+			t.Errorf("call %d: result pointer %p != call 0's %p — all concurrent callers must share the identical singleflight result", i, results[i], results[0])
+		}
+	}
+}
+
+func TestNewCoalescingLambda_SequentialCalls_BothReexecute(t *testing.T) {
+	const fnName = "process-payment"
+	fake := &coalesceLambdaFake{}
+	decorated := awsclient.NewCoalescingLambda(fake)
+
+	if _, err := decorated.GetFunction(context.Background(), &lambda.GetFunctionInput{FunctionName: aws.String(fnName)}); err != nil {
+		t.Fatalf("first call error: %v", err)
+	}
+	if _, err := decorated.GetFunction(context.Background(), &lambda.GetFunctionInput{FunctionName: aws.String(fnName)}); err != nil {
+		t.Fatalf("second call error: %v", err)
+	}
+
+	if got := fake.getFunctionCalls.Load(); got != 2 {
+		t.Errorf("GetFunction reached the inner fake %d times across two sequential identical calls under opID 0, want 2 (no caching, only in-flight dedup)", got)
+	}
+}
+
+// TestNewCoalescingLambda_SequentialCalls_SameNonZeroOp_MemoizesToOneUnderlyingCall
+// mirrors the SFN/SNS/S3 sequential-memoization pins for Lambda: two
+// sequential calls under the same non-zero op must reach the inner fake
+// exactly once.
+func TestNewCoalescingLambda_SequentialCalls_SameNonZeroOp_MemoizesToOneUnderlyingCall(t *testing.T) {
+	const fnName = "process-payment"
+	fake := &coalesceLambdaFake{}
+	decorated := awsclient.NewCoalescingLambda(fake)
+	ctx := awsclient.WithDetailOp(context.Background(), domain.Gen(5))
+
+	first, err := decorated.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: aws.String(fnName)})
+	if err != nil {
+		t.Fatalf("first call error: %v", err)
+	}
+	second, err := decorated.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: aws.String(fnName)})
+	if err != nil {
+		t.Fatalf("second call error: %v", err)
+	}
+
+	if got := fake.getFunctionCalls.Load(); got != 1 {
+		t.Errorf("GetFunction reached the inner fake %d times across two SEQUENTIAL calls under the same non-zero op, want 1 (completed result must be memoized per (op, key))", got)
+	}
+	if first == nil || second == nil || first.Configuration.FunctionName == nil || second.Configuration.FunctionName == nil || *first.Configuration.FunctionName != *second.Configuration.FunctionName {
+		t.Errorf("first result %+v and second (memoized) result %+v must carry the same FunctionName", first, second)
+	}
+}
+
+func TestNewCoalescingLambda_ConcurrentDifferentKeys_BothExecuteIndependently(t *testing.T) {
+	fake := &coalesceLambdaFake{getFunctionBlock: make(chan struct{})}
+	decorated := awsclient.NewCoalescingLambda(fake)
+
+	names := [2]string{"process-payment", "process-refund"}
+	var errs [2]error
+	var wg sync.WaitGroup
+	wg.Add(2)
+	for i := range 2 {
+		go func(i int) {
+			defer wg.Done()
+			_, errs[i] = decorated.GetFunction(context.Background(), &lambda.GetFunctionInput{FunctionName: aws.String(names[i])})
+		}(i)
+	}
+	time.Sleep(concurrentGateSleep)
+	close(fake.getFunctionBlock)
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("call %d: unexpected error: %v", i, err)
+		}
+	}
+	if got := fake.getFunctionCalls.Load(); got != 2 {
+		t.Errorf("GetFunction reached the inner fake %d times for two concurrent DIFFERENT-key calls, want 2 (different keys must not coalesce)", got)
+	}
+}
+
+func TestNewCoalescingLambda_PassThrough_ListFunctionsReachesInnerFake(t *testing.T) {
+	fake := &coalesceLambdaFake{}
+	decorated := awsclient.NewCoalescingLambda(fake)
+
+	if _, err := decorated.ListFunctions(context.Background(), &lambda.ListFunctionsInput{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := fake.listFuncCalls.Load(); got != 1 {
+		t.Errorf("ListFunctions reached the inner fake %d times, want 1 (non-coalesced method must pass straight through)", got)
+	}
+}
+
+// TestNewCoalescingLambda_SatisfiesEveryNarrowLambdaInterface is a
+// compile-level assertion (#261 boundary-sealing wave, item d): the
+// decorator NewCoalescingLambda returns must still satisfy every narrow
+// Lambda interface asserted anywhere in core/aws (apigw_related.go,
+// related_common.go, secrets_related_extra.go, lambda_related.go,
+// lambda_detail_enrichment.go each narrow ServiceClients.Lambda to one of
+// these) — a future decorator field rename or method-set change that
+// silently dropped one would break those call sites' type assertions rather
+// than fail to compile here.
+func TestNewCoalescingLambda_SatisfiesEveryNarrowLambdaInterface(t *testing.T) {
+	decorated := awsclient.NewCoalescingLambda(&coalesceLambdaFake{})
+
+	var _ awsclient.LambdaAPI = decorated
+	if _, ok := decorated.(awsclient.LambdaGetFunctionAPI); !ok {
+		t.Error("NewCoalescingLambda's result does not satisfy LambdaGetFunctionAPI")
+	}
+	if _, ok := decorated.(awsclient.LambdaListFunctionsAPI); !ok {
+		t.Error("NewCoalescingLambda's result does not satisfy LambdaListFunctionsAPI")
+	}
+	if _, ok := decorated.(awsclient.LambdaListEventSourceMappingsAPI); !ok {
+		t.Error("NewCoalescingLambda's result does not satisfy LambdaListEventSourceMappingsAPI")
+	}
+	if _, ok := decorated.(awsclient.LambdaListTagsAPI); !ok {
+		t.Error("NewCoalescingLambda's result does not satisfy LambdaListTagsAPI")
+	}
+}
+
+// coalesceLambdaECRDefByTarget returns the "lambda" RelatedDef targeting
+// "ecr" (checkLambdaECR, core/aws/lambda_related.go) — the same lookup
+// aws_lambda_related_test.go's lambdaCheckerByTarget performs, duplicated
+// here rather than shared across the package boundary (that helper lives in
+// package unit_test; this file is package unit).
+func coalesceLambdaECRDefByTarget(t *testing.T) resource.RelatedChecker {
+	t.Helper()
+	for _, def := range resource.GetRelated("lambda") {
+		if def.TargetType == "ecr" {
+			if def.Checker == nil {
+				t.Fatal("lambda related checker for ecr is nil")
+			}
+			return def.Checker
+		}
+	}
+	t.Fatal("lambda has no registered related def targeting ecr")
+	return nil
+}
+
+// TestLambdaGetFunction_ECRCheckerAndEnricher_ShareOneUnderlyingCallPerOperation
+// pins item (d)'s integration scenario end to end through the REAL exported
+// consumers: opening an Image-package-type Lambda's detail dispatches BOTH
+// the ecr related checker (checkLambdaECR) and the detail enricher
+// (enrichLambda), and both call GetFunction for the identical function.
+// Driven under one shared coalescingLambda-decorated fake and one shared
+// non-zero WithDetailOp id — exactly how core/runtime.DetailOperation wires
+// every task an operation spawns — the inner fake must be reached exactly
+// once.
+func TestLambdaGetFunction_ECRCheckerAndEnricher_ShareOneUnderlyingCallPerOperation(t *testing.T) {
+	const fnName = "image-fn"
+	const op = domain.Gen(9)
+	fake := &coalesceLambdaFake{}
+	decorated := awsclient.NewCoalescingLambda(fake)
+	sc := &awsclient.ServiceClients{Lambda: decorated}
+
+	ctx := awsclient.WithDetailOp(context.Background(), op)
+	res := resource.Resource{
+		ID:        fnName,
+		Fields:    map[string]string{"package_type": "Image"},
+		RawStruct: lambdatypes.FunctionConfiguration{FunctionName: aws.String(fnName)},
+	}
+
+	ecrChecker := coalesceLambdaECRDefByTarget(t)
+	ecrResult := ecrChecker(ctx, sc, res, nil)
+	if ecrResult.State == domain.RelatedUnknown {
+		t.Fatalf("ecr related check returned Unknown, want a resolved result driving a real GetFunction call: %+v", ecrResult)
+	}
+
+	enricher := resource.GetDetailEnricher("lambda")
+	if enricher == nil {
+		t.Fatal("lambda detail enricher not registered")
+	}
+	// OpID must match the operation ctx already carries (enrichDetail's
+	// engine re-wraps ctx via WithDetailOp(ctx, dctx.OpID) rather than
+	// trusting the incoming ctx's own marker — core/aws/detail_enrich_engine.go)
+	// so the enricher's GetFunction call lands in the SAME coalescing
+	// namespace as the checker's call above.
+	dctx := &awsclient.DetailEnrichmentCtx{Clients: sc, OpID: op}
+	if _, err := enricher(ctx, dctx, res); err != nil {
+		t.Fatalf("enrichLambda: unexpected error: %v", err)
+	}
+
+	if got := fake.getFunctionCalls.Load(); got != 1 {
+		t.Errorf("GetFunction reached the inner fake %d times across the ecr related checker + the detail enricher under ONE operation, want 1", got)
 	}
 }

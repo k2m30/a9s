@@ -171,11 +171,11 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 	return &ServiceClients{
 		Region: cfg.Region,
 		EC2:    ec2.NewFromConfig(cfg),
-		// S3/SNS/SFN are wrapped with in-flight call coalescing (coalesce.go)
-		// — a detail open fires the same read (GetBucketPolicy/
-		// GetTopicAttributes/DescribeStateMachine) from a related checker and
-		// an on-demand enricher concurrently; singleflight shares one
-		// in-flight call's result instead of firing it twice. Once a call
+		// S3/SNS/SFN/Lambda are wrapped with in-flight call coalescing
+		// (coalesce.go) — a detail open fires the same read (GetBucketPolicy/
+		// GetTopicAttributes/DescribeStateMachine/GetFunction) from a related
+		// checker and an on-demand enricher concurrently; singleflight shares
+		// one in-flight call's result instead of firing it twice. Once a call
 		// completes under a detail operation, its result is also memoized for
 		// the rest of that operation (completedResultMemo) so a later,
 		// sequential call under the SAME operation still doesn't re-fetch;
@@ -187,7 +187,7 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 		DocDB:            docdb.NewFromConfig(cfg),
 		EKS:              eks.NewFromConfig(cfg),
 		SecretsManager:   secretsmanager.NewFromConfig(cfg),
-		Lambda:           lambda.NewFromConfig(cfg),
+		Lambda:           NewCoalescingLambda(lambda.NewFromConfig(cfg)),
 		CloudWatch:       cloudwatch.NewFromConfig(cfg),
 		SNS:              NewCoalescingSNS(sns.NewFromConfig(cfg)),
 		SQS:              sqs.NewFromConfig(cfg),

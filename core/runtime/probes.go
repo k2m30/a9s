@@ -949,6 +949,11 @@ func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceCl
 // lookup miss and fall through to its own live re-fetch, discarding the
 // exact IsTruncated signal this method exists to carry — the #233
 // regression this comment documents against reintroduction.
+//
+// Every RunRelatedDef caller — the TUI's per-def fan-out
+// (runtime_adapter_related.go) and the executor's KindRelatedCheck case
+// (executor.go) alike — builds its cacheSnap argument via this method, so
+// both lanes see the identical IsTruncated-aware snapshot.
 func (c *Core) BuildResourceCacheSnapshot() resource.ResourceCache {
 	rowStoreAll := c.session.RowStore.SnapshotAll(true)
 	snap := make(resource.ResourceCache, len(rowStoreAll))

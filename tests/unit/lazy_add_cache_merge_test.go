@@ -57,6 +57,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -256,6 +257,22 @@ func collectECSTaskCacheViaChecker(t *testing.T, _ tui.Model, source resource.Re
 func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 	m, efsSource := setupLiveModeEFSDetail(t)
 
+	// replayRelatedCache's per-def completeness check (#261 Codex P1) matches
+	// cache entries against resource.GetRelated(rt) by DefDisplayName, not by
+	// TargetType alone — use the real "ecs-task" def's own DisplayName rather
+	// than a guessed literal, so this fixture stays correct if the catalog
+	// entry's wording ever changes.
+	var ecsTaskDisplayName string
+	for _, def := range resource.GetRelated("efs") {
+		if def.TargetType == "ecs-task" {
+			ecsTaskDisplayName = def.DisplayName
+			break
+		}
+	}
+	if ecsTaskDisplayName == "" {
+		t.Fatal("efs has no registered related def targeting ecs-task")
+	}
+
 	// No pre-seeding — "ecs-task" cache is empty at this point.
 
 	// Dispatch LazyAddedResources with a single task.
@@ -267,9 +284,28 @@ func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 		},
 	}
 
+	// The indirect check below (execRelatedCheckerResult) drives a REAL
+	// Ctrl+R refresh through RunRelatedDef. "ecs-task" was only ever added
+	// via LazyAddedResources (Partial origin), never a Fetch-origin
+	// top-level load, so it is absent from FetchOriginCacheKeys/
+	// mainCacheKeys — RunRelatedDef's NeedsTargetCache prefetch (#261
+	// boundary-sealing wave, item g) still attempts a live "ecs-task" list
+	// on refresh, and this harness has no real AWS clients, so an
+	// unregistered fetcher would fail that prefetch and correctly report
+	// UnknownRelated rather than the stale lazy-added Count — the production
+	// contract this test must not weaken. Registering a fake fetcher here
+	// gives the prefetch something to succeed against, exactly like a real
+	// account's ecs:ListTasks call would, so the indirect check still
+	// observes the LazyAdd-created cache entry's Truncated marking.
+	resource.SetPaginatedForTest("ecs-task", func(_ context.Context, _ any, _ string) (domain.FetchResult, error) {
+		return domain.FetchResult{Resources: []resource.Resource{lazyTask}}, nil
+	})
+	t.Cleanup(func() { resource.CleanupPaginatedForTest("ecs-task") })
+
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "efs",
 		SourceResourceID: efsSource.ID,
+		DefDisplayName:   ecsTaskDisplayName,
 		Result:           resource.RelatedCheckResult{TargetType: "ecs-task", Count: 1},
 		LazyAddedResources: map[string][]resource.Resource{
 			"ecs-task": {lazyTask},
@@ -308,6 +344,7 @@ func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "efs",
 		SourceResourceID: efsSource.ID,
+		DefDisplayName:   ecsTaskDisplayName,
 		Result:           resource.RelatedCheckResult{TargetType: "ecs-task", Count: 1},
 		CachedPages: map[string]resource.ResourceCacheEntry{
 			"ecs-task": {

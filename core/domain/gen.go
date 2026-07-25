@@ -4,7 +4,7 @@ package domain
 
 // Gen is the program-wide generation-counter type used by async-result
 // staleness guards. Every session-rotation counter (ConnectGen,
-// AvailabilityGen, EnrichmentGen, RelatedGen, EnrichGen, per-type
+// AvailabilityGen, EnrichmentGen, DetailOpGen, per-type
 // EnrichmentTypeGen) and every message field that carries one of those
 // values (Gen, TypeGen, NewGen, CurrentGen, Generation) uses this single
 // type — there is one generation-counter type across the program.

@@ -503,11 +503,15 @@ func TestBeginDetailOperation_BackfillsEmptyResourceType(t *testing.T) {
 
 // TestRunRelatedDef_CTEventsBackfilledType_SkipsFetchByIDsLazyAdd pins the
 // behavioral consequence of the Type backfill above: RunRelatedDef's
-// ct-events lazy-add exemption (core/runtime/executor.go, "op.Resource.Type
-// != ct-events") reads op.Resource.Type, not the resourceType string
-// BeginDetailOperation was called with — so a ct-events resource whose own
-// Type was empty at op creation must still trip the exemption and skip
-// FetchByIDs, never issuing a cross-account lookup for event-derived IDs.
+// ct-events lazy-add exemption (core/runtime/executor.go, "op.ResourceType
+// != ct-events") sees a correct value regardless of the caller's own
+// resource.Type — a ct-events resource whose own Type was empty at op
+// creation must still trip the exemption and skip FetchByIDs, never issuing
+// a cross-account lookup for event-derived IDs. (The exemption itself reads
+// op.ResourceType, not op.Resource.Type — see
+// TestRunRelatedDef_CTEventsExemption_ReadsOperationResourceTypeNotResourceType
+// below for the test that distinguishes the two fields; here they happen to
+// agree once BeginDetailOperation backfills the empty Type.)
 func TestRunRelatedDef_CTEventsBackfilledType_SkipsFetchByIDsLazyAdd(t *testing.T) {
 	const targetType = "test-ctevents-lazy-target"
 	var fetchCalls atomic.Int64
@@ -523,7 +527,7 @@ func TestRunRelatedDef_CTEventsBackfilledType_SkipsFetchByIDsLazyAdd(t *testing.
 	op, _ := core.BeginDetailOperation("ct-events", res, false)
 
 	if op.Resource.Type != "ct-events" {
-		t.Fatalf("op.Resource.Type = %q, want backfilled %q — the exemption below reads this field", op.Resource.Type, "ct-events")
+		t.Fatalf("op.Resource.Type = %q, want backfilled %q", op.Resource.Type, "ct-events")
 	}
 
 	def := resource.RelatedDef{
@@ -544,6 +548,87 @@ func TestRunRelatedDef_CTEventsBackfilledType_SkipsFetchByIDsLazyAdd(t *testing.
 	}
 	if result.LazyAddError != nil {
 		t.Errorf("result.LazyAddError = %v, want nil", result.LazyAddError)
+	}
+}
+
+// TestRunRelatedDef_CTEventsExemption_ReadsOperationResourceTypeNotResourceType
+// distinguishes op.ResourceType from op.Resource.Type directly: res.Type is
+// deliberately non-empty AND different from "ct-events", so
+// BeginDetailOperation's backfill (which only fires on an EMPTY Type) never
+// touches it — op.Resource.Type stays mismatched while op.ResourceType (the
+// resourceType argument) is "ct-events". The exemption must still trip,
+// proving it reads op.ResourceType.
+func TestRunRelatedDef_CTEventsExemption_ReadsOperationResourceTypeNotResourceType(t *testing.T) {
+	const targetType = "test-ctevents-guard-target"
+	var fetchCalls atomic.Int64
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
+		fetchCalls.Add(1)
+		return nil, nil
+	})
+	t.Cleanup(func() { resource.CleanupFetchByIDsForTest(targetType) })
+
+	_, core := newTestControllerAndCore(t)
+	res := resource.Resource{ID: "evt-guard-001", Type: "some-other-type"}
+	op, _ := core.BeginDetailOperation("ct-events", res, false)
+
+	if op.Resource.Type != "some-other-type" {
+		t.Fatalf("test setup invalid: op.Resource.Type = %q, want the mismatched %q unchanged (a non-empty Type is never backfilled)", op.Resource.Type, "some-other-type")
+	}
+	if op.ResourceType != "ct-events" {
+		t.Fatalf("op.ResourceType = %q, want %q", op.ResourceType, "ct-events")
+	}
+
+	def := resource.RelatedDef{
+		TargetType:  targetType,
+		DisplayName: "CT Events Guard Target",
+		Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+			return resource.RelatedCheckResult{TargetType: targetType, Count: 1, ResourceIDs: []string{"lazy-id-1"}}
+		},
+	}
+
+	runtime.RunRelatedDef(context.Background(), op, nil, nil, def)
+
+	if got := fetchCalls.Load(); got != 0 {
+		t.Errorf("FetchByIDs called %d time(s), want 0 — the ct-events exemption must read op.ResourceType (%q), not the mismatched op.Resource.Type (%q)", got, op.ResourceType, op.Resource.Type)
+	}
+}
+
+// TestRunRelatedDef_TotalPrefetchFailure_ReturnsUnknownWithoutRunningChecker
+// pins the other g-item fix: a NeedsTargetCache def whose prefetch fails
+// completely (an error with zero rows — e.g. access denied) must short-circuit
+// to UnknownRelated BEFORE the checker ever runs, rather than letting the
+// checker read the missing/stale target cache as a confirmed zero.
+func TestRunRelatedDef_TotalPrefetchFailure_ReturnsUnknownWithoutRunningChecker(t *testing.T) {
+	const targetType = "test-prefetch-failure-target"
+	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (domain.FetchResult, error) {
+		return domain.FetchResult{}, errors.New("access denied")
+	})
+	t.Cleanup(func() { resource.CleanupPaginatedForTest(targetType) })
+
+	_, core := newTestControllerAndCore(t)
+	op, _ := core.BeginDetailOperation("ec2", resource.Resource{ID: "i-prefetch0001"}, false)
+
+	checkerCalls := 0
+	def := resource.RelatedDef{
+		TargetType:       targetType,
+		DisplayName:      "Prefetch Failure Target",
+		NeedsTargetCache: true,
+		Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+			checkerCalls++
+			return resource.RelatedCheckResult{TargetType: targetType, Count: 0, State: domain.RelatedResolved}
+		},
+	}
+
+	result := runtime.RunRelatedDef(context.Background(), op, nil, nil, def)
+
+	if checkerCalls != 0 {
+		t.Errorf("checker invoked %d time(s), want 0 — a total prefetch failure must short-circuit before the checker ever reads the missing target cache", checkerCalls)
+	}
+	if result.Result.State != domain.RelatedUnknown {
+		t.Errorf("Result.State = %v, want RelatedUnknown", result.Result.State)
+	}
+	if result.Result.Count != 0 {
+		t.Errorf("Result.Count = %d, want 0 (Unknown, not a false confirmed zero)", result.Result.Count)
 	}
 }
 

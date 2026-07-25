@@ -620,6 +620,33 @@ func TestPolicyDocCache_SetIfNewer_OpZero_WritesEmptyKey_DoesNotBlockLaterOp(t *
 	}
 }
 
+// TestPolicyDocCache_SetIfNewer_NoEviction_UnrelatedKeysNeverInterfere pins
+// the PolicyDocumentCache half of #261's version-keyed eviction contract
+// (item e): PolicyDocumentCache's keys are stable (never version-stamped),
+// so its own SetIfNewer always passes resource="" to opAwareDocStore — no
+// eviction bookkeeping applies at all. Two keys that would collide under
+// DetailDocCache's ":"-stripping scheme (both share the "managed" prefix)
+// must NOT evict each other here.
+func TestPolicyDocCache_SetIfNewer_NoEviction_UnrelatedKeysNeverInterfere(t *testing.T) {
+	var cache awsclient.PolicyDocumentCache
+	keyA := awsclient.ManagedKey("arn:aws:iam::123456789012:policy/policy-a")
+	keyB := awsclient.ManagedKey("arn:aws:iam::123456789012:policy/policy-b")
+
+	if ok := cache.SetIfNewer(keyA, "doc-a", domain.Gen(5)); !ok {
+		t.Fatal("SetIfNewer(keyA) must succeed")
+	}
+	if ok := cache.SetIfNewer(keyB, "doc-b", domain.Gen(5)); !ok {
+		t.Fatal("SetIfNewer(keyB) must succeed")
+	}
+
+	if got := cache.Get(keyA); got != "doc-a" {
+		t.Errorf("Get(keyA) after writing keyB = %v, want %q (PolicyDocumentCache has no eviction)", got, "doc-a")
+	}
+	if got := cache.Get(keyB); got != "doc-b" {
+		t.Errorf("Get(keyB) = %v, want %q", got, "doc-b")
+	}
+}
+
 func TestRefresh_OnDetailView_DispatchesEnrichment(t *testing.T) {
 	app := tui.New("demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),

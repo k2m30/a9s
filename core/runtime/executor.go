@@ -788,11 +788,13 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 	if def.NeedsTargetCache {
 		if _, inMain := mainCacheKeys[def.TargetType]; !inMain {
 			if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
-				// E5 partial success: rows may arrive alongside a composite
-				// error (listed-but-denied resources). Seed whatever rows
-				// came — a partially-visible target cache beats an unknown
-				// "?" row.
-				if fr, err := pf(checkCtx, op.Clients, ""); err == nil || len(fr.Resources) > 0 {
+				fr, err := pf(checkCtx, op.Clients, "")
+				switch {
+				case err == nil || len(fr.Resources) > 0:
+					// E5 partial success: rows may arrive alongside a composite
+					// error (listed-but-denied resources). Seed whatever rows
+					// came — a partially-visible target cache beats an unknown
+					// "?" row.
 					isTrunc := fr.Pagination != nil && fr.Pagination.IsTruncated
 					if prev, hasPrev := localCache[def.TargetType]; hasPrev && prev.IsTruncated {
 						isTrunc = true
@@ -807,6 +809,22 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 					enriched[def.TargetType] = entry
 					localCache = enriched
 					cachedPages = map[string]resource.ResourceCacheEntry{def.TargetType: entry}
+				default:
+					// Total prefetch failure (e.g. access denied), zero rows:
+					// def declared NeedsTargetCache because its own checker
+					// logic depends on this cache to answer accurately.
+					// Running the checker anyway risks it reading the
+					// missing/stale target-cache entry as "confirmed zero
+					// related resources" when the true answer is "could not
+					// check" — a denied ListX must not read as "none". Report
+					// unknown directly instead of letting the checker guess.
+					return messages.RelatedCheckResult{
+						ResourceType:     op.ResourceType,
+						SourceResourceID: op.Resource.ID,
+						DefDisplayName:   def.DisplayName,
+						Result:           resource.UnknownRelated(def.TargetType),
+						OperationID:      op.ID,
+					}
 				}
 			}
 		}
@@ -822,7 +840,7 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 	// the drill fetches on demand (KindFetchByIDDetail) — so a cross-account
 	// target (an AssumeRole role in another account) does not surface a
 	// "FetchByIDs failed" header error at detail open.
-	if op.Resource.Type != "ct-events" && len(checkResult.ResourceIDs) > 0 {
+	if op.ResourceType != "ct-events" && len(checkResult.ResourceIDs) > 0 {
 		if ff := resource.GetFetchByIDs(def.TargetType); ff != nil {
 			missing := MissingFromCache(localCache, def.TargetType, checkResult.ResourceIDs)
 			if len(missing) > 0 {

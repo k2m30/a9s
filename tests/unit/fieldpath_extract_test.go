@@ -1,6 +1,8 @@
 package unit_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -421,6 +423,48 @@ func TestExtractSubtree_JSONStringWithNulls(t *testing.T) {
 	// key2 null is acceptable as empty or omitted — no assertion on it
 }
 
+// TestExtractSubtree_JSONStringTrailingGarbageRejected pins tryParseJSON's
+// EOF-token requirement (#261 boundary-sealing wave): a single json.Decoder
+// Decode call does not itself reject trailing content the way json.Unmarshal
+// does, and dec.More() is insufficient — it only reports whether another
+// VALUE follows, so a stray closing delimiter ("{...}}", "[1,2]]") or a
+// second concatenated value slips through undetected. Only requiring the
+// next token to be io.EOF closes this: any of those must fall back to the
+// raw string unchanged, exactly like TestExtractSubtree_JSONStringMalformed's
+// contract, while an ordinary single object/array (no trailing content)
+// still parses to structured YAML.
+func TestExtractSubtree_JSONStringTrailingGarbageRejected(t *testing.T) {
+	cases := []struct {
+		name         string
+		raw          string
+		wantRejected bool
+	}{
+		{name: "ValidObject_Accepted", raw: `{"a":1}`, wantRejected: false},
+		{name: "ValidArray_Accepted", raw: `[1,2]`, wantRejected: false},
+		{name: "ExtraClosingBrace_Rejected", raw: `{"a":1}}`, wantRejected: true},
+		{name: "ExtraClosingBracket_Rejected", raw: `[1,2]]`, wantRejected: true},
+		{name: "TrailingGarbageWord_Rejected", raw: `{"a":1}garbage`, wantRejected: true},
+		{name: "TwoConcatenatedValues_Rejected", raw: `{"a":1}{"b":2}`, wantRejected: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			holder := testJSONHolder{Name: "test", JSONData: &tc.raw}
+			got := fieldpath.ExtractSubtree(holder, "jsonData")
+
+			if tc.wantRejected {
+				if got != tc.raw {
+					t.Errorf("ExtractSubtree(%q) = %q, want the raw string unchanged (trailing content must be rejected)", tc.raw, got)
+				}
+				return
+			}
+			if got == tc.raw {
+				t.Errorf("ExtractSubtree(%q) = %q, want structured YAML, not the raw JSON blob unchanged", tc.raw, got)
+			}
+		})
+	}
+}
+
 func TestExtractSubtree_JSONStringWhitespace(t *testing.T) {
 	raw := `  {"key":"value"}  `
 	holder := testJSONHolder{Name: "test", JSONData: &raw}
@@ -534,6 +578,75 @@ func TestToSafeValue_JSONStringArrayParsed(t *testing.T) {
 
 	if _, isSlice := jsonDataVal.([]any); !isSlice {
 		t.Errorf("ToSafeValue JSON array: expected []interface{} (parsed JSON array), got %T: %v", jsonDataVal, jsonDataVal)
+	}
+}
+
+// unexportedEmbedInner has an UNEXPORTED type name (lowercase), so reflect
+// reports the field it's anonymously embedded as unexported — even though
+// its own OWN fields (Foo, Bar) are exported. encoding/json still promotes
+// Foo/Bar into the parent's JSON object despite this.
+type unexportedEmbedInner struct {
+	Foo string `json:"foo"`
+	Bar int    `json:"bar"`
+}
+
+// unexportedEmbedWrapper embeds unexportedEmbedInner anonymously alongside
+// its own exported field, mirroring an AWS SDK RawStruct shape this
+// codebase's enrichers wrap (e.g. FunctionEnriched embedding
+// lambdatypes.FunctionConfiguration) — except the embedded type's name here
+// is deliberately unexported, the axis under test.
+type unexportedEmbedWrapper struct {
+	unexportedEmbedInner
+	Baz string `json:"baz"`
+}
+
+// TestToSafeValue_UnexportedAnonymousEmbed_ShapeParityWithEncodingJSON pins
+// #261's ToSafeValue fix: the promote-inline pass no longer gates on
+// field.IsExported() (core/fieldpath/extract.go), matching resolveField and
+// encoding/json — Foo/Bar promote into the top-level map exactly like
+// encoding/json.Marshal renders them, instead of vanishing because the
+// embedded TYPE's name happens to be unexported. Compares ToSafeValue's
+// output against a real encoding/json round trip so this is a genuine
+// shape-parity pin, not an assumption about either pipeline's exact
+// behavior.
+func TestToSafeValue_UnexportedAnonymousEmbed_ShapeParityWithEncodingJSON(t *testing.T) {
+	v := unexportedEmbedWrapper{
+		unexportedEmbedInner: unexportedEmbedInner{Foo: "foo-value", Bar: 42},
+		Baz:                  "baz-value",
+	}
+
+	safe := fieldpath.ToSafeValue(reflect.ValueOf(v))
+	safeMap, ok := safe.(map[string]any)
+	if !ok {
+		t.Fatalf("ToSafeValue = %T, want map[string]any", safe)
+	}
+
+	jsonBytes, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	var jsonMap map[string]any
+	if err := json.Unmarshal(jsonBytes, &jsonMap); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+
+	if len(safeMap) != len(jsonMap) {
+		t.Fatalf("ToSafeValue produced %d top-level key(s) %v, encoding/json produced %d key(s) %v — shapes diverge", len(safeMap), mapKeys(safeMap), len(jsonMap), mapKeys(jsonMap))
+	}
+	for k, jsonVal := range jsonMap {
+		safeVal, ok := safeMap[k]
+		if !ok {
+			t.Errorf("ToSafeValue is missing key %q that encoding/json promotes through the unexported anonymous embed; got keys %v", k, mapKeys(safeMap))
+			continue
+		}
+		// json.Unmarshal decodes numbers as float64; ToSafeValue's FormatValue
+		// renders scalars as strings — compare via fmt.Sprint to stay agnostic
+		// to which native representation each pipeline chose, since the
+		// contract under test is key PRESENCE/promotion parity, not identical
+		// Go types.
+		if fmt.Sprint(safeVal) != fmt.Sprint(jsonVal) {
+			t.Errorf("key %q: ToSafeValue = %v, encoding/json = %v", k, safeVal, jsonVal)
+		}
 	}
 }
 

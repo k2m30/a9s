@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// coalesce.go wraps the three AWS clients whose narrow related-checker AND
+// coalesce.go wraps the four AWS clients whose narrow related-checker AND
 // on-demand detail-enricher independently call the identical operation on
 // the identical resource on every detail open: sfn's DescribeStateMachine
 // (checkSFNRole + checkSFNKMS + checkSFNLambda + enrichSfn — up to 4x
 // concurrently), sns's GetTopicAttributes (checkSNSKMS + checkSNSRole +
-// enrichSns), and s3's GetBucketPolicy (the s3→role related checker +
-// enrichS3). golang.org/x/sync/singleflight coalesces concurrent identical
+// enrichSns), s3's GetBucketPolicy (the s3→role related checker + enrichS3),
+// and lambda's GetFunction (checkLambdaECR + enrichLambda).
+// golang.org/x/sync/singleflight coalesces concurrent identical
 // in-flight calls into one underlying call and shares its result across
 // every caller waiting on that key. Layered on top, completedResultMemo
 // (below) retains a completed operation-scoped call's result so a caller
@@ -33,11 +34,11 @@
 // this package). Demo mode's fakes (core/demo/client.go) are instant,
 // in-process, and deterministic — coalescing them would add complexity for
 // zero benefit, so they stay undecorated (core/demo/client.go overwrites
-// these three fields with typed fakes immediately after calling
+// these four fields with typed fakes immediately after calling
 // CreateServiceClients, discarding whatever real client this file
 // constructed).
 //
-// The three constructors are exported (returning the widest interface, not
+// The four constructors are exported (returning the widest interface, not
 // the concrete decorator type) so both the live bootstrap and external
 // tests (tests/unit, an exported-symbols-only package) can construct one —
 // the decorator struct types themselves stay unexported implementation
@@ -51,6 +52,7 @@ import (
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
@@ -226,17 +228,22 @@ func (c *coalescingSFN) DescribeStateMachine(ctx context.Context, params *sfn.De
 			return v.(*sfn.DescribeStateMachineOutput), nil
 		}
 	}
+	// memo.set runs INSIDE the singleflight function, before doCall's deferred
+	// cleanup deletes the group's entry for key — a caller arriving between
+	// "flight done" and "memo populated" would otherwise slip past both layers
+	// and issue a second AWS call, violating the at-most-once-per-operation
+	// contract this memo exists to keep.
 	v, err, _ := c.g.Do(key, func() (any, error) {
-		return c.SFNAPI.DescribeStateMachine(ctx, params, optFns...)
+		out, err := c.SFNAPI.DescribeStateMachine(ctx, params, optFns...)
+		if err == nil && opID != 0 {
+			c.memo.set(key, out)
+		}
+		return out, err
 	})
 	if err != nil {
 		return nil, err
 	}
-	out := v.(*sfn.DescribeStateMachineOutput)
-	if opID != 0 {
-		c.memo.set(key, out)
-	}
-	return out, nil
+	return v.(*sfn.DescribeStateMachineOutput), nil
 }
 
 // SNSFullAPI widens SNSAPI with the two SNS operations used only via a
@@ -286,17 +293,19 @@ func (c *coalescingSNS) GetTopicAttributes(ctx context.Context, params *sns.GetT
 			return v.(*sns.GetTopicAttributesOutput), nil
 		}
 	}
+	// memo.set runs INSIDE the singleflight function — see coalescingSFN's
+	// DescribeStateMachine for why (the race this closes).
 	v, err, _ := c.g.Do(key, func() (any, error) {
-		return c.SNSFullAPI.GetTopicAttributes(ctx, params, optFns...)
+		out, err := c.SNSFullAPI.GetTopicAttributes(ctx, params, optFns...)
+		if err == nil && opID != 0 {
+			c.memo.set(key, out)
+		}
+		return out, err
 	})
 	if err != nil {
 		return nil, err
 	}
-	out := v.(*sns.GetTopicAttributesOutput)
-	if opID != 0 {
-		c.memo.set(key, out)
-	}
-	return out, nil
+	return v.(*sns.GetTopicAttributesOutput), nil
 }
 
 // S3FullAPI widens S3API with the six S3 operations used only via a narrow
@@ -347,23 +356,93 @@ func NewCoalescingS3(api S3FullAPI) S3FullAPI {
 	return &coalescingS3{S3FullAPI: api, memo: newCompletedResultMemo()}
 }
 
+// s3BucketPolicyResult is the memoized value for GetBucketPolicy: it wraps
+// BOTH the output and the error, because a benign NoSuchBucketPolicy (very
+// common — most buckets have no policy) is a definitive, memoizable answer
+// for the rest of the operation, not a transient failure — the plain-output
+// memo the SFN/SNS decorators use has no room for an error half. Genuinely
+// retryable errors (anything else) are never stored here.
+type s3BucketPolicyResult struct {
+	out *s3.GetBucketPolicyOutput
+	err error
+}
+
 func (c *coalescingS3) GetBucketPolicy(ctx context.Context, params *s3.GetBucketPolicyInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyOutput, error) {
 	opID := DetailOpFromContext(ctx)
 	key := coalesceKey(ctx, aws.ToString(params.Bucket))
 	if opID != 0 {
 		if v, ok := c.memo.get(key); ok {
-			return v.(*s3.GetBucketPolicyOutput), nil
+			r := v.(s3BucketPolicyResult)
+			return r.out, r.err
 		}
 	}
+	// memo.set runs INSIDE the singleflight function — see coalescingSFN's
+	// DescribeStateMachine for why (the race this closes).
 	v, err, _ := c.g.Do(key, func() (any, error) {
-		return c.S3FullAPI.GetBucketPolicy(ctx, params, optFns...)
+		out, err := c.S3FullAPI.GetBucketPolicy(ctx, params, optFns...)
+		if opID != 0 && (err == nil || s3BenignAbsenceErr(err, "NoSuchBucketPolicy")) {
+			c.memo.set(key, s3BucketPolicyResult{out: out, err: err})
+		}
+		return out, err
 	})
 	if err != nil {
 		return nil, err
 	}
-	out := v.(*s3.GetBucketPolicyOutput)
+	return v.(*s3.GetBucketPolicyOutput), nil
+}
+
+// coalescingLambda wraps LambdaAPI, coalescing concurrent identical
+// GetFunction calls (same operation, same FunctionName) into one underlying
+// call — checkLambdaECR (lambda_related.go) and enrichLambda
+// (lambda_detail_enrichment.go) each call it independently on every Image-
+// package-type Lambda detail open. LambdaAPI is already the complete
+// aggregate of every Lambda operation asserted anywhere in core/aws
+// (LambdaGetFunctionAPI, LambdaListEventSourceMappingsAPI — apigw_related.go,
+// related_common.go, secrets_related_extra.go), so embedding it alone is
+// sufficient — no narrower interface elsewhere needs a separate pass-through,
+// unlike SNSFullAPI/S3FullAPI's widening.
+//
+// Callers must treat the shared *lambda.GetFunctionOutput as read-only:
+// every current consumer only reads from it.
+//
+// Does not violate "transport carries no session state" — see
+// coalescingSFN's doc comment; the same reasoning applies verbatim. No
+// benign-absence memoization (contrast coalescingS3): a Lambda function
+// disappearing out from under an open detail view is a genuine anomaly, not
+// a common, expected state the way an S3 bucket having no policy is — so
+// GetFunction errors are never memoized, exactly like SFN/SNS.
+type coalescingLambda struct {
+	LambdaAPI
+	g    singleflight.Group
+	memo *completedResultMemo
+}
+
+// NewCoalescingLambda wraps api with in-flight GetFunction call coalescing.
+// Exported for construction at the live client bootstrap (client.go) and
+// from external tests; the concrete decorator type stays unexported.
+func NewCoalescingLambda(api LambdaAPI) LambdaAPI {
+	return &coalescingLambda{LambdaAPI: api, memo: newCompletedResultMemo()}
+}
+
+func (c *coalescingLambda) GetFunction(ctx context.Context, params *lambda.GetFunctionInput, optFns ...func(*lambda.Options)) (*lambda.GetFunctionOutput, error) {
+	opID := DetailOpFromContext(ctx)
+	key := coalesceKey(ctx, aws.ToString(params.FunctionName))
 	if opID != 0 {
-		c.memo.set(key, out)
+		if v, ok := c.memo.get(key); ok {
+			return v.(*lambda.GetFunctionOutput), nil
+		}
 	}
-	return out, nil
+	// memo.set runs INSIDE the singleflight function — see coalescingSFN's
+	// DescribeStateMachine for why (the race this closes).
+	v, err, _ := c.g.Do(key, func() (any, error) {
+		out, err := c.LambdaAPI.GetFunction(ctx, params, optFns...)
+		if err == nil && opID != 0 {
+			c.memo.set(key, out)
+		}
+		return out, err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.(*lambda.GetFunctionOutput), nil
 }

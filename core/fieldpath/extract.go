@@ -5,6 +5,7 @@ package fieldpath
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"maps"
 	"reflect"
 	"sort"
@@ -355,7 +356,13 @@ func ToSafeValue(val reflect.Value) any {
 		// the same RawStruct in two different shapes.
 		for i := 0; i < t.NumField(); i++ {
 			field := t.Field(i)
-			if !field.IsExported() || !promotesInline(field) {
+			// No IsExported gate on this pass: reflect reports an anonymous
+			// field as unexported when the embedded TYPE's name is unexported,
+			// yet encoding/json still promotes that type's own exported fields
+			// — and resolveField resolves them. Gating here would render the
+			// same RawStruct in two different shapes across the YAML and JSON
+			// views, the divergence this two-pass promotion exists to prevent.
+			if !promotesInline(field) {
 				continue
 			}
 			fv := val.Field(i)
@@ -567,8 +574,10 @@ func tryParseJSON(s string) any {
 		return nil
 	}
 	// json.Unmarshal rejects trailing content; a single Decode does not —
-	// keep the stricter contract.
-	if dec.More() {
+	// keep the stricter contract. dec.More() is not sufficient: it reports
+	// whether another VALUE follows, so stray closing delimiters ("{...}}",
+	// "[1,2]]") slip through. Only an EOF token proves nothing trails.
+	if tok, err := dec.Token(); err != io.EOF || tok != nil {
 		return nil
 	}
 	// Ordinary numbers go back to int64/float64 so rendering is unchanged;

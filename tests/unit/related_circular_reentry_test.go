@@ -104,6 +104,7 @@ func feedEC2RelatedResults(m tui.Model, sourceID string) tui.Model {
 		m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 			ResourceType:     "ec2",
 			SourceResourceID: sourceID,
+			DefDisplayName:   def.DisplayName,
 			Result: resource.RelatedCheckResult{
 				TargetType:  def.TargetType,
 				Count:       stubRelatedCount,

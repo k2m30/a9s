@@ -389,7 +389,17 @@ func TestEnrichEc2_BinaryNonUTF8NonGzip_FallsBackToRawBase64(t *testing.T) {
 	}
 }
 
-func TestEnrichEc2_OversizedGzipUserData_TruncatedAtOneMiBCap(t *testing.T) {
+// TestEnrichEc2_OversizedGzipUserData_FallsBackToRawBase64 pins gunzipUserData's
+// explicit-error-above-the-cap contract (#261 boundary-sealing wave, item f):
+// an oversized decompressed payload must never be presented as complete,
+// truncated content. gunzipUserData itself is unexported (core/aws), so the
+// only externally observable proof that it returned an error rather than a
+// truncated []byte is that decodeUserData's caller-side fallback chain takes
+// over exactly like any other unrecoverable gunzip failure (see
+// TestEnrichEc2_CorruptGzipUserData_FallsBackToRawBase64) — the still-gzipped
+// bytes fail the utf8.Valid gate, so enrichEc2 falls back to the original
+// base64 string instead of a silently truncated 1 MiB prefix.
+func TestEnrichEc2_OversizedGzipUserData_FallsBackToRawBase64(t *testing.T) {
 	const oneMiB = 1 << 20
 	large := strings.Repeat("A", oneMiB*2) // 2 MiB decompressed, well past the 1 MiB cap
 	encoded := gzipThenBase64(t, []byte(large))
@@ -410,11 +420,38 @@ func TestEnrichEc2_OversizedGzipUserData_TruncatedAtOneMiBCap(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	enriched := got.RawStruct.(awsclient.InstanceEnriched)
-	if len(enriched.UserData) != oneMiB {
-		t.Errorf("len(enriched.UserData) = %d, want exactly the %d-byte decompression cap", len(enriched.UserData), oneMiB)
+	if enriched.UserData != encoded {
+		t.Errorf("enriched.UserData = %q, want original base64 fallback %q (oversized decompression must error, never truncate)", enriched.UserData, encoded)
 	}
-	if !strings.HasPrefix(enriched.UserData, strings.Repeat("A", 100)) {
-		t.Errorf("enriched.UserData missing expected prefix; got first bytes: %q", enriched.UserData[:min(100, len(enriched.UserData))])
+}
+
+// TestEnrichEc2_AtCapGzipUserData_DecodesIntact pins the cap's other edge:
+// a payload that decompresses to EXACTLY maxUserDataDecompressedSize (1 MiB)
+// is at-or-below the cap and must still decode in full, not trip the
+// oversized fallback above.
+func TestEnrichEc2_AtCapGzipUserData_DecodesIntact(t *testing.T) {
+	const oneMiB = 1 << 20
+	atCap := strings.Repeat("B", oneMiB)
+	encoded := gzipThenBase64(t, []byte(atCap))
+
+	fake := &enrichEc2Fake{
+		describeAttrFn: func(_ *ec2.DescribeInstanceAttributeInput) (*ec2.DescribeInstanceAttributeOutput, error) {
+			return &ec2.DescribeInstanceAttributeOutput{
+				UserData: &ec2types.AttributeValue{Value: aws.String(encoded)},
+			}, nil
+		},
+	}
+
+	enricher := ec2Enricher(t)
+	res := makeEc2Res(ec2TestInstanceID)
+
+	got, err := enricher(context.Background(), makeEc2Ctx(fake), res)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	enriched := got.RawStruct.(awsclient.InstanceEnriched)
+	if enriched.UserData != atCap {
+		t.Errorf("enriched.UserData length = %d, want the full %d-byte at-cap payload decoded intact (not the base64 fallback)", len(enriched.UserData), oneMiB)
 	}
 }
 

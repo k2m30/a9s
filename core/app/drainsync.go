@@ -46,7 +46,7 @@ func DrainSync(c *Controller, pending []runtime.TaskRequest) {
 }
 
 // DrainSyncContext is the context-aware variant of DrainSync. ctx is
-// forwarded to every Core.ExecuteTask call; callers should supply a context
+// forwarded to every Core.ExecuteTaskAt call; callers should supply a context
 // with an appropriate deadline when execution time must be bounded.
 func DrainSyncContext(ctx context.Context, c *Controller, pending []runtime.TaskRequest) {
 	DrainSyncContextProgress(ctx, c, pending, nil)

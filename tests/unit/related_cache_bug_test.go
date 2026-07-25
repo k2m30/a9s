@@ -195,6 +195,7 @@ func setupEC2DetailWithResults(t *testing.T) tui.Model {
 		m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 			ResourceType:     "ec2",
 			SourceResourceID: ec2Res[0].ID,
+			DefDisplayName:   def.DisplayName,
 			Result: resource.RelatedCheckResult{
 				TargetType:  def.TargetType,
 				Count:       stubRelatedCount,

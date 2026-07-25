@@ -134,3 +134,90 @@ func TestApply_AutoOpenSingleDetail_ZeroRowsNoPaginationNoStubCreator_Placeholde
 		t.Errorf("Body.List.Rows = %+v, want empty (still the zero-row placeholder)", snap.Body.List.Rows)
 	}
 }
+
+// TestApply_AutoOpenSingleDetail_NonEmptyPageMissingTarget_StillChasesViaFetchMore
+// pins #261's Codex-flagged gap: a page that HAS rows but does not contain
+// the target must still chase via KindFetchMore when pagination remains —
+// keying the decision on "was the target found" (matched == nil) rather than
+// len(ls.Rows) == 0. Before the fix, a non-empty page silently stopped the
+// chase, stranding a target that never lands on the first page of a large
+// listing.
+func TestApply_AutoOpenSingleDetail_NonEmptyPageMissingTarget_StillChasesViaFetchMore(t *testing.T) {
+	const targetID = "i-0target00000002"
+	c := newTestController(t)
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
+	c.SetListAutoOpenSingle(true)
+	c.PatchListRelatedIDSet([]string{targetID})
+
+	_, tasks := c.Handle(messages.ResourcesLoaded{
+		ResourceType: "ec2",
+		// Non-empty page, but none of these rows is the target — the target
+		// is somewhere on a LATER page.
+		Resources:  []resource.Resource{{ID: "i-0other0000000001", Type: "ec2"}},
+		Pagination: &resource.PaginationMeta{IsTruncated: true, NextToken: "chase-tok-2"},
+	})
+
+	var fetchMore *runtime.TaskRequest
+	for i := range tasks {
+		if tasks[i].Key.Kind == runtime.KindFetchMore {
+			fetchMore = &tasks[i]
+		}
+	}
+	if fetchMore == nil {
+		t.Fatalf("expected a KindFetchMore task when a non-empty page does not contain the target; tasks: %+v", tasks)
+	}
+	payload, ok := fetchMore.Payload.(runtime.FetchMorePayload)
+	if !ok {
+		t.Fatalf("KindFetchMore Payload = %T, want runtime.FetchMorePayload", fetchMore.Payload)
+	}
+	if payload.ContinuationToken != "chase-tok-2" {
+		t.Errorf("FetchMorePayload.ContinuationToken = %q, want %q", payload.ContinuationToken, "chase-tok-2")
+	}
+
+	snap := c.Snapshot()
+	if snap.Body.Kind != app.BodyKindList {
+		t.Errorf("Body.Kind = %v, want BodyKindList — the chase must still be in flight, no detail opened yet", snap.Body.Kind)
+	}
+}
+
+// TestApply_AutoOpenSingleDetail_LoadingMoreAlreadyTrue_NoPrematureStubCreation
+// pins the LoadingMore guard: while the TOP-of-stack placeholder list's own
+// chase is already in flight (ls.LoadingMore == true), autoOpenSingleDetail
+// must never fall through to StubCreator synthesis for it — even for a type
+// ("ami") that has one registered. Handle's ResourcesLoaded case
+// unconditionally clears LoadingMore on the SCREEN THE INCOMING EVENT
+// MATCHES (handleResourcesLoadedEvent resolves ls by ResourceType, not
+// simply "top of stack" — see Handle's own doc comment), so this drives a
+// ResourcesLoaded for a DIFFERENT, unrelated resource type ("ec2", not on
+// the stack at all): it never touches the "ami" placeholder's LoadingMore,
+// yet autoOpenSingleDetail still evaluates whatever is currently on top
+// ("ami") on every ResourcesLoaded event. Without the guard, this unrelated
+// event would misread "ami"'s still-in-flight chase as exhausted and
+// synthesize a premature stub.
+func TestApply_AutoOpenSingleDetail_LoadingMoreAlreadyTrue_NoPrematureStubCreation(t *testing.T) {
+	const targetID = "ami-0race0000000001"
+	c := newTestController(t)
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ami"})
+	c.SetListAutoOpenSingle(true)
+	c.PatchListRelatedIDSet([]string{targetID})
+	c.SetListLoadingMore(true)
+
+	var snap app.ViewState
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("Handle panicked while a chase was already in flight: %v", r)
+			}
+		}()
+		c.Handle(messages.ResourcesLoaded{
+			ResourceType: "ec2",
+			Resources:    nil,
+			Pagination:   nil,
+		})
+		snap = c.Snapshot()
+	}()
+
+	if snap.Body.Kind != app.BodyKindList {
+		t.Errorf("Body.Kind = %v, want BodyKindList — a chase already in flight on the top-of-stack placeholder must never fall through to premature stub synthesis, even when an unrelated ResourcesLoaded event arrives", snap.Body.Kind)
+	}
+}

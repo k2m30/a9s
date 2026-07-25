@@ -216,3 +216,89 @@ func TestDetailDocCache_SetIfNewer_OpZero_WritesEmptyKey_DoesNotBlockLaterOp(t *
 		t.Errorf("Get after op-3 write = %v, want %q", got, "op-3-value")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Version-keyed eviction (#261 boundary-sealing wave, item e): accepting a
+// newer version-stamped key for the same logical resource (e.g. a
+// CloudFormation stack's repeated "cfn:<id>:<version>" template updates)
+// must evict the superseded key's doc AND its writerOp bookkeeping, so the
+// cache does not grow without bound across the session's lifetime for a
+// stack an operator keeps refreshing.
+// ---------------------------------------------------------------------------
+
+// TestDetailDocCache_SetIfNewer_NewerVersionedKey_EvictsSupersededDoc pins
+// the core eviction contract: two keys sharing the same "<prefix>:<id>"
+// logical resource (only the trailing ":<version>" differs) — accepting the
+// newer one removes the older key's doc entirely, and the newer key holds
+// the new value.
+func TestDetailDocCache_SetIfNewer_NewerVersionedKey_EvictsSupersededDoc(t *testing.T) {
+	var cache awsclient.DetailDocCache
+	const keyV1 = "cfn:prod-vpc-network:100"
+	const keyV2 = "cfn:prod-vpc-network:200"
+
+	if ok := cache.SetIfNewer(keyV1, "template-v1", domain.Gen(5)); !ok {
+		t.Fatal("SetIfNewer(v1) on an empty key must succeed")
+	}
+	if got := cache.Get(keyV1); got != "template-v1" {
+		t.Fatalf("Get(v1) after v1 write = %v, want %q", got, "template-v1")
+	}
+
+	if ok := cache.SetIfNewer(keyV2, "template-v2", domain.Gen(5)); !ok {
+		t.Fatal("SetIfNewer(v2) must succeed")
+	}
+	if got := cache.Get(keyV2); got != "template-v2" {
+		t.Errorf("Get(v2) after v2 write = %v, want %q", got, "template-v2")
+	}
+	if got := cache.Get(keyV1); got != nil {
+		t.Errorf("Get(v1) after v2 accepted for the same logical resource = %v, want nil (superseded key evicted)", got)
+	}
+}
+
+// TestDetailDocCache_SetIfNewer_EvictedKey_WriterOpBookkeepingAlsoCleared
+// pins that eviction removes the superseded key's writerOp entry too, not
+// just its doc: re-using the OLD key's name after eviction with an opID that
+// would have been refused against its ORIGINAL writer must now succeed,
+// since nothing records that original writer any longer.
+func TestDetailDocCache_SetIfNewer_EvictedKey_WriterOpBookkeepingAlsoCleared(t *testing.T) {
+	var cache awsclient.DetailDocCache
+	const keyV1 = "cfn:prod-vpc-network:100"
+	const keyV2 = "cfn:prod-vpc-network:200"
+
+	if ok := cache.SetIfNewer(keyV1, "template-v1", domain.Gen(9)); !ok {
+		t.Fatal("SetIfNewer(v1, op 9) must succeed")
+	}
+	if ok := cache.SetIfNewer(keyV2, "template-v2", domain.Gen(9)); !ok {
+		t.Fatal("SetIfNewer(v2, op 9) must succeed — evicts v1's doc and writerOp entry")
+	}
+
+	// Re-writing keyV1 (now absent) with an op strictly OLDER than the op 9
+	// that originally wrote it must succeed — op 9 no longer has a recorded
+	// claim on keyV1, since eviction cleared it.
+	if ok := cache.SetIfNewer(keyV1, "template-v1-again", domain.Gen(1)); !ok {
+		t.Error("SetIfNewer(v1, op 1) after eviction reported failure — the evicted key's writerOp entry must have been cleared, not just its doc")
+	}
+	if got := cache.Get(keyV1); got != "template-v1-again" {
+		t.Errorf("Get(v1) after re-write = %v, want %q", got, "template-v1-again")
+	}
+}
+
+// TestDetailDocCache_SetIfNewer_OrderingSemantics_UnchangedForNonEvictedKey
+// pins that version-keyed eviction bookkeeping does not alter the
+// stale-op-refused/newer-op-replaces ordering contract for writes to the
+// SAME key — TestDetailDocCache_SetIfNewer_StaleOpRefused_NewerOpReplaces
+// above already pins this for a bare (unversioned) key; this variant uses a
+// versioned key to confirm the eviction bookkeeping path doesn't change it.
+func TestDetailDocCache_SetIfNewer_OrderingSemantics_UnchangedForNonEvictedKey(t *testing.T) {
+	var cache awsclient.DetailDocCache
+	const key = "cfn:prod-vpc-network:100"
+
+	if ok := cache.SetIfNewer(key, "op-7-value", domain.Gen(7)); !ok {
+		t.Fatal("SetIfNewer(op 7) must succeed")
+	}
+	if ok := cache.SetIfNewer(key, "op-5-value", domain.Gen(5)); ok {
+		t.Error("SetIfNewer(op 5) reported success — a strictly-older op must still be refused for a versioned key")
+	}
+	if got := cache.Get(key); got != "op-7-value" {
+		t.Errorf("Get after refused op-5 write = %v, want op-7's value %q unchanged", got, "op-7-value")
+	}
+}

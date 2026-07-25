@@ -18,9 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   show decoded user data (base64 and gzip handled); SNS topics show
   their full attribute set including effective delivery policy; S3
   buckets show bucket policy, CORS rules, and lifecycle configuration.
-  All nine enrichers (the six new plus IAM policy documents, role
-  policies, and Transfer agreements) run on one generic engine, and a
-  dedicated demo smoke gate walks every one of them on every push.
+  These six and the two IAM document enrichers run on one generic
+  engine (Transfer agreements keep their own resolver), and a dedicated
+  demo smoke gate walks all nine of them on every push.
 - Detail open/refresh runs under a single operation identity: the
   enrichment and every related-panel check created by one user action
   share one generation, one set of AWS clients, and one call-coalescing

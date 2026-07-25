@@ -185,18 +185,7 @@ func (c *Core) RefreshListEnrichment(rt string) domain.Gen {
 	if !c.HasIssueEnricher(canon) {
 		return 0
 	}
-	c.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
-		if len(rows) == 0 {
-			return rows
-		}
-		out := make([]resource.Resource, len(rows))
-		copy(out, rows)
-		for i := range out {
-			out[i].Findings = stripWave2Findings(out[i].Findings)
-			out[i].AttentionDetails = nil
-		}
-		return out
-	})
+	c.AmendRows(canon, stripWave2FindingsRows)
 	tok := c.BumpEnrichmentTypeGen(canon)
 	c.DeleteEnrichmentRan(canon)
 	c.DeleteEnrichmentTruncatedIDs(canon)
@@ -225,18 +214,7 @@ func (c *Core) ClearAllWave2Findings() {
 		canons[k] = struct{}{}
 	}
 	for canon := range canons {
-		c.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
-			if len(rows) == 0 {
-				return rows
-			}
-			out := make([]resource.Resource, len(rows))
-			copy(out, rows)
-			for i := range out {
-				out[i].Findings = stripWave2Findings(out[i].Findings)
-				out[i].AttentionDetails = nil
-			}
-			return out
-		})
+		c.AmendRows(canon, stripWave2FindingsRows)
 	}
 }
 
@@ -250,6 +228,23 @@ func stripWave2Findings(findings []domain.Finding) []domain.Finding {
 		if !strings.HasPrefix(f.Source, "wave2:") {
 			out = append(out, f)
 		}
+	}
+	return out
+}
+
+// stripWave2FindingsRows returns a copy of rows with every wave2-sourced
+// Finding removed and AttentionDetails cleared — the shared AmendRows
+// callback RefreshListEnrichment and ClearAllWave2Findings both need: a
+// stale wave2 verdict must not survive into the next enrichment pass.
+func stripWave2FindingsRows(rows []resource.Resource) []resource.Resource {
+	if len(rows) == 0 {
+		return rows
+	}
+	out := make([]resource.Resource, len(rows))
+	copy(out, rows)
+	for i := range out {
+		out[i].Findings = stripWave2Findings(out[i].Findings)
+		out[i].AttentionDetails = nil
 	}
 	return out
 }

@@ -22,15 +22,26 @@ import (
 // decompression of an adversarial or corrupt payload must still be bounded.
 const maxUserDataDecompressedSize = 1 << 20 // 1 MiB
 
-// gunzipUserData decompresses gzip-magic-prefixed user data, capping output
-// at maxUserDataDecompressedSize via io.LimitReader.
+// gunzipUserData decompresses gzip-magic-prefixed user data, returning an
+// explicit error when the decompressed size exceeds
+// maxUserDataDecompressedSize rather than silently truncating and presenting
+// partial content as complete: reads one byte past the cap via io.LimitReader
+// so a still-full reader after that read means the true size is unknown but
+// at least cap+1, definitively over the limit.
 func gunzipUserData(data []byte) ([]byte, error) {
 	r, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
 	defer r.Close() //nolint:errcheck // read-only decompression, nothing to flush
-	return io.ReadAll(io.LimitReader(r, maxUserDataDecompressedSize))
+	out, err := io.ReadAll(io.LimitReader(r, maxUserDataDecompressedSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(out) > maxUserDataDecompressedSize {
+		return nil, fmt.Errorf("decompressed user data exceeds %d bytes", maxUserDataDecompressedSize)
+	}
+	return out, nil
 }
 
 // decodeUserData runs the DescribeInstanceAttribute UserData decode chain:

@@ -60,17 +60,35 @@ func (c *Core) observeRelatedCheckResultRows(msg messages.RelatedCheckResult) {
 }
 
 // resolveCachedPagePagination derives the PaginationMeta to store for one
-// RelatedCheckResult CachedPages entry: entry.Pagination verbatim when
-// present, or a synthesized {IsTruncated: true} when the entry reports
-// truncation without carrying pagination detail (e.g. a related-checker's
-// NeedsTargetCache prefetch that only inspected a first page). Shared by
-// observeRelatedCheckResultRows's RowStore dual-write above and
-// HandleRelatedCheckResult's PatchResourceCache intent
+// RelatedCheckResult CachedPages entry: entry.Pagination when present, or a
+// synthesized {IsTruncated: true} when the entry reports truncation without
+// carrying pagination detail (e.g. a related-checker's NeedsTargetCache
+// prefetch that only inspected a first page). Truncation is a UNION of
+// entry.IsTruncated and entry.Pagination.IsTruncated, never a downgrade —
+// matching this codebase's standing rule that a truncation signal only ever
+// strengthens (C5's nil-Pagination-is-conservatively-truncated, RowStore's
+// refusal to replace an exact entry with a stale truncated subset, the
+// availability path's refusal to promote an unobserved count to Exact): a
+// future constructor that ever sets the two fields independently must not
+// have this silently turn a true "N+" into a confident, wrong "N". Copies
+// the struct rather than mutating it in place, since the same *PaginationMeta
+// also reaches PatchResourceCache's write of the canonical ResourceCache
+// entry. Shared by observeRelatedCheckResultRows's RowStore dual-write above
+// and HandleRelatedCheckResult's PatchResourceCache intent
 // (handlers_resources.go) so the two writers of the same CachedPages data
 // cannot diverge on which entries the truncation assumption applies to.
 func resolveCachedPagePagination(entry resource.ResourceCacheEntry) *resource.PaginationMeta {
-	if entry.Pagination == nil && entry.IsTruncated {
-		return &resource.PaginationMeta{IsTruncated: true}
+	if entry.Pagination == nil {
+		if entry.IsTruncated {
+			return &resource.PaginationMeta{IsTruncated: true}
+		}
+		return nil
 	}
-	return entry.Pagination
+	truncated := entry.IsTruncated || entry.Pagination.IsTruncated
+	if entry.Pagination.IsTruncated == truncated {
+		return entry.Pagination
+	}
+	meta := *entry.Pagination
+	meta.IsTruncated = true
+	return &meta
 }

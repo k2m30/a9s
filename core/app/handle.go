@@ -425,15 +425,18 @@ func (c *Controller) popAutoOpenSinglePlaceholderOnNotFound(msg messages.ByIDFet
 // renderer stack, so it never opens detail through this controller path.
 //
 // Two fallbacks so a by-ID drill never strands the placeholder list forever
-// when the target row never lands on the first page:
+// when the target row never lands on the current page — keyed on "was the
+// target found", not "is the page empty": a page with unrelated rows but
+// not the target is exactly as unresolved as an empty one, and must chase
+// the same way:
 //
-//  1. Zero rows, more pages available (HasPagination), no chase already in
-//     flight (!LoadingMore): return the KindFetchMore task that paginates
-//     further, same shape handleActionLoadMore builds.
-//  2. Zero rows, no more pages: synthesize a stub Resource via the type's
-//     registered StubCreator and open its detail directly — the listing
-//     genuinely never surfaced the target (e.g. a cross-account reference),
-//     so there is nothing left to page through.
+//  1. Target not found, more pages available (HasPagination), no chase
+//     already in flight (!LoadingMore): return the KindFetchMore task that
+//     paginates further, same shape handleActionLoadMore builds.
+//  2. Target not found, no more pages: synthesize a stub Resource via the
+//     type's registered StubCreator and open its detail directly — the
+//     listing genuinely never surfaced the target (e.g. a cross-account
+//     reference), so there is nothing left to page through.
 //
 // If neither fallback applies (no pagination and no StubCreator), the
 // placeholder list is left as-is, same as before these fallbacks existed.
@@ -465,9 +468,11 @@ func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 	}
 	targetType := top.Ctx.ResourceType
 	if matched == nil {
-		if len(ls.Rows) != 0 {
-			return nil // target row not loaded yet; keep the placeholder list
-		}
+		// A page that HAS rows but not the target is exactly the "never lands
+		// on the first page" case fallback 1 exists for — keying this on
+		// len(ls.Rows) instead of "was the target found" stranded any target
+		// past page 1 on a large listing, silently contradicting this
+		// function's own "never stranded" contract.
 		if ls.HasPagination && !ls.LoadingMore {
 			ls.LoadingMore = true
 			return []runtime.TaskRequest{{
@@ -478,6 +483,9 @@ func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 					FetchFilter:       ls.FetchFilter,
 				},
 			}}
+		}
+		if ls.LoadingMore {
+			return nil // a chase is already in flight; wait for its result
 		}
 		td := resource.FindResourceType(targetType)
 		if td == nil {

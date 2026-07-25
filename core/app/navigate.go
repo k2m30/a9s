@@ -279,9 +279,20 @@ func (c *Controller) ReplayRelatedCache(resourceType string, res resource.Resour
 }
 
 // replayRelatedCache is the lock-free implementation of ReplayRelatedCache.
+// Returns whether the cache covers EVERY def resource.GetRelated(resourceType)
+// registers — an explicit completeness answer, not inferred from "did we
+// merge anything". A PARTIAL cache (some defs' checks completed in a prior
+// operation, others never finished before this one began) still merges
+// every entry it has — render what you know — but reports incomplete so the
+// caller keeps dispatching the related-check task; otherwise the still
+// in-flight defs' rows would be stranded in Loading forever, since
+// BeginDetailOperation has already invalidated whatever was still running
+// for them under the prior operation ID.
+//
 // Callers must hold c.mu (write).
 func (c *Controller) replayRelatedCache(resourceType string, res resource.Resource) bool {
-	if len(resource.GetRelated(resourceType)) == 0 {
+	defs := resource.GetRelated(resourceType)
+	if len(defs) == 0 {
 		return false
 	}
 	ds := c.topDetailState()
@@ -293,6 +304,7 @@ func (c *Controller) replayRelatedCache(resourceType string, res resource.Resour
 	if !hit || len(cached) == 0 {
 		return false
 	}
+	haveDef := make(map[string]bool, len(cached))
 	for _, entry := range cached {
 		errMsg := ""
 		if entry.Result.Err != nil {
@@ -300,6 +312,12 @@ func (c *Controller) replayRelatedCache(resourceType string, res resource.Resour
 		}
 		mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType,
 			entry.Result.EffectiveState(), entry.Result.Count, false, errMsg, entry.Result.Truncated, entry.Result.ResourceIDs, entry.Result.FetchFilter)
+		haveDef[entry.DefDisplayName] = true
+	}
+	for _, def := range defs {
+		if !haveDef[def.DisplayName] {
+			return false
+		}
 	}
 	return true
 }
@@ -440,16 +458,21 @@ func (c *Controller) beginDetailWorkloadLocked(rt string, res resource.Resource,
 	effectiveRefresh := refresh || pendingRefresh
 
 	op, built := c.core.BeginDetailOperation(rt, res, effectiveRefresh)
-	if refresh {
-		c.core.PendingDetailRefreshSet(key, op.ID)
-	}
 
-	hasRelated := false
+	hasEnrich, hasRelated := false, false
 	for _, t := range built {
-		if t.Key.Kind == runtime.KindRelatedCheck {
+		switch t.Key.Kind {
+		case runtime.KindEnrichDetail:
+			hasEnrich = true
+		case runtime.KindRelatedCheck:
 			hasRelated = true
-			break
 		}
+	}
+	// Only an enrichment completion retires the record (Core.HandleEnrichDetailResult),
+	// and SkipCache is the only thing it feeds — arming it for a type with no
+	// enricher would strand an entry nothing can ever clear.
+	if refresh && hasEnrich {
+		c.core.PendingDetailRefreshSet(key, op.ID)
 	}
 	if !hasRelated {
 		return op, built

@@ -57,9 +57,3 @@ func MissingFromCache(cache resource.ResourceCache, targetType string, ids []str
 	}
 	return missing
 }
-
-// BuildResourceCacheSnapshot is defined in probes.go. Every RunRelatedDef
-// caller — the TUI's per-def fan-out (runtime_adapter_related.go) and the
-// executor's KindRelatedCheck case (executor.go) alike — builds its
-// cacheSnap argument via Core.BuildResourceCacheSnapshot, so both lanes see
-// the identical IsTruncated-aware snapshot.

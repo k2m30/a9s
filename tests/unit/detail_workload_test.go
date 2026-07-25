@@ -238,27 +238,38 @@ func TestDetailWorkload_OpenRelatedDetail_BothTasksSameOp(t *testing.T) {
 	assertCompleteWorkload(t, tasks)
 }
 
-// TestDetailWorkload_CacheReplay_RelatedOmitted_EnrichPresentFreshOp covers
-// the replay carve-out: a fresh detail open for a resource whose related
-// cache is already populated must NOT dispatch a new KindRelatedCheck (the
-// cached rows are replayed directly into the panel instead — D6), while
-// KindEnrichDetail must still be present, carrying a genuinely fresh
-// (non-zero) op ID.
-func TestDetailWorkload_CacheReplay_RelatedOmitted_EnrichPresentFreshOp(t *testing.T) {
+// TestDetailWorkload_CacheReplay_CompleteCoverage_RelatedOmitted_EnrichPresentFreshOp
+// covers the replay carve-out's COMPLETE-coverage half: a fresh detail open
+// for a resource whose related cache already holds an entry for EVERY def
+// resource.GetRelated(ec2) registers must NOT dispatch a new
+// KindRelatedCheck (the cached rows are replayed directly into the panel
+// instead — D6), while KindEnrichDetail must still be present, carrying a
+// genuinely fresh (non-zero) op ID. Partial coverage (some but not all defs
+// cached) is a DIFFERENT contract — see
+// TestDetailWorkload_CacheReplay_PartialCoverage_RelatedStillDispatched.
+func TestDetailWorkload_CacheReplay_CompleteCoverage_RelatedOmitted_EnrichPresentFreshOp(t *testing.T) {
 	c, core := newDetailParityHeadlessController(t)
 	const id = "i-workload0000008"
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: workloadSrcType})
 	c.ApplyResourcesLoaded(workloadSrcType, []resource.Resource{workloadRes(id)}, nil, false)
 
-	def0 := resource.GetRelated(workloadSrcType)[0]
-	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), []runtime.RelatedCacheResult{
-		{DefDisplayName: def0.DisplayName, Result: resource.RelatedCheckResult{TargetType: def0.TargetType, State: domain.RelatedResolved, Count: 3}},
-	})
+	defs := resource.GetRelated(workloadSrcType)
+	if len(defs) < 2 {
+		t.Fatalf("resource.GetRelated(%q) has only %d defs, want several for a meaningful complete-coverage fixture", workloadSrcType, len(defs))
+	}
+	results := make([]runtime.RelatedCacheResult, 0, len(defs))
+	for _, d := range defs {
+		results = append(results, runtime.RelatedCacheResult{
+			DefDisplayName: d.DisplayName,
+			Result:         resource.RelatedCheckResult{TargetType: d.TargetType, State: domain.RelatedResolved, Count: 3},
+		})
+	}
+	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), results)
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionSelect})
 
 	if related := findTaskKind(tasks, runtime.KindRelatedCheck); related != nil {
-		t.Errorf("KindRelatedCheck task present on a cache-replay detail open; want omitted (D6: no re-fan-out over cached data). tasks: %v", taskKindsOf(tasks))
+		t.Errorf("KindRelatedCheck task present on a COMPLETE cache-replay detail open; want omitted (D6: no re-fan-out over cached data). tasks: %v", taskKindsOf(tasks))
 	}
 	enrich := findTaskKind(tasks, runtime.KindEnrichDetail)
 	if enrich == nil {
@@ -272,6 +283,7 @@ func TestDetailWorkload_CacheReplay_RelatedOmitted_EnrichPresentFreshOp(t *testi
 	if snap.Body.Detail == nil {
 		t.Fatal("Snapshot().Body.Detail is nil after a cache-replay detail open")
 	}
+	def0 := defs[0]
 	var found bool
 	for _, block := range snap.Body.Detail.Related {
 		if block.Name == def0.DisplayName {
@@ -283,6 +295,58 @@ func TestDetailWorkload_CacheReplay_RelatedOmitted_EnrichPresentFreshOp(t *testi
 	}
 	if !found {
 		t.Errorf("related panel has no block named %q — cache replay did not populate it", def0.DisplayName)
+	}
+}
+
+// TestDetailWorkload_CacheReplay_PartialCoverage_RelatedStillDispatched
+// covers the replay carve-out's PARTIAL-coverage half (#261 Codex P1): a
+// related cache covering only SOME of ec2's registered defs must still
+// merge every cached entry it has into the panel (render what you know), but
+// must NOT suppress KindRelatedCheck — the still-uncached defs' rows would
+// otherwise be stranded in Loading forever, since BeginDetailOperation has
+// already invalidated whatever was still running for them under any prior
+// operation ID.
+func TestDetailWorkload_CacheReplay_PartialCoverage_RelatedStillDispatched(t *testing.T) {
+	c, core := newDetailParityHeadlessController(t)
+	const id = "i-workload0000010"
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: workloadSrcType})
+	c.ApplyResourcesLoaded(workloadSrcType, []resource.Resource{workloadRes(id)}, nil, false)
+
+	defs := resource.GetRelated(workloadSrcType)
+	if len(defs) < 2 {
+		t.Fatalf("resource.GetRelated(%q) has only %d defs, want at least 2 so a strict subset is possible", workloadSrcType, len(defs))
+	}
+	def0 := defs[0]
+	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), []runtime.RelatedCacheResult{
+		{DefDisplayName: def0.DisplayName, Result: resource.RelatedCheckResult{TargetType: def0.TargetType, State: domain.RelatedResolved, Count: 3}},
+	})
+
+	_, tasks := c.Apply(app.Action{Kind: app.ActionSelect})
+
+	related := findTaskKind(tasks, runtime.KindRelatedCheck)
+	if related == nil {
+		t.Errorf("KindRelatedCheck task absent on a PARTIAL cache-replay detail open (%d/%d defs cached); want still dispatched so the uncached defs are not stranded in Loading. tasks: %v", 1, len(defs), taskKindsOf(tasks))
+	}
+	enrich := findTaskKind(tasks, runtime.KindEnrichDetail)
+	if enrich == nil {
+		t.Fatalf("KindEnrichDetail task missing on a cache-replay detail open; tasks: %v", taskKindsOf(tasks))
+	}
+
+	snap := c.Snapshot()
+	if snap.Body.Detail == nil {
+		t.Fatal("Snapshot().Body.Detail is nil after a cache-replay detail open")
+	}
+	var found bool
+	for _, block := range snap.Body.Detail.Related {
+		if block.Name == def0.DisplayName {
+			found = true
+			if block.State != domain.RelatedResolved || block.Count != 3 {
+				t.Errorf("related block %q = {State:%v Count:%d}, want {State:RelatedResolved Count:3} eagerly merged from the partial cache", def0.DisplayName, block.State, block.Count)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("related panel has no block named %q — partial cache replay did not merge the entry it DOES have", def0.DisplayName)
 	}
 }
 
@@ -489,5 +553,31 @@ func TestStickyRefresh_RotateClearsIt(t *testing.T) {
 	successorTasks := mintSuccessorWorkload(t, c, id)
 	if enrichSkipCache(t, successorTasks) {
 		t.Error("successor operation's DetailCtx.SkipCache = true after Session.Rotate(), want false — Rotate must clear all pending-refresh state")
+	}
+}
+
+// TestStickyRefresh_EnricherlessTypeDoesNotArmIt pins the arming precondition:
+// only a workload that actually carries enrichment records a pending refresh.
+// SkipCache is the record's sole consumer and only an EnrichDetailResult
+// retires it (Core.HandleEnrichDetailResult), so arming it for one of the many
+// types with no registered detail enricher would strand an entry no completion
+// can ever clear — a per-refreshed-resource leak living until Rotate.
+func TestStickyRefresh_EnricherlessTypeDoesNotArmIt(t *testing.T) {
+	c, core := newDetailParityHeadlessController(t)
+	const rt, id = "vpc", "vpc-0a1b2c3d4e5f60001"
+	if resource.GetDetailEnricher(rt) != nil {
+		t.Fatalf("fixture invalid: %q now registers a detail enricher — pick a type without one", rt)
+	}
+
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: rt})
+	c.ApplyResourcesLoaded(rt, []resource.Resource{{ID: id, Type: rt}}, nil, false)
+	c.Apply(app.Action{Kind: app.ActionSelect})
+
+	_, tasks := c.Apply(app.Action{Kind: app.ActionRefresh})
+	if findTaskKind(tasks, runtime.KindEnrichDetail) != nil {
+		t.Fatalf("fixture invalid: %q dispatched an enrich task; got %v", rt, taskKindsOf(tasks))
+	}
+	if _, armed := core.PendingDetailRefreshGet(runtime.RelatedCacheKey(rt, id)); armed {
+		t.Error("refresh on an enricher-less type armed the pending-refresh record — nothing can ever clear it")
 	}
 }
