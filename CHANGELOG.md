@@ -44,7 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   terminal again; both previously rendered no feedback at all.
 - Documents keep numeric fidelity: integers above 2^53 in policy
   documents, templates, ASL definitions, and topic attributes no longer
-  silently round (9007199254740993 stayed ...992 before).
+  silently round (9007199254740993 stayed ...992 before), and a
+  malformed document with a stray trailing brace still displays
+  verbatim rather than being reshaped into structure.
 - YAML and JSON views render the same shape for the same resource: the
   YAML view promotes embedded struct fields exactly like the JSON view
   (`encoding/json` semantics) instead of nesting them under the

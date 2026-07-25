@@ -196,6 +196,48 @@ func TestDetailWorkload_RelatedRowRetry_BothTasksSameOp(t *testing.T) {
 	assertCompleteWorkload(t, tasks)
 }
 
+// TestDetailWorkload_RelatedRowRetry_ForceRelated_CompleteButStaleCache_StillDispatchesRelatedCheck
+// pins #261's forceRelated pin (item c's companion): a resolve-in-place
+// retry (ActionRelatedSelect on a RelatedUnknown row) must still dispatch
+// KindRelatedCheck even when relatedCacheCoverage would otherwise read the
+// cache as COMPLETE (every def already has an entry, seeded stale here) —
+// forceRelated's RelatedCacheDelete is deliberately NOT made redundant by
+// PatchRelatedCache's idempotent-per-def replace (item c): a duplicate-free
+// cache can still be fully populated and stale, and only the delete forces
+// relatedCacheCoverage to read "incomplete" again.
+func TestDetailWorkload_RelatedRowRetry_ForceRelated_CompleteButStaleCache_StillDispatchesRelatedCheck(t *testing.T) {
+	c, core := newDetailParityHeadlessController(t)
+	const id = "i-workload0000015"
+	openWorkloadDetail(t, c, id)
+
+	def0, idx0 := workloadRelatedDefByTarget(t, "cfn")
+
+	// Seed COMPLETE coverage for every ec2 def (including "cfn" itself) with
+	// stale values — relatedCacheCoverage alone would read this as complete
+	// and suppress KindRelatedCheck (item b), regardless of item c's
+	// duplicate-free replace fix.
+	defs := resource.GetRelated(workloadSrcType)
+	results := make([]runtime.RelatedCacheResult, 0, len(defs))
+	for _, d := range defs {
+		results = append(results, runtime.RelatedCacheResult{
+			DefDisplayName: d.DisplayName,
+			Result:         resource.RelatedCheckResult{TargetType: d.TargetType, State: domain.RelatedResolved, Count: 3},
+		})
+	}
+	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), results)
+
+	// Put the retried row into RelatedUnknown focus — the resolve-in-place
+	// trigger (resource.RelatedEnter returns RelatedEnterResolveInPlace).
+	c.ApplyDetailRelatedResultForResource(workloadSrcType, id, def0.DisplayName, def0.TargetType,
+		domain.RelatedUnknown, 0, false, "", false, nil, nil)
+
+	_, tasks := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: strconv.Itoa(idx0)})
+
+	if related := findTaskKind(tasks, runtime.KindRelatedCheck); related == nil {
+		t.Errorf("KindRelatedCheck task absent on a forceRelated resolve-in-place retry against a COMPLETE (but stale) related cache; want still dispatched (forceRelated's delete must not be made redundant by the duplicate-free replace fix). tasks: %v", taskKindsOf(tasks))
+	}
+}
+
 // TestDetailWorkload_DetailCtrlR_BothTasksSameOp covers "detail Ctrl+R":
 // ActionRefresh while a detail screen is on top always deletes the related
 // cache first, so this is never the cache-replay case — both tasks must be
@@ -347,6 +389,115 @@ func TestDetailWorkload_CacheReplay_PartialCoverage_RelatedStillDispatched(t *te
 	}
 	if !found {
 		t.Errorf("related panel has no block named %q — partial cache replay did not merge the entry it DOES have", def0.DisplayName)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// YAML/JSON direct-open cache-replay suppression (#261 Codex-flagged
+// regression, item b): beginDetailWorkloadLocked's suppression decision
+// (relatedCacheCoverage) is screen-independent — a YAML/JSON-only open has
+// no detail panel to merge into, but must still suppress KindRelatedCheck on
+// complete coverage exactly like the plain-detail path above
+// (TestDetailWorkload_CacheReplay_CompleteCoverage_.../_PartialCoverage_...).
+// Before the fix, replayRelatedCache bailed out (incomplete) whenever
+// topDetailState() was nil — always true under a YAML/JSON screen — so
+// every such open re-ran the ENTIRE related fan-out against AWS regardless
+// of cache completeness.
+// ---------------------------------------------------------------------------
+
+func TestDetailWorkload_YAMLOpen_CompleteCoverage_RelatedOmitted(t *testing.T) {
+	c, core := newDetailParityHeadlessController(t)
+	const id = "i-workload0000011"
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: workloadSrcType})
+	c.ApplyResourcesLoaded(workloadSrcType, []resource.Resource{workloadRes(id)}, nil, false)
+
+	defs := resource.GetRelated(workloadSrcType)
+	results := make([]runtime.RelatedCacheResult, 0, len(defs))
+	for _, d := range defs {
+		results = append(results, runtime.RelatedCacheResult{
+			DefDisplayName: d.DisplayName,
+			Result:         resource.RelatedCheckResult{TargetType: d.TargetType, State: domain.RelatedResolved, Count: 3},
+		})
+	}
+	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), results)
+
+	_, tasks := c.Apply(app.Action{Kind: app.ActionOpenYAML})
+
+	if related := findTaskKind(tasks, runtime.KindRelatedCheck); related != nil {
+		t.Errorf("KindRelatedCheck task present on a YAML open with COMPLETE related-cache coverage; want omitted. tasks: %v", taskKindsOf(tasks))
+	}
+	if enrich := findTaskKind(tasks, runtime.KindEnrichDetail); enrich == nil {
+		t.Fatalf("KindEnrichDetail task missing on a YAML open; tasks: %v", taskKindsOf(tasks))
+	}
+}
+
+func TestDetailWorkload_YAMLOpen_PartialCoverage_RelatedStillDispatched(t *testing.T) {
+	c, core := newDetailParityHeadlessController(t)
+	const id = "i-workload0000012"
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: workloadSrcType})
+	c.ApplyResourcesLoaded(workloadSrcType, []resource.Resource{workloadRes(id)}, nil, false)
+
+	defs := resource.GetRelated(workloadSrcType)
+	if len(defs) < 2 {
+		t.Fatalf("resource.GetRelated(%q) has only %d defs, want at least 2 so a strict subset is possible", workloadSrcType, len(defs))
+	}
+	def0 := defs[0]
+	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), []runtime.RelatedCacheResult{
+		{DefDisplayName: def0.DisplayName, Result: resource.RelatedCheckResult{TargetType: def0.TargetType, State: domain.RelatedResolved, Count: 3}},
+	})
+
+	_, tasks := c.Apply(app.Action{Kind: app.ActionOpenYAML})
+
+	if related := findTaskKind(tasks, runtime.KindRelatedCheck); related == nil {
+		t.Errorf("KindRelatedCheck task absent on a YAML open with PARTIAL related-cache coverage (%d/%d defs cached); want still dispatched. tasks: %v", 1, len(defs), taskKindsOf(tasks))
+	}
+}
+
+func TestDetailWorkload_JSONOpen_CompleteCoverage_RelatedOmitted(t *testing.T) {
+	c, core := newDetailParityHeadlessController(t)
+	const id = "i-workload0000013"
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: workloadSrcType})
+	c.ApplyResourcesLoaded(workloadSrcType, []resource.Resource{workloadRes(id)}, nil, false)
+
+	defs := resource.GetRelated(workloadSrcType)
+	results := make([]runtime.RelatedCacheResult, 0, len(defs))
+	for _, d := range defs {
+		results = append(results, runtime.RelatedCacheResult{
+			DefDisplayName: d.DisplayName,
+			Result:         resource.RelatedCheckResult{TargetType: d.TargetType, State: domain.RelatedResolved, Count: 3},
+		})
+	}
+	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), results)
+
+	_, tasks := c.Apply(app.Action{Kind: app.ActionOpenJSON})
+
+	if related := findTaskKind(tasks, runtime.KindRelatedCheck); related != nil {
+		t.Errorf("KindRelatedCheck task present on a JSON open with COMPLETE related-cache coverage; want omitted. tasks: %v", taskKindsOf(tasks))
+	}
+	if enrich := findTaskKind(tasks, runtime.KindEnrichDetail); enrich == nil {
+		t.Fatalf("KindEnrichDetail task missing on a JSON open; tasks: %v", taskKindsOf(tasks))
+	}
+}
+
+func TestDetailWorkload_JSONOpen_PartialCoverage_RelatedStillDispatched(t *testing.T) {
+	c, core := newDetailParityHeadlessController(t)
+	const id = "i-workload0000014"
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: workloadSrcType})
+	c.ApplyResourcesLoaded(workloadSrcType, []resource.Resource{workloadRes(id)}, nil, false)
+
+	defs := resource.GetRelated(workloadSrcType)
+	if len(defs) < 2 {
+		t.Fatalf("resource.GetRelated(%q) has only %d defs, want at least 2 so a strict subset is possible", workloadSrcType, len(defs))
+	}
+	def0 := defs[0]
+	core.RelatedCacheSet(runtime.RelatedCacheKey(workloadSrcType, id), []runtime.RelatedCacheResult{
+		{DefDisplayName: def0.DisplayName, Result: resource.RelatedCheckResult{TargetType: def0.TargetType, State: domain.RelatedResolved, Count: 3}},
+	})
+
+	_, tasks := c.Apply(app.Action{Kind: app.ActionOpenJSON})
+
+	if related := findTaskKind(tasks, runtime.KindRelatedCheck); related == nil {
+		t.Errorf("KindRelatedCheck task absent on a JSON open with PARTIAL related-cache coverage (%d/%d defs cached); want still dispatched. tasks: %v", 1, len(defs), taskKindsOf(tasks))
 	}
 }
 

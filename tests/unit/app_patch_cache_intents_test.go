@@ -136,6 +136,90 @@ func TestApplyIntents_PatchRelatedCache_WritesSessionRelatedCache(t *testing.T) 
 	}
 }
 
+// TestApplyIntents_PatchRelatedCache_SameDefTwice_ReplacesInPlace pins
+// #261's idempotent-per-def fix: applying a SECOND PatchRelatedCache intent
+// for a DefDisplayName already present under the key REPLACES that entry
+// rather than appending a duplicate. Before the fix, a re-observed result
+// for an already-covered def (e.g. a YAML/JSON open's related fan-out
+// re-running against an already-populated cache) silently doubled up every
+// def's entry on each pass.
+func TestApplyIntents_PatchRelatedCache_SameDefTwice_ReplacesInPlace(t *testing.T) {
+	c, core := newTestControllerAndCore(t)
+	key := runtime.RelatedCacheKey("ec2", "i-relcache002")
+
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PatchRelatedCache{
+			ResourceType:   "ec2",
+			SourceID:       "i-relcache002",
+			DefDisplayName: "Security Groups",
+			Result:         resource.RelatedCheckResult{TargetType: "sg", Count: 3, ResourceIDs: []string{"sg-1", "sg-2", "sg-3"}},
+		},
+	})
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PatchRelatedCache{
+			ResourceType:   "ec2",
+			SourceID:       "i-relcache002",
+			DefDisplayName: "Security Groups",
+			Result:         resource.RelatedCheckResult{TargetType: "sg", Count: 5, ResourceIDs: []string{"sg-1", "sg-2", "sg-3", "sg-4", "sg-5"}},
+		},
+	})
+
+	cached, hit := core.RelatedCacheGet(key)
+	if !hit {
+		t.Fatal("Core.RelatedCacheGet after two PatchRelatedCache intents for the same def: hit=false")
+	}
+	if len(cached) != 1 {
+		t.Fatalf("Core.RelatedCacheGet after two PatchRelatedCache intents for the SAME def: len=%d, want exactly 1 (idempotent replace, not append)", len(cached))
+	}
+	if cached[0].Result.Count != 5 {
+		t.Errorf("cached[0].Result.Count = %d, want 5 (the NEWER value)", cached[0].Result.Count)
+	}
+}
+
+// TestApplyIntents_PatchRelatedCache_TwoDifferentDefs_Coexist pins the other
+// half: entries for DIFFERENT DefDisplayNames under the same key must
+// coexist — the replace-in-place fix must key strictly on DefDisplayName,
+// never collapse the whole cache down to one entry.
+func TestApplyIntents_PatchRelatedCache_TwoDifferentDefs_Coexist(t *testing.T) {
+	c, core := newTestControllerAndCore(t)
+	key := runtime.RelatedCacheKey("ec2", "i-relcache003")
+
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PatchRelatedCache{
+			ResourceType:   "ec2",
+			SourceID:       "i-relcache003",
+			DefDisplayName: "Security Groups",
+			Result:         resource.RelatedCheckResult{TargetType: "sg", Count: 3},
+		},
+	})
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PatchRelatedCache{
+			ResourceType:   "ec2",
+			SourceID:       "i-relcache003",
+			DefDisplayName: "EBS Volumes",
+			Result:         resource.RelatedCheckResult{TargetType: "ebs", Count: 2},
+		},
+	})
+
+	cached, hit := core.RelatedCacheGet(key)
+	if !hit {
+		t.Fatal("Core.RelatedCacheGet after two PatchRelatedCache intents for DIFFERENT defs: hit=false")
+	}
+	if len(cached) != 2 {
+		t.Fatalf("Core.RelatedCacheGet after two PatchRelatedCache intents for DIFFERENT defs: len=%d, want 2", len(cached))
+	}
+	byName := map[string]int{}
+	for _, entry := range cached {
+		byName[entry.DefDisplayName] = entry.Result.Count
+	}
+	if byName["Security Groups"] != 3 {
+		t.Errorf("Security Groups Count = %d, want 3", byName["Security Groups"])
+	}
+	if byName["EBS Volumes"] != 2 {
+		t.Errorf("EBS Volumes Count = %d, want 2", byName["EBS Volumes"])
+	}
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Contract 3 (integration pin): reopening the same detail must not re-dispatch
 // KindRelatedCheck once the cache is populated via the fixed intent.

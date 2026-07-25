@@ -159,7 +159,11 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 // Calls Core.HandleEnrichDetailResult directly (bypassing Controller.Handle,
 // whose TUI-facing signature returns only tasks) so the FlashIntent on
 // enrichment failure applies synchronously via dispatchDetailOpResultIntents —
-// within this single Update() call, with no cmd round-trip. On success,
+// within this single Update() call, with no messages.Flash round-trip needed
+// to START the flash; dispatchDetailOpResultIntents itself still routes the
+// flash through the real Core.HandleFlash lifecycle (gen bump, error
+// history, auto-clear tick), so its returned cmd must be batched in, not
+// dropped. On success,
 // applies the enriched resource to detail state via
 // ctrl.ApplyDetailEnrichmentForResource (the same merge
 // Controller.foldEnrichDetailResultLocked calls for the web/headless lane),
@@ -183,10 +187,10 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 		OperationID:  msg.OperationID,
 		Err:          msg.Err,
 	})
-	m.dispatchDetailOpResultIntents(intents)
+	flashCmd := m.dispatchDetailOpResultIntents(intents)
 	coreCmd := m.dispatchTaskRequests(tasks)
 	if msg.Err != nil {
-		return m, coreCmd
+		return m, tea.Batch(flashCmd, coreCmd)
 	}
 
 	ef, ad := primaryWave2Finding(msg.EnrichedRes)
@@ -229,16 +233,19 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 			}
 		}
 	}
-	return m, coreCmd
+	return m, tea.Batch(flashCmd, coreCmd)
 }
 
 // handleRelatedCheckResult is the adapter shim for messages.RelatedCheckResult.
 // Calls Core.HandleRelatedCheckResult directly (bypassing Controller.Handle,
 // whose TUI-facing signature returns only tasks) so its PatchRelatedCache /
-// PatchResourceCache / PatchLazyResourceCache session writes and any
-// LazyAddError/checker-error FlashIntent apply via dispatchDetailOpResultIntents
-// within this single Update() call, with no cmd round-trip. Then merges the
-// row into every matching stacked detail's RelatedRows via
+// PatchResourceCache / PatchLazyResourceCache session writes apply via
+// dispatchDetailOpResultIntents within this single Update() call, with no
+// messages.Flash round-trip needed to START a flash for any
+// LazyAddError/checker-error — dispatchDetailOpResultIntents still routes
+// that flash through the real Core.HandleFlash lifecycle and returns a cmd
+// that must be batched in. Then merges the row into every matching stacked
+// detail's RelatedRows via
 // ctrl.ApplyDetailRelatedResultForResource, the same exported method
 // Controller.foldRelatedCheckResultLocked calls for the web/headless lane and
 // the TUI's own related-navigation fetch-by-ID path
@@ -257,7 +264,7 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 		LazyAddedResources: msg.LazyAddedResources,
 		LazyAddError:       msg.LazyAddError,
 	})
-	m.dispatchDetailOpResultIntents(intents)
+	flashCmd := m.dispatchDetailOpResultIntents(intents)
 	cmd := m.dispatchTaskRequests(tasks)
 
 	errMsg := ""
@@ -277,7 +284,7 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 		msg.Result.ResourceIDs,
 		msg.Result.FetchFilter,
 	)
-	return m, cmd
+	return m, tea.Batch(flashCmd, cmd)
 }
 
 // dispatchDetailOpResultIntents applies the intents returned by
@@ -286,19 +293,42 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 // PatchRelatedCache / PatchLazyResourceCache session writes either Core
 // method can emit (dispatchHandlerResult's applyIntent has no case for these
 // three and would silently drop them, since its only callers today — the 6
-// ported handlers in app_flash.go/app_session.go — never emit them) — then
-// direct-mutates m.flash for any FlashIntent present so it renders within the
-// same Update() call, with no cmd round-trip. Neither Core method ever
-// returns a FlashTickPayload task alongside its FlashIntent (verified against
-// both bodies), so there is no auto-clear tick to schedule here, matching the
-// Controller.Handle web-lane fold these two callers bypass.
-func (m *Model) dispatchDetailOpResultIntents(intents []runtime.UIIntent) {
+// ported handlers in app_flash.go/app_session.go — never emit them).
+//
+// Any FlashIntent present is then routed through the SAME path
+// messages.Flash takes (handleFlash, app_flash.go), not direct-mutated: this
+// bumps m.flash.gen before rendering the new text, so an auto-clear tick
+// already in flight for a PREVIOUS flash (which still carries the
+// pre-bump gen) cannot match the new one and clear it early; it also
+// produces the AppendErrorHistoryIntent and schedules this flash's own
+// FlashTickPayload auto-clear tick, both of which a direct field mutation
+// skipped entirely — the two ported handlers here are the only Handle*
+// callers that construct a FlashIntent without ever going through
+// handleFlash, so this is the one seam that needs to call out to it. Calls
+// the same helpers handleFlash itself calls (Core.HandleFlash,
+// dispatchHandlerResult) rather than duplicating either body.
+func (m *Model) dispatchDetailOpResultIntents(intents []runtime.UIIntent) tea.Cmd {
 	m.ctrl.ApplyIntents(intents)
+	var cmds []tea.Cmd
 	for _, in := range intents {
-		if fi, ok := in.(runtime.FlashIntent); ok {
-			m.flash.text = fi.Text
-			m.flash.isError = fi.IsError
-			m.flash.active = true
+		fi, ok := in.(runtime.FlashIntent)
+		if !ok {
+			continue
 		}
+		m.flash.gen++
+		flashIntents, flashTasks := m.core.HandleFlash(runtime.FlashEvent{
+			Text: fi.Text, IsError: fi.IsError, NewGen: m.flash.gen,
+		})
+		if c := m.dispatchHandlerResult(flashIntents, flashTasks); c != nil {
+			cmds = append(cmds, c)
+		}
+	}
+	switch len(cmds) {
+	case 0:
+		return nil
+	case 1:
+		return cmds[0]
+	default:
+		return tea.Batch(cmds...)
 	}
 }

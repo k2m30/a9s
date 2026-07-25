@@ -352,6 +352,82 @@ func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
 	}
 }
 
+// TestEnrichResult_ErrorFlash_AdvancesGenSoStalePendingTickCannotClearIt pins
+// #261's flash-lifecycle fix: dispatchDetailOpResultIntents
+// (internal/tui/runtime_adapter_resources.go) used to direct-mutate m.flash
+// for an enrichment-error FlashIntent, so flash.gen was never bumped — a
+// tick already pending from an EARLIER flash (stamped with the OLD gen)
+// could then clear the brand-new error almost immediately, and no
+// error-history entry was ever recorded (AppendErrorHistoryIntent only
+// fires by routing through Core.HandleFlash). It now bumps m.flash.gen and
+// routes through Core.HandleFlash + dispatchHandlerResult — the same path
+// messages.Flash itself takes.
+func TestEnrichResult_ErrorFlash_AdvancesGenSoStalePendingTickCannotClearIt(t *testing.T) {
+	m := newEnrichApp()
+
+	// Establish a baseline flash (simulating the EARLIER flash whose
+	// auto-clear tick — stamped with genBefore — is the "stale pending
+	// tick" this fix must survive).
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "earlier notice"})
+	genBefore := m.FlashGen()
+	if genBefore == 0 {
+		t.Fatalf("baseline flash.gen should be >0 after Flash, got %d", genBefore)
+	}
+
+	res := rolePolicyRes("arn:aws:iam::123456789012:policy/gen-bump-test", "gen-bump-test", "Managed")
+	m, _ = rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetDetail,
+		ResourceType: "role_policies",
+		Resource:     &res,
+	})
+
+	m, cmd := rootApplyMsg(m, messages.EnrichDetailResult{
+		ResourceType: "role_policies",
+		ResourceID:   res.ID,
+		Err:          fmt.Errorf("GetPolicy: access denied"),
+	})
+
+	genAfter := m.FlashGen()
+	if genAfter <= genBefore {
+		t.Fatalf("flash.gen after the enrichment error = %d, want strictly greater than the pre-error baseline %d — a direct m.flash mutation (the regression) never bumps gen", genAfter, genBefore)
+	}
+
+	// The returned cmd must carry the new flash's own auto-clear tick — do
+	// NOT execute it (it is a tea.Tick auto-clear timer; running it would
+	// deliver ClearFlash and erase the flash before assertions below run —
+	// see qa_error_log_test.go's TestErrorHistoryAccumulation_NonErrorFlashesNotAdded
+	// for the same established idiom).
+	if cmd == nil {
+		t.Fatal("dispatchDetailOpResultIntents returned a nil cmd for an error FlashIntent — want the auto-clear tick to still be scheduled")
+	}
+
+	// Simulate the STALE tick from the EARLIER flash arriving now (stamped
+	// with genBefore, not the new error flash's genAfter). Before the fix,
+	// genAfter == genBefore, so this would have incorrectly cleared the
+	// brand-new error.
+	m, _ = rootApplyMsg(m, messages.ClearFlash{Gen: genBefore})
+
+	view := stripANSI(rootViewContent(m))
+	if !strings.Contains(view, "enrich failed") {
+		t.Errorf("a stale ClearFlash stamped with the PRE-error gen (%d) cleared the new error flash (now at gen %d) — the gen bump must make them distinct. View:\n%s", genBefore, genAfter, view)
+	}
+
+	// Error-history entry recorded: pressing "!" must open the error log
+	// viewer, not flash "No errors this session" (the observable proxy
+	// qa_error_log_test.go's TestErrorHistoryAccumulation_ErrorFlashesAddToHistory
+	// uses — Model has no direct error-history accessor from this package).
+	m, bangCmd := rootApplyMsg(m, tea.KeyPressMsg{Code: '!'})
+	if bangCmd != nil {
+		if msg := bangCmd(); msg != nil {
+			m, _ = rootApplyMsg(m, msg)
+		}
+	}
+	afterBang := stripANSI(rootViewContent(m))
+	if strings.Contains(afterBang, "No errors this session") {
+		t.Error("no error-history entry recorded for the enrichment failure — dispatchDetailOpResultIntents must route through Core.HandleFlash (which emits AppendErrorHistoryIntent), not a direct m.flash mutation")
+	}
+}
+
 func TestEnrichResult_StaleGeneration_IsDiscarded(t *testing.T) {
 	app := tui.New("demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),

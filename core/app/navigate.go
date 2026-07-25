@@ -278,33 +278,81 @@ func (c *Controller) ReplayRelatedCache(resourceType string, res resource.Resour
 	return c.replayRelatedCache(resourceType, res)
 }
 
-// replayRelatedCache is the lock-free implementation of ReplayRelatedCache.
-// Returns whether the cache covers EVERY def resource.GetRelated(resourceType)
-// registers — an explicit completeness answer, not inferred from "did we
-// merge anything". A PARTIAL cache (some defs' checks completed in a prior
-// operation, others never finished before this one began) still merges
-// every entry it has — render what you know — but reports incomplete so the
-// caller keeps dispatching the related-check task; otherwise the still
-// in-flight defs' rows would be stranded in Loading forever, since
-// BeginDetailOperation has already invalidated whatever was still running
-// for them under the prior operation ID.
+// replayRelatedCache is the lock-free implementation of ReplayRelatedCache:
+// merges cached results into the top detail screen AND reports whether that
+// cache is complete, bailing out (false) unconditionally when no detail
+// screen is on top.
+//
+// beginDetailWorkloadLocked does NOT use this: its suppression decision must
+// not depend on a detail screen being present on the stack — a YAML/JSON-only
+// open (core/app/navigate.go's PushYAML/PushJSON cases) has no detail state
+// at all, but a fully-covered related cache must still suppress its related
+// task the same as a plain detail open does (R2 — bailing here on `ds == nil`
+// meant every YAML/JSON open re-ran the entire related fan-out against AWS,
+// no matter how complete the cache already was). beginDetailWorkloadLocked
+// calls relatedCacheCoverage (the pure, screen-independent completeness
+// predicate) and mergeRelatedCacheIntoDetail (the panel merge, itself a
+// no-op with no detail screen present) separately instead.
 //
 // Callers must hold c.mu (write).
 func (c *Controller) replayRelatedCache(resourceType string, res resource.Resource) bool {
-	defs := resource.GetRelated(resourceType)
-	if len(defs) == 0 {
+	if c.topDetailState() == nil {
 		return false
 	}
-	ds := c.topDetailState()
-	if ds == nil {
-		return false
+	cached, complete := c.relatedCacheCoverage(resourceType, res)
+	c.mergeRelatedCacheIntoDetail(resourceType, res, cached)
+	return complete
+}
+
+// relatedCacheCoverage fetches the cached related-check results for
+// (resourceType, res.ID) and reports whether they cover EVERY def
+// resource.GetRelated(resourceType) registers — an explicit completeness
+// answer, not inferred from "did we merge anything" and not gated on any
+// detail screen being present (see replayRelatedCache's doc comment for why
+// that gate is wrong for this decision). A PARTIAL cache (some defs' checks
+// completed in a prior operation, others never finished before this one
+// began) reports incomplete, so the caller keeps dispatching the
+// related-check task; otherwise the still in-flight defs' rows would be
+// stranded in Loading forever, since BeginDetailOperation has already
+// invalidated whatever was still running for them under the prior operation
+// ID.
+//
+// Callers must hold c.mu (read or write).
+func (c *Controller) relatedCacheCoverage(resourceType string, res resource.Resource) (cached []runtime.RelatedCacheResult, complete bool) {
+	defs := resource.GetRelated(resourceType)
+	if len(defs) == 0 {
+		return nil, false
 	}
 	ck := runtime.RelatedCacheKey(resourceType, res.ID)
 	cached, hit := c.core.RelatedCacheGet(ck)
 	if !hit || len(cached) == 0 {
-		return false
+		return cached, false
 	}
 	haveDef := make(map[string]bool, len(cached))
+	for _, entry := range cached {
+		haveDef[entry.DefDisplayName] = true
+	}
+	for _, def := range defs {
+		if !haveDef[def.DisplayName] {
+			return cached, false
+		}
+	}
+	return cached, true
+}
+
+// mergeRelatedCacheIntoDetail merges cached related-check results into the
+// top detail screen's RelatedRows when one matching (resourceType, res.ID)
+// is on top of the stack. No-op when there is none — a YAML/JSON-only open
+// has no panel to populate, even though its related task's result still
+// needs to write through the session cache for the plain-detail open (or
+// next YAML/JSON open) that follows.
+//
+// Callers must hold c.mu (write).
+func (c *Controller) mergeRelatedCacheIntoDetail(resourceType string, res resource.Resource, cached []runtime.RelatedCacheResult) {
+	ds := c.topDetailState()
+	if ds == nil || len(cached) == 0 {
+		return
+	}
 	for _, entry := range cached {
 		errMsg := ""
 		if entry.Result.Err != nil {
@@ -312,14 +360,7 @@ func (c *Controller) replayRelatedCache(resourceType string, res resource.Resour
 		}
 		mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType,
 			entry.Result.EffectiveState(), entry.Result.Count, false, errMsg, entry.Result.Truncated, entry.Result.ResourceIDs, entry.Result.FetchFilter)
-		haveDef[entry.DefDisplayName] = true
 	}
-	for _, def := range defs {
-		if !haveDef[def.DisplayName] {
-			return false
-		}
-	}
-	return true
 }
 
 // SeedFilteredListFromCache seeds the top list screen from the session
@@ -421,24 +462,32 @@ func (c *Controller) BeginDetailWorkload(rt string, res resource.Resource, refre
 // *TaskRequest out-params to fold together), and the per-entry-point tests
 // in tests/unit/detail_workload_test.go pin that no caller drops an element.
 //
-// Cache-replay suppression: attempts to replay a cached related result into
-// the top detail screen (replayRelatedCache) and omits the related task ONLY
-// when that replay actually populated the panel (D6 — no re-fan-out over
-// cached data). Callers never make this choice themselves; it used to be
-// duplicated ad hoc at each call site (applyNavResult's PushDetail case,
-// openRelatedDetail's own hand-rolled copy), which is exactly the kind of
-// divergence risk a single builder closes.
+// Cache-replay suppression: omits the related task ONLY when
+// relatedCacheCoverage reports the cache complete for every registered def
+// (D6 — no re-fan-out over cached data) — a screen-independent decision
+// (R2): a YAML/JSON-only open has no detail state to merge into
+// (mergeRelatedCacheIntoDetail is a no-op there), but its suppression
+// decision must be identical to a plain detail open's, or every such open
+// re-runs the entire related fan-out against AWS regardless of how complete
+// the cache already is. Callers never make this choice themselves; it used
+// to be duplicated ad hoc at each call site (applyNavResult's PushDetail
+// case, openRelatedDetail's own hand-rolled copy), which is exactly the kind
+// of divergence risk a single builder closes.
 //
-// forceRelated deletes the resource's RelatedCache entry before attempting
-// the replay above, so a caller whose entire purpose is recomputing a
-// row the user is already looking at (resolve-in-place Enter/click, and
-// owner decision #38's reveal-on-Back recompute) can never have that
-// recompute silently swallowed by its own stale cached result — the same
+// forceRelated deletes the resource's RelatedCache entry before checking
+// coverage above, so a caller whose entire purpose is recomputing a row the
+// user is already looking at (resolve-in-place Enter/click, and owner
+// decision #38's reveal-on-Back recompute) can never have that recompute
+// silently swallowed by its own stale-but-complete cached result — the same
 // "delete first" idiom the detail Ctrl+R path already used ad hoc, now
-// shared instead of duplicated. It leaves refresh (enrich cache SkipCache)
-// untouched: these callers want a fresh RELATED check, not a forced live
-// re-fetch of cached enrichment (SFN/CFN/IAM policy documents etc.) as an
-// unrelated side effect.
+// shared instead of duplicated. This is NOT about preventing duplicate cache
+// entries (PatchRelatedCache, core/app/intents.go, replaces per DefDisplayName
+// unconditionally, with or without this delete) — it is the only way to force
+// relatedCacheCoverage to read "incomplete" for a resource whose cache is
+// already fully (but stalely) populated, since completeness alone drives
+// suppression. It leaves refresh (enrich cache SkipCache) untouched: these
+// callers want a fresh RELATED check, not a forced live re-fetch of cached
+// enrichment (SFN/CFN/IAM policy documents etc.) as an unrelated side effect.
 //
 // Sticky refresh: an explicit refresh (refresh=true) is a demand on the
 // RESOURCE, not on the one operation that happened to carry it — a
@@ -481,7 +530,9 @@ func (c *Controller) beginDetailWorkloadLocked(rt string, res resource.Resource,
 	if forceRelated {
 		c.core.RelatedCacheDelete(key)
 	}
-	if c.replayRelatedCache(rt, res) {
+	cached, complete := c.relatedCacheCoverage(rt, res)
+	c.mergeRelatedCacheIntoDetail(rt, res, cached)
+	if complete {
 		tasks := make([]runtime.TaskRequest, 0, len(built)-1)
 		for _, t := range built {
 			if t.Key.Kind != runtime.KindRelatedCheck {

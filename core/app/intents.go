@@ -284,18 +284,35 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			c.core.SetResourceCache(v.ResourceType, v.Entry)
 
 		case runtime.PatchRelatedCache:
-			// Mirrors the TUI adapter's app_dispatch.go case: append to any
-			// existing slice under the runtime.RelatedCacheKey. This is the
-			// write-through that makes the cache-hit replay path in
-			// openSelectedListDetail (controller.go) and openRelatedDetail
-			// (navigate.go) hit on a second open of the same detail.
+			// Idempotent per def: REPLACES any existing entry for this
+			// DefDisplayName under the key rather than appending a second
+			// one. The cache is read for completeness
+			// (core/app/navigate.go's relatedCacheCoverage, R2/R3) as well
+			// as panel replay, so a re-observed result for an
+			// already-covered def must update in place — an append-only
+			// write let a re-run of the related-check fan-out (e.g. a
+			// YAML/JSON open, whose suppression decision is independent of
+			// whether a detail panel is on top) silently double up every
+			// def's entry on each pass. This is also the write-through that
+			// makes the cache-hit replay path in openSelectedListDetail
+			// (controller.go) and openRelatedDetail (navigate.go) hit on a
+			// second open of the same detail.
 			if v.SourceID != "" {
 				key := runtime.RelatedCacheKey(v.ResourceType, v.SourceID)
 				existing, _ := c.core.RelatedCacheGet(key)
-				c.core.RelatedCacheSet(key, append(existing, runtime.RelatedCacheResult{
-					DefDisplayName: v.DefDisplayName,
-					Result:         v.Result,
-				}))
+				entry := runtime.RelatedCacheResult{DefDisplayName: v.DefDisplayName, Result: v.Result}
+				replaced := false
+				for i := range existing {
+					if existing[i].DefDisplayName == v.DefDisplayName {
+						existing[i] = entry
+						replaced = true
+						break
+					}
+				}
+				if !replaced {
+					existing = append(existing, entry)
+				}
+				c.core.RelatedCacheSet(key, existing)
 			}
 
 		case runtime.PatchLazyResourceCache:
